@@ -45,6 +45,7 @@ SETUP_CODE = "" # Optional: Set a custom 6-digit code for first-time setup
 [[d1_databases]]
 binding = "DB"
 database_name = "openinspection-db"
+database_id = "966a4e7f-e5d6-47b4-ac89-bd2739e33442"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]

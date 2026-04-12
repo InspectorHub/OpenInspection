@@ -1,5 +1,6 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
 import readline from 'readline';
 
 // =============================================================================
@@ -15,7 +16,7 @@ const getArg = (key) => {
 };
 
 // Configuration Paths & Naming
-const TOML_PATH = getArg('--config') || getArg('--toml') || 'wrangler.toml';
+const TOML_PATH = path.resolve(getArg('--config') || getArg('--toml') || 'wrangler.toml');
 const PROJECT_SLUG = getArg('--name') || 'openinspection';
 
 // Project Context (Initialized via Args or Fallback)
@@ -319,8 +320,11 @@ async function executeTeardown() {
     step("Step 5: Resetting wrangler.toml to placeholder state...");
     if (fs.existsSync(TOML_PATH)) {
         let toml = fs.readFileSync(TOML_PATH, 'utf8');
-        toml = toml.replace(/database_id\s*=\s*"[0-9a-f-]{36}"/g, 'database_id = "YOUR_D1_DATABASE_ID"');
-        toml = toml.replace(/id\s*=\s*"[0-9a-f]{32}"/g, 'id = "YOUR_KV_NAMESPACE_ID"');
+        // Reset Database ID to placeholder
+        toml = toml.replace(/database_id\s*=\s*"[^"]*"/g, 'database_id = "00000000-0000-0000-0000-000000000000"');
+        // Reset KV ID to placeholder
+        toml = toml.replace(/id\s*=\s*"[^"]*"/g, 'id = "00000000000000000000000000000000"');
+        // Reset Base URL to default
         toml = toml.replace(/APP_BASE_URL\s*=\s*"https:\/\/[^"]*"/g, 'APP_BASE_URL = "https://openinspection.workers.dev"');
         fs.writeFileSync(TOML_PATH, toml);
         info("wrangler.toml reset");
