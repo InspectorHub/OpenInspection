@@ -11,29 +11,20 @@ export interface IntegrationProvider {
 
 
     /**
-     * Called when a tenant connects their Stripe account.
-     */
-    handleStripeConnect(subdomain: string, accountId: string): Promise<void>;
-
-    /**
-     * Returns whether certain features (like M2M sync) are available in this provider.
+     * Returns whether certain features are available in this provider.
      */
     getCapabilities(): ProviderCapabilities;
 }
 
 export interface TenantUpdateParams {
     id?: string;
-    subdomain: string;
     status: string;
     tier?: 'free' | 'pro' | 'enterprise';
     name?: string;
-    deploymentMode?: 'shared' | 'silo';
     adminEmail?: string;
     adminPasswordHash?: string;
 }
 
 export interface ProviderCapabilities {
     allowsM2M: boolean;
-    requiresPortalAuth: boolean;
-    supportsSiloProvisioning: boolean;
 }

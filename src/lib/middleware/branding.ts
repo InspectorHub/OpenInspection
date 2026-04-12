@@ -10,8 +10,7 @@ import { HonoConfig } from '../../types/hono';
  * Uses KV for caching and D1 as a fallback.
  */
 export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
-    const host = c.req.header('host') || '';
-    const subdomain = host.split('.')[0];
+    const tenantId = c.get('tenantId');
     
     // Default system branding (fallback)
     const defaultBranding: BrandingConfig = {
@@ -23,13 +22,12 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         gaMeasurementId: c.env.GA_MEASUREMENT_ID || null
     };
 
-    // Global routes use defaults
-    if (!subdomain || subdomain === 'www' || subdomain === 'app') {
+    if (!tenantId) {
         c.set('branding', defaultBranding);
         return await next();
     }
 
-    const cacheKey = `branding:${subdomain}`;
+    const cacheKey = `branding:${tenantId}`;
     const cached = await c.env.TENANT_CACHE?.get(cacheKey);
     
     if (cached) {
@@ -52,8 +50,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             gaMeasurementId: tenantConfigs.gaMeasurementId
         })
         .from(tenantConfigs)
-        .innerJoin(tenants, eq(tenants.id, tenantConfigs.tenantId))
-        .where(eq(tenants.subdomain, subdomain))
+        .where(eq(tenantConfigs.tenantId, tenantId))
         .get();
 
         const branding: BrandingConfig = config ? {

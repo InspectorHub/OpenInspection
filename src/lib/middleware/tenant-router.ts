@@ -54,7 +54,6 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
     }
 
     if (tenant) {
-        c.set('requestedSubdomain', tenant.subdomain);
         c.set('tenantTier', tenant.tier || 'free');
         c.set('tenantStatus', tenant.status || 'active');
     }

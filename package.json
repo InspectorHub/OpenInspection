@@ -15,7 +15,6 @@
     "dev": "concurrently --kill-others \"wrangler dev --port 8788\" \"npx tailwindcss -i ./src/styles/input.css -o ./public/styles.css --watch\"",
     "build": "npm run css:build && tsc",
     "deploy": "npx wrangler d1 migrations apply openinspection-db --remote --batch && npm run css:build && npx wrangler deploy",
-    "deploy:saas": "npx wrangler d1 migrations apply DB --remote --batch -c wrangler.saas.toml && npm run css:build && npx wrangler deploy -c wrangler.saas.toml",
     "setup:cloudflare": "node scripts/setup-cloudflare.js",
     "setup:local": "node scripts/setup-cloudflare.js --local",
     "teardown:cloudflare": "node scripts/teardown-cloudflare.js",
