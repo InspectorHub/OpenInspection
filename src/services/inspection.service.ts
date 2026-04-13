@@ -9,11 +9,13 @@ type Inspection = z.infer<typeof InspectionSchema>;
 type InspectionListParams = z.infer<typeof InspectionListQuerySchema>;
 type CreateInspectionData = z.infer<typeof CreateInspectionSchema>;
 
+import { ScopedDB } from '../lib/db/scoped';
+
 /**
  * Service to handle all inspection-related business logic.
  */
 export class InspectionService {
-    constructor(private db: D1Database, private r2?: R2Bucket) {}
+    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -104,12 +106,17 @@ export class InspectionService {
      * Fetches a single inspection with its template.
      */
     async getInspection(id: string, tenantId: string) {
-        const db = this.getDrizzle();
-        const result = await db.select().from(inspections).where(eq(inspections.id, id)).get();
-        if (!result || result.tenantId !== tenantId) throw Errors.NotFound('Inspection not found');
+        if (!this.sdb) throw new Error('ScopedDB session missing');
 
-        const template = await db.select().from(templates).where(eq(templates.id, result.templateId as string)).get();
-        const signed = await db.select().from(inspectionAgreements).where(eq(inspectionAgreements.inspectionId, id)).get();
+        const result = await this.sdb.getById(inspections, id);
+        if (!result) throw Errors.NotFound('Inspection not found');
+
+        const template = result.templateId 
+            ? await this.sdb.getById(templates, result.templateId as string)
+            : null;
+        const signed = await this.sdb.raw.select().from(inspectionAgreements)
+            .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId)))
+            .get();
 
         return { 
             inspection: { 
@@ -133,7 +140,7 @@ export class InspectionService {
      * Creates a new inspection.
      */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string }): Promise<Inspection> {
-        const db = this.getDrizzle();
+        if (!this.sdb) throw new Error('ScopedDB session missing');
         const id = crypto.randomUUID();
         const createdAt = new Date();
         const status = 'draft' as const;
@@ -141,7 +148,7 @@ export class InspectionService {
 
         const newInspection = {
             id,
-            tenantId,
+            // tenantId is injected by sdb.insert
             inspectorId: data.inspectorId || null,
             propertyAddress: data.propertyAddress,
             clientName: data.clientName || 'Private Client',
@@ -153,10 +160,11 @@ export class InspectionService {
             createdAt
         };
 
-        await db.insert(inspections).values(newInspection);
+        await this.sdb.insert(inspections, newInspection);
         
         return {
             ...newInspection,
+            tenantId,
             clientEmail: newInspection.clientEmail as string | null,
             inspectorId: newInspection.inspectorId as string | null,
             createdAt: newInspection.createdAt.toISOString()
@@ -191,9 +199,15 @@ export class InspectionService {
      * Updates an inspection's results.
      */
     async updateResults(id: string, tenantId: string, data: Record<string, unknown>) {
-        await this.getInspection(id, tenantId); // Ownership check
         const db = this.getDrizzle();
-        const existing = await db.select().from(inspectionResults).where(eq(inspectionResults.inspectionId, id)).get();
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) {
+            throw Errors.NotFound('Inspection not found or access denied');
+        }
+
+        const existing = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
 
         if (existing) {
             const mergedData = { ...(existing.data as Record<string, unknown>), ...data };
@@ -202,6 +216,7 @@ export class InspectionService {
             await db.insert(inspectionResults).values({
                 id: crypto.randomUUID(),
                 inspectionId: id,
+                tenantId,
                 data,
                 lastSyncedAt: new Date()
             });

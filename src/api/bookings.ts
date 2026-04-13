@@ -153,7 +153,9 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
 
     // Async tasks
     c.executionCtx.waitUntil((async () => {
-        const inspector = await db.select().from(users).where(eq(users.id, inspectorId!)).get();
+        const inspector = await db.select().from(users)
+            .where(and(eq(users.id, inspectorId!), eq(users.tenantId, tenantId)))
+            .get();
         if (inspector?.googleRefreshToken && inspector?.googleCalendarId) {
             const startDateTime = `${body.date}T${body.timeSlot === 'morning' ? '08:00:00' : '13:00:00'}Z`;
             await createCalendarEvent(

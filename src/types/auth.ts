@@ -16,6 +16,8 @@ export interface BrandingConfig {
     gaMeasurementId?: string | null | undefined;
 }
 
+import { ScopedDB } from '../lib/db/scoped';
+
 export interface AuthVariables {
     tenantId: string;
     resolvedTenantId?: string; // Explicitly tracked for isolation guard
@@ -25,6 +27,7 @@ export interface AuthVariables {
     tenantTier?: string;
     tenantStatus?: string;
     branding?: BrandingConfig;
+    sdb?: ScopedDB;
 }
 
 export interface InspectionData {

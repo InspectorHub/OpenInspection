@@ -179,6 +179,14 @@ app.use('*', async (c, next) => {
         }
     }
 
+    // --- Scoped DB Injection ---
+    const tenantIdForDb = c.get('tenantId') || c.get('resolvedTenantId');
+    if (tenantIdForDb) {
+        const { createScopedDb } = await import('./lib/db/scoped');
+        const db = drizzle(c.env.DB);
+        c.set('sdb', createScopedDb(db as any, tenantIdForDb));
+    }
+
     return next();
 });
 

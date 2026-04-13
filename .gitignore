@@ -13,6 +13,8 @@ backups/
 .env*
 .dev.vars*
 
-# Cloudflare config
 wrangler.*.toml
 !wrangler.toml
+
+# Build artifacts
+/public/styles.css

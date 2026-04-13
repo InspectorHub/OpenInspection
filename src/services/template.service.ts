@@ -29,8 +29,10 @@ export class TemplateService {
      */
     async getTemplate(id: string, tenantId: string) {
         const db = this.getDrizzle();
-        const template = await db.select().from(templates).where(eq(templates.id, id)).get();
-        if (!template || template.tenantId !== tenantId) {
+        const template = await db.select().from(templates)
+            .where(and(eq(templates.id, id), eq(templates.tenantId, tenantId)))
+            .get();
+        if (!template) {
             throw Errors.NotFound('Template not found');
         }
         return template;

@@ -55,7 +55,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.email = new EmailService(c.env.RESEND_API_KEY, c.env.SENDER_EMAIL, c.env.APP_NAME);
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS);
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'));
                     break;
                 case 'team':
                     target.team = new TeamService(c.env.DB, c.env);
