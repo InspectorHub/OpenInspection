@@ -79,8 +79,8 @@ export class AdminService {
 
         if (inspectionIds.length > 0) {
             [results, signers] = await Promise.all([
-                db.select().from(inspectionResults).where(inArray(inspectionResults.inspectionId, inspectionIds)),
-                db.select().from(inspectionAgreements).where(inArray(inspectionAgreements.inspectionId, inspectionIds)),
+                db.select().from(inspectionResults).where(dbAnd(inArray(inspectionResults.inspectionId, inspectionIds), eq(inspectionResults.tenantId, tenantId))),
+                db.select().from(inspectionAgreements).where(dbAnd(inArray(inspectionAgreements.inspectionId, inspectionIds), eq(inspectionAgreements.tenantId, tenantId))),
             ]);
         }
 
@@ -105,7 +105,7 @@ export class AdminService {
         const matchedIds = matched.map((r) => r.id);
         if (matchedIds.length === 0) return { matched: 0, deletedAgreements: 0 };
 
-        await db.delete(inspectionAgreements).where(inArray(inspectionAgreements.inspectionId, matchedIds));
+        await db.delete(inspectionAgreements).where(dbAnd(inArray(inspectionAgreements.inspectionId, matchedIds), eq(inspectionAgreements.tenantId, tenantId)));
         await db.update(inspections).set({ clientName: null, clientEmail: null })
             .where(dbAnd(eq(inspections.tenantId, tenantId), eq(inspections.clientEmail, clientEmail)));
 
@@ -157,11 +157,18 @@ export class AdminService {
     }
 
     /**
+     * Alias for updateTenantStatus used during initial system setup.
+     */
+    async handleTenantUpdate(params: TenantUpdateParams) {
+        return this.updateTenantStatus(params);
+    }
+
+    /**
      * Connects a Stripe account for the tenant.
      */
     async updateStripeConnect(subdomain: string, accountId: string) {
-        if (!this.integration) {
-            throw new Error('IntegrationProvider not configured');
+        if (!this.integration?.handleStripeConnect) {
+            throw new Error('IntegrationProvider not configured or does not support Stripe Connect');
         }
         await this.integration.handleStripeConnect(subdomain, accountId);
     }

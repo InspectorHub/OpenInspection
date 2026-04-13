@@ -37,6 +37,7 @@ export const agreements = sqliteTable('agreements', {
 
 export const inspectionAgreements = sqliteTable('inspection_agreements', {
     id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull().references(() => tenants.id),
     inspectionId: text('inspection_id').notNull().references(() => inspections.id),
     signatureBase64: text('signature_base64').notNull(),
     signedAt: integer('signed_at', { mode: 'timestamp' }).notNull(),
@@ -46,6 +47,7 @@ export const inspectionAgreements = sqliteTable('inspection_agreements', {
 
 export const inspectionResults = sqliteTable('inspection_results', {
     id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull().references(() => tenants.id),
     inspectionId: text('inspection_id').notNull().references(() => inspections.id),
     data: text('data', { mode: 'json' }).notNull(),
     lastSyncedAt: integer('last_synced_at', { mode: 'timestamp' }).notNull(),

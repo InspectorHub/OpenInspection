@@ -125,6 +125,7 @@ describe('AdminService', () => {
         // Note: signatureBase64 is NOT NULL in schema
         await testDb.insert(inspectionAgreements).values({
             id: 'agree-1',
+            tenantId,
             inspectionId: 'insp-1',
             signatureBase64: 'data:image/png;base64,abc',
             signedAt: new Date(),

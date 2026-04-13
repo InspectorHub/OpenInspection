@@ -217,7 +217,8 @@ adminRoutes.openapi(importDataRoute, async (c) => {
     for (const r of importedResults as unknown as ResultImport[]) {
         if (!r.id || !r.inspectionId) continue;
         await db.insert(inspectionResults).values({
-            id: r.id, 
+            id: r.id,
+            tenantId,
             inspectionId: r.inspectionId,
             data: typeof r.data === 'string' ? r.data : JSON.stringify(r.data),
             lastSyncedAt: r.lastSyncedAt ? new Date(r.lastSyncedAt) : new Date(),

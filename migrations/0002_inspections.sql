@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS agreements (
 -- A signed instance of an agreement for one inspection.
 CREATE TABLE IF NOT EXISTS inspection_agreements (
     id                TEXT    PRIMARY KEY,
+    tenant_id         TEXT    NOT NULL REFERENCES tenants(id),
     inspection_id     TEXT    NOT NULL REFERENCES inspections(id),
     signature_base64  TEXT    NOT NULL,
     signed_at         INTEGER NOT NULL,

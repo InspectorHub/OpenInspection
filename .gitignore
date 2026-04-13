@@ -6,3 +6,13 @@ build/
 .DS_Store
 Thumbs.db
 *.log
+
+# Temporary and local files
+backups/
+*.bak
+.env*
+.dev.vars*
+
+# Cloudflare config
+wrangler.*.toml
+!wrangler.toml

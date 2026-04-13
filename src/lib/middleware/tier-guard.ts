@@ -31,7 +31,7 @@ export const TIER_FEATURES: Record<string, string[]> = {
 /**
  * Middleware: allow everything in standalone mode.
  */
-export const requireActiveSubscription: MiddlewareHandler<HonoConfig> = async (c, next) => {
+export const requireActiveSubscription: MiddlewareHandler<HonoConfig> = async (_c, next) => {
     return next();
 };
 
@@ -39,6 +39,6 @@ export const requireActiveSubscription: MiddlewareHandler<HonoConfig> = async (c
 /**
  * Middleware factory: allow all features in standalone mode.
  */
-export const requireTierFeature = (feature: string): MiddlewareHandler<HonoConfig> => async (c, next) => {
+export const requireTierFeature = (_feature: string): MiddlewareHandler<HonoConfig> => async (_c, next) => {
     return next();
 };
