@@ -73,7 +73,7 @@ export class ScopedDB {
     }
 
     /**
-     * Access the raw database if complex joins are needed, 
+     * Access the raw database if complex joins are needed,
      * but try to use scoped methods for simple CRUD.
      */
     get raw() {

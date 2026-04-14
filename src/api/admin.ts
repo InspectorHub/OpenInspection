@@ -1,5 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { writeAuditLog } from '../lib/audit';
 import { HonoConfig } from '../types/hono';
@@ -216,6 +217,22 @@ adminRoutes.openapi(importDataRoute, async (c) => {
 
     for (const r of importedResults as unknown as ResultImport[]) {
         if (!r.id || !r.inspectionId) continue;
+        
+        // Verify inspectionId belongs to current tenant
+        const inspection = await db.select().from(inspections)
+            .where(eq(inspections.id, r.inspectionId))
+            .get();
+        
+        if (!inspection) {
+            console.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} not found`);
+            continue;
+        }
+        
+        if (inspection.tenantId !== tenantId) {
+            console.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} belongs to different tenant`);
+            continue;
+        }
+        
         await db.insert(inspectionResults).values({
             id: r.id,
             tenantId,

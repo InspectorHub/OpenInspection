@@ -7,14 +7,16 @@ import { logger } from '../logger';
 
 /**
  * Middleware to resolve the current tenant/workspace.
+ * In standalone mode, uses the global workspace.
+ * In SaaS mode, resolves based on subdomain.
  */
 export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const url = new URL(c.req.url);
     const path = url.pathname;
-    const hostWithPort = c.req.header('host') || '';
-    const host = hostWithPort.split(':')[0];
-    
-    if (path === '/status' || path.startsWith('/static/') || path.includes('.')) {
+    const host = c.req.header('host') || '';
+
+    // Bypass for status checks
+    if (path === '/status') {
         return next();
     }
 
@@ -23,24 +25,26 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
     let tenantId: string | null = null;
     let subdomain: string | null = null;
 
-    // Resolve Subdomain from Host OR Custom Header (for local testing)
-    const parts = host.split('.');
-    const isLocalhost = parts.length === 2 && (parts[1] === 'localhost' || parts[1] === 'local');
-    
-    if (parts.length >= 3 || isLocalhost) {
-        subdomain = parts[0];
-        if (subdomain === 'www' || subdomain === 'app' || subdomain === 'api' || subdomain === 'dev') {
-            subdomain = null;
+    // Extract subdomain from host or X-Forwarded-Host header
+    const forwardedHost = c.req.header('x-forwarded-host');
+    const actualHost = forwardedHost || host;
+
+    // Extract subdomain: anything before the first dot that isn't www/dev
+    const hostParts = actualHost.split('.');
+    if (hostParts.length > 2) {
+        const potentialSubdomain = hostParts[0];
+        if (potentialSubdomain !== 'www' && potentialSubdomain !== 'dev' && potentialSubdomain !== 'localhost') {
+            subdomain = potentialSubdomain;
         }
     }
 
-    // Fallback to custom header for easier local testing
+    // Check for header-based subdomain override (useful for testing/CLI)
     const headerSubdomain = c.req.header('x-tenant-subdomain');
     if (headerSubdomain) {
         subdomain = headerSubdomain;
     }
 
-    if (c.env.APP_MODE === 'saas' && subdomain) {
+    if ((c.env.APP_MODE as string) === 'saas' && subdomain) {
         const cacheKey = `tenant:${subdomain}`;
         let cachedTenant = c.env.TENANT_CACHE ? await c.env.TENANT_CACHE.get(cacheKey, { type: 'json' }) : null;
 
@@ -68,17 +72,20 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
         c.set('tenantId', tenantId);
 
         const cacheKey = `global_tenant:${tenantId}`;
-        let tenant = c.env.TENANT_CACHE ? await c.env.TENANT_CACHE.get(cacheKey, { type: 'json' }) : null;
+        let cachedTenant = c.env.TENANT_CACHE ? await c.env.TENANT_CACHE.get(cacheKey, { type: 'json' }) : null;
 
-        if (!tenant) {
-            tenant = await db.select().from(tenants).where(eq(tenants.id, tenantId)).get() || null;
-            if (tenant && c.env.TENANT_CACHE) {
-                c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(tenant), { expirationTtl: 3600 }));
+        if (!cachedTenant) {
+            const tenant = await db.select().from(tenants).where(eq(tenants.id, tenantId)).get();
+            if (tenant) {
+                cachedTenant = tenant;
+                if (c.env.TENANT_CACHE) {
+                    c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(tenant), { expirationTtl: 3600 }));
+                }
             }
         }
 
-        if (tenant) {
-            const t = tenant as Record<string, unknown>;
+        if (cachedTenant) {
+            const t = cachedTenant as Record<string, unknown>;
             c.set('requestedSubdomain', t.subdomain as string);
             c.set('tenantTier', (t.tier as string) || 'free');
             c.set('tenantStatus', (t.status as string) || 'active');

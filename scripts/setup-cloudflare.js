@@ -20,12 +20,10 @@ const TOML_PATH = path.resolve(getArg('--config') || getArg('--toml') || 'wrangl
 const PROJECT_SLUG = getArg('--name') || 'openinspection';
 const PROJECT_TITLE = getArg('--app-name') || getArg('--title') || 'OpenInspection';
 
-// Dynamic Resource Naming (Aligned with wrangler.saas.toml)
-const DB_NAME = getArg('--db-name') || (TOML_PATH.includes('saas') ? 'inspectorhub-core-db-shared' : `${PROJECT_SLUG}-db`);
-const KV_NAME = getArg('--kv-name') || (TOML_PATH.includes('saas') ? 'inspectorhub-core-tenant-cache' : `${PROJECT_SLUG}-tenant-cache`);
-const BUCKETS = TOML_PATH.includes('saas') 
-    ? [`inspectorhub-core-bucket-shared`] 
-    : [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
+// Dynamic Resource Naming
+const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
+const KV_NAME = getArg('--kv-name') || `${PROJECT_SLUG}-tenant-cache`;
+const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
 const WORKER_NAME = PROJECT_SLUG;
 
 const isForce = args.includes('--force') || args.includes('-y') || args.includes('--yes');
@@ -206,12 +204,12 @@ if (isLocal) {
     info(`.dev.vars ${fs.existsSync(varsPath) ? 'updated' : 'created'} with JWT_SECRET`);
 
     step("Step 2: Applying local database migrations...");
-    run(`npx wrangler d1 migrations apply DB --local -c ${TOML_PATH}`);
+    run('npx wrangler d1 migrations apply DB --local');
     info("Migrations applied locally");
 
     step("Step 3: Generating setup verification code (local KV)...");
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    run(`npx wrangler kv key put --binding=TENANT_CACHE "setup_verification_code" "${verificationCode}" --local -c ${TOML_PATH}`);
+    run(`npx wrangler kv key put --binding=TENANT_CACHE "setup_verification_code" "${verificationCode}" --local`);
     info("Verification code stored in local KV");
 
     if (isAutoSeed) {

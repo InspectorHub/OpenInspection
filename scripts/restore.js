@@ -16,11 +16,9 @@ const getArg = (key) => {
 const TOML_PATH = getArg('--config') || getArg('--toml') || 'wrangler.toml';
 const PROJECT_SLUG = 'openinspection';
 
-// Dynamic Resource Naming (Aligned with setup-cloudflare.js)
-const DB_NAME = getArg('--db-name') || (TOML_PATH.includes('saas') ? 'inspectorhub-core-db-shared' : `${PROJECT_SLUG}-db`);
-const BUCKETS = TOML_PATH.includes('saas') 
-    ? [`inspectorhub-core-bucket-shared`] 
-    : [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
+// Dynamic Resource Naming
+const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
+const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
 const BACKUP_ROOT = 'backups';
 
 const info = (msg) => console.log(`  ✓ ${msg}`);
