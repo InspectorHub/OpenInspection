@@ -32,7 +32,6 @@ export interface AppEnv {
     CF_ACCOUNT_ID?: string;
     CF_API_TOKEN?: string;
     APP_MODE?: 'standalone';
-    SETUP_CODE?: string;
     INTEGRATION_SECRET?: string;
 }
 

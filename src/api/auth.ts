@@ -283,8 +283,8 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
 
     const body = c.req.valid('json');
 
-    // 2. Verification Code Check — strictly required
-    const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE?.get('setup_verification_code');
+    // 2. Verification Code Check — strictly from KV only
+    const storedCode = await c.env.TENANT_CACHE?.get('setup_verification_code');
     if (!storedCode) {
         return c.json({
             success: false,
