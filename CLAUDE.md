@@ -38,7 +38,7 @@ npm run deploy       # Deploy to Cloudflare Workers
 ### Standalone Engine (Single-Tenant)
 - Optimized for single-tenant deployments (Private Instances).
 - Resolves configuration via a fixed `SINGLE_TENANT_ID`.
-- Stable API surface designed to be extended by SaaS overlay branches (e.g., `saas` branch).
+- Clean and stable API surface for all inspection management operations.
 
 ### Inspection Engine
 - JSON-schema based inspection templates.
