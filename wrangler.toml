@@ -10,22 +10,10 @@ directory = "./public"
 
 [vars]
 ENVIRONMENT = "production"
-# Cloudflare Turnstile site key — replace with your key from dash.cloudflare.com → Turnstile
-# The value below is Cloudflare's official always-pass test key (safe to use until you go live)
-TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
-# Your deployed Worker URL — used to build Google OAuth callback URIs
-# Replace with your actual Workers subdomain after first deploy, e.g. "https://openinspection.your-subdomain.workers.dev"
-APP_BASE_URL = "https://openinspection.workers.dev"
-
-# ── Branding Customization (Global Defaults) ──────────────────────────────
-APP_NAME = "OpenInspection"
-PRIMARY_COLOR = "#4f46e5"
-SENDER_EMAIL = "OpenInspection <noreply@example.com>"
-BILLING_URL = "https://example.com/pricing"
-SUPPORT_EMAIL = "support@example.com"
 APP_MODE = "standalone"
-SINGLE_TENANT_ID = "00000000-0000-0000-0000-000000000000"
-SETUP_CODE = "" # Optional: Set a custom 6-digit code for first-time setup
+# Turnstile site key — replace with your key from dash.cloudflare.com → Turnstile
+# Default: Cloudflare's official always-pass test key (safe to use until you go live)
+TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
 # ── Secrets — set via: wrangler secret put SECRET_NAME ──────────────────────
 # Run `npm run setup:cloudflare` to be prompted for each one interactively.
