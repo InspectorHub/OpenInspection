@@ -45,10 +45,12 @@ SETUP_CODE = "" # Optional: Set a custom 6-digit code for first-time setup
 [[d1_databases]]
 binding = "DB"
 database_name = "openinspection-db"
+database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "TENANT_CACHE"
+id = "00000000000000000000000000000000"
 
 [observability]
 enabled = true
