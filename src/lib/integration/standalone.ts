@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, users, templates } from '../db/schema';
-import { IntegrationProvider, TenantUpdateParams, ProviderCapabilities } from '../integration';
+import { IntegrationProvider, TenantUpdateParams } from '../integration';
 
 /**
  * Standalone implementation of IntegrationProvider.
@@ -77,13 +77,5 @@ export class StandaloneProvider implements IntegrationProvider {
     async handleStripeConnect(subdomain: string, accountId: string): Promise<void> {
         const db = this.getDrizzle();
         await db.update(tenants).set({ stripeConnectAccountId: accountId }).where(eq(tenants.subdomain, subdomain));
-    }
-
-    getCapabilities(): ProviderCapabilities {
-        return {
-            allowsM2M: false, // OS version doesn't "expect" M2M by default
-            requiresPortalAuth: false,
-            supportsSiloProvisioning: true
-        };
     }
 }

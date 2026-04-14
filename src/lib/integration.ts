@@ -13,12 +13,6 @@ export interface TenantUpdateParams {
     adminPasswordHash?: string;
 }
 
-export interface ProviderCapabilities {
-    allowsM2M: boolean;
-    requiresPortalAuth?: boolean;
-    supportsSiloProvisioning?: boolean;
-}
-
 export interface IntegrationProvider {
     /**
      * Called when a tenant's status, tier, or metadata is updated.
@@ -30,9 +24,4 @@ export interface IntegrationProvider {
      * Called when a tenant connects their Stripe account.
      */
     handleStripeConnect?(subdomain: string, accountId: string): Promise<void>;
-
-    /**
-     * Returns whether certain features are available in this provider.
-     */
-    getCapabilities(): ProviderCapabilities;
 }
