@@ -33,7 +33,7 @@ export interface AppEnv {
     CF_API_TOKEN?: string;
     APP_MODE?: 'standalone';
     SETUP_CODE?: string;
-    PORTAL_M2M_SECRET?: string;
+    INTEGRATION_SECRET?: string;
 }
 
 import { AdminService } from '../services/admin.service';
