@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { users, inspections } from '../lib/db/schema';
 import { createCalendarEvent } from './calendar';
 import { HonoConfig } from '../types/hono';
@@ -153,9 +153,7 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
 
     // Async tasks
     c.executionCtx.waitUntil((async () => {
-        const inspector = await db.select().from(users)
-            .where(and(eq(users.id, inspectorId!), eq(users.tenantId, tenantId)))
-            .get();
+        const inspector = await db.select().from(users).where(eq(users.id, inspectorId!)).get();
         if (inspector?.googleRefreshToken && inspector?.googleCalendarId) {
             const startDateTime = `${body.date}T${body.timeSlot === 'morning' ? '08:00:00' : '13:00:00'}Z`;
             await createCalendarEvent(

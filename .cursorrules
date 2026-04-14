@@ -1,0 +1,44 @@
+# OpenInspection Core Development Rules
+
+You are an expert full-stack engineer specialized in Cloudflare Workers, Hono, and High-Fidelity UI Design. Every change you make to the `apps/core` project must adhere to these standards.
+
+## 1. High-Fidelity Design System (Glassmorphism)
+All UI components MUST feel premium and "SaaS-grade".
+- **Visual Style**: Use glassmorphism (transparency + backdrop-blur).
+- **Colors**: Prefer Slate for surfaces and Indigo/Blue for accents. Avoid generic red/blue/green.
+- **Typography**: Use **Inter** or **Outfit**. Avoid browser default sans-serif.
+- **Tailwind Ordering**: MUST follow the standardized class sequence: **Layout → Box Model → Typography → Visual Styles → Interaction/States**. (e.g., `flex items-center w-full p-4 text-sm bg-white hover:bg-slate-50`).
+- **Micro-animations**: Add `animate-fade-in` or `animate-float` where appropriate.
+- **Layouts**: Wrap pages in `BareLayout` or `MainLayout`. Ensure absolute responsiveness.
+
+## 2. API Architecture (Contract-First)
+We use **OpenAPIHono v4** exclusively for type-safety and auto-documentation.
+- **Zod Schemas**: Every endpoint MUST have a request and response schema defined in `src/lib/validations/`.
+- **OpenAPI Definitions**: Use `createRoute` and `app.openapi()` instead of basic `app.get()`.
+- **Validation**: Never trust client input. Rely on Zod for coercion and validation.
+- **Documentation**: Ensure `app.doc('/doc', ...)` is updated and accessible via `/ui`.
+
+## 3. Infrastructure & Automation (Robustness)
+Infrastructure scripts (Setup/Teardown) must be production-ready and fault-tolerant.
+- **Retry Logic**: Commands interacting with Cloudflare APIs MUST use a 3-retry mechanism with incremental backoff.
+- **Non-Interactive**: Detect non-interactive environments and use fallback values.
+- **Clean state**: Ensure teardown scripts handle "missing resources" gracefully without failing.
+- **Wrangler Hygiene**: Do not leave `preview_` placeholder IDs in `wrangler.toml`. Explicitly set `workers_dev = true` to suppress warnings.
+
+## 4. Error Handling & Professionalism
+- **Centralized Errors**: Use `AppError` and `ErrorCode` from `src/lib/errors.ts`.
+- **Frontend Parsing**: When a fetch fails, parse the response. If it contains Zod issues, display the specific message instead of `[object Object]`.
+- **Professional Failbacks**: 404/NotFound pages must be branded and provide clear Call-to-Actions (e.g., "Initialize System" if 0 tenants exist).
+
+## 5. Coding Standards & Hard Blocks
+- **Hard Block Policy**: Zero tolerance for `any`, unused variables (`no-unused-vars`), and TypeScript compilation errors. All MUST be resolved before commit.
+- **Strict TypeScript**: `strict: true` is enforced. Use generics for context and environment.
+- **Zero Warnings**: All commits must pass `npm run lint` and `npm run type-check`.
+- **English Standard**: Communications with the primary user (you) may be in Simplified Chinese, but **all code, commit messages, and technical documentation (including APIs) must be written in English.**
+
+## 6. Project Structure
+- `scripts/`: Platform-specific automation.
+- `src/api/`: OpenAPIHono controllers.
+- `src/templates/`: TSX-based SSR templates.
+- `src/lib/db/`: Drizzle schemas and migrations.
+- `public/`: Static assets and client-side JS.

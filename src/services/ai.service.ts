@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
 
 /**
@@ -68,10 +68,8 @@ Professional Comment:`;
         const db = this.getDrizzle();
 
         // 1. Verify ownership and existence
-        const inspection = await db.select().from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (!inspection) {
+        const inspection = await db.select().from(inspections).where(eq(inspections.id, inspectionId)).get();
+        if (!inspection || inspection.tenantId !== tenantId) {
             throw new Error('Inspection not found or access denied');
         }
 
