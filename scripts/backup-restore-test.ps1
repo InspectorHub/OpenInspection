@@ -3,6 +3,12 @@
 $ErrorActionPreference = "Stop"
 cd "d:\Code\inspectorhub\apps\core"
 
+$ConfigArgs = $args
+if ($ConfigArgs.Length -eq 0) {
+    # Default to standalone testing if no args provided
+    $ConfigArgs = @()
+}
+
 function Log($msg) {
     Write-Host "`n>>> $msg" -ForegroundColor Cyan
 }
@@ -10,7 +16,9 @@ function Log($msg) {
 try {
     # Phase 0: Pre-flight Teardown (Ensure clean start)
     Log "Phase 0: Ensuring a clean starting environment..."
-    npm run teardown:cloudflare -- --force
+    npm run teardown:cloudflare -- --force $ConfigArgs
+    Log "Waiting 30 seconds for Cloudflare resource deletion to propagate..."
+    Start-Sleep -Seconds 30
 
     # Phase 1: Clean Deployment
     Log "Phase 1: Performing initial clean setup on Cloudflare (with retries)..."
@@ -19,8 +27,8 @@ try {
     $workerUrl = $null
     while ($null -eq $workerUrl -and $retryCount -lt $maxRetries) {
         try {
-            $setupOutput = npm run setup:cloudflare -- --force
-            $workerUrl = ($setupOutput | Select-String "https://[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev").Matches.Value
+            $setupOutput = npm run setup:cloudflare -- --force $ConfigArgs
+            $workerUrl = ($setupOutput | Select-String "https://[a-z0-9.-]+\.workers\.dev").Matches.Value
         } catch {
             $retryCount++
             Log "Deployment attempt $retryCount failed. Retrying..."
@@ -40,11 +48,13 @@ try {
 
     # Phase 3: Backup
     Log "Phase 3: Backing up remote resources..."
-    npm run backup
+    npm run backup -- $ConfigArgs
 
     # Phase 4: Teardown
     Log "Phase 4: Tearing down infrastructure..."
-    npm run teardown:cloudflare -- --force
+    npm run teardown:cloudflare -- --force $ConfigArgs
+    Log "Waiting 30 seconds for Cloudflare resource deletion to propagate..."
+    Start-Sleep -Seconds 30
 
     # Phase 5: Redemption (Clean Deploy)
     Log "Phase 5: Re-deploying fresh infrastructure (with retries)..."
@@ -52,8 +62,8 @@ try {
     $workerUrl2 = $null
     while ($null -eq $workerUrl2 -and $retryCount2 -lt $maxRetries) {
         try {
-            $setupOutput2 = npm run setup:cloudflare -- --force
-            $workerUrl2 = ($setupOutput2 | Select-String "https://[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev").Matches.Value
+            $setupOutput2 = npm run setup:cloudflare -- --force $ConfigArgs
+            $workerUrl2 = ($setupOutput2 | Select-String "https://[a-z0-9.-]+\.workers\.dev").Matches.Value
         } catch {
             $retryCount2++
             Log "Deployment attempt $retryCount2 failed. Retrying..."
@@ -67,10 +77,11 @@ try {
 
     # Phase 6: Restore
     Log "Phase 6: Restoring data from latest backup..."
-    npm run restore -- --yes
+    npm run restore -- --yes $ConfigArgs
 
     # Phase 7: Verification
-    Log "Phase 7: Verifying data integrity via Playwright..."
+    Log "Phase 7: Verifying data integrity via Playwright (waiting 60s for DNS)..."
+    Start-Sleep -Seconds 60
     $env:BASE_URL = $workerUrl2
     npx playwright test tests/backup-restore-verify.spec.ts --project=chromium
 

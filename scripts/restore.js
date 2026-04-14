@@ -7,8 +7,18 @@ import readline from 'readline';
 // OpenInspection — Cloudflare Restore Script (D1 SQL + R2 Media)
 // =============================================================================
 
-const DB_NAME = 'openinspection-db';
-const BUCKETS = ['openinspection-photos', 'openinspection-photos-preview'];
+// Argument Parsing Helper
+const getArg = (key) => {
+    const idx = process.argv.indexOf(key);
+    return (idx !== -1 && process.argv[idx + 1] && !process.argv[idx + 1].startsWith('--')) ? process.argv[idx + 1] : null;
+};
+
+const TOML_PATH = getArg('--config') || getArg('--toml') || 'wrangler.toml';
+const PROJECT_SLUG = 'openinspection';
+
+// Dynamic Resource Naming
+const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
+const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
 const BACKUP_ROOT = 'backups';
 
 const info = (msg) => console.log(`  ✓ ${msg}`);
@@ -26,7 +36,7 @@ function run(cmd, options = {}) {
 }
 
 const args = process.argv.slice(2);
-const specifiedBackup = args[0];
+const specifiedBackup = args.find(a => !a.startsWith('-') && args[args.indexOf(a) - 1] !== '--config' && args[args.indexOf(a) - 1] !== '--toml');
 
 if (!fs.existsSync(BACKUP_ROOT)) {
     die(`Backup directory not found: ${BACKUP_ROOT}`);
@@ -49,7 +59,7 @@ if (specifiedBackup) {
 console.log("\n╔══════════════════════════════════════════════════════╗");
 console.log("║         OpenInspection — Cloudflare Restore          ║");
 console.log("╚══════════════════════════════════════════════════════╝");
-console.log(`\n  SOURCE: ${targetBackupDir}\n  TARGET: Cloudflare Production (${DB_NAME})`);
+console.log(`\n  CONFIG: ${TOML_PATH}\n  SOURCE: ${targetBackupDir}\n  TARGET: Cloudflare Production (${DB_NAME})`);
 
 const isForce = args.includes('--force') || args.includes('-y') || args.includes('--yes');
 
@@ -76,18 +86,17 @@ async function executeRestore() {
     // 0. Pre-restore: Drop existing tables to avoid CREATE TABLE collisions
     step(`Purging existing tables in ${DB_NAME} to ensure a clean restore...`);
     try {
-        const tablesJson = run(`npx wrangler d1 execute ${DB_NAME} --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';" --json`, { silent: true });
+        const tablesJson = run(`npx wrangler d1 execute ${DB_NAME} --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';" --json -c ${TOML_PATH}`, { silent: true });
         
         // Wrangler JSON output can be nested or contain metadata
         const parsed = JSON.parse(tablesJson);
-        const results = Array.isArray(parsed) ? parsed[0].results : parsed.results;
+        const results = Array.isArray(parsed) ? (parsed[0].results || []) : (parsed.results || []);
         const tables = results.map(r => r.name);
 
         if (tables.length > 0) {
             info(`Found ${tables.length} tables. Dropping in dependency order...`);
             
             // Hardcoded order to handle foreign keys (Leaf to Root)
-            // We drop children before parents to satisfy constraints
             const dropOrder = [
                 'inspection_results', 
                 'inspection_agreements',
@@ -105,11 +114,11 @@ async function executeRestore() {
 
             const sortedTables = [
                 ...tables.filter(t => !dropOrder.includes(t)), // Unknown tables first
-                ...dropOrder.filter(t => tables.includes(t))   // Known tables in order
+                ...dropOrder.filter(t => tables.includes(t)).reverse() // Known tables in reverse order for dropping
             ];
 
             for (const table of sortedTables) {
-                run(`npx wrangler d1 execute ${DB_NAME} --remote --command "DROP TABLE IF EXISTS \\"${table}\\";" --yes`, { silent: true });
+                run(`npx wrangler d1 execute ${DB_NAME} --remote --command "DROP TABLE IF EXISTS \\"${table}\\";" --yes -c ${TOML_PATH}`, { silent: true });
                 console.log(`    - Dropped: ${table}`);
             }
             info("Environment purged.");
@@ -125,7 +134,7 @@ async function executeRestore() {
     if (fs.existsSync(sqlFile)) {
         step(`Restoring D1 Database: ${DB_NAME}`);
         // Note: Batch mode is recommended for large imports
-        run(`npx wrangler d1 execute ${DB_NAME} --remote --file "${sqlFile}"`);
+        run(`npx wrangler d1 execute ${DB_NAME} --remote --file "${sqlFile}" -c ${TOML_PATH}`);
         info("Database restored.");
     } else {
         warn("No database.sql found in backup folder. Skipping DB restore.");

@@ -5,6 +5,7 @@ import { getCookie } from 'hono/cookie';
 import { verify } from 'hono/jwt';
 import { drizzle } from 'drizzle-orm/d1';
 import { users } from './lib/db/schema';
+import * as schema from './lib/db/schema';
 
 import { brandingMiddleware } from './lib/middleware/branding';
 import { tenantRouter } from './lib/middleware/tenant-router';
@@ -29,6 +30,8 @@ import { AgreementsPage } from './templates/pages/agreements';
 import { SetupPage } from './templates/pages/setup';
 
 
+import coreAuthRoutes from './api/auth';
+import integrationRoutes from './api/integration';
 import inspectionsRoutes from './api/inspections';
 import aiRoutes from './api/ai';
 import bookingsRoutes from './api/bookings';
@@ -37,7 +40,6 @@ import agentRoutes from './api/agent';
 import availabilityRoutes from './api/availability';
 import calendarRoutes from './api/calendar';
 import teamRoutes from './api/team';
-import coreAuthRoutes from './api/auth';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -63,15 +65,24 @@ app.get('/status', (c) => c.json({ status: 'ok', timestamp: new Date().toISOStri
  * Global Error Handler
  * Standardizes all application errors into a JSON response.
  */
-app.onError((err, c) => {
-    if (err instanceof AppError) {
-        return sendError(c, err.message, err.code, err.status, err.details);
+app.onError((err: unknown, c: Context<HonoConfig>) => {
+    // Robust check for AppError or any object carrying a status and code
+    const isAppError = err instanceof AppError || (
+        typeof err === 'object' && err !== null &&
+        'status' in err && typeof (err as Record<string, unknown>).status === 'number' &&
+        'code' in err && typeof (err as Record<string, unknown>).code === 'string'
+    );
+
+    if (isAppError) {
+        const appErr = err as Record<string, unknown>;
+        const status = appErr.status as number;
+        return sendError(c, appErr.message as string, appErr.code as string, status as 500, appErr.details as Record<string, unknown> | undefined);
     }
 
     logger.error('Unhandled application error', {
         method: c.req.method,
         url: c.req.url,
-    }, err);
+    }, err instanceof Error ? err : undefined);
 
     return sendError(c, 'Internal server error', ErrorCode.INTERNAL_ERROR, 500);
 });
@@ -95,10 +106,10 @@ app.use('*', brandingMiddleware);
 // Global JWT Middleware — extracts tenantId / userRole from Bearer token or cookie.
 app.use('*', async (c, next) => {
     const path = c.req.path;
-    const isAuth = path.startsWith('/api/auth/') || path === '/login' || path === '/join';
-    const isPublic = path.startsWith('/api/public/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || path.includes('.');
-    
-    if (isAuth || isPublic || path === '/setup') return next();
+    const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup';
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || path.includes('.');
+
+    if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join') return next();
 
     // Generate setup code if system is uninitialized and we are in standalone
     if (c.env.APP_MODE === 'standalone' && c.env.TENANT_CACHE) {
@@ -135,11 +146,33 @@ app.use('*', async (c, next) => {
         const payload = await verify(token, c.env.JWT_SECRET, 'HS256');
         const tenantId = (payload['custom:tenantId'] ?? payload['tenantId']) as string | undefined;
         const userRole = (payload['custom:userRole'] ?? payload['role']) as string | undefined;
-        
+
         if (tenantId) c.set('tenantId', tenantId);
         if (userRole) c.set('userRole', userRole as UserRole);
-    } catch {
-        // Invalid token — let individual routes decide whether to reject
+
+        // Also update user object in context if needed
+        if (userRole) {
+            c.set('user', {
+                sub: payload.sub as string,
+                email: payload.email as string,
+                role: userRole as UserRole,
+                tenantId: tenantId as string
+            });
+        }
+
+    } catch (err: unknown) {
+        // Invalid token — we don't throw here to allow public routes to work
+        // but the absence of tenantId/userRole will be caught by route-level guards.
+        const message = err instanceof Error ? err.message : String(err);
+        logger.info(`[JWT] Token verification failed: ${message}`);
+    }
+
+    // --- Scoped DB Injection ---
+    const tenantIdForDb = c.get('tenantId') || c.get('resolvedTenantId');
+    if (tenantIdForDb) {
+        const { createScopedDb } = await import('./lib/db/scoped');
+        const db = drizzle(c.env.DB);
+        c.set('sdb', createScopedDb(db as unknown as ReturnType<typeof drizzle<typeof schema>>, tenantIdForDb));
     }
 
     return next();
@@ -158,6 +191,7 @@ app.route('/api/agent', agentRoutes);
 app.route('/api/availability', availabilityRoutes);
 app.route('/api/calendar', calendarRoutes);
 app.route('/api/team', teamRoutes);
+app.route('/api/integration', integrationRoutes);
 
 // OpenAPI Documentation
 app.doc('/doc', {

@@ -33,12 +33,12 @@ npm run deploy       # Deploy to Cloudflare Workers
 ### Authentication
 - JWT-based authentication system.
 - Supports both Cookie (for dashboard) and Bearer Header (for API) token delivery.
-- Password hashing using SHA-256 (Web Crypto API).
+- Standalone-first password hashing using SHA-256 (Web Crypto API).
 
-### Workspaces (Multi-tenancy)
-- Supports multiple workspaces within a single deployment.
-- Resolves workspace via subdomain or a fixed `SINGLE_TENANT_ID` for standalone use.
-- Configuration-driven branding (name, colors, logos) per workspace.
+### Standalone Engine (Single-Tenant)
+- Optimized for single-tenant deployments (Private Instances).
+- Resolves configuration via a fixed `SINGLE_TENANT_ID`.
+- Clean and stable API surface for all inspection management operations.
 
 ### Inspection Engine
 - JSON-schema based inspection templates.

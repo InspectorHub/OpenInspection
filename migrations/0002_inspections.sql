@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS inspections (
 -- Key = item id from templates.schema, value = { status, notes, media[] }
 CREATE TABLE IF NOT EXISTS inspection_results (
     id              TEXT    PRIMARY KEY,
+    tenant_id       TEXT    NOT NULL REFERENCES tenants(id),
     inspection_id   TEXT    NOT NULL REFERENCES inspections(id),
     data            TEXT    NOT NULL,   -- JSON sparse map
     last_synced_at  INTEGER NOT NULL
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS agreements (
 -- A signed instance of an agreement for one inspection.
 CREATE TABLE IF NOT EXISTS inspection_agreements (
     id                TEXT    PRIMARY KEY,
+    tenant_id         TEXT    NOT NULL REFERENCES tenants(id),
     inspection_id     TEXT    NOT NULL REFERENCES inspections(id),
     signature_base64  TEXT    NOT NULL,
     signed_at         INTEGER NOT NULL,
@@ -83,8 +85,10 @@ CREATE TABLE IF NOT EXISTS availability_overrides (
 CREATE INDEX IF NOT EXISTS idx_inspections_tenant      ON inspections(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_inspections_inspector   ON inspections(inspector_id);
 CREATE INDEX IF NOT EXISTS idx_inspections_status      ON inspections(status);
+CREATE INDEX IF NOT EXISTS idx_results_tenant          ON inspection_results(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_results_inspection      ON inspection_results(inspection_id);
 CREATE INDEX IF NOT EXISTS idx_agreements_tenant       ON agreements(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_insp_agreements_insp    ON inspection_agreements(inspection_id);
+CREATE INDEX IF NOT EXISTS idx_insp_agreements_tenant  ON inspection_agreements(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_availability_inspector  ON availability(inspector_id);
 CREATE INDEX IF NOT EXISTS idx_avail_overrides_insp    ON availability_overrides(inspector_id);

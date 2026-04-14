@@ -1,5 +1,6 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
 import crypto from 'crypto';
 
 // =============================================================================
@@ -15,13 +16,13 @@ const getArg = (key) => {
 };
 
 // Configuration Paths & Naming
-const TOML_PATH = getArg('--config') || getArg('--toml') || 'wrangler.toml';
+const TOML_PATH = path.resolve(getArg('--config') || getArg('--toml') || 'wrangler.toml');
 const PROJECT_SLUG = getArg('--name') || 'openinspection';
 const PROJECT_TITLE = getArg('--app-name') || getArg('--title') || 'OpenInspection';
 
 // Dynamic Resource Naming
-const DB_NAME = `${PROJECT_SLUG}-db`;
-const KV_NAME = `${PROJECT_SLUG}-tenant-cache`;
+const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
+const KV_NAME = getArg('--kv-name') || `${PROJECT_SLUG}-tenant-cache`;
 const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
 const WORKER_NAME = PROJECT_SLUG;
 
@@ -86,15 +87,34 @@ function run(cmd, options = {}) {
         }
 
         // Final failure logic
-        if (!options.silent) {
+        if (!options.ignoreError) {
             process.stdout.write(result.stdout || '');
             process.stderr.write(result.stderr || '');
-        }
-
-        if (!options.ignoreError) {
             die(`Command failed after ${attempt} retries: ${cmd}\n${output}`);
         }
         return output;
+    }
+}
+
+function extractJson(output) {
+    const firstBrace = output.indexOf('{');
+    const firstBracket = output.indexOf('[');
+    let start = -1;
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) start = firstBrace;
+    else start = firstBracket;
+
+    const lastBrace = output.lastIndexOf('}');
+    const lastBracket = output.lastIndexOf(']');
+    let end = -1;
+    if (lastBrace !== -1 && (lastBracket === -1 || lastBrace > lastBracket)) end = lastBrace;
+    else end = lastBracket;
+
+    if (start === -1 || end === -1 || end < start) return null;
+    
+    try {
+        return JSON.parse(output.substring(start, end + 1));
+    } catch (e) {
+        return null;
     }
 }
 
@@ -103,11 +123,11 @@ function getCloudflareState() {
     const state = { d1: [], kv: [], r2: [] };
     try {
         const d1Output = run('npx wrangler d1 list --json', { silent: true, ignoreError: true });
-        state.d1 = JSON.parse(d1Output);
+        state.d1 = extractJson(d1Output) || [];
     } catch (e) {}
     try {
         const kvOutput = run('npx wrangler kv namespace list', { silent: true, ignoreError: true });
-        state.kv = JSON.parse(kvOutput);
+        state.kv = extractJson(kvOutput) || [];
     } catch (e) {}
     try {
         const r2Output = run('npx wrangler r2 bucket list', { silent: true, ignoreError: true });
@@ -213,14 +233,11 @@ const conflictKV = initialState.kv.find(ns => ns.title === KV_NAME);
 const conflictR2 = BUCKETS.filter(b => initialState.r2.includes(b));
 
 if (conflictD1 || conflictKV || conflictR2.length > 0) {
-    warn("Existing resources detected. Setup requires a clean environment.");
-    if (conflictD1) console.log(`  - D1 Database: ${DB_NAME} (${conflictD1.uuid})`);
-    if (conflictKV) console.log(`  - KV Namespace: ${KV_NAME} (${conflictKV.id})`);
-    if (conflictR2.length > 0) console.log(`  - R2 Buckets: ${conflictR2.join(', ')}`);
-    
-    console.log("\n  Please run 'npm run teardown:cloudflare' first to clear them.");
-    if (!isForce) process.exit(1);
-    else info("Force mode: proceeding anyway...");
+    warn("Existing resources detected. This script will attempt to reuse or update them.");
+    if (conflictD1) console.log(`  - Reusing D1 Database: ${DB_NAME} (${conflictD1.uuid})`);
+    if (conflictKV) console.log(`  - Reusing KV Namespace: ${KV_NAME} (${conflictKV.id})`);
+    if (conflictR2.length > 0) console.log(`  - Reusing R2 Buckets: ${conflictR2.join(', ')}`);
+    info("Proceeding with idempotent setup...");
 } else {
     info("Clean environment confirmed.");
 }
@@ -229,39 +246,47 @@ if (conflictD1 || conflictKV || conflictR2.length > 0) {
 step("Step 1: Checking Cloudflare authentication...");
 let whoamiJson;
 try {
-    whoamiJson = JSON.parse(run('npx wrangler whoami --json', { silent: true }));
+    const whoamiOutput = run('npx wrangler whoami --json', { silent: true });
+    whoamiJson = extractJson(whoamiOutput);
 } catch (e) {
     if (isForce) die("Not logged in and --force enabled. Please run 'npx wrangler login' first.");
     console.log("  Not logged in. Opening browser...");
     run('npx wrangler login');
-    whoamiJson = JSON.parse(run('npx wrangler whoami --json', { silent: true }));
+    const whoamiOutput = run('npx wrangler whoami --json', { silent: true });
+    whoamiJson = extractJson(whoamiOutput);
 }
 
-const accountId = whoamiJson.account?.id || whoamiJson.accounts?.[0]?.id;
+const accountId = whoamiJson?.account?.id || whoamiJson?.accounts?.[0]?.id;
 if (!accountId) die("Could not determine Cloudflare account ID.");
 info(`Account ID: ${accountId}`);
 
 // 3. Create D1 Database
-step(`Step 2: Creating D1 database: ${DB_NAME}`);
-const d1Output = run(`npx wrangler d1 create ${DB_NAME}`, { ignoreError: true, silent: true });
+step(`Step 2: Preparing D1 database: ${DB_NAME}`);
 let d1Id;
 
-try {
-    const d1ListResult = run('npx wrangler d1 list --json', { silent: true, ignoreError: true });
-    d1Id = JSON.parse(d1ListResult).find(db => db.name === DB_NAME)?.uuid;
-} catch (e) {}
-
-if (!d1Id) {
-    d1Id = d1Output.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0];
-}
-
-// Fallback: Check wrangler.toml if create failed with "exists" and list didn't help
-if (!d1Id && d1Output.includes('already exists') && fs.existsSync(TOML_PATH)) {
-    const toml = fs.readFileSync(TOML_PATH, 'utf8');
-    const existingId = toml.match(/database_id\s*=\s*"([0-9a-f-]{36})"/)?.[1];
-    if (existingId && existingId !== '00000000-0000-0000-0000-000000000000') {
-        d1Id = existingId;
-        warn(`Using existing D1 ID from ${TOML_PATH}: ${d1Id}`);
+if (conflictD1) {
+    info(`Using existing D1 database found in Step 0: ${conflictD1.uuid}`);
+    d1Id = conflictD1.uuid;
+} else {
+    const d1Output = run(`npx wrangler d1 create ${DB_NAME}`, { ignoreError: true, silent: true });
+    
+    try {
+        const d1ListResult = run('npx wrangler d1 list --json', { silent: true, ignoreError: true });
+        d1Id = JSON.parse(d1ListResult).find(db => db.name === DB_NAME)?.uuid;
+    } catch (e) {}
+    
+    if (!d1Id) {
+        d1Id = d1Output.match(/database_id\s*=\s*"([^"]*)"/)?.[1] || d1Output.match(/"uuid":\s*"([^"]*)"/)?.[1];
+    }
+    
+    // Fallback: Check wrangler.toml if create failed with "exists" and list didn't help
+    if (!d1Id && d1Output.includes('already exists') && fs.existsSync(TOML_PATH)) {
+        const toml = fs.readFileSync(TOML_PATH, 'utf8');
+        const existingId = toml.match(/database_id\s*=\s*"([0-9a-f-]{36})"/)?.[1];
+        if (existingId && existingId !== '00000000-0000-0000-0000-000000000000') {
+            d1Id = existingId;
+            warn(`Using existing D1 ID from ${TOML_PATH}: ${d1Id}`);
+        }
     }
 }
 
@@ -269,18 +294,25 @@ if (!d1Id) die(`Could not determine D1 database ID. Output: ${d1Output}`);
 info(`D1 database ID: ${d1Id}`);
 
 // 4. Create KV Namespace
-step(`Step 3: Creating KV namespace: ${KV_NAME}`);
-const kvOutput = run(`npx wrangler kv namespace create ${KV_NAME}`, { ignoreError: true, silent: true });
+step(`Step 3: Preparing KV namespace: ${KV_NAME}`);
 let kvId;
 
-try {
-    kvId = JSON.parse(run('npx wrangler kv namespace list', { silent: true, ignoreError: true })).find(ns => ns.title === KV_NAME)?.id;
-} catch (e) {}
-
-if (!kvId) {
-    kvId = kvOutput.match(/"id":\s*"([^"]*)"/)?.[1];
+if (conflictKV) {
+    info(`Using existing KV namespace found in Step 0: ${conflictKV.id}`);
+    kvId = conflictKV.id;
+} else {
+    const kvOutput = run(`npx wrangler kv namespace create ${KV_NAME}`, { ignoreError: true, silent: true });
+    
+    try {
+        const kvListOutput = run('npx wrangler kv namespace list', { silent: true, ignoreError: true });
+        kvId = JSON.parse(kvListOutput).find(ns => ns.title === KV_NAME)?.id;
+    } catch (e) {}
+    
+    if (!kvId) {
+        kvId = kvOutput.match(/id\s*=\s*"([^"]*)"/)?.[1] || kvOutput.match(/"id":\s*"([^"]*)"/)?.[1];
+    }
 }
-if (!kvId) die(`Could not determine KV namespace ID. Output: ${kvOutput}`);
+if (!kvId) die(`Could not determine KV namespace ID. Status: ${initialState.kv.length > 0 ? 'Not found in list' : 'Empty list'}`);
 info(`KV namespace ID: ${kvId}`);
 
 // 5. Create R2 Buckets
@@ -291,7 +323,7 @@ for (const bucket of BUCKETS) {
 info("R2 buckets ready");
 
 // 6. Patch wrangler.toml
-step("Step 5: Patching wrangler.toml with resource IDs...");
+step(`Step 5: Patching ${TOML_PATH} with resource IDs...`);
 if (fs.existsSync(TOML_PATH)) {
     let toml = fs.readFileSync(TOML_PATH, 'utf8');
     // More robust regex for patching with word boundaries
@@ -301,7 +333,7 @@ if (fs.existsSync(TOML_PATH)) {
     if (!toml.includes(d1Id)) toml = toml.replace(/\bdatabase_id\s*=\s*"[^"]*"/, `database_id = "${d1Id}"`);
     if (!toml.includes(kvId)) toml = toml.replace(/\bid\s*=\s*"[^"]*"/, `id = "${kvId}"`);
     fs.writeFileSync(TOML_PATH, toml);
-    info("wrangler.toml updated");
+    info(`${TOML_PATH} updated`);
 }
 
 // 7. Apply Database Migrations
@@ -321,7 +353,8 @@ if (PROJECT_TITLE !== 'OpenInspection' && fs.existsSync(TOML_PATH)) {
 // 8. Generate Setup Verification Code
 step("Step 8: Generating Setup Verification Code...");
 const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-run(`npx wrangler kv key put --binding=TENANT_CACHE "setup_verification_code" "${verificationCode}" --ttl 1800 --remote -c ${TOML_PATH}`);
+const kvNamespaceId = kvId; // We already have it from Step 3
+run(`npx wrangler kv key put "setup_verification_code" "${verificationCode}" --namespace-id ${kvNamespaceId} --ttl 1800 --remote -c ${TOML_PATH}`);
 info("Verification code generated and stored in KV (expires in 30m)");
 
 // 9. Build and Deploy
@@ -342,8 +375,8 @@ const verifiedKV = finalState.kv.find(ns => ns.title === KV_NAME);
 const verifiedR2 = BUCKETS.filter(b => finalState.r2.includes(b));
 
 if (verifiedD1 && verifiedKV && verifiedR2.length === BUCKETS.length) {
-    const urlMatch = deployOutput.match(/https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev/);
-    const workerUrl = urlMatch ? urlMatch[0] : 'Unknown';
+    const urlMatch = deployOutput.match(/https?:\/\/[a-z0-9.-]+\.workers\.dev/);
+    const workerUrl = urlMatch ? urlMatch[0] : `https://${WORKER_NAME}.workers.dev`;
 
     console.log("\n╔══════════════════════════════════════════════════════╗");
     console.log("║  ✓ Setup Success: All resources verified.            ║");

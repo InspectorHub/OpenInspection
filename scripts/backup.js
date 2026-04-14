@@ -6,8 +6,18 @@ import path from 'path';
 // OpenInspection — Cloudflare Backup Script (D1 SQL + R2 Media)
 // =============================================================================
 
-const DB_NAME = 'openinspection-db';
-const BUCKETS = ['openinspection-photos', 'openinspection-photos-preview'];
+// Argument Parsing Helper
+const getArg = (key) => {
+    const idx = process.argv.indexOf(key);
+    return (idx !== -1 && process.argv[idx + 1] && !process.argv[idx + 1].startsWith('--')) ? process.argv[idx + 1] : null;
+};
+
+const TOML_PATH = getArg('--config') || getArg('--toml') || 'wrangler.toml';
+const PROJECT_SLUG = 'openinspection';
+
+// Dynamic Resource Naming
+const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
+const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
 const BACKUP_ROOT = 'backups';
 
 const info = (msg) => console.log(`  ✓ ${msg}`);
@@ -36,13 +46,14 @@ if (!fs.existsSync(backupDir)) {
 console.log("\n╔══════════════════════════════════════════════════════╗");
 console.log("║         OpenInspection — Cloudflare Backup           ║");
 console.log("╚══════════════════════════════════════════════════════╝");
+info(`Config: ${TOML_PATH}`);
 info(`Destination: ${backupDir}`);
 
 // 2. Database Backup (D1)
 step(`Backing up D1 Database: ${DB_NAME}`);
 const sqlFile = path.join(backupDir, 'database.sql');
 // Wrangler d1 export creates a local file directly
-run(`npx wrangler d1 export ${DB_NAME} --remote --output "${sqlFile}"`);
+run(`npx wrangler d1 export ${DB_NAME} --remote --output "${sqlFile}" -c ${TOML_PATH}`);
 info(`Database snapshotted to: ${sqlFile}`);
 
 // 3. Media Backup (R2)
