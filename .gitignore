@@ -16,3 +16,6 @@ backups/
 # Cloudflare config
 wrangler.*.toml
 !wrangler.toml
+
+# Qwen config
+.qwen/

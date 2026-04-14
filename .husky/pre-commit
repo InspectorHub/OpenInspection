@@ -35,20 +35,62 @@ fi
 # 3. Bundle size check
 step "Bundle size check"
 DIST="./.dist-pre-commit"
-rm -rf "$DIST"
-if npx wrangler deploy --dry-run --outdir "$DIST" > /dev/null 2>&1; then
-    # Note: On Windows/Standard sh, we'll try to find the JS file
-    WORKER_JS=$(ls "$DIST"/*.js 2>/dev/null | head -1)
-    if [ -n "$WORKER_JS" ]; then
-        # This part might need gzip available in terminal
-        pass "Bundle build success"
+WRANGLER_LOG="./.dist-wrangler-output.log"
+rm -rf "$DIST" "$WRANGLER_LOG"
+
+# Run wrangler in background, capture output for gzip size parsing
+npx wrangler deploy --dry-run --outdir "$DIST" > "$WRANGLER_LOG" 2>&1 &
+WRANGLER_PID=$!
+BUNDLE_OK=0
+SECONDS=0
+
+while [ $SECONDS -lt 60 ]; do
+    if [ -d "$DIST" ]; then
+        # Check for any JS or map files
+        for f in "$DIST"/*.js "$DIST"/*.js.map; do
+            if [ -f "$f" ]; then
+                BUNDLE_OK=1
+                break 2
+            fi
+        done
+    fi
+    sleep 0.5
+done
+
+# Kill wrangler if still running
+kill "$WRANGLER_PID" 2>/dev/null
+wait "$WRANGLER_PID" 2>/dev/null
+
+if [ "$BUNDLE_OK" -eq 1 ]; then
+    # Parse wrangler dry-run output: "Total Upload: 1292.14 KiB / gzip: 214.96 KiB"
+    TOTAL_LINE=$(grep -i "Total Upload" "$WRANGLER_LOG" 2>/dev/null)
+
+    if [ -n "$TOTAL_LINE" ]; then
+        # Extract gzip size from the line
+        GZIP_KB=$(echo "$TOTAL_LINE" | sed -n 's/.*gzip: *\([0-9.]*\) *KiB.*/\1/p' | tr -d ' ')
+        if [ -z "$GZIP_KB" ]; then
+            GZIP_KB=$(echo "$TOTAL_LINE" | sed -n 's/.*gzip: *\([0-9.]*\) *KB.*/\1/p' | tr -d ' ')
+        fi
+
+        if [ -n "$GZIP_KB" ]; then
+            SIZE_LIMIT=1024  # 1 MiB = 1024 KiB
+            EXCEEDS=$(echo "$GZIP_KB $SIZE_LIMIT" | awk '{if ($1 >= $2) print "yes"; else print "no"}')
+
+            if [ "$EXCEEDS" = "yes" ]; then
+                fail "Bundle gzip size ${GZIP_KB}KiB exceeds 1MiB limit (1024KiB)"
+            else
+                pass "Bundle gzip size: ${GZIP_KB}KiB (limit: 1024KiB)"
+            fi
+        else
+            echo "  ⚠  Could not parse gzip size from wrangler output, skipping size check"
+        fi
     else
-        echo "  ⚠  Bundle check: no output detected"
+        echo "  ⚠  Could not find 'Total Upload' line in wrangler output, skipping size check"
     fi
 else
-    fail "Bundle build failed"
+    fail "Bundle build failed (no output)"
 fi
-rm -rf "$DIST"
+rm -rf "$DIST" "$WRANGLER_LOG"
 
 if [ "$FAILED" -eq 1 ]; then
     echo "\n${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"
@@ -57,4 +99,3 @@ fi
 
 echo "\n${GREEN}All pre-commit checks passed.${NC}"
 exit 0
-

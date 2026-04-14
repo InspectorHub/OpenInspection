@@ -61,7 +61,10 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                                     <input id="verificationCode" name="verificationCode" type="text" required placeholder="000000"
                                         class="premium-input relative block w-full rounded-2xl border-0 py-5 text-slate-900 ring-2 ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-orange-600 sm:text-sm sm:leading-6 pl-6 transition-all" />
                                 </div>
-                                <p class="mt-2 ml-1 text-[10px] text-slate-400 font-medium">Check your Cloudflare Worker logs for the 6-digit code.</p>
+                                <p class="mt-2 ml-1 text-[11px] text-slate-500 font-medium leading-relaxed">
+                                    Find the 6-digit code in your Cloudflare deployment logs,
+                                    or check the <code class="px-1 py-0.5 bg-slate-100 rounded text-slate-700 font-mono">setup_verification_code</code> key in KV namespace.
+                                </p>
                             </div>
 
                             <div>
