@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { sign, verify } from 'hono/jwt';
 import { getCookie, setCookie } from 'hono/cookie';
@@ -308,10 +309,28 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
     // Cleanup code
     if (c.env.TENANT_CACHE) await c.env.TENANT_CACHE.delete('setup_verification_code');
 
-    // 4. Return login token immediately (optional, or just redirect to login)
+    // 4. Issue a JWT for the new admin so the caller can authenticate immediately
+    const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
+    let token = '';
+    if (newUser && c.env.JWT_SECRET) {
+        const now = Math.floor(Date.now() / 1000);
+        token = await sign({
+            sub: newUser.id,
+            email: newUser.email,
+            'custom:tenantId': newUser.tenantId,
+            'custom:userRole': newUser.role,
+            role: newUser.role,
+            exp: now + 60 * 60 * 24,
+        }, c.env.JWT_SECRET, 'HS256');
+        setCookie(c, 'inspector_token', token, {
+            httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 60 * 60 * 24,
+        });
+    }
+
     return c.json({
         success: true,
-        data: { token: '', redirect: '/login?initialized=true' }
+        token,
+        data: { token, redirect: '/dashboard' }
     }, 200);
 });
 

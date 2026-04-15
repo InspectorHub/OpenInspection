@@ -201,7 +201,9 @@ app.use('*', async (c, next) => {
 app.use('/api/*', requireActiveSubscription);
 
 // Module Routes
+// Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
 app.route('/api/auth', coreAuthRoutes);
+app.route('/', coreAuthRoutes);
 app.route('/api/inspections', inspectionsRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/public', bookingsRoutes);
@@ -259,8 +261,6 @@ app.get('/setup', (c) => {
     return c.html(SetupPage({ branding: c.get('branding') }));
 });
 
-// POST /setup — alias for /api/auth/setup (used by tests and setup wizard JS)
-app.post('/setup', (c) => c.redirect('/api/auth/setup', 307));
 
 app.get('/book', (c) => {
     const branding = c.get('branding');
