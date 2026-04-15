@@ -108,7 +108,7 @@ api.post('/tenants/:subdomain/stripe-connect', verifyPortalSignature, async (c) 
     const adminService = c.get('services').admin;
 
     try {
-        await adminService.handleStripeConnect(subdomain as string, accountId);
+        await adminService.updateStripeConnect(subdomain as string, accountId);
         return c.json({ success: true });
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error';

@@ -21,7 +21,6 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
     }
 
     const db = drizzle(c.env.DB);
-    // eslint-disable-next-line no-useless-assignment
     let tenantId: string | null = null;
     let subdomain: string | null = null;
 

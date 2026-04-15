@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, users } from '../db/schema';
-import { IntegrationProvider, TenantUpdateParams, ProviderCapabilities } from '../integration';
+import { IntegrationProvider, TenantUpdateParams } from '../integration';
 
 /**
  * Portal implementation of IntegrationProvider.
@@ -93,11 +93,4 @@ export class PortalProvider implements IntegrationProvider {
         }
     }
 
-    getCapabilities(): ProviderCapabilities {
-        return {
-            allowsM2M: true,
-            requiresPortalAuth: true,
-            supportsSiloProvisioning: true
-        };
-    }
 }
