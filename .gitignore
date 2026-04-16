@@ -12,6 +12,7 @@ backups/
 *.bak
 .env*
 .dev.vars*
+test-results/
 
 # Cloudflare config
 wrangler.*.toml
