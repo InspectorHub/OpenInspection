@@ -40,6 +40,8 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     supportEmail: text('support_email'),
     billingUrl: text('billing_url'),
     gaMeasurementId: text('ga_measurement_id'),
+    integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
+    secrets: text('secrets'),                      // AES-GCM encrypted JSON: {resendApiKey, turnstileSecretKey, geminiApiKey, googleClientSecret}
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

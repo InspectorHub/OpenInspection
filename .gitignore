@@ -1,4 +1,5 @@
 node_modules/
+public/styles.css
 .wrangler/
 .dev.vars
 dist/
@@ -12,6 +13,7 @@ backups/
 *.bak
 .env*
 .dev.vars*
+test-results/
 
 # Cloudflare config
 wrangler.*.toml

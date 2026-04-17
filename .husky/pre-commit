@@ -34,25 +34,13 @@ fi
 
 # 3. Bundle size check
 step "Bundle size check"
-DIST="./.dist-pre-commit"
-rm -rf "$DIST"
-BUNDLE_OUTPUT=$(npx wrangler deploy --dry-run --outdir "$DIST" 2>&1)
-if [ $? -eq 0 ]; then
-    GZIP_KB=$(echo "$BUNDLE_OUTPUT" | grep "Total Upload" | grep -oE 'gzip: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+')
-    if [ -n "$GZIP_KB" ]; then
-        GZIP_INT=$(echo "$GZIP_KB" | cut -d'.' -f1)
-        if [ "$GZIP_INT" -ge 1024 ]; then
-            fail "Bundle too large: ${GZIP_KB} KiB gzip (limit: 1024 KiB)"
-        else
-            pass "Bundle size: ${GZIP_KB} KiB gzip (limit: 1024 KiB)"
-        fi
-    else
-        echo "  ⚠  Bundle check: could not parse gzip size"
-    fi
+if node scripts/check-bundle-size.js; then
+    # Handled by Node script gracefully
+    :
 else
-    fail "Bundle build failed (no output)"
+    # FAILED if node script fails
+    FAILED=1
 fi
-rm -rf "$DIST" "$WRANGLER_LOG"
 
 if [ "$FAILED" -eq 1 ]; then
     echo "\n${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"

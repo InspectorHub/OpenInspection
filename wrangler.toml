@@ -33,12 +33,12 @@ TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 [[d1_databases]]
 binding = "DB"
 database_name = "openinspection-standalone-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "65aa4435-2387-4d9a-9a8b-0095194f2699"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "TENANT_CACHE"
-id = "00000000000000000000000000000000"
+id = "c890ac2c34ea4f758970bfc0ef7d6d4b"
 
 [observability]
 enabled = true

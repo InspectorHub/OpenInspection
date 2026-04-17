@@ -14,29 +14,18 @@ export const BareLayout = (props: { title: string, children: unknown, branding?:
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
                 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-                <script src="https://cdn.tailwindcss.com"></script>
-                <script dangerouslySetInnerHTML={{ __html: `
-                    tailwind.config = {
-                        theme: {
-                            extend: {
-                                fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
-                                colors: { primary: '${primaryColor}' }
-                            }
-                        }
-                    }
-                ` }} />
                 <script defer src="https://unpkg.com/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
                 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
                 <link rel="stylesheet" href="/styles.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
-                    :root { 
-                        --primary-color: ${primaryColor}; 
+                    :root {
+                        --primary-color: ${primaryColor};
                         --primary-glow: ${primaryColor}40;
                     }
                     body { font-family: 'Inter', sans-serif; }
                     .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
                 ` }} />
-                
+
                 {extraHead}
 
                 {gaMeasurementId && (
@@ -74,23 +63,12 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
                 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-                <script src="https://cdn.tailwindcss.com"></script>
-                <script dangerouslySetInnerHTML={{ __html: `
-                    tailwind.config = {
-                        theme: {
-                            extend: {
-                                fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },
-                                colors: { primary: '${primaryColor}' }
-                            }
-                        }
-                    }
-                ` }} />
                 <script defer src="https://unpkg.com/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
                 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
                 <link rel="stylesheet" href="/styles.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
-                    :root { 
-                        --primary-color: ${primaryColor}; 
+                    :root {
+                        --primary-color: ${primaryColor};
                         --primary-glow: ${primaryColor}40;
                     }
                     body { font-family: 'Inter', sans-serif; }

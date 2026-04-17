@@ -113,7 +113,8 @@ app.use('*', async (c, next) => {
 
     // Generate setup code if system is uninitialized and we are in standalone
     if (c.env.APP_MODE === 'standalone' && c.env.TENANT_CACHE) {
-        const storedCode = await c.env.TENANT_CACHE.get('setup_verification_code');
+        // Prefer explicit environment variable if set by user during deployment
+        const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE.get('setup_verification_code');
 
         if (!storedCode) {
             const db = drizzle(c.env.DB);
@@ -124,6 +125,13 @@ app.use('*', async (c, next) => {
                 logger.warn('New system detected. System initialization code generated.', { code: newCode });
                 logger.info(`Initialization Code Required: ${newCode}`);
             }
+        } else if (c.env.SETUP_CODE) {
+             // Just log that we are using the user-defined code
+             const db = drizzle(c.env.DB);
+             const user = await db.select().from(users).limit(1).get();
+             if (!user) {
+                 logger.info('System initialization required. Using user-defined SETUP_CODE.');
+             }
         }
     }
 

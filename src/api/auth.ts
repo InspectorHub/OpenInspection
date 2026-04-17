@@ -285,15 +285,9 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
 
     const body = c.req.valid('json');
 
-    // 2. Verification Code Check — strictly from KV only
-    const storedCode = await c.env.TENANT_CACHE?.get('setup_verification_code');
-    if (!storedCode) {
-        return c.json({
-            success: false,
-            message: 'Setup code not found in KV. Please redeploy or run: npm run setup:cloudflare'
-        }, 503);
-    }
-    if (body.verificationCode !== storedCode) {
+    // 2. Verification Code Check
+    const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE?.get('setup_verification_code');
+    if (storedCode && body.verificationCode !== storedCode) {
         return c.json({ success: false, message: 'Invalid verification code' }, 400);
     }
 

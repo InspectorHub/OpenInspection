@@ -18,7 +18,9 @@ export type AuditAction =
     | 'agreement.update'
     | 'agreement.delete'
     | 'data.export'
-    | 'data.delete';
+    | 'data.delete'
+    | 'config.integration.update'
+    | 'config.secrets.update';
 
 export interface AuditParams {
     db: D1Database;
