@@ -17,30 +17,39 @@ import { PortalProvider } from '../integration/portal';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
+ * When env vars for email/AI are absent, falls back to AES-GCM-decrypted DB secrets.
  */
 export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
+    // Pre-load DB secrets only when env vars are absent and tenant is known.
+    // Env vars always take priority over DB-stored config.
+    let dbSecrets: { resendApiKey?: string; senderEmail?: string; geminiApiKey?: string } = {};
+    const tenantId = c.get('tenantId');
+    if (tenantId && (!c.env.RESEND_API_KEY || !c.env.GEMINI_API_KEY)) {
+        try {
+            const bSvc = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
+            dbSecrets = await bSvc.getDecryptedSecrets(tenantId, c.env.JWT_SECRET);
+        } catch {
+            // Secrets not yet configured — proceed without them
+        }
+    }
+
     const services = {} as AppServices;
 
-    // Use a Proxy to implement lazy loading
     c.set('services', new Proxy(services, {
         get(target, prop: keyof AppServices) {
-            // Already instantiated?
             if (target[prop]) return target[prop];
 
-            // Instantiate on demand
             switch (prop) {
                 case 'admin':
                     {
-                        // Select provider based on environment configuration
-                        const provider = c.env.PORTAL_API_URL 
+                        const provider = c.env.PORTAL_API_URL
                             ? new PortalProvider(c.env.DB, c.env.TENANT_CACHE)
                             : new StandaloneProvider(c.env.DB, c.env.TENANT_CACHE);
-                            
                         target.admin = new AdminService(c.env.DB, provider);
                     }
                     break;
                 case 'ai':
-                    target.ai = new AIService(c.env.DB, c.env.GEMINI_API_KEY);
+                    target.ai = new AIService(c.env.DB, c.env.GEMINI_API_KEY || dbSecrets.geminiApiKey || '');
                     break;
                 case 'auth':
                     target.auth = new AuthService(c.env.DB, c.env.TENANT_CACHE);
@@ -52,7 +61,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
                     break;
                 case 'email':
-                    target.email = new EmailService(c.env.RESEND_API_KEY, c.env.SENDER_EMAIL, c.env.APP_NAME);
+                    target.email = new EmailService(
+                        c.env.RESEND_API_KEY || dbSecrets.resendApiKey || '',
+                        c.env.SENDER_EMAIL || dbSecrets.senderEmail || '',
+                        c.env.APP_NAME || 'OpenInspection'
+                    );
                     break;
                 case 'inspection':
                     target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'));

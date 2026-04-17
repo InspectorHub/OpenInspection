@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "concurrently --kill-others \"wrangler dev --port 8788\" \"npx tailwindcss -i ./src/styles/input.css -o ./public/styles.css --watch\"",
     "build": "npm run css:build && tsc",
-    "deploy": "npx wrangler d1 migrations apply openinspection-db --remote --batch && npm run css:build && npx wrangler deploy",
+    "deploy": "npx wrangler d1 migrations apply openinspection-standalone-db --remote && npm run css:build && npx wrangler deploy",
     "deploy:saas": "npx wrangler d1 migrations apply DB --remote -c wrangler.saas.toml && npm run css:build && npx wrangler deploy -c wrangler.saas.toml",
     "setup:cloudflare": "node scripts/setup-cloudflare.js",
     "setup:local": "node scripts/setup-cloudflare.js --local",
@@ -25,7 +25,7 @@
     "css:build": "npx tailwindcss -i ./src/styles/input.css -o ./public/styles.css --minify",
     "css:watch": "npx tailwindcss -i ./src/styles/input.css -o ./public/styles.css --watch",
     "db:migrate": "npx wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply openinspection-db --remote",
+    "db:migrate:remote": "wrangler d1 migrations apply openinspection-standalone-db --remote",
     "test:unit": "vitest run --config vitest.config.ts",
     "type-check": "npx -p typescript tsc --noEmit",
     "lint": "eslint .",

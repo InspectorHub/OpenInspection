@@ -649,9 +649,96 @@ adminRoutes.openapi(uploadLogoRoute, async (c) => {
     const formData = await c.req.formData();
     const file = formData.get('logo') as File;
     if (!file || !(file instanceof File)) throw Errors.BadRequest('No logo file provided.');
-    
+
     const brandingService = c.var.services.branding;
     const logoUrl = await brandingService.uploadLogo(c.get('tenantId'), file);
     return c.json({ success: true, logoUrl }, 200);
 });
+
+// ─── Integration Config & Secrets ────────────────────────────────────────────
+
+const IntegrationConfigSchema = z.object({
+    appBaseUrl: z.string().optional(),
+    turnstileSiteKey: z.string().optional(),
+    googleClientId: z.string().optional(),
+}).openapi('IntegrationConfig');
+
+const SecretsInputSchema = z.object({
+    resendApiKey: z.string().optional(),
+    senderEmail: z.string().optional(),
+    turnstileSecretKey: z.string().optional(),
+    geminiApiKey: z.string().optional(),
+    googleClientSecret: z.string().optional(),
+}).openapi('SecretsInput');
+
+const getConfigRoute = createRoute({
+    method: 'get',
+    path: '/config',
+    tags: ['Config'],
+    summary: 'Get integration config and masked secrets',
+    middleware: [requireRole(['owner'])],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ integrationConfig: IntegrationConfigSchema, secrets: z.record(z.string(), z.string()) }) }).openapi('ConfigResponse') } },
+            description: 'Success',
+        },
+    },
+});
+
+adminRoutes.openapi(getConfigRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const svc = c.var.services.branding;
+    const [integrationConfig, secrets] = await Promise.all([
+        svc.getIntegrationConfig(tenantId),
+        svc.getMaskedSecrets(tenantId, c.env.JWT_SECRET),
+    ]);
+    return c.json({ success: true, data: { integrationConfig, secrets } }, 200);
+});
+
+const updateIntegrationConfigRoute = createRoute({
+    method: 'post',
+    path: '/config',
+    tags: ['Config'],
+    summary: 'Save non-sensitive integration config (plaintext)',
+    middleware: [requireRole(['owner'])],
+    request: { body: { content: { 'application/json': { schema: IntegrationConfigSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Saved' },
+    },
+});
+
+adminRoutes.openapi(updateIntegrationConfigRoute, async (c) => {
+    const body = c.req.valid('json');
+    await c.var.services.branding.updateIntegrationConfig(c.get('tenantId'), body as unknown as import('../services/branding.service').IntegrationConfig);
+    writeAuditLog({
+        db: c.env.DB, tenantId: c.get('tenantId'), userId: c.get('user')?.sub,
+        action: 'config.integration.update', entityType: 'tenant_config',
+        ipAddress: c.req.header('CF-Connecting-IP'), executionCtx: c.executionCtx,
+    });
+    return c.json({ success: true }, 200);
+});
+
+const updateSecretsRoute = createRoute({
+    method: 'post',
+    path: '/config/secrets',
+    tags: ['Config'],
+    summary: 'Save encrypted secrets (AES-256-GCM). Masked values are ignored.',
+    middleware: [requireRole(['owner'])],
+    request: { body: { content: { 'application/json': { schema: SecretsInputSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Saved' },
+    },
+});
+
+adminRoutes.openapi(updateSecretsRoute, async (c) => {
+    const body = c.req.valid('json');
+    await c.var.services.branding.updateSecrets(c.get('tenantId'), c.env.JWT_SECRET, body as unknown as import('../services/branding.service').SecretsConfig);
+    writeAuditLog({
+        db: c.env.DB, tenantId: c.get('tenantId'), userId: c.get('user')?.sub,
+        action: 'config.secrets.update', entityType: 'tenant_config',
+        ipAddress: c.req.header('CF-Connecting-IP'), executionCtx: c.executionCtx,
+    });
+    return c.json({ success: true }, 200);
+});
+
 export default adminRoutes;

@@ -1,3 +1,4 @@
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 function parseJwt(t) {
     try { return JSON.parse(atob(t.split('.')[1])); } catch { return {}; }
 }
@@ -14,139 +15,216 @@ if (!token) {
     }
 }
 
-document.getElementById('logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('inspector_token');
-    window.location.href = '/login';
-});
-
-// Populate profile info from JWT
-(function () {
-    const payload = parseJwt(token);
-    const email = payload.email || '';
-    const role = payload['custom:userRole'] || payload.role || '';
-    const name = email ? email.split('@')[0] : 'User';
-
-    const emailEl = document.getElementById('profileEmail');
-    const roleEl = document.getElementById('profileRole');
-    if (emailEl) emailEl.textContent = email || 'Unknown user';
-    if (roleEl) roleEl.textContent = role || 'inspector';
-
-    const avatarSrc = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff&size=56';
-    const profileAvatar = document.getElementById('profileAvatar');
-    if (profileAvatar) profileAvatar.src = avatarSrc;
-
-    const navAvatar = document.querySelector('nav img[alt="User"]');
-    if (navAvatar) {
-        navAvatar.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff';
-        navAvatar.alt = name;
-    }
-})();
-
-function showAlert(msg, isError, target = 'pwAlert') {
-    const el = document.getElementById(target);
-    if (!el) return;
-    el.textContent = msg;
-    el.className = 'mb-4 px-4 py-3 rounded-xl text-sm font-medium ' + (isError ? 'bg-red-50 text-red-700 border border-red-200 fade-in' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 fade-in');
-    el.classList.remove('hidden');
-    setTimeout(() => el.classList.add('hidden'), 4000);
+const logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('inspector_token');
+        window.location.href = '/login';
+    });
 }
 
-async function uploadLogo(event) {
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg, isError) {
+    const el = document.getElementById('statusToast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold text-white z-50 ' +
+        (isError ? 'bg-red-600' : 'bg-emerald-600');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.classList.add('hidden'); }, 3500);
+}
+
+// ─── Load config on page load ─────────────────────────────────────────────────
+async function loadConfig() {
+    try {
+        const res = await fetch('/api/admin/config', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) return;
+        const { data } = await res.json();
+        const ic = data.integrationConfig || {};
+        const s = data.secrets || {};
+
+        // Integration config (plaintext)
+        if (ic.appBaseUrl) setVal('appBaseUrl', ic.appBaseUrl);
+        if (ic.turnstileSiteKey) setVal('turnstileSiteKey', ic.turnstileSiteKey);
+        if (ic.googleClientId) setVal('googleClientId', ic.googleClientId);
+
+        // Masked secrets — show placeholder to indicate configured
+        setMasked('resendApiKey', s.resendApiKey);
+        setMasked('senderEmail', s.senderEmail);
+        setMasked('turnstileSecretKey', s.turnstileSecretKey);
+        setMasked('geminiApiKey', s.geminiApiKey);
+        setMasked('googleClientSecret', s.googleClientSecret);
+    } catch { /* ignore — page still works */ }
+}
+
+function setVal(id, val) {
+    const el = document.getElementById(id);
+    if (el && val) el.value = val;
+}
+
+function setMasked(id, masked) {
+    const el = document.getElementById(id);
+    if (!el || !masked) return;
+    el.placeholder = masked + ' (configured — leave blank to keep)';
+}
+
+// ─── Logo upload ──────────────────────────────────────────────────────────────
+function handleLogoSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const formData = new FormData();
     formData.append('logo', file);
 
-    const alertTarget = 'brandingAlert';
-    try {
-        const res = await fetch('/api/admin/branding/logo', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token },
-            body: formData
-        });
-
-        const response = await res.json();
-        const data = response.data || response;
-        if (res.ok) {
-            const preview = document.getElementById('brandingLogoPreview');
-            const placeholder = document.getElementById('brandingLogoPlaceholder');
+    fetch('/api/admin/branding/logo', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: formData
+    }).then(r => r.json()).then(data => {
+        if (data.logoUrl) {
+            const preview = document.getElementById('logoPreview');
+            const placeholder = document.getElementById('logoPlaceholder');
             if (preview) {
                 preview.src = data.logoUrl;
             } else if (placeholder) {
-                // If it was a placeholder, replace it with an image
-                const parent = placeholder.parentElement;
-                placeholder.remove();
-                const newImg = document.createElement('img');
-                newImg.id = 'brandingLogoPreview';
-                newImg.src = data.logoUrl;
-                newImg.alt = 'Logo';
-                newImg.className = 'w-full h-full object-contain';
-                parent.prepend(newImg);
+                const img = document.createElement('img');
+                img.id = 'logoPreview';
+                img.src = data.logoUrl;
+                img.className = 'w-full h-full object-contain p-4';
+                placeholder.replaceWith(img);
             }
-            showAlert('Logo uploaded successfully. Refresh to see changes globally.', false, alertTarget);
+            showToast('Logo uploaded.', false);
         } else {
-            showAlert('Upload failed: ' + (data.error || 'Unknown error'), true, alertTarget);
+            showToast('Upload failed.', true);
         }
-    } catch (err) {
-        showAlert('Network error during upload.', true, alertTarget);
-    }
+    }).catch(() => showToast('Network error.', true));
 }
 
+// ─── Save branding ────────────────────────────────────────────────────────────
 async function saveBranding() {
-    const siteName = document.getElementById('siteName').value;
-    const primaryColor = document.getElementById('primaryColor').value;
-    const supportEmail = document.getElementById('supportEmail').value;
-    const billingUrl = document.getElementById('billingUrl').value;
-    const gaMeasurementId = document.getElementById('gaMeasurementId').value;
+    const body = {
+        siteName: document.getElementById('siteName')?.value,
+        primaryColor: document.getElementById('primaryColor')?.value,
+        gaMeasurementId: document.getElementById('gaMeasurementId')?.value,
+    };
+    // Remove empty keys
+    Object.keys(body).forEach(k => { if (!body[k]) delete body[k]; });
 
-    const alertTarget = 'brandingAlert';
-    const btn = document.getElementById('brandingBtn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
+    const btn = document.getElementById('saveBrandingBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
     try {
         const res = await fetch('/api/admin/branding', {
             method: 'POST',
-            headers: { 
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify({ siteName, primaryColor, supportEmail, billingUrl, gaMeasurementId })
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
         });
-
-        if (res.ok) {
-            showAlert('Branding updated successfully! Some changes may take up to an hour to propagate (cache).', false, alertTarget);
-        } else {
-            const err = await res.json();
-            showAlert('Error: ' + (err.error || 'Failed to save branding'), true, alertTarget);
-        }
-    } catch (err) {
-        showAlert('Network error while saving.', true, alertTarget);
+        showToast(res.ok ? 'Branding saved.' : 'Failed to save branding.', !res.ok);
+    } catch {
+        showToast('Network error.', true);
     } finally {
-        btn.disabled = false;
-        btn.textContent = 'Save Branding Changes';
+        if (btn) { btn.disabled = false; btn.textContent = 'Save Branding'; }
     }
 }
 
+// ─── Save secrets (encrypted) ─────────────────────────────────────────────────
+// `section` controls which fields are included:
+//   'email'      → resendApiKey, senderEmail
+//   'turnstile'  → turnstileSecretKey (+ siteKey goes to integration)
+//   'ai'         → geminiApiKey
+//   'google'     → googleClientSecret (+ clientId goes to integration)
+async function saveSecrets(section) {
+    const secretFields = {
+        email: ['resendApiKey', 'senderEmail'],
+        turnstile: ['turnstileSecretKey'],
+        ai: ['geminiApiKey'],
+        google: ['googleClientSecret'],
+    };
+
+    const body = {};
+    for (const field of (secretFields[section] || [])) {
+        const val = document.getElementById(field)?.value;
+        if (val && val.trim()) body[field] = val.trim();
+    }
+
+    // Nothing entered — nothing to save
+    if (Object.keys(body).length === 0) {
+        showToast('No changes to save.', false);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/admin/config/secrets', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (res.ok) {
+            // Clear fields and reload masked placeholders
+            for (const field of (secretFields[section] || [])) {
+                const el = document.getElementById(field);
+                if (el) el.value = '';
+            }
+            await loadConfig();
+            showToast('Saved and encrypted.', false);
+        } else {
+            showToast('Failed to save.', true);
+        }
+    } catch {
+        showToast('Network error.', true);
+    }
+}
+
+// ─── Save integration config (plaintext) ─────────────────────────────────────
+async function saveIntegration() {
+    const body = {};
+    const plainFields = ['appBaseUrl', 'turnstileSiteKey', 'googleClientId'];
+    for (const field of plainFields) {
+        const val = document.getElementById(field)?.value?.trim();
+        if (val) body[field] = val;
+    }
+
+    // Google client secret goes to encrypted store
+    const googleSecret = document.getElementById('googleClientSecret')?.value?.trim();
+    if (googleSecret) {
+        await fetch('/api/admin/config/secrets', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googleClientSecret: googleSecret })
+        });
+        const el = document.getElementById('googleClientSecret');
+        if (el) el.value = '';
+    }
+
+    if (Object.keys(body).length === 0 && !googleSecret) {
+        showToast('No changes to save.', false);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/admin/config', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        await loadConfig();
+        showToast(res.ok ? 'Integration config saved.' : 'Failed to save.', !res.ok);
+    } catch {
+        showToast('Network error.', true);
+    }
+}
+
+// ─── Change password ──────────────────────────────────────────────────────────
 async function changePassword() {
-    const currentPassword = document.getElementById('currentPassword').value;
-    const newPassword = document.getElementById('newPassword').value;
-    const confirmPassword = document.getElementById('confirmPassword').value;
+    const currentPassword = document.getElementById('currentPassword')?.value;
+    const newPassword = document.getElementById('newPassword')?.value;
+    const confirmPassword = document.getElementById('confirmPassword')?.value;
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
-        showAlert('All fields are required.', true); return;
-    }
-    if (newPassword !== confirmPassword) {
-        showAlert('New passwords do not match.', true); return;
-    }
-    if (newPassword.length < 8) {
-        showAlert('New password must be at least 8 characters.', true); return;
-    }
-
-    const btn = document.getElementById('pwBtn');
-    btn.disabled = true;
-    btn.textContent = 'Updating...';
+    if (!currentPassword || !newPassword || !confirmPassword) { showToast('All fields are required.', true); return; }
+    if (newPassword !== confirmPassword) { showToast('New passwords do not match.', true); return; }
+    if (newPassword.length < 8) { showToast('New password must be at least 8 characters.', true); return; }
 
     const res = await fetch('/api/auth/change-password', {
         method: 'POST',
@@ -154,14 +232,17 @@ async function changePassword() {
         body: JSON.stringify({ currentPassword, newPassword })
     });
 
-    btn.disabled = false;
-    btn.textContent = 'Update Password';
-
     if (res.ok) {
-        document.getElementById('pwForm').reset();
-        showAlert('Password updated successfully.', false);
+        ['currentPassword', 'newPassword', 'confirmPassword'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        showToast('Password updated.', false);
     } else {
-        const err = await res.json();
-        showAlert('Error: ' + (err.error || 'Failed to update password'), true);
+        const err = await res.json().catch(() => ({}));
+        showToast('Error: ' + (err.error?.message || 'Failed'), true);
     }
 }
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loadConfig();
