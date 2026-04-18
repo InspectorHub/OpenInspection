@@ -165,5 +165,6 @@ npx playwright test --reporter=html && open playwright-report/index.html
 - Dev server must be running before tests.
 - `npm run db:migrate` must run at least once before `npm run dev`.
 - Local D1 state: `.wrangler/state/v3/d1/` — delete to reset.
-- Real API keys (Resend, Stripe, Gemini, Turnstile) are not required. Calls are skipped or use mock fallbacks when keys are absent.
+- Real API keys (Resend, Stripe, Gemini) are not required. Calls are skipped or use mock fallbacks when keys are absent.
+- **Turnstile is required** — `TURNSTILE_SECRET_KEY` must be set even for local dev and CI. Use Cloudflare's always-pass test secret (`1x0000000000000000000000000000000AA`). If absent, `POST /api/book` throws a 500 error.
 - The Cloudflare Turnstile test keys in `.dev.vars.example` always pass validation — safe for CI.

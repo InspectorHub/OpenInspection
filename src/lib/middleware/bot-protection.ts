@@ -6,7 +6,7 @@ import { Context, Next } from 'hono';
  * Skips verification when TURNSTILE_SECRET_KEY is not configured (local dev).
  */
 export async function verifyTurnstile(token: string, secretKey: string): Promise<boolean> {
-    if (!secretKey) return true; // Not configured ??skip in local dev
+    if (!secretKey) throw new Error('TURNSTILE_SECRET_KEY is not configured');
     const body = new FormData();
     body.append('secret', secretKey);
     body.append('response', token);
