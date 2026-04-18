@@ -121,8 +121,9 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
 
     const service = c.var.services.booking;
 
-    // Bot Protection
-    if (c.env.TURNSTILE_SECRET_KEY && body.turnstileToken) {
+    // Bot Protection — always enforce when secret is configured
+    if (c.env.TURNSTILE_SECRET_KEY) {
+        if (!body.turnstileToken) throw Errors.Forbidden('Security verification token missing.');
         const isValid = await service.verifyBotProtection(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY);
         if (!isValid) throw Errors.Forbidden('Security verification failed.');
     }

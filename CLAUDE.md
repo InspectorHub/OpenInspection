@@ -53,6 +53,7 @@ npm run deploy       # Deploy to Cloudflare Workers
 | `DB` | Yes | Cloudflare D1 Database binding |
 | `PHOTOS` | Yes | Cloudflare R2 Bucket for image storage |
 | `TENANT_CACHE`| Yes | Cloudflare KV for configuration caching |
+| `TURNSTILE_SECRET_KEY` | **Yes** | Server-side Turnstile verification — `POST /api/book` enforces this. Use test secret `1x0000000000000000000000000000000AA` for local dev. |
 | `APP_BASE_URL` | No | Public URL for OAuth and link generation |
 | `RESEND_API_KEY`| No | Email delivery (via Resend.com) |
 | `GEMINI_API_KEY`| No | AI-powered inspection assistance |

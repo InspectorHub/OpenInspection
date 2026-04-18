@@ -218,7 +218,7 @@ Secrets (set via `wrangler secret put` for production, `.dev.vars` for local):
 | `GEMINI_API_KEY` | No | AI comment and summary assist |
 | `STRIPE_SECRET_KEY` | No | Real Stripe checkout; mock fallback if absent |
 | `STRIPE_WEBHOOK_SECRET` | No | HMAC-SHA256 webhook verification |
-| `TURNSTILE_SECRET_KEY` | No | Server-side Turnstile verification |
+| `TURNSTILE_SECRET_KEY` | **Yes** | Server-side Turnstile verification — `POST /api/book` rejects requests without a valid token when this secret is configured. Use Cloudflare test secret for local dev. |
 | `GOOGLE_CLIENT_ID` | No | Google Calendar OAuth |
 | `GOOGLE_CLIENT_SECRET` | No | Google Calendar OAuth |
 | `CF_ACCOUNT_ID` | No | Cloudflare account ID — required for silo mode |

@@ -208,7 +208,7 @@ cp .dev.vars.example .dev.vars
 | `SENDER_EMAIL` | Any placeholder string |
 | `GEMINI_API_KEY` | Your real key, or leave blank to skip AI |
 | `STRIPE_SECRET_KEY` | Leave blank â€?mock checkout used if absent |
-| `TURNSTILE_SECRET_KEY` | Use Cloudflare test key from `.dev.vars.example` |
+| `TURNSTILE_SECRET_KEY` | **Required.** Use Cloudflare always-pass test secret: `1x0000000000000000000000000000000AA`. If absent, `POST /api/book` returns 500. |
 
 ---
 

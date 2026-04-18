@@ -54,7 +54,7 @@ npm run deploy
 | `GEMINI_API_KEY` | No | AI comment assist — disabled if omitted |
 | `STRIPE_SECRET_KEY` | No | Real Stripe checkout on reports. Falls back to mock if absent. |
 | `STRIPE_WEBHOOK_SECRET` | No | Verifies Stripe webhook HMAC signature. |
-| `TURNSTILE_SECRET_KEY` | No | Server-side Cloudflare Turnstile verification on `/book`. Skipped for dev/demo tenant if absent. |
+| `TURNSTILE_SECRET_KEY` | **Yes** | Server-side Cloudflare Turnstile verification on `POST /api/book`. Booking requests are rejected with 403 if this secret is absent or the token is invalid. Use Cloudflare's test secret (`1x0000000000000000000000000000000AA`) for local dev. |
 | `GOOGLE_CLIENT_ID` | No | Google Calendar OAuth — allows inspectors to sync availability from Google Calendar. |
 | `GOOGLE_CLIENT_SECRET` | No | Google Calendar OAuth client secret. |
 | `CF_ACCOUNT_ID` | No | Cloudflare account ID — required for silo mode (per-tenant isolated D1). |
@@ -63,7 +63,9 @@ npm run deploy
 | `APP_NAME` | No | Global site name default. |
 | `GA_MEASUREMENT_ID` | No | Google Analytics 4 Measurement ID. |
 
-`TURNSTILE_SITE_KEY` is a non-secret var — set it in `wrangler.toml` under `[vars]`. The Cloudflare test keys (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`) are pre-configured and always pass in local dev.
+`TURNSTILE_SITE_KEY` is a non-secret var — set it in `wrangler.toml` under `[vars]`.
+
+> **Turnstile is required in production.** When `TURNSTILE_SECRET_KEY` is set, `POST /api/book` enforces the token — requests without a valid token are rejected. For local dev, use Cloudflare's always-pass test keys: site key `1x00000000000000000000AA`, secret key `1x0000000000000000000000000000000AA`.
 
 Set for production:
 ```bash

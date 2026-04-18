@@ -123,43 +123,43 @@ function renderInspections(list) {
         return;
     }
 
-    tbody.innerHTML = list.map(ins => \`
+    tbody.innerHTML = list.map(ins => `
         <tr class="table-row-hover group">
             <td class="py-6 px-10">
                 <div>
-                    <p class="text-sm font-bold text-slate-900">\${ins.propertyAddress}</p>
-                    <p class="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: \${ins.id.split('-')[0]}</p>
+                    <p class="text-sm font-bold text-slate-900">${ins.propertyAddress}</p>
+                    <p class="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: ${ins.id.split('-')[0]}</p>
                 </div>
             </td>
             <td class="px-8 py-6">
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200 uppercase">
-                        \${(ins.clientName || 'U')[0]}
+                        ${(ins.clientName || 'U')[0]}
                     </div>
                     <div>
-                        <p class="text-[11px] font-bold text-slate-900">\${ins.clientName || 'Unnamed'}</p>
-                        <p class="text-[9px] text-slate-400 font-medium">\${ins.clientEmail || 'No email'}</p>
+                        <p class="text-[11px] font-bold text-slate-900">${ins.clientName || 'Unnamed'}</p>
+                        <p class="text-[9px] text-slate-400 font-medium">${ins.clientEmail || 'No email'}</p>
                     </div>
                 </div>
             </td>
             <td class="px-8 py-6">
-                <span class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest \${getStatusStyle(ins.status)} shadow-sm ring-1 ring-inset">
+                <span class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest ${getStatusStyle(ins.status)} shadow-sm ring-1 ring-inset">
                     <span class="w-1 h-1 rounded-full bg-current"></span>
-                    \${ins.status.replace('_', ' ')}
+                    ${ins.status.replace('_', ' ')}
                 </span>
             </td>
             <td class="px-8 py-6">
-                <p class="text-[11px] font-bold text-slate-900">$\${(ins.price || 0).toLocaleString()}</p>
-                <p class="text-[9px] text-slate-400 font-medium">\${ins.paymentStatus || 'unknown'}</p>
+                <p class="text-[11px] font-bold text-slate-900">$${(ins.price || 0).toLocaleString()}</p>
+                <p class="text-[9px] text-slate-400 font-medium">${ins.paymentStatus || 'unknown'}</p>
             </td>
             <td class="py-6 pl-3 pr-10 text-right">
-                <a href="/api/inspections/\${ins.id}/report" target="_blank" class="inline-flex items-center gap-2 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-indigo-600 transition-all active:scale-95">
+                <a href="/api/inspections/${ins.id}/report" target="_blank" class="inline-flex items-center gap-2 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-indigo-600 transition-all active:scale-95">
                     Live Report
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                 </a>
             </td>
         </tr>
-    \`).join('');
+    `).join('');
 }
 
 function getStatusStyle(status) {
