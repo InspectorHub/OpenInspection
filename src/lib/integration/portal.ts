@@ -16,7 +16,7 @@ export class PortalProvider implements IntegrationProvider {
 
     async handleTenantUpdate(params: TenantUpdateParams): Promise<void> {
         const db = this.getDrizzle();
-        const { id, subdomain, status, tier, name, adminEmail, adminPasswordHash } = params;
+        const { id, subdomain, status, tier, name, maxUsers, adminEmail, adminPasswordHash } = params;
 
         // Upsert tenant
         const existingTenant = await db.select()
@@ -31,6 +31,7 @@ export class PortalProvider implements IntegrationProvider {
                 name: name || subdomain,
                 status: (status as 'active' | 'suspended' | 'trial') || 'active',
                 tier: (tier as 'free' | 'pro' | 'enterprise') || 'free',
+                ...(maxUsers != null ? { maxUsers } : {}),
                 createdAt: new Date(),
             });
         } else {
@@ -39,6 +40,7 @@ export class PortalProvider implements IntegrationProvider {
                     status: (status as 'active' | 'suspended' | 'trial') || existingTenant.status,
                     tier: (tier as 'free' | 'pro' | 'enterprise') || existingTenant.tier,
                     name: name || existingTenant.name,
+                    ...(maxUsers != null ? { maxUsers } : {}),
                 })
                 .where(eq(tenants.subdomain, subdomain));
         }

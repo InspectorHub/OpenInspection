@@ -9,6 +9,7 @@ export interface TenantUpdateParams {
     tier?: 'free' | 'pro' | 'enterprise';
     name?: string;
     deploymentMode?: string;
+    maxUsers?: number;
     adminEmail?: string;
     adminPasswordHash?: string;
 }

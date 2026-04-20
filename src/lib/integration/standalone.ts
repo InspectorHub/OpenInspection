@@ -16,7 +16,7 @@ export class StandaloneProvider implements IntegrationProvider {
 
     async handleTenantUpdate(params: TenantUpdateParams): Promise<void> {
         const db = this.getDrizzle();
-        const { id, subdomain, status, tier, name, deploymentMode, adminEmail, adminPasswordHash } = params;
+        const { id, subdomain, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash } = params;
 
         let tenantId = id || crypto.randomUUID();
         const existingTenant = await db.select().from(tenants).where(eq(tenants.subdomain, subdomain)).get();
@@ -28,18 +28,20 @@ export class StandaloneProvider implements IntegrationProvider {
                 subdomain,
                 tier: tier || 'free',
                 status: (adminEmail ? 'active' : status) || 'pending',
-                deploymentMode: deploymentMode || 'silo', // Default to silo for OS
+                deploymentMode: deploymentMode || 'silo',
+                ...(maxUsers != null ? { maxUsers } : {}),
                 createdAt: new Date(),
             });
         } else {
             tenantId = existingTenant.id;
-            const update: Record<string, string | Date> = { 
-                status: (adminEmail ? 'active' : status) || 'pending' 
+            const update: Record<string, string | number | Date> = {
+                status: (adminEmail ? 'active' : status) || 'pending'
             };
             if (tier) update.tier = tier;
             if (deploymentMode) update.deploymentMode = deploymentMode;
             if (name) update.name = name;
-            
+            if (maxUsers != null) update.maxUsers = maxUsers;
+
             await db.update(tenants).set(update).where(eq(tenants.subdomain, subdomain));
         }
 

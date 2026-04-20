@@ -4,7 +4,7 @@ import { eq, and, count } from 'drizzle-orm';
 import { UserRole } from '../types/auth';
 
 export class TeamService {
-    constructor(private db: D1Database, private env?: { RESEND_API_KEY?: string; SENDER_EMAIL?: string; APP_NAME?: string }) {}
+    constructor(private db: D1Database, private env?: { RESEND_API_KEY?: string; SENDER_EMAIL?: string; APP_NAME?: string; APP_MODE?: string }) {}
 
     private getDB() {
         return drizzle(this.db);
@@ -32,18 +32,20 @@ export class TeamService {
     }) {
         const db = this.getDB();
 
-        // 1. Quota Check
-        const tenantRecord = await db.select({ maxUsers: tenants.maxUsers })
-            .from(tenants).where(eq(tenants.id, params.tenantId)).limit(1);
-        const maxUsers = tenantRecord[0]?.maxUsers ?? 5;
+        // 1. Quota Check (skipped in standalone/self-hosted mode — no seat limits)
+        if (this.env?.APP_MODE !== 'standalone') {
+            const tenantRecord = await db.select({ maxUsers: tenants.maxUsers })
+                .from(tenants).where(eq(tenants.id, params.tenantId)).limit(1);
+            const maxUsers = tenantRecord[0]?.maxUsers ?? 5;
 
-        const currentUsersCount = await db.select({ value: count() }).from(users).where(eq(users.tenantId, params.tenantId));
-        const pendingCount = await db.select({ value: count() }).from(tenantInvites)
-            .where(and(eq(tenantInvites.tenantId, params.tenantId), eq(tenantInvites.status, 'pending')));
+            const currentUsersCount = await db.select({ value: count() }).from(users).where(eq(users.tenantId, params.tenantId));
+            const pendingCount = await db.select({ value: count() }).from(tenantInvites)
+                .where(and(eq(tenantInvites.tenantId, params.tenantId), eq(tenantInvites.status, 'pending')));
 
-        const total = (currentUsersCount[0]?.value ?? 0) + (pendingCount[0]?.value ?? 0);
-        if (total >= maxUsers) {
-            throw new Error(`User limit reached (${maxUsers}). Please upgrade your plan.`);
+            const total = (currentUsersCount[0]?.value ?? 0) + (pendingCount[0]?.value ?? 0);
+            if (total >= maxUsers) {
+                throw new Error(`User limit reached (${maxUsers}). Please upgrade your plan.`);
+            }
         }
 
         // 2. Check if already a member
