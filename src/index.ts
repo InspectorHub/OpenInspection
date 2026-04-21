@@ -120,7 +120,9 @@ app.use('*', async (c, next) => {
             const db = drizzle(c.env.DB);
             const user = await db.select().from(users).limit(1).get();
             if (!user) {
-                const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+                // Use CSPRNG instead of Math.random so the one-hour bootstrap code isn't predictable.
+                const rand = crypto.getRandomValues(new Uint32Array(1))[0];
+                const newCode = (100000 + (rand % 900000)).toString();
                 await c.env.TENANT_CACHE.put('setup_verification_code', newCode, { expirationTtl: 3600 });
                 logger.warn('New system detected. System initialization code generated.', { code: newCode });
                 logger.info(`Initialization Code Required: ${newCode}`);
@@ -141,6 +143,12 @@ app.use('*', async (c, next) => {
         : getCookie(c, 'inspector_token');
 
     if (!token) return next();
+
+    // Fail closed if the signing key is missing or too weak to meaningfully resist offline brute force.
+    if (!c.env.JWT_SECRET || c.env.JWT_SECRET.length < 32) {
+        logger.error('JWT_SECRET is missing or shorter than 32 characters; refusing to verify tokens');
+        throw Errors.Internal('Server configuration error');
+    }
 
     try {
         const payload = await verify(token, c.env.JWT_SECRET, 'HS256');

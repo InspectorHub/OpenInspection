@@ -100,6 +100,8 @@ export class AuthService {
 
     /**
      * Creates a password reset token and stores it in KV.
+     * Value format: "{userId}:{issuedAtUnixSec}" so we can detect tokens that predate
+     * a password change and reject them even though they haven't expired yet.
      */
     async createPasswordResetToken(email: string): Promise<string | null> {
         const db = this.getDrizzle();
@@ -108,7 +110,8 @@ export class AuthService {
 
         const resetToken = crypto.randomUUID();
         const kvKey = `pw_reset:${resetToken}`;
-        await this.kv.put(kvKey, user.id, { expirationTtl: 3600 });
+        const issuedAt = Math.floor(Date.now() / 1000);
+        await this.kv.put(kvKey, `${user.id}:${issuedAt}`, { expirationTtl: 3600 });
         return resetToken;
     }
 
@@ -119,8 +122,20 @@ export class AuthService {
         if (!this.kv) throw Errors.BadRequest('Password reset not available');
 
         const kvKey = `pw_reset:${token}`;
-        const userId = await this.kv.get(kvKey);
-        if (!userId) throw Errors.BadRequest('Invalid or expired reset token');
+        const raw = await this.kv.get(kvKey);
+        if (!raw) throw Errors.BadRequest('Invalid or expired reset token');
+
+        // Support both legacy ("userId") and new ("userId:issuedAt") formats.
+        const sepIdx = raw.indexOf(':');
+        const userId = sepIdx === -1 ? raw : raw.slice(0, sepIdx);
+        const issuedAt = sepIdx === -1 ? 0 : parseInt(raw.slice(sepIdx + 1), 10) || 0;
+
+        // Reject reset tokens issued before the user's last password change.
+        const invalidatedAt = await this.kv.get(`pwchanged:${userId}`);
+        if (invalidatedAt && issuedAt <= parseInt(invalidatedAt, 10)) {
+            await this.kv.delete(kvKey);
+            throw Errors.BadRequest('Invalid or expired reset token');
+        }
 
         const db = this.getDrizzle();
         const newHash = await hashPassword(newPassword);

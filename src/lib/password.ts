@@ -28,6 +28,16 @@ async function sha256Hex(input: string): Promise<string> {
     return toHex(new Uint8Array(buf));
 }
 
+/** Constant-time string comparison. Returns false immediately on length mismatch. */
+function timingSafeEqual(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) {
+        diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return diff === 0;
+}
+
 async function pbkdf2(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<Uint8Array> {
     const key = await crypto.subtle.importKey(
         'raw',
@@ -64,9 +74,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
         const salt = fromHex(parts[1]);
         const expected = parts[2];
         const actual = toHex(await pbkdf2(password, salt, PBKDF2_ITERATIONS));
-        return [actual === expected, false];
+        return [timingSafeEqual(actual, expected), false];
     }
     const legacy = await sha256Hex(password);
-    const valid = legacy === stored;
+    const valid = timingSafeEqual(legacy, stored);
     return [valid, valid];
 }

@@ -154,4 +154,25 @@ describe('AuthService', () => {
             expect.objectContaining({ expirationTtl: 90000 })
         );
     });
+
+    it('should reject a reset token that predates the last password change', async () => {
+        await testDb.insert(users).values({
+            id: 'u-stale',
+            tenantId: 't1',
+            email: 'stale@example.com',
+            passwordHash: 'old',
+            role: 'owner',
+            createdAt: new Date(),
+        });
+
+        // Reset token issued at t=1000, but password was changed at t=2000.
+        await mockKV.put('pw_reset:stale-token', 'u-stale:1000');
+        await mockKV.put('pwchanged:u-stale', '2000');
+
+        await expect(authService.resetPassword('stale-token', 'new-pass'))
+            .rejects.toThrow('Invalid or expired reset token');
+
+        // Stale token should have been scrubbed from KV as a side effect.
+        expect(await mockKV.get('pw_reset:stale-token')).toBeNull();
+    });
 });

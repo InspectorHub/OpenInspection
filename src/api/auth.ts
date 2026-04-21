@@ -2,21 +2,43 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
-import { sign, verify } from 'hono/jwt';
-import { getCookie, setCookie } from 'hono/cookie';
+import { sign } from 'hono/jwt';
+import { setCookie } from 'hono/cookie';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
-import { 
-    LoginSchema, 
-    ChangePasswordSchema, 
-    JoinTeamSchema, 
-    ForgotPasswordSchema, 
+import {
+    LoginSchema,
+    ChangePasswordSchema,
+    JoinTeamSchema,
+    ForgotPasswordSchema,
     ResetPasswordSchema,
     AuthResponseSchema,
     SuccessResponseSchema,
     SetupSchema
 } from '../lib/validations/auth.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
+
+/**
+ * Require a strong JWT_SECRET (≥32 chars) before signing/verifying anything.
+ * Fail-closed if missing or too weak to resist offline brute-force.
+ */
+function requireJwtSecret(secret: string | undefined): string {
+    if (!secret || secret.length < 32) {
+        throw Errors.Internal('Server configuration error');
+    }
+    return secret;
+}
+
+/** Cookie attributes for the auth token. Secure is on everywhere except explicit `development` mode. */
+function authCookieOptions(env: { APP_MODE?: string }) {
+    return {
+        httpOnly: true,
+        secure: env.APP_MODE !== 'development',
+        sameSite: 'Lax' as const,
+        path: '/',
+        maxAge: 60 * 60 * 24,
+    };
+}
 
 /**
  * Interface for the decoded JWT payload.
@@ -63,6 +85,7 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
     const body = c.req.valid('json');
     const user = await c.var.services.auth.validateCredentials(body.email, body.password);
 
+    const secret = requireJwtSecret(c.env.JWT_SECRET);
     const now = Math.floor(Date.now() / 1000);
     const token = await sign({
         sub: user.id,
@@ -72,14 +95,9 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
         role: user.role,
         iat: now,
         exp: now + 60 * 60 * 24,
-    }, c.env.JWT_SECRET, 'HS256');
+    }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, {
-        httpOnly: true,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: 60 * 60 * 24,
-    });
+    setCookie(c, 'inspector_token', token, authCookieOptions(c.env));
 
     return c.json({
         success: true,
@@ -111,15 +129,13 @@ const changePasswordRoute = createRoute({
 });
 
 coreAuthRoutes.openapi(changePasswordRoute, async (c) => {
-    const rawToken = getCookie(c, 'inspector_token') || c.req.header('Authorization')?.replace('Bearer ', '');
-    if (!rawToken) throw Errors.Unauthorized();
-
-    const payload = await verify(rawToken, c.env.JWT_SECRET, 'HS256') as unknown as AuthPayload;
-    if (!payload.sub) throw Errors.Unauthorized();
+    // The global JWT middleware has already verified the token and populated c.var.user.
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
 
     const body = c.req.valid('json');
-    await c.var.services.auth.updatePassword(payload.sub, body.currentPassword, body.newPassword);
-    
+    await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
+
     return c.json({
         success: true,
         data: { success: true }
@@ -152,6 +168,7 @@ coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
     const body = c.req.valid('json');
     const user = await c.var.services.auth.joinTeam(body.token, body.password);
 
+    const secret = requireJwtSecret(c.env.JWT_SECRET);
     const now = Math.floor(Date.now() / 1000);
     const token = await sign({
         sub: user.id,
@@ -161,14 +178,9 @@ coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
         role: user.role,
         iat: now,
         exp: now + 60 * 60 * 24,
-    }, c.env.JWT_SECRET, 'HS256');
+    }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, {
-        httpOnly: true,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: 60 * 60 * 24,
-    });
+    setCookie(c, 'inspector_token', token, authCookieOptions(c.env));
 
     return c.json({
         success: true,
@@ -314,7 +326,8 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
     // 4. Issue a JWT for the new admin so the caller can authenticate immediately
     const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
     let token = '';
-    if (newUser && c.env.JWT_SECRET) {
+    if (newUser) {
+        const secret = requireJwtSecret(c.env.JWT_SECRET);
         const now = Math.floor(Date.now() / 1000);
         token = await sign({
             sub: newUser.id,
@@ -324,10 +337,8 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
             role: newUser.role,
             iat: now,
             exp: now + 60 * 60 * 24,
-        }, c.env.JWT_SECRET, 'HS256');
-        setCookie(c, 'inspector_token', token, {
-            httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 60 * 60 * 24,
-        });
+        }, secret, 'HS256');
+        setCookie(c, 'inspector_token', token, authCookieOptions(c.env));
     }
 
     return c.json({
@@ -362,11 +373,13 @@ const meRoute = createRoute({
 });
 
 coreAuthRoutes.openapi(meRoute, async (c) => {
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
     return c.json({
         success: true,
         data: {
             user: {
-                id: c.get('tenantId'), // Simplified for verification: returning tenantId as a proxy for 'me'
+                id: user.sub,
                 tenantId: c.get('tenantId'),
                 role: c.get('userRole')
             }
