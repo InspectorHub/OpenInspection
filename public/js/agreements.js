@@ -1,37 +1,29 @@
-function parseJwt(t) {
-    if (!t || typeof t !== 'string' || !t.includes('.')) return {};
-    try { return JSON.parse(atob(t.split('.')[1])); } catch { return {}; }
+// Cookie-only auth. Server reads the HttpOnly inspector_token cookie automatically.
+
+const authFetch = (url, opts = {}) =>
+    fetch(url, { credentials: 'same-origin', ...opts });
+
+async function logout() {
+    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/login';
 }
 
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const token = getCookie('inspector_token') || localStorage.getItem('inspector_token');
-    
-    // Avatar Initialization
-    if (token) {
-        const payload = parseJwt(token);
-        const email = payload.email || '';
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const meRes = await authFetch('/api/auth/me');
+        if (meRes.status === 401) { window.location.href = '/login'; return; }
+        const me = await meRes.json();
+        const email = me?.data?.user?.email || '';
         const name = email ? email.split('@')[0] : 'User';
         const avatarEl = document.querySelector('nav img[alt="User"]');
         if (avatarEl) {
             avatarEl.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff';
             avatarEl.alt = name;
         }
-    }
+    } catch { /* fall through; page continues without avatar */ }
 
     const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.onclick = () => {
-            document.cookie = 'inspector_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            localStorage.removeItem('inspector_token');
-            window.location.href = '/login';
-        };
-    }
+    if (logoutBtn) logoutBtn.onclick = logout;
 
     loadAgreements();
 });
@@ -41,10 +33,10 @@ async function loadAgreements() {
     if (!list) return;
 
     try {
-        const res = await fetch('/api/admin/agreements');
+        const res = await authFetch('/api/admin/agreements');
+        if (res.status === 401) { window.location.href = '/login'; return; }
         const response = await res.json();
-        
-        // Correct the data path from response.data.agreements
+
         const agreements = (response.data && response.data.agreements) || response.agreements || [];
 
         if (agreements && agreements.length > 0) {
@@ -116,12 +108,12 @@ async function submitAgreement() {
     btn.textContent = 'Publishing...';
 
     try {
-        const res = await fetch('/api/admin/agreements', {
+        const res = await authFetch('/api/admin/agreements', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, content })
         });
-        
+
         if (res.ok) {
             closeModal();
             document.getElementById('agreementName').value = '';
@@ -143,7 +135,7 @@ async function deleteAgreement(id) {
     if (!confirm('Are you sure you want to remove this agreement?')) return;
 
     try {
-        const res = await fetch(`/api/admin/agreements/${id}`, { method: 'DELETE' });
+        const res = await authFetch(`/api/admin/agreements/${id}`, { method: 'DELETE' });
         if (res.ok) {
             loadAgreements();
         } else {

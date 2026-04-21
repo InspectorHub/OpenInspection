@@ -1,27 +1,15 @@
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-function parseJwt(t) {
-    try { return JSON.parse(atob(t.split('.')[1])); } catch { return {}; }
-}
+// Cookie-only auth: rely on the HttpOnly inspector_token cookie set by the server.
 
-let token = localStorage.getItem('inspector_token');
-if (!token) {
-    const urlParams = new URLSearchParams(window.location.search);
-    token = urlParams.get('token');
-    if (token) {
-        localStorage.setItem('inspector_token', token);
-        window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-        window.location.href = '/login';
-    }
+const authFetch = (url, opts = {}) =>
+    fetch(url, { credentials: 'same-origin', ...opts });
+
+async function logout() {
+    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/login';
 }
 
 const logoutBtn = document.getElementById('logoutBtn');
-if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
-        localStorage.removeItem('inspector_token');
-        window.location.href = '/login';
-    });
-}
+if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 function showToast(msg, isError) {
@@ -37,20 +25,17 @@ function showToast(msg, isError) {
 // ─── Load config on page load ─────────────────────────────────────────────────
 async function loadConfig() {
     try {
-        const res = await fetch('/api/admin/config', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
+        const res = await authFetch('/api/admin/config');
+        if (res.status === 401) { window.location.href = '/login'; return; }
         if (!res.ok) return;
         const { data } = await res.json();
         const ic = data.integrationConfig || {};
         const s = data.secrets || {};
 
-        // Integration config (plaintext)
         if (ic.appBaseUrl) setVal('appBaseUrl', ic.appBaseUrl);
         if (ic.turnstileSiteKey) setVal('turnstileSiteKey', ic.turnstileSiteKey);
         if (ic.googleClientId) setVal('googleClientId', ic.googleClientId);
 
-        // Masked secrets — show placeholder to indicate configured
         setMasked('resendApiKey', s.resendApiKey);
         setMasked('senderEmail', s.senderEmail);
         setMasked('turnstileSecretKey', s.turnstileSecretKey);
@@ -78,9 +63,8 @@ function handleLogoSelect(event) {
     const formData = new FormData();
     formData.append('logo', file);
 
-    fetch('/api/admin/branding/logo', {
+    authFetch('/api/admin/branding/logo', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token },
         body: formData
     }).then(r => r.json()).then(data => {
         if (data.logoUrl) {
@@ -109,16 +93,15 @@ async function saveBranding() {
         primaryColor: document.getElementById('primaryColor')?.value,
         gaMeasurementId: document.getElementById('gaMeasurementId')?.value,
     };
-    // Remove empty keys
     Object.keys(body).forEach(k => { if (!body[k]) delete body[k]; });
 
     const btn = document.getElementById('saveBrandingBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
     try {
-        const res = await fetch('/api/admin/branding', {
+        const res = await authFetch('/api/admin/branding', {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
         showToast(res.ok ? 'Branding saved.' : 'Failed to save branding.', !res.ok);
@@ -129,12 +112,6 @@ async function saveBranding() {
     }
 }
 
-// ─── Save secrets (encrypted) ─────────────────────────────────────────────────
-// `section` controls which fields are included:
-//   'email'      → resendApiKey, senderEmail
-//   'turnstile'  → turnstileSecretKey (+ siteKey goes to integration)
-//   'ai'         → geminiApiKey
-//   'google'     → googleClientSecret (+ clientId goes to integration)
 async function saveSecrets(section) {
     const secretFields = {
         email: ['resendApiKey', 'senderEmail'],
@@ -149,20 +126,18 @@ async function saveSecrets(section) {
         if (val && val.trim()) body[field] = val.trim();
     }
 
-    // Nothing entered — nothing to save
     if (Object.keys(body).length === 0) {
         showToast('No changes to save.', false);
         return;
     }
 
     try {
-        const res = await fetch('/api/admin/config/secrets', {
+        const res = await authFetch('/api/admin/config/secrets', {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
         if (res.ok) {
-            // Clear fields and reload masked placeholders
             for (const field of (secretFields[section] || [])) {
                 const el = document.getElementById(field);
                 if (el) el.value = '';
@@ -177,7 +152,6 @@ async function saveSecrets(section) {
     }
 }
 
-// ─── Save integration config (plaintext) ─────────────────────────────────────
 async function saveIntegration() {
     const body = {};
     const plainFields = ['appBaseUrl', 'turnstileSiteKey', 'googleClientId'];
@@ -186,12 +160,11 @@ async function saveIntegration() {
         if (val) body[field] = val;
     }
 
-    // Google client secret goes to encrypted store
     const googleSecret = document.getElementById('googleClientSecret')?.value?.trim();
     if (googleSecret) {
-        await fetch('/api/admin/config/secrets', {
+        await authFetch('/api/admin/config/secrets', {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ googleClientSecret: googleSecret })
         });
         const el = document.getElementById('googleClientSecret');
@@ -204,9 +177,9 @@ async function saveIntegration() {
     }
 
     try {
-        const res = await fetch('/api/admin/config', {
+        const res = await authFetch('/api/admin/config', {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
         await loadConfig();
@@ -216,7 +189,6 @@ async function saveIntegration() {
     }
 }
 
-// ─── Change password ──────────────────────────────────────────────────────────
 async function changePassword() {
     const currentPassword = document.getElementById('currentPassword')?.value;
     const newPassword = document.getElementById('newPassword')?.value;
@@ -226,9 +198,9 @@ async function changePassword() {
     if (newPassword !== confirmPassword) { showToast('New passwords do not match.', true); return; }
     if (newPassword.length < 8) { showToast('New password must be at least 8 characters.', true); return; }
 
-    const res = await fetch('/api/auth/change-password', {
+    const res = await authFetch('/api/auth/change-password', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPassword, newPassword })
     });
 
@@ -237,12 +209,13 @@ async function changePassword() {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
-        showToast('Password updated.', false);
+        showToast('Password updated. Please sign in again.', false);
+        // Changing password revokes the current token. Force a re-auth.
+        setTimeout(() => { window.location.href = '/login'; }, 1500);
     } else {
         const err = await res.json().catch(() => ({}));
         showToast('Error: ' + (err.error?.message || 'Failed'), true);
     }
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
 loadConfig();

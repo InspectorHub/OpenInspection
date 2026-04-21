@@ -103,11 +103,16 @@ app.use('*', diMiddleware);
 app.use('*', tenantRouter);
 app.use('*', brandingMiddleware);
 
+// Static asset extensions — these bypass JWT verification. We use a strict allowlist
+// rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
+// can't trick the middleware into treating a protected route as public.
+const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|otf|json|txt|pdf)$/i;
+
 // Global JWT Middleware — extracts tenantId / userRole from Bearer token or cookie.
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || path.includes('.');
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join') return next();
 

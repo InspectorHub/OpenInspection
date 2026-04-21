@@ -3,6 +3,10 @@ import { eq } from 'drizzle-orm';
 import { users, tenantInvites } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
+import { logger } from '../lib/logger';
+
+/** Dummy PBKDF2 hash used to equalize verify() timing when the email lookup misses. */
+const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000';
 
 /**
  * Service to handle all authentication-related business logic.
@@ -15,6 +19,20 @@ export class AuthService {
         return drizzle(this.db);
     }
 
+    /** Write a session-invalidation marker for a user. Safe to call during DB mutations. */
+    private async writeInvalidation(userId: string) {
+        if (!this.kv) return;
+        const ts = Math.floor(Date.now() / 1000).toString();
+        try {
+            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+        } catch (err) {
+            logger.warn('Failed to write session-invalidation key; outstanding tokens may remain valid until exp', {
+                userId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
     /**
      * Hashes a password using PBKDF2-SHA256. Thin wrapper retained so callers
      * that reach in via the service (e.g. the setup route) keep working.
@@ -25,12 +43,18 @@ export class AuthService {
 
     /**
      * Validates a user's credentials. Lazily upgrades legacy SHA-256 hashes to PBKDF2.
+     * Runs PBKDF2 even when the email is unknown to hide user-existence via timing.
      */
     async validateCredentials(email: string, password: string) {
         const db = this.getDrizzle();
         const user = await db.select().from(users).where(eq(users.email, email)).get();
 
-        if (!user) throw Errors.Unauthorized('Invalid email or password');
+        if (!user) {
+            // Perform a throwaway verification against a fixed hash so the response time
+            // does not leak whether the email exists.
+            await verifyPassword(password, DUMMY_HASH);
+            throw Errors.Unauthorized('Invalid email or password');
+        }
 
         const [valid, needsRehash] = await verifyPassword(password, user.passwordHash);
         if (!valid) {
@@ -60,11 +84,7 @@ export class AuthService {
 
         const newHash = await hashPassword(newPassword);
         await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
-
-        if (this.kv) {
-            const ts = Math.floor(Date.now() / 1000).toString();
-            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
-        }
+        await this.writeInvalidation(userId);
     }
 
     /**
@@ -141,8 +161,14 @@ export class AuthService {
         const newHash = await hashPassword(newPassword);
         await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
         await this.kv.delete(kvKey);
+        await this.writeInvalidation(userId);
+    }
 
-        const ts = Math.floor(Date.now() / 1000).toString();
-        await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+    /**
+     * Invalidate all outstanding JWTs for a user. Call this from any future endpoint
+     * that changes a user's role, disables them, deletes them, or on explicit logout.
+     */
+    async invalidateUserSessions(userId: string) {
+        await this.writeInvalidation(userId);
     }
 }

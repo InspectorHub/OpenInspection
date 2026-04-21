@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { sign } from 'hono/jwt';
-import { setCookie } from 'hono/cookie';
+import { setCookie, deleteCookie } from 'hono/cookie';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
 import {
@@ -29,11 +29,15 @@ function requireJwtSecret(secret: string | undefined): string {
     return secret;
 }
 
-/** Cookie attributes for the auth token. Secure is on everywhere except explicit `development` mode. */
-function authCookieOptions(env: { APP_MODE?: string }) {
+/**
+ * Cookie attributes for the auth token. `Secure` is always set — Cloudflare Workers only
+ * serve over HTTPS in production, and modern browsers treat `localhost` as a trustworthy
+ * origin so Secure cookies still work under `wrangler dev`.
+ */
+function authCookieOptions() {
     return {
         httpOnly: true,
-        secure: env.APP_MODE !== 'development',
+        secure: true,
         sameSite: 'Lax' as const,
         path: '/',
         maxAge: 60 * 60 * 24,
@@ -97,11 +101,14 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
         exp: now + 60 * 60 * 24,
     }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, authCookieOptions(c.env));
+    setCookie(c, 'inspector_token', token, authCookieOptions());
 
+    // Intentionally do NOT return the token in the body. Browser clients authenticate via the
+    // HttpOnly cookie. Exposing the raw JWT in JSON invites clients to persist it in localStorage
+    // or a JS-readable cookie, which defeats HttpOnly and widens the XSS blast radius.
     return c.json({
         success: true,
-        data: { token, redirect: '/dashboard' }
+        data: { redirect: '/dashboard' }
     }, 200);
 });
 
@@ -180,11 +187,11 @@ coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
         exp: now + 60 * 60 * 24,
     }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, authCookieOptions(c.env));
+    setCookie(c, 'inspector_token', token, authCookieOptions());
 
     return c.json({
         success: true,
-        data: { token, redirect: '/dashboard' }
+        data: { redirect: '/dashboard' }
     }, 200);
 });
 
@@ -325,11 +332,10 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
 
     // 4. Issue a JWT for the new admin so the caller can authenticate immediately
     const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
-    let token = '';
     if (newUser) {
         const secret = requireJwtSecret(c.env.JWT_SECRET);
         const now = Math.floor(Date.now() / 1000);
-        token = await sign({
+        const token = await sign({
             sub: newUser.id,
             email: newUser.email,
             'custom:tenantId': newUser.tenantId,
@@ -338,13 +344,12 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
             iat: now,
             exp: now + 60 * 60 * 24,
         }, secret, 'HS256');
-        setCookie(c, 'inspector_token', token, authCookieOptions(c.env));
+        setCookie(c, 'inspector_token', token, authCookieOptions());
     }
 
     return c.json({
         success: true,
-        token,
-        data: { token, redirect: '/dashboard' }
+        data: { redirect: '/dashboard' }
     }, 200);
 });
 
@@ -360,6 +365,7 @@ const meRoute = createRoute({
                     schema: createApiResponseSchema(z.object({
                         user: z.object({
                             id: z.string(),
+                            email: z.string().optional(),
                             tenantId: z.string().optional(),
                             role: z.string()
                         })
@@ -380,11 +386,44 @@ coreAuthRoutes.openapi(meRoute, async (c) => {
         data: {
             user: {
                 id: user.sub,
+                email: user.email,
                 tenantId: c.get('tenantId'),
                 role: c.get('userRole')
             }
         }
     }, 200);
+});
+
+const logoutRoute = createRoute({
+    method: 'post',
+    path: '/logout',
+    summary: 'Log Out',
+    description: 'Clears the auth cookie and revokes outstanding JWTs for this user.',
+    responses: {
+        200: {
+            content: {
+                'application/json': { schema: SuccessResponseSchema }
+            },
+            description: 'Logout successful'
+        }
+    }
+});
+
+coreAuthRoutes.openapi(logoutRoute, async (c) => {
+    // If the request carries a valid token, revoke all of this user's tokens server-side.
+    // The JS client can't clear an HttpOnly cookie — we must do it via Set-Cookie.
+    const user = c.get('user');
+    if (user?.sub) {
+        await c.var.services.auth.invalidateUserSessions(user.sub);
+    }
+
+    deleteCookie(c, 'inspector_token', {
+        path: '/',
+        secure: true,
+        sameSite: 'Lax',
+    });
+
+    return c.json({ success: true, data: { success: true } }, 200);
 });
 
 export default coreAuthRoutes;
