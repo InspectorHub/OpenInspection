@@ -64,7 +64,7 @@ calendarRoutes.get('/connect', async (c) => {
         return c.json({ error: 'Google Calendar integration is not configured' }, 501);
     }
 
-    const token = getCookie(c, 'inspector_token');
+    const token = getCookie(c, '__Host-inspector_token');
     if (!token) return c.redirect('/login');
     let payload: HonoConfig['Variables']['user'];
     try {
@@ -161,7 +161,7 @@ const disconnectRoute = createRoute({
 });
 
 calendarRoutes.openapi(disconnectRoute, async (c) => {
-    const token = getCookie(c, 'inspector_token');
+    const token = getCookie(c, '__Host-inspector_token');
     if (!token) return c.json({ error: 'Not authenticated' }, 401);
     let payload: HonoConfig['Variables']['user'];
     try {
@@ -204,7 +204,7 @@ const syncRoute = createRoute({
 });
 
 calendarRoutes.openapi(syncRoute, async (c) => {
-    const token = getCookie(c, 'inspector_token');
+    const token = getCookie(c, '__Host-inspector_token');
     if (!token) return c.json({ error: 'Not authenticated' }, 401);
     let payload: HonoConfig['Variables']['user'];
     try {

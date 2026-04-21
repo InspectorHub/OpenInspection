@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
 const BASE = 'http://localhost:8789';
+
+/** Fetch a CSRF token by visiting GET /login. Required for POST /api/auth/login. */
+async function getCsrfToken(request: APIRequestContext): Promise<string> {
+  const pageRes = await request.get(`${BASE}/login`);
+  const setCookie = pageRes.headers()['set-cookie'] ?? '';
+  const match = setCookie.match(/__Host-csrf_token=([^;]+)/);
+  return match?.[1] ?? '';
+}
 
 // ─── Global Setup ─────────────────────────────────────────────────────────────
 // Attempt to initialize the workspace. If the DB is empty, POST /setup creates
@@ -32,7 +41,7 @@ test.beforeAll(async ({ request }) => {
 
   // Token now travels via the HttpOnly cookie only, not in the JSON body.
   const setupCookie = res.headers()['set-cookie'] ?? '';
-  const setupMatch = setupCookie.match(/inspector_token=([^;]+)/);
+  const setupMatch = setupCookie.match(/__Host-inspector_token=([^;]+)/);
   setupToken = setupMatch?.[1] ?? '';
   if (!setupToken) return;
 
@@ -51,13 +60,14 @@ test.beforeAll(async ({ request }) => {
     headers: { 'Content-Type': 'application/json' },
   });
 
+  const csrf = await getCsrfToken(request);
   const loginRes = await request.post(`${BASE}/api/auth/login`, {
     data: { email: AGENT_EMAIL, password: 'agentpass99' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   if (loginRes.status() !== 200) return;
   const cookie = loginRes.headers()['set-cookie'] ?? '';
-  const match = cookie.match(/inspector_token=([^;]+)/);
+  const match = cookie.match(/__Host-inspector_token=([^;]+)/);
   agentToken = match?.[1] ?? '';
 });
 
@@ -107,9 +117,10 @@ test('GET /login renders HTML with email + password form', async ({ page }) => {
 });
 
 test('POST /api/auth/login rejects wrong password', async ({ request }) => {
+  const csrf = await getCsrfToken(request);
   const res = await request.post(`${BASE}/api/auth/login`, {
     data: { email: 'admin@example.com', password: 'definitely-wrong-password' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   expect(res.status()).toBe(401);
   const body = await res.json();
@@ -117,9 +128,10 @@ test('POST /api/auth/login rejects wrong password', async ({ request }) => {
 });
 
 test('POST /api/auth/login rejects missing fields', async ({ request }) => {
+  const csrf = await getCsrfToken(request);
   const res = await request.post(`${BASE}/api/auth/login`, {
     data: { email: 'admin@example.com' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   expect(res.status()).toBe(400);
   const body = await res.json();
@@ -131,9 +143,16 @@ test('POST /api/auth/login succeeds and sets inspector_token cookie', async ({ r
   // If the DB was pre-existing, we cannot guarantee which password was used.
   test.skip(!setupToken, 'Skipping: DB was pre-existing; run against a fresh DB to verify login success');
 
+  // Double-submit CSRF: visit GET /login to mint a __Host-csrf_token cookie, then echo it.
+  const pageRes = await request.get(`${BASE}/login`);
+  const csrfSetCookie = pageRes.headers()['set-cookie'] ?? '';
+  const csrfMatch = csrfSetCookie.match(/__Host-csrf_token=([^;]+)/);
+  const csrf = csrfMatch?.[1] ?? '';
+  expect(csrf).not.toBe('');
+
   const res = await request.post(`${BASE}/api/auth/login`, {
     data: { email: 'admin@example.com', password: 'testpassword123' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   expect(res.status()).toBe(200);
   const body = await res.json();
@@ -145,9 +164,17 @@ test('POST /api/auth/login succeeds and sets inspector_token cookie', async ({ r
   expect(body.token).toBeUndefined();
   const setCookie = res.headers()['set-cookie'];
   expect(setCookie).toBeDefined();
-  expect(setCookie).toContain('inspector_token');
+  expect(setCookie).toContain("__Host-inspector_token");
   expect(setCookie).toContain('HttpOnly');
   expect(setCookie).toContain('Secure');
+});
+
+test('POST /api/auth/login rejects request without CSRF token', async ({ request }) => {
+  const res = await request.post(`${BASE}/api/auth/login`, {
+    data: { email: 'anyone@example.com', password: 'whatever' },
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(res.status()).toBe(403);
 });
 
 // ─── Dashboard Auth Guard ─────────────────────────────────────────────────────
@@ -918,7 +945,7 @@ test.describe('invite and join flow (authenticated)', () => {
     expect(body.redirect).toBe('/dashboard');
     // httpOnly cookie set in response
     const cookie = res.headers()['set-cookie'];
-    expect(cookie).toContain('inspector_token');
+    expect(cookie).toContain("__Host-inspector_token");
   });
 
   test('POST /api/auth/join rejects a second use of the same token', async ({ request }) => {
@@ -934,15 +961,16 @@ test.describe('invite and join flow (authenticated)', () => {
 
   test('new user from invite can log in with their password', async ({ request }) => {
     test.skip(!inviteToken, 'Skipping: invite not created (requires fresh DB)');
+    const csrf = await getCsrfToken(request);
     const res = await request.post(`${BASE}/api/auth/login`, {
       data: { email: joinEmail, password: 'securepass99' },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
     const cookie = res.headers()['set-cookie'];
-    expect(cookie).toContain('inspector_token');
+    expect(cookie).toContain("__Host-inspector_token");
   });
 });
 
@@ -1061,15 +1089,15 @@ test.describe('password change (authenticated)', () => {
       headers: { 'Content-Type': 'application/json' },
     });
     if (joinRes.status() !== 200) return;
-    // Extract token from cookie for subsequent Bearer usage
+    const csrf = await getCsrfToken(request);
     const loginRes = await request.post(`${BASE}/api/auth/login`, {
       data: { email: pwEmail, password: originalPassword },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     if (loginRes.status() !== 200) return;
     // Parse token from cookie set-cookie header
     const cookie = loginRes.headers()['set-cookie'] ?? '';
-    const match = cookie.match(/inspector_token=([^;]+)/);
+    const match = cookie.match(/__Host-inspector_token=([^;]+)/);
     userToken = match?.[1] ?? '';
   });
 
@@ -1108,18 +1136,20 @@ test.describe('password change (authenticated)', () => {
 
   test('old password is rejected after change', async ({ request }) => {
     test.skip(!userToken, 'Skipping: user setup failed (requires fresh DB)');
+    const csrf = await getCsrfToken(request);
     const res = await request.post(`${BASE}/api/auth/login`, {
       data: { email: pwEmail, password: originalPassword },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     expect(res.status()).toBe(401);
   });
 
   test('new password works after change', async ({ request }) => {
     test.skip(!userToken, 'Skipping: user setup failed (requires fresh DB)');
+    const csrf = await getCsrfToken(request);
     const res = await request.post(`${BASE}/api/auth/login`, {
       data: { email: pwEmail, password: newPassword },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     expect(res.status()).toBe(200);
     const body = await res.json();

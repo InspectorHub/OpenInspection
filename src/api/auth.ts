@@ -6,6 +6,7 @@ import { sign } from 'hono/jwt';
 import { setCookie, deleteCookie } from 'hono/cookie';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
+import { requireCsrfToken } from '../lib/middleware/csrf';
 import {
     LoginSchema,
     ChangePasswordSchema,
@@ -30,26 +31,27 @@ function requireJwtSecret(secret: string | undefined): string {
 }
 
 /**
- * Cookie attributes for the auth token. `Secure` is always set — Cloudflare Workers only
- * serve over HTTPS in production, and modern browsers treat `localhost` as a trustworthy
- * origin so Secure cookies still work under `wrangler dev`.
+ * Cookie attributes for the auth token. `__Host-` prefix demands Secure + path=/ + no Domain,
+ * which this helper already satisfies. SameSite=Strict blocks all cross-site cookie sending —
+ * including top-level navigation — so a malicious link can never drag a logged-in session
+ * into a mutation or a sensitive GET.
  */
 function authCookieOptions() {
     return {
         httpOnly: true,
         secure: true,
-        sameSite: 'Lax' as const,
+        sameSite: 'Strict' as const,
         path: '/',
         maxAge: 60 * 60 * 24,
     };
 }
 
 /**
- * Interface for the decoded JWT payload.
+ * Interface for the decoded JWT payload. Intentionally does not carry email or any other
+ * PII — JWTs are signed, not encrypted.
  */
 export interface AuthPayload {
     sub: string;
-    email: string;
     'custom:tenantId': string;
     'custom:userRole': string;
     role: string;
@@ -66,6 +68,7 @@ const loginRoute = createRoute({
     path: '/login',
     summary: 'User Login',
     description: 'Validates credentials and sets a JWT cookie.',
+    middleware: [requireCsrfToken],
     request: {
         body: {
             content: {
@@ -91,9 +94,10 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
 
     const secret = requireJwtSecret(c.env.JWT_SECRET);
     const now = Math.floor(Date.now() / 1000);
+    // Email is intentionally NOT in the payload — JWTs are signed but not encrypted, and the
+    // token travels through logs / intermediaries. PII belongs in the DB, not in the bearer.
     const token = await sign({
         sub: user.id,
-        email: user.email,
         'custom:tenantId': user.tenantId,
         'custom:userRole': user.role,
         role: user.role,
@@ -101,7 +105,7 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
         exp: now + 60 * 60 * 24,
     }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, authCookieOptions());
+    setCookie(c, '__Host-inspector_token', token, authCookieOptions());
 
     // Intentionally do NOT return the token in the body. Browser clients authenticate via the
     // HttpOnly cookie. Exposing the raw JWT in JSON invites clients to persist it in localStorage
@@ -179,7 +183,6 @@ coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
     const now = Math.floor(Date.now() / 1000);
     const token = await sign({
         sub: user.id,
-        email: user.email,
         'custom:tenantId': user.tenantId,
         'custom:userRole': user.role,
         role: user.role,
@@ -187,7 +190,7 @@ coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
         exp: now + 60 * 60 * 24,
     }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, authCookieOptions());
+    setCookie(c, '__Host-inspector_token', token, authCookieOptions());
 
     return c.json({
         success: true,
@@ -337,14 +340,13 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
         const now = Math.floor(Date.now() / 1000);
         const token = await sign({
             sub: newUser.id,
-            email: newUser.email,
             'custom:tenantId': newUser.tenantId,
             'custom:userRole': newUser.role,
             role: newUser.role,
             iat: now,
             exp: now + 60 * 60 * 24,
         }, secret, 'HS256');
-        setCookie(c, 'inspector_token', token, authCookieOptions());
+        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
     }
 
     return c.json({
@@ -381,12 +383,17 @@ const meRoute = createRoute({
 coreAuthRoutes.openapi(meRoute, async (c) => {
     const user = c.get('user');
     if (!user?.sub) throw Errors.Unauthorized();
+
+    // Email is stored only in the DB, never the JWT.
+    const db = drizzle(c.env.DB);
+    const row = await db.select({ email: users.email }).from(users).where(eq(users.id, user.sub)).get();
+
     return c.json({
         success: true,
         data: {
             user: {
                 id: user.sub,
-                email: user.email,
+                email: row?.email,
                 tenantId: c.get('tenantId'),
                 role: c.get('userRole')
             }
@@ -417,10 +424,10 @@ coreAuthRoutes.openapi(logoutRoute, async (c) => {
         await c.var.services.auth.invalidateUserSessions(user.sub);
     }
 
-    deleteCookie(c, 'inspector_token', {
+    deleteCookie(c, '__Host-inspector_token', {
         path: '/',
         secure: true,
-        sameSite: 'Lax',
+        sameSite: 'Strict',
     });
 
     return c.json({ success: true, data: { success: true } }, 200);

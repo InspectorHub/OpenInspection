@@ -1,3 +1,8 @@
+function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+}
+
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
@@ -14,9 +19,15 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     errorMsg.classList.add('hidden');
 
     try {
+        // Double-submit CSRF: the server issued __Host-csrf_token on GET /login; we echo it
+        // as X-CSRF-Token so the server can verify the request originated from its own page.
+        const csrf = getCookie('__Host-csrf_token');
         const res = await fetch('/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrf,
+            },
             credentials: 'same-origin',
             body: JSON.stringify({ email, password }),
         });
