@@ -87,6 +87,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
                 </div>
 
+                <script src="/js/modal-dialog.js"></script>
                 <script src="/js/templates.js"></script>
             </div>
         </MainLayout>

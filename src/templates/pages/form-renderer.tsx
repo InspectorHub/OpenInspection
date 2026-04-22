@@ -323,6 +323,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     </div>
                 </div>
                 
+                <script src="/js/modal-dialog.js"></script>
                 <script src="/js/form-renderer.js"></script>
             </div>
         </BareLayout>

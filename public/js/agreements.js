@@ -108,7 +108,7 @@ async function submitAgreement() {
     const btn = document.getElementById('submitAgreementBtn');
 
     if (!name || !content) {
-        alert('Name and content are required');
+        modalAlert('Name and content are required', 'Validation');
         return;
     }
 
@@ -129,10 +129,10 @@ async function submitAgreement() {
             loadAgreements();
         } else {
             const err = await res.json();
-            alert(err.error || 'Failed to create agreement');
+            modalAlert(err.error || 'Failed to create agreement', 'Error');
         }
     } catch (e) {
-        alert('An error occurred during publication');
+        modalAlert('An error occurred during publication', 'Error');
     } finally {
         btn.disabled = false;
         btn.textContent = 'Publish Agreement';
@@ -140,16 +140,16 @@ async function submitAgreement() {
 }
 
 async function deleteAgreement(id) {
-    if (!confirm('Are you sure you want to remove this agreement?')) return;
+    if (!await modalConfirm('Are you sure you want to remove this agreement?', 'Remove Agreement')) return;
 
     try {
         const res = await fetch(`/api/admin/agreements/${id}`, { method: 'DELETE' });
         if (res.ok) {
             loadAgreements();
         } else {
-            alert('Failed to delete agreement');
+            await modalAlert('Failed to delete agreement', 'Error');
         }
     } catch (e) {
-        alert('An error occurred during removal');
+        await modalAlert('An error occurred during removal', 'Error');
     }
 }

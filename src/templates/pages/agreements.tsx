@@ -86,6 +86,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                     </div>
                 </div>
 
+                <script src="/js/modal-dialog.js"></script>
                 <script src="/js/agreements.js"></script>
             </div>
         </MainLayout>

@@ -13,7 +13,7 @@ ENVIRONMENT = "production"
 APP_NAME = "InspectorHub Software"
 PRIMARY_COLOR = "#4f46e5"
 # Shared SaaS core URL
-APP_BASE_URL = "https://openinspection.workers.dev"
+APP_BASE_URL = "https://app.inspectorhub.io"
 APP_MODE = "saas"
 
 # ── SaaS Portal Integration ──────────────────────────────────────────────

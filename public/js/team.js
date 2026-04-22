@@ -36,12 +36,12 @@
             }
 
             const response = await res.json();
-            const { members = [], invites = [] } = response.data || response;
+            const { members = [], invites = [], maxUsers } = response.data || response;
 
             // Quota display
             const pending = invites.filter(i => i.status === 'pending');
             const total = members.length + pending.length;
-            quotaBadge.textContent = `Seats used: ${total}`;
+            quotaBadge.textContent = maxUsers ? `Seats used: ${total} / ${maxUsers}` : `Seats used: ${total}`;
 
             renderMembers(members);
             renderInvites(pending);
@@ -134,7 +134,7 @@
                 document.getElementById('inviteEmail').value = '';
                 fetchData();
             } else {
-                inviteResult.textContent = data.error || 'Invitation failed.';
+                inviteResult.textContent = data.error?.message || data.error || 'Invitation failed.';
                 inviteResult.classList.remove('hidden');
             }
         } catch {

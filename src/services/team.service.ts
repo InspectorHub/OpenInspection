@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import { UserRole } from '../types/auth';
+import { Errors } from '../lib/errors';
 
 export class TeamService {
     constructor(private db: D1Database, private env?: { RESEND_API_KEY?: string; SENDER_EMAIL?: string; APP_NAME?: string; APP_MODE?: string }) {}
@@ -12,17 +13,21 @@ export class TeamService {
 
     async getMembers(tenantId: string) {
         const db = this.getDB();
-        const activeUsers = await db.select({
-            id: users.id,
-            email: users.email,
-            role: users.role,
-            createdAt: users.createdAt
-        }).from(users).where(eq(users.tenantId, tenantId));
+        const [activeUsers, pendingInvites, tenantRecord] = await Promise.all([
+            db.select({
+                id: users.id,
+                email: users.email,
+                role: users.role,
+                createdAt: users.createdAt
+            }).from(users).where(eq(users.tenantId, tenantId)),
+            db.select().from(tenantInvites)
+                .where(and(eq(tenantInvites.tenantId, tenantId), eq(tenantInvites.status, 'pending'))),
+            db.select({ maxUsers: tenants.maxUsers })
+                .from(tenants).where(eq(tenants.id, tenantId)).limit(1),
+        ]);
 
-        const pendingInvites = await db.select().from(tenantInvites)
-            .where(and(eq(tenantInvites.tenantId, tenantId), eq(tenantInvites.status, 'pending')));
-
-        return { activeUsers, pendingInvites };
+        const maxUsers = tenantRecord[0]?.maxUsers ?? 3;
+        return { activeUsers, pendingInvites, maxUsers };
     }
 
     async createInvite(params: {
@@ -36,7 +41,7 @@ export class TeamService {
         if (this.env?.APP_MODE !== 'standalone') {
             const tenantRecord = await db.select({ maxUsers: tenants.maxUsers })
                 .from(tenants).where(eq(tenants.id, params.tenantId)).limit(1);
-            const maxUsers = tenantRecord[0]?.maxUsers ?? 5;
+            const maxUsers = tenantRecord[0]?.maxUsers ?? 3;
 
             const currentUsersCount = await db.select({ value: count() }).from(users).where(eq(users.tenantId, params.tenantId));
             const pendingCount = await db.select({ value: count() }).from(tenantInvites)
@@ -44,14 +49,14 @@ export class TeamService {
 
             const total = (currentUsersCount[0]?.value ?? 0) + (pendingCount[0]?.value ?? 0);
             if (total >= maxUsers) {
-                throw new Error(`User limit reached (${maxUsers}). Please upgrade your plan.`);
+                throw Errors.Forbidden(`Seat limit reached (${maxUsers}). Request more seats from your workspace dashboard.`);
             }
         }
 
         // 2. Check if already a member
         const existing = await db.select().from(users)
             .where(and(eq(users.tenantId, params.tenantId), eq(users.email, params.email))).limit(1);
-        if (existing.length > 0) throw new Error('User is already a member');
+        if (existing.length > 0) throw Errors.Conflict('User is already a member');
 
         // 3. Create Invite (7-day expiry)
         const inviteToken = crypto.randomUUID();

@@ -233,7 +233,7 @@ async function submitInspection() {
     };
 
     if (!body.propertyAddress || !body.templateId) {
-        alert('Address and Template logic are required.');
+        modalAlert('Address and Template logic are required.', 'Validation');
         return;
     }
 
@@ -253,7 +253,7 @@ async function submitInspection() {
        });
 
        if (res.ok) {
-           alert('Inspection deployed successfully!');
+           await modalAlert('Inspection deployed successfully!', 'Success');
            closeModal();
            // Clear form
            document.getElementById('propAddress').value = '';
@@ -265,11 +265,11 @@ async function submitInspection() {
            fetchInspections(token, true);
        } else {
            const err = await res.json();
-           alert("Sync Error: " + (err.error || 'Failed to deploy workflow'));
+           await modalAlert('Sync Error: ' + (err.error || 'Failed to deploy workflow'), 'Error');
        }
    } catch (e) {
        console.error(e);
-       alert('Connection error while deploying workflow.');
+       await modalAlert('Connection error while deploying workflow.', 'Error');
    } finally {
        if (btn) {
            btn.disabled = false;

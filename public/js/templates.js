@@ -133,7 +133,7 @@ function renderTemplates() {
 }
 
 async function deleteTemplate(id) {
-    if (!confirm('Eliminate this template from the repository?')) return;
+    if (!await modalConfirm('Eliminate this template from the repository?', 'Remove Template')) return;
     const token = localStorage.getItem('inspector_token') || getCookie('inspector_token');
     const res = await fetch('/api/inspections/templates/' + id, {
         method: 'DELETE',
@@ -144,7 +144,7 @@ async function deleteTemplate(id) {
         renderTemplates();
     } else {
         const err = await res.json();
-        alert('Deployment Error: ' + (err.error || 'Failed to delete'));
+        modalAlert('Deployment Error: ' + (err.error || 'Failed to delete'), 'Error');
     }
 }
 
@@ -161,12 +161,12 @@ function closeModal() {
 async function submitTemplate() {
     const name = document.getElementById('tplName').value.trim();
     const schemaRaw = document.getElementById('tplSchema').value.trim();
-    if (!name) { alert('Please enter a template name.'); return; }
+    if (!name) { modalAlert('Please enter a template name.', 'Validation'); return; }
     let schema;
     try {
         schema = schemaRaw ? JSON.parse(schemaRaw) : [];
     } catch {
-        alert('Schema must be valid JSON.'); return;
+        modalAlert('Schema must be valid JSON.', 'Validation'); return;
     }
     const btn = document.getElementById('submitTplBtn');
     btn.disabled = true;
@@ -185,6 +185,6 @@ async function submitTemplate() {
         loadTemplates(token);
     } else {
         const err = await res.json();
-        alert('Sync Error: ' + (err.error || 'Failed to create'));
+        modalAlert('Sync Error: ' + (err.error || 'Failed to create'), 'Error');
     }
 }

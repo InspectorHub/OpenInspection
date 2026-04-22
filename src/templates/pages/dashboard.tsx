@@ -157,6 +157,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
                 </div>
 
+                <script src="/js/modal-dialog.js"></script>
                 <script src="/js/dashboard.js"></script>
             </div>
         </MainLayout>

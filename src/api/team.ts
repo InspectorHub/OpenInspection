@@ -34,14 +34,15 @@ const listTeamMembersRoute = createRoute({
 teamRoutes.openapi(listTeamMembersRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const teamService = c.var.services.team;
-    const { activeUsers, pendingInvites } = await teamService.getMembers(tenantId);
+    const { activeUsers, pendingInvites, maxUsers } = await teamService.getMembers(tenantId);
 
-    return c.json({ 
-        success: true, 
-        data: { 
-            members: activeUsers, 
-            invites: pendingInvites 
-        } 
+    return c.json({
+        success: true,
+        data: {
+            members: activeUsers,
+            invites: pendingInvites,
+            maxUsers,
+        }
     }, 200);
 });
 

@@ -7,7 +7,7 @@ export const tenants = sqliteTable('tenants', {
     tier: text('tier').notNull().default('free'),
     stripeConnectAccountId: text('stripe_connect_account_id'),
     status: text('status').notNull().default('pending'),
-    maxUsers: integer('max_users').notNull().default(5),
+    maxUsers: integer('max_users').notNull().default(3),
     deploymentMode: text('deployment_mode').notNull().default('shared'), // shared, silo
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });

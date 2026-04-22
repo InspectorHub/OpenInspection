@@ -1,4 +1,4 @@
-// ©¤©¤ Offline photo queue ??IndexedDB store for blobs pending upload ©¤©¤©¤©¤©¤
+// ï¿½ï¿½ï¿½ï¿½ Offline photo queue ??IndexedDB store for blobs pending upload ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 const pendingPhotoDb = {
   _db: null,
   open() {
@@ -159,7 +159,7 @@ document.addEventListener('alpine:init', () => {
           this.results[itemId].photos.push({ key });
           this.saveLocally();
         } else {
-          alert('Failed to upload photo');
+          modalAlert('Failed to upload photo', 'Error');
         }
       } catch (e) {
         console.error('Upload failed', e);
@@ -303,7 +303,7 @@ document.addEventListener('alpine:init', () => {
           this.saveLocally();
           this.showAnnotationModal = false;
         } else {
-          alert('Failed to save annotation');
+          modalAlert('Failed to save annotation', 'Error');
         }
       } catch (e) {
         console.error('Save annotation failed', e);
@@ -387,7 +387,7 @@ document.addEventListener('alpine:init', () => {
           this.isDelivered = true;
           if (this.inspection) this.inspection.status = 'completed';
         } else {
-          alert('Failed to mark inspection as complete on server.');
+          modalAlert('Failed to mark inspection as complete on server.', 'Error');
         }
       } catch (e) {
         console.error('Completion failed', e);
