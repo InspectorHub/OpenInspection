@@ -1,3 +1,11 @@
+// Scrub sensitive query params (e.g. ?reset_token=...) from browser history/URL bar
+// so the token doesn't leak via Referer header or remain visible in the address bar.
+(function() {
+    if (window.location.search && window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname);
+    }
+})();
+
 function getCookie(name) {
     const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : '';
