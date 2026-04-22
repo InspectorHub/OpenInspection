@@ -19,7 +19,6 @@ import { HonoConfig } from './types/hono';
 import { UserRole } from './types/auth';
 import { logger } from './lib/logger';
 
-import { HomePage } from './templates/pages/home';
 import { LoginPage } from './templates/pages/login';
 import { DashboardPage } from './templates/pages/dashboard';
 import { SettingsPage } from './templates/pages/settings';
@@ -348,16 +347,6 @@ app.get('/inspections/:id/form', htmlAuthGuard(['inspector']), (c) => {
     return c.html(FormRendererPage({ inspectionId: id, branding }));
 });
 
-app.get('/', (c) => {
-    const isStandalone = c.env.APP_MODE === 'standalone';
-    const requestedSubdomain = c.get('requestedSubdomain');
-    
-    // In standalone mode or when a specific tenant is identified, go to dashboard
-    if (isStandalone || (requestedSubdomain && requestedSubdomain !== 'www' && requestedSubdomain !== 'dev')) {
-        return c.redirect('/dashboard');
-    }
-    
-    return c.html(HomePage({ branding: c.get('branding') }));
-});
+app.get('/', (c) => c.redirect('/dashboard'));
 
 export default app;
