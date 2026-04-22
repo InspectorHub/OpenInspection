@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
 const BASE = 'http://localhost:8789';
+
+/** Fetch a CSRF token by visiting GET /login. Required for POST /api/auth/login. */
+async function getCsrfToken(request: APIRequestContext): Promise<string> {
+  const pageRes = await request.get(`${BASE}/login`);
+  const setCookie = pageRes.headers()['set-cookie'] ?? '';
+  const match = setCookie.match(/__Host-csrf_token=([^;]+)/);
+  return match?.[1] ?? '';
+}
 
 // ─── Global Setup ─────────────────────────────────────────────────────────────
 // Attempt to initialize the workspace. If the DB is empty, POST /setup creates
@@ -10,7 +19,7 @@ const BASE = 'http://localhost:8789';
 //   - setupToken is set only when setup returns 200 (fresh install)
 //   - If 409 (pre-existing DB), those tests skip gracefully.
 
-let setupToken = '';  // JWT from a fresh setup �?has the real tenantId in claims
+let setupToken = '';  // JWT from a fresh setup �?has the real tenantId in claims
 let agentToken = '';  // JWT for an agent user, created in global beforeAll
 
 const AGENT_EMAIL = 'agent.testuser@example.com';
@@ -26,12 +35,14 @@ test.beforeAll(async ({ request }) => {
     },
     headers: { 'Content-Type': 'application/json' },
   });
-  // 200 = first-time setup, 409 = already set up �?both are acceptable
+  // 200 = first-time setup, 409 = already set up �?both are acceptable
   expect([200, 409]).toContain(res.status());
   if (res.status() !== 200) return;
 
-  const body = await res.json();
-  setupToken = body.token ?? '';
+  // Token now travels via the HttpOnly cookie only, not in the JSON body.
+  const setupCookie = res.headers()['set-cookie'] ?? '';
+  const setupMatch = setupCookie.match(/__Host-inspector_token=([^;]+)/);
+  setupToken = setupMatch?.[1] ?? '';
   if (!setupToken) return;
 
   // ── 2. Create an agent user for agent CRM tests ──────────────────────────
@@ -49,13 +60,14 @@ test.beforeAll(async ({ request }) => {
     headers: { 'Content-Type': 'application/json' },
   });
 
+  const csrf = await getCsrfToken(request);
   const loginRes = await request.post(`${BASE}/api/auth/login`, {
     data: { email: AGENT_EMAIL, password: 'agentpass99' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   if (loginRes.status() !== 200) return;
   const cookie = loginRes.headers()['set-cookie'] ?? '';
-  const match = cookie.match(/inspector_token=([^;]+)/);
+  const match = cookie.match(/__Host-inspector_token=([^;]+)/);
   agentToken = match?.[1] ?? '';
 });
 
@@ -81,7 +93,7 @@ test('homepage loads and shows booking CTA', async ({ page }) => {
 test('booking page loads with inspector selector', async ({ page }) => {
   await page.goto(`${BASE}/book`);
   await expect(page.locator('body')).not.toContainText('Error');
-  // Should render a form or booking UI �?not a blank page
+  // Should render a form or booking UI �?not a blank page
   await expect(page.locator('body')).not.toBeEmpty();
 });
 
@@ -105,9 +117,10 @@ test('GET /login renders HTML with email + password form', async ({ page }) => {
 });
 
 test('POST /api/auth/login rejects wrong password', async ({ request }) => {
+  const csrf = await getCsrfToken(request);
   const res = await request.post(`${BASE}/api/auth/login`, {
     data: { email: 'admin@example.com', password: 'definitely-wrong-password' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   expect(res.status()).toBe(401);
   const body = await res.json();
@@ -115,9 +128,10 @@ test('POST /api/auth/login rejects wrong password', async ({ request }) => {
 });
 
 test('POST /api/auth/login rejects missing fields', async ({ request }) => {
+  const csrf = await getCsrfToken(request);
   const res = await request.post(`${BASE}/api/auth/login`, {
     data: { email: 'admin@example.com' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   expect(res.status()).toBe(400);
   const body = await res.json();
@@ -129,21 +143,38 @@ test('POST /api/auth/login succeeds and sets inspector_token cookie', async ({ r
   // If the DB was pre-existing, we cannot guarantee which password was used.
   test.skip(!setupToken, 'Skipping: DB was pre-existing; run against a fresh DB to verify login success');
 
+  // Double-submit CSRF: visit GET /login to mint a __Host-csrf_token cookie, then echo it.
+  const pageRes = await request.get(`${BASE}/login`);
+  const csrfSetCookie = pageRes.headers()['set-cookie'] ?? '';
+  const csrfMatch = csrfSetCookie.match(/__Host-csrf_token=([^;]+)/);
+  const csrf = csrfMatch?.[1] ?? '';
+  expect(csrf).not.toBe('');
+
   const res = await request.post(`${BASE}/api/auth/login`, {
     data: { email: 'admin@example.com', password: 'testpassword123' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
   });
   expect(res.status()).toBe(200);
   const body = await res.json();
   expect(body.success).toBe(true);
-  expect(body.redirect).toBe('/dashboard');
-  expect(typeof body.token).toBe('string');
-  expect(body.token.length).toBeGreaterThan(0);
-  // Cookie should be set in response headers
+  expect(body.data?.redirect).toBe('/dashboard');
+  // The raw JWT must NOT appear in the response body — authentication is cookie-only for
+  // browser clients so the token can't leak to localStorage or JS-visible cookies.
+  expect(body.data?.token).toBeUndefined();
+  expect(body.token).toBeUndefined();
   const setCookie = res.headers()['set-cookie'];
   expect(setCookie).toBeDefined();
-  expect(setCookie).toContain('inspector_token');
+  expect(setCookie).toContain("__Host-inspector_token");
   expect(setCookie).toContain('HttpOnly');
+  expect(setCookie).toContain('Secure');
+});
+
+test('POST /api/auth/login rejects request without CSRF token', async ({ request }) => {
+  const res = await request.post(`${BASE}/api/auth/login`, {
+    data: { email: 'anyone@example.com', password: 'whatever' },
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(res.status()).toBe(403);
 });
 
 // ─── Dashboard Auth Guard ─────────────────────────────────────────────────────
@@ -170,7 +201,7 @@ test('GET /book serves Cloudflare Turnstile script', async ({ page }) => {
 
 test('POST /api/public/book with invalid turnstileToken is accepted in dev tenant (Turnstile skipped for dev)', async ({ request }) => {
   // In the dev/demo tenant, bot verification is intentionally bypassed.
-  // This test documents that behaviour �?bots cannot abuse a DB-backed tenant via this path.
+  // This test documents that behaviour �?bots cannot abuse a DB-backed tenant via this path.
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const res = await request.post(`${BASE}/api/public/book`, {
@@ -244,7 +275,7 @@ test('POST /api/public/book succeeds in dev context', async ({ request }) => {
   expect(body.inspectionId).toBeDefined();
 });
 
-// ─── Protected API �?Auth Enforcement ────────────────────────────────────────
+// ─── Protected API �?Auth Enforcement ────────────────────────────────────────
 
 test('GET /api/inspections blocks unauthenticated requests', async ({ request }) => {
   const res = await request.get(`${BASE}/api/inspections`);
@@ -328,7 +359,7 @@ test('POST /api/inspections/webhook/stripe rejects invalid HMAC signature', asyn
 // ─── Payment Success Redirect ─────────────────────────────────────────────────
 
 test('GET /api/inspections/demo/payment-success-mock redirects to report', async ({ request }) => {
-  // Follow redirects �?should end at the report URL
+  // Follow redirects �?should end at the report URL
   const res = await request.get(`${BASE}/api/inspections/demo/payment-success-mock`);
   expect(res.status()).toBe(200);
   expect(res.url()).toContain('/report');
@@ -346,7 +377,7 @@ test('join page renders HTML', async ({ page }) => {
 // ─── Setup Wizard ─────────────────────────────────────────────────────────────
 
 test('GET /setup renders HTML (form or redirect to dashboard)', async ({ request }) => {
-  // Follows redirects by default �?either shows setup form or dashboard, never errors
+  // Follows redirects by default �?either shows setup form or dashboard, never errors
   const res = await request.get(`${BASE}/setup`);
   expect(res.status()).toBe(200);
   expect(res.headers()['content-type']).toContain('text/html');
@@ -393,7 +424,7 @@ test('POST /setup returns 409 when setup is already complete', async ({ request 
   expect(body).toHaveProperty('error');
 });
 
-// ─── Auth Enforcement �?Protected Endpoints ───────────────────────────────────
+// ─── Auth Enforcement �?Protected Endpoints ───────────────────────────────────
 
 test('GET /api/admin/export blocks unauthenticated requests', async ({ request }) => {
   const res = await request.get(`${BASE}/api/admin/export`);
@@ -411,7 +442,7 @@ test('GET /api/agent/leaderboard blocks unauthenticated requests', async ({ requ
 });
 
 test('GET /api/agent/my-reports rejects requests with no role', async ({ request }) => {
-  // Malformed JWT (unsigned) �?should be 401
+  // Malformed JWT (unsigned) �?should be 401
   const res = await request.get(`${BASE}/api/agent/my-reports`, {
     headers: { Authorization: 'Bearer not.a.real.token' },
   });
@@ -422,7 +453,7 @@ test('GET /api/agent/my-reports rejects requests with no role', async ({ request
 // Creates a real inspection in the DB then patches results twice to verify
 // that each PATCH merges fields rather than replacing the whole blob.
 //
-// Requires a valid JWT with a real tenantId �?only available from a fresh setup.
+// Requires a valid JWT with a real tenantId �?only available from a fresh setup.
 // Skips gracefully when the DB was pre-existing.
 
 test.describe('field-level merge on inspection results', () => {
@@ -464,21 +495,21 @@ test.describe('field-level merge on inspection results', () => {
   test('two PATCH results calls merge fields (last-write-wins per item)', async ({ request }) => {
     test.skip(!inspectionId, 'Skipping: no inspection created (DB was pre-existing; run against a fresh DB)');
 
-    // First PATCH �?set field_a
+    // First PATCH �?set field_a
     const r1 = await request.patch(`${BASE}/api/inspections/${inspectionId}/results`, {
       data: { data: { field_a: { status: 'Good', notes: 'First note' } } },
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     });
     expect(r1.status()).toBe(200);
 
-    // Second PATCH �?add field_b without repeating field_a
+    // Second PATCH �?add field_b without repeating field_a
     const r2 = await request.patch(`${BASE}/api/inspections/${inspectionId}/results`, {
       data: { data: { field_b: { status: 'Monitor', notes: 'Second note' } } },
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     });
     expect(r2.status()).toBe(200);
 
-    // GET results �?both fields must be present
+    // GET results �?both fields must be present
     const getRes = await request.get(`${BASE}/api/inspections/${inspectionId}/results`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -509,7 +540,7 @@ test.describe('field-level merge on inspection results', () => {
   });
 });
 
-// ─── Availability Management �?Auth Enforcement ───────────────────────────────
+// ─── Availability Management �?Auth Enforcement ───────────────────────────────
 
 test('GET /api/availability blocks unauthenticated requests', async ({ request }) => {
   const res = await request.get(`${BASE}/api/availability`);
@@ -537,7 +568,7 @@ test('POST /api/availability/overrides blocks unauthenticated requests', async (
   expect(res.status()).toBe(401);
 });
 
-// ─── Availability Management �?Authenticated ─────────────────────────────────
+// ─── Availability Management �?Authenticated ─────────────────────────────────
 
 test.describe('availability CRUD (authenticated)', () => {
   let token = '';
@@ -686,7 +717,7 @@ test.describe('availability CRUD (authenticated)', () => {
   });
 });
 
-// ─── Template CRUD �?Auth Enforcement ────────────────────────────────────────
+// ─── Template CRUD �?Auth Enforcement ────────────────────────────────────────
 
 test('POST /api/inspections/templates blocks unauthenticated requests', async ({ request }) => {
   const res = await request.post(`${BASE}/api/inspections/templates`, {
@@ -709,7 +740,7 @@ test('DELETE /api/inspections/templates/:id blocks unauthenticated requests', as
   expect(res.status()).toBe(401);
 });
 
-// ─── Template CRUD �?Authenticated ───────────────────────────────────────────
+// ─── Template CRUD �?Authenticated ───────────────────────────────────────────
 
 test.describe('template CRUD (authenticated)', () => {
   let token = '';
@@ -824,7 +855,7 @@ test.describe('template CRUD (authenticated)', () => {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     });
 
-    // Attempt to delete the template �?should be blocked
+    // Attempt to delete the template �?should be blocked
     const delRes = await request.delete(`${BASE}/api/inspections/templates/${defaultTemplate.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -834,7 +865,7 @@ test.describe('template CRUD (authenticated)', () => {
   });
 });
 
-// ─── Team Invite & Join �?Validation ─────────────────────────────────────────
+// ─── Team Invite & Join �?Validation ─────────────────────────────────────────
 
 test('POST /api/auth/join rejects missing token', async ({ request }) => {
   const res = await request.post(`${BASE}/api/auth/join`, {
@@ -866,7 +897,7 @@ test('POST /api/auth/join rejects short password', async ({ request }) => {
   expect(body).toHaveProperty('error');
 });
 
-// ─── Team Invite & Join �?Full Flow ──────────────────────────────────────────
+// ─── Team Invite & Join �?Full Flow ──────────────────────────────────────────
 
 test.describe('invite and join flow (authenticated)', () => {
   let token = '';
@@ -914,7 +945,7 @@ test.describe('invite and join flow (authenticated)', () => {
     expect(body.redirect).toBe('/dashboard');
     // httpOnly cookie set in response
     const cookie = res.headers()['set-cookie'];
-    expect(cookie).toContain('inspector_token');
+    expect(cookie).toContain("__Host-inspector_token");
   });
 
   test('POST /api/auth/join rejects a second use of the same token', async ({ request }) => {
@@ -930,22 +961,23 @@ test.describe('invite and join flow (authenticated)', () => {
 
   test('new user from invite can log in with their password', async ({ request }) => {
     test.skip(!inviteToken, 'Skipping: invite not created (requires fresh DB)');
+    const csrf = await getCsrfToken(request);
     const res = await request.post(`${BASE}/api/auth/login`, {
       data: { email: joinEmail, password: 'securepass99' },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
     const cookie = res.headers()['set-cookie'];
-    expect(cookie).toContain('inspector_token');
+    expect(cookie).toContain("__Host-inspector_token");
   });
 });
 
-// ─── Google Calendar �?Auth Enforcement ───────────────────────────────────────
+// ─── Google Calendar �?Auth Enforcement ───────────────────────────────────────
 
 test('GET /api/calendar/connect returns 401 or 501 when not authenticated or GOOGLE_CLIENT_ID is not configured', async ({ request }) => {
-  // JWT middleware fires first (no cookie) �?401. If somehow authenticated but no GOOGLE_CLIENT_ID �?501.
+  // JWT middleware fires first (no cookie) �?401. If somehow authenticated but no GOOGLE_CLIENT_ID �?501.
   const res = await request.get(`${BASE}/api/calendar/connect`);
   expect([401, 501, 302]).toContain(res.status());
 });
@@ -963,7 +995,7 @@ test('POST /api/calendar/sync returns 401 without auth cookie', async ({ request
   expect(res.status()).toBe(401);
 });
 
-// ─── Admin M2M Endpoints �?Auth Enforcement ───────────────────────────────────
+// ─── Admin M2M Endpoints �?Auth Enforcement ───────────────────────────────────
 // These endpoints use Authorization: Bearer {JWT_SECRET} (shared secret), not a user JWT.
 
 test('POST /api/admin/silo rejects request with no Authorization header', async ({ request }) => {
@@ -1018,7 +1050,7 @@ test('POST /api/admin/connect rejects missing fields with correct secret', async
   expect(body).toHaveProperty('error');
 });
 
-// ─── Password Change �?Auth Enforcement ──────────────────────────────────────
+// ─── Password Change �?Auth Enforcement ──────────────────────────────────────
 
 test('POST /api/auth/change-password blocks unauthenticated requests', async ({ request }) => {
   const res = await request.post(`${BASE}/api/auth/change-password`, {
@@ -1028,7 +1060,7 @@ test('POST /api/auth/change-password blocks unauthenticated requests', async ({ 
   expect(res.status()).toBe(401);
 });
 
-// ─── Password Change �?Authenticated ─────────────────────────────────────────
+// ─── Password Change �?Authenticated ─────────────────────────────────────────
 // Uses a dedicated user created via invite so the main admin credentials stay intact.
 
 test.describe('password change (authenticated)', () => {
@@ -1057,15 +1089,15 @@ test.describe('password change (authenticated)', () => {
       headers: { 'Content-Type': 'application/json' },
     });
     if (joinRes.status() !== 200) return;
-    // Extract token from cookie for subsequent Bearer usage
+    const csrf = await getCsrfToken(request);
     const loginRes = await request.post(`${BASE}/api/auth/login`, {
       data: { email: pwEmail, password: originalPassword },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     if (loginRes.status() !== 200) return;
     // Parse token from cookie set-cookie header
     const cookie = loginRes.headers()['set-cookie'] ?? '';
-    const match = cookie.match(/inspector_token=([^;]+)/);
+    const match = cookie.match(/__Host-inspector_token=([^;]+)/);
     userToken = match?.[1] ?? '';
   });
 
@@ -1104,18 +1136,20 @@ test.describe('password change (authenticated)', () => {
 
   test('old password is rejected after change', async ({ request }) => {
     test.skip(!userToken, 'Skipping: user setup failed (requires fresh DB)');
+    const csrf = await getCsrfToken(request);
     const res = await request.post(`${BASE}/api/auth/login`, {
       data: { email: pwEmail, password: originalPassword },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     expect(res.status()).toBe(401);
   });
 
   test('new password works after change', async ({ request }) => {
     test.skip(!userToken, 'Skipping: user setup failed (requires fresh DB)');
+    const csrf = await getCsrfToken(request);
     const res = await request.post(`${BASE}/api/auth/login`, {
       data: { email: pwEmail, password: newPassword },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
     });
     expect(res.status()).toBe(200);
     const body = await res.json();
@@ -1123,7 +1157,7 @@ test.describe('password change (authenticated)', () => {
   });
 });
 
-// ─── Inspection CRUD �?Auth Enforcement ──────────────────────────────────────
+// ─── Inspection CRUD �?Auth Enforcement ──────────────────────────────────────
 
 test('GET /api/inspections blocks unauthenticated list', async ({ request }) => {
   const res = await request.get(`${BASE}/api/inspections`);
@@ -1140,7 +1174,7 @@ test('POST /api/inspections/:id/complete blocks unauthenticated requests', async
   expect(res.status()).toBe(401);
 });
 
-// ─── Inspection CRUD �?Authenticated ─────────────────────────────────────────
+// ─── Inspection CRUD �?Authenticated ─────────────────────────────────────────
 
 test.describe('inspection CRUD (authenticated)', () => {
   let token = '';
@@ -1231,7 +1265,7 @@ test.describe('inspection CRUD (authenticated)', () => {
   });
 });
 
-// ─── Admin Export �?Authenticated ────────────────────────────────────────────
+// ─── Admin Export �?Authenticated ────────────────────────────────────────────
 
 test('GET /api/admin/export returns full tenant data for admin', async ({ request }) => {
   test.skip(!setupToken, 'Skipping: requires fresh DB');
@@ -1247,7 +1281,7 @@ test('GET /api/admin/export returns full tenant data for admin', async ({ reques
   expect(Array.isArray(body.agreements)).toBe(true);
 });
 
-// ─── Agent CRM �?Authenticated ────────────────────────────────────────────────
+// ─── Agent CRM �?Authenticated ────────────────────────────────────────────────
 
 test('GET /api/agent/leaderboard returns empty leaderboard for fresh DB', async ({ request }) => {
   test.skip(!setupToken, 'Skipping: requires fresh DB');
@@ -1287,7 +1321,7 @@ test('POST /api/ai/comment-assist blocks unauthenticated requests', async ({ req
 test('POST /api/ai/comment-assist returns 500 without GEMINI_API_KEY (missing key error)', async ({ request }) => {
   test.skip(!setupToken, 'Skipping: requires fresh DB');
   const res = await request.post(`${BASE}/api/ai/comment-assist`, {
-    data: { text: 'Some rust on panel', context: 'Electrical Panel �?Defect' },
+    data: { text: 'Some rust on panel', context: 'Electrical Panel �?Defect' },
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${setupToken}` },
   });
   // 500 = GEMINI_API_KEY not set (throws "Gemini API Key missing"); 200 = key present and Gemini responded
@@ -1672,7 +1706,7 @@ test.describe('tenant tier/status lifecycle (M2M)', () => {
   test('POST /api/admin/tenant-status omitting tier leaves tier unchanged', async ({ request }) => {
     test.skip(!setupToken, 'Skipping: requires fresh DB');
 
-    // Set status only �?tier should remain as-is
+    // Set status only �?tier should remain as-is
     const res = await request.post(`${BASE}/api/admin/tenant-status`, {
       data: { subdomain: 'dev', status: 'active' }, // no tier field
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
@@ -1690,7 +1724,7 @@ test.describe('tenant tier/status lifecycle (M2M)', () => {
     test.skip(!setupToken, 'Skipping: requires fresh DB');
 
     // The dev subdomain bypasses tier guard. We verify that read endpoints remain accessible
-    // regardless �?this documents the read-only access guarantee.
+    // regardless �?this documents the read-only access guarantee.
     await request.post(`${BASE}/api/admin/tenant-status`, {
       data: { subdomain: 'dev', status: 'past_due' },
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },

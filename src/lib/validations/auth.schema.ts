@@ -20,7 +20,6 @@ export const LoginSchema = z.object({
  */
 export const AuthResponseSchema = createApiResponseSchema(
     z.object({
-        token: z.string().openapi({ example: 'eyJhbGciOiJIUzI1...' }),
         redirect: z.string().openapi({ example: '/dashboard' }),
     })
 );

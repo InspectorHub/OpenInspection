@@ -1,6 +1,5 @@
 export interface User {
     sub: string;
-    email: string;
     role: 'owner' | 'admin' | 'inspector' | 'agent';
     tenantId?: string;
 }

@@ -1,36 +1,32 @@
-﻿function parseJwt(t) {
-    if (!t || typeof t !== 'string' || !t.includes('.')) return {};
-    try { return JSON.parse(atob(t.split('.')[1])); } catch { return {}; }
-}
+// Authenticated browser pages rely on the HttpOnly `inspector_token` cookie. The cookie is not
+// readable from JS; the browser sends it automatically with same-origin fetches. We never store
+// the token in localStorage or a JS-readable cookie — that would defeat HttpOnly.
 
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
+const authFetch = (url, opts = {}) =>
+    fetch(url, { credentials: 'same-origin', ...opts });
+
+async function logout() {
+    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/login';
 }
 
 let inspections = [];
 let searchDebounce;
+let currentUserEmail = '';
 
-document.addEventListener('DOMContentLoaded', () => {
-    let token = localStorage.getItem('inspector_token') || getCookie('inspector_token');
-    
-    if (!token) {
-        const urlParams = new URLSearchParams(window.location.search);
-        token = urlParams.get('token');
-        if (token) {
-            localStorage.setItem('inspector_token', token);
-            window.history.replaceState({}, document.title, window.location.pathname);
-        } else {
-            window.location.href = '/login';
-            return;
-        }
+document.addEventListener('DOMContentLoaded', async () => {
+    // Fetch current user for avatar. If unauthenticated, htmlAuthGuard already redirected;
+    // a 401 here only happens on race conditions — bounce to /login in that case.
+    try {
+        const meRes = await authFetch('/api/auth/me');
+        if (meRes.status === 401) { window.location.href = '/login'; return; }
+        const me = await meRes.json();
+        currentUserEmail = me?.data?.user?.email || '';
+    } catch (e) {
+        console.error('Failed to load session:', e);
     }
 
-    // Avatar Initialization
-    const payload = parseJwt(token);
-    const email = payload.email || '';
-    const name = email ? email.split('@')[0] : 'User';
+    const name = currentUserEmail ? currentUserEmail.split('@')[0] : 'User';
     const avatarEl = document.querySelector('nav img[alt="User"]');
     if (avatarEl) {
         avatarEl.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff';
@@ -38,28 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.onclick = () => {
-            localStorage.removeItem('inspector_token');
-            document.cookie = 'inspector_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            window.location.href = '/login';
-        };
-    }
+    if (logoutBtn) logoutBtn.onclick = logout;
 
-    // Search/Filters
     const searchInput = document.getElementById('filterSearch');
     if (searchInput) {
         searchInput.oninput = () => {
             clearTimeout(searchDebounce);
-            searchDebounce = setTimeout(() => fetchInspections(token, true), 400);
+            searchDebounce = setTimeout(() => fetchInspections(true), 400);
         };
     }
 
-    fetchInspections(token, true);
-    fetchPrerequisites(token);
+    fetchInspections(true);
+    fetchPrerequisites();
 });
 
-async function fetchInspections(token, initial = false) {
+async function fetchInspections() {
     const tbody = document.getElementById('inspectionsList');
     if (!tbody) return;
 
@@ -68,9 +57,8 @@ async function fetchInspections(token, initial = false) {
         const query = searchInput ? searchInput.value.trim() : '';
         const url = query ? `/api/inspections?search=${encodeURIComponent(query)}` : '/api/inspections';
 
-        const res = await fetch(url, {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
+        const res = await authFetch(url);
+        if (res.status === 401) { window.location.href = '/login'; return; }
 
         if (!res.ok) {
             tbody.innerHTML = '<tr><td colspan="5" class="py-20 text-center text-sm font-bold text-red-500">Failed to sync with registry.</td></tr>';
@@ -173,11 +161,11 @@ function getStatusStyle(status) {
     return styles[status] || styles['scheduled'];
 }
 
-async function fetchPrerequisites(token) {
+async function fetchPrerequisites() {
     try {
         const [templatesRes, inspectorsRes] = await Promise.all([
-            fetch('/api/inspections/templates', { headers: { 'Authorization': 'Bearer ' + token } }),
-            fetch('/api/inspections/inspectors', { headers: { 'Authorization': 'Bearer ' + token } })
+            authFetch('/api/inspections/templates'),
+            authFetch('/api/inspections/inspectors')
         ]);
 
         if (templatesRes.ok) {
@@ -222,8 +210,7 @@ function closeModal() {
 
 async function submitInspection() {
     const btn = document.getElementById('submitInsBtn');
-    const token = localStorage.getItem('inspector_token') || getCookie('inspector_token');
-    
+
     const body = {
         propertyAddress: document.getElementById('propAddress')?.value.trim(),
         templateId: document.getElementById('templateId')?.value,
@@ -243,26 +230,22 @@ async function submitInspection() {
     }
 
     try {
-       const res = await fetch('/api/inspections', {
+       const res = await authFetch('/api/inspections', {
            method: 'POST',
-           headers: {
-               'Authorization': 'Bearer ' + token,
-               'Content-Type': 'application/json'
-           },
+           headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify(body)
        });
 
        if (res.ok) {
            await modalAlert('Inspection deployed successfully!', 'Success');
            closeModal();
-           // Clear form
            document.getElementById('propAddress').value = '';
            document.getElementById('templateId').value = '';
            document.getElementById('clientName').value = '';
            document.getElementById('clientEmail').value = '';
            document.getElementById('inspectorId').value = '';
-           
-           fetchInspections(token, true);
+
+           fetchInspections(true);
        } else {
            const err = await res.json();
            await modalAlert('Sync Error: ' + (err.error || 'Failed to deploy workflow'), 'Error');

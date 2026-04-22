@@ -2,15 +2,16 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
-import { sign, verify } from 'hono/jwt';
-import { getCookie, setCookie } from 'hono/cookie';
+import { sign } from 'hono/jwt';
+import { setCookie, deleteCookie } from 'hono/cookie';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
-import { 
-    LoginSchema, 
-    ChangePasswordSchema, 
-    JoinTeamSchema, 
-    ForgotPasswordSchema, 
+import { requireCsrfToken } from '../lib/middleware/csrf';
+import {
+    LoginSchema,
+    ChangePasswordSchema,
+    JoinTeamSchema,
+    ForgotPasswordSchema,
     ResetPasswordSchema,
     AuthResponseSchema,
     SuccessResponseSchema,
@@ -19,15 +20,43 @@ import {
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 
 /**
- * Interface for the decoded JWT payload.
+ * Require a strong JWT_SECRET (≥32 chars) before signing/verifying anything.
+ * Fail-closed if missing or too weak to resist offline brute-force.
+ */
+function requireJwtSecret(secret: string | undefined): string {
+    if (!secret || secret.length < 32) {
+        throw Errors.Internal('Server configuration error');
+    }
+    return secret;
+}
+
+/**
+ * Cookie attributes for the auth token. `__Host-` prefix demands Secure + path=/ + no Domain,
+ * which this helper already satisfies. SameSite=Strict blocks all cross-site cookie sending —
+ * including top-level navigation — so a malicious link can never drag a logged-in session
+ * into a mutation or a sensitive GET.
+ */
+function authCookieOptions() {
+    return {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Strict' as const,
+        path: '/',
+        maxAge: 60 * 60 * 24,
+    };
+}
+
+/**
+ * Interface for the decoded JWT payload. Intentionally does not carry email or any other
+ * PII — JWTs are signed, not encrypted.
  */
 export interface AuthPayload {
     sub: string;
-    email: string;
     'custom:tenantId': string;
     'custom:userRole': string;
     role: string;
     exp: number;
+    iat?: number;
 }
 
 const coreAuthRoutes = new OpenAPIHono<HonoConfig>();
@@ -39,6 +68,7 @@ const loginRoute = createRoute({
     path: '/login',
     summary: 'User Login',
     description: 'Validates credentials and sets a JWT cookie.',
+    middleware: [requireCsrfToken],
     request: {
         body: {
             content: {
@@ -62,26 +92,27 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
     const body = c.req.valid('json');
     const user = await c.var.services.auth.validateCredentials(body.email, body.password);
 
+    const secret = requireJwtSecret(c.env.JWT_SECRET);
     const now = Math.floor(Date.now() / 1000);
+    // Email is intentionally NOT in the payload — JWTs are signed but not encrypted, and the
+    // token travels through logs / intermediaries. PII belongs in the DB, not in the bearer.
     const token = await sign({
         sub: user.id,
-        email: user.email,
         'custom:tenantId': user.tenantId,
         'custom:userRole': user.role,
         role: user.role,
+        iat: now,
         exp: now + 60 * 60 * 24,
-    }, c.env.JWT_SECRET, 'HS256');
+    }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, {
-        httpOnly: true,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: 60 * 60 * 24,
-    });
+    setCookie(c, '__Host-inspector_token', token, authCookieOptions());
 
+    // Intentionally do NOT return the token in the body. Browser clients authenticate via the
+    // HttpOnly cookie. Exposing the raw JWT in JSON invites clients to persist it in localStorage
+    // or a JS-readable cookie, which defeats HttpOnly and widens the XSS blast radius.
     return c.json({
         success: true,
-        data: { token, redirect: '/dashboard' }
+        data: { redirect: '/dashboard' }
     }, 200);
 });
 
@@ -109,15 +140,13 @@ const changePasswordRoute = createRoute({
 });
 
 coreAuthRoutes.openapi(changePasswordRoute, async (c) => {
-    const rawToken = getCookie(c, 'inspector_token') || c.req.header('Authorization')?.replace('Bearer ', '');
-    if (!rawToken) throw Errors.Unauthorized();
-
-    const payload = await verify(rawToken, c.env.JWT_SECRET, 'HS256') as unknown as AuthPayload;
-    if (!payload.sub) throw Errors.Unauthorized();
+    // The global JWT middleware has already verified the token and populated c.var.user.
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
 
     const body = c.req.valid('json');
-    await c.var.services.auth.updatePassword(payload.sub, body.currentPassword, body.newPassword);
-    
+    await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
+
     return c.json({
         success: true,
         data: { success: true }
@@ -150,26 +179,22 @@ coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
     const body = c.req.valid('json');
     const user = await c.var.services.auth.joinTeam(body.token, body.password);
 
+    const secret = requireJwtSecret(c.env.JWT_SECRET);
     const now = Math.floor(Date.now() / 1000);
     const token = await sign({
         sub: user.id,
-        email: user.email,
         'custom:tenantId': user.tenantId,
         'custom:userRole': user.role,
         role: user.role,
+        iat: now,
         exp: now + 60 * 60 * 24,
-    }, c.env.JWT_SECRET);
+    }, secret, 'HS256');
 
-    setCookie(c, 'inspector_token', token, {
-        httpOnly: true,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: 60 * 60 * 24,
-    });
+    setCookie(c, '__Host-inspector_token', token, authCookieOptions());
 
     return c.json({
         success: true,
-        data: { token, redirect: '/dashboard' }
+        data: { redirect: '/dashboard' }
     }, 200);
 });
 
@@ -201,9 +226,8 @@ coreAuthRoutes.openapi(forgotPasswordRoute, async (c) => {
     
     if (!resetToken) return c.json({ success: true, data: { success: true } }, 200);
 
-    const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
-    const host = c.req.header('host');
-    const resetLink = `${protocol}://${host}/login?reset_token=${resetToken}`;
+    const baseUrl = c.env.APP_BASE_URL || 'http://localhost:8788';
+    const resetLink = `${baseUrl}/login?reset_token=${resetToken}`;
 
     if (c.env.RESEND_API_KEY && !c.env.RESEND_API_KEY.includes('your_api_key')) {
         await fetch('https://api.resend.com/emails', {
@@ -311,26 +335,23 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
 
     // 4. Issue a JWT for the new admin so the caller can authenticate immediately
     const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
-    let token = '';
-    if (newUser && c.env.JWT_SECRET) {
+    if (newUser) {
+        const secret = requireJwtSecret(c.env.JWT_SECRET);
         const now = Math.floor(Date.now() / 1000);
-        token = await sign({
+        const token = await sign({
             sub: newUser.id,
-            email: newUser.email,
             'custom:tenantId': newUser.tenantId,
             'custom:userRole': newUser.role,
             role: newUser.role,
+            iat: now,
             exp: now + 60 * 60 * 24,
-        }, c.env.JWT_SECRET, 'HS256');
-        setCookie(c, 'inspector_token', token, {
-            httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 60 * 60 * 24,
-        });
+        }, secret, 'HS256');
+        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
     }
 
     return c.json({
         success: true,
-        token,
-        data: { token, redirect: '/dashboard' }
+        data: { redirect: '/dashboard' }
     }, 200);
 });
 
@@ -346,6 +367,7 @@ const meRoute = createRoute({
                     schema: createApiResponseSchema(z.object({
                         user: z.object({
                             id: z.string(),
+                            email: z.string().optional(),
                             tenantId: z.string().optional(),
                             role: z.string()
                         })
@@ -359,16 +381,56 @@ const meRoute = createRoute({
 });
 
 coreAuthRoutes.openapi(meRoute, async (c) => {
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+
+    // Email is stored only in the DB, never the JWT.
+    const db = drizzle(c.env.DB);
+    const row = await db.select({ email: users.email }).from(users).where(eq(users.id, user.sub)).get();
+
     return c.json({
         success: true,
         data: {
             user: {
-                id: c.get('tenantId'), // Simplified for verification: returning tenantId as a proxy for 'me'
+                id: user.sub,
+                email: row?.email,
                 tenantId: c.get('tenantId'),
                 role: c.get('userRole')
             }
         }
     }, 200);
+});
+
+const logoutRoute = createRoute({
+    method: 'post',
+    path: '/logout',
+    summary: 'Log Out',
+    description: 'Clears the auth cookie and revokes outstanding JWTs for this user.',
+    responses: {
+        200: {
+            content: {
+                'application/json': { schema: SuccessResponseSchema }
+            },
+            description: 'Logout successful'
+        }
+    }
+});
+
+coreAuthRoutes.openapi(logoutRoute, async (c) => {
+    // If the request carries a valid token, revoke all of this user's tokens server-side.
+    // The JS client can't clear an HttpOnly cookie — we must do it via Set-Cookie.
+    const user = c.get('user');
+    if (user?.sub) {
+        await c.var.services.auth.invalidateUserSessions(user.sub);
+    }
+
+    deleteCookie(c, '__Host-inspector_token', {
+        path: '/',
+        secure: true,
+        sameSite: 'Strict',
+    });
+
+    return c.json({ success: true, data: { success: true } }, 200);
 });
 
 export default coreAuthRoutes;

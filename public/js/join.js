@@ -34,12 +34,13 @@ if (joinForm) {
         const res = await fetch('/api/auth/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ token, password })
         });
         const data = await res.json();
         if (res.ok) {
-          if (data.token) localStorage.setItem('inspector_token', data.token);
-          window.location.href = data.redirect || '/dashboard';
+          // The server set an HttpOnly + Secure cookie. Do not persist the token client-side.
+          window.location.href = data.data?.redirect || '/dashboard';
         } else {
           errBox.textContent = data.error || 'Failed to join workspace.';
           errBox.classList.remove('hidden');

@@ -1,13 +1,15 @@
-const token = localStorage.getItem('inspector_token');
-if (!token) window.location.href = '/dashboard';
+// Cookie-only auth. htmlAuthGuard already gated this page server-side.
+
+const authFetch = (url, opts = {}) =>
+    fetch(url, { credentials: 'same-origin', ...opts });
+
+async function logout() {
+    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/login';
+}
 
 const logoutBtn = document.getElementById('logoutBtn');
-if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
-        localStorage.removeItem('inspector_token');
-        window.location.href = '/';
-    });
-}
+if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
 const statusColors = {
     draft: 'bg-amber-100/50 text-amber-700 border-amber-200',
@@ -17,9 +19,8 @@ const statusColors = {
 
 async function loadReports() {
     try {
-        const res = await fetch('/api/agent/my-reports', {
-            headers: { Authorization: 'Bearer ' + token },
-        });
+        const res = await authFetch('/api/agent/my-reports');
+        if (res.status === 401) { window.location.href = '/login'; return; }
         const reportsList = document.getElementById('reportsList');
         if (!reportsList) return;
 
@@ -43,7 +44,7 @@ async function loadReports() {
             <tr class="hover:bg-slate-50/80 transition-colors">
                 <td class="py-5 pl-8 pr-3 text-sm font-semibold text-slate-900">${r.propertyAddress}</td>
                 <td class="px-6 py-5 text-sm text-slate-600">
-                    <p>${r.clientName || '\u2014'}</p>
+                    <p>${r.clientName || '—'}</p>
                     <p class="text-xs text-slate-400">${r.clientEmail || ''}</p>
                 </td>
                 <td class="px-6 py-5">

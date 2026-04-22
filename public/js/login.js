@@ -1,3 +1,8 @@
+function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+}
+
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
@@ -5,22 +10,28 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     const emailInfo = document.getElementById('email');
     const passwordInfo = document.getElementById('password');
     if (!emailInfo || !passwordInfo) return;
-    
+
     const email = emailInfo.value;
     const password = passwordInfo.value;
 
     btn.disabled = true;
-    btn.textContent = 'Signing in\u2026';
+    btn.textContent = 'Signing in…';
     errorMsg.classList.add('hidden');
 
     try {
+        // Double-submit CSRF: the server issued __Host-csrf_token on GET /login; we echo it
+        // as X-CSRF-Token so the server can verify the request originated from its own page.
+        const csrf = getCookie('__Host-csrf_token');
         const res = await fetch('/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrf,
+            },
+            credentials: 'same-origin',
             body: JSON.stringify({ email, password }),
         });
 
-        // Handle non-JSON responses (e.g. 503 plain text)
         const contentType = res.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
             if (res.status === 503) {
@@ -37,14 +48,10 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         const data = await res.json();
 
         if (res.ok && data.success) {
-            const authData = data.data;
-            if (authData.token) {
-                localStorage.setItem('inspector_token', authData.token);
-                // Also set non-httpOnly cookie for luxury/fallback visibility if needed,
-                // but rely on localStorage for API calls.
-                document.cookie = `inspector_token=${authData.token}; path=/; max-age=86400; samesite=lax`;
-            }
-            window.location.href = authData.redirect || '/dashboard';
+            // The server set an HttpOnly + Secure cookie on this response. Do NOT mirror it into
+            // localStorage or document.cookie — that would downgrade the cookie to a JS-readable
+            // one and let any XSS steal the session.
+            window.location.href = data.data?.redirect || '/dashboard';
         } else {
             errorMsg.textContent = data.error?.message || data.error || 'Login failed. Please try again.';
             errorMsg.classList.remove('hidden');

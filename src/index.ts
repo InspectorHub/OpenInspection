@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Context } from 'hono';
 import { serveStatic } from 'hono/cloudflare-workers';
-import { getCookie } from 'hono/cookie';
+import { deleteCookie, getCookie } from 'hono/cookie';
 import { verify } from 'hono/jwt';
 import { drizzle } from 'drizzle-orm/d1';
 import { users } from './lib/db/schema';
@@ -11,6 +11,8 @@ import { brandingMiddleware } from './lib/middleware/branding';
 import { tenantRouter } from './lib/middleware/tenant-router';
 import { diMiddleware } from './lib/middleware/di';
 import { requireActiveSubscription } from './lib/middleware/tier-guard';
+import { securityHeaders } from './lib/middleware/security-headers';
+import { issueCsrfCookie } from './lib/middleware/csrf';
 import { AppError, ErrorCode, Errors } from './lib/errors';
 import { sendError } from './lib/response';
 import { HonoConfig } from './types/hono';
@@ -79,9 +81,12 @@ app.onError((err: unknown, c: Context<HonoConfig>) => {
         return sendError(c, appErr.message as string, appErr.code as string, status as 500, appErr.details as Record<string, unknown> | undefined);
     }
 
+    // Strip the query string before logging so one-shot secrets in URLs (e.g. ?reset_token=…)
+    // don't get captured by downstream log sinks.
+    const pathOnly = c.req.url.split('?')[0];
     logger.error('Unhandled application error', {
         method: c.req.method,
-        url: c.req.url,
+        url: pathOnly,
     }, err instanceof Error ? err : undefined);
 
     return sendError(c, 'Internal server error', ErrorCode.INTERNAL_ERROR, 500);
@@ -99,15 +104,21 @@ app.get('/sw.js', serveStatic(staticOpts({ path: './sw.js' })));
 app.get('/js/*', serveStatic(staticOpts({ root: './' })));
 
 // Global Middlewares
+app.use('*', securityHeaders);
 app.use('*', diMiddleware);
 app.use('*', tenantRouter);
 app.use('*', brandingMiddleware);
+
+// Static asset extensions — these bypass JWT verification. We use a strict allowlist
+// rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
+// can't trick the middleware into treating a protected route as public.
+const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|otf|json|txt|pdf)$/i;
 
 // Global JWT Middleware — extracts tenantId / userRole from Bearer token or cookie.
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || path.includes('.');
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join') return next();
 
@@ -120,7 +131,9 @@ app.use('*', async (c, next) => {
             const db = drizzle(c.env.DB);
             const user = await db.select().from(users).limit(1).get();
             if (!user) {
-                const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+                // Use CSPRNG instead of Math.random so the one-hour bootstrap code isn't predictable.
+                const rand = crypto.getRandomValues(new Uint32Array(1))[0];
+                const newCode = (100000 + (rand % 900000)).toString();
                 await c.env.TENANT_CACHE.put('setup_verification_code', newCode, { expirationTtl: 3600 });
                 logger.warn('New system detected. System initialization code generated.', { code: newCode });
                 logger.info(`Initialization Code Required: ${newCode}`);
@@ -138,33 +151,69 @@ app.use('*', async (c, next) => {
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.startsWith('Bearer ')
         ? authHeader.slice(7)
-        : getCookie(c, 'inspector_token');
+        : getCookie(c, '__Host-inspector_token');
 
     if (!token) return next();
 
+    // Fail closed if the signing key is missing or too weak to meaningfully resist offline brute force.
+    if (!c.env.JWT_SECRET || c.env.JWT_SECRET.length < 32) {
+        logger.error('JWT_SECRET is missing or shorter than 32 characters; refusing to verify tokens');
+        throw Errors.Internal('Server configuration error');
+    }
+
     try {
+        // Decode header first so we can reject non-JWT-typed tokens before spending CPU on
+        // signature verification.
+        const headerPart = token.split('.')[0];
+        if (headerPart) {
+            try {
+                const header = JSON.parse(atob(headerPart.replace(/-/g, '+').replace(/_/g, '/')));
+                if (header.typ && header.typ !== 'JWT') {
+                    throw Errors.Unauthorized('Unsupported token type');
+                }
+            } catch (err) {
+                if (err instanceof AppError) throw err;
+                // Malformed header — fall through to verify() which will reject.
+            }
+        }
+
         const payload = await verify(token, c.env.JWT_SECRET, 'HS256');
         const tenantId = (payload['custom:tenantId'] ?? payload['tenantId']) as string | undefined;
         const userRole = (payload['custom:userRole'] ?? payload['role']) as string | undefined;
+        const userId = payload.sub as string | undefined;
+        const tokenIat = payload.iat as number | undefined;
+
+        // Reject tokens issued before the user's last password change / reset.
+        if (userId && c.env.TENANT_CACHE) {
+            const invalidatedAt = await c.env.TENANT_CACHE.get(`pwchanged:${userId}`);
+            if (invalidatedAt) {
+                const invalidatedTs = parseInt(invalidatedAt, 10);
+                if (!tokenIat || tokenIat < invalidatedTs) {
+                    throw Errors.Unauthorized('Token has been invalidated');
+                }
+            }
+        }
 
         if (tenantId) c.set('tenantId', tenantId);
         if (userRole) c.set('userRole', userRole as UserRole);
 
-        // Also update user object in context if needed
+        // Populate the per-request user context. Email is intentionally not carried in the JWT
+        // anymore — routes that need it (e.g. /me) look it up from the DB.
         if (userRole) {
             c.set('user', {
                 sub: payload.sub as string,
-                email: payload.email as string,
                 role: userRole as UserRole,
                 tenantId: tenantId as string
             });
         }
 
     } catch (err: unknown) {
-        // Invalid token — we don't throw here to allow public routes to work
-        // but the absence of tenantId/userRole will be caught by route-level guards.
+        // Clear the bad cookie so the browser stops re-sending it on every request.
+        deleteCookie(c, '__Host-inspector_token', { path: '/', secure: true, sameSite: 'Strict' });
+        if (err instanceof AppError) throw err;
         const message = err instanceof Error ? err.message : String(err);
         logger.info(`[JWT] Token verification failed: ${message}`);
+        throw Errors.Unauthorized('Invalid or expired token');
     }
 
     // --- Tenant Isolation Guard (Fail-Fast) ---
@@ -224,8 +273,22 @@ app.doc('/doc', {
     },
 });
 
-// Swagger UI
-app.get('/ui', (c) => {
+// HTML Auth Guard Middleware
+const htmlAuthGuard = (allowedRoles?: string[]) => {
+    return async (c: Context<HonoConfig>, next: () => Promise<void>) => {
+        const userRole = c.get('userRole');
+        if (!userRole) return c.redirect('/login');
+
+        if (allowedRoles && !allowedRoles.includes(userRole)) {
+            return c.redirect('/dashboard?error=unauthorized_role');
+        }
+
+        return await next();
+    };
+};
+
+// Swagger UI (owner/admin only)
+app.get('/ui', htmlAuthGuard(['owner', 'admin']), (c) => {
     return c.html(`
         <!DOCTYPE html>
         <html lang="en">
@@ -253,6 +316,8 @@ app.get('/ui', (c) => {
 
 // View Handlers
 app.get('/login', (c) => {
+    // Issue the CSRF cookie before rendering so the form's submit handler can echo it back.
+    issueCsrfCookie(c);
     const branding = c.get('branding');
     return c.html(LoginPage({ branding }));
 });
@@ -266,20 +331,6 @@ app.get('/book', (c) => {
     const branding = c.get('branding');
     return c.html(PublicBookingPage({ siteKey: c.env.TURNSTILE_SITE_KEY, branding }));
 });
-
-// HTML Auth Guard Middleware
-const htmlAuthGuard = (allowedRoles?: string[]) => {
-    return async (c: Context<HonoConfig>, next: () => Promise<void>) => {
-        const userRole = c.get('userRole');
-        if (!userRole) return c.redirect('/login');
-        
-        if (allowedRoles && !allowedRoles.includes(userRole)) {
-            return c.redirect('/dashboard?error=unauthorized_role');
-        }
-        
-        return await next();
-    };
-};
 
 // Pages with Auth
 app.get('/dashboard', htmlAuthGuard(), (c) => c.html(DashboardPage({ branding: c.get('branding') })));

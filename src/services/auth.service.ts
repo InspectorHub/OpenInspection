@@ -2,6 +2,11 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users, tenantInvites } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { hashPassword, verifyPassword } from '../lib/password';
+import { logger } from '../lib/logger';
+
+/** Dummy PBKDF2 hash used to equalize verify() timing when the email lookup misses. */
+const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000';
 
 /**
  * Service to handle all authentication-related business logic.
@@ -14,30 +19,51 @@ export class AuthService {
         return drizzle(this.db);
     }
 
-    /**
-     * Hashes a password using SHA-256 (internal consistency).
-     */
-    async hashPassword(password: string): Promise<string> {
-        const encoder = new TextEncoder();
-        const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(password));
-        return Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
+    /** Write a session-invalidation marker for a user. Safe to call during DB mutations. */
+    private async writeInvalidation(userId: string) {
+        if (!this.kv) return;
+        const ts = Math.floor(Date.now() / 1000).toString();
+        try {
+            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+        } catch (err) {
+            logger.warn('Failed to write session-invalidation key; outstanding tokens may remain valid until exp', {
+                userId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     /**
-     * Validates a user's credentials.
+     * Hashes a password using PBKDF2-SHA256. Thin wrapper retained so callers
+     * that reach in via the service (e.g. the setup route) keep working.
+     */
+    async hashPassword(password: string): Promise<string> {
+        return hashPassword(password);
+    }
+
+    /**
+     * Validates a user's credentials. Lazily upgrades legacy SHA-256 hashes to PBKDF2.
+     * Runs PBKDF2 even when the email is unknown to hide user-existence via timing.
      */
     async validateCredentials(email: string, password: string) {
         const db = this.getDrizzle();
         const user = await db.select().from(users).where(eq(users.email, email)).get();
 
-        if (!user) throw Errors.Unauthorized('Invalid email or password');
-
-        const incomingHash = await this.hashPassword(password);
-        
-        if (user.passwordHash !== incomingHash) {
+        if (!user) {
+            // Perform a throwaway verification against a fixed hash so the response time
+            // does not leak whether the email exists.
+            await verifyPassword(password, DUMMY_HASH);
             throw Errors.Unauthorized('Invalid email or password');
+        }
+
+        const [valid, needsRehash] = await verifyPassword(password, user.passwordHash);
+        if (!valid) {
+            throw Errors.Unauthorized('Invalid email or password');
+        }
+
+        if (needsRehash) {
+            const upgraded = await hashPassword(password);
+            await db.update(users).set({ passwordHash: upgraded }).where(eq(users.id, user.id));
         }
 
         return user;
@@ -51,13 +77,14 @@ export class AuthService {
         const user = await db.select().from(users).where(eq(users.id, userId)).get();
         if (!user) throw Errors.NotFound('User not found');
 
-        const currentHash = await this.hashPassword(currentPassword);
-        if (user.passwordHash !== currentHash) {
+        const [valid] = await verifyPassword(currentPassword, user.passwordHash);
+        if (!valid) {
             throw Errors.Unauthorized('Current password is incorrect');
         }
 
-        const newHash = await this.hashPassword(newPassword);
+        const newHash = await hashPassword(newPassword);
         await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
+        await this.writeInvalidation(userId);
     }
 
     /**
@@ -74,7 +101,7 @@ export class AuthService {
         const existing = await db.select().from(users).where(eq(users.email, invite.email)).get();
         if (existing) throw Errors.Conflict('An account with this email already exists');
 
-        const passwordHash = await this.hashPassword(password);
+        const passwordHash = await hashPassword(password);
         const userId = crypto.randomUUID();
 
         await db.insert(users).values({
@@ -93,6 +120,8 @@ export class AuthService {
 
     /**
      * Creates a password reset token and stores it in KV.
+     * Value format: "{userId}:{issuedAtUnixSec}" so we can detect tokens that predate
+     * a password change and reject them even though they haven't expired yet.
      */
     async createPasswordResetToken(email: string): Promise<string | null> {
         const db = this.getDrizzle();
@@ -101,7 +130,8 @@ export class AuthService {
 
         const resetToken = crypto.randomUUID();
         const kvKey = `pw_reset:${resetToken}`;
-        await this.kv.put(kvKey, user.id, { expirationTtl: 3600 });
+        const issuedAt = Math.floor(Date.now() / 1000);
+        await this.kv.put(kvKey, `${user.id}:${issuedAt}`, { expirationTtl: 3600 });
         return resetToken;
     }
 
@@ -112,12 +142,33 @@ export class AuthService {
         if (!this.kv) throw Errors.BadRequest('Password reset not available');
 
         const kvKey = `pw_reset:${token}`;
-        const userId = await this.kv.get(kvKey);
-        if (!userId) throw Errors.BadRequest('Invalid or expired reset token');
+        const raw = await this.kv.get(kvKey);
+        if (!raw) throw Errors.BadRequest('Invalid or expired reset token');
+
+        // Support both legacy ("userId") and new ("userId:issuedAt") formats.
+        const sepIdx = raw.indexOf(':');
+        const userId = sepIdx === -1 ? raw : raw.slice(0, sepIdx);
+        const issuedAt = sepIdx === -1 ? 0 : parseInt(raw.slice(sepIdx + 1), 10) || 0;
+
+        // Reject reset tokens issued before the user's last password change.
+        const invalidatedAt = await this.kv.get(`pwchanged:${userId}`);
+        if (invalidatedAt && issuedAt <= parseInt(invalidatedAt, 10)) {
+            await this.kv.delete(kvKey);
+            throw Errors.BadRequest('Invalid or expired reset token');
+        }
 
         const db = this.getDrizzle();
-        const newHash = await this.hashPassword(newPassword);
+        const newHash = await hashPassword(newPassword);
         await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
         await this.kv.delete(kvKey);
+        await this.writeInvalidation(userId);
+    }
+
+    /**
+     * Invalidate all outstanding JWTs for a user. Call this from any future endpoint
+     * that changes a user's role, disables them, deletes them, or on explicit logout.
+     */
+    async invalidateUserSessions(userId: string) {
+        await this.writeInvalidation(userId);
     }
 }

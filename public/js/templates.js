@@ -1,65 +1,48 @@
-function parseJwt(t) {
-    if (!t || typeof t !== 'string' || !t.includes('.')) return {};
-    try { return JSON.parse(atob(t.split('.')[1])); } catch { return {}; }
-}
+// Cookie-only auth: the HttpOnly inspector_token cookie is sent automatically on same-origin
+// fetches. Do NOT read/write the token from JS — that would downgrade the cookie to JS-readable.
 
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
+const authFetch = (url, opts = {}) =>
+    fetch(url, { credentials: 'same-origin', ...opts });
+
+async function logout() {
+    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    window.location.href = '/login';
 }
 
 let allTemplates = [];
 
-document.addEventListener('DOMContentLoaded', () => {
-    let token = localStorage.getItem('inspector_token') || getCookie('inspector_token');
-    
-    if (!token) {
-        const urlParams = new URLSearchParams(window.location.search);
-        token = urlParams.get('token');
-        if (token) {
-            localStorage.setItem('inspector_token', token);
-            window.history.replaceState({}, document.title, window.location.pathname);
-        } else {
-            window.location.href = '/login';
-            return;
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const meRes = await authFetch('/api/auth/me');
+        if (meRes.status === 401) { window.location.href = '/login'; return; }
+        const me = await meRes.json();
+        const email = me?.data?.user?.email || '';
+        const name = email ? email.split('@')[0] : 'User';
+        const avatarEl = document.querySelector('nav img[alt="User"]');
+        if (avatarEl) {
+            avatarEl.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff';
+            avatarEl.alt = name;
         }
-    }
-
-    // Avatar Initialization
-    const payload = parseJwt(token);
-    const email = payload.email || '';
-    const name = email ? email.split('@')[0] : 'User';
-    const avatarEl = document.querySelector('nav img[alt="User"]');
-    if (avatarEl) {
-        avatarEl.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff';
-        avatarEl.alt = name;
+    } catch (e) {
+        console.error('Failed to load session:', e);
     }
 
     const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('inspector_token');
-            document.cookie = 'inspector_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            window.location.href = '/login';
-        });
-    }
+    if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
-    loadTemplates(token);
+    loadTemplates();
 });
 
-async function loadTemplates(token) {
+async function loadTemplates() {
     try {
-        const res = await fetch('/api/inspections/templates', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
+        const res = await authFetch('/api/inspections/templates');
+        if (res.status === 401) { window.location.href = '/login'; return; }
         const tbody = document.getElementById('templatesList');
         if (!res.ok) {
             tbody.innerHTML = '<tr><td colspan="4" class="py-20 text-center text-sm text-red-500 font-bold">Failed to load templates.</td></tr>';
             return;
         }
         const response = await res.json();
-        // The API returns { success: true, data: { templates: [...] } }
         allTemplates = (response.data && response.data.templates) || response.templates || [];
         renderTemplates();
     } catch (e) {
@@ -134,11 +117,7 @@ function renderTemplates() {
 
 async function deleteTemplate(id) {
     if (!await modalConfirm('Eliminate this template from the repository?', 'Remove Template')) return;
-    const token = localStorage.getItem('inspector_token') || getCookie('inspector_token');
-    const res = await fetch('/api/inspections/templates/' + id, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + token }
-    });
+    const res = await authFetch('/api/inspections/templates/' + id, { method: 'DELETE' });
     if (res.ok) {
         allTemplates = allTemplates.filter(t => t.id !== id);
         renderTemplates();
@@ -171,18 +150,17 @@ async function submitTemplate() {
     const btn = document.getElementById('submitTplBtn');
     btn.disabled = true;
     btn.textContent = 'Deploying...';
-    
-    const token = localStorage.getItem('inspector_token') || getCookie('inspector_token');
-    const res = await fetch('/api/inspections/templates', {
+
+    const res = await authFetch('/api/inspections/templates', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, schema })
     });
     btn.disabled = false;
     btn.textContent = 'Deploy Template';
     if (res.ok) {
         closeModal();
-        loadTemplates(token);
+        loadTemplates();
     } else {
         const err = await res.json();
         modalAlert('Sync Error: ' + (err.error || 'Failed to create'), 'Error');
