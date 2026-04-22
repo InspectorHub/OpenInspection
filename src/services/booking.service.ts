@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { availability, availabilityOverrides, inspections, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { safeISODate } from '../lib/date';
 
 /**
  * Service to handle public booking flow and availability lookups.
@@ -137,7 +138,7 @@ export class AvailabilityService {
         await db.insert(availabilityOverrides).values(newOverride);
         return {
             ...newOverride,
-            createdAt: newOverride.createdAt.toISOString()
+            createdAt: safeISODate(newOverride.createdAt)
         };
     }
 

@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { availability, availabilityOverrides } from '../lib/db/schema';
 import { HonoConfig } from '../types/hono';
+import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
 import { 
@@ -58,7 +59,7 @@ availabilityRoutes.openapi(listAvailabilityRoute, async (c) => {
     // Ensure createdAt is formatted as a string for the response
     const formattedAvailability = slots.map(s => ({
         ...s,
-        createdAt: s.createdAt.toISOString()
+        createdAt: safeISODate(s.createdAt)
     }));
 
     return c.json({ success: true, data: { availability: formattedAvailability } }, 200);
@@ -153,7 +154,7 @@ availabilityRoutes.openapi(listOverridesRoute, async (c) => {
 
     const formattedOverrides = overrides.map(o => ({
         ...o,
-        createdAt: o.createdAt.toISOString()
+        createdAt: safeISODate(o.createdAt)
     }));
 
     return c.json({ success: true, data: { overrides: formattedOverrides } }, 200);

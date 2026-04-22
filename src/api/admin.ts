@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { writeAuditLog } from '../lib/audit';
+import { safeISODate } from '../lib/date';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
 import { 
@@ -283,7 +284,7 @@ adminRoutes.openapi(listMembersRoute, async (c) => {
     // Map Date to string for schema compatibility
     const formattedMembers = members.members.map((m: { id: string; email: string; role: string; createdAt: Date }) => ({
         ...m,
-        createdAt: m.createdAt.toISOString()
+        createdAt: safeISODate(m.createdAt)
     }));
     
     return c.json({ success: true, data: formattedMembers }, 200);
@@ -462,7 +463,7 @@ adminRoutes.openapi(getAuditLogsRoute, async (c) => {
         ...result,
         items: result.logs.map(log => ({
             ...log,
-            createdAt: log.createdAt.toISOString()
+            createdAt: safeISODate(log.createdAt)
         }))
     };
     

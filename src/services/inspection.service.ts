@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../lib/validations/inspection.schema';
 
 import { ScopedDB } from '../lib/db/scoped';
+import { safeISODate, safeTimestamp } from '../lib/date';
 
 type Inspection = z.infer<typeof InspectionSchema>;
 type InspectionListParams = z.infer<typeof InspectionListQuerySchema>;
@@ -62,7 +63,7 @@ export class InspectionService {
         let nextCursor: string | null = null;
         if (hasMore) {
             const last = page[page.length - 1];
-            nextCursor = btoa(JSON.stringify({ createdAt: last.createdAt!.getTime(), id: last.id }));
+            nextCursor = btoa(JSON.stringify({ createdAt: safeTimestamp(last.createdAt), id: last.id }));
         }
 
         const inspectionsFormatted: Inspection[] = page.map(row => ({
@@ -75,7 +76,7 @@ export class InspectionService {
             date: row.date as string,
             inspectorId: row.inspectorId as string | null,
             templateId: row.templateId as string | null,
-            createdAt: row.createdAt!.toISOString(),
+            createdAt: safeISODate(row.createdAt),
         }));
 
         return { inspections: inspectionsFormatted, nextCursor, hasMore };
@@ -129,7 +130,7 @@ export class InspectionService {
                 date: result.date as string,
                 inspectorId: result.inspectorId as string | null,
                 templateId: result.templateId as string | null,
-                createdAt: result.createdAt.toISOString(),
+                createdAt: safeISODate(result.createdAt),
                 signedByClient: !!signed
             },
             template: template || null

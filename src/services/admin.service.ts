@@ -13,6 +13,7 @@ import {
 import { Errors } from '../lib/errors';
 
 import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
+import { safeTimestamp } from '../lib/date';
 
 /**
  * Service to handle administrative tasks such as member management, 
@@ -140,7 +141,7 @@ export class AdminService {
         let nextCursor: string | null = null;
         if (hasMore) {
             const last = page[page.length - 1];
-            nextCursor = btoa(JSON.stringify({ createdAt: (last.createdAt as Date).getTime(), id: last.id }));
+            nextCursor = btoa(JSON.stringify({ createdAt: safeTimestamp(last.createdAt), id: last.id }));
         }
 
         return { logs: page, nextCursor, hasMore };
