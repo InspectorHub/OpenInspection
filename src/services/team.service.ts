@@ -74,6 +74,20 @@ export class TeamService {
         return { token: inviteToken, expiresAt };
     }
 
+    async removeMember(tenantId: string, userId: string, requesterId: string) {
+        if (userId === requesterId) {
+            throw Errors.BadRequest('Cannot remove yourself');
+        }
+        const db = this.getDB();
+        const user = await db.select().from(users)
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
+            .get();
+        if (!user) throw Errors.NotFound('Member not found');
+
+        await db.delete(users).where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+        return user;
+    }
+
     async sendInviteEmail(to: string, inviteLink: string) {
         const { RESEND_API_KEY, SENDER_EMAIL, APP_NAME = 'OpenInspection' } = this.env ?? {};
         if (!RESEND_API_KEY) return;
