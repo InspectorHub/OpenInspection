@@ -167,7 +167,7 @@ export class InspectionService {
             ...newInspection,
             clientEmail: newInspection.clientEmail as string | null,
             inspectorId: newInspection.inspectorId as string | null,
-            createdAt: newInspection.createdAt.toISOString()
+            createdAt: safeISODate(newInspection.createdAt)
         } as Inspection;
     }
 
@@ -193,7 +193,7 @@ export class InspectionService {
 
         return {
             ...clone,
-            createdAt: clone.createdAt.toISOString()
+            createdAt: safeISODate(clone.createdAt)
         };
     }
 
