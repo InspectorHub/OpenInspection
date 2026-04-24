@@ -88,3 +88,61 @@ export const BulkInspectionSchema = z.object({
 export const InspectionResponseSchema = createApiResponseSchema(InspectionSchema).openapi('InspectionResponse');
 export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
 export const InspectionStatsResponseSchema = createApiResponseSchema(InspectionStatsSchema).openapi('InspectionStatsResponse');
+
+// --- Report Data ---
+
+export const PublishInspectionSchema = z.object({
+  theme: z.enum(['modern', 'classic', 'minimal']).default('modern'),
+  notifyClient: z.boolean().default(true),
+  notifyAgent: z.boolean().default(true),
+  requireSignature: z.boolean().default(false),
+  requirePayment: z.boolean().default(false),
+}).openapi('PublishInspection');
+
+export const ReportItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  rating: z.string().nullable(),
+  ratingColor: z.string(),
+  ratingLabel: z.string().nullable(),
+  severityBucket: z.enum(['satisfactory', 'monitor', 'defect', 'other']),
+  notes: z.string().nullable(),
+  photos: z.array(z.object({ key: z.string(), url: z.string() })),
+  recommendation: z.string().nullable().optional(),
+  estimateMin: z.number().nullable().optional(),
+  estimateMax: z.number().nullable().optional(),
+}).openapi('ReportItem');
+
+export const ReportSectionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  icon: z.string().nullable().optional(),
+  defectCount: z.number(),
+  items: z.array(ReportItemSchema),
+}).openapi('ReportSection');
+
+export const ReportDataResponseSchema = z.object({
+  inspection: z.object({
+    id: z.string(),
+    propertyAddress: z.string(),
+    date: z.string(),
+    status: z.string(),
+    inspectorName: z.string().nullable(),
+  }),
+  theme: z.enum(['modern', 'classic', 'minimal']),
+  stats: z.object({
+    total: z.number(),
+    satisfactory: z.number(),
+    monitor: z.number(),
+    defect: z.number(),
+  }),
+  sections: z.array(ReportSectionSchema),
+  ratingLevels: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    abbreviation: z.string(),
+    color: z.string(),
+    severity: z.string(),
+    isDefect: z.boolean(),
+  })),
+}).openapi('ReportData');

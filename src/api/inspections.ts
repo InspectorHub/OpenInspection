@@ -4,14 +4,16 @@ import { renderProfessionalReport } from '../templates/pages/report.template';
 import { writeAuditLog } from '../lib/audit';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
-import { 
-    InspectionListQuerySchema, 
-    CreateInspectionSchema, 
-    UpdateInspectionSchema, 
-    PatchResultsSchema, 
+import {
+    InspectionListQuerySchema,
+    CreateInspectionSchema,
+    UpdateInspectionSchema,
+    PatchResultsSchema,
     BulkInspectionSchema,
     InspectionSchema,
-    InspectionListResponseSchema
+    InspectionListResponseSchema,
+    PublishInspectionSchema,
+    ReportDataResponseSchema
 } from '../lib/validations/inspection.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -754,6 +756,77 @@ inspectionsRoutes.openapi(completeInspectionRoute, async (c) => {
         executionCtx: c.executionCtx,
     });
     return c.json({ success: true, data: { success: true } }, 200);
+});
+
+/**
+ * GET /api/inspections/:id/report-data
+ */
+const getReportDataRoute = createRoute({
+    method: 'get',
+    path: '/{id}/report-data',
+    tags: ['Inspections'],
+    summary: 'Get structured report data',
+    request: {
+        params: z.object({ id: z.string() }),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(ReportDataResponseSchema),
+                },
+            },
+            description: 'Report data',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(getReportDataRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const service = c.var.services.inspection;
+    const data = await service.getReportData(id, tenantId);
+    return c.json({ success: true, data }, 200);
+});
+
+/**
+ * POST /api/inspections/:id/publish
+ */
+const publishRoute = createRoute({
+    method: 'post',
+    path: '/{id}/publish',
+    tags: ['Inspections'],
+    summary: 'Publish inspection report',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string() }),
+        body: {
+            content: {
+                'application/json': {
+                    schema: PublishInspectionSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ reportUrl: z.string(), status: z.string() })),
+                },
+            },
+            description: 'Published',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(publishRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const service = c.var.services.inspection;
+    const result = await service.publishInspection(id, tenantId, body);
+    return c.json({ success: true, data: result }, 200);
 });
 
 export default inspectionsRoutes;

@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, inspectionAgreements, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { computeReportStats, getRatingColor, getRatingBucket, type RatingLevel } from '../lib/report-utils';
 import { z } from 'zod';
 import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../lib/validations/inspection.schema';
 
@@ -238,5 +239,122 @@ export class InspectionService {
             httpMetadata: { contentType: file.type }
         });
         return key;
+    }
+
+    /**
+     * Builds structured report data for a given inspection.
+     */
+    async getReportData(inspectionId: string, tenantId: string) {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        const template = inspection.templateId
+            ? await db.select().from(templates).where(eq(templates.id, inspection.templateId)).get()
+            : null;
+        const resultsRow = await db.select().from(inspectionResults)
+            .where(eq(inspectionResults.inspectionId, inspectionId))
+            .get();
+
+        interface SchemaItem { id: string; label: string; icon?: string }
+        interface SchemaSection { id: string; title: string; icon?: string; items: SchemaItem[] }
+        interface SchemaData { sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
+        interface ResultEntry { rating?: string; notes?: string; photos?: { key: string }[]; recommendation?: string; estimateMin?: number; estimateMax?: number }
+
+        const schemaData: SchemaData = template?.schema
+            ? (typeof template.schema === 'string' ? JSON.parse(template.schema) : template.schema) as SchemaData
+            : { sections: [] };
+
+        const levels: RatingLevel[] = schemaData.ratingSystem?.levels ?? [];
+        const resultData: Record<string, ResultEntry> = resultsRow?.data
+            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, ResultEntry>
+            : {};
+
+        const stats = computeReportStats(schemaData.sections, resultData, levels);
+
+        const sections = schemaData.sections.map((sec: SchemaSection) => ({
+            id: sec.id,
+            title: sec.title,
+            icon: sec.icon ?? null,
+            defectCount: stats.sectionDefects[sec.id] ?? 0,
+            items: sec.items.map((item: SchemaItem) => {
+                const res = resultData[item.id] || {};
+                const ratingId = res.rating ?? null;
+                const bucket = getRatingBucket(ratingId, levels);
+                const level = levels.find((l: RatingLevel) => l.id === ratingId);
+
+                const photos = (res.photos || []).map((p: { key: string }) => ({
+                    key: p.key,
+                    url: `/api/inspections/${inspectionId}/photos/${encodeURIComponent(p.key)}`,
+                }));
+
+                return {
+                    id: item.id,
+                    label: item.label,
+                    rating: ratingId,
+                    ratingColor: getRatingColor(ratingId, levels),
+                    ratingLabel: level?.label ?? ratingId,
+                    severityBucket: bucket,
+                    notes: res.notes ?? null,
+                    photos,
+                    recommendation: res.recommendation ?? null,
+                    estimateMin: res.estimateMin ?? null,
+                    estimateMax: res.estimateMax ?? null,
+                };
+            }),
+        }));
+
+        let inspectorName: string | null = null;
+        if (inspection.inspectorId) {
+            const inspector = await db.select({ email: users.email })
+                .from(users).where(eq(users.id, inspection.inspectorId)).get();
+            inspectorName = inspector?.email?.split('@')[0] ?? null;
+        }
+
+        return {
+            inspection: { ...inspection, inspectorName },
+            theme: 'modern' as const,
+            stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
+            sections,
+            ratingLevels: levels.length > 0 ? levels : [
+                { id: 'Satisfactory', label: 'Satisfactory', abbreviation: 'SAT', color: '#22c55e', severity: 'good', isDefect: false },
+                { id: 'Monitor', label: 'Monitor', abbreviation: 'MON', color: '#f59e0b', severity: 'marginal', isDefect: false },
+                { id: 'Defect', label: 'Defect', abbreviation: 'DEF', color: '#f43f5e', severity: 'significant', isDefect: true },
+                { id: 'Not Inspected', label: 'Not Inspected', abbreviation: 'NI', color: '#3b82f6', severity: 'minor', isDefect: false },
+            ],
+        };
+    }
+
+    /**
+     * Publishes an inspection report (transitions to delivered status).
+     */
+    async publishInspection(inspectionId: string, tenantId: string, _options: {
+        theme: string;
+        notifyClient: boolean;
+        notifyAgent: boolean;
+        requireSignature: boolean;
+        requirePayment: boolean;
+    }) {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+        if (inspection.status === 'delivered') throw Errors.BadRequest('Inspection is already published');
+
+        await db.update(inspections)
+            .set({ status: 'delivered' })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+
+        const accessToken = crypto.randomUUID();
+
+        return {
+            reportUrl: `/report/${inspectionId}?token=${accessToken}`,
+            status: 'delivered',
+        };
     }
 }
