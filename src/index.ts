@@ -29,6 +29,8 @@ import { TemplatesPage } from './templates/pages/templates';
 import { TeamPage } from './templates/pages/team';
 import { AgreementsPage } from './templates/pages/agreements';
 import { SetupPage } from './templates/pages/setup';
+import { ReportCardStackPage } from './templates/pages/report-card-stack';
+import { InspectionEditPage } from './templates/pages/inspection-edit';
 
 
 import coreAuthRoutes from './api/auth';
@@ -118,7 +120,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join') return next();
 
@@ -330,6 +332,32 @@ app.get('/setup', (c) => {
 app.get('/book', (c) => {
     const branding = c.get('branding');
     return c.html(PublicBookingPage({ siteKey: c.env.TURNSTILE_SITE_KEY, branding }));
+});
+
+// Public report page (no auth required)
+app.get('/report/:id', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
+    if (!tenantId) return c.text('Not found', 404);
+
+    try {
+        const service = c.var.services.inspection;
+        const data = await service.getReportData(id, tenantId as string);
+
+        return c.html(ReportCardStackPage({
+            inspectionId: id,
+            address: data.inspection.propertyAddress || 'Unknown Address',
+            date: data.inspection.date || '',
+            inspectorName: data.inspection.inspectorName,
+            theme: data.theme,
+            stats: data.stats,
+            sections: data.sections,
+            ratingLevels: data.ratingLevels as import('./lib/report-utils').RatingLevel[],
+            branding: c.get('branding'),
+        }));
+    } catch {
+        return c.text('Report not found', 404);
+    }
 });
 
 // Pages with Auth
