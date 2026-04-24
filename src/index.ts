@@ -376,6 +376,13 @@ app.get('/inspections/:id/form', htmlAuthGuard(['inspector']), (c) => {
     return c.html(FormRendererPage({ inspectionId: id, branding }));
 });
 
+// Inspection Edit Page - Inspector + Admin/Owner
+app.get('/inspections/:id/edit', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
+    return c.html(InspectionEditPage({ inspectionId: id, branding: c.get('branding') }));
+});
+
 app.get('/', (c) => c.redirect('/dashboard'));
 
 export default app;
