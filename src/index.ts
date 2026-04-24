@@ -101,6 +101,7 @@ app.get('/styles.css', serveStatic(staticOpts({ path: './styles.css' })));
 app.get('/manifest.json', serveStatic(staticOpts({ path: './manifest.json' })));
 app.get('/sw.js', serveStatic(staticOpts({ path: './sw.js' })));
 app.get('/js/*', serveStatic(staticOpts({ root: './' })));
+app.get('/css/*', serveStatic(staticOpts({ root: './' })));
 
 // Global Middlewares
 app.use('*', securityHeaders);
