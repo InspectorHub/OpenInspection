@@ -52,7 +52,7 @@ Visit the printed Worker URL — you will be redirected to `/setup` to create yo
 If you prefer to create resources one-by-one:
 
 ### 1. Create resources
-鼓
+
 ---
 
 ## First-Run Setup Wizard

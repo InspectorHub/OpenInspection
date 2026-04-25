@@ -90,6 +90,10 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 - **KV invalidation**: On password change/reset/delete, write `pwchanged:{userId}` to KV. Auth middleware rejects tokens with `iat < changedAt`.
 - **D1 date safety**: Always use `safeISODate()` / `safeTimestamp()` from `src/lib/date.ts` when serializing DB date values. D1 returns mixed formats (Date, int, string).
 
+## Language Rules
+
+- **English only**: All source code, comments, documentation, commit messages, and user-facing strings in this project MUST be written in English. No Chinese or other non-English text is permitted.
+
 ## Structured Logging Rules
 
 - **No raw console**: Server-side code MUST use `import { logger } from '../lib/logger'` instead of `console.log/error/warn/info`. The `Logger` class outputs structured JSON for log aggregators.
