@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import { users } from '../lib/db/schema/tenant';
 import { availabilityOverrides } from '../lib/db/schema/inspection';
 import { HonoConfig } from '../types/hono';
-import { CalendarSyncResponseSchema, CalendarSuccessResponseSchema } from '../lib/validations/calendar.schema';
+import { CalendarSyncResponseSchema, CalendarSuccessResponseSchema, CalendarCallbackQuerySchema } from '../lib/validations/calendar.schema';
 import { logger } from '../lib/logger';
 
 const calendarRoutes = new OpenAPIHono<HonoConfig>();
@@ -95,9 +95,11 @@ calendarRoutes.get('/connect', async (c) => {
  * Exchanges OAuth code and stores refresh token.
  */
 calendarRoutes.get('/callback', async (c) => {
-    const code = c.req.query('code');
-    const state = c.req.query('state');
-    const error = c.req.query('error');
+    const parsed = CalendarCallbackQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) {
+        return c.json({ error: 'Invalid query parameters' }, 400);
+    }
+    const { code, state, error } = parsed.data;
 
     if (error) {
         const escapeHtml = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

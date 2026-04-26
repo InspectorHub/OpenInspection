@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Context } from 'hono';
 import { HonoConfig } from '../types/hono';
 import { TenantUpdateParams } from '../lib/integration';
+import { TenantStatusBodySchema, StripeConnectBodySchema } from '../lib/validations/admin.schema';
 import { logger } from '../lib/logger';
 
 const api = new Hono<HonoConfig>();
@@ -80,13 +81,16 @@ function hexToUint8Array(hex: string) {
  */
 api.patch('/tenants/:subdomain', verifyPortalSignature, async (c) => {
     const subdomain = c.req.param('subdomain');
-    const body = await c.req.json<Partial<TenantUpdateParams>>();
+    const parsed = TenantStatusBodySchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+        return c.json({ error: 'Invalid input', details: parsed.error.flatten().fieldErrors }, 400);
+    }
 
     const adminService = c.get('services').admin;
 
     try {
         await adminService.handleTenantUpdate({
-            ...body,
+            ...parsed.data,
             subdomain,
         } as TenantUpdateParams);
 
@@ -103,12 +107,15 @@ api.patch('/tenants/:subdomain', verifyPortalSignature, async (c) => {
  */
 api.post('/tenants/:subdomain/stripe-connect', verifyPortalSignature, async (c) => {
     const subdomain = c.req.param('subdomain');
-    const { accountId } = await c.req.json<{ accountId: string }>();
+    const parsed = StripeConnectBodySchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+        return c.json({ error: 'Invalid input', details: parsed.error.flatten().fieldErrors }, 400);
+    }
 
     const adminService = c.get('services').admin;
 
     try {
-        await adminService.updateStripeConnect(subdomain as string, accountId);
+        await adminService.updateStripeConnect(subdomain as string, parsed.data.accountId);
         return c.json({ success: true });
     } catch (error: unknown) {
         logger.error('Failed to handle stripe connect', {}, error instanceof Error ? error : undefined);

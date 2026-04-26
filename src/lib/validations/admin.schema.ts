@@ -67,6 +67,29 @@ export const StripeConnectSchema = z.object({
 }).openapi('StripeConnect');
 
 /**
+ * Body schema for PATCH /api/integration/tenants/:subdomain (M2M).
+ * subdomain comes from URL param, not body.
+ */
+export const TenantStatusBodySchema = z.object({
+    id: z.string().uuid().optional(),
+    status: z.string().min(1),
+    tier: z.string().optional(),
+    name: z.string().optional(),
+    deploymentMode: z.enum(['shared', 'silo']).optional(),
+    setupVerificationCode: z.string().optional(),
+    maxUsers: z.number().int().positive().optional(),
+    adminEmail: z.string().email().optional(),
+    adminPasswordHash: z.string().optional(),
+});
+
+/**
+ * Body schema for POST /api/integration/tenants/:subdomain/stripe-connect (M2M).
+ */
+export const StripeConnectBodySchema = z.object({
+    accountId: z.string().min(1),
+});
+
+/**
  * Response Schemas
  */
 export const AdminExportResponseSchema = createApiResponseSchema(z.object({

@@ -90,6 +90,14 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 - **KV invalidation**: On password change/reset/delete, write `pwchanged:{userId}` to KV. Auth middleware rejects tokens with `iat < changedAt`.
 - **D1 date safety**: Always use `safeISODate()` / `safeTimestamp()` from `src/lib/date.ts` when serializing DB date values. D1 returns mixed formats (Date, int, string).
 
+## Input Validation Rules
+
+- **Zod required**: Every API endpoint that accepts user input (body, query, params) MUST validate using a Zod schema. No manual `if (!field)` or TypeScript generics-only validation.
+- **OpenAPIHono routes**: Use `createRoute()` with `request.body/query/params` schemas and access validated data via `c.req.valid('json')`, `c.req.valid('query')`, `c.req.valid('param')`.
+- **Non-OpenAPIHono routes**: Use `schema.safeParse(await c.req.json())` and return 400 on failure. This applies to workaround routes that cannot use `createRoute()`.
+- **Schema location**: All Zod schemas live in `src/lib/validations/*.schema.ts`. Do not define schemas inline in route handlers.
+- **No raw c.req.json()**: Never use `c.req.json<T>()` with only TypeScript generics — generics provide zero runtime protection.
+
 ## Language Rules
 
 - **English only**: All source code, comments, documentation, commit messages, and user-facing strings in this project MUST be written in English. No Chinese or other non-English text is permitted.
