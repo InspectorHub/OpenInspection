@@ -20,7 +20,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                         </div>
                     </div>
                     <h2 class="text-center text-4xl font-black tracking-tight text-slate-900 leading-tight">Welcome to {siteName}</h2>
-                    <p class="mt-4 text-center text-sm font-semibold text-slate-500 uppercase tracking-widest">Global Workspace Initialization</p>
+                    <p class="mt-4 text-center text-sm font-semibold text-slate-500 uppercase tracking-widest">First-Time Setup</p>
                 </div>
 
                 <div class="mt-12 sm:mx-auto sm:w-full sm:max-w-[480px] animate-fade-in" style="animation-delay: 0.1s;">
@@ -45,7 +45,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             </div>
 
                             <div>
-                                <label for="password" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Master Password</label>
+                                <label for="password" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Password</label>
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="password" name="password" type="password" required placeholder="••••••••"
@@ -70,7 +70,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <div>
                                 <button type="submit" id="submitBtn" 
                                     class="premium-button flex w-full justify-center rounded-2xl bg-emerald-600 px-6 py-5 text-base font-bold text-white shadow-xl shadow-emerald-100 hover:bg-slate-900 hover:shadow-emerald-200 active:scale-95 disabled:bg-slate-300 transition-all">
-                                    Initialize System
+                                    Create Account
                                 </button>
                             </div>
                         </form>

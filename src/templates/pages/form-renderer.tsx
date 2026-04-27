@@ -222,8 +222,8 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <div class="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-emerald-200 group hover:rotate-6 transition-transform">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
-                                <h3 class="text-3xl font-black tracking-tightest text-slate-900 mb-3">Audit Concluded</h3>
-                                <p class="text-lg text-slate-500 font-medium max-w-md mx-auto">The protocol is finalized, synchronized, and the generated professional document is now officially certified.</p>
+                                <h3 class="text-3xl font-black tracking-tightest text-slate-900 mb-3">Inspection Complete</h3>
+                                <p class="text-lg text-slate-500 font-medium max-w-md mx-auto">The inspection has been finalized and the report is ready for download.</p>
                             </div>
                             <a
                                 x-bind:href={`'/api/inspections/' + inspectionId + '/report'`}
