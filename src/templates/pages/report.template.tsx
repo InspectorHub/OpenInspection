@@ -81,7 +81,7 @@ export function renderProfessionalReport(data: {
         branding,
         extraHead: (
             <>
-                <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js">{''}</script>
+                <script defer src="/vendor/alpine.min.js">{''}</script>
                 <script src="/js/signature_pad.umd.min.js">{''}</script>
             </>
         ),

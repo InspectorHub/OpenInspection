@@ -14,11 +14,7 @@ const PRECACHE_ASSETS = [
   '/manifest.json',
 ];
 
-const CDN_HOSTS = [
-  'cdn.jsdelivr.net',
-  'fonts.googleapis.com',
-  'fonts.gstatic.com',
-];
+const CDN_HOSTS = [];
 
 // ���� Install: precache static shell ������������������������������������������������������������������������������������
 self.addEventListener('install', (event) => {

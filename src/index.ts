@@ -105,6 +105,9 @@ app.get('/manifest.json', serveStatic(staticOpts({ path: './manifest.json' })));
 app.get('/sw.js', serveStatic(staticOpts({ path: './sw.js' })));
 app.get('/js/*', serveStatic(staticOpts({ root: './' })));
 app.get('/css/*', serveStatic(staticOpts({ root: './' })));
+app.get('/vendor/*', serveStatic(staticOpts({ root: './' })));
+app.get('/fonts.css', serveStatic(staticOpts({ path: './fonts.css' })));
+app.get('/fonts/*', serveStatic(staticOpts({ root: './' })));
 
 // Global Middlewares
 app.use('*', securityHeaders);
@@ -299,11 +302,11 @@ app.get('/ui', htmlAuthGuard(['owner', 'admin']), (c) => {
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <title>Swagger UI</title>
-            <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css" />
+            <link rel="stylesheet" href="/vendor/swagger-ui.css" />
         </head>
         <body>
             <div id="swagger-ui"></div>
-            <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js" crossorigin></script>
+            <script src="/vendor/swagger-ui-bundle.js" crossorigin></script>
             <script>
                 window.onload = () => {
                     window.ui = SwaggerUIBundle({

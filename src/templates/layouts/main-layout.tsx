@@ -14,11 +14,9 @@ export const BareLayout = (props: { title: string, children: unknown, branding?:
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{title}</title>
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-                <script defer src="https://unpkg.com/@alpinejs/collapse@3.14.9/dist/cdn.min.js"></script>
-                <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
+                <link rel="stylesheet" href="/fonts.css" />
+                <script defer src="/vendor/alpine-collapse.min.js"></script>
+                <script defer src="/vendor/alpine.min.js"></script>
                 <link rel="stylesheet" href="/styles.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
@@ -66,11 +64,9 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{title}</title>
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-                <script defer src="https://unpkg.com/@alpinejs/collapse@3.14.9/dist/cdn.min.js"></script>
-                <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
+                <link rel="stylesheet" href="/fonts.css" />
+                <script defer src="/vendor/alpine-collapse.min.js"></script>
+                <script defer src="/vendor/alpine.min.js"></script>
                 <link rel="stylesheet" href="/styles.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {

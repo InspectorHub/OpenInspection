@@ -60,8 +60,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
     extraHead: (
       <>
         <link rel="stylesheet" href="/css/report-themes.css" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="/fonts.css" />
         <script src="/js/signature_pad.umd.min.js">{''}</script>
         <script src="/js/report-client.js">{''}</script>
       </>

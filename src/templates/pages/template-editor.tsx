@@ -540,7 +540,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
             </div>
 
             {/* Scripts */}
-            <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+            <script src="/vendor/sortable.min.js"></script>
             <script src="/js/template-editor.js"></script>
         </BareLayout>
     );

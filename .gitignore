@@ -1,5 +1,8 @@
 node_modules/
 public/styles.css
+public/vendor/
+public/fonts/
+public/fonts.css
 .wrangler/
 .dev.vars
 dist/

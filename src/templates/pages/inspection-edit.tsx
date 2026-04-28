@@ -15,7 +15,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
     branding,
     extraHead: (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="/fonts.css" />
         <script src="/js/inspection-edit.js"></script>
         <style dangerouslySetInnerHTML={{ __html: `
           body { font-family: 'DM Sans', system-ui, sans-serif; }

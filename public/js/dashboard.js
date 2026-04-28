@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const name = currentUserEmail ? currentUserEmail.split('@')[0] : 'User';
     const avatarEl = document.querySelector('nav img[alt="User"]');
     if (avatarEl) {
-        avatarEl.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff';
+        avatarEl.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="8" fill="%236366f1"/><text x="32" y="32" text-anchor="middle" dy=".35em" fill="white" font-family="sans-serif" font-size="24" font-weight="600">' + (name.charAt(0) || 'U').toUpperCase() + '</text></svg>');
         avatarEl.alt = name;
     }
 
