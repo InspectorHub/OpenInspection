@@ -28,6 +28,47 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                 <div class="space-y-12">
 
+                    {/* ── Profile ── */}
+                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 space-y-10">
+                        <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
+                            {sectionIcon('M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', 'bg-teal-600/10 text-teal-600')}
+                            <div>
+                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Profile</h2>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inspector Identity · Shown on Reports</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                            <div class="space-y-3">
+                                <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Full Name</label>
+                                <div class="relative group">
+                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
+                                    <input type="text" id="profileName" placeholder="John Smith"
+                                        class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                                </div>
+                                <p class="text-[10px] text-slate-400 font-bold ml-1">Displayed on inspection reports.</p>
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Phone</label>
+                                <input type="tel" id="profilePhone" placeholder="(555) 123-4567"
+                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">License #</label>
+                                <input type="text" id="profileLicense" placeholder="HI-12345"
+                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                                <p class="text-[10px] text-slate-400 font-bold ml-1">State inspector license number.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button onclick="saveProfile()" id="saveProfileBtn"
+                                class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
+                                Save Profile
+                            </button>
+                        </div>
+                    </section>
+
                     {/* ── Branding ── */}
                     <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 space-y-10">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">

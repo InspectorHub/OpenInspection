@@ -100,7 +100,7 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                 {/* Mobile Header Bar */}
                 <div class="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100 overflow-hidden ring-2 ring-white">
+                        <div class="w-8 h-8 flex-shrink-0">
                             <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                         </div>
                         <span class="text-lg font-extrabold text-slate-900 tracking-tight">{siteName}</span>
@@ -119,7 +119,7 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                         {/* Close header */}
                         <div class="p-6 flex items-center justify-between border-b border-slate-100">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100 overflow-hidden ring-2 ring-white">
+                                <div class="w-9 h-9 flex-shrink-0">
                                     <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                                 </div>
                                 <span class="text-xl font-extrabold text-slate-900 tracking-tight">{siteName}</span>
@@ -165,10 +165,10 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                     {/* Sidebar / Navigation */}
                     <aside class="w-72 bg-white border-r border-slate-200 hidden lg:flex flex-col sticky top-0 h-screen">
                         <div class="p-8 flex items-center gap-4 border-b border-slate-100">
-                            <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100 overflow-hidden ring-4 ring-white">
+                            <div class="w-10 h-10 flex-shrink-0">
                                 <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                             </div>
-                            <span class="text-2xl font-extrabold text-slate-900 tracking-tightest leading-tight">{siteName}</span>
+                            <span class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">{siteName}</span>
                         </div>
 
                         <nav class="flex-1 p-6 space-y-2 overflow-y-auto">

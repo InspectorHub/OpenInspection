@@ -207,4 +207,42 @@ async function changePassword() {
     }
 }
 
+// ─── Profile ─────────────────────────────────────────────────────────────────
+async function loadProfile() {
+    try {
+        var res = await authFetch('/api/auth/me');
+        if (!res.ok) return;
+        var json = await res.json();
+        var u = json.data?.user;
+        if (u) {
+            if (u.name) setVal('profileName', u.name);
+            if (u.phone) setVal('profilePhone', u.phone);
+            if (u.licenseNumber) setVal('profileLicense', u.licenseNumber);
+        }
+    } catch { /* ignore */ }
+}
+
+async function saveProfile() {
+    var body = {
+        name: document.getElementById('profileName')?.value?.trim() || '',
+        phone: document.getElementById('profilePhone')?.value?.trim() || '',
+        licenseNumber: document.getElementById('profileLicense')?.value?.trim() || '',
+    };
+    var btn = document.getElementById('saveProfileBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+        var res = await authFetch('/api/auth/profile', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        showToast(res.ok ? 'Profile saved.' : 'Failed to save profile.', !res.ok);
+    } catch {
+        showToast('Network error.', true);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save Profile'; }
+    }
+}
+
 loadConfig();
+loadProfile();

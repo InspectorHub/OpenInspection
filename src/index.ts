@@ -355,10 +355,15 @@ app.get('/report/:id', async (c) => {
         const service = c.var.services.inspection;
         const data = await service.getReportData(id, tenantId as string);
 
+        const rawDate = data.inspection.date || '';
+        const formattedDate = rawDate ? new Date(rawDate).toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        }) : '';
+
         return c.html(ReportCardStackPage({
             inspectionId: id,
             address: data.inspection.propertyAddress || 'Unknown Address',
-            date: data.inspection.date || '',
+            date: formattedDate || rawDate,
             inspectorName: data.inspection.inspectorName,
             theme: data.theme,
             stats: data.stats,

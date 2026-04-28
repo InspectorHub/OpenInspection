@@ -81,8 +81,8 @@ export function renderProfessionalReport(data: {
         branding,
         extraHead: (
             <>
-                <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" />
-                <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js" />
+                <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js">{''}</script>
+                <script src="/js/signature_pad.umd.min.js">{''}</script>
             </>
         ),
         children: (

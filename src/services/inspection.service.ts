@@ -313,9 +313,9 @@ export class InspectionService {
 
         let inspectorName: string | null = null;
         if (inspection.inspectorId) {
-            const inspector = await db.select({ email: users.email })
+            const inspector = await db.select({ name: users.name, email: users.email })
                 .from(users).where(eq(users.id, inspection.inspectorId)).get();
-            inspectorName = inspector?.email?.split('@')[0] ?? null;
+            inspectorName = inspector?.name || (inspector?.email?.split('@')[0] ?? null);
         }
 
         return {

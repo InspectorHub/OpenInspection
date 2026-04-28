@@ -62,8 +62,8 @@ export function ReportCardStackPage(props: ReportPageProps) {
         <link rel="stylesheet" href="/css/report-themes.css" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet" />
-        <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js" />
-        <script src="/js/report-client.js" />
+        <script src="/js/signature_pad.umd.min.js">{''}</script>
+        <script src="/js/report-client.js">{''}</script>
       </>
     ),
     children: (
