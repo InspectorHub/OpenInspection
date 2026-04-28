@@ -18,7 +18,7 @@ import {
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements } from '../lib/db/schema';
 import { eq, inArray, and } from 'drizzle-orm';
 
 const inspectionsRoutes = new OpenAPIHono<HonoConfig>();
@@ -735,8 +735,65 @@ inspectionsRoutes.get('/:id/report', async (c) => {
 });
 
 /**
- * POST /api/inspections/:id/complete
+ * GET /api/inspections/:id/agreement (public — for report gatekeeper)
+ * Returns the first active agreement for this tenant.
  */
+inspectionsRoutes.get('/:id/agreement', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    // Verify inspection exists
+    const inspection = await db.select().from(inspectionTable)
+        .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId))).get();
+    if (!inspection) throw Errors.NotFound('Inspection not found');
+
+    // Get the first agreement for this tenant
+    const agreement = await db.select().from(agreements)
+        .where(eq(agreements.tenantId, tenantId)).get();
+    if (!agreement) {
+        return c.json({ success: true, data: { agreement: null } }, 200);
+    }
+
+    return c.json({ success: true, data: { agreement: { id: agreement.id, name: agreement.name, content: agreement.content } } }, 200);
+});
+
+/**
+ * POST /api/inspections/:id/sign (public — client signature submission)
+ */
+inspectionsRoutes.post('/:id/sign', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    // Verify inspection exists
+    const inspection = await db.select().from(inspectionTable)
+        .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId))).get();
+    if (!inspection) throw Errors.NotFound('Inspection not found');
+
+    const body = await c.req.json<{ signatureBase64: string }>();
+    if (!body.signatureBase64) throw Errors.BadRequest('Signature is required');
+
+    // Check if already signed
+    const existing = await db.select().from(inspectionAgreements)
+        .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId))).get();
+    if (existing) {
+        return c.json({ success: true, data: { alreadySigned: true } }, 200);
+    }
+
+    await db.insert(inspectionAgreements).values({
+        id: crypto.randomUUID(),
+        tenantId,
+        inspectionId: id,
+        signatureBase64: body.signatureBase64,
+        signedAt: new Date(),
+        ipAddress: c.req.header('CF-Connecting-IP') || null,
+        userAgent: c.req.header('User-Agent') || null,
+    });
+
+    return c.json({ success: true, data: { signed: true } }, 200);
+});
+
 /**
  * POST /api/inspections/:id/complete
  */
