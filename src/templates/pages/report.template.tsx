@@ -8,6 +8,7 @@ interface SchemaSectionRaw { title?: string; name?: string; items: SchemaItemRaw
 interface SchemaItem { id: string; label: string; }
 interface SchemaSection { title: string; items: SchemaItem[]; }
 interface ResultItem { rating?: string; status?: string; notes?: string; photos?: { key: string }[]; }
+interface RatingLevel { id: string; label: string; abbreviation?: string; color: string; severity: string; isDefect: boolean; }
 
 export function renderProfessionalReport(data: {
     inspection: InspectionRecord,
@@ -20,7 +21,7 @@ export function renderProfessionalReport(data: {
     const isAuthenticated = data.isAuthenticated ?? false;
     const siteName = branding?.siteName || 'OpenInspection';
     const logoUrl = branding?.logoUrl;
-    const rawSchema = typeof template.schema === 'string' ? JSON.parse(template.schema) as { sections: SchemaSectionRaw[] } : template.schema as { sections: SchemaSectionRaw[] };
+    const rawSchema = typeof template.schema === 'string' ? JSON.parse(template.schema) as { sections: SchemaSectionRaw[]; ratingSystem?: { levels: RatingLevel[] } } : template.schema as { sections: SchemaSectionRaw[]; ratingSystem?: { levels: RatingLevel[] } };
     // Normalize field names: DB may have "name" but templates use "title"/"label"
     const schema: { sections: SchemaSection[] } = {
         sections: (rawSchema.sections || []).map((sec: SchemaSectionRaw) => ({
@@ -31,6 +32,29 @@ export function renderProfessionalReport(data: {
             })),
         })),
     };
+    const ratingLevels: RatingLevel[] = rawSchema.ratingSystem?.levels || [
+        { id: 'Satisfactory', label: 'Satisfactory', color: '#22c55e', severity: 'good', isDefect: false },
+        { id: 'Monitor', label: 'Monitor', color: '#f59e0b', severity: 'marginal', isDefect: false },
+        { id: 'Defect', label: 'Defect', color: '#ef4444', severity: 'significant', isDefect: true },
+    ];
+    const levelMap = new Map(ratingLevels.map(l => [l.id, l]));
+
+    // Resolve a rating ID to its severity bucket
+    const resolveSeverity = (ratingId: string | undefined): 'good' | 'marginal' | 'defect' | null => {
+        if (!ratingId) return null;
+        const level = levelMap.get(ratingId);
+        if (level) {
+            if (level.isDefect || level.severity === 'significant') return 'defect';
+            if (level.severity === 'marginal') return 'marginal';
+            if (level.severity === 'good') return 'good';
+        }
+        // Legacy fallback: full string IDs
+        if (ratingId === 'Satisfactory') return 'good';
+        if (ratingId === 'Monitor') return 'marginal';
+        if (ratingId === 'Defect') return 'defect';
+        return null;
+    };
+
     const resultData = results?.data || {};
 
     const stats = {
@@ -43,10 +67,11 @@ export function renderProfessionalReport(data: {
     schema.sections.forEach((s: SchemaSection) => {
         s.items.forEach((i: SchemaItem) => {
             const res = resultData[i.id];
-            const val = res?.rating || res?.status;
-            if (val === 'Satisfactory') stats.satisfactory++;
-            if (val === 'Monitor') stats.monitor++;
-            if (val === 'Defect') stats.defect++;
+            const ratingId = res?.rating || res?.status;
+            const bucket = resolveSeverity(ratingId);
+            if (bucket === 'good') stats.satisfactory++;
+            if (bucket === 'marginal') stats.monitor++;
+            if (bucket === 'defect') stats.defect++;
             stats.total++;
         });
     });
@@ -198,14 +223,17 @@ export function renderProfessionalReport(data: {
                         <div class="space-y-24">
                             {section.items.map((item: SchemaItem) => {
                                 const res: ResultItem = resultData[item.id] || {};
-                                const statusConfigs: Record<string, { bg: string, text: string, dot: string }> = {
-                                    'Satisfactory': { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-                                    'Monitor': { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
-                                    'Defect': { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' }
+                                const bucketConfigs: Record<string, { bg: string, text: string, dot: string }> = {
+                                    'good': { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+                                    'marginal': { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+                                    'defect': { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' }
                                 };
-                                const itemRating = res.rating || res.status;
-                                const conf = statusConfigs[itemRating ?? ''] || { bg: 'bg-slate-50', text: 'text-slate-400', dot: 'bg-slate-300' };
-                                
+                                const itemRatingId = res.rating || res.status;
+                                const bucket = resolveSeverity(itemRatingId);
+                                const level = itemRatingId ? levelMap.get(itemRatingId) : undefined;
+                                const conf = bucketConfigs[bucket ?? ''] || { bg: 'bg-slate-50', text: 'text-slate-400', dot: 'bg-slate-300' };
+                                const displayLabel = level?.label || itemRatingId || 'NO DATA';
+
                                 return (
                                     <div class="flex flex-col lg:flex-row gap-16 avoid-break group" key={item.id}>
                                         <div class="flex-grow">
@@ -213,7 +241,7 @@ export function renderProfessionalReport(data: {
                                                 <h3 class="text-3xl font-black tracking-tightest text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
                                                 <div class={`${conf.bg} ${conf.text} px-4 py-2 rounded-2xl flex items-center gap-3 border border-current/10 shadow-sm`}>
                                                     <div class={`w-2 h-2 rounded-full ${conf.dot} shadow-sm animate-pulse`}></div>
-                                                    <span class="text-[10px] font-black uppercase tracking-[0.2em]">{itemRating || 'NO DATA'}</span>
+                                                    <span class="text-[10px] font-black uppercase tracking-[0.2em]">{displayLabel}</span>
                                                 </div>
                                             </div>
                                             <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl">{res.notes || 'No notes recorded.'}</p>
