@@ -23,6 +23,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           .font-mono { font-family: 'JetBrains Mono', monospace; }
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          [x-cloak] { display: none !important; }
         ` }} />
       </>
     ),
@@ -292,7 +293,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
         </div>
 
         {/* ===== Publish Modal ===== */}
-        <div x-show="showPublishModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div x-cloak x-show="showPublishModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div class="w-full max-w-md rounded-3xl p-6 shadow-xl" style="background: rgba(255,253,250,0.95); backdrop-filter: blur(20px);" x-on:click="if ($event.target === $el) showPublishModal = false">
             <h3 class="text-lg font-bold mb-4 font-heading" style="color: #1a1815">Publish Report</h3>
             <div class="space-y-4">

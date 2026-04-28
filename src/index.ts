@@ -373,8 +373,8 @@ app.get('/settings', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsPa
 app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.html(TeamPage({ branding: c.get('branding') })));
 app.get('/agreements', htmlAuthGuard(['owner', 'admin', 'agent']), (c) => c.html(AgreementsPage({ branding: c.get('branding') })));
 
-// Field Inspection Form - Strictly for Inspectors
-app.get('/inspections/:id/form', htmlAuthGuard(['inspector']), (c) => {
+// Field Inspection Form
+app.get('/inspections/:id/form', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
     const id = c.req.param('id');
     const branding = c.get('branding');
     if (!id) return c.redirect('/dashboard');

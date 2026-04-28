@@ -115,7 +115,7 @@ function renderInspections(list) {
         <tr class="table-row-hover group">
             <td class="py-6 px-10">
                 <div>
-                    <p class="text-sm font-bold text-slate-900">${ins.propertyAddress}</p>
+                    <a href="/inspections/${ins.id}/edit" class="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors">${ins.propertyAddress}</a>
                     <p class="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: ${ins.id.split('-')[0]}</p>
                 </div>
             </td>
@@ -220,13 +220,13 @@ async function submitInspection() {
     };
 
     if (!body.propertyAddress || !body.templateId) {
-        modalAlert('Address and Template logic are required.', 'Validation');
+        modalAlert('Address and template are required.', 'Validation');
         return;
     }
 
     if (btn) {
         btn.disabled = true;
-        btn.innerText = 'Deploying...';
+        btn.innerText = 'Creating...';
     }
 
     try {
@@ -237,7 +237,7 @@ async function submitInspection() {
        });
 
        if (res.ok) {
-           await modalAlert('Inspection deployed successfully!', 'Success');
+           await modalAlert('Inspection created.', 'Success');
            closeModal();
            document.getElementById('propAddress').value = '';
            document.getElementById('templateId').value = '';
@@ -248,7 +248,7 @@ async function submitInspection() {
            fetchInspections(true);
        } else {
            const err = await res.json();
-           await modalAlert('Sync Error: ' + (err.error || 'Failed to deploy workflow'), 'Error');
+           await modalAlert('Error: ' + (err.error?.message || err.error || 'Failed to create inspection'), 'Error');
        }
    } catch (e) {
        console.error(e);

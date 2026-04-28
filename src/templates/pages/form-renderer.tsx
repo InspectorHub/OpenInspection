@@ -19,7 +19,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     <div class="sticky top-6 z-50 mb-10 transition-all duration-500" x-bind:class="{ 'translate-y-[-12px]': scrolled }">
                         <div class="glass-panel flex items-center justify-between px-8 py-5 rounded-[2.5rem] shadow-2xl shadow-indigo-100/30 ring-1 ring-white/60">
                             <div>
-                                <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Syncing Property...'"></h1>
+                                <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Loading...'"></h1>
                                 <div class="flex items-center gap-2 mt-1">
                                     <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600/60" x-text="template?.name || 'Inspection Template'"></span>
                                     <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
@@ -43,7 +43,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             </div>
                         </div>
                         
-                        {/* High-Fidelity Progress Bar */}
+                        {/* Progress Bar */}
                         <div class="mt-4 px-2">
                             <div class="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden backdrop-blur-sm shadow-inner p-0.5">
                                 <div class="h-full bg-gradient-to-r from-indigo-600 to-blue-500 rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_rgba(79,70,229,0.4)]" 
@@ -51,7 +51,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 </div>
                             </div>
                             <div class="flex justify-between mt-2 px-2">
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Progress</p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progress</p>
                                 <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest tabular-nums" x-text="completionPercentage + '%'"></p>
                             </div>
                         </div>

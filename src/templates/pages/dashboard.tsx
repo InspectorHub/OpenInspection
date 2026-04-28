@@ -15,7 +15,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
                         </div>
                         <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Inspections</h1>
-                        <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage and track your property analysis workflow from a single, high-fidelity interface.</p>
+                        <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage your inspections.</p>
                     </div>
                     
                     <div class="flex items-center gap-4">
@@ -41,7 +41,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class={`w-14 h-14 rounded-2xl bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-${stat.color}-600 group-hover:text-white transition-all duration-300 shadow-sm`}>
                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Real-time</span>
+                                <span class="sr-only">Live</span>
                             </div>
                             <h3 class="text-4xl font-black text-slate-900 tracking-tightest mb-1" id={stat.id}>0</h3>
                             <p class="text-sm font-bold text-slate-500 uppercase tracking-tight">{stat.label}</p>
@@ -53,11 +53,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 <div class="glass-panel relative overflow-hidden rounded-[3rem] min-h-[500px] animate-fade-in shadow-2xl shadow-slate-200/50" style="animation-delay: 0.3s">
                     <div class="px-10 py-8 border-b border-slate-100/50 flex flex-col sm:flex-row items-center justify-between gap-6">
                         <div class="flex items-center gap-6">
-                             <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Registry</h2>
-                             <div class="flex items-center gap-2 group cursor-pointer">
-                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-glow shadow-emerald-500/50"></span>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-emerald-500 transition-colors">Monitoring Activity</span>
-                             </div>
+                             <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Recent Inspections</h2>
                         </div>
                         <div class="flex items-center gap-4 w-full sm:w-auto">
                             <div class="relative w-full sm:w-80 group">
@@ -72,10 +68,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         <table class="w-full text-left">
                             <thead class="bg-slate-50/40">
                                 <tr>
-                                    <th class="py-6 px-10 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Target Property</th>
+                                    <th class="py-6 px-10 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Address</th>
                                     <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Inspector</th>
-                                    <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Workflow State</th>
-                                    <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Complexity</th>
+                                    <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Status</th>
+                                    <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fee</th>
                                     <th class="relative py-6 pl-3 pr-10 text-right"><span class="sr-only">Control</span></th>
                                 </tr>
                             </thead>
@@ -87,7 +83,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                                 <div class="absolute inset-0 border-[6px] border-indigo-50 rounded-full"></div>
                                                 <div class="absolute inset-0 border-[6px] border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
                                             </div>
-                                            <p class="text-sm font-black text-slate-300 uppercase tracking-[0.3em]">Syncing</p>
+                                            <p class="text-sm font-black text-slate-300 uppercase tracking-[0.3em]">Loading</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -112,7 +108,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                                 </div>
                                 <h3 class="text-3xl font-black text-slate-900 tracking-tightest mb-2 leading-none">New Inspection</h3>
-                                <p class="text-sm text-slate-500 font-semibold tracking-tight">Configure the parameters for a new field analysis.</p>
+                                <p class="text-sm text-slate-500 font-semibold tracking-tight">Enter the details for this inspection.</p>
                             </div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -147,7 +143,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
 
                             <div class="pt-4 flex gap-4">
                                 <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all">
-                                    Discard
+                                    Cancel
                                 </button>
                                 <button type="button" onclick="submitInspection()" id="submitInsBtn" class="premium-button flex-[2] py-4.5 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-900 transition-all active:scale-95">
                                     Create Inspection
