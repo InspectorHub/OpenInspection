@@ -62,6 +62,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
         <link rel="stylesheet" href="/css/report-themes.css" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet" />
+        <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js" />
         <script src="/js/report-client.js" />
       </>
     ),
@@ -70,7 +71,52 @@ export function ReportCardStackPage(props: ReportPageProps) {
         data-theme={theme}
         class="theme-bg min-h-screen theme-font-body"
         x-data={`reportClient(${JSON.stringify({ inspectionId, stats, sections })})`}
+        x-init="init()"
       >
+        {/* Agreement Gate Overlay (Spectora-style) */}
+        <template x-if="agreementGate && !agreementLoading">
+          <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
+            <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div class="text-center">
+                <div class="w-14 h-14 bg-indigo-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-white" x-text="agreementName || 'Inspection Agreement'"></h2>
+                <p class="text-sm text-slate-400 mt-1">Please review and sign before viewing the report.</p>
+              </div>
+
+              <div class="bg-slate-800 rounded-xl p-5 max-h-48 overflow-y-auto text-sm text-slate-300 leading-relaxed border border-slate-700" x-text="agreementContent"></div>
+
+              <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Your Signature</span>
+                  <button x-on:click="clearSignature()" class="text-xs text-rose-400 hover:text-rose-300 font-medium">Clear</button>
+                </div>
+                <div class="bg-slate-800 border border-slate-600 rounded-xl overflow-hidden">
+                  <canvas id="signatureCanvas" class="w-full h-32 cursor-crosshair touch-none"></canvas>
+                </div>
+              </div>
+
+              <button
+                x-on:click="submitSignature()"
+                x-bind:disabled="signing"
+                class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <span x-show="!signing">Accept &amp; View Report</span>
+                <span x-show="signing">Submitting...</span>
+                <svg x-show="!signing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        {/* Main content — blurred when agreement gate is active */}
+        <div {...{':class': "agreementGate && !agreementLoading ? 'blur-sm pointer-events-none select-none' : ''"}}>
+
         {/* Header */}
         <div class="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-6">
           <div class="flex items-start justify-between mb-6">
@@ -242,6 +288,8 @@ export function ReportCardStackPage(props: ReportPageProps) {
             </div>
           </div>
         </div>
+
+        </div>{/* end blur wrapper */}
 
         {/* Lightbox */}
         <div

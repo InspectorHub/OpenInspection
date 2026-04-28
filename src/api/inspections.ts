@@ -735,6 +735,20 @@ inspectionsRoutes.get('/:id/report', async (c) => {
 });
 
 /**
+ * GET /api/inspections/:id/sign-status (public — check if client already signed)
+ */
+inspectionsRoutes.get('/:id/sign-status', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    const existing = await db.select().from(inspectionAgreements)
+        .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId))).get();
+
+    return c.json({ success: true, data: { signed: !!existing } }, 200);
+});
+
+/**
  * GET /api/inspections/:id/agreement (public — for report gatekeeper)
  * Returns the first active agreement for this tenant.
  */
