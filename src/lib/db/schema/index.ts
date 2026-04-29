@@ -9,3 +9,4 @@ export {
     availabilityOverrides,
     comments,
 } from './inspection';
+export { contacts } from './contact';

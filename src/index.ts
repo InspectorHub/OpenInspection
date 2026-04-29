@@ -44,6 +44,7 @@ import agentRoutes from './api/agent';
 import availabilityRoutes from './api/availability';
 import calendarRoutes from './api/calendar';
 import teamRoutes from './api/team';
+import contactRoutes from './api/contacts';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -267,6 +268,7 @@ app.route('/api/agent', agentRoutes);
 app.route('/api/availability', availabilityRoutes);
 app.route('/api/calendar', calendarRoutes);
 app.route('/api/team', teamRoutes);
+app.route('/api/contacts', contactRoutes);
 app.route('/api/integration', integrationRoutes);
 
 // OpenAPI Documentation

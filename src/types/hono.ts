@@ -56,6 +56,7 @@ import { InspectionService } from '../services/inspection.service';
 import { TeamService } from '../services/team.service';
 import { TemplateService } from '../services/template.service';
 import { AgreementService } from '../services/agreement.service';
+import { ContactService } from '../services/contact.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -74,6 +75,7 @@ export interface AppServices {
     agreement: AgreementService;
     availability: AvailabilityService;
     ai: AIService;
+    contact: ContactService;
 }
 
 /**
