@@ -18,9 +18,15 @@ const countResult = execSync(
   `npx wrangler d1 execute ${DB_NAME} ${flag} --json --command "SELECT COUNT(*) as c FROM comments WHERE tenant_id = '${TENANT_ID}'"`,
   { encoding: 'utf8' }
 );
-const count = JSON.parse(countResult)?.[0]?.results?.[0]?.c ?? 0;
+let count = 0;
+try {
+  const jsonStart = countResult.indexOf('[');
+  if (jsonStart >= 0) {
+    count = JSON.parse(countResult.slice(jsonStart))?.[0]?.results?.[0]?.c ?? 0;
+  }
+} catch { /* fallback to 0 — seed will proceed */ }
 
-if (count > 0) {
+if (count >= COMMENTS.length) {
   console.log(`Seed skipped: ${count} comments already exist for tenant '${TENANT_ID}'.`);
   process.exit(0);
 }
@@ -165,7 +171,7 @@ const COMMENTS = [
 
 const values = COMMENTS.map(c => {
   const id = randomUUID();
-  return `('${id}', '${TENANT_ID}', '${c.category}', '${c.text.replace(/'/g, "''")}', '${c.severity}', '${new Date().toISOString()}')`;
+  return `('${id}', '${TENANT_ID}', '${c.category}', '${c.text.replace(/'/g, "''")}', '${c.severity}', ${Date.now()})`;
 }).join(',\n');
 
 const sql = `INSERT INTO comments (id, tenant_id, category, text, severity, created_at) VALUES\n${values};`;
