@@ -295,7 +295,7 @@ async function fetchPrerequisites() {
     try {
         await populateAgents();
     } catch (e) {
-        // Contacts module may not exist yet — silently ignore
+        console.error('populateAgents failed:', e);
     }
 }
 
@@ -303,7 +303,7 @@ async function populateAgents() {
     const res = await authFetch('/api/contacts?type=agent&limit=100');
     if (!res.ok) return;
     const data = await res.json();
-    const agents = data.data?.contacts || data.contacts || [];
+    const agents = data.data?.contacts || [];
     const select = document.getElementById('agentId');
     if (!select || agents.length === 0) return;
     agents.forEach(a => {
