@@ -9,6 +9,11 @@ export {
     availabilityOverrides,
     comments,
     agreementRequests,
+    services,
+    inspectionServices,
+    discountCodes,
+    automations,
+    automationLogs,
 } from './inspection';
 export { contacts } from './contact';
 export { invoices } from './invoice';
