@@ -74,3 +74,11 @@ export const availabilityOverrides = sqliteTable('availability_overrides', {
     endTime: text('end_time'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
+
+export const comments = sqliteTable('comments', {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull().references(() => tenants.id),
+    text: text('text').notNull(),
+    category: text('category'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});

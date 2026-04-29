@@ -6,5 +6,6 @@ export {
     agreements,
     inspectionAgreements,
     availability,
-    availabilityOverrides
+    availabilityOverrides,
+    comments,
 } from './inspection';
