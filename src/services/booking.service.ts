@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { availability, availabilityOverrides, inspections, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
@@ -58,6 +58,61 @@ export class BookingService {
             overrides, 
             bookedSlots: jobs.map(j => j.date) 
         };
+    }
+
+    /**
+     * Returns computed time slots for a given inspector/date.
+     * Reads recurring availability windows, date overrides, and existing bookings.
+     */
+    async getAvailableSlots(
+        tenantId: string,
+        inspectorId: string,
+        dateStr: string,
+    ): Promise<Array<{ time: string; available: boolean }>> {
+        const db = this.getDrizzle();
+        const date = new Date(dateStr + 'T00:00:00');
+        const dayOfWeek = date.getDay();
+
+        const [windows, overrides, existingInsp] = await Promise.all([
+            db.select().from(availability).where(and(
+                eq(availability.tenantId, tenantId),
+                eq(availability.inspectorId, inspectorId),
+                eq(availability.dayOfWeek, dayOfWeek),
+            )).all(),
+            db.select().from(availabilityOverrides).where(and(
+                eq(availabilityOverrides.tenantId, tenantId),
+                eq(availabilityOverrides.inspectorId, inspectorId),
+                eq(availabilityOverrides.date, dateStr),
+            )).all(),
+            db.select({ date: inspections.date }).from(inspections).where(and(
+                eq(inspections.tenantId, tenantId),
+                eq(inspections.inspectorId, inspectorId),
+                sql`date(${inspections.date}) = ${dateStr}`,
+                sql`${inspections.status} not in ('cancelled')`,
+            )).all(),
+        ]);
+
+        // If a blocking override exists, no slots available
+        const blocked = overrides.some(o => !o.isAvailable);
+        const effectiveWindows = blocked ? overrides.filter(o => o.isAvailable) : windows;
+        if (effectiveWindows.length === 0) return [];
+
+        // Build 30-minute slot grid from each window
+        const slots: string[] = [];
+        for (const w of effectiveWindows) {
+            const start = w.startTime ?? '08:00';
+            const end   = w.endTime   ?? '17:00';
+            let current = start;
+            while (current < end) {
+                if (!slots.includes(current)) slots.push(current);
+                const [h, m] = current.split(':').map(Number);
+                const next = new Date(0, 0, 0, h, m + 30);
+                current = `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`;
+            }
+        }
+
+        const busyTimes = new Set(existingInsp.map(i => String(i.date).slice(11, 16)));
+        return slots.map(time => ({ time, available: !busyTimes.has(time) }));
     }
 
     /**
