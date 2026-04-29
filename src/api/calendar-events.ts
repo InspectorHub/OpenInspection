@@ -52,8 +52,9 @@ const eventsRoute = createRoute({
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
         query: z.object({
-            start: z.string().datetime(),
-            end: z.string().datetime(),
+            // Accept either YYYY-MM-DD (FullCalendar dayGridMonth view) or full ISO 8601
+            start: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Expected date or ISO datetime'),
+            end: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Expected date or ISO datetime'),
         }),
     },
     responses: {
@@ -123,9 +124,12 @@ calendarEventsRoutes.openapi(eventsRoute, async (c) => {
                     }
                 }
                 const calId = encodeURIComponent(userRow.googleCalendarId ?? 'primary');
+                // Google API requires full RFC3339 timestamps. Convert YYYY-MM-DD inputs.
+                const toRfc3339 = (s: string): string =>
+                    /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z` : new Date(s).toISOString();
                 const params = new URLSearchParams({
-                    timeMin: start,
-                    timeMax: end,
+                    timeMin: toRfc3339(start),
+                    timeMax: toRfc3339(end),
                     singleEvents: 'true',
                     orderBy: 'startTime',
                 });

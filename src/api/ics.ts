@@ -47,17 +47,29 @@ icsRoutes.get('/:token', async (c) => {
         logger.error('[ics] Failed to load inspections', { tenantId }, e instanceof Error ? e : undefined);
     }
 
+    // inspections.date may be either YYYY-MM-DD or a full ISO timestamp; normalize to date-only.
+    function dateOnly(dateStr: string): string {
+        if (!dateStr) return '';
+        return dateStr.slice(0, 10).replace(/-/g, '');
+    }
     function fmtDT(dateStr: string): string {
-        return dateStr.replace(/-/g, '') + 'T090000Z';
+        const d = dateOnly(dateStr);
+        return d ? `${d}T090000Z` : '';
     }
     function fmtDTEnd(dateStr: string): string {
-        return dateStr.replace(/-/g, '') + 'T120000Z';
+        const d = dateOnly(dateStr);
+        return d ? `${d}T120000Z` : '';
     }
     function escICS(s: string): string {
         return (s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
     }
 
-    const baseUrl = c.env.APP_BASE_URL ?? `https://${c.req.header('host') ?? 'openinspection.app'}`;
+    // Prefer the request's Host header (production URL) over APP_BASE_URL which may be set to
+    // localhost in development env vars and accidentally leaked into deploy. Fall back to APP_BASE_URL.
+    const reqHost = c.req.header('host');
+    const baseUrl = reqHost
+        ? `https://${reqHost}`
+        : (c.env.APP_BASE_URL ?? 'https://openinspection.app');
 
     const vevents = upcoming.map((r) => [
         'BEGIN:VEVENT',

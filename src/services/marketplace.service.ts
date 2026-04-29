@@ -73,8 +73,8 @@ export class MarketplaceService {
       id:        newTemplateId,
       tenantId:  this.tenantId,
       name:      mkt.name,
-      schema:    JSON.parse(mkt.schema as string),
-      createdAt: now,
+      schema:    mkt.schema,
+      createdAt: new Date(now),
     });
 
     await this.db.insert(tenantMarketplaceImports).values({
