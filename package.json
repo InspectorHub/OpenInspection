@@ -33,6 +33,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "security-scan": "npm audit --audit-level=high",
+    "seed:comments": "node scripts/seed-comments.js --local",
+    "seed:comments:remote": "node scripts/seed-comments.js",
     "prepare": "husky"
   },
   "dependencies": {
