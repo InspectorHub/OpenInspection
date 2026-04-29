@@ -8,11 +8,42 @@ interface AgreementSignProps {
     clientName: string | null;
     status: 'pending' | 'viewed' | 'signed';
     branding?: BrandingConfig | undefined;
+    /** Optional variables substituted into the agreement HTML body (e.g. {{client_name}}). */
+    vars?: {
+        client_name?: string;
+        property_address?: string;
+        inspection_date?: string;
+        inspector_name?: string;
+    } | undefined;
 }
 
-export const AgreementSignPage = ({ token, agreementName, agreementContent, clientName, status, branding }: AgreementSignProps): JSX.Element => {
+/** Replace {{var}} placeholders with the provided values; missing vars become empty strings. */
+function substituteVars(template: string, vars: Record<string, string | undefined>): string {
+    return template.replace(/\{\{(client_name|property_address|inspection_date|inspector_name)\}\}/g, (_m, key) => vars[key] ?? '');
+}
+
+/**
+ * Backward-compat: if the stored content does not look like HTML (no leading `<` tag),
+ * treat it as plain text and wrap paragraphs / preserve line breaks.
+ */
+function renderAgreementContent(raw: string): string {
+    if (!raw) return '';
+    const trimmed = raw.trimStart();
+    if (trimmed.startsWith('<')) return raw; // HTML from Quill — render as-is
+    // plain text → paragraph wrap, escape angle brackets first to avoid HTML injection
+    const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return '<p>' + escaped.replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+}
+
+export const AgreementSignPage = ({ token, agreementName, agreementContent, clientName, status, branding, vars }: AgreementSignProps): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     const alreadySigned = status === 'signed';
+    const renderedHtml = substituteVars(renderAgreementContent(agreementContent || ''), {
+        client_name: vars?.client_name ?? clientName ?? '',
+        property_address: vars?.property_address ?? '',
+        inspection_date: vars?.inspection_date ?? '',
+        inspector_name: vars?.inspector_name ?? '',
+    });
 
     return (
         <BareLayout title={`Sign Agreement | ${siteName}`} branding={branding}>
@@ -36,9 +67,12 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
 
                         {/* Agreement content */}
                         <div class="px-10 py-8 border-b border-slate-100 max-h-96 overflow-y-auto">
-                            <div id="agreementContent" class="prose prose-slate max-w-none text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
-                                {agreementContent}
-                            </div>
+                            <div
+                                id="agreementContent"
+                                class="prose prose-slate max-w-none text-sm text-slate-700 leading-relaxed font-medium"
+                                style="font-size:15px;line-height:1.7;color:#1e293b;"
+                                dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                            ></div>
                         </div>
 
                         {/* Signature area */}

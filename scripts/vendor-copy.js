@@ -31,6 +31,14 @@ for (const [src, dest] of jsFiles) {
   console.log(`  vendor/${dest}`);
 }
 
+// ── Quill ──────────────────────────────────────────────────────────────────────
+// Quill 2.x ships an unminified UMD bundle as `quill.js` (no `quill.min.js`).
+const quillDir = join(vendorDir, 'quill');
+mkdirSync(quillDir, { recursive: true });
+cpSync(join(nm, 'quill/dist/quill.js'), join(quillDir, 'quill.js'));
+cpSync(join(nm, 'quill/dist/quill.snow.css'), join(quillDir, 'quill.snow.css'));
+console.log('  vendor/quill/quill.js + quill.snow.css');
+
 // ── Fonts ───────────────────────────────────────────────────────────────────────
 const fontsDir = join(pub, 'fonts');
 mkdirSync(fontsDir, { recursive: true });

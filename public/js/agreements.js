@@ -1,6 +1,48 @@
 let allAgreements = [];
+let quillEditor = null;
+
+function getAgreementContent() {
+    if (quillEditor) {
+        // Quill returns '<p><br></p>' for empty input — normalize to empty string
+        const html = quillEditor.root.innerHTML;
+        if (html === '<p><br></p>') return '';
+        return html;
+    }
+    const el = document.getElementById('agreementContent');
+    return el ? el.value : '';
+}
+
+function setAgreementContent(html) {
+    const value = html || '';
+    if (quillEditor) {
+        // If existing content is plain text (no leading tag), wrap it before assigning
+        if (value && !value.trimStart().startsWith('<')) {
+            quillEditor.setText(value);
+        } else {
+            quillEditor.root.innerHTML = value;
+        }
+    }
+    const el = document.getElementById('agreementContent');
+    if (el) el.value = value;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
+    const editorEl = document.getElementById('agreementEditor');
+    if (editorEl && typeof Quill !== 'undefined') {
+        const toolbarOptions = [
+            ['bold', 'italic', 'underline'],
+            [{ header: [2, 3, false] }],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ indent: '-1' }, { indent: '+1' }],
+            ['clean'],
+        ];
+        quillEditor = new Quill('#agreementEditor', {
+            theme: 'snow',
+            modules: { toolbar: toolbarOptions },
+            placeholder: 'Enter the full legal terms here...',
+        });
+    }
+
     try {
         const meRes = await authFetch('/api/auth/me');
         if (meRes.status === 401) { window.location.href = '/login'; return; }
@@ -95,7 +137,7 @@ async function loadAgreements() {
 function showCreateModal() {
     document.getElementById('editAgreementId').value = '';
     document.getElementById('agreementName').value = '';
-    document.getElementById('agreementContent').value = '';
+    setAgreementContent('');
     const titleEl = document.getElementById('modalAgreementTitle');
     if (titleEl) titleEl.textContent = 'Create Professional Agreement';
     document.getElementById('submitAgreementBtn').textContent = 'Publish Agreement';
@@ -107,7 +149,7 @@ function showEditModal(id) {
     if (!agreement) return;
     document.getElementById('editAgreementId').value = id;
     document.getElementById('agreementName').value = agreement.name || '';
-    document.getElementById('agreementContent').value = agreement.content || '';
+    setAgreementContent(agreement.content || '');
     const titleEl = document.getElementById('modalAgreementTitle');
     if (titleEl) titleEl.textContent = 'Edit Agreement';
     document.getElementById('submitAgreementBtn').textContent = 'Save Changes';
@@ -121,7 +163,7 @@ function closeModal() {
 
 async function submitAgreement() {
     const name = document.getElementById('agreementName').value;
-    const content = document.getElementById('agreementContent').value;
+    const content = getAgreementContent();
     const btn = document.getElementById('submitAgreementBtn');
 
     if (!name || !content) {

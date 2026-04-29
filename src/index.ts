@@ -4,6 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers';
 import { deleteCookie, getCookie } from 'hono/cookie';
 import { verify } from 'hono/jwt';
 import { drizzle } from 'drizzle-orm/d1';
+import { and, eq } from 'drizzle-orm';
 import { users } from './lib/db/schema';
 import * as schema from './lib/db/schema';
 
@@ -386,6 +387,35 @@ app.get('/agreements/sign/:token', async (c) => {
         const svc = c.var.services.agreement;
         const { request, agreement } = await svc.getAgreementByToken(token);
         await svc.markViewed(token);
+
+        // Best-effort fetch of linked inspection + inspector for placeholder substitution.
+        // Scoped to the request's tenantId — public token is the secret, but we still
+        // refuse to leak data across tenants.
+        const vars: { client_name?: string; property_address?: string; inspection_date?: string; inspector_name?: string } = {
+            client_name: request.clientName ?? '',
+        };
+        if (request.inspectionId) {
+            try {
+                const db = drizzle(c.env.DB, { schema });
+                const insp = await db.select().from(schema.inspections)
+                    .where(and(eq(schema.inspections.id, request.inspectionId), eq(schema.inspections.tenantId, request.tenantId)))
+                    .get();
+                if (insp) {
+                    vars.property_address = insp.propertyAddress ?? '';
+                    vars.inspection_date = insp.date ?? '';
+                    if (!vars.client_name) vars.client_name = insp.clientName ?? '';
+                    if (insp.inspectorId) {
+                        const inspector = await db.select().from(schema.users)
+                            .where(and(eq(schema.users.id, insp.inspectorId), eq(schema.users.tenantId, request.tenantId)))
+                            .get();
+                        if (inspector) vars.inspector_name = inspector.name ?? inspector.email ?? '';
+                    }
+                }
+            } catch (e) {
+                logger.warn('agreement-sign: failed to load inspection vars', { token: token.slice(0, 8), error: (e as Error).message });
+            }
+        }
+
         return c.html(AgreementSignPage({
             token,
             agreementName: agreement.name,
@@ -393,6 +423,7 @@ app.get('/agreements/sign/:token', async (c) => {
             clientName: request.clientName ?? null,
             status: request.status as 'pending' | 'viewed' | 'signed',
             branding,
+            vars,
         }));
     } catch {
         return c.text('Agreement not found or link has expired.', 404);

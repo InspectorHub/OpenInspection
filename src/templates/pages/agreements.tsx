@@ -70,9 +70,13 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                         class="premium-input w-full px-6 py-4.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Legal Content (Markdown Support)</label>
-                                    <textarea id="agreementContent" rows={12} placeholder="Enter the full legal terms here..."
-                                        class="w-full px-6 py-4.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-medium resize-none leading-relaxed min-h-[300px]"></textarea>
+                                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
+                                    <link rel="stylesheet" href="/vendor/quill/quill.snow.css" />
+                                    <div class="rounded-2xl border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
+                                        <div id="agreementEditor" style="min-height: 280px; font-size: 15px;"></div>
+                                    </div>
+                                    <input type="hidden" id="agreementContent" />
+                                    <p class="text-[10px] text-slate-400 font-semibold ml-1 mt-1">Tip: variables like {'{{client_name}}'}, {'{{property_address}}'}, {'{{inspection_date}}'}, and {'{{inspector_name}}'} will be substituted on the sign page.</p>
                                 </div>
                                 <div class="pt-4 flex gap-6">
                                     <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-slate-400 hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest">
@@ -115,6 +119,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
 
                 <script src="/js/modal-dialog.js"></script>
                 <script src="/js/auth.js"></script>
+                <script src="/vendor/quill/quill.js"></script>
                 <script src="/js/agreements.js"></script>
             </div>
         </MainLayout>
