@@ -44,7 +44,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 </a>
                 <div>
                   <h1 class="text-sm font-bold leading-tight" style="color: #1a1815" x-text="inspection.propertyAddress || 'Loading...'"></h1>
-                  <p class="text-[10px] font-mono" style="color: #b0aaa3" x-text="inspection.date || ''"></p>
+                  <p class="text-[10px] font-mono" style="color: #b0aaa3" x-text="formattedDate"></p>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -161,7 +161,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 Dashboard
               </a>
               <h2 class="text-sm font-bold font-heading" style="color: #1a1815" x-text="inspection.propertyAddress || 'Loading...'"></h2>
-              <p class="text-[10px] font-mono mt-1" style="color: #b0aaa3" x-text="inspection.date || ''"></p>
+              <p class="text-[10px] font-mono mt-1" style="color: #b0aaa3" x-text="formattedDate"></p>
             </div>
             <div class="px-5 py-3">
               <div class="flex justify-between text-[10px] font-mono mb-1" style="color: #908a83">
@@ -359,6 +359,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </div>
         </div>
       </div>
+      <script src="/js/toast.js"></script>
       <script src="/js/inspection-edit.js"></script>
       </>
     ),

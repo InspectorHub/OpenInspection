@@ -1,3 +1,5 @@
+let allAgreements = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         const meRes = await authFetch('/api/auth/me');
@@ -28,6 +30,7 @@ async function loadAgreements() {
         const response = await res.json();
 
         const agreements = (response.data && response.data.agreements) || response.agreements || [];
+        allAgreements = agreements;
 
         if (agreements && agreements.length > 0) {
             list.innerHTML = agreements.map(a => `
@@ -48,10 +51,16 @@ async function loadAgreements() {
                     </td>
                     <td class="px-6 py-6 text-sm text-slate-500 font-bold">${new Date(a.createdAt).toLocaleDateString()}</td>
                     <td class="py-6 pl-3 pr-10 text-right">
-                        <button onclick="deleteAgreement('${a.id}')" class="inline-flex items-center gap-2 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-red-500 transition-all active:scale-95">
-                            Remove
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        </button>
+                        <div class="flex items-center justify-end gap-4">
+                            <button onclick="showEditModal('${a.id}')" class="inline-flex items-center gap-1.5 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-indigo-600 transition-all active:scale-95">
+                                Edit
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            </button>
+                            <button onclick="deleteAgreement('${a.id}')" class="inline-flex items-center gap-2 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-red-500 transition-all active:scale-95">
+                                Remove
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `).join('');
@@ -80,11 +89,30 @@ async function loadAgreements() {
 }
 
 function showCreateModal() {
+    document.getElementById('editAgreementId').value = '';
+    document.getElementById('agreementName').value = '';
+    document.getElementById('agreementContent').value = '';
+    const titleEl = document.getElementById('modalAgreementTitle');
+    if (titleEl) titleEl.textContent = 'Create Professional Agreement';
+    document.getElementById('submitAgreementBtn').textContent = 'Publish Agreement';
+    document.getElementById('createModal').classList.remove('hidden');
+}
+
+function showEditModal(id) {
+    const agreement = allAgreements.find(a => a.id === id);
+    if (!agreement) return;
+    document.getElementById('editAgreementId').value = id;
+    document.getElementById('agreementName').value = agreement.name || '';
+    document.getElementById('agreementContent').value = agreement.content || '';
+    const titleEl = document.getElementById('modalAgreementTitle');
+    if (titleEl) titleEl.textContent = 'Edit Agreement';
+    document.getElementById('submitAgreementBtn').textContent = 'Save Changes';
     document.getElementById('createModal').classList.remove('hidden');
 }
 
 function closeModal() {
     document.getElementById('createModal').classList.add('hidden');
+    document.getElementById('editAgreementId').value = '';
 }
 
 async function submitAgreement() {
@@ -100,27 +128,29 @@ async function submitAgreement() {
     btn.disabled = true;
     btn.textContent = 'Publishing...';
 
+    const editingId = document.getElementById('editAgreementId').value;
+
     try {
-        const res = await authFetch('/api/admin/agreements', {
-            method: 'POST',
+        const url = editingId ? `/api/admin/agreements/${editingId}` : '/api/admin/agreements';
+        const method = editingId ? 'PUT' : 'POST';
+        const res = await authFetch(url, {
+            method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, content })
         });
 
         if (res.ok) {
             closeModal();
-            document.getElementById('agreementName').value = '';
-            document.getElementById('agreementContent').value = '';
             loadAgreements();
         } else {
             const err = await res.json();
-            modalAlert(err.error || 'Failed to create agreement', 'Error');
+            modalAlert(err.error || (editingId ? 'Failed to update agreement' : 'Failed to create agreement'), 'Error');
         }
     } catch (e) {
-        modalAlert('An error occurred during publication', 'Error');
+        modalAlert('An error occurred', 'Error');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Publish Agreement';
+        btn.textContent = editingId ? 'Save Changes' : 'Publish Agreement';
     }
 }
 

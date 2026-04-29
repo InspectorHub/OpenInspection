@@ -284,6 +284,9 @@ async function fetchPrerequisites() {
                     filterSelect.appendChild(opt);
                 });
             }
+
+            // Re-render now that inspector names are available
+            if (inspections.length > 0) renderInspections(inspections);
         }
     } catch (e) {
         console.error('Prerequisites Load Error:', e);
@@ -343,7 +346,8 @@ async function submitInspection() {
        });
 
        if (res.ok) {
-           await modalAlert('Inspection created.', 'Success');
+           const data = await res.json();
+           const newId = data?.data?.inspection?.id;
            closeModal();
            document.getElementById('propAddress').value = '';
            document.getElementById('templateId').value = '';
@@ -351,6 +355,10 @@ async function submitInspection() {
            document.getElementById('clientEmail').value = '';
            document.getElementById('inspectorId').value = '';
 
+           if (newId) {
+               window.location.href = '/inspections/' + newId + '/edit';
+               return;
+           }
            fetchInspections(true);
        } else {
            const err = await res.json();

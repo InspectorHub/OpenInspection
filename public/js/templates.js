@@ -47,7 +47,7 @@ function countSchemaItems(schema) {
     if (!schema) return 0;
     if (Array.isArray(schema)) return schema.length;
     if (typeof schema === 'string') {
-        try { const p = JSON.parse(schema); return Array.isArray(p) ? p.length : 0; } catch { return 0; }
+        try { const p = JSON.parse(schema); return Array.isArray(p) ? p.length : countSchemaItems(p); } catch { return 0; }
     }
     if (typeof schema === 'object' && Array.isArray(schema.items)) return schema.items.length;
     if (typeof schema === 'object' && Array.isArray(schema.sections)) {
