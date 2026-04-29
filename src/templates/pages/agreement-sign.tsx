@@ -51,23 +51,25 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                                 <p class="text-slate-500 font-semibold">This agreement has been signed. Thank you!</p>
                             </div>
                         ) : (
-                            <div class="px-10 py-8" id="signSection">
-                                <p class="text-sm font-bold text-slate-500 mb-4">Draw your signature below:</p>
-                                <div class="border-2 border-slate-200 rounded-2xl overflow-hidden bg-slate-50 mb-6" style="touch-action: none;">
-                                    <canvas id="sigCanvas" width="580" height="180" class="w-full cursor-crosshair block"></canvas>
+                            <>
+                                <div class="px-10 py-8" id="signSection">
+                                    <p class="text-sm font-bold text-slate-500 mb-4">Draw your signature below:</p>
+                                    <div class="border-2 border-slate-200 rounded-2xl overflow-hidden bg-slate-50 mb-6" style="touch-action: none;">
+                                        <canvas id="sigCanvas" width="580" height="180" class="w-full cursor-crosshair block"></canvas>
+                                    </div>
+                                    <div class="flex gap-3">
+                                        <button onclick="clearSig()" class="flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 border border-slate-200 transition">Clear</button>
+                                        <button onclick="submitSignature()" id="submitSigBtn" class="flex-[2] py-3 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-slate-900 transition">Sign Agreement</button>
+                                    </div>
                                 </div>
-                                <div class="flex gap-3">
-                                    <button onclick="clearSig()" class="flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 border border-slate-200 transition">Clear</button>
-                                    <button onclick="submitSignature()" id="submitSigBtn" class="flex-[2] py-3 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-slate-900 transition">Sign Agreement</button>
-                                </div>
-                                <div id="sigSuccess" class="hidden mt-6 text-center">
+                                <div id="sigSuccess" class="hidden px-10 py-10 text-center">
                                     <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
                                         <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                     </div>
                                     <p class="text-lg font-black text-slate-900">Signed successfully!</p>
                                     <p class="text-slate-500 font-semibold text-sm mt-1">Thank you for signing this agreement.</p>
                                 </div>
-                            </div>
+                            </>
                         )}
                     </div>
 
@@ -122,7 +124,6 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                         if (res.ok) {
                             document.getElementById('signSection').classList.add('hidden');
                             document.getElementById('sigSuccess').classList.remove('hidden');
-                            document.getElementById('sigSuccess').parentElement.classList.remove('hidden');
                         } else {
                             var d = await res.json();
                             alert(d.error?.message || 'Signing failed. Please try again.');

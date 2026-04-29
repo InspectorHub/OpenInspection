@@ -10,7 +10,8 @@ export class AgreementService {
     constructor(private db: D1Database) {}
 
     private getDrizzle() {
-        return drizzle(this.db);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return drizzle(this.db as any);
     }
 
     /**
@@ -55,7 +56,7 @@ export class AgreementService {
             version: (existing.version as number) + 1,
         };
 
-        await db.update(agreements).set(updateData).where(eq(agreements.id, id));
+        await db.update(agreements).set(updateData).where(and(eq(agreements.id, id), eq(agreements.tenantId, tenantId)));
         return { ...existing, ...updateData };
     }
 
@@ -70,7 +71,7 @@ export class AgreementService {
             throw Errors.NotFound('Agreement template not found');
         }
 
-        await db.delete(agreements).where(eq(agreements.id, id));
+        await db.delete(agreements).where(and(eq(agreements.id, id), eq(agreements.tenantId, tenantId)));
     }
 
     /**
@@ -110,50 +111,40 @@ export class AgreementService {
      * Looks up a signing request by its public token (no tenant scope — token is the secret).
      */
     async getRequestByToken(token: string) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = drizzle(this.db as any);
-        return db.select().from(agreementRequests).where(eq(agreementRequests.token, token)).get();
+        return this.getDrizzle().select().from(agreementRequests).where(eq(agreementRequests.token, token)).get();
     }
 
     /**
      * Returns the agreement content for a given public token.
      */
     async getAgreementByToken(token: string) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = drizzle(this.db as any);
-        const request = await db.select().from(agreementRequests).where(eq(agreementRequests.token, token)).get();
+        const request = await this.getRequestByToken(token);
         if (!request) throw Errors.NotFound('Signing request not found');
-        const agreement = await db.select().from(agreements).where(eq(agreements.id, request.agreementId)).get();
+        const agreement = await this.getDrizzle().select().from(agreements).where(eq(agreements.id, request.agreementId)).get();
         if (!agreement) throw Errors.NotFound('Agreement not found');
         return { request, agreement };
     }
 
     /**
-     * Marks a signing request as viewed (idempotent).
+     * Marks a signing request as viewed (idempotent, no pre-SELECT needed).
      */
     async markViewed(token: string) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = drizzle(this.db as any);
-        const request = await db.select().from(agreementRequests).where(eq(agreementRequests.token, token)).get();
-        if (!request) throw Errors.NotFound('Signing request not found');
-        if (request.status === 'pending') {
-            await db.update(agreementRequests)
-                .set({ status: 'viewed', viewedAt: new Date() })
-                .where(eq(agreementRequests.token, token));
-        }
+        await this.getDrizzle()
+            .update(agreementRequests)
+            .set({ status: 'viewed', viewedAt: new Date() })
+            .where(and(eq(agreementRequests.token, token), eq(agreementRequests.status, 'pending')));
     }
 
     /**
      * Records a client signature on a signing request.
      */
     async signRequest(token: string, signatureBase64: string) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = drizzle(this.db as any);
-        const request = await db.select().from(agreementRequests).where(eq(agreementRequests.token, token)).get();
+        const request = await this.getRequestByToken(token);
         if (!request) throw Errors.NotFound('Signing request not found');
         if (request.status === 'signed') throw Errors.Conflict('Agreement already signed');
 
-        await db.update(agreementRequests)
+        await this.getDrizzle()
+            .update(agreementRequests)
             .set({ status: 'signed', signatureBase64, signedAt: new Date() })
             .where(eq(agreementRequests.token, token));
         return { ...request, status: 'signed' as const, signatureBase64, signedAt: new Date() };
@@ -163,8 +154,7 @@ export class AgreementService {
      * Lists all signing requests for a tenant (most recent first).
      */
     async listRequests(tenantId: string) {
-        const db = this.getDrizzle();
-        return db.select().from(agreementRequests)
+        return this.getDrizzle().select().from(agreementRequests)
             .where(eq(agreementRequests.tenantId, tenantId))
             .all();
     }

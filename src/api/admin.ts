@@ -726,14 +726,12 @@ adminRoutes.openapi(sendAgreementRoute, async (c) => {
     const body = c.req.valid('json');
     const svc = c.var.services.agreement;
 
-    const opts: { agreementId: string; clientEmail: string; clientName?: string | null; inspectionId?: string | null } = {
+    const request = await svc.createSigningRequest(tenantId, {
         agreementId: body.agreementId,
         clientEmail: body.clientEmail,
-    };
-    if (body.clientName !== undefined) opts.clientName = body.clientName;
-    if (body.inspectionId !== undefined) opts.inspectionId = body.inspectionId;
-
-    const request = await svc.createSigningRequest(tenantId, opts);
+        ...(body.clientName !== undefined ? { clientName: body.clientName } : {}),
+        ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
+    });
     const signUrl = `${getBaseUrl(c)}/agreements/sign/${request.token}`;
 
     await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl)

@@ -2,12 +2,6 @@
 var _allComments = [];
 var _targetTextarea = null;
 
-function _escapeHtml(str) {
-    var d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-}
-
 async function loadCommentsLibrary() {
     var res = await authFetch('/api/admin/comments');
     if (!res.ok) return;

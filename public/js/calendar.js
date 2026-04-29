@@ -2,6 +2,18 @@ var allInspections = [];
 var currentYear = new Date().getFullYear();
 var currentMonth = new Date().getMonth(); // 0-indexed
 
+function _statusChipClass(status) {
+    if (status === 'complete') return 'bg-emerald-100 text-emerald-700';
+    if (status === 'in_progress') return 'bg-blue-100 text-blue-700';
+    return 'bg-indigo-100 text-indigo-700';
+}
+
+function _statusBadgeClass(status) {
+    if (status === 'complete') return 'text-emerald-600 bg-emerald-50';
+    if (status === 'in_progress') return 'text-blue-600 bg-blue-50';
+    return 'text-indigo-600 bg-indigo-50';
+}
+
 document.addEventListener('DOMContentLoaded', loadCalendar);
 
 async function loadCalendar() {
@@ -76,8 +88,7 @@ function renderMonth() {
         }
         cells += '</div>';
         dayInsp.slice(0, 3).forEach(function(insp) {
-            var color = insp.status === 'complete' ? 'bg-emerald-100 text-emerald-700' : insp.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700';
-            cells += '<div class="text-[10px] font-bold px-1.5 py-0.5 rounded mb-0.5 truncate ' + color + '">' + _escapeHtml(insp.propertyAddress || 'Inspection') + '</div>';
+            cells += '<div class="text-[10px] font-bold px-1.5 py-0.5 rounded mb-0.5 truncate ' + _statusChipClass(insp.status) + '">' + _escapeHtml(insp.propertyAddress || 'Inspection') + '</div>';
         });
         if (dayInsp.length > 3) {
             cells += '<div class="text-[9px] text-slate-400 font-bold px-1">+' + (dayInsp.length - 3) + ' more</div>';
@@ -113,14 +124,13 @@ function showDay(dateStr) {
     title.textContent = new Date(dateStr + 'T12:00:00').toLocaleDateString('default', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     list.innerHTML = insp.map(function(i) {
-        var statusColor = i.status === 'complete' ? 'text-emerald-600 bg-emerald-50' : i.status === 'in_progress' ? 'text-blue-600 bg-blue-50' : 'text-indigo-600 bg-indigo-50';
         return '<a href="/inspections/' + i.id + '/edit" class="flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 transition">' +
             '<div class="w-2 h-2 rounded-full bg-indigo-400 mt-2 flex-shrink-0"></div>' +
             '<div class="flex-1 min-w-0">' +
             '<p class="font-bold text-slate-900 text-sm truncate">' + _escapeHtml(i.propertyAddress || 'Unknown') + '</p>' +
             (i.clientName ? '<p class="text-xs text-slate-400 font-semibold">' + _escapeHtml(i.clientName) + '</p>' : '') +
             '</div>' +
-            '<span class="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ' + statusColor + '">' + (i.status || 'draft') + '</span>' +
+            '<span class="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ' + _statusBadgeClass(i.status) + '">' + (i.status || 'draft') + '</span>' +
             '</a>';
     }).join('');
 
@@ -128,8 +138,3 @@ function showDay(dateStr) {
     detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function _escapeHtml(str) {
-    var d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-}

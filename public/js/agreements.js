@@ -29,7 +29,7 @@ async function loadAgreements() {
         if (res.status === 401) { window.location.href = '/login'; return; }
         const response = await res.json();
 
-        const agreements = (response.data && response.data.agreements) || response.agreements || [];
+        const agreements = response.data?.agreements || [];
         allAgreements = agreements;
 
         if (agreements && agreements.length > 0) {
@@ -170,17 +170,17 @@ function closeSendModal() {
 }
 
 async function submitSend() {
-    var id = document.getElementById('sendAgreementId').value;
-    var email = document.getElementById('sendClientEmail').value.trim();
-    var name = document.getElementById('sendClientName').value.trim();
+    const id = document.getElementById('sendAgreementId').value;
+    const email = document.getElementById('sendClientEmail').value.trim();
+    const name = document.getElementById('sendClientName').value.trim();
     if (!email) { modalAlert('Client email is required.'); return; }
-    var btn = document.getElementById('submitSendBtn');
+    const btn = document.getElementById('submitSendBtn');
     btn.disabled = true;
     btn.textContent = 'Sending...';
     try {
-        var body = { agreementId: id, clientEmail: email };
+        const body = { agreementId: id, clientEmail: email };
         if (name) body.clientName = name;
-        var res = await authFetch('/api/admin/agreements/send', {
+        const res = await authFetch('/api/admin/agreements/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -189,7 +189,7 @@ async function submitSend() {
             closeSendModal();
             modalAlert('Signing request sent successfully!', 'Sent');
         } else {
-            var err = await res.json();
+            const err = await res.json();
             modalAlert(err.error?.message || 'Failed to send signing request.', 'Error');
         }
     } catch (e) {
