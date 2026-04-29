@@ -194,6 +194,31 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </div>
                             </div>
 
+                            {/* Services selection */}
+                            <div id="servicesSection" style="display:none" class="mb-4">
+                                <div class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Services</div>
+                                <div id="servicesList" class="space-y-2 max-h-48 overflow-y-auto"></div>
+                                <div id="serviceTotalBar" style="display:none" class="mt-3">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <input id="discountCodeInput" type="text" placeholder="Discount code"
+                                               class="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-1.5 uppercase font-bold" />
+                                        <button onclick="validateDiscount()"
+                                                class="text-xs px-3 py-1.5 bg-slate-100 rounded-lg font-semibold text-slate-700">Apply</button>
+                                    </div>
+                                    <div id="discountError" style="display:none" class="text-xs text-red-500 mb-1"></div>
+                                    <div class="flex justify-between items-center bg-slate-900 text-white rounded-xl px-4 py-3">
+                                        <div>
+                                            <div class="text-xs font-bold text-slate-400">TOTAL</div>
+                                            <div id="serviceCountLabel" class="text-xs text-slate-500"></div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div id="serviceTotalAmount" class="text-lg font-black">$0.00</div>
+                                            <div id="serviceDiscountLine" style="display:none" class="text-xs text-green-400"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="pt-4 flex gap-4">
                                 <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all">
                                     Cancel

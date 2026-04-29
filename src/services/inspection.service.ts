@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements, users } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, type RatingLevel } from '../lib/report-utils';
 import { z } from 'zod';
@@ -191,6 +191,24 @@ export class InspectionService {
         };
 
         await this.sdb.insert(inspections, newInspection);
+
+        // Link selected services
+        if (data.serviceIds && data.serviceIds.length > 0) {
+            const db2 = this.getDrizzle();
+            const svcRows = await db2.select().from(services)
+                .where(and(eq(services.tenantId, tenantId), inArray(services.id, data.serviceIds)));
+            if (svcRows.length > 0) {
+                await db2.insert(inspectionServices).values(svcRows.map(s => ({
+                    id:            crypto.randomUUID(),
+                    tenantId,
+                    inspectionId:  id,
+                    serviceId:     s.id,
+                    priceOverride: null,
+                    nameSnapshot:  s.name,
+                    priceSnapshot: s.price,
+                })));
+            }
+        }
 
         return {
             ...newInspection,
