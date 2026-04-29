@@ -19,6 +19,9 @@ function inspectionEditor(inspectionId) {
     saveTimer: null,
     saveState: 'idle',
     _reportStats: { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
+    aiSuggestions: [],
+    aiTargetField: null,
+    showAiPopover: false,
 
     publishOptions: {
       theme: 'modern',
@@ -318,6 +321,41 @@ function inspectionEditor(inspectionId) {
       } finally {
         this.publishing = false;
       }
+    },
+
+    async suggestComment(itemName, sectionName, targetField) {
+      const btn = event.currentTarget;
+      const origText = btn.textContent;
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const res = await authFetch('/api/ai/suggest-comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemName, sectionName }),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const suggestions = json.data || [];
+        if (!suggestions.length) return;
+        this.aiSuggestions = suggestions;
+        this.aiTargetField = targetField;
+        this.showAiPopover = true;
+      } catch (e) {
+        console.error('[AI] suggestComment error', e);
+      } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
+      }
+    },
+
+    insertSuggestion(text) {
+      if (this.aiTargetField) {
+        this.aiTargetField.value = text;
+        this.aiTargetField.dispatchEvent(new Event('input'));
+      }
+      this.showAiPopover = false;
+      this.aiSuggestions = [];
     },
   };
 }
