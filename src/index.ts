@@ -438,7 +438,7 @@ app.get('/templates/:id/edit', htmlAuthGuard(['owner', 'admin']), (c) => {
     const id = c.req.param('id') as string;
     return c.html(TemplateEditorPage({ templateId: id, branding: c.get('branding') }));
 });
-app.get('/marketplace', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(MarketplacePage({ branding: c.get('branding') })));
+app.get('/marketplace', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MarketplacePage({ branding: c.get('branding') })));
 app.get('/settings', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsPage({ branding: c.get('branding') })));
 app.get('/settings/automations', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsAutomationsPage({ branding: c.get('branding') })));
 app.get('/settings/data', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsDataPage({ branding: c.get('branding') })));
