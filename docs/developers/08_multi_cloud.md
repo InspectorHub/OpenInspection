@@ -3,44 +3,44 @@ domain: "Multi Cloud & Engine Agnostic"
 related_code_paths: ["src/ports/", "src/adapters/"]
 core_rule: "Never use cloud-specific SDKs natively in core domains. Adhere to WinterCG web standards (Request/Response) and abstract database queries via Drizzle ORM."
 ---
-# 05. 多云支持与去厂商锁定策略 (Multi-Cloud & Cloud-Agnostic Strategy)
+# 05. Multi-Cloud & Cloud-Agnostic Strategy
 
-为了让开源系统真正实现“不被单一云厂商绑架 (No Vendor Lock-in)”，并且同时可以被部署在 Cloudflare、AWS 或 Google Cloud 等不同平台上，我们的核心系统设计必须引入高度解耦的**云中立方**架构模式。
+To ensure the open-source system is truly free from vendor lock-in and can be deployed on Cloudflare, AWS, or Google Cloud, the core architecture must adopt a highly decoupled, cloud-neutral design.
 
-## 关键架构模式：六边形架构 (Ports and Adapters)
+## Key Architecture Pattern: Hexagonal Architecture (Ports and Adapters)
 
-系统绝对禁止将底层云厂商SDK（如 `aws-sdk-s3` 或 `Cloudflare D1 binding`）直接泄露并在核心业务逻辑文件（Core Logic）中硬编码调用。全系统推行强依赖倒置设计：
+The system strictly prohibits leaking cloud-vendor SDKs (such as `aws-sdk-s3` or `Cloudflare D1 binding`) directly into core business logic files. The entire system enforces strong dependency inversion:
 
-1. **核心业务域 (Domain Layer)**：纯以 TypeScript 编写的验房检验单与客户管理逻辑，完全“云无感”。
-2. **接口规范定义 (Ports)**：定义清晰的操作接口，如 `IStorageProvider`, `IDatabaseProvider`, `IEmailProvider`。
-3. **云厂商适配器实现 (Adapters)**：在最外层网关实现具体适配（如 `AWSS3Adapter`, `CloudflareR2Adapter`, `GoogleCloudStorageAdapter`）。运行时根据环境变量动态注入给业务层。
+1. **Domain Layer**: Pure TypeScript inspection and customer management logic, completely cloud-agnostic.
+2. **Ports**: Clearly defined operation interfaces, such as `IStorageProvider`, `IDatabaseProvider`, `IEmailProvider`.
+3. **Adapters**: Concrete vendor-specific implementations at the outermost gateway layer (e.g., `AWSS3Adapter`, `CloudflareR2Adapter`, `GoogleCloudStorageAdapter`). Injected into the business layer at runtime based on environment variables.
 
-## 无服务器边缘计算的“车同轨”: WinterCG 标准
+## Serverless Edge Computing Standard: WinterCG
 
-在计算节点 Runtime 的选择上，为了避免业务代码被死死绑定在特定云厂商奇怪的上下文格式上（例如 AWS Lambda 特有的古怪 `event` json payload 格式）：
+To avoid tightly coupling business code to vendor-specific context formats (e.g., AWS Lambda's proprietary `event` JSON payload format):
 
-* **使用基于 Web 标准的框架 (Hono)**：抛弃厂商专用 HTTP 解析写法。Hono / SonicJS 这种框架完全建立在标准的 Web Request / Response API (WinterCG 提案) 之上。
-* **效果**：写好的一份核心路由和网络接收代码，**不用改动一行**，只需引入不同的执行入口（Entrypoint Wrapper），就可以原封不动地跑在：
+* **Use Web-standard frameworks (Hono)**: Instead of vendor-specific HTTP parsing. Hono is built entirely on the standard Web Request/Response API (WinterCG proposal).
+* **Result**: The same routing and request-handling code runs **without any modification** on:
   - Cloudflare Workers
   - AWS Lambda
   - Google Cloud Functions / Cloud Run
-  - 甚至自己家里的 Node.js / Bun 单机物理服务器上
+  - Even a self-hosted Node.js / Bun server
 
-## 数据库方言独立：全量 ORM 引擎
+## Database Dialect Independence: Full ORM Engine
 
-将 SQL 方言的捆绑度降至最低。这非常影响数据在公有云之间的平滑迁移。
+Minimize SQL dialect coupling. This is critical for smooth data migration between cloud providers.
 
-* **使用 Drizzle ORM 等现代查询构建器**：业务层面全部用强类型的 ORM 语法书写。
-* **透明切换能力**：底层连接池可以通过一个参数开关直接热插拔：
-  - 环境 A（免费部署）：选用 Cloudflare D1 Serverless 驱动。
-  - 环境 B（海量并发）：切换成 AWS RDS Aurora Serverless v2 PostgreSQL。
-  - 环境 C（Google 玩家）：跑在 GCP Cloud SQL 上。
+* **Use modern query builders like Drizzle ORM**: All business-level queries are written in strongly-typed ORM syntax.
+* **Transparent switching**: The underlying connection pool can be hot-swapped via a single configuration parameter:
+  - Environment A (free deployment): Cloudflare D1 Serverless driver.
+  - Environment B (high concurrency): AWS RDS Aurora Serverless v2 PostgreSQL.
+  - Environment C (Google Cloud): GCP Cloud SQL.
 
-## 基础设施即代码统一化 (Unified IaC)
+## Unified Infrastructure as Code (IaC)
 
-不要因为一键部署方便就仅依赖特定云的 UI 控制面板或私有构建脚本（如 `wrangler.toml` 仅针对 CF）。
+Do not rely solely on a specific cloud's UI console or proprietary build scripts (e.g., `wrangler.toml` only targets Cloudflare).
 
-* 更严谨的项目部署策略应当使用支持多云生态的系统构建工具，例如 **Terraform** 或者 **Pulumi**。
-* 为社区开源用户提供多套模板：`aws-deployment-stack` (CDK) 与 `cloudflare-deployment-stack` (Wrangler/TF)。
+* Production deployment strategies should use multi-cloud infrastructure tools such as **Terraform** or **Pulumi**.
+* Provide community users with multiple deployment templates: `aws-deployment-stack` (CDK) and `cloudflare-deployment-stack` (Wrangler/TF).
 
-通过以上全方位在计算、存储、数据库和构建层面的“解耦反制”措施，才能使得产品永远保持平台中立的开源核心血液，随时根据云计算计费战哪家便宜便带着全部家当无缝迁移去哪里。
+Through these comprehensive decoupling measures across compute, storage, database, and build layers, the product maintains a platform-neutral open-source core that can seamlessly migrate to any cloud provider at any time.

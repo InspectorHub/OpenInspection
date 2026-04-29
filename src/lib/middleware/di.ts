@@ -11,6 +11,11 @@ import { TeamService } from '../../services/team.service';
 import { TemplateService } from '../../services/template.service';
 import { AgreementService } from '../../services/agreement.service';
 import { AvailabilityService } from '../../services/booking.service';
+import { ContactService } from '../../services/contact.service';
+import { InvoiceService } from '../../services/invoice.service';
+import { ServiceService } from '../../services/service.service';
+import { AutomationService } from '../../services/automation.service';
+import { MarketplaceService } from '../../services/marketplace.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -68,10 +73,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     );
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'));
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE);
                     break;
                 case 'team':
-                    target.team = new TeamService(c.env.DB, c.env);
+                    target.team = new TeamService(c.env.DB, ...(c.env.APP_MODE ? [{ APP_MODE: c.env.APP_MODE }] : []));
                     break;
                 case 'template':
                     target.template = new TemplateService(c.env.DB);
@@ -81,6 +86,21 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'availability':
                     target.availability = new AvailabilityService(c.env.DB);
+                    break;
+                case 'contact':
+                    target.contact = new ContactService(c.env.DB);
+                    break;
+                case 'invoice':
+                    target.invoice = new InvoiceService(c.env.DB);
+                    break;
+                case 'service':
+                    target.service = new ServiceService(c.env.DB);
+                    break;
+                case 'automation':
+                    target.automation = new AutomationService(c.env.DB);
+                    break;
+                case 'marketplace':
+                    target.marketplace = new MarketplaceService(c.env.DB, c.get('tenantId'));
                     break;
             }
             return target[prop];

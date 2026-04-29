@@ -41,8 +41,7 @@ const getReportsRoute = createRoute({
 
 agentRoutes.openapi(getReportsRoute, async (c) => {
     // Move RBAC check inside to fix OpenAPIHono type inference issues with context
-    const check = await requireRole(['office_staff', 'admin'])(c, async () => {});
-    if (check) return check;
+    await requireRole(['office_staff', 'admin'])(c, async () => {});
 
     const tenantId = c.get('tenantId');
     const user = c.get('user');
@@ -95,8 +94,7 @@ const getLeaderboardRoute = createRoute({
 });
 
 agentRoutes.openapi(getLeaderboardRoute, async (c) => {
-    const check = await requireRole(['admin', 'inspector', 'office_staff'])(c, async () => {});
-    if (check) return check;
+    await requireRole(['admin', 'inspector', 'office_staff'])(c, async () => {});
 
     const tenantId = c.get('tenantId');
     const db = drizzle(c.env.DB);

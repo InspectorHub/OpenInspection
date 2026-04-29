@@ -1,4 +1,5 @@
 import { BareLayout } from '../layouts/main-layout';
+import { AtmosphericBg } from '../components/atmospheric-bg';
 import { BrandingConfig } from '../../types/auth';
 
 export const FormRendererPage = (props: { inspectionId: string, branding?: BrandingConfig | undefined }): JSX.Element => {
@@ -7,11 +8,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
     return (
         <BareLayout title="Inspection Field Tool" branding={branding}>
             <div class="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden relative" x-data={`inspectionForm('${inspectionId}')`}>
-                {/* Atmospheric Background */}
-                <div class="fixed inset-0 pointer-events-none overflow-hidden select-none">
-                    <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/5 blur-[120px] rounded-full animate-float"></div>
-                    <div class="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full animate-float" style="animation-delay: -2s"></div>
-                </div>
+                <AtmosphericBg />
 
                 {/* Main Viewport */}
                 <div class="max-w-4xl mx-auto px-6 py-8 relative z-10">
@@ -19,9 +16,9 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     <div class="sticky top-6 z-50 mb-10 transition-all duration-500" x-bind:class="{ 'translate-y-[-12px]': scrolled }">
                         <div class="glass-panel flex items-center justify-between px-8 py-5 rounded-[2.5rem] shadow-2xl shadow-indigo-100/30 ring-1 ring-white/60">
                             <div>
-                                <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Syncing Property...'"></h1>
+                                <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Loading...'"></h1>
                                 <div class="flex items-center gap-2 mt-1">
-                                    <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600/60" x-text="template?.name || 'Protocol Interface'"></span>
+                                    <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600/60" x-text="template?.name || 'Inspection Template'"></span>
                                     <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
                                     <span class="text-[10px] font-black uppercase tracking-widest text-slate-400" x-text="inspectionId.substring(0,8).toUpperCase()"></span>
                                 </div>
@@ -43,7 +40,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             </div>
                         </div>
                         
-                        {/* High-Fidelity Progress Bar */}
+                        {/* Progress Bar */}
                         <div class="mt-4 px-2">
                             <div class="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden backdrop-blur-sm shadow-inner p-0.5">
                                 <div class="h-full bg-gradient-to-r from-indigo-600 to-blue-500 rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_rgba(79,70,229,0.4)]" 
@@ -51,7 +48,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 </div>
                             </div>
                             <div class="flex justify-between mt-2 px-2">
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Progress</p>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progress</p>
                                 <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest tabular-nums" x-text="completionPercentage + '%'"></p>
                             </div>
                         </div>
@@ -161,7 +158,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                             <div class="relative flex-shrink-0 w-32 h-32 rounded-[2rem] overflow-hidden bg-slate-100 group shadow-2xl shadow-indigo-100/10 border-4 border-white">
                                                                 <img x-bind:src="photo.pending && photo.dataUrl ? photo.dataUrl : '/api/inspections/files/' + photo.key" class="w-full h-full object-cover" />
 
-                                                                {/* Protocol Metadata Overlay */}
+                                                                {/* Photo Metadata Overlay */}
                                                                 <div x-show="photo.pending" class="absolute inset-0 bg-amber-600/60 backdrop-blur-[2px] flex items-center justify-center">
                                                                     <span class="text-[9px] font-black uppercase tracking-[0.2em] text-white">Queued</span>
                                                                 </div>
@@ -202,7 +199,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                         </template>
                     </div>
 
-                    {/* Protocol Finalization Architecture */}
+                    {/* Inspection Completion */}
                     <div class="mt-20 flex flex-col gap-8 pb-32">
                         <div x-show="!isDelivered && inspection?.status !== 'completed'">
                             <button
@@ -211,7 +208,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 x-bind:class="{ 'opacity-50 pointer-events-none': !isComplete }"
                                 x-bind:disabled="syncing"
                             >
-                                <span class="text-xl tracking-tightest" x-text="syncing ? 'Finalizing Registry...' : 'Authorize Completion'"></span>
+                                <span class="text-xl tracking-tightest" x-text="syncing ? 'Submitting...' : 'Complete Inspection'"></span>
                                 <svg class="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="!syncing"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 <svg class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="syncing"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             </button>
@@ -222,8 +219,8 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <div class="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-emerald-200 group hover:rotate-6 transition-transform">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
-                                <h3 class="text-3xl font-black tracking-tightest text-slate-900 mb-3">Audit Concluded</h3>
-                                <p class="text-lg text-slate-500 font-medium max-w-md mx-auto">The protocol is finalized, synchronized, and the generated professional document is now officially certified.</p>
+                                <h3 class="text-3xl font-black tracking-tightest text-slate-900 mb-3">Inspection Complete</h3>
+                                <p class="text-lg text-slate-500 font-medium max-w-md mx-auto">The inspection has been finalized and the report is ready for download.</p>
                             </div>
                             <a
                                 x-bind:href={`'/api/inspections/' + inspectionId + '/report'`}
@@ -315,7 +312,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                         x-bind:disabled="syncing"
                                     >
                                         <svg x-show="syncing" class="w-5 h-5 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                        <span class="tracking-tightest text-lg" x-text="syncing ? 'Integrating...' : 'Apply Markup Protocol'"></span>
+                                        <span class="tracking-tightest text-lg" x-text="syncing ? 'Saving...' : 'Save Markup'"></span>
                                     </button>
                                 </div>
                             </div>

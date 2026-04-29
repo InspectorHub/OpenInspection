@@ -1,4 +1,5 @@
 import { AppError, ErrorCode } from '../lib/errors';
+import { logger } from '../lib/logger';
 
 /**
  * Service to handle transactional email delivery using Resend.
@@ -12,7 +13,7 @@ export class EmailService {
      */
     async sendEmail(to: string[], subject: string, html: string) {
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
-            console.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);
+            logger.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);
             return;
         }
 
@@ -33,11 +34,11 @@ export class EmailService {
 
             if (!res.ok) {
                 const text = await res.text();
-                console.error(`[email] Resend delivery failed: ${text}`);
+                logger.error('[email] Resend delivery failed', { response: text });
                 throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email delivery failed');
             }
         } catch (err) {
-            console.error('[email] Delivery exception:', err);
+            logger.error('[email] Delivery exception', {}, err instanceof Error ? err : undefined);
             throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email service unavailable');
         }
     }
@@ -83,6 +84,30 @@ export class EmailService {
                </div>
                <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link: ${reportUrl}</p>
              </div>`
+        );
+    }
+
+    /**
+     * Sends an agreement signing request email to a client.
+     */
+    async sendAgreementRequest(to: string, clientName: string | null, agreementName: string, signUrl: string) {
+        const name = clientName || 'Client';
+        await this.sendEmail(
+            [to],
+            `Please sign: ${agreementName}`,
+            `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #4f46e5;">Document Ready to Sign</h2>
+                <p>Hi ${name},</p>
+                <p>You have been asked to review and sign the following agreement:</p>
+                <p style="font-weight: bold; color: #1e293b;">${agreementName}</p>
+                <div style="margin: 32px 0;">
+                    <a href="${signUrl}" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Review &amp; Sign Agreement</a>
+                </div>
+                <p style="font-size: 14px; color: #64748b;">If the button doesn't work, copy and paste this link: ${signUrl}</p>
+                <p style="color: #64748b; font-size: 14px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                    Thank you,<br>${this.appName} Team
+                </p>
+            </div>`
         );
     }
 

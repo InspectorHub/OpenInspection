@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { writeFileSync, existsSync, rmSync } from 'fs';
+import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,45 +19,61 @@ const __dirname = path.dirname(__filename);
  */
 export default function globalSetup() {
     const appDir = path.resolve(__dirname, '..');
-    const sqlFile = path.join(appDir, 'tests', '.reset-core-db.sql');
-
     // Delete in FK-safe order (child tables first)
-    const sql = [
-        'PRAGMA foreign_keys=OFF;',
-        'DELETE FROM inspection_agreements;',
-        'DELETE FROM inspection_results;',
-        'DELETE FROM inspections;',
-        'DELETE FROM availability_overrides;',
-        'DELETE FROM availability;',
-        'DELETE FROM tenant_invites;',
-        'DELETE FROM agreements;',
-        'DELETE FROM templates;',
-        'DELETE FROM users;',
-        'DELETE FROM tenant_configs;',
-        'DELETE FROM tenants;',
-        'PRAGMA foreign_keys=ON;',
-    ].join('\n');
-
-    writeFileSync(sqlFile, sql, 'utf8');
+    // Use --command per table because wrangler --file doesn't persist PRAGMA across statements
+    const tables = [
+        'audit_logs',
+        'inspection_agreements',
+        'inspection_results',
+        'inspections',
+        'availability_overrides',
+        'availability',
+        'tenant_invites',
+        'agreements',
+        'templates',
+        'users',
+        'tenant_configs',
+        'tenants',
+    ];
 
     try {
         // Ensure all schema migrations are applied (idempotent)
         execSync('npm run db:migrate', { cwd: appDir, stdio: 'pipe' });
 
-        // Clear all data rows (schema stays intact)
-        execSync(
-            'npx wrangler d1 execute openinspection-db --local --file "tests/.reset-core-db.sql"',
-            { cwd: appDir, stdio: 'pipe' },
-        );
+        // Clear all data rows one table at a time (schema stays intact)
+        for (const table of tables) {
+            try {
+                execSync(
+                    `npx wrangler d1 execute openinspection-standalone-db --local --command "DELETE FROM ${table}" --yes`,
+                    { cwd: appDir, stdio: 'pipe' },
+                );
+            } catch {
+                // Table may not exist in older migrations — skip
+            }
+        }
 
-        // Clear setup verification code from KV so POST /setup works without a code
+        // Clear all KV keys (setup codes, pwchanged tokens, cached tenants)
         try {
-            execSync(
-                'npx wrangler kv key delete "setup_verification_code" --namespace-id TENANT_CACHE --local',
-                { cwd: appDir, stdio: 'pipe' },
-            );
+            const toml = readFileSync(path.join(appDir, 'wrangler.toml'), 'utf8');
+            const nsMatch = toml.match(/\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([^"]+)"/);
+            const nsId = nsMatch?.[1];
+            if (nsId) {
+                const listOutput = execSync(
+                    `npx wrangler kv key list --namespace-id ${nsId} --local`,
+                    { cwd: appDir, encoding: 'utf8' },
+                );
+                const keys = JSON.parse(listOutput) as { name: string }[];
+                for (const key of keys) {
+                    try {
+                        execSync(
+                            `npx wrangler kv key delete "${key.name}" --namespace-id ${nsId} --local`,
+                            { cwd: appDir, stdio: 'pipe' },
+                        );
+                    } catch { /* ignore */ }
+                }
+            }
         } catch {
-            // Key may not exist — that's fine
+            // KV may not be initialized — that's fine
         }
 
         console.info('\n[globalSetup] Local D1 cleared — all tests will run against a fresh workspace.\n');
@@ -65,9 +81,7 @@ export default function globalSetup() {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(
             `\n[globalSetup] WARNING: Could not reset local D1 (${msg.split('\n')[0]}).\n` +
-            '  Ensure wrangler is installed and the DB was created: npx wrangler d1 create openinspection-db\n',
+            '  Ensure wrangler is installed and the DB was created: npx wrangler d1 create openinspection-standalone-db\n',
         );
-    } finally {
-        if (existsSync(sqlFile)) rmSync(sqlFile);
     }
 }

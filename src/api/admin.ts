@@ -1,16 +1,19 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
-import { writeAuditLog } from '../lib/audit';
+import { auditFromContext } from '../lib/audit';
 import { safeISODate } from '../lib/date';
+import { getBaseUrl } from '../lib/url';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
-import { 
-    UpdateBrandingSchema, 
-    InviteMemberSchema, 
-    DataErasureSchema, 
+import { logger } from '../lib/logger';
+import {
+    UpdateBrandingSchema,
+    InviteMemberSchema,
+    DataErasureSchema,
     AgreementSchema,
+    SendAgreementSchema,
     AdminExportResponseSchema,
     MemberListResponseSchema,
     AuditLogResponseSchema,
@@ -19,10 +22,12 @@ import {
     ImportResponseSchema,
     AgreementListResponseSchema,
     AgreementResponseSchema,
-    EraseDataResponseSchema
+    EraseDataResponseSchema,
+    CommentSchema,
+    CommentResponseSchema,
 } from '../lib/validations/admin.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
-import { templates, agreements as agreementTable, inspections, inspectionResults } from '../lib/db/schema';
+import { templates, agreements as agreementTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
 
 const adminRoutes = new OpenAPIHono<HonoConfig>();
 
@@ -52,12 +57,7 @@ adminRoutes.openapi(exportDataRoute, async (c) => {
     const adminService = c.var.services.admin;
     const data = await adminService.getExport(tenantId);
     
-    writeAuditLog({
-        db: c.env.DB, tenantId, userId: c.get('user')?.sub,
-        action: 'data.export', entityType: 'bulk_export',
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
-    });
+    auditFromContext(c, 'data.export', 'bulk_export');
 
     return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data } }, 200);
 });
@@ -99,25 +99,11 @@ adminRoutes.openapi(inviteMemberRoute, async (c) => {
     const adminService = c.var.services.admin;
     const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role);
 
-    const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
-    const host = c.req.header('host');
-    const inviteLink = `${protocol}://${host}/join?token=${inviteId}`;
+    const inviteLink = `${getBaseUrl(c)}/join?token=${inviteId}`;
 
-    if (c.env.RESEND_API_KEY && !c.env.RESEND_API_KEY.includes('your_api_key')) {
-        const inviteEmailPromise = fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${c.env.RESEND_API_KEY}` },
-            body: JSON.stringify({
-                from: c.env.SENDER_EMAIL || 'OpenInspection <noreply@example.com>',
-                to: [body.email],
-                subject: 'You\'ve been invited to join a workspace',
-                html: `<p>You've been invited to join a ${c.env.APP_NAME || 'OpenInspection'} workspace.</p>
-                       <p><a href="${inviteLink}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Accept Invitation</a></p>
-                       <p>Link expires in 7 days: ${inviteLink}</p>`
-            })
-        }).catch(e => console.error('Invite email error:', e));
-        c.executionCtx.waitUntil(inviteEmailPromise);
-    }
+    const emailPromise = c.var.services.email.sendInvitation(body.email, inviteLink)
+        .catch(() => { /* email delivery is best-effort */ });
+    c.executionCtx.waitUntil(emailPromise);
 
     return c.json({ success: true, data: { inviteLink, expiresAt: expiresAt.toISOString() } }, 201);
 });
@@ -159,7 +145,6 @@ const importDataRoute = createRoute({
 
 adminRoutes.openapi(importDataRoute, async (c) => {
     const tenantId = c.get('tenantId');
-    const user = c.get('user');
     const body = c.req.valid('json');
 
     const importedInspections = Array.isArray(body.inspections) ? body.inspections : [];
@@ -225,12 +210,12 @@ adminRoutes.openapi(importDataRoute, async (c) => {
             .get();
         
         if (!inspection) {
-            console.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} not found`);
+            logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} not found`);
             continue;
         }
         
         if (inspection.tenantId !== tenantId) {
-            console.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} belongs to different tenant`);
+            logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} belongs to different tenant`);
             continue;
         }
         
@@ -244,13 +229,7 @@ adminRoutes.openapi(importDataRoute, async (c) => {
         counts.results++;
     }
 
-    writeAuditLog({
-        db: c.env.DB, tenantId, userId: user?.sub,
-        action: 'data.export', entityType: 'import',
-        metadata: { counts },
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
-    });
+    auditFromContext(c, 'data.import', 'import', { metadata: { counts } });
 
     return c.json({ success: true, data: { message: 'Import complete.', imported: counts } }, 200);
 });
@@ -467,12 +446,7 @@ adminRoutes.openapi(getAuditLogsRoute, async (c) => {
         }))
     };
     
-    writeAuditLog({
-        db: c.env.DB, tenantId, userId: c.get('user')?.sub,
-        action: 'data.export', entityType: 'audit_log',
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
-    });
+    auditFromContext(c, 'audit.view', 'audit_log');
 
     return c.json({ success: true, data: formattedResult }, 200);
 });
@@ -513,12 +487,8 @@ adminRoutes.openapi(eraseDataRoute, async (c) => {
     const adminService = c.var.services.admin;
     const counts = await adminService.eraseClientData(tenantId, body.clientEmail);
     
-    writeAuditLog({
-        db: c.env.DB, tenantId, userId: c.get('user')?.sub,
-        action: 'data.delete', entityType: 'client',
+    auditFromContext(c, 'data.delete', 'client', {
         metadata: { clientEmail: body.clientEmail, ...counts },
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx
     });
 
     return c.json({ success: true, data: { message: 'Client data erased successfully.', ...counts } }, 200);
@@ -711,11 +681,7 @@ const updateIntegrationConfigRoute = createRoute({
 adminRoutes.openapi(updateIntegrationConfigRoute, async (c) => {
     const body = c.req.valid('json');
     await c.var.services.branding.updateIntegrationConfig(c.get('tenantId'), body as unknown as import('../services/branding.service').IntegrationConfig);
-    writeAuditLog({
-        db: c.env.DB, tenantId: c.get('tenantId'), userId: c.get('user')?.sub,
-        action: 'config.integration.update', entityType: 'tenant_config',
-        ipAddress: c.req.header('CF-Connecting-IP'), executionCtx: c.executionCtx,
-    });
+    auditFromContext(c, 'config.integration.update', 'tenant_config');
     return c.json({ success: true }, 200);
 });
 
@@ -734,12 +700,178 @@ const updateSecretsRoute = createRoute({
 adminRoutes.openapi(updateSecretsRoute, async (c) => {
     const body = c.req.valid('json');
     await c.var.services.branding.updateSecrets(c.get('tenantId'), c.env.JWT_SECRET, body as unknown as import('../services/branding.service').SecretsConfig);
-    writeAuditLog({
-        db: c.env.DB, tenantId: c.get('tenantId'), userId: c.get('user')?.sub,
-        action: 'config.secrets.update', entityType: 'tenant_config',
-        ipAddress: c.req.header('CF-Connecting-IP'), executionCtx: c.executionCtx,
-    });
+    auditFromContext(c, 'config.secrets.update', 'tenant_config');
     return c.json({ success: true }, 200);
+});
+
+// --- Agreement Signing ---
+
+const sendAgreementRoute = createRoute({
+    method: 'post',
+    path: '/agreements/send',
+    tags: ['Agreements'],
+    summary: 'Send an agreement signing request to a client',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { body: { content: { 'application/json': { schema: SendAgreementSchema } } } },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ token: z.string(), signUrl: z.string() }) }) } },
+            description: 'Signing request created and email sent',
+        },
+    },
+});
+
+adminRoutes.openapi(sendAgreementRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const svc = c.var.services.agreement;
+
+    const request = await svc.createSigningRequest(tenantId, {
+        agreementId: body.agreementId,
+        clientEmail: body.clientEmail,
+        ...(body.clientName !== undefined ? { clientName: body.clientName } : {}),
+        ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
+    });
+    const signUrl = `${getBaseUrl(c)}/agreements/sign/${request.token}`;
+
+    await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl)
+        .catch(e => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+
+    auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, clientEmail: body.clientEmail } });
+    return c.json({ success: true as const, data: { token: request.token, signUrl } }, 200);
+});
+
+// --- Comments Library ---
+
+const listCommentsRoute = createRoute({
+    method: 'get',
+    path: '/comments',
+    tags: ['Comments'],
+    summary: 'List comment library entries',
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comments: z.array(CommentResponseSchema) }) }) } },
+            description: 'Success',
+        },
+    },
+    security: [{ bearerAuth: [] }],
+});
+
+adminRoutes.openapi(listCommentsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+    const rows = await db.select().from(comments).where(eq(comments.tenantId, tenantId)).all();
+    return c.json({ success: true as const, data: { comments: rows.map(r => ({ ...r, createdAt: safeISODate(r.createdAt) })) } }, 200);
+});
+
+const createCommentRoute = createRoute({
+    method: 'post',
+    path: '/comments',
+    tags: ['Comments'],
+    summary: 'Create a comment library entry',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { body: { content: { 'application/json': { schema: CommentSchema } } } },
+    responses: {
+        201: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comment: CommentResponseSchema }) }) } },
+            description: 'Created',
+        },
+    },
+    security: [{ bearerAuth: [] }],
+});
+
+adminRoutes.openapi(createCommentRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { text, category } = c.req.valid('json');
+    const db = drizzle(c.env.DB);
+    const row = { id: crypto.randomUUID(), tenantId, text, category: category ?? null, createdAt: new Date() };
+    await db.insert(comments).values(row);
+    return c.json({ success: true as const, data: { comment: { ...row, createdAt: safeISODate(row.createdAt) } } }, 201);
+});
+
+const deleteCommentRoute = createRoute({
+    method: 'delete',
+    path: '/comments/{id}',
+    tags: ['Comments'],
+    summary: 'Delete a comment library entry',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.boolean() }) } },
+            description: 'Deleted',
+        },
+        404: { description: 'Not found' },
+    },
+    security: [{ bearerAuth: [] }],
+});
+
+adminRoutes.openapi(deleteCommentRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const db = drizzle(c.env.DB);
+    const existing = await db.select().from(comments)
+        .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
+    if (!existing) throw Errors.NotFound('Comment not found');
+    await db.delete(comments).where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
+    return c.json({ success: true }, 200);
+});
+
+// --- ICS Subscription Token ---
+
+const icsTokenRoute = createRoute({
+    method: 'get',
+    path: '/ics-token',
+    tags: ['Calendar'],
+    summary: 'Get the tenant ICS subscription URL (creating a token if missing).',
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(true),
+                        data: z.object({ url: z.string() }),
+                    }),
+                },
+            },
+            description: 'Subscription URL',
+        },
+    },
+    security: [{ bearerAuth: [] }],
+});
+
+adminRoutes.openapi(icsTokenRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    const configs = await db
+        .select()
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .limit(1);
+
+    let token = configs[0]?.icsToken ?? null;
+
+    if (!token) {
+        token = crypto.randomUUID().replace(/-/g, '');
+        if (configs[0]) {
+            await db
+                .update(tenantConfigs)
+                .set({ icsToken: token, updatedAt: new Date() })
+                .where(eq(tenantConfigs.tenantId, tenantId));
+        } else {
+            await db.insert(tenantConfigs).values({
+                tenantId,
+                icsToken: token,
+                updatedAt: new Date(),
+            });
+        }
+    }
+
+    const baseUrl = getBaseUrl(c);
+    return c.json({ success: true as const, data: { url: `${baseUrl}/api/ics/${token}` } }, 200);
 });
 
 export default adminRoutes;

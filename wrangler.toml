@@ -5,6 +5,9 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 preview_urls = true
 
+[triggers]
+crons = ["* * * * *"]
+
 [assets]
 directory = "./public"
 
@@ -39,6 +42,12 @@ migrations_dir = "migrations"
 [[kv_namespaces]]
 binding = "TENANT_CACHE"
 id = "c890ac2c34ea4f758970bfc0ef7d6d4b"
+
+[[unsafe.bindings]]
+type = "ratelimit"
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
 
 [observability]
 enabled = true

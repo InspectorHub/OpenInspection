@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
+import { logger } from '../lib/logger';
 
 /**
  * Service to handle AI-powered features using Google Gemini.
@@ -40,7 +41,7 @@ export class AIService {
 
         if (!res.ok) {
             const error = await res.text();
-            console.error('Gemini API Error:', error);
+            logger.error('Gemini API Error', { response: error });
             throw new Error('Failed to generate content from AI');
         }
 
@@ -73,8 +74,8 @@ Professional Comment:`;
             throw new Error('Inspection not found or access denied');
         }
 
-        // 2. Fetch results
-        const results = await db.select().from(inspectionResults).where(eq(inspectionResults.inspectionId, inspectionId)).get();
+        // 2. Fetch results (scoped by tenantId for defense-in-depth)
+        const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId))).get();
         if (!results) return 'No significant defects observed during this inspection.';
 
         const data = results.data as Record<string, { status: string; notes?: string }>;
@@ -91,5 +92,41 @@ ${defects}
 Summary:`;
 
         return this.callGemini(prompt);
+    }
+
+    /**
+     * Suggests 3 professional inspection comments for a specific form item.
+     * Returns empty array if Gemini key is absent or the call fails.
+     */
+    async suggestComment(params: {
+        itemName:         string;
+        sectionName:      string;
+        rating?:          string;
+        propertyAddress?: string;
+        yearBuilt?:       number | null;
+        sqft?:            number | null;
+    }): Promise<string[]> {
+        if (!this.apiKey || this.apiKey.includes('your_api_key')) return [];
+
+        const context = [
+            params.rating    ? `Rating: ${params.rating}` : null,
+            params.yearBuilt ? `Year Built: ${params.yearBuilt}` : null,
+            params.sqft      ? `Sq Ft: ${params.sqft}` : null,
+        ].filter(Boolean).join(', ');
+
+        const prompt = `You are a certified home inspector writing a professional inspection report.
+Item: "${params.itemName}" in section "${params.sectionName}"${context ? ` (${context})` : ''}.
+Write exactly 3 short, professional inspection comments for this item.
+Each comment must be 1-2 sentences, factual, and in standard inspection report style.
+Return only a JSON array of 3 strings, no other text. Example: ["Comment 1.", "Comment 2.", "Comment 3."]`;
+
+        try {
+            const text = await this.callGemini(prompt);
+            const match = text.match(/\[[\s\S]*\]/);
+            if (!match) return [];
+            return JSON.parse(match[0]) as string[];
+        } catch {
+            return [];
+        }
     }
 }

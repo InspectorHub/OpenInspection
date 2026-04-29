@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { tenantConfigs } from '../db/schema';
 import { HonoConfig } from '../../types/hono';
+import { logger } from '../logger';
 
 /**
  * Middleware to resolve and inject branding configuration for the current tenant.
@@ -35,7 +36,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             c.set('branding', JSON.parse(cached));
             return await next();
         } catch (e) {
-            console.error('[branding] Cache parse failed:', e);
+            logger.error('[branding] Cache parse failed', {}, e instanceof Error ? e : undefined);
         }
     }
 
@@ -65,10 +66,14 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         c.set('branding', branding);
         
         if (config && c.env.TENANT_CACHE) {
-            c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(branding), { expirationTtl: 3600 }));
+            try {
+                c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(branding), { expirationTtl: 3600 }));
+            } catch {
+                // executionCtx unavailable in test environments
+            }
         }
     } catch (e) {
-        console.error('[branding] DB lookup failed:', e);
+        logger.error('[branding] DB lookup failed', {}, e instanceof Error ? e : undefined);
         c.set('branding', defaultBranding);
     }
 

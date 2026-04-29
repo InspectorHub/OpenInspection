@@ -1,22 +1,28 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { renderProfessionalReport } from '../templates/pages/report.template';
-import { writeAuditLog } from '../lib/audit';
+import { ReportGatePage } from '../templates/pages/report-gate';
+import { auditFromContext } from '../lib/audit';
+import { getBaseUrl } from '../lib/url';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
-import { 
-    InspectionListQuerySchema, 
-    CreateInspectionSchema, 
-    UpdateInspectionSchema, 
-    PatchResultsSchema, 
+import {
+    InspectionListQuerySchema,
+    CreateInspectionSchema,
+    UpdateInspectionSchema,
+    PatchResultsSchema,
     BulkInspectionSchema,
     InspectionSchema,
-    InspectionListResponseSchema
+    InspectionListResponseSchema,
+    InspectionCountsSchema,
+    PublishInspectionSchema,
+    ReportDataResponseSchema,
+    CancelInspectionSchema,
 } from '../lib/validations/inspection.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, agreementRequests } from '../lib/db/schema';
 import { eq, inArray, and } from 'drizzle-orm';
 
 const inspectionsRoutes = new OpenAPIHono<HonoConfig>();
@@ -109,6 +115,37 @@ inspectionsRoutes.openapi(listTemplatesRoute, async (c) => {
     const service = c.var.services.template;
     const templates = await service.listTemplates(c.get('tenantId'));
     return c.json({ success: true, data: { templates } }, 200);
+});
+
+/**
+ * GET /api/inspections/templates/:id
+ */
+const getTemplateRoute = createRoute({
+    method: 'get',
+    path: '/templates/{id}',
+    tags: ['Templates'],
+    summary: 'Get template',
+    description: 'Retrieve a single template with full schema.',
+    request: {
+        params: z.object({ id: z.string() }),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ template: z.unknown() })),
+                },
+            },
+            description: 'Template details',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(getTemplateRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const service = c.var.services.template;
+    const template = await service.getTemplate(id, c.get('tenantId'));
+    return c.json({ success: true, data: { template } }, 200);
 });
 
 /**
@@ -288,7 +325,6 @@ const bulkUpdateRoute = createRoute({
 
 inspectionsRoutes.openapi(bulkUpdateRoute, async (c) => {
     const tenantId = c.get('tenantId');
-    const user = c.get('user');
     const body = c.req.valid('json');
     const db = drizzle(c.env.DB);
 
@@ -297,28 +333,43 @@ inspectionsRoutes.openapi(bulkUpdateRoute, async (c) => {
         await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
             .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
 
-        writeAuditLog({
-            db: c.env.DB, tenantId, userId: user.sub,
-            action: 'inspection.bulk_assign', entityType: 'inspection',
+        auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
             metadata: { ids: body.ids, inspectorId: body.inspectorId },
-            ipAddress: c.req.header('CF-Connecting-IP'),
-            executionCtx: c.executionCtx,
         });
     } else {
         if (!body.status) throw Errors.BadRequest('status is required for updateStatus.');
         await db.update(inspectionTable).set({ status: body.status })
             .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
 
-        writeAuditLog({
-            db: c.env.DB, tenantId, userId: user.sub,
-            action: 'inspection.bulk_status', entityType: 'inspection',
+        auditFromContext(c, 'inspection.bulk_status', 'inspection', {
             metadata: { ids: body.ids, status: body.status },
-            ipAddress: c.req.header('CF-Connecting-IP'),
-            executionCtx: c.executionCtx,
         });
     }
 
     return c.json({ success: true, data: { count: body.ids.length } }, 200);
+});
+
+/**
+ * GET /api/inspections/counts
+ */
+const getCountsRoute = createRoute({
+    method: 'get',
+    path: '/counts',
+    tags: ['Inspections'],
+    summary: 'Get inspection tab counts',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(InspectionCountsSchema) } },
+            description: 'Tab counts',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(getCountsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const counts = await c.var.services.inspection.getCounts(tenantId);
+    return c.json({ success: true, data: counts });
 });
 
 /**
@@ -397,14 +448,11 @@ inspectionsRoutes.openapi(deleteInspectionRoute, async (c) => {
     const { inspection } = await service.getInspection(id, tenantId);
 
     const db = drizzle(c.env.DB);
-    await db.delete(inspectionTable).where(eq(inspectionTable.id, id));
+    await db.delete(inspectionTable).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
-    writeAuditLog({
-        db: c.env.DB, tenantId, userId: c.get('user')?.sub,
-        action: 'inspection.delete', entityType: 'inspection', entityId: id,
+    auditFromContext(c, 'inspection.delete', 'inspection', {
+        entityId: id,
         metadata: { propertyAddress: inspection.propertyAddress },
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
     });
     return c.json({ success: true, data: { success: true } }, 200);
 });
@@ -430,7 +478,7 @@ const updateInspectionRoute = createRoute({
             },
         },
     },
-    middleware: [requireRole(['inspector'])],
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
     responses: {
         200: {
             content: {
@@ -450,15 +498,12 @@ inspectionsRoutes.openapi(updateInspectionRoute, async (c) => {
     const db = drizzle(c.env.DB);
 
     const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
-    await db.update(inspectionTable).set(body).where(eq(inspectionTable.id, id));
+    await db.update(inspectionTable).set(body).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
     if (body.status && body.status !== inspection.status) {
-        writeAuditLog({
-            db: c.env.DB, tenantId, userId: c.get('user')?.sub,
-            action: 'inspection.status_change', entityType: 'inspection', entityId: id,
+        auditFromContext(c, 'inspection.status_change', 'inspection', {
+            entityId: id,
             metadata: { from: inspection.status, to: body.status },
-            ipAddress: c.req.header('CF-Connecting-IP'),
-            executionCtx: c.executionCtx,
         });
     }
     return c.json({ success: true, data: { success: true } }, 200);
@@ -513,7 +558,7 @@ const updateResultsRoute = createRoute({
             },
         },
     },
-    middleware: [requireRole(['inspector'])],
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
     responses: {
         200: {
             content: {
@@ -581,12 +626,9 @@ inspectionsRoutes.openapi(createInspectionRoute, async (c) => {
         inspectorId: body.inspectorId || c.get('user').sub
     });
 
-    writeAuditLog({
-        db: c.env.DB, tenantId: c.get('tenantId'), userId: c.get('user').sub,
-        action: 'inspection.create', entityType: 'inspection', entityId: inspection.id,
+    auditFromContext(c, 'inspection.create', 'inspection', {
+        entityId: inspection.id,
         metadata: { propertyAddress: inspection.propertyAddress },
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
     });
     
     return c.json({
@@ -606,7 +648,7 @@ const cloneInspectionRoute = createRoute({
     request: {
         params: z.object({ id: z.string().uuid() }),
     },
-    middleware: [requireRole(['admin', 'inspector'])],
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
     responses: {
         201: {
             content: {
@@ -624,12 +666,9 @@ inspectionsRoutes.openapi(cloneInspectionRoute, async (c) => {
     const service = c.var.services.inspection;
     const clone = await service.cloneInspection(id, c.get('tenantId'));
 
-    writeAuditLog({
-        db: c.env.DB, tenantId: c.get('tenantId'), userId: c.get('user').sub,
-        action: 'inspection.create', entityType: 'inspection', entityId: clone.id,
+    auditFromContext(c, 'inspection.create', 'inspection', {
+        entityId: clone.id,
         metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
     });
     return c.json({ success: true, data: { inspection: clone } }, 201);
 });
@@ -641,7 +680,7 @@ const uploadPhotoRoute = createRoute({
     method: 'post',
     path: '/{id}/upload',
     tags: ['Inspections'],
-    summary: 'Upload photo',
+    summary: 'Upload inspection photo',
     request: {
         params: z.object({ id: z.string().uuid() }),
         body: {
@@ -655,7 +694,7 @@ const uploadPhotoRoute = createRoute({
             },
         },
     },
-    middleware: [requireRole(['inspector'])],
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
     responses: {
         200: {
             content: {
@@ -687,8 +726,64 @@ inspectionsRoutes.openapi(uploadPhotoRoute, async (c) => {
 inspectionsRoutes.get('/:id/report', async (c) => {
     const id = c.req.param('id');
     const service = c.var.services.inspection;
+
+    // Agent view: token-based access that bypasses login and report gates
+    const viewParam  = c.req.query('view');
+    const tokenParam = c.req.query('token');
+    if (viewParam === 'agent' && tokenParam) {
+        const resolved = await service.resolveAgentViewToken(tokenParam);
+        if (!resolved || resolved.inspectionId !== id) {
+            return c.html('<html><body><p style="font-family:sans-serif;padding:2rem">Invalid or expired agent view link.</p></body></html>', 403);
+        }
+        const { inspection, template } = await service.getInspection(id!, resolved.tenantId);
+        const db = drizzle(c.env.DB);
+        const results = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, resolved.tenantId))).get();
+        return c.html(renderProfessionalReport({
+            inspection: { ...inspection, internalNotes: null, paymentStatus: null, paymentRequired: false } as never,
+            template: template as never,
+            results: (results || { data: {} }) as never,
+            branding: c.get('branding'),
+            isAuthenticated: false,
+        }));
+    }
+
     const { inspection, template } = await service.getInspection(id!, c.get('tenantId'));
-    
+
+    // Report gates: payment or agreement required before viewing
+    const baseUrl = getBaseUrl(c);
+    const branding = c.get('branding');
+    const companyName = branding?.siteName || c.env.APP_NAME || 'InspectorHub';
+    const primaryColor = branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1';
+
+    if (inspection.paymentRequired === true && inspection.paymentStatus !== 'paid') {
+        return c.html(ReportGatePage({
+            reason: 'payment',
+            companyName, primaryColor,
+            actionUrl: `${baseUrl}/invoices?inspection=${id}`,
+            actionLabel: 'View Invoice & Pay',
+        }) as string);
+    }
+
+    if (inspection.agreementRequired === true) {
+        const db2 = drizzle(c.env.DB as any);
+        const signed = await db2.select({ id: agreementRequests.id })
+            .from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.inspectionId, id as string),
+                eq(agreementRequests.status, 'signed')
+            ))
+            .limit(1);
+        if (signed.length === 0) {
+            return c.html(ReportGatePage({
+                reason: 'agreement',
+                companyName, primaryColor,
+                actionUrl: `${baseUrl}/sign/${id}`,
+                actionLabel: 'Sign Agreement',
+            }) as string);
+        }
+    }
+
     const db = drizzle(c.env.DB);
     const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
 
@@ -696,13 +791,87 @@ inspectionsRoutes.get('/:id/report', async (c) => {
         inspection: inspection as never,
         template: template as never,
         results: (results || { data: {} }) as never,
-        branding: c.get('branding')
+        branding: c.get('branding'),
+        isAuthenticated: true
     }));
 });
 
 /**
- * POST /api/inspections/:id/complete
+ * GET /api/inspections/:id/sign-status (public — check if client already signed)
  */
+inspectionsRoutes.get('/:id/sign-status', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    const existing = await db.select().from(inspectionAgreements)
+        .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId))).get();
+
+    return c.json({ success: true, data: { signed: !!existing } }, 200);
+});
+
+/**
+ * GET /api/inspections/:id/agreement (public — for report gatekeeper)
+ * Returns the first active agreement for this tenant.
+ */
+inspectionsRoutes.get('/:id/agreement', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    // Verify inspection exists
+    const inspection = await db.select().from(inspectionTable)
+        .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId))).get();
+    if (!inspection) throw Errors.NotFound('Inspection not found');
+
+    // Get the first agreement for this tenant
+    const agreement = await db.select().from(agreements)
+        .where(eq(agreements.tenantId, tenantId)).get();
+    if (!agreement) {
+        return c.json({ success: true, data: { agreement: null } }, 200);
+    }
+
+    return c.json({ success: true, data: { agreement: { id: agreement.id, name: agreement.name, content: agreement.content } } }, 200);
+});
+
+/**
+ * POST /api/inspections/:id/sign (public — client signature submission)
+ */
+inspectionsRoutes.post('/:id/sign', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    // Verify inspection exists
+    const inspection = await db.select().from(inspectionTable)
+        .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId))).get();
+    if (!inspection) throw Errors.NotFound('Inspection not found');
+
+    const raw = await c.req.json();
+    const parsed = z.object({ signatureBase64: z.string().min(1) }).safeParse(raw);
+    if (!parsed.success) return c.json({ success: false, error: { message: 'Invalid signature data', code: 'validation_error' } }, 400);
+    const body = parsed.data;
+
+    // Check if already signed
+    const existing = await db.select().from(inspectionAgreements)
+        .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId))).get();
+    if (existing) {
+        return c.json({ success: true, data: { alreadySigned: true } }, 200);
+    }
+
+    await db.insert(inspectionAgreements).values({
+        id: crypto.randomUUID(),
+        tenantId,
+        inspectionId: id,
+        signatureBase64: body.signatureBase64,
+        signedAt: new Date(),
+        ipAddress: c.req.header('CF-Connecting-IP') || null,
+        userAgent: c.req.header('User-Agent') || null,
+    });
+
+    return c.json({ success: true, data: { signed: true } }, 200);
+});
+
 /**
  * POST /api/inspections/:id/complete
  */
@@ -714,7 +883,7 @@ const completeInspectionRoute = createRoute({
     request: {
         params: z.object({ id: z.string().uuid() }),
     },
-    middleware: [requireRole(['inspector'])],
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
     responses: {
         200: {
             content: {
@@ -734,26 +903,163 @@ inspectionsRoutes.openapi(completeInspectionRoute, async (c) => {
     const { inspection } = await service.getInspection(id, tenantId);
 
     const db = drizzle(c.env.DB);
-    await db.update(inspectionTable).set({ status: 'completed' }).where(eq(inspectionTable.id, id));
+    await db.update(inspectionTable).set({ status: 'completed' }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
     if (inspection.clientEmail) {
-        const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
-        const host = c.req.header('host');
-        const reportUrl = `${protocol}://${host}/api/inspections/${id}/report`;
-
-        const emailService = c.var.services.email;
-        const emailPromise = emailService.sendReportReady(inspection.clientEmail, inspection.propertyAddress as string, reportUrl);
+        const reportUrl = `${getBaseUrl(c)}/api/inspections/${id}/report`;
+        const emailPromise = c.var.services.email.sendReportReady(inspection.clientEmail, inspection.propertyAddress as string, reportUrl);
         c.executionCtx.waitUntil(emailPromise);
     }
 
-    writeAuditLog({
-        db: c.env.DB, tenantId, userId: c.get('user')?.sub,
-        action: 'inspection.complete', entityType: 'inspection', entityId: id,
+    auditFromContext(c, 'inspection.complete', 'inspection', {
+        entityId: id,
         metadata: { propertyAddress: inspection.propertyAddress },
-        ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
     });
     return c.json({ success: true, data: { success: true } }, 200);
+});
+
+/**
+ * GET /api/inspections/:id/report-data
+ */
+const getReportDataRoute = createRoute({
+    method: 'get',
+    path: '/{id}/report-data',
+    tags: ['Inspections'],
+    summary: 'Get structured report data',
+    request: {
+        params: z.object({ id: z.string() }),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(ReportDataResponseSchema),
+                },
+            },
+            description: 'Report data',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(getReportDataRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const service = c.var.services.inspection;
+    const data = await service.getReportData(id, tenantId);
+    return c.json({ success: true, data }, 200);
+});
+
+/**
+ * POST /api/inspections/:id/confirm
+ */
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/confirm',
+    tags: ['Inspections'], summary: 'Confirm inspection',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
+}), async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.inspection.confirmInspection(tenantId, id);
+    return c.json({ success: true });
+});
+
+/**
+ * POST /api/inspections/:id/cancel
+ */
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/cancel',
+    tags: ['Inspections'], summary: 'Cancel inspection',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string() }),
+        body: { content: { 'application/json': { schema: CancelInspectionSchema } } },
+    },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Cancelled' } },
+}), async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const { reason, notes } = c.req.valid('json');
+    await c.var.services.inspection.cancelInspection(tenantId, id, reason, notes);
+    return c.json({ success: true });
+});
+
+/**
+ * POST /api/inspections/:id/uncancel
+ */
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/uncancel',
+    tags: ['Inspections'], summary: 'Uncancel inspection',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Uncancelled' } },
+}), async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.inspection.uncancelInspection(tenantId, id);
+    return c.json({ success: true });
+});
+
+/**
+ * POST /api/inspections/:id/publish
+ */
+const publishRoute = createRoute({
+    method: 'post',
+    path: '/{id}/publish',
+    tags: ['Inspections'],
+    summary: 'Publish inspection report',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string() }),
+        body: {
+            content: {
+                'application/json': {
+                    schema: PublishInspectionSchema,
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ reportUrl: z.string(), status: z.string() })),
+                },
+            },
+            description: 'Published',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(publishRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const service = c.var.services.inspection;
+    const result = await service.publishInspection(id, tenantId, body);
+    return c.json({ success: true, data: result }, 200);
+});
+
+// POST /api/inspections/:id/agent-token — generates a shareable agent view token
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/agent-token',
+    tags: ['Inspections'],
+    summary: 'Generate shareable agent view token',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string(), url: z.string() })) } },
+            description: 'Agent view token and URL',
+        },
+    },
+}), async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
+    const baseUrl = getBaseUrl(c);
+    return c.json({ success: true, data: { token, url: `${baseUrl}/report/${id}?view=agent&token=${token}` } });
 });
 
 export default inspectionsRoutes;

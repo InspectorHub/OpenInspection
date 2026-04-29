@@ -6,6 +6,8 @@ import { sign } from 'hono/jwt';
 import { setCookie, deleteCookie } from 'hono/cookie';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
+import { getBaseUrl } from '../lib/url';
+import { checkRateLimit } from '../lib/rate-limit';
 import { requireCsrfToken } from '../lib/middleware/csrf';
 import {
     LoginSchema,
@@ -14,10 +16,9 @@ import {
     ForgotPasswordSchema,
     ResetPasswordSchema,
     AuthResponseSchema,
-    SuccessResponseSchema,
     SetupSchema
 } from '../lib/validations/auth.schema';
-import { createApiResponseSchema } from '../lib/validations/shared.schema';
+import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 
 /**
  * Require a strong JWT_SECRET (≥32 chars) before signing/verifying anything.
@@ -89,6 +90,8 @@ const loginRoute = createRoute({
 });
 
 coreAuthRoutes.openapi(loginRoute, async (c) => {
+    await checkRateLimit(c, 'login');
+
     const body = c.req.valid('json');
     const user = await c.var.services.auth.validateCredentials(body.email, body.password);
 
@@ -221,28 +224,18 @@ const forgotPasswordRoute = createRoute({
 });
 
 coreAuthRoutes.openapi(forgotPasswordRoute, async (c) => {
+    await checkRateLimit(c, 'forgot');
+
     const body = c.req.valid('json');
     const resetToken = await c.var.services.auth.createPasswordResetToken(body.email);
     
     if (!resetToken) return c.json({ success: true, data: { success: true } }, 200);
 
-    const baseUrl = c.env.APP_BASE_URL || 'http://localhost:8788';
+    const baseUrl = getBaseUrl(c);
     const resetLink = `${baseUrl}/login?reset_token=${resetToken}`;
 
-    if (c.env.RESEND_API_KEY && !c.env.RESEND_API_KEY.includes('your_api_key')) {
-        await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${c.env.RESEND_API_KEY}` },
-            body: JSON.stringify({
-                from: c.env.SENDER_EMAIL || `${c.env.APP_NAME} <noreply@example.com>`,
-                to: [body.email],
-                subject: 'Reset your password',
-                html: `<p>Click the link below to reset your ${c.env.APP_NAME} password. This link expires in 1 hour.</p>
-                       <p><a href="${resetLink}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Reset Password</a></p>
-                       <p style="font-size:12px;color:#999;">If you didn't request this, ignore this email. Link: ${resetLink}</p>`
-            })
-        }).catch(e => console.error('Reset email error:', e));
-    }
+    await c.var.services.email.sendPasswordReset(body.email, resetLink)
+        .catch(() => { /* email delivery is best-effort */ });
 
     return c.json({ success: true, data: { success: true } }, 200);
 });
@@ -386,7 +379,12 @@ coreAuthRoutes.openapi(meRoute, async (c) => {
 
     // Email is stored only in the DB, never the JWT.
     const db = drizzle(c.env.DB);
-    const row = await db.select({ email: users.email }).from(users).where(eq(users.id, user.sub)).get();
+    const row = await db.select({
+        email: users.email,
+        name: users.name,
+        phone: users.phone,
+        licenseNumber: users.licenseNumber,
+    }).from(users).where(eq(users.id, user.sub)).get();
 
     return c.json({
         success: true,
@@ -394,11 +392,60 @@ coreAuthRoutes.openapi(meRoute, async (c) => {
             user: {
                 id: user.sub,
                 email: row?.email,
+                name: row?.name || null,
+                phone: row?.phone || null,
+                licenseNumber: row?.licenseNumber || null,
                 tenantId: c.get('tenantId'),
                 role: c.get('userRole')
             }
         }
     }, 200);
+});
+
+// ── Profile update ──────────────────────────────────────────────────────────
+const updateProfileRoute = createRoute({
+    method: 'patch',
+    path: '/profile',
+    summary: 'Update Profile',
+    description: 'Update the current user\'s profile (name, phone, license number).',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        name: z.string().max(100).optional(),
+                        phone: z.string().max(30).optional(),
+                        licenseNumber: z.string().max(50).optional(),
+                    })
+                }
+            }
+        }
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SuccessResponseSchema } },
+            description: 'Profile updated'
+        },
+        401: { description: 'Unauthorized' }
+    }
+});
+
+coreAuthRoutes.openapi(updateProfileRoute, async (c) => {
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+
+    const body = c.req.valid('json');
+    const updates: Record<string, string | null> = {};
+    if (body.name !== undefined) updates.name = body.name || null;
+    if (body.phone !== undefined) updates.phone = body.phone || null;
+    if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber || null;
+
+    if (Object.keys(updates).length > 0) {
+        const db = drizzle(c.env.DB);
+        await db.update(users).set(updates).where(eq(users.id, user.sub)).run();
+    }
+
+    return c.json({ success: true, data: { updated: true } }, 200);
 });
 
 const logoutRoute = createRoute({

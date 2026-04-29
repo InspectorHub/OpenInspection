@@ -24,13 +24,9 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
     let tenantId: string | null = null;
     let subdomain: string | null = null;
 
-    // Extract subdomain from host or X-Forwarded-Host header
-    const forwardedHost = c.req.header('x-forwarded-host');
-    const actualHost = forwardedHost || host;
-
     // Extract subdomain: anything before the first dot that isn't www/dev/app
-    // In shared SaaS mode, hostname is "app.inspectorhub.io" — "app" is NOT a tenant subdomain
-    const hostParts = actualHost.split('.');
+    // In shared SaaS mode, hostname is "app.<domain>" — "app" is NOT a tenant subdomain
+    const hostParts = host.split('.');
     if (hostParts.length > 2) {
         const potentialSubdomain = hostParts[0];
         if (potentialSubdomain !== 'www' && potentialSubdomain !== 'dev' && potentialSubdomain !== 'localhost' && potentialSubdomain !== 'app') {
@@ -38,9 +34,9 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
         }
     }
 
-    // Check for header-based subdomain override (useful for testing/CLI)
+    // Check for header-based subdomain override (M2M only — requires PORTAL_M2M_SECRET)
     const headerSubdomain = c.req.header('x-tenant-subdomain');
-    if (headerSubdomain) {
+    if (headerSubdomain && c.env.PORTAL_M2M_SECRET && c.req.header('authorization') === `Bearer ${c.env.PORTAL_M2M_SECRET}`) {
         subdomain = headerSubdomain;
     }
 
@@ -69,7 +65,7 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
             c.set('tenantStatus', (cached.status as string) || 'active');
         }
     } else if ((c.env.APP_MODE as string) === 'saas' && !subdomain) {
-        // Shared SaaS mode (app.inspectorhub.io): tenant resolved later via JWT claims
+        // Shared SaaS mode (app.<domain>): tenant resolved later via JWT claims
         // Skip tenant resolution here — JWT middleware sets tenantId from token
         return next();
     } else {

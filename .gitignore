@@ -1,5 +1,9 @@
 node_modules/
 public/styles.css
+public/vendor/
+public/fonts/
+public/fonts.css
+src/generated/version.ts
 .wrangler/
 .dev.vars
 dist/
@@ -21,3 +25,4 @@ wrangler.*.toml
 
 # Qwen config
 .qwen/
+.worktrees/

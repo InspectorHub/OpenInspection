@@ -1,0 +1,110 @@
+{
+  "id": "seed_residential_v1",
+  "name": "Standard Residential Inspection",
+  "description": "InterNACHI-aligned residential inspection template covering all major home systems.",
+  "version": 1,
+  "schema": {
+    "sections": [
+      {
+        "id": "s_roof", "title": "Roof",
+        "items": [
+          { "id": "i_roof_cover",    "label": "Roof Covering",        "type": "rating" },
+          { "id": "i_roof_flashing", "label": "Flashing",             "type": "rating" },
+          { "id": "i_gutters",       "label": "Gutters & Downspouts", "type": "rating" },
+          { "id": "i_chimney",       "label": "Chimney",              "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_ext", "title": "Exterior",
+        "items": [
+          { "id": "i_siding",   "label": "Siding / Cladding",   "type": "rating" },
+          { "id": "i_windows",  "label": "Windows & Doors",     "type": "rating" },
+          { "id": "i_driveway", "label": "Driveway & Walkways", "type": "rating" },
+          { "id": "i_grading",  "label": "Grading & Drainage",  "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_struct", "title": "Structure",
+        "items": [
+          { "id": "i_foundation", "label": "Foundation",           "type": "rating" },
+          { "id": "i_framing",    "label": "Framing",              "type": "rating" },
+          { "id": "i_basement",   "label": "Basement / Crawlspace","type": "rating" }
+        ]
+      },
+      {
+        "id": "s_hvac", "title": "HVAC",
+        "items": [
+          { "id": "i_furnace",   "label": "Heating System",    "type": "rating" },
+          { "id": "i_ac",        "label": "Cooling System",    "type": "rating" },
+          { "id": "i_ductwork",  "label": "Ductwork & Venting","type": "rating" },
+          { "id": "i_filter",    "label": "Air Filter",        "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_plumbing", "title": "Plumbing",
+        "items": [
+          { "id": "i_supply",   "label": "Supply Lines",         "type": "rating" },
+          { "id": "i_drain",    "label": "Drain / Waste / Vent", "type": "rating" },
+          { "id": "i_wh",       "label": "Water Heater",         "type": "rating" },
+          { "id": "i_fixtures", "label": "Fixtures",             "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_electrical", "title": "Electrical",
+        "items": [
+          { "id": "i_panel",   "label": "Service Panel",          "type": "rating" },
+          { "id": "i_wiring",  "label": "Visible Wiring",         "type": "rating" },
+          { "id": "i_outlets", "label": "Outlets & Switches",     "type": "rating" },
+          { "id": "i_gfci",    "label": "GFCI / AFCI Protection", "type": "rating" },
+          { "id": "i_smoke",   "label": "Smoke & CO Detectors",   "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_int", "title": "Interior",
+        "items": [
+          { "id": "i_ceilings",  "label": "Ceilings & Walls", "type": "rating" },
+          { "id": "i_floors",    "label": "Floors",            "type": "rating" },
+          { "id": "i_stairs",    "label": "Stairways",         "type": "rating" },
+          { "id": "i_fireplace", "label": "Fireplace",         "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_kitchen", "title": "Kitchen",
+        "items": [
+          { "id": "i_appliances", "label": "Appliances",             "type": "rating" },
+          { "id": "i_cabinets",   "label": "Cabinets & Countertops", "type": "rating" },
+          { "id": "i_sink_k",     "label": "Sink & Faucet",          "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_bath", "title": "Bathrooms",
+        "items": [
+          { "id": "i_toilet",  "label": "Toilet",          "type": "rating" },
+          { "id": "i_tub",     "label": "Tub / Shower",    "type": "rating" },
+          { "id": "i_sink_b",  "label": "Sink & Vanity",   "type": "rating" },
+          { "id": "i_exhaust", "label": "Exhaust Fan",     "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_attic", "title": "Attic",
+        "items": [
+          { "id": "i_insulation",  "label": "Insulation",  "type": "rating" },
+          { "id": "i_ventilation", "label": "Ventilation", "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_garage", "title": "Garage",
+        "items": [
+          { "id": "i_door",     "label": "Garage Door & Opener", "type": "rating" },
+          { "id": "i_firewall", "label": "Firewall",             "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_summary", "title": "Summary",
+        "items": [
+          { "id": "i_overall", "label": "Overall Condition Notes", "type": "text" }
+        ]
+      }
+    ]
+  }
+}

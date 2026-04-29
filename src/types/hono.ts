@@ -23,7 +23,7 @@ export interface AppEnv {
     // System Defaults
     APP_NAME: string;
     PRIMARY_COLOR: string;
-    APP_BASE_URL: string;
+    APP_BASE_URL?: string;
     GA_MEASUREMENT_ID: string;
 
     // Optional Configuration
@@ -33,6 +33,13 @@ export interface AppEnv {
     CF_API_TOKEN?: string;
     APP_MODE?: 'standalone' | 'saas';
     SETUP_CODE?: string;
+
+    // Payments
+    STRIPE_SECRET_KEY?: string;
+    STRIPE_WEBHOOK_SECRET?: string;
+
+    // Rate Limiting
+    RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
 
     // SaaS Portal Integration
     PORTAL_API_URL?: string;
@@ -49,6 +56,11 @@ import { InspectionService } from '../services/inspection.service';
 import { TeamService } from '../services/team.service';
 import { TemplateService } from '../services/template.service';
 import { AgreementService } from '../services/agreement.service';
+import { ContactService } from '../services/contact.service';
+import { InvoiceService } from '../services/invoice.service';
+import { ServiceService } from '../services/service.service';
+import { AutomationService } from '../services/automation.service';
+import { MarketplaceService } from '../services/marketplace.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -67,6 +79,11 @@ export interface AppServices {
     agreement: AgreementService;
     availability: AvailabilityService;
     ai: AIService;
+    contact: ContactService;
+    invoice: InvoiceService;
+    service: ServiceService;
+    automation: AutomationService;
+    marketplace: MarketplaceService;
 }
 
 /**

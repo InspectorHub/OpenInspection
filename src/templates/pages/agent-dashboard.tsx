@@ -1,4 +1,5 @@
 import { BareLayout } from '../layouts/main-layout';
+import { AtmosphericBg } from '../components/atmospheric-bg';
 import { BrandingConfig } from '../../types/auth';
 
 export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -8,23 +9,15 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
     return (
         <BareLayout title={`${siteName} | Agent Portal`} branding={branding}>
             <div class="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden relative">
-                {/* Atmospheric Background */}
-                <div class="fixed inset-0 pointer-events-none overflow-hidden select-none">
-                    <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/5 blur-[120px] rounded-full animate-float"></div>
-                    <div class="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full animate-float" style="animation-delay: -2s"></div>
-                </div>
+                <AtmosphericBg />
 
                 {/* Floating Navigation */}
                 <nav class="sticky top-6 mx-auto max-w-7xl px-6 z-50">
                     <div class="glass-panel flex h-20 items-center justify-between px-8 rounded-[2rem] shadow-2xl shadow-indigo-100/20">
                         <div class="flex items-center gap-8">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-200 overflow-hidden ring-4 ring-white">
-                                    {logoUrl ? (
-                                        <img src={logoUrl} alt={siteName} class="w-full h-full object-contain" />
-                                    ) : (
-                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                    )}
+                                <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                                    <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                                 </div>
                                 <span class="text-2xl font-black tracking-tightest text-slate-900">{siteName}</span>
                             </div>
@@ -74,7 +67,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                                             <td colspan={5} class="py-32 text-center">
                                                 <div class="flex flex-col items-center gap-4">
                                                     <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-xl shadow-indigo-100"></div>
-                                                    <p class="text-sm font-bold text-slate-400 animate-pulse">Synchronizing Referral Data...</p>
+                                                    <p class="text-sm font-bold text-slate-400 animate-pulse">Loading...</p>
                                                 </div>
                                             </td>
                                         </tr>
@@ -94,6 +87,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                     </div>
                 </main>
 
+                <script src="/js/auth.js"></script>
                 <script src="/js/agent-dashboard.js"></script>
             </div>
         </BareLayout>

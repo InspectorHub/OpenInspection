@@ -1,5 +1,8 @@
+import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { auditLogs } from './db/schema/tenant';
+import { logger } from './logger';
+import type { HonoConfig } from '../types/hono';
 
 export type AuditAction =
     | 'inspection.create'
@@ -17,8 +20,11 @@ export type AuditAction =
     | 'agreement.create'
     | 'agreement.update'
     | 'agreement.delete'
+    | 'agreement.send'
     | 'data.export'
+    | 'data.import'
     | 'data.delete'
+    | 'audit.view'
     | 'config.integration.update'
     | 'config.secrets.update';
 
@@ -50,9 +56,33 @@ export function writeAuditLog(params: AuditParams): void {
         metadata: rest.metadata ?? null,
         ipAddress: rest.ipAddress ?? null,
         createdAt: new Date(),
-    }).then(() => {}).catch((e) => console.error('[audit] write failed:', e));
+    }).then(() => {}).catch((e) => logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined));
 
     if (executionCtx) {
         try { executionCtx.waitUntil(write); } catch { /* swallow if ctx unavailable */ }
     }
+}
+
+/**
+ * Context-aware wrapper around writeAuditLog that extracts common fields
+ * (tenantId, userId, ipAddress, executionCtx) from the Hono context.
+ */
+export function auditFromContext(
+    c: Context<HonoConfig>,
+    action: AuditAction,
+    entityType: string,
+    options?: { entityId?: string; metadata?: Record<string, unknown> }
+): void {
+    const user = c.get('user');
+    writeAuditLog({
+        db: c.env.DB,
+        tenantId: c.get('tenantId') as string,
+        userId: user?.sub,
+        action,
+        entityType,
+        entityId: options?.entityId,
+        metadata: options?.metadata,
+        ipAddress: c.req.header('CF-Connecting-IP'),
+        executionCtx: c.executionCtx,
+    });
 }

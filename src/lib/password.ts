@@ -1,12 +1,3 @@
-/** Returns an error message if the password fails complexity rules, or null if valid. */
-export function validatePasswordStrength(password: string): string | null {
-    if (password.length < 8) return 'Password must be at least 8 characters.';
-    if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter.';
-    if (!/[0-9]/.test(password)) return 'Password must contain at least one digit.';
-    if (!/[^A-Za-z0-9]/.test(password)) return 'Password must contain at least one special character.';
-    return null;
-}
-
 const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_SALT_BYTES = 16;
 const PBKDF2_HASH_BITS = 256;
@@ -29,7 +20,7 @@ async function sha256Hex(input: string): Promise<string> {
 }
 
 /** Constant-time string comparison. Returns false immediately on length mismatch. */
-function timingSafeEqual(a: string, b: string): boolean {
+export function timingSafeEqual(a: string, b: string): boolean {
     if (a.length !== b.length) return false;
     let diff = 0;
     for (let i = 0; i < a.length; i++) {

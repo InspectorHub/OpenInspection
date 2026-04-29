@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
+import { getBaseUrl } from '../lib/url';
 import { HonoConfig } from '../types/hono';
 import {
     InviteMemberSchema,
@@ -90,12 +91,10 @@ teamRoutes.openapi(inviteTeamMemberRoute, async (c) => {
         role: body.role,
     });
 
-    const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
-    const host = c.req.header('host');
-    const inviteLink = `${protocol}://${host}/join?token=${token}`;
+    const inviteLink = `${getBaseUrl(c)}/join?token=${token}`;
 
     // Send email via service (requires RESEND_API_KEY in env)
-    await teamService.sendInviteEmail(body.email, inviteLink);
+    await c.var.services.email.sendInvitation(body.email, inviteLink);
 
     return c.json({ 
         success: true, 

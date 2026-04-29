@@ -48,9 +48,14 @@ declare global {
             'x-on:touchmove.passive'?: string;
             'x-on:touchend.passive'?: string;
             '@click'?: string;
+            '@click.outside'?: string;
             '@submit.prevent'?: string;
             '@input'?: string;
             '@change'?: string;
+            'x-model.number'?: string;
+            'x-bind:data-id'?: string;
+            'x-bind:title'?: string;
+            'x-bind:name'?: string;
         }
     }
 }

@@ -1,4 +1,5 @@
 import { BareLayout } from '../layouts/main-layout';
+import { AtmosphericBg } from '../components/atmospheric-bg';
 import { BrandingConfig } from '../../types/auth';
 
 export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -7,11 +8,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
     return (
         <BareLayout title={`System Setup | ${siteName}`} branding={branding}>
             <div class="relative min-h-screen flex flex-col justify-center py-12 px-6 lg:px-8 overflow-hidden font-sans">
-                {/* Background Atmosphere */}
-                <div class="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden pointer-events-none">
-                    <div class="absolute top-[-10%] right-[-10%] w-[50%] h-[60%] bg-emerald-50 rounded-full blur-[120px] animate-float"></div>
-                    <div class="absolute bottom-[-10%] left-[-10%] w-[40%] h-[50%] bg-blue-50 rounded-full blur-[100px] animate-float" style="animation-delay: -3s;"></div>
-                </div>
+                <AtmosphericBg />
 
                 <div class="sm:mx-auto sm:w-full sm:max-w-md animate-fade-in">
                     <div class="flex justify-center mb-8">
@@ -20,7 +17,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                         </div>
                     </div>
                     <h2 class="text-center text-4xl font-black tracking-tight text-slate-900 leading-tight">Welcome to {siteName}</h2>
-                    <p class="mt-4 text-center text-sm font-semibold text-slate-500 uppercase tracking-widest">Global Workspace Initialization</p>
+                    <p class="mt-4 text-center text-sm font-semibold text-slate-500 uppercase tracking-widest">First-Time Setup</p>
                 </div>
 
                 <div class="mt-12 sm:mx-auto sm:w-full sm:max-w-[480px] animate-fade-in" style="animation-delay: 0.1s;">
@@ -45,7 +42,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             </div>
 
                             <div>
-                                <label for="password" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Master Password</label>
+                                <label for="password" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Password</label>
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="password" name="password" type="password" required placeholder="••••••••"
@@ -70,7 +67,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <div>
                                 <button type="submit" id="submitBtn" 
                                     class="premium-button flex w-full justify-center rounded-2xl bg-emerald-600 px-6 py-5 text-base font-bold text-white shadow-xl shadow-emerald-100 hover:bg-slate-900 hover:shadow-emerald-200 active:scale-95 disabled:bg-slate-300 transition-all">
-                                    Initialize System
+                                    Create Account
                                 </button>
                             </div>
                         </form>

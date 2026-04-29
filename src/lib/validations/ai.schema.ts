@@ -29,3 +29,22 @@ export const CommentAssistResponseSchema = createApiResponseSchema(z.object({
 export const AutoSummaryResponseSchema = createApiResponseSchema(z.object({
     summary: z.string().openapi({ example: 'The inspection revealed critical defects in the roofing and plumbing systems.' }),
 })).openapi('AutoSummaryResponse');
+
+/**
+ * Input for the AI comment suggestion request.
+ */
+export const SuggestCommentSchema = z.object({
+    itemName:        z.string().min(1).max(200).openapi({ example: 'Roof Covering' }),
+    sectionName:     z.string().min(1).max(200).openapi({ example: 'Roof' }),
+    rating:          z.string().optional().openapi({ example: 'Defect' }),
+    propertyAddress: z.string().optional(),
+    yearBuilt:       z.number().int().nullable().optional(),
+    sqft:            z.number().int().nullable().optional(),
+}).openapi('SuggestCommentRequest');
+
+/**
+ * Response for the AI comment suggestion.
+ */
+export const SuggestCommentResponseSchema = createApiResponseSchema(
+    z.array(z.string()).openapi({ example: ['Comment 1.', 'Comment 2.', 'Comment 3.'] })
+).openapi('SuggestCommentResponse');

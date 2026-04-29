@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, users } from '../db/schema';
 import { IntegrationProvider, TenantUpdateParams } from '../integration';
+import { logger } from '../logger';
 
 /**
  * Portal implementation of IntegrationProvider.
@@ -49,7 +50,7 @@ export class PortalProvider implements IntegrationProvider {
         if (adminEmail && adminPasswordHash) {
             const finalTenantId = id || existingTenant?.id;
             if (!finalTenantId) {
-                console.error('Cannot sync admin: No tenant ID resolved');
+                logger.error('Cannot sync admin: No tenant ID resolved');
                 return;
             }
 

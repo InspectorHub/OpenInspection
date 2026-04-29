@@ -1,12 +1,4 @@
 (function() {
-    const authFetch = (url, opts = {}) =>
-        fetch(url, { credentials: 'same-origin', ...opts });
-
-    async function logout() {
-        try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
-        window.location.href = '/login';
-    }
-
     const membersList = document.getElementById('membersList');
     const invitesList = document.getElementById('invitesList');
     const quotaBadge = document.getElementById('quotaBadge');
@@ -51,7 +43,20 @@
 
     function renderMembers(members) {
         if (!members || members.length === 0) {
-            membersList.innerHTML = '<tr><td colspan="3" class="px-6 py-8 text-sm text-center text-slate-400">No active members found.</td></tr>';
+            membersList.innerHTML = `
+                <tr>
+                    <td colspan="3" class="py-32 text-center">
+                        <div class="flex flex-col items-center gap-6">
+                            <div class="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center">
+                                <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                            </div>
+                            <div>
+                                <p class="text-lg font-black text-slate-900 tracking-tight">Just you for now</p>
+                                <p class="text-sm text-slate-400 font-medium mt-1">Invite team members to collaborate.</p>
+                            </div>
+                        </div>
+                    </td>
+                </tr>`;
             return;
         }
         membersList.innerHTML = members.map(m => `

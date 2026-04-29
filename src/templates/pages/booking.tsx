@@ -1,4 +1,5 @@
 import { BareLayout } from '../layouts/main-layout';
+import { AtmosphericBg } from '../components/atmospheric-bg';
 import { BrandingConfig } from '../../types/auth';
 
 export const PublicBookingPage = ({ siteKey, branding }: { siteKey: string, branding?: BrandingConfig | undefined }): JSX.Element => {
@@ -7,11 +8,7 @@ export const PublicBookingPage = ({ siteKey, branding }: { siteKey: string, bran
     return (
         <BareLayout title={`Book Inspection | ${siteName}`} branding={branding}>
             <div class="relative min-h-screen py-20 px-6 lg:px-8 font-sans overflow-hidden">
-                {/* Background Atmosphere */}
-                <div class="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden pointer-events-none">
-                    <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[60%] bg-indigo-50/50 rounded-full blur-[120px] animate-float"></div>
-                    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[50%] bg-blue-50/40 rounded-full blur-[100px] animate-float" style="animation-delay: -4s;"></div>
-                </div>
+                <AtmosphericBg />
 
                 <div class="max-w-3xl mx-auto animate-fade-in">
                     <nav class="mb-16 flex items-center justify-between">
@@ -27,9 +24,9 @@ export const PublicBookingPage = ({ siteKey, branding }: { siteKey: string, bran
                         <div class="mb-16">
                             <div class="flex items-center gap-2 mb-4">
                                 <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
-                                <span class="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">Direct Engagement</span>
+                                <span class="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">Book Inspection</span>
                             </div>
-                            <h1 class="text-5xl font-black text-slate-900 tracking-tightest mb-4 leading-none">Schedule Analysis</h1>
+                            <h1 class="text-5xl font-black text-slate-900 tracking-tightest mb-4 leading-none">Schedule Inspection</h1>
                             <p class="text-slate-500 text-lg font-semibold tracking-tight">Professional property analysis configured for high-fidelity reporting.</p>
                         </div>
 
@@ -51,10 +48,10 @@ export const PublicBookingPage = ({ siteKey, branding }: { siteKey: string, bran
 
                             {/* Client Details */}
                             <div class="space-y-8">
-                                <h3 class="text-xs font-black text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase II: Petitioner Data</h3>
+                                <h3 class="text-xs font-black text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase II: Client Information</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div class="space-y-3">
-                                        <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-widest">Legal Name</label>
+                                        <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-widest">Full Name</label>
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                             <input type="text" name="clientName" required placeholder="John Doe"
@@ -62,7 +59,7 @@ export const PublicBookingPage = ({ siteKey, branding }: { siteKey: string, bran
                                         </div>
                                     </div>
                                     <div class="space-y-3">
-                                        <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-widest">Digital Mail</label>
+                                        <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-widest">Email</label>
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                             <input type="email" name="clientEmail" required placeholder="john@example.com"
@@ -74,10 +71,10 @@ export const PublicBookingPage = ({ siteKey, branding }: { siteKey: string, bran
 
                             {/* Scheduling */}
                             <div class="space-y-8">
-                                <h3 class="text-xs font-black text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase III: Temporal Allocation</h3>
+                                <h3 class="text-xs font-black text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase III: Scheduling</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div class="space-y-3">
-                                        <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-widest">Deployment Date</label>
+                                        <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-widest">Inspection Date</label>
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                             <input type="date" name="date" required 
@@ -104,7 +101,7 @@ export const PublicBookingPage = ({ siteKey, branding }: { siteKey: string, bran
 
                             <button type="submit" id="submitBtn" 
                                 class="premium-button w-full py-6 px-10 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-[0.3em] shadow-[0_20px_50px_rgba(0,0,0,0.2)] hover:bg-black transition-all active:scale-95 disabled:bg-slate-300 disabled:pointer-events-none">
-                                Deploy Request
+                                Submit Request
                             </button>
                         </form>
 

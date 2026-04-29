@@ -1,5 +1,6 @@
 import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
+import { BUILD } from '../../generated/version';
 
 export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
@@ -20,13 +21,54 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
             <div class="max-w-5xl mx-auto space-y-16 animate-fade-in">
                 <div class="space-y-4">
                     <div class="flex items-center gap-3">
-                        <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">System Config</span>
+                        <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Settings</span>
                     </div>
                     <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Settings</h1>
                     <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Configure your workspace, integrations, and API credentials.</p>
                 </div>
 
                 <div class="space-y-12">
+
+                    {/* ── Profile ── */}
+                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 space-y-10">
+                        <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
+                            {sectionIcon('M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', 'bg-teal-600/10 text-teal-600')}
+                            <div>
+                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Profile</h2>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inspector Identity · Shown on Reports</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                            <div class="space-y-3">
+                                <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Full Name</label>
+                                <div class="relative group">
+                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
+                                    <input type="text" id="profileName" placeholder="John Smith"
+                                        class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                                </div>
+                                <p class="text-[10px] text-slate-400 font-bold ml-1">Displayed on inspection reports.</p>
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Phone</label>
+                                <input type="tel" id="profilePhone" placeholder="(555) 123-4567"
+                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">License #</label>
+                                <input type="text" id="profileLicense" placeholder="HI-12345"
+                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                                <p class="text-[10px] text-slate-400 font-bold ml-1">State inspector license number.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button onclick="saveProfile()" id="saveProfileBtn"
+                                class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
+                                Save Profile
+                            </button>
+                        </div>
+                    </section>
 
                     {/* ── Branding ── */}
                     <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 space-y-10">
@@ -61,7 +103,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         </div>
 
                         <div class="space-y-4">
-                            <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Deployment Logo</label>
+                            <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Company Logo</label>
                             <div class="flex flex-col sm:flex-row items-center gap-10 p-10 bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-200 group hover:border-indigo-300 transition-colors">
                                 <div class="w-32 h-32 bg-white rounded-3xl border border-slate-100 shadow-xl flex items-center justify-center overflow-hidden">
                                     {logoUrl ? (
@@ -228,6 +270,28 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         </div>
                     </section>
 
+                    {/* ── Apple Calendar / ICS Subscription ── */}
+                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                        <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
+                            {sectionIcon('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'bg-slate-600/10 text-slate-600')}
+                            <div>
+                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Apple Calendar</h2>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">ICS Subscription · Read-only</p>
+                            </div>
+                        </div>
+                        <p class="text-sm text-slate-500 max-w-2xl">Subscribe to your inspections in Apple Calendar, Google Calendar, or any app that supports ICS feeds.</p>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <input id="icsUrl" type="text" readonly
+                                class="flex-1 px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 bg-slate-50 text-slate-600 font-mono text-xs"
+                                placeholder="Loading subscription URL..." />
+                            <button onclick="copyIcsUrl()" id="copyIcsBtn"
+                                class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                                Copy Link
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-bold ml-1">In Apple Calendar: File → New Calendar Subscription → paste URL.</p>
+                    </section>
+
                     {/* ── Password ── */}
                     <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
@@ -263,9 +327,19 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                 </div>
 
-                {/* Status toast */}
-                <div id="statusToast" class="fixed bottom-8 right-8 hidden items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold text-white z-50 transition-all"></div>
+                {/* ── Build Info ── */}
+                <div class="flex items-center justify-between px-2 pt-2 pb-6 border-t border-slate-100">
+                    <span class="text-[11px] text-slate-400 font-mono">
+                        commit <a href={`https://github.com/InspectorHub/OpenInspection/commit/${BUILD.commit}`}
+                            target="_blank" rel="noopener noreferrer"
+                            class="text-slate-600 font-bold hover:text-indigo-600 transition-colors">{BUILD.shortCommit}</a>
+                    </span>
+                    <span class="text-[11px] text-slate-400">
+                        Built {new Date(BUILD.buildTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                </div>
 
+                <script src="/js/auth.js"></script>
                 <script src="/js/settings.js"></script>
             </div>
         </MainLayout>

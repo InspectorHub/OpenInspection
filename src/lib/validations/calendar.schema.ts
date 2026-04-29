@@ -12,10 +12,10 @@ export const CalendarSyncResponseSchema = createApiResponseSchema(
 ).openapi('CalendarSyncResponse');
 
 /**
- * Schema for a generic success response (e.g. for disconnect).
+ * Query schema for the Google OAuth callback.
  */
-export const CalendarSuccessResponseSchema = createApiResponseSchema(
-    z.object({
-        success: z.boolean().openapi({ example: true }),
-    })
-).openapi('CalendarSuccessResponse');
+export const CalendarCallbackQuerySchema = z.object({
+    code: z.string().optional(),
+    state: z.string().optional(),
+    error: z.string().optional(),
+});

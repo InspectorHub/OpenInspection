@@ -67,6 +67,29 @@ export const StripeConnectSchema = z.object({
 }).openapi('StripeConnect');
 
 /**
+ * Body schema for PATCH /api/integration/tenants/:subdomain (M2M).
+ * subdomain comes from URL param, not body.
+ */
+export const TenantStatusBodySchema = z.object({
+    id: z.string().uuid().optional(),
+    status: z.string().min(1),
+    tier: z.string().optional(),
+    name: z.string().optional(),
+    deploymentMode: z.enum(['shared', 'silo']).optional(),
+    setupVerificationCode: z.string().optional(),
+    maxUsers: z.number().int().positive().optional(),
+    adminEmail: z.string().email().optional(),
+    adminPasswordHash: z.string().optional(),
+});
+
+/**
+ * Body schema for POST /api/integration/tenants/:subdomain/stripe-connect (M2M).
+ */
+export const StripeConnectBodySchema = z.object({
+    accountId: z.string().min(1),
+});
+
+/**
  * Response Schemas
  */
 export const AdminExportResponseSchema = createApiResponseSchema(z.object({
@@ -135,6 +158,13 @@ export const AgreementListResponseSchema = createApiResponseSchema(z.object({
     })),
 })).openapi('AgreementListResponse');
 
+export const SendAgreementSchema = z.object({
+    agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    clientEmail: z.string().email().openapi({ example: 'client@example.com' }),
+    clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }),
+    inspectionId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+}).openapi('SendAgreement');
+
 export const AgreementResponseSchema = createApiResponseSchema(z.object({
     agreement: z.object({
         id: z.string().uuid(),
@@ -168,3 +198,16 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         expiresAt: z.string(),
     })),
 })).openapi('TeamMembersResponse');
+
+export const CommentSchema = z.object({
+    text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }),
+    category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }),
+}).openapi('Comment');
+
+export const CommentResponseSchema = z.object({
+    id: z.string().uuid(),
+    tenantId: z.string().uuid(),
+    text: z.string(),
+    category: z.string().nullable(),
+    createdAt: z.string(),
+}).openapi('CommentResponse');

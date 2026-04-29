@@ -1,14 +1,3 @@
-// Cookie-only auth: the HttpOnly inspector_token cookie is sent automatically on same-origin
-// fetches. Do NOT read/write the token from JS — that would downgrade the cookie to JS-readable.
-
-const authFetch = (url, opts = {}) =>
-    fetch(url, { credentials: 'same-origin', ...opts });
-
-async function logout() {
-    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
-    window.location.href = '/login';
-}
-
 let allTemplates = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -20,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const name = email ? email.split('@')[0] : 'User';
         const avatarEl = document.querySelector('nav img[alt="User"]');
         if (avatarEl) {
-            avatarEl.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=6366f1&color=fff';
+            avatarEl.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="8" fill="%236366f1"/><text x="32" y="32" text-anchor="middle" dy=".35em" fill="white" font-family="sans-serif" font-size="24" font-weight="600">' + (name.charAt(0) || 'U').toUpperCase() + '</text></svg>');
             avatarEl.alt = name;
         }
     } catch (e) {
@@ -58,7 +47,7 @@ function countSchemaItems(schema) {
     if (!schema) return 0;
     if (Array.isArray(schema)) return schema.length;
     if (typeof schema === 'string') {
-        try { const p = JSON.parse(schema); return Array.isArray(p) ? p.length : 0; } catch { return 0; }
+        try { const p = JSON.parse(schema); return Array.isArray(p) ? p.length : countSchemaItems(p); } catch { return 0; }
     }
     if (typeof schema === 'object' && Array.isArray(schema.items)) return schema.items.length;
     if (typeof schema === 'object' && Array.isArray(schema.sections)) {
@@ -75,19 +64,22 @@ function renderTemplates() {
         tbody.innerHTML = `
           <tr>
             <td colspan="4" class="py-32 text-center">
-              <div class="flex flex-col items-center gap-4 animate-slide-in">
-                <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-2">
-                  <svg class="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+              <div class="flex flex-col items-center gap-6">
+                <div class="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center">
+                  <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>
-                <p class="text-xl font-bold text-slate-900">No templates yet</p>
-                <p class="text-slate-500 max-w-xs mx-auto">Click "New Template" to create your first checklist.</p>
+                <div>
+                  <p class="text-lg font-black text-slate-900 tracking-tight">No templates yet</p>
+                  <p class="text-sm text-slate-400 font-medium mt-1">Create a checklist template for your inspections.</p>
+                </div>
+                <button onclick="showCreateModal()" class="px-6 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-slate-900 transition-all active:scale-95">New Template</button>
               </div>
             </td>
           </tr>`;
         return;
     }
     tbody.innerHTML = allTemplates.map(t => {
-        const itemCount = countSchemaItems(t.schema);
+        const itemCount = t.itemCount ?? countSchemaItems(t.schema);
         return `
           <tr class="table-row-hover group">
             <td class="py-6 pl-10 pr-3">
@@ -96,15 +88,15 @@ function renderTemplates() {
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                 </div>
                 <div>
-                  <p class="text-sm font-bold text-slate-900">${t.name}</p>
-                  <p class="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">Ref: ${t.id.split('-')[0]}</p>
+                  <a href="/templates/${t.id}/edit" class="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors">${t.name}</a>
+                  <p class="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: ${t.id.split('-')[0]}</p>
                 </div>
               </div>
             </td>
             <td class="px-6 py-6">
               <span class="inline-flex items-center rounded-lg border border-indigo-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-indigo-50/50 text-indigo-600">v${t.version}.0</span>
             </td>
-            <td class="px-6 py-6 text-sm text-slate-500 font-bold">${itemCount} Points</td>
+            <td class="px-6 py-6 text-sm text-slate-500 font-bold">${itemCount} items</td>
             <td class="py-6 pl-3 pr-10 text-right">
               <button onclick="deleteTemplate('${t.id}')" class="inline-flex items-center gap-2 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-red-500 transition-all active:scale-95">
                 Remove
@@ -116,14 +108,14 @@ function renderTemplates() {
 }
 
 async function deleteTemplate(id) {
-    if (!await modalConfirm('Eliminate this template from the repository?', 'Remove Template')) return;
+    if (!await modalConfirm('Delete this template?', 'Delete Template')) return;
     const res = await authFetch('/api/inspections/templates/' + id, { method: 'DELETE' });
     if (res.ok) {
         allTemplates = allTemplates.filter(t => t.id !== id);
         renderTemplates();
     } else {
         const err = await res.json();
-        modalAlert('Deployment Error: ' + (err.error || 'Failed to delete'), 'Error');
+        modalAlert('Error: ' + (err.error || 'Failed to delete'), 'Error');
     }
 }
 
@@ -134,35 +126,39 @@ function showCreateModal() {
 function closeModal() {
     document.getElementById('createModal').classList.add('hidden');
     document.getElementById('tplName').value = '';
-    document.getElementById('tplSchema').value = '';
 }
 
 async function submitTemplate() {
     const name = document.getElementById('tplName').value.trim();
-    const schemaRaw = document.getElementById('tplSchema').value.trim();
     if (!name) { modalAlert('Please enter a template name.', 'Validation'); return; }
-    let schema;
-    try {
-        schema = schemaRaw ? JSON.parse(schemaRaw) : [];
-    } catch {
-        modalAlert('Schema must be valid JSON.', 'Validation'); return;
-    }
+
     const btn = document.getElementById('submitTplBtn');
     btn.disabled = true;
-    btn.textContent = 'Deploying...';
+    btn.textContent = 'Creating...';
 
-    const res = await authFetch('/api/inspections/templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, schema })
-    });
-    btn.disabled = false;
-    btn.textContent = 'Deploy Template';
-    if (res.ok) {
-        closeModal();
-        loadTemplates();
-    } else {
-        const err = await res.json();
-        modalAlert('Sync Error: ' + (err.error || 'Failed to create'), 'Error');
+    try {
+        const res = await authFetch('/api/inspections/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, schema: { sections: [], ratingLevels: [] } })
+        });
+        if (res.ok) {
+            const result = await res.json();
+            const newId = result?.data?.template?.id;
+            closeModal();
+            if (newId) {
+                window.location.href = '/templates/' + newId + '/edit';
+            } else {
+                loadTemplates();
+            }
+        } else {
+            const err = await res.json();
+            modalAlert('Error: ' + (err.error || 'Failed to create'), 'Error');
+        }
+    } catch (e) {
+        modalAlert('Connection error: ' + e.message, 'Error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Template';
     }
 }

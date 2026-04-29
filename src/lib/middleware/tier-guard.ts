@@ -19,7 +19,8 @@ export const STATUS = {
 } as const;
 
 
-/** Feature gating definitions */
+// In shared/standalone deployment mode, all features are available regardless of tier.
+// Tier enforcement is handled at the portal level before provisioning.
 export const TIER_FEATURES: Record<string, string[]> = {
     silo_mode: [TIERS.free, TIERS.pro, TIERS.enterprise],
     stripe_connect: [TIERS.free, TIERS.pro, TIERS.enterprise],

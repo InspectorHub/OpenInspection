@@ -1,13 +1,3 @@
-// Cookie-only auth. htmlAuthGuard already gated this page server-side.
-
-const authFetch = (url, opts = {}) =>
-    fetch(url, { credentials: 'same-origin', ...opts });
-
-async function logout() {
-    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
-    window.location.href = '/login';
-}
-
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) logoutBtn.addEventListener('click', logout);
 

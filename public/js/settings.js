@@ -1,26 +1,5 @@
-// Cookie-only auth: rely on the HttpOnly inspector_token cookie set by the server.
-
-const authFetch = (url, opts = {}) =>
-    fetch(url, { credentials: 'same-origin', ...opts });
-
-async function logout() {
-    try { await authFetch('/api/auth/logout', { method: 'POST' }); } catch {}
-    window.location.href = '/login';
-}
-
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) logoutBtn.addEventListener('click', logout);
-
-// ─── Toast ────────────────────────────────────────────────────────────────────
-function showToast(msg, isError) {
-    const el = document.getElementById('statusToast');
-    if (!el) return;
-    el.textContent = msg;
-    el.className = 'fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold text-white z-50 ' +
-        (isError ? 'bg-red-600' : 'bg-emerald-600');
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => { el.classList.add('hidden'); }, 3500);
-}
 
 // ─── Load config on page load ─────────────────────────────────────────────────
 async function loadConfig() {
@@ -218,4 +197,68 @@ async function changePassword() {
     }
 }
 
+// ─── Profile ─────────────────────────────────────────────────────────────────
+async function loadProfile() {
+    try {
+        var res = await authFetch('/api/auth/me');
+        if (!res.ok) return;
+        var json = await res.json();
+        var u = json.data?.user;
+        if (u) {
+            if (u.name) setVal('profileName', u.name);
+            if (u.phone) setVal('profilePhone', u.phone);
+            if (u.licenseNumber) setVal('profileLicense', u.licenseNumber);
+        }
+    } catch { /* ignore */ }
+}
+
+async function saveProfile() {
+    var body = {
+        name: document.getElementById('profileName')?.value?.trim() || '',
+        phone: document.getElementById('profilePhone')?.value?.trim() || '',
+        licenseNumber: document.getElementById('profileLicense')?.value?.trim() || '',
+    };
+    var btn = document.getElementById('saveProfileBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+        var res = await authFetch('/api/auth/profile', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        showToast(res.ok ? 'Profile saved.' : 'Failed to save profile.', !res.ok);
+    } catch {
+        showToast('Network error.', true);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save Profile'; }
+    }
+}
+
+// ─── ICS Subscription URL ─────────────────────────────────────────────────────
+async function loadIcsUrl() {
+    const input = document.getElementById('icsUrl');
+    if (!input) return;
+    try {
+        const res = await authFetch('/api/admin/ics-token');
+        if (!res.ok) return;
+        const data = await res.json();
+        input.value = data.data?.url || '';
+    } catch { /* silent — feature is non-critical */ }
+}
+
+function copyIcsUrl() {
+    const input = document.getElementById('icsUrl');
+    if (!input?.value) return;
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = document.getElementById('copyIcsBtn');
+        if (btn) {
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = orig; }, 2000);
+        }
+    });
+}
+
 loadConfig();
+loadProfile();
+loadIcsUrl();

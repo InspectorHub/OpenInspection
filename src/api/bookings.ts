@@ -5,6 +5,8 @@ import { users, inspections } from '../lib/db/schema';
 import { createCalendarEvent } from './calendar';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
+import { checkRateLimit } from '../lib/rate-limit';
+import { logger } from '../lib/logger';
 import { 
     PublicBookingSchema, 
     InspectorsResponseSchema, 
@@ -115,6 +117,8 @@ const createBookingRoute = createRoute({
 });
 
 bookingsRoutes.openapi(createBookingRoute, async (c) => {
+    await checkRateLimit(c, 'book');
+
     const body = c.req.valid('json');
     const tenantId = c.get('tenantId') || c.get('requestedSubdomain');
     if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
@@ -165,7 +169,7 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
                 `Inspection: ${body.address}`,
                 startDateTime,
                 body.address
-            ).catch(e => console.error('Calendar sync failed:', e));
+            ).catch(e => logger.error('Calendar sync failed', {}, e instanceof Error ? e : undefined));
         }
 
         const emailService = c.var.services.email;
@@ -175,13 +179,96 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
             body.address,
             body.date,
             body.timeSlot === 'morning' ? 'Morning (08:00 - 12:00)' : 'Afternoon (13:00 - 17:00)'
-        ).catch(e => console.error('Booking confirmation email failed:', e));
+        ).catch(e => logger.error('Booking confirmation email failed', {}, e instanceof Error ? e : undefined));
     })());
 
     return c.json({ 
         success: true, 
         data: { success: true, inspectionId } 
     }, 200);
+});
+
+/**
+ * GET /api/public/agreements/:token — fetch agreement content + mark viewed
+ */
+const getAgreementByTokenRoute = createRoute({
+    method: 'get',
+    path: '/agreements/:token',
+    tags: ['Public'],
+    summary: 'Get agreement for signing (public, token-gated)',
+    request: { params: z.object({ token: z.string().min(1) }) },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(true),
+                        data: z.object({
+                            status: z.enum(['pending', 'viewed', 'signed']),
+                            clientName: z.string().nullable(),
+                            agreementName: z.string(),
+                            agreementContent: z.string(),
+                        }),
+                    }),
+                },
+            },
+            description: 'Agreement content',
+        },
+    },
+});
+
+bookingsRoutes.openapi(getAgreementByTokenRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    const svc = c.var.services.agreement;
+    const { request, agreement } = await svc.getAgreementByToken(token);
+    await svc.markViewed(token);
+    return c.json({
+        success: true as const,
+        data: {
+            status: request.status as 'pending' | 'viewed' | 'signed',
+            clientName: request.clientName ?? null,
+            agreementName: agreement.name,
+            agreementContent: agreement.content,
+        },
+    }, 200);
+});
+
+/**
+ * POST /api/public/agreements/:token/sign — submit client signature
+ */
+const signAgreementRoute = createRoute({
+    method: 'post',
+    path: '/agreements/:token/sign',
+    tags: ['Public'],
+    summary: 'Submit client signature (public, token-gated)',
+    request: {
+        params: z.object({ token: z.string().min(1) }),
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({ signatureBase64: z.string().min(1) }),
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({ success: z.literal(true) }),
+                },
+            },
+            description: 'Signed',
+        },
+    },
+});
+
+bookingsRoutes.openapi(signAgreementRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    const { signatureBase64 } = c.req.valid('json');
+    const svc = c.var.services.agreement;
+    await svc.signRequest(token, signatureBase64);
+    return c.json({ success: true as const }, 200);
 });
 
 export default bookingsRoutes;

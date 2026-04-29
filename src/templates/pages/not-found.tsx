@@ -1,4 +1,5 @@
 import { BareLayout } from '../layouts/main-layout';
+import { AtmosphericBg } from '../components/atmospheric-bg';
 import { BrandingConfig } from '../../types/auth';
 
 export const NotFoundPage = (props: { 
@@ -13,11 +14,7 @@ export const NotFoundPage = (props: {
     return (
         <BareLayout title={`${siteName} | ${title}`} branding={branding}>
             <div class="relative min-h-screen flex items-center justify-center py-20 px-6 lg:px-8 font-sans overflow-hidden">
-                {/* Background Atmosphere */}
-                <div class="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden pointer-events-none">
-                    <div class="absolute top-[-10%] right-[-10%] w-[60%] h-[70%] bg-slate-100/60 rounded-full blur-[120px] animate-float"></div>
-                    <div class="absolute bottom-[-10%] left-[-10%] w-[50%] h-[60%] bg-indigo-50/50 rounded-full blur-[100px] animate-float" style="animation-delay: -3.5s;"></div>
-                </div>
+                <AtmosphericBg />
 
                 <div class="max-w-xl w-full text-center animate-fade-in">
                     <div class="glass-panel p-12 md:p-20 rounded-[4rem] shadow-2xl shadow-slate-200/50 border border-white/40">
@@ -62,7 +59,7 @@ export const NotFoundPage = (props: {
                     </div>
 
                     <div class="mt-12">
-                        <span class="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] leading-none">OpenInspection Protocol v1.0.0-rc.1</span>
+                        <span class="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] leading-none">OpenInspection v1.0.0</span>
                     </div>
                 </div>
             </div>
