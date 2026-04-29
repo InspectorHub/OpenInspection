@@ -50,6 +50,7 @@ import calendarRoutes from './api/calendar';
 import teamRoutes from './api/team';
 import contactRoutes from './api/contacts';
 import invoiceRoutes from './api/invoices';
+import servicesRoutes from './api/services';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -275,6 +276,7 @@ app.route('/api/calendar', calendarRoutes);
 app.route('/api/team', teamRoutes);
 app.route('/api/contacts', contactRoutes);
 app.route('/api/invoices', invoiceRoutes);
+app.route('/api/services', servicesRoutes);
 app.route('/api/integration', integrationRoutes);
 
 // OpenAPI Documentation
