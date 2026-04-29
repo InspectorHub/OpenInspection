@@ -82,3 +82,18 @@ export const comments = sqliteTable('comments', {
     category: text('category'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
+
+export const agreementRequests = sqliteTable('agreement_requests', {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull().references(() => tenants.id),
+    inspectionId: text('inspection_id').references(() => inspections.id),
+    agreementId: text('agreement_id').notNull().references(() => agreements.id),
+    clientEmail: text('client_email').notNull(),
+    clientName: text('client_name'),
+    token: text('token').notNull().unique(),
+    status: text('status', { enum: ['pending', 'viewed', 'signed'] }).notNull().default('pending'),
+    signatureBase64: text('signature_base64'),
+    signedAt: integer('signed_at', { mode: 'timestamp' }),
+    viewedAt: integer('viewed_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
