@@ -67,6 +67,35 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </div>
                     </div>
 
+                    {/* Unconfirmed warning banner */}
+                    <div id="unconfirmedBanner" class="mx-8 mb-0 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-semibold" style="display:none; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        <span id="unconfirmedBannerText"></span>
+                        <button onclick="setTab('unconfirmed')" class="ml-auto text-xs underline font-bold">View</button>
+                    </div>
+
+                    {/* Tab strip */}
+                    <div class="px-8 pt-4 pb-0 flex gap-1 flex-wrap" id="inspectionTabStrip">
+                        {[
+                            { key: 'all',         label: 'All',         color: '#6366f1' },
+                            { key: 'today',       label: 'Today',       color: '#f59e0b' },
+                            { key: 'upcoming',    label: 'Upcoming',    color: '#3b82f6' },
+                            { key: 'past',        label: 'Past',        color: '#94a3b8' },
+                            { key: 'unconfirmed', label: 'Unconfirmed', color: '#ef4444' },
+                            { key: 'in_progress', label: 'In Progress', color: '#22c55e' },
+                        ].map(({ key, label, color }) => (
+                            <button
+                                key={key}
+                                data-tab={key}
+                                onclick={`setTab('${key}')`}
+                                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-500"
+                            >
+                                {label}
+                                <span id={`tab-count-${key}`} class="text-white text-[9px] font-black rounded-full px-1.5 py-0.5 min-w-[18px] text-center" style={`background: ${color}`}>0</span>
+                            </button>
+                        ))}
+                    </div>
+
                     <div class="overflow-x-auto custom-scrollbar">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50/40">

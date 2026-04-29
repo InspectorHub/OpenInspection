@@ -4,6 +4,8 @@ let allTemplates = [];
 let searchDebounce;
 let currentUserEmail = '';
 let selectedInspectorId = '';
+let activeTab = 'all';
+let tabCounts = { all: 0, today: 0, upcoming: 0, past: 0, unconfirmed: 0, inProgress: 0 };
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Fetch current user for avatar. If unauthenticated, htmlAuthGuard already redirected;
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     fetchInspections(true);
+    fetchCounts();
     fetchPrerequisites();
 });
 
@@ -57,6 +60,7 @@ async function fetchInspections() {
         const params = new URLSearchParams();
         if (query) params.set('search', query);
         if (selectedInspectorId) params.set('inspectorId', selectedInspectorId);
+        if (activeTab && activeTab !== 'all') params.set('tab', activeTab);
         const qs = params.toString();
         const url = qs ? `/api/inspections?${qs}` : '/api/inspections';
 
@@ -81,6 +85,67 @@ async function fetchInspections() {
         }
     }
 }
+
+async function fetchCounts() {
+    try {
+        const res = await authFetch('/api/inspections/counts');
+        if (!res.ok) return;
+        const json = await res.json();
+        tabCounts = json.data || tabCounts;
+        renderTabCounts();
+        // Default to Today tab if there are inspections today, else Upcoming
+        if (activeTab === 'all' && (tabCounts.today > 0 || tabCounts.upcoming > 0)) {
+            activeTab = tabCounts.today > 0 ? 'today' : 'upcoming';
+            renderTabActive();
+            fetchInspections();
+        }
+    } catch (e) {
+        console.error('[Dashboard] fetchCounts error', e);
+    }
+}
+
+function renderTabCounts() {
+    const tabs = [
+        { key: 'all', countKey: 'all' },
+        { key: 'today', countKey: 'today' },
+        { key: 'upcoming', countKey: 'upcoming' },
+        { key: 'past', countKey: 'past' },
+        { key: 'unconfirmed', countKey: 'unconfirmed' },
+        { key: 'in_progress', countKey: 'inProgress' },
+    ];
+    tabs.forEach(({ key, countKey }) => {
+        const badge = document.getElementById('tab-count-' + key);
+        if (badge) badge.textContent = String(tabCounts[countKey] ?? 0);
+    });
+
+    // Show unconfirmed warning banner
+    const banner = document.getElementById('unconfirmedBanner');
+    const bannerText = document.getElementById('unconfirmedBannerText');
+    if (banner && bannerText) {
+        const count = tabCounts.unconfirmed || 0;
+        banner.style.display = count > 0 ? 'flex' : 'none';
+        bannerText.textContent = `${count} unconfirmed inspection${count !== 1 ? 's' : ''} awaiting confirmation`;
+    }
+}
+
+function renderTabActive() {
+    document.querySelectorAll('[data-tab]').forEach(btn => {
+        const tab = btn.getAttribute('data-tab');
+        const isActive = tab === activeTab;
+        btn.classList.toggle('bg-white', isActive);
+        btn.classList.toggle('text-indigo-700', isActive);
+        btn.classList.toggle('shadow-sm', isActive);
+        btn.classList.toggle('text-slate-500', !isActive);
+    });
+}
+
+function setTab(tab) {
+    activeTab = tab;
+    renderTabActive();
+    fetchInspections();
+}
+
+window.setTab = setTab;
 
 function updateStats(counts) {
     const map = {
