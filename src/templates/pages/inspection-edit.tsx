@@ -208,6 +208,22 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <span x-show="inspection.paymentStatus === 'paid'" class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background: #dcfce7; color: #16a34a">Paid</span>
                 <span x-show="inspection.paymentStatus !== 'paid'" class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background: #fee2e2; color: #dc2626" x-text="'Unpaid · $' + ((inspection.price || 0) / 100).toFixed(2)"></span>
               </div>
+              {/* Share with Agent */}
+              <div x-data="{ agentUrl: '', copying: false, agentErr: '' }" class="pt-1">
+                <button
+                  x-show="!agentUrl"
+                  x-on:click={`copying=true; authFetch('/api/inspections/'+inspectionId+'/agent-token',{method:'POST'}).then(r=>r.json()).then(j=>{agentUrl=j.data?.url||'';copying=false;}).catch(()=>{agentErr='Failed to generate link';copying=false;});`}
+                  x-bind:disabled="copying"
+                  x-text="copying ? 'Generating...' : 'Share with Agent'"
+                  class="text-xs px-3 py-1.5 rounded-lg font-semibold w-full text-left"
+                  style="background: #f1ede8; color: #46423c"
+                />
+                <div x-show="agentUrl" class="flex items-center gap-1 mt-1">
+                  <input x-bind:value="agentUrl" readonly class="flex-1 text-[10px] border rounded px-2 py-1 bg-white" style="border-color: rgba(232,228,221,0.6)" />
+                  <button x-on:click="navigator.clipboard.writeText(agentUrl)" class="text-[10px] px-2 py-1 rounded font-bold" style="background: #4f46e5; color: white">Copy</button>
+                </div>
+                <div x-show="agentErr" x-text="agentErr" class="text-[10px] mt-1" style="color: #dc2626" />
+              </div>
             </div>
             {/* Property Info Card */}
             <div

@@ -726,6 +726,28 @@ inspectionsRoutes.openapi(uploadPhotoRoute, async (c) => {
 inspectionsRoutes.get('/:id/report', async (c) => {
     const id = c.req.param('id');
     const service = c.var.services.inspection;
+
+    // Agent view: token-based access that bypasses login and report gates
+    const viewParam  = c.req.query('view');
+    const tokenParam = c.req.query('token');
+    if (viewParam === 'agent' && tokenParam) {
+        const resolved = await service.resolveAgentViewToken(tokenParam);
+        if (!resolved || resolved.inspectionId !== id) {
+            return c.html('<html><body><p style="font-family:sans-serif;padding:2rem">Invalid or expired agent view link.</p></body></html>', 403);
+        }
+        const { inspection, template } = await service.getInspection(id!, resolved.tenantId);
+        const db = drizzle(c.env.DB);
+        const results = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, resolved.tenantId))).get();
+        return c.html(renderProfessionalReport({
+            inspection: { ...inspection, internalNotes: null, paymentStatus: null, paymentRequired: false } as never,
+            template: template as never,
+            results: (results || { data: {} }) as never,
+            branding: c.get('branding'),
+            isAuthenticated: false,
+        }));
+    }
+
     const { inspection, template } = await service.getInspection(id!, c.get('tenantId'));
 
     // Report gates: payment or agreement required before viewing
@@ -1017,6 +1039,27 @@ inspectionsRoutes.openapi(publishRoute, async (c) => {
     const service = c.var.services.inspection;
     const result = await service.publishInspection(id, tenantId, body);
     return c.json({ success: true, data: result }, 200);
+});
+
+// POST /api/inspections/:id/agent-token — generates a shareable agent view token
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/agent-token',
+    tags: ['Inspections'],
+    summary: 'Generate shareable agent view token',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ token: z.string(), url: z.string() })) } },
+            description: 'Agent view token and URL',
+        },
+    },
+}), async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
+    const baseUrl = getBaseUrl(c);
+    return c.json({ success: true, data: { token, url: `${baseUrl}/report/${id}?view=agent&token=${token}` } });
 });
 
 export default inspectionsRoutes;

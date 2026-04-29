@@ -25,7 +25,7 @@ type CreateInspectionData = z.infer<typeof CreateInspectionSchema>;
  * Service to handle all inspection-related business logic.
  */
 export class InspectionService {
-    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB) {}
+    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, private kv?: KVNamespace) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -486,5 +486,36 @@ export class InspectionService {
             status:       'scheduled' as any,
             cancelReason: null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
+     * Generates a 30-day shareable agent view token stored in KV.
+     * The token grants read-only access to the report without requiring login.
+     */
+    async generateAgentViewToken(tenantId: string, inspectionId: string): Promise<string> {
+        const db = this.getDrizzle();
+        const rows = await db.select({ id: inspections.id })
+            .from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .limit(1);
+        if (!rows[0]) throw Errors.NotFound('Inspection not found');
+        if (!this.kv) throw Errors.Internal('KV not available');
+
+        const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+        await this.kv.put(`agent_view_token:${token}`, `${inspectionId}:${tenantId}`, {
+            expirationTtl: 30 * 24 * 60 * 60,
+        });
+        return token;
+    }
+
+    /**
+     * Resolves an agent view token from KV.
+     */
+    async resolveAgentViewToken(token: string): Promise<{ inspectionId: string; tenantId: string } | null> {
+        if (!this.kv) return null;
+        const val = await this.kv.get(`agent_view_token:${token}`);
+        if (!val) return null;
+        const [inspectionId, tenantId] = val.split(':');
+        return { inspectionId, tenantId };
     }
 }
