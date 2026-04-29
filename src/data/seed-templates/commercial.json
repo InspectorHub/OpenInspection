@@ -1,0 +1,76 @@
+{
+  "id": "seed_commercial_v1",
+  "name": "Commercial Building Inspection",
+  "description": "ASTM E2018-aligned commercial property condition assessment template.",
+  "version": 1,
+  "schema": {
+    "sections": [
+      {
+        "id": "s_site", "title": "Site",
+        "items": [
+          { "id": "i_site_grading", "label": "Grading & Drainage",  "type": "rating" },
+          { "id": "i_parking",      "label": "Parking & Paving",    "type": "rating" },
+          { "id": "i_landscaping",  "label": "Landscaping",         "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_envelope", "title": "Building Envelope",
+        "items": [
+          { "id": "i_roof_c",    "label": "Roof",              "type": "rating" },
+          { "id": "i_facade",    "label": "Facade / Cladding", "type": "rating" },
+          { "id": "i_windows_c", "label": "Windows & Glazing", "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_struct_c", "title": "Structure",
+        "items": [
+          { "id": "i_foundation_c", "label": "Foundation",             "type": "rating" },
+          { "id": "i_frame_c",      "label": "Structural Frame",       "type": "rating" },
+          { "id": "i_slab",         "label": "Elevated Slabs/Floors",  "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_mep", "title": "Mechanical / Electrical / Plumbing",
+        "items": [
+          { "id": "i_hvac_c",     "label": "HVAC",                   "type": "rating" },
+          { "id": "i_elec_c",     "label": "Electrical Service",     "type": "rating" },
+          { "id": "i_plumbing_c", "label": "Plumbing",               "type": "rating" },
+          { "id": "i_fire",       "label": "Fire Protection",        "type": "rating" },
+          { "id": "i_elevator",   "label": "Vertical Transportation", "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_interior_c", "title": "Interior",
+        "items": [
+          { "id": "i_floors_c",   "label": "Floors",              "type": "rating" },
+          { "id": "i_ceilings_c", "label": "Ceilings",            "type": "rating" },
+          { "id": "i_walls_c",    "label": "Walls & Partitions",  "type": "rating" },
+          { "id": "i_restrooms",  "label": "Restrooms",           "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_accessibility", "title": "Accessibility (ADA)",
+        "items": [
+          { "id": "i_ada_parking", "label": "Accessible Parking", "type": "rating" },
+          { "id": "i_ada_entry",   "label": "Building Entry",     "type": "rating" },
+          { "id": "i_ada_rest",    "label": "Restrooms",          "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_env", "title": "Environmental",
+        "items": [
+          { "id": "i_asbestos", "label": "Asbestos Concerns",   "type": "text" },
+          { "id": "i_mold",     "label": "Mold / Moisture",     "type": "rating" },
+          { "id": "i_lead",     "label": "Lead Paint Concerns", "type": "text" }
+        ]
+      },
+      {
+        "id": "s_summary_c", "title": "Summary & Recommendations",
+        "items": [
+          { "id": "i_summary_c", "label": "Overall Assessment",   "type": "text" },
+          { "id": "i_deferred",  "label": "Deferred Maintenance", "type": "text" }
+        ]
+      }
+    ]
+  }
+}

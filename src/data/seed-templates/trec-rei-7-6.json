@@ -1,0 +1,68 @@
+{
+  "id": "seed_trec_rei_7_6_v1",
+  "name": "Texas TREC REI 7-6",
+  "description": "Texas Real Estate Commission required residential inspection form (REI 7-6, 2024).",
+  "version": 1,
+  "schema": {
+    "sections": [
+      {
+        "id": "s_structural", "title": "I. Structural Systems",
+        "items": [
+          { "id": "i_foundations", "label": "A. Foundations",             "type": "rating" },
+          { "id": "i_grading_dr",  "label": "B. Grading & Drainage",      "type": "rating" },
+          { "id": "i_roof_cover",  "label": "C. Roof Covering Materials", "type": "rating" },
+          { "id": "i_roof_struct", "label": "D. Roof Structure & Attic",  "type": "rating" },
+          { "id": "i_walls_ext",   "label": "E. Walls (Exterior)",        "type": "rating" },
+          { "id": "i_walls_int",   "label": "F. Walls (Interior)",        "type": "rating" },
+          { "id": "i_ceilings",    "label": "G. Ceilings & Floors",       "type": "rating" },
+          { "id": "i_doors_ext",   "label": "H. Doors (Exterior)",        "type": "rating" },
+          { "id": "i_doors_int",   "label": "I. Doors (Interior)",        "type": "rating" },
+          { "id": "i_windows",     "label": "J. Windows",                 "type": "rating" },
+          { "id": "i_stairways",   "label": "K. Stairways",               "type": "rating" },
+          { "id": "i_fireplace",   "label": "L. Fireplaces & Chimneys",   "type": "rating" },
+          { "id": "i_porches",     "label": "M. Porches, Balconies, Decks & Carports", "type": "rating" },
+          { "id": "i_other_str",   "label": "N. Other",                   "type": "text" }
+        ]
+      },
+      {
+        "id": "s_electrical", "title": "II. Electrical Systems",
+        "items": [
+          { "id": "i_service",   "label": "A. Service Entrance & Panels",       "type": "rating" },
+          { "id": "i_branch",    "label": "B. Branch Circuits",                 "type": "rating" },
+          { "id": "i_connected", "label": "C. Connected Devices & Fixtures",    "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_hvac_trec", "title": "III. HVAC Systems",
+        "items": [
+          { "id": "i_heating", "label": "A. Heating", "type": "rating" },
+          { "id": "i_cooling", "label": "B. Cooling", "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_plumbing_trec", "title": "IV. Plumbing System",
+        "items": [
+          { "id": "i_supply_p", "label": "A. Plumbing Supply",        "type": "rating" },
+          { "id": "i_drain_p",  "label": "B. Plumbing Drains",        "type": "rating" },
+          { "id": "i_wh_trec",  "label": "C. Water Heaters",          "type": "rating" },
+          { "id": "i_hydro",    "label": "D. Hydro-Massage Therapy",  "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_appliances_trec", "title": "V. Appliances",
+        "items": [
+          { "id": "i_dishwasher", "label": "A. Dishwasher",            "type": "rating" },
+          { "id": "i_disposal",   "label": "B. Food Waste Disposer",   "type": "rating" },
+          { "id": "i_range",      "label": "C. Range/Oven/Microwave",  "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_optional", "title": "VI. Optional Systems",
+        "items": [
+          { "id": "i_pool", "label": "A. Lawn Sprinkler Systems",  "type": "rating" },
+          { "id": "i_gas",  "label": "B. Gas Distribution System", "type": "rating" }
+        ]
+      }
+    ]
+  }
+}
