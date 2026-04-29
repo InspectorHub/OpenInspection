@@ -13,6 +13,7 @@ import {
     BulkInspectionSchema,
     InspectionSchema,
     InspectionListResponseSchema,
+    InspectionCountsSchema,
     PublishInspectionSchema,
     ReportDataResponseSchema
 } from '../lib/validations/inspection.schema';
@@ -344,6 +345,29 @@ inspectionsRoutes.openapi(bulkUpdateRoute, async (c) => {
     }
 
     return c.json({ success: true, data: { count: body.ids.length } }, 200);
+});
+
+/**
+ * GET /api/inspections/counts
+ */
+const getCountsRoute = createRoute({
+    method: 'get',
+    path: '/counts',
+    tags: ['Inspections'],
+    summary: 'Get inspection tab counts',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(InspectionCountsSchema) } },
+            description: 'Tab counts',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(getCountsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const counts = await c.var.services.inspection.getCounts(tenantId);
+    return c.json({ success: true, data: counts });
 });
 
 /**

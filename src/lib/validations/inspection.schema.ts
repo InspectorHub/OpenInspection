@@ -27,6 +27,7 @@ export const InspectionListQuerySchema = z.object({
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }),
     dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-01-01' }),
     dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-12-31' }),
+    tab: z.enum(['all', 'today', 'upcoming', 'past', 'unconfirmed', 'in_progress']).optional().openapi({ example: 'today' }),
 }).openapi('InspectionListQuery');
 
 /**
@@ -54,7 +55,19 @@ export const UpdateInspectionSchema = z.object({
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }),
     price: z.number().min(0).optional().openapi({ example: 450 }),
     status: z.enum(['draft', 'completed', 'delivered']).optional().openapi({ example: 'completed' }),
+    paymentRequired:   z.boolean().optional().openapi({ example: false }),
+    agreementRequired: z.boolean().optional().openapi({ example: false }),
 }).openapi('UpdateInspection');
+
+export const InspectionCountsSchema = z.object({
+    all:         z.number().openapi({ example: 42 }),
+    today:       z.number().openapi({ example: 3 }),
+    upcoming:    z.number().openapi({ example: 12 }),
+    past:        z.number().openapi({ example: 27 }),
+    unconfirmed: z.number().openapi({ example: 2 }),
+    inProgress:  z.number().openapi({ example: 1 }),
+}).openapi('InspectionCounts');
+export type InspectionCounts = z.infer<typeof InspectionCountsSchema>;
 
 /**
  * Stats Schema
