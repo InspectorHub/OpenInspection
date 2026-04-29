@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { renderProfessionalReport } from '../templates/pages/report.template';
+import { ReportGatePage } from '../templates/pages/report-gate';
 import { auditFromContext } from '../lib/audit';
 import { getBaseUrl } from '../lib/url';
 import { HonoConfig } from '../types/hono';
@@ -20,7 +21,7 @@ import {
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, agreementRequests } from '../lib/db/schema';
 import { eq, inArray, and } from 'drizzle-orm';
 
 const inspectionsRoutes = new OpenAPIHono<HonoConfig>();
@@ -725,7 +726,43 @@ inspectionsRoutes.get('/:id/report', async (c) => {
     const id = c.req.param('id');
     const service = c.var.services.inspection;
     const { inspection, template } = await service.getInspection(id!, c.get('tenantId'));
-    
+
+    // Report gate: payment required
+    if (inspection.paymentRequired === true && inspection.paymentStatus !== 'paid') {
+        const baseUrl = getBaseUrl(c);
+        const branding = c.get('branding');
+        return c.html(ReportGatePage({
+            reason: 'payment',
+            companyName: branding?.siteName || c.env.APP_NAME || 'InspectorHub',
+            primaryColor: branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1',
+            actionUrl: `${baseUrl}/invoices?inspection=${id}`,
+            actionLabel: 'View Invoice & Pay',
+        }) as string);
+    }
+
+    // Report gate: agreement required
+    if (inspection.agreementRequired === true) {
+        const db2 = drizzle(c.env.DB as any);
+        const signed = await db2.select({ id: agreementRequests.id })
+            .from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.inspectionId, id as string),
+                eq(agreementRequests.status, 'signed')
+            ))
+            .limit(1);
+        if (signed.length === 0) {
+            const baseUrl = getBaseUrl(c);
+            const branding = c.get('branding');
+            return c.html(ReportGatePage({
+                reason: 'agreement',
+                companyName: branding?.siteName || c.env.APP_NAME || 'InspectorHub',
+                primaryColor: branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1',
+                actionUrl: `${baseUrl}/sign/${id}`,
+                actionLabel: 'Sign Agreement',
+            }) as string);
+        }
+    }
+
     const db = drizzle(c.env.DB);
     const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
 
