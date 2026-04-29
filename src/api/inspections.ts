@@ -16,7 +16,8 @@ import {
     InspectionListResponseSchema,
     InspectionCountsSchema,
     PublishInspectionSchema,
-    ReportDataResponseSchema
+    ReportDataResponseSchema,
+    CancelInspectionSchema,
 } from '../lib/validations/inspection.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -924,6 +925,58 @@ inspectionsRoutes.openapi(getReportDataRoute, async (c) => {
     const service = c.var.services.inspection;
     const data = await service.getReportData(id, tenantId);
     return c.json({ success: true, data }, 200);
+});
+
+/**
+ * POST /api/inspections/:id/confirm
+ */
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/confirm',
+    tags: ['Inspections'], summary: 'Confirm inspection',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
+}), async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.inspection.confirmInspection(tenantId, id);
+    return c.json({ success: true });
+});
+
+/**
+ * POST /api/inspections/:id/cancel
+ */
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/cancel',
+    tags: ['Inspections'], summary: 'Cancel inspection',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string() }),
+        body: { content: { 'application/json': { schema: CancelInspectionSchema } } },
+    },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Cancelled' } },
+}), async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const { reason, notes } = c.req.valid('json');
+    await c.var.services.inspection.cancelInspection(tenantId, id, reason, notes);
+    return c.json({ success: true });
+});
+
+/**
+ * POST /api/inspections/:id/uncancel
+ */
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/uncancel',
+    tags: ['Inspections'], summary: 'Uncancel inspection',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Uncancelled' } },
+}), async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.inspection.uncancelInspection(tenantId, id);
+    return c.json({ success: true });
 });
 
 /**

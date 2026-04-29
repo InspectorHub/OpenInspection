@@ -419,4 +419,40 @@ export class InspectionService {
             status: 'delivered',
         };
     }
+
+    async confirmInspection(tenantId: string, id: string): Promise<void> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId))).limit(1);
+        if (!rows[0]) throw Errors.NotFound('Inspection not found');
+        if (rows[0].status === 'cancelled') throw Errors.BadRequest('Cannot confirm a cancelled inspection');
+        await db.update(inspections).set({
+            status:      'confirmed' as any,
+            confirmedAt: new Date().toISOString(),
+        }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
+
+    async cancelInspection(tenantId: string, id: string, reason: string, notes?: string): Promise<void> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId))).limit(1);
+        if (!rows[0]) throw Errors.NotFound('Inspection not found');
+        const cancelNote = notes ? `${reason}: ${notes}` : reason;
+        await db.update(inspections).set({
+            status:       'cancelled' as any,
+            cancelReason: cancelNote,
+        }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
+
+    async uncancelInspection(tenantId: string, id: string): Promise<void> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId))).limit(1);
+        if (!rows[0]) throw Errors.NotFound('Inspection not found');
+        if (rows[0].status !== 'cancelled') throw Errors.BadRequest('Inspection is not cancelled');
+        await db.update(inspections).set({
+            status:       'scheduled' as any,
+            cancelReason: null,
+        }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
 }

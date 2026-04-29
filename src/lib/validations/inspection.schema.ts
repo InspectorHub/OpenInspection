@@ -59,6 +59,11 @@ export const UpdateInspectionSchema = z.object({
     agreementRequired: z.boolean().optional().openapi({ example: false }),
 }).openapi('UpdateInspection');
 
+export const CancelInspectionSchema = z.object({
+    reason: z.enum(['client_cancelled', 'scheduling_conflict', 'weather', 'other']),
+    notes:  z.string().max(500).optional(),
+}).openapi('CancelInspection');
+
 export const InspectionCountsSchema = z.object({
     all:         z.number().openapi({ example: 42 }),
     today:       z.number().openapi({ example: 3 }),
