@@ -8,6 +8,14 @@ import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } f
 
 import { ScopedDB } from '../lib/db/scoped';
 import { safeISODate, safeTimestamp } from '../lib/date';
+import { AutomationService } from './automation.service';
+import { logger } from '../lib/logger';
+
+function fireAutomation(db: D1Database, tenantId: string, inspectionId: string, event: string): void {
+    new AutomationService(db)
+        .trigger({ tenantId, inspectionId, triggerEvent: event, companyName: '', reportBaseUrl: '' })
+        .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
+}
 
 type Inspection = z.infer<typeof InspectionSchema>;
 type InspectionListParams = z.infer<typeof InspectionListQuerySchema>;
@@ -191,6 +199,7 @@ export class InspectionService {
         };
 
         await this.sdb.insert(inspections, newInspection);
+        fireAutomation(this.db, tenantId, id, 'inspection.created');
 
         // Link selected services
         if (data.serviceIds && data.serviceIds.length > 0) {
@@ -431,6 +440,7 @@ export class InspectionService {
         await db.update(inspections)
             .set({ status: 'delivered' })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+        fireAutomation(this.db, tenantId, inspectionId, 'report.published');
 
         return {
             reportUrl: `/report/${inspectionId}`,
@@ -456,6 +466,7 @@ export class InspectionService {
             status:      'confirmed' as any,
             confirmedAt: new Date().toISOString(),
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+        fireAutomation(this.db, tenantId, id, 'inspection.confirmed');
     }
 
     async cancelInspection(tenantId: string, id: string, reason: string, notes?: string): Promise<void> {
@@ -465,6 +476,7 @@ export class InspectionService {
             status:       'cancelled' as any,
             cancelReason: cancelNote,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+        fireAutomation(this.db, tenantId, id, 'inspection.cancelled');
     }
 
     async uncancelInspection(tenantId: string, id: string): Promise<void> {
