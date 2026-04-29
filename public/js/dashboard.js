@@ -358,13 +358,16 @@ function renderInspections(list) {
 
 function getStatusStyle(status) {
     const styles = {
+        'draft': 'bg-slate-100 text-slate-600 ring-slate-200',
         'scheduled': 'bg-slate-100 text-slate-600 ring-slate-200',
+        'confirmed': 'bg-blue-50 text-blue-700 ring-blue-200',
         'in_progress': 'bg-blue-50 text-blue-600 ring-blue-100',
         'pending': 'bg-amber-50 text-amber-600 ring-amber-100',
         'completed': 'bg-emerald-50 text-emerald-600 ring-emerald-100',
-        'cancelled': 'bg-red-50 text-red-600 ring-red-100'
+        'delivered': 'bg-purple-50 text-purple-600 ring-purple-100',
+        'cancelled': 'bg-red-50 text-red-600 ring-red-100',
     };
-    return styles[status] || styles['scheduled'];
+    return styles[status] || styles['draft'];
 }
 
 function getInspectorName(inspectorId) {

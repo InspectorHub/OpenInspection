@@ -49,15 +49,9 @@ export class ServiceService {
             .where(and(eq(services.id, id), eq(services.tenantId, tenantId))).limit(1);
         if (!existing[0]) throw Errors.NotFound('Service not found');
 
-        const update: Record<string, unknown> = {};
-        if (data.name            !== undefined) update.name            = data.name;
-        if (data.description     !== undefined) update.description     = data.description;
-        if (data.price           !== undefined) update.price           = data.price;
-        if (data.durationMinutes !== undefined) update.durationMinutes = data.durationMinutes;
-        if (data.templateId      !== undefined) update.templateId      = data.templateId;
-        if (data.agreementId     !== undefined) update.agreementId     = data.agreementId;
-        if (data.active          !== undefined) update.active          = data.active;
-        if (data.sortOrder       !== undefined) update.sortOrder       = data.sortOrder;
+        const update = Object.fromEntries(
+            Object.entries(data).filter(([_, v]) => v !== undefined)
+        );
 
         await db.update(services).set(update).where(and(eq(services.id, id), eq(services.tenantId, tenantId)));
         const rows = await db.select().from(services).where(eq(services.id, id));
@@ -112,14 +106,18 @@ export class ServiceService {
         discountCodeId: string | null;
         message?: string;
     }> {
+        const invalid = (message: string) =>
+            ({ valid: false as const, discountAmount: 0, discountCodeId: null, message });
+
         const db = this.getDrizzle();
         const rows = await db.select().from(discountCodes)
             .where(and(eq(discountCodes.tenantId, tenantId), eq(discountCodes.active, true)));
+        // JS-side filter instead of SQL UPPER() — intentional for D1 compatibility
         const dc = rows.find(r => r.code.toUpperCase() === code.toUpperCase());
 
-        if (!dc) return { valid: false, discountAmount: 0, discountCodeId: null, message: 'Code not found' };
-        if (dc.expiresAt && new Date(dc.expiresAt) < new Date()) return { valid: false, discountAmount: 0, discountCodeId: null, message: 'Code expired' };
-        if (dc.maxUses !== null && dc.usesCount >= dc.maxUses) return { valid: false, discountAmount: 0, discountCodeId: null, message: 'Code usage limit reached' };
+        if (!dc) return invalid('Code not found');
+        if (dc.expiresAt && new Date(dc.expiresAt) < new Date()) return invalid('Code expired');
+        if (dc.maxUses !== null && dc.usesCount >= dc.maxUses) return invalid('Code usage limit reached');
 
         const discountAmount = dc.type === 'fixed'
             ? Math.min(dc.value, subtotal)
