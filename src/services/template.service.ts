@@ -13,15 +13,38 @@ export class TemplateService {
         return drizzle(this.db);
     }
 
+    private countSchemaItems(schema: string | null): number {
+        if (!schema) return 0;
+        try {
+            const parsed = JSON.parse(schema);
+            if (Array.isArray(parsed)) return parsed.length;
+            if (Array.isArray(parsed?.sections)) {
+                return parsed.sections.reduce(
+                    (acc: number, sec: { items?: unknown[] }) => acc + (Array.isArray(sec.items) ? sec.items.length : 0),
+                    0
+                );
+            }
+            return 0;
+        } catch {
+            return 0;
+        }
+    }
+
     /**
      * Lists all templates for a tenant.
      */
     async listTemplates(tenantId: string) {
         const db = this.getDrizzle();
-        return db.select({ id: templates.id, name: templates.name, version: templates.version })
+        const rows = await db.select({ id: templates.id, name: templates.name, version: templates.version, schema: templates.schema })
             .from(templates)
             .where(eq(templates.tenantId, tenantId))
             .all();
+        return rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            version: row.version,
+            itemCount: this.countSchemaItems(row.schema as string | null),
+        }));
     }
 
     /**

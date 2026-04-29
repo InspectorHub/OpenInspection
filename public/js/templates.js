@@ -79,7 +79,7 @@ function renderTemplates() {
         return;
     }
     tbody.innerHTML = allTemplates.map(t => {
-        const itemCount = countSchemaItems(t.schema);
+        const itemCount = t.itemCount ?? countSchemaItems(t.schema);
         return `
           <tr class="table-row-hover group">
             <td class="py-6 pl-10 pr-3">
