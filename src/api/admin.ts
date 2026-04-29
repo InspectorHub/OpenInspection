@@ -13,6 +13,7 @@ import {
     InviteMemberSchema,
     DataErasureSchema,
     AgreementSchema,
+    SendAgreementSchema,
     AdminExportResponseSchema,
     MemberListResponseSchema,
     AuditLogResponseSchema,
@@ -701,6 +702,45 @@ adminRoutes.openapi(updateSecretsRoute, async (c) => {
     await c.var.services.branding.updateSecrets(c.get('tenantId'), c.env.JWT_SECRET, body as unknown as import('../services/branding.service').SecretsConfig);
     auditFromContext(c, 'config.secrets.update', 'tenant_config');
     return c.json({ success: true }, 200);
+});
+
+// --- Agreement Signing ---
+
+const sendAgreementRoute = createRoute({
+    method: 'post',
+    path: '/agreements/send',
+    tags: ['Agreements'],
+    summary: 'Send an agreement signing request to a client',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { body: { content: { 'application/json': { schema: SendAgreementSchema } } } },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ token: z.string(), signUrl: z.string() }) }) } },
+            description: 'Signing request created and email sent',
+        },
+    },
+});
+
+adminRoutes.openapi(sendAgreementRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const svc = c.var.services.agreement;
+
+    const opts: { agreementId: string; clientEmail: string; clientName?: string | null; inspectionId?: string | null } = {
+        agreementId: body.agreementId,
+        clientEmail: body.clientEmail,
+    };
+    if (body.clientName !== undefined) opts.clientName = body.clientName;
+    if (body.inspectionId !== undefined) opts.inspectionId = body.inspectionId;
+
+    const request = await svc.createSigningRequest(tenantId, opts);
+    const signUrl = `${getBaseUrl(c)}/agreements/sign/${request.token}`;
+
+    await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl)
+        .catch(e => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+
+    auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, clientEmail: body.clientEmail } });
+    return c.json({ success: true as const, data: { token: request.token, signUrl } }, 200);
 });
 
 // --- Comments Library ---

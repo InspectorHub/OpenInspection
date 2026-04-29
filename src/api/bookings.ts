@@ -188,4 +188,87 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
     }, 200);
 });
 
+/**
+ * GET /api/public/agreements/:token — fetch agreement content + mark viewed
+ */
+const getAgreementByTokenRoute = createRoute({
+    method: 'get',
+    path: '/agreements/:token',
+    tags: ['Public'],
+    summary: 'Get agreement for signing (public, token-gated)',
+    request: { params: z.object({ token: z.string().min(1) }) },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(true),
+                        data: z.object({
+                            status: z.enum(['pending', 'viewed', 'signed']),
+                            clientName: z.string().nullable(),
+                            agreementName: z.string(),
+                            agreementContent: z.string(),
+                        }),
+                    }),
+                },
+            },
+            description: 'Agreement content',
+        },
+    },
+});
+
+bookingsRoutes.openapi(getAgreementByTokenRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    const svc = c.var.services.agreement;
+    const { request, agreement } = await svc.getAgreementByToken(token);
+    await svc.markViewed(token);
+    return c.json({
+        success: true as const,
+        data: {
+            status: request.status as 'pending' | 'viewed' | 'signed',
+            clientName: request.clientName ?? null,
+            agreementName: agreement.name,
+            agreementContent: agreement.content,
+        },
+    }, 200);
+});
+
+/**
+ * POST /api/public/agreements/:token/sign — submit client signature
+ */
+const signAgreementRoute = createRoute({
+    method: 'post',
+    path: '/agreements/:token/sign',
+    tags: ['Public'],
+    summary: 'Submit client signature (public, token-gated)',
+    request: {
+        params: z.object({ token: z.string().min(1) }),
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({ signatureBase64: z.string().min(1) }),
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({ success: z.literal(true) }),
+                },
+            },
+            description: 'Signed',
+        },
+    },
+});
+
+bookingsRoutes.openapi(signAgreementRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    const { signatureBase64 } = c.req.valid('json');
+    const svc = c.var.services.agreement;
+    await svc.signRequest(token, signatureBase64);
+    return c.json({ success: true as const }, 200);
+});
+
 export default bookingsRoutes;

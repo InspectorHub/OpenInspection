@@ -158,6 +158,13 @@ export const AgreementListResponseSchema = createApiResponseSchema(z.object({
     })),
 })).openapi('AgreementListResponse');
 
+export const SendAgreementSchema = z.object({
+    agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    clientEmail: z.string().email().openapi({ example: 'client@example.com' }),
+    clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }),
+    inspectionId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+}).openapi('SendAgreement');
+
 export const AgreementResponseSchema = createApiResponseSchema(z.object({
     agreement: z.object({
         id: z.string().uuid(),

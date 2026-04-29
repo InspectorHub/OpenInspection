@@ -20,6 +20,7 @@ export type AuditAction =
     | 'agreement.create'
     | 'agreement.update'
     | 'agreement.delete'
+    | 'agreement.send'
     | 'data.export'
     | 'data.import'
     | 'data.delete'

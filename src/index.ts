@@ -29,6 +29,7 @@ import { TemplatesPage } from './templates/pages/templates';
 import { TemplateEditorPage } from './templates/pages/template-editor';
 import { TeamPage } from './templates/pages/team';
 import { AgreementsPage } from './templates/pages/agreements';
+import { AgreementSignPage } from './templates/pages/agreement-sign';
 import { ContactsPage } from './templates/pages/contacts';
 import { InvoicesPage } from './templates/pages/invoices';
 import { SetupPage } from './templates/pages/setup';
@@ -128,9 +129,9 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path === '/book' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || STATIC_ASSET_EXT.test(path);
 
-    if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join') return next();
+    if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
     // Generate setup code if system is uninitialized and we are in standalone
     if (c.env.APP_MODE === 'standalone' && c.env.TENANT_CACHE) {
@@ -352,6 +353,27 @@ app.get('/setup', (c) => {
 app.get('/book', (c) => {
     const branding = c.get('branding');
     return c.html(PublicBookingPage({ siteKey: c.env.TURNSTILE_SITE_KEY, branding }));
+});
+
+// Public agreement signing page (no auth required — token is the secret)
+app.get('/agreements/sign/:token', async (c) => {
+    const token = c.req.param('token') as string;
+    const branding = c.get('branding');
+    try {
+        const svc = c.var.services.agreement;
+        const { request, agreement } = await svc.getAgreementByToken(token);
+        await svc.markViewed(token);
+        return c.html(AgreementSignPage({
+            token,
+            agreementName: agreement.name,
+            agreementContent: agreement.content,
+            clientName: request.clientName ?? null,
+            status: request.status as 'pending' | 'viewed' | 'signed',
+            branding,
+        }));
+    } catch {
+        return c.text('Agreement not found or link has expired.', 404);
+    }
 });
 
 // Public report page (no auth required)

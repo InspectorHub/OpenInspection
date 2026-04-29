@@ -56,6 +56,10 @@ async function loadAgreements() {
                                 Edit
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                             </button>
+                            <button onclick="showSendModal('${a.id}')" class="inline-flex items-center gap-1.5 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-emerald-600 transition-all active:scale-95">
+                                Send
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            </button>
                             <button onclick="deleteAgreement('${a.id}')" class="inline-flex items-center gap-2 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-red-500 transition-all active:scale-95">
                                 Remove
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -151,6 +155,48 @@ async function submitAgreement() {
     } finally {
         btn.disabled = false;
         btn.textContent = editingId ? 'Save Changes' : 'Publish Agreement';
+    }
+}
+
+function showSendModal(id) {
+    document.getElementById('sendAgreementId').value = id;
+    document.getElementById('sendClientEmail').value = '';
+    document.getElementById('sendClientName').value = '';
+    document.getElementById('sendModal').classList.remove('hidden');
+}
+
+function closeSendModal() {
+    document.getElementById('sendModal').classList.add('hidden');
+}
+
+async function submitSend() {
+    var id = document.getElementById('sendAgreementId').value;
+    var email = document.getElementById('sendClientEmail').value.trim();
+    var name = document.getElementById('sendClientName').value.trim();
+    if (!email) { modalAlert('Client email is required.'); return; }
+    var btn = document.getElementById('submitSendBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try {
+        var body = { agreementId: id, clientEmail: email };
+        if (name) body.clientName = name;
+        var res = await authFetch('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (res.ok) {
+            closeSendModal();
+            modalAlert('Signing request sent successfully!', 'Sent');
+        } else {
+            var err = await res.json();
+            modalAlert(err.error?.message || 'Failed to send signing request.', 'Error');
+        }
+    } catch (e) {
+        modalAlert('An error occurred.', 'Error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Request';
     }
 }
 

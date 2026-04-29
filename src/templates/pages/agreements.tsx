@@ -87,6 +87,32 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                     </div>
                 </div>
 
+                {/* Send Agreement Modal */}
+                <div id="sendModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-12 sm:px-0">
+                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onclick="closeSendModal()"></div>
+                    <div class="flex min-h-full items-center justify-center">
+                        <div class="relative w-full max-w-md bg-white rounded-[2.5rem] p-10 shadow-2xl">
+                            <h3 class="text-2xl font-black text-slate-900 mb-2">Send for Signature</h3>
+                            <p class="text-sm text-slate-400 font-semibold mb-8">Client will receive an email with a link to review and sign.</p>
+                            <input type="hidden" id="sendAgreementId" />
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Client Email *</label>
+                                    <input type="email" id="sendClientEmail" placeholder="client@example.com" class="premium-input w-full px-5 py-4 rounded-2xl border-2 border-slate-50 focus:border-indigo-500 outline-none font-bold text-sm" />
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Client Name</label>
+                                    <input type="text" id="sendClientName" placeholder="John Smith" class="premium-input w-full px-5 py-4 rounded-2xl border-2 border-slate-50 focus:border-indigo-500 outline-none font-bold text-sm" />
+                                </div>
+                            </div>
+                            <div class="mt-8 flex gap-4">
+                                <button onclick="closeSendModal()" class="flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition">Cancel</button>
+                                <button onclick="submitSend()" id="submitSendBtn" class="flex-[2] py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-900 transition">Send Request</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <script src="/js/modal-dialog.js"></script>
                 <script src="/js/auth.js"></script>
                 <script src="/js/agreements.js"></script>
