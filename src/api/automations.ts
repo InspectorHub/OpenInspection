@@ -1,7 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import type { HonoConfig } from '../types/hono';
-import { Errors } from '../lib/errors';
 import {
     AutomationListResponseSchema, AutomationLogListResponseSchema,
     CreateAutomationSchema, UpdateAutomationSchema, AutomationSchema,
@@ -69,7 +68,8 @@ automationsRoutes.openapi(updateRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
-    const row = await c.var.services.automation.update(tenantId, id, data as Parameters<typeof c.var.services.automation.update>[2]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod partial() adds undefined to values, incompatible with exactOptionalPropertyTypes
+    const row = await c.var.services.automation.update(tenantId, id, data as any);
     return c.json({ success: true, data: row });
 });
 
@@ -84,13 +84,8 @@ const deleteRoute = createRoute({
 automationsRoutes.openapi(deleteRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
     const { id } = c.req.valid('param');
-    try {
-        await c.var.services.automation.delete(tenantId, id);
-        return c.json({ success: true });
-    } catch (err) {
-        if (err instanceof Error && err.message.includes('default')) throw Errors.Forbidden('Cannot delete a default automation rule');
-        throw err;
-    }
+    await c.var.services.automation.delete(tenantId, id);
+    return c.json({ success: true });
 });
 
 export default automationsRoutes;

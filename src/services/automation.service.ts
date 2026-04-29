@@ -3,6 +3,7 @@ import { eq, and, lte, sql } from 'drizzle-orm';
 import { automations, automationLogs, inspections } from '../lib/db/schema';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 import { nanoid } from 'nanoid';
+import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 
 function interpolate(template: string, vars: Record<string, string>): string {
@@ -78,7 +79,7 @@ export class AutomationService {
         const db = this.getDrizzle();
         const existing = await db.select().from(automations)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId))).limit(1);
-        if (!existing[0]) throw new Error('Automation not found');
+        if (!existing[0]) throw Errors.NotFound('Automation not found');
         await db.update(automations).set(data as any)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId)));
         return (await db.select().from(automations).where(eq(automations.id, id)))[0];
@@ -88,8 +89,8 @@ export class AutomationService {
         const db = this.getDrizzle();
         const existing = await db.select().from(automations)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId))).limit(1);
-        if (!existing[0]) throw new Error('Automation not found');
-        if (existing[0].isDefault) throw new Error('Cannot delete a default automation rule');
+        if (!existing[0]) throw Errors.NotFound('Automation not found');
+        if (existing[0].isDefault) throw Errors.Forbidden('Cannot delete a default automation rule');
         await db.delete(automations).where(and(eq(automations.id, id), eq(automations.tenantId, tenantId)));
     }
 
