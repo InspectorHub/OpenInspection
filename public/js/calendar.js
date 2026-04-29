@@ -48,7 +48,8 @@ function renderMonth() {
     var grid = document.getElementById('calGrid');
     if (!label || !grid) return;
 
-    var monthName = new Date(currentYear, currentMonth, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var monthName = MONTHS[currentMonth] + ' ' + currentYear;
     label.textContent = monthName;
 
     // Build a map: dateStr (YYYY-MM-DD) -> inspections[]
