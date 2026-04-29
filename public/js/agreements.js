@@ -3,27 +3,29 @@ let quillEditor = null;
 
 function getAgreementContent() {
     if (quillEditor) {
-        // Quill returns '<p><br></p>' for empty input — normalize to empty string
-        const html = quillEditor.root.innerHTML;
-        if (html === '<p><br></p>') return '';
-        return html;
+        if (!quillEditor.getText().trim()) return '';
+        return quillEditor.root.innerHTML;
     }
-    const el = document.getElementById('agreementContent');
+    var el = document.getElementById('agreementContent');
     return el ? el.value : '';
 }
 
-function setAgreementContent(html) {
-    const value = html || '';
-    if (quillEditor) {
-        // If existing content is plain text (no leading tag), wrap it before assigning
-        if (value && !value.trimStart().startsWith('<')) {
-            quillEditor.setText(value);
-        } else {
-            quillEditor.root.innerHTML = value;
-        }
+function setAgreementContent(value) {
+    if (!quillEditor) {
+        var el = document.getElementById('agreementContent');
+        if (el) el.value = value || '';
+        return;
     }
-    const el = document.getElementById('agreementContent');
-    if (el) el.value = value;
+    if (!value) {
+        quillEditor.setContents([]);
+    } else if (!value.trimStart().startsWith('<')) {
+        quillEditor.setText(value);
+    } else {
+        quillEditor.clipboard.dangerouslyPasteHTML(value);
+    }
+    // Keep hidden input in sync (some downstream readers may use it)
+    var hidden = document.getElementById('agreementContent');
+    if (hidden) hidden.value = value || '';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

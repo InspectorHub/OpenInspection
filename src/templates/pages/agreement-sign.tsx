@@ -17,9 +17,19 @@ interface AgreementSignProps {
     } | undefined;
 }
 
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 /** Replace {{var}} placeholders with the provided values; missing vars become empty strings. */
 function substituteVars(template: string, vars: Record<string, string | undefined>): string {
-    return template.replace(/\{\{(client_name|property_address|inspection_date|inspector_name)\}\}/g, (_m, key) => vars[key] ?? '');
+    return template.replace(/\{\{(client_name|property_address|inspection_date|inspector_name)\}\}/g,
+        (_m, key) => escapeHtml(vars[key] ?? ''));
 }
 
 /**
