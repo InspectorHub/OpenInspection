@@ -3,7 +3,6 @@ import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
-import { MarketplaceService } from '../services/marketplace.service';
 
 const marketplaceRoutes = new OpenAPIHono<HonoConfig>();
 
@@ -16,9 +15,9 @@ marketplaceRoutes.openapi(createRoute({
     request: {
         query: z.object({
             search:   z.string().optional(),
-            category: z.string().optional(),
-            page:     z.coerce.number().optional(),
-            pageSize: z.coerce.number().optional(),
+            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction']).optional(),
+            page:     z.coerce.number().int().min(1).optional(),
+            pageSize: z.coerce.number().int().min(1).max(100).optional(),
         }),
     },
     responses: {
@@ -29,8 +28,7 @@ marketplaceRoutes.openapi(createRoute({
     },
 }), async (c) => {
     const q = c.req.valid('query');
-    const svc = new MarketplaceService(c.env.DB, c.get('tenantId'));
-    const data = await svc.list({
+    const data = await c.var.services.marketplace.list({
         ...(q.search   !== undefined ? { search:   q.search }   : {}),
         ...(q.category !== undefined ? { category: q.category } : {}),
         ...(q.page     !== undefined ? { page:     q.page }     : {}),
@@ -56,11 +54,13 @@ marketplaceRoutes.openapi(createRoute({
 }), async (c) => {
     const { id } = c.req.valid('param');
     try {
-        const svc = new MarketplaceService(c.env.DB, c.get('tenantId'));
-        const localTemplateId = await svc.importTemplate(id);
+        const localTemplateId = await c.var.services.marketplace.importTemplate(id);
         return c.json({ success: true, data: { localTemplateId } }, 201);
-    } catch {
-        throw Errors.NotFound('Marketplace template not found');
+    } catch (err) {
+        if (err instanceof Error && err.message === 'Marketplace template not found') {
+            throw Errors.NotFound('Marketplace template not found');
+        }
+        throw err;
     }
 });
 

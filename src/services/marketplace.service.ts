@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, like, and, desc } from 'drizzle-orm';
+import { eq, like, and, desc, sql } from 'drizzle-orm';
 import { marketplaceTemplates, tenantMarketplaceImports } from '../lib/db/schema/marketplace';
 import { templates } from '../lib/db/schema';
 
@@ -51,6 +51,21 @@ export class MarketplaceService {
 
     if (!mkt) throw new Error('Marketplace template not found');
 
+    // Check if already imported by this tenant — make endpoint idempotent
+    const [existing] = await this.db
+      .select()
+      .from(tenantMarketplaceImports)
+      .where(and(
+        eq(tenantMarketplaceImports.tenantId, this.tenantId),
+        eq(tenantMarketplaceImports.marketplaceTemplateId, marketplaceId),
+      ))
+      .limit(1);
+
+    if (existing) {
+      // Already imported — return existing local template id
+      return existing.localTemplateId;
+    }
+
     const newTemplateId = crypto.randomUUID();
     const now = new Date().toISOString();
 
@@ -58,10 +73,8 @@ export class MarketplaceService {
       id:        newTemplateId,
       tenantId:  this.tenantId,
       name:      mkt.name,
-      version:   mkt.semver,
-      schema:    mkt.schema,
+      schema:    JSON.parse(mkt.schema as string),
       createdAt: now,
-      updatedAt: now,
     });
 
     await this.db.insert(tenantMarketplaceImports).values({
@@ -75,7 +88,7 @@ export class MarketplaceService {
 
     await this.db
       .update(marketplaceTemplates)
-      .set({ downloadCount: mkt.downloadCount + 1, updatedAt: now })
+      .set({ downloadCount: sql`${marketplaceTemplates.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceTemplates.id, marketplaceId));
 
     return newTemplateId;
