@@ -39,13 +39,18 @@ metricsRoutes.openapi(createRoute({
     const totalInspections = monthly.reduce((s, r) => s + Number(r.count || 0), 0);
     const avgOrderValue    = totalInspections > 0 ? Math.round(totalRevenue / totalInspections) : 0;
 
-    // Top agents
-    const topAgentsRaw = await db.select({
-        agentId: inspections.referredByAgentId,
-        count:   sql<number>`count(*)`,
-        revenue: sql<number>`sum(${inspections.price})`,
+    // Top agents — single JOIN query instead of N+1
+    const topAgents = await db.select({
+        agentId:   inspections.referredByAgentId,
+        agentName: contacts.name,
+        count:     sql<number>`count(*)`,
+        revenue:   sql<number>`sum(${inspections.price})`,
     })
         .from(inspections)
+        .leftJoin(contacts, and(
+            eq(contacts.id, inspections.referredByAgentId),
+            eq(contacts.tenantId, inspections.tenantId),
+        ))
         .where(and(
             eq(inspections.tenantId, tenantId),
             gte(inspections.date, fromStr),
@@ -53,20 +58,13 @@ metricsRoutes.openapi(createRoute({
         ))
         .groupBy(inspections.referredByAgentId)
         .orderBy(sql`count(*) desc`)
-        .limit(10);
-
-    // Resolve agent names from contacts table
-    const topAgents = await Promise.all(topAgentsRaw.map(async (row) => {
-        let agentName = row.agentId || 'Unknown';
-        if (row.agentId) {
-            const contactRows = await db.select({ name: contacts.name })
-                .from(contacts).where(eq(contacts.id, row.agentId)).limit(1);
-            if (contactRows[0]) {
-                agentName = contactRows[0].name || agentName;
-            }
-        }
-        return { agentId: row.agentId ?? null, agentName, count: Number(row.count), revenue: Number(row.revenue || 0) };
-    }));
+        .limit(10)
+        .then(rows => rows.map(r => ({
+            agentId:   r.agentId ?? null,
+            agentName: r.agentName || r.agentId || 'Unknown',
+            count:     Number(r.count),
+            revenue:   Number(r.revenue || 0),
+        })));
 
     // Service breakdown
     const serviceBreakdown = await db.select({

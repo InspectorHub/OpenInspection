@@ -2,8 +2,8 @@ import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
 
 interface MetricsPageProps {
-    appName?: string;
-    branding?: BrandingConfig;
+    appName?: string | undefined;
+    branding?: BrandingConfig | undefined;
 }
 
 export function MetricsPage({ appName, branding }: MetricsPageProps) {

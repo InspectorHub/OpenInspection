@@ -323,8 +323,9 @@ function inspectionEditor(inspectionId) {
       }
     },
 
-    async suggestComment(itemName, sectionName, targetField) {
-      const btn = event.currentTarget;
+    async suggestComment(itemName, sectionName, targetField, ev) {
+      const btn = ev?.currentTarget || ev?.target;
+      if (!btn) return;
       const origText = btn.textContent;
       btn.textContent = '...';
       btn.disabled = true;

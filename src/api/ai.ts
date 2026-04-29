@@ -21,6 +21,7 @@ const commentAssistRoute = createRoute({
     path: '/comment-assist',
     tags: ['AI'],
     summary: 'Professional comment assistant',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
         body: {
             content: {
@@ -59,6 +60,7 @@ const autoSummaryRoute = createRoute({
     path: '/auto-summary',
     tags: ['AI'],
     summary: 'Generate inspection summary',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
         body: {
             content: {
