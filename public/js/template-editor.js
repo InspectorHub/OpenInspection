@@ -1,8 +1,5 @@
 // Template Editor — Alpine.js data function
-// Cookie-only auth: HttpOnly inspector_token cookie sent automatically on same-origin fetches.
-
-const authFetch = (url, opts = {}) =>
-    fetch(url, { credentials: 'same-origin', ...opts });
+// Requires auth.js to be loaded first (provides authFetch)
 
 function templateEditor() {
     return {
@@ -82,6 +79,8 @@ function templateEditor() {
         ],
 
         cannedComments: [],
+        newCommentText: '',
+        newCommentCategory: '',
 
         get selectedSection() {
             return this.template.sections.find(s => s.id === this.selectedSectionId) || null;
@@ -194,7 +193,47 @@ function templateEditor() {
         filteredComments() {
             if (!this.commentSearch) return this.cannedComments;
             const q = this.commentSearch.toLowerCase();
-            return this.cannedComments.filter(c => (c.title || '').toLowerCase().includes(q) || (c.body || '').toLowerCase().includes(q) || (c.category || '').toLowerCase().includes(q));
+            return this.cannedComments.filter(c => c.text.toLowerCase().includes(q) || (c.category || '').toLowerCase().includes(q));
+        },
+
+        async loadCannedComments() {
+            try {
+                const res = await authFetch('/api/admin/comments');
+                if (!res.ok) return;
+                const data = await res.json();
+                this.cannedComments = data.data?.comments || [];
+            } catch (e) {
+                console.error('Failed to load comments:', e);
+            }
+        },
+
+        async addCannedComment() {
+            const text = this.newCommentText.trim();
+            if (!text) return;
+            const category = this.newCommentCategory.trim() || null;
+            try {
+                const res = await authFetch('/api/admin/comments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, category })
+                });
+                if (!res.ok) return;
+                this.newCommentText = '';
+                this.newCommentCategory = '';
+                await this.loadCannedComments();
+            } catch (e) {
+                console.error('Failed to add comment:', e);
+            }
+        },
+
+        async deleteCannedComment(id) {
+            try {
+                const res = await authFetch('/api/admin/comments/' + id, { method: 'DELETE' });
+                if (!res.ok) return;
+                await this.loadCannedComments();
+            } catch (e) {
+                console.error('Failed to delete comment:', e);
+            }
         },
 
         async saveTemplate() {
@@ -318,6 +357,7 @@ function templateEditor() {
                 console.error('Failed to load template:', e);
             }
             this.$nextTick(() => this.initSortable());
+            await this.loadCannedComments();
         }
     };
 }

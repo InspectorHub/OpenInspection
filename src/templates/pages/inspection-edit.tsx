@@ -127,12 +127,16 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     style="background: #f3f1ed; border-color: #e8e4dd; color: #1a1815"
                     rows={3}
                   ></textarea>
-                  <div class="mt-2 flex gap-2">
+                  <div class="mt-2 flex gap-2 flex-wrap">
                     <label class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer" style="background: #eef4ff; color: #4a72ff">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       Camera
                       <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="uploadPhoto(item.id, $event)" />
                     </label>
+                    <button type="button" onclick="openCommentPicker(this)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors" style="background: #f0fdf4; color: #16a34a">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3-3-3z"></path></svg>
+                      Library
+                    </button>
                   </div>
                 </div>
               </div>
@@ -295,12 +299,16 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       style="background: #f3f1ed; border-color: #e8e4dd; color: #1a1815"
                       rows={3}
                     ></textarea>
-                    <div class="mt-2 flex gap-2">
+                    <div class="mt-2 flex gap-2 flex-wrap">
                       <label class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer" style="background: #eef4ff; color: #4a72ff">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         Camera
                         <input type="file" accept="image/*" class="hidden" x-on:change="uploadPhoto(item.id, $event)" />
                       </label>
+                      <button type="button" onclick="openCommentPicker(this)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors" style="background: #f0fdf4; color: #16a34a">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3-3-3z"></path></svg>
+                        Library
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -359,6 +367,9 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </div>
         </div>
       </div>
+      <div id="commentPicker" class="hidden fixed z-[200] bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 w-72 max-h-64 overflow-y-auto"></div>
+      <script src="/js/auth.js"></script>
+      <script src="/js/comments-library.js"></script>
       <script src="/js/toast.js"></script>
       <script src="/js/inspection-edit.js"></script>
       </>

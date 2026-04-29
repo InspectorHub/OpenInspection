@@ -1,7 +1,5 @@
 // public/js/inspection-edit.js
-var authFetch = function (url, opts) {
-  return fetch(url, Object.assign({ credentials: 'same-origin' }, opts || {}));
-};
+// Requires auth.js to be loaded first (provides authFetch)
 
 function inspectionEditor(inspectionId) {
   return {

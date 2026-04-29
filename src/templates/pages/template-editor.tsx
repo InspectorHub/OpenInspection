@@ -511,35 +511,33 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                             <input type="text" x-model="commentSearch" class="flex-1 text-sm bg-transparent border-0 p-0 focus:ring-0" placeholder="Search comments..." />
                         </div>
                     </div>
+                    <div class="px-4 pb-3 space-y-2">
+                        <input type="text" x-model="newCommentText" placeholder="Comment text..." class="w-full text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
+                        <div class="flex gap-2">
+                            <input type="text" x-model="newCommentCategory" placeholder="Category (optional)" class="flex-1 text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
+                            <button {...{'@click': 'addCannedComment()'}} class="px-4 py-2 rounded-xl bg-blueprint-600 text-white text-sm font-600 hover:bg-blueprint-700 transition-colors">Add</button>
+                        </div>
+                    </div>
                     <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-2 scrollbar-thin">
                         <template x-for="cc in filteredComments()" x-bind:key="cc.id">
-                            <div class="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors cursor-pointer group">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="text-sm font-600 text-ink-700" x-text="cc.title || 'Untitled'"></span>
-                                    <span x-show="cc.is_defect" class="text-[9px] font-700 text-red-500 bg-red-50 px-1.5 py-0.5 rounded uppercase">defect</span>
-                                    <span x-show="cc.source_platform" class="text-[9px] font-500 px-1.5 py-0.5 rounded"
-                                        x-bind:class="cc.source_platform === 'spectora' ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'"
-                                        x-text="cc.source_platform"></span>
+                            <div class="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors group flex items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <span x-show="cc.category" class="text-[9px] font-700 uppercase tracking-wide text-blueprint-500 mr-1" x-text="cc.category"></span>
+                                    <span class="text-sm font-600 text-ink-700" x-text="cc.text"></span>
                                 </div>
-                                <p class="text-[11px] text-ink-400 line-clamp-2" x-text="cc.body"></p>
-                                <div class="flex items-center gap-2 mt-2" x-show="cc.recommendation || cc.category">
-                                    <span x-show="cc.recommendation" class="text-[9px] font-mono bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded" x-text="cc.recommendation"></span>
-                                    <span x-show="cc.category" class="text-[9px] font-500 bg-surface-100 text-ink-400 px-1.5 py-0.5 rounded" x-text="cc.category"></span>
-                                </div>
+                                <button {...{'@click': 'deleteCannedComment(cc.id)'}} class="shrink-0 text-ink-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all mt-0.5">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
                             </div>
                         </template>
-                    </div>
-                    <div class="px-4 pb-4">
-                        <button class="w-full py-2.5 rounded-xl bg-blueprint-50 text-blueprint-600 text-sm font-600 hover:bg-blueprint-100 transition-colors flex items-center justify-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14m7-7H5"/></svg>
-                            New Comment
-                        </button>
+                        <p x-show="filteredComments().length === 0" class="text-sm text-ink-400 text-center py-4">No comments yet.</p>
                     </div>
                 </div>
 
             </div>
 
             {/* Scripts */}
+            <script src="/js/auth.js"></script>
             <script src="/vendor/sortable.min.js"></script>
             <script src="/js/template-editor.js"></script>
         </BareLayout>
