@@ -39,6 +39,18 @@ cpSync(join(nm, 'quill/dist/quill.js'), join(quillDir, 'quill.js'));
 cpSync(join(nm, 'quill/dist/quill.snow.css'), join(quillDir, 'quill.snow.css'));
 console.log('  vendor/quill/quill.js + quill.snow.css');
 
+// ── FullCalendar ────────────────────────────────────────────────────────────────
+const fcDir = join(vendorDir, 'fullcalendar');
+mkdirSync(fcDir, { recursive: true });
+const fcPackages = ['core', 'daygrid', 'timegrid', 'interaction'];
+for (const pkg of fcPackages) {
+  cpSync(
+    join(nm, `@fullcalendar/${pkg}/index.global.min.js`),
+    join(fcDir, `${pkg}.global.min.js`)
+  );
+  console.log(`  vendor/fullcalendar/${pkg}.global.min.js`);
+}
+
 // ── Fonts ───────────────────────────────────────────────────────────────────────
 const fontsDir = join(pub, 'fonts');
 mkdirSync(fontsDir, { recursive: true });
