@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lt } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema/inspection';
 import { users } from '../lib/db/schema/tenant';
 import type { HonoConfig } from '../types/hono';
@@ -52,8 +52,8 @@ const eventsRoute = createRoute({
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
         query: z.object({
-            start: z.string(),
-            end: z.string(),
+            start: z.string().datetime(),
+            end: z.string().datetime(),
         }),
     },
     responses: {
@@ -84,13 +84,14 @@ calendarEventsRoutes.openapi(eventsRoute, async (c) => {
         .where(and(
             eq(inspections.tenantId, tenantId),
             gte(inspections.date, startDate),
-            lte(inspections.date, endDate),
+            lt(inspections.date, endDate),
         ));
 
     const events: unknown[] = rows.map((r) => ({
         id: r.id,
         title: r.propertyAddress,
         start: r.date,
+        allDay: true,
         url: `/inspections/${r.id}/edit`,
         color: '#6366F1',
         extendedProps: { source: 'local', status: r.status },
@@ -102,16 +103,25 @@ calendarEventsRoutes.openapi(eventsRoute, async (c) => {
             const userRows = await db
                 .select()
                 .from(users)
-                .where(eq(users.id, jwtUser.sub))
+                .where(and(eq(users.id, jwtUser.sub), eq(users.tenantId, tenantId)))
                 .limit(1);
 
             const userRow = userRows[0];
             if (userRow?.googleRefreshToken) {
-                const accessToken = await refreshGoogleToken(
-                    c.env.GOOGLE_CLIENT_ID,
-                    c.env.GOOGLE_CLIENT_SECRET,
-                    userRow.googleRefreshToken,
-                );
+                const cacheKey = `gcal_access:${jwtUser.sub}`;
+                let accessToken: string | null = c.env.TENANT_CACHE
+                    ? await c.env.TENANT_CACHE.get(cacheKey)
+                    : null;
+                if (!accessToken) {
+                    accessToken = await refreshGoogleToken(
+                        c.env.GOOGLE_CLIENT_ID,
+                        c.env.GOOGLE_CLIENT_SECRET,
+                        userRow.googleRefreshToken,
+                    );
+                    if (c.env.TENANT_CACHE) {
+                        await c.env.TENANT_CACHE.put(cacheKey, accessToken, { expirationTtl: 3500 });
+                    }
+                }
                 const calId = encodeURIComponent(userRow.googleCalendarId ?? 'primary');
                 const params = new URLSearchParams({
                     timeMin: start,
