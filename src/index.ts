@@ -76,6 +76,7 @@ import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
+import eventsRoutes from './api/events';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -312,6 +313,7 @@ app.route('/api/calendar', calendarRoutes);
 app.route('/api/team', teamRoutes);
 app.route('/api/contacts', contactRoutes);
 app.route('/api/recommendations', recommendationsRoutes);
+app.route('/api', eventsRoutes);
 app.route('/api/invoices', invoiceRoutes);
 app.route('/api/services', servicesRoutes);
 app.route('/api/automations', automationsRoutes);

@@ -57,6 +57,15 @@ export class PortalProvider implements IntegrationProvider {
             } catch (seedErr) {
                 logger.error('Auto-seed recommendations failed in portal provider', { tenantId: newTenantId }, seedErr instanceof Error ? seedErr : undefined);
             }
+
+            // Spec 4D — Auto-seed default event types
+            try {
+                const { EventService } = await import('../../services/event.service');
+                const eventSvc = new EventService(this.db);
+                await eventSvc.bulkSeed(newTenantId);
+            } catch (seedErr) {
+                logger.error('Auto-seed event types failed in portal provider', { tenantId: newTenantId }, seedErr instanceof Error ? seedErr : undefined);
+            }
         } else {
             await db.update(tenants)
                 .set({

@@ -21,7 +21,7 @@ export class EventService {
             .orderBy(asc(eventTypes.sortOrder)).all();
     }
 
-    async createEventType(tenantId: string, data: Partial<typeof eventTypes.$inferInsert>) {
+    async createEventType(tenantId: string, data: Record<string, unknown>) {
         const row = {
             id:        crypto.randomUUID(),
             tenantId,
@@ -33,8 +33,8 @@ export class EventService {
         return row;
     }
 
-    async updateEventType(tenantId: string, id: string, data: Partial<typeof eventTypes.$inferInsert>) {
-        await drizzle(this.db).update(eventTypes).set(data)
+    async updateEventType(tenantId: string, id: string, data: Record<string, unknown>) {
+        await drizzle(this.db).update(eventTypes).set(data as never)
             .where(and(eq(eventTypes.id, id), eq(eventTypes.tenantId, tenantId))).run();
     }
 
@@ -100,7 +100,7 @@ export class EventService {
         return reminderTs;
     }
 
-    async createEvent(tenantId: string, inspectionId: string, data: Partial<typeof inspectionEvents.$inferInsert>) {
+    async createEvent(tenantId: string, inspectionId: string, data: Record<string, unknown>) {
         const d = drizzle(this.db);
         const row = {
             id:        crypto.randomUUID(),

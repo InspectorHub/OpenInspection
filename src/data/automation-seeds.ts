@@ -122,4 +122,26 @@ export const AUTOMATION_SEEDS = [
         // For Spec 2A: leave active=true; reconsider in Spec 3 if email noise
         // becomes a complaint.
     },
+    // Spec 4D — Inspection Events automations.
+    // EventService pre-INSERTs automation_logs with computed sendAt
+    // (scheduled_at - 24h for reminder, completed_at + 72h for follow-up).
+    // delayMinutes is unused for these rules; cron flush picks up by sendAt.
+    {
+        name:            'Event Reminder (24h before)',
+        trigger:         'event.created' as const,
+        recipient:       'client' as const,
+        delayMinutes:    0,
+        subjectTemplate: 'Reminder: {{event_type_name}} tomorrow — {{property_address}}',
+        bodyTemplate:    '<p>Hi {{client_name}},</p><p>Just a reminder that your {{event_type_name}} is scheduled for {{event_scheduled_at}} at {{property_address}}.</p><p>— {{company_name}}</p>',
+        isDefault: true,
+    },
+    {
+        name:            'Event Follow-up (results ready)',
+        trigger:         'event.completed' as const,
+        recipient:       'client' as const,
+        delayMinutes:    0,
+        subjectTemplate: '{{event_type_name}} results — {{property_address}}',
+        bodyTemplate:    '<p>Hi {{client_name}},</p><p>The results for your {{event_type_name}} at {{property_address}} are now available in your inspection report.</p><p>— {{company_name}}</p>',
+        isDefault: true,
+    },
 ] as const;

@@ -180,7 +180,26 @@ export class AutomationService {
                     invoice_url:      `${appBaseUrl}/invoices`,
                     payment_url:      `${appBaseUrl}/invoices`,
                     company_name:     appName,
+                    // Spec 4D — event-related vars (populated below if log.eventId set)
+                    event_type_name:      '',
+                    event_scheduled_at:   '',
+                    event_inspector_name: '',
                 };
+
+                // Spec 4D — populate event vars when log was created by EventService.
+                if (log.eventId) {
+                    try {
+                        const { eventTypes, inspectionEvents } = await import('../lib/db/schema');
+                        const ev = await db.select().from(inspectionEvents).where(eq(inspectionEvents.id, log.eventId)).get();
+                        if (ev) {
+                            const et = await db.select().from(eventTypes).where(eq(eventTypes.id, ev.eventTypeId as string)).get();
+                            vars.event_type_name    = (et?.name as string) ?? '';
+                            vars.event_scheduled_at = ev.scheduledAt ? new Date(ev.scheduledAt as Date).toLocaleString() : '';
+                        }
+                    } catch (err) {
+                        logger.error('Failed to load event vars for automation log', { logId: log.id, eventId: log.eventId }, err instanceof Error ? err : undefined);
+                    }
+                }
 
                 // Lazy: only create agreement_request when this rule actually needs it
                 const needsAgreementUrl = automation.bodyTemplate.includes('{{agreement_sign_url}}') ||
