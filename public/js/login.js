@@ -11,6 +11,9 @@ function getCookie(name) {
     return m ? decodeURIComponent(m[1]) : '';
 }
 
+// Spec 4A — challenge token from /api/auth/login when 2FA is enabled.
+let pendingChallengeToken = null;
+
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
@@ -56,6 +59,23 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         const data = await res.json();
 
         if (res.ok && data.success) {
+            // Spec 4A — If the user has 2FA enabled, the server returns a challenge instead
+            // of a session cookie. Switch UI to step='2fa' and prompt for the TOTP code.
+            if (data.data?.requires2fa && data.data?.challengeToken) {
+                pendingChallengeToken = data.data.challengeToken;
+                // The Alpine wrapper around the form watches this state via a custom event.
+                const root = document.querySelector('[x-data]');
+                if (root && root.__x) {
+                    root.__x.$data.step = '2fa';
+                } else if (root && root._x_dataStack) {
+                    // Alpine v3 stores reactive data on _x_dataStack
+                    root._x_dataStack[0].step = '2fa';
+                }
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+                setTimeout(() => { document.getElementById('twofaCode')?.focus(); }, 50);
+                return;
+            }
             // The server set an HttpOnly + Secure cookie on this response. Do NOT mirror it into
             // localStorage or document.cookie — that would downgrade the cookie to a JS-readable
             // one and let any XSS steal the session.
@@ -73,3 +93,51 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         btn.textContent = 'Sign In';
     }
 });
+
+// Spec 4A — 2FA verification step.
+const twofaForm = document.getElementById('twofaForm');
+if (twofaForm) {
+    twofaForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('twofaSubmitBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const codeInput = document.getElementById('twofaCode');
+        if (!btn || !codeInput) return;
+
+        const code = codeInput.value.trim();
+        if (!code) return;
+        if (!pendingChallengeToken) {
+            errorMsg.textContent = 'Session expired. Please sign in again.';
+            errorMsg.classList.remove('hidden');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+        errorMsg.classList.add('hidden');
+
+        try {
+            const csrf = getCookie('__Host-csrf_token');
+            const res = await fetch('/api/auth/login/2fa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+                credentials: 'same-origin',
+                body: JSON.stringify({ challengeToken: pendingChallengeToken, code }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                window.location.href = data.data?.redirect || '/dashboard';
+            } else {
+                errorMsg.textContent = data.error?.message || data.error || 'Invalid verification code.';
+                errorMsg.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Verify';
+            }
+        } catch {
+            errorMsg.textContent = 'Network error. Please try again.';
+            errorMsg.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Verify';
+        }
+    });
+}

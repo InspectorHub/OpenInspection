@@ -28,6 +28,11 @@ export const users = sqliteTable('users', {
     locale: text('locale'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    // Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled.
+    totpSecret:        text('totp_secret'),
+    totpEnabled:       integer('totp_enabled', { mode: 'boolean' }).notNull().default(false),
+    totpRecoveryCodes: text('totp_recovery_codes'),
+    totpVerifiedAt:    integer('totp_verified_at', { mode: 'timestamp' }),
 });
 
 export const tenantInvites = sqliteTable('tenant_invites', {

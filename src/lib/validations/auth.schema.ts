@@ -64,6 +64,37 @@ export const ForgotPasswordSchema = z.object({
 });
 
 /**
+ * Spec 4A — TOTP 2FA schemas. Recovery codes have 8 chars + dash; we accept the same
+ * 6-digit input for both TOTP and recovery code (recovery codes are 4-4 alphabetic).
+ */
+export const TotpVerifySchema = z.object({
+    code: z.string().min(6).max(20).openapi({ example: '123456' }),
+});
+
+export const TotpDisableSchema = z.object({
+    password: z.string().min(1).openapi({ example: 'currentPassword' }),
+    code: z.string().min(6).max(20).openapi({ example: '123456' }),
+});
+
+export const TotpRegenerateSchema = TotpDisableSchema;
+
+export const TotpLoginSchema = z.object({
+    challengeToken: z.string().min(10).openapi({ example: 'eyJhbGciOiJI...' }),
+    code: z.string().min(6).max(20).openapi({ example: '123456' }),
+});
+
+export const TotpSetupResponseSchema = createApiResponseSchema(z.object({
+    secret: z.string().openapi({ example: 'JBSWY3DPEHPK3PXP' }),
+    qrCodeDataUri: z.string().openapi({ example: 'data:image/png;base64,...' }),
+    recoveryCodes: z.array(z.string()).openapi({ example: ['ABCD-EFGH'] }),
+}));
+
+export const Login2faResponseSchema = createApiResponseSchema(z.union([
+    z.object({ redirect: z.string() }),
+    z.object({ requires2fa: z.literal(true), challengeToken: z.string() }),
+]));
+
+/**
  * Validation schema for the system initialization (Zero-Setup).
  */
 export const SetupSchema = z.object({

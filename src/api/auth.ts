@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
-import { sign } from 'hono/jwt';
+import { sign, verify } from 'hono/jwt';
 import { setCookie, deleteCookie } from 'hono/cookie';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
@@ -11,6 +11,7 @@ import { getBaseUrl } from '../lib/url';
 import { checkRateLimit } from '../lib/rate-limit';
 import { requireCsrfToken } from '../lib/middleware/csrf';
 import { requireRole } from '../lib/middleware/rbac';
+import { verifyPassword } from '../lib/password';
 import {
     LoginSchema,
     ChangePasswordSchema,
@@ -18,7 +19,13 @@ import {
     ForgotPasswordSchema,
     ResetPasswordSchema,
     AuthResponseSchema,
-    SetupSchema
+    SetupSchema,
+    TotpVerifySchema,
+    TotpDisableSchema,
+    TotpRegenerateSchema,
+    TotpLoginSchema,
+    TotpSetupResponseSchema,
+    Login2faResponseSchema
 } from '../lib/validations/auth.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 
@@ -99,6 +106,25 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
 
     const secret = requireJwtSecret(c.env.JWT_SECRET);
     const now = Math.floor(Date.now() / 1000);
+
+    // Spec 4A — If the user has 2FA enabled, return a short-lived challenge token instead of
+    // the session JWT. The client must POST it back along with a TOTP code to /api/auth/login/2fa
+    // before any session is granted.
+    if (user.totpEnabled) {
+        const challengeToken = await sign({
+            sub: user.id,
+            t: 'challenge',
+            iat: now,
+            exp: now + 60 * 5,
+        }, secret, 'HS256');
+        // Intentionally NOT a Set-Cookie — challenge tokens travel JSON-only so a stolen
+        // session cookie alone never permits 2FA bypass.
+        return c.json({
+            success: true,
+            data: { requires2fa: true, challengeToken }
+        }, 200);
+    }
+
     // Email is intentionally NOT in the payload — JWTs are signed but not encrypted, and the
     // token travels through logs / intermediaries. PII belongs in the DB, not in the bearer.
     const token = await sign({
@@ -413,6 +439,8 @@ const meRoute = createRoute({
                             tenantId: z.string().optional(),
                             role: z.string(),
                             onboardingState: z.record(z.string(), z.boolean()).nullable().optional(),
+                            totpEnabled: z.boolean().optional(),
+                            recoveryCodesRemaining: z.number().nullable().optional(),
                         })
                     }))
                 }
@@ -435,7 +463,15 @@ coreAuthRoutes.openapi(meRoute, async (c) => {
         phone: users.phone,
         licenseNumber: users.licenseNumber,
         onboardingState: users.onboardingState,
+        totpEnabled: users.totpEnabled,
+        totpRecoveryCodes: users.totpRecoveryCodes,
     }).from(users).where(eq(users.id, user.sub)).get();
+
+    let recoveryCodesRemaining: number | null = null;
+    if (row?.totpEnabled && row.totpRecoveryCodes) {
+        try { recoveryCodesRemaining = (JSON.parse(row.totpRecoveryCodes) as string[]).length; }
+        catch { recoveryCodesRemaining = 0; }
+    }
 
     return c.json({
         success: true,
@@ -448,7 +484,9 @@ coreAuthRoutes.openapi(meRoute, async (c) => {
                 licenseNumber: row?.licenseNumber || null,
                 onboardingState: row?.onboardingState ?? null,
                 tenantId: c.get('tenantId'),
-                role: c.get('userRole')
+                role: c.get('userRole'),
+                totpEnabled: !!row?.totpEnabled,
+                recoveryCodesRemaining,
             }
         }
     }, 200);
@@ -530,6 +568,249 @@ coreAuthRoutes.openapi(logoutRoute, async (c) => {
     });
 
     return c.json({ success: true, data: { success: true } }, 200);
+});
+
+// ─── Spec 4A — TOTP 2FA endpoints ──────────────────────────────────────────
+// All 5 endpoints below were added by Spec 4A. They are additive — no existing
+// behaviour was altered beyond the requires2fa branch in the login handler above.
+
+const TOTP_ISSUER = 'OpenInspection';
+
+/** Look up the current user row or 401 if the JWT is missing/stale. */
+async function loadCurrentUser(c: Parameters<Parameters<typeof coreAuthRoutes.openapi>[1]>[0]) {
+    const userPayload = c.get('user');
+    if (!userPayload?.sub) throw Errors.Unauthorized();
+    const db = drizzle(c.env.DB);
+    const row = await db.select().from(users).where(eq(users.id, userPayload.sub)).get();
+    if (!row) throw Errors.Unauthorized();
+    return row;
+}
+
+const totpSetupRoute = createRoute({
+    method: 'post',
+    path: '/2fa/setup',
+    summary: 'Begin TOTP 2FA enrollment',
+    description: 'Generates a fresh secret + recovery codes and returns the QR data URI. Caller must POST /2fa/verify before 2FA is actually enabled.',
+    responses: {
+        200: { content: { 'application/json': { schema: TotpSetupResponseSchema } }, description: 'Setup payload' },
+        401: { description: 'Unauthorized' },
+    }
+});
+
+coreAuthRoutes.openapi(totpSetupRoute, async (c) => {
+    const me = await loadCurrentUser(c);
+    const totpSvc = c.var.services.totp;
+
+    const secret = totpSvc.generateSecret();
+    const recoveryCodes = totpSvc.generateRecoveryCodes(8);
+    const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
+    const otpAuthUrl = totpSvc.buildOtpAuthUrl({ accountName: me.email, issuer: TOTP_ISSUER, secret });
+    const qrCodeDataUri = await totpSvc.qrCodeDataUri(otpAuthUrl);
+
+    // Persist the secret + recovery hashes immediately, but keep totpEnabled=false until
+    // the user proves they can produce a valid code via /2fa/verify. This way an abandoned
+    // setup never locks anyone out.
+    const db = drizzle(c.env.DB);
+    await db.update(users).set({
+        totpSecret: secret,
+        totpRecoveryCodes: JSON.stringify(recoveryHashes),
+        totpEnabled: false,
+        totpVerifiedAt: null,
+    }).where(eq(users.id, me.id));
+
+    return c.json({
+        success: true,
+        data: { secret, qrCodeDataUri, recoveryCodes }
+    }, 200);
+});
+
+const totpVerifyRoute = createRoute({
+    method: 'post',
+    path: '/2fa/verify',
+    summary: 'Activate TOTP 2FA',
+    description: 'Verifies the supplied code against the pending secret. On success, sets totpEnabled=true.',
+    request: { body: { content: { 'application/json': { schema: TotpVerifySchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: '2FA enabled' },
+        400: { description: 'Invalid code or no pending secret' },
+        401: { description: 'Unauthorized' },
+    }
+});
+
+coreAuthRoutes.openapi(totpVerifyRoute, async (c) => {
+    const me = await loadCurrentUser(c);
+    if (!me.totpSecret) throw Errors.BadRequest('No pending 2FA setup. Call /2fa/setup first.');
+
+    const { code } = c.req.valid('json');
+    const ok = c.var.services.totp.verifyCode(me.totpSecret, code);
+    if (!ok) throw Errors.BadRequest('Invalid verification code');
+
+    const db = drizzle(c.env.DB);
+    await db.update(users).set({
+        totpEnabled: true,
+        totpVerifiedAt: new Date(),
+    }).where(eq(users.id, me.id));
+
+    return c.json({ success: true, data: { success: true } }, 200);
+});
+
+const totpDisableRoute = createRoute({
+    method: 'post',
+    path: '/2fa/disable',
+    summary: 'Disable TOTP 2FA',
+    description: 'Requires both the current password and a valid TOTP / recovery code. Wipes all 2FA state.',
+    request: { body: { content: { 'application/json': { schema: TotpDisableSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: '2FA disabled' },
+        400: { description: 'Invalid input' },
+        401: { description: 'Unauthorized — wrong password or code' },
+    }
+});
+
+coreAuthRoutes.openapi(totpDisableRoute, async (c) => {
+    const me = await loadCurrentUser(c);
+    const { password, code } = c.req.valid('json');
+
+    const [pwOk] = await verifyPassword(password, me.passwordHash);
+    if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
+
+    if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
+
+    const totpSvc = c.var.services.totp;
+    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+    let updatedHashes: string[] | null = null;
+    if (!codeOk && me.totpRecoveryCodes) {
+        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+        const result = await totpSvc.consumeRecoveryCode(code, hashes);
+        codeOk = result.matched;
+        if (result.matched) updatedHashes = result.remainingHashes;
+    }
+    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+    const db = drizzle(c.env.DB);
+    await db.update(users).set({
+        totpSecret: null,
+        totpEnabled: false,
+        totpRecoveryCodes: null,
+        totpVerifiedAt: null,
+    }).where(eq(users.id, me.id));
+
+    // updatedHashes intentionally discarded — we are wiping all 2FA state anyway.
+    void updatedHashes;
+    return c.json({ success: true, data: { success: true } }, 200);
+});
+
+const totpRegenRoute = createRoute({
+    method: 'post',
+    path: '/2fa/recovery-codes/regenerate',
+    summary: 'Regenerate recovery codes',
+    description: 'Invalidates all existing recovery codes and returns a fresh set. Requires password + 2FA code.',
+    request: { body: { content: { 'application/json': { schema: TotpRegenerateSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: TotpSetupResponseSchema } }, description: 'New recovery codes' },
+        401: { description: 'Unauthorized' },
+    }
+});
+
+coreAuthRoutes.openapi(totpRegenRoute, async (c) => {
+    const me = await loadCurrentUser(c);
+    const { password, code } = c.req.valid('json');
+
+    const [pwOk] = await verifyPassword(password, me.passwordHash);
+    if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
+
+    if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
+
+    const totpSvc = c.var.services.totp;
+    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+    if (!codeOk && me.totpRecoveryCodes) {
+        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+        const result = await totpSvc.consumeRecoveryCode(code, hashes);
+        codeOk = result.matched;
+        // We are about to overwrite recovery codes wholesale, so consuming the matched code
+        // here doesn't need to be persisted separately.
+    }
+    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+    const recoveryCodes = totpSvc.generateRecoveryCodes(8);
+    const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
+
+    const db = drizzle(c.env.DB);
+    await db.update(users).set({
+        totpRecoveryCodes: JSON.stringify(recoveryHashes),
+    }).where(eq(users.id, me.id));
+
+    // QR code is irrelevant on regenerate; surface an empty string to keep the schema stable.
+    return c.json({
+        success: true,
+        data: { secret: me.totpSecret, qrCodeDataUri: '', recoveryCodes }
+    }, 200);
+});
+
+const login2faRoute = createRoute({
+    method: 'post',
+    path: '/login/2fa',
+    summary: 'Complete 2FA login',
+    description: 'Exchanges a short-lived challenge token + TOTP code for a session cookie.',
+    middleware: [requireCsrfToken],
+    request: { body: { content: { 'application/json': { schema: TotpLoginSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: Login2faResponseSchema } }, description: 'Login complete' },
+        401: { description: 'Invalid or expired challenge / code' },
+    }
+});
+
+coreAuthRoutes.openapi(login2faRoute, async (c) => {
+    await checkRateLimit(c, 'login');
+
+    const { challengeToken, code } = c.req.valid('json');
+    const secret = requireJwtSecret(c.env.JWT_SECRET);
+
+    let payload: Record<string, unknown>;
+    try {
+        payload = await verify(challengeToken, secret, 'HS256') as Record<string, unknown>;
+    } catch {
+        throw Errors.Unauthorized('Invalid or expired challenge');
+    }
+    if (payload['t'] !== 'challenge' || typeof payload['sub'] !== 'string') {
+        throw Errors.Unauthorized('Invalid challenge token');
+    }
+    const userId = payload['sub'] as string;
+
+    const db = drizzle(c.env.DB);
+    const me = await db.select().from(users).where(eq(users.id, userId)).get();
+    if (!me || !me.totpEnabled || !me.totpSecret) {
+        throw Errors.Unauthorized('Invalid challenge token');
+    }
+
+    const totpSvc = c.var.services.totp;
+    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+    if (!codeOk && me.totpRecoveryCodes) {
+        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+        const result = await totpSvc.consumeRecoveryCode(code, hashes);
+        if (result.matched) {
+            codeOk = true;
+            // Single-use semantics: persist remaining hashes immediately, before we issue
+            // the session cookie. If the DB write fails we don't want to grant a session.
+            await db.update(users).set({
+                totpRecoveryCodes: JSON.stringify(result.remainingHashes),
+            }).where(eq(users.id, me.id));
+        }
+    }
+    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+    const now = Math.floor(Date.now() / 1000);
+    const sessionToken = await sign({
+        sub: me.id,
+        'custom:tenantId': me.tenantId,
+        'custom:userRole': me.role,
+        role: me.role,
+        iat: now,
+        exp: now + 60 * 60 * 24,
+    }, secret, 'HS256');
+
+    setCookie(c, '__Host-inspector_token', sessionToken, authCookieOptions());
+    return c.json({ success: true, data: { redirect: '/dashboard' } }, 200);
 });
 
 export default coreAuthRoutes;

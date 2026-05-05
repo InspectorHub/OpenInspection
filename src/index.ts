@@ -50,6 +50,7 @@ import { MetricsPage } from './templates/pages/metrics';
 import { SettingsDataPage } from './templates/pages/settings-data';
 import { MessagesPublicPage } from './templates/pages/messages-public';
 import { NotificationsPage } from './templates/pages/notifications';
+import { SettingsSecurityPage } from './templates/pages/settings-security';
 
 
 import coreAuthRoutes from './api/auth';
@@ -164,7 +165,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 // Global JWT Middleware — extracts tenantId / userRole from Bearer token or cookie.
 app.use('*', async (c, next) => {
     const path = c.req.path;
-    const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup';
+    const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
     const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
@@ -531,6 +532,11 @@ app.get('/settings/services', htmlAuthGuard(['owner', 'admin']), (c) => {
 app.get('/settings/event-types', htmlAuthGuard(['owner', 'admin']), (c) => {
     const b = c.get('branding');
     return c.html(SettingsEventTypesPage(b ? { branding: b } : {}));
+});
+// Spec 4A — TOTP 2FA settings page (per-user, all roles allowed).
+app.get('/settings/security', htmlAuthGuard(), (c) => {
+    const b = c.get('branding');
+    return c.html(SettingsSecurityPage(b ? { branding: b } : {}));
 });
 app.get('/metrics', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MetricsPage({ branding: c.get('branding') })));
 app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.html(TeamPage({ branding: c.get('branding') })));
