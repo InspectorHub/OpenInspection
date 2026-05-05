@@ -49,6 +49,7 @@ export const inspections = sqliteTable('inspections', {
     messageToken:        text('message_token').unique('idx_inspections_msg_token'),
     templateSnapshot:    text('template_snapshot', { mode: 'json' }),
     templateSnapshotVersion: integer('template_snapshot_version').default(1),
+    reportThemeOverride: text('report_theme_override', { enum: ['modern', 'classic', 'minimal'] }),
 });
 
 export const agreements = sqliteTable('agreements', {

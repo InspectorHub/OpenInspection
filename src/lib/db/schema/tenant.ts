@@ -51,6 +51,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     secrets: text('secrets'),                      // AES-GCM encrypted JSON: {resendApiKey, turnstileSecretKey, geminiApiKey, googleClientSecret}
     icsToken: text('ics_token'),
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
+    reportTheme: text('report_theme', { enum: ['modern', 'classic', 'minimal'] }).notNull().default('modern'),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
