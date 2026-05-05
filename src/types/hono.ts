@@ -68,6 +68,7 @@ import { MessageService } from '../services/message.service';
 import { NotificationService } from '../services/notification.service';
 import { WidgetService } from '../services/widget.service';
 import { RecommendationService } from '../services/recommendation.service';
+import { EventService } from '../services/event.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -95,6 +96,7 @@ export interface AppServices {
     notification: NotificationService;
     widget: WidgetService;
     recommendation: RecommendationService;
+    event: EventService;
 }
 
 /**

@@ -5,6 +5,7 @@ const AUTOMATION_TRIGGERS = [
     'inspection.created', 'inspection.confirmed', 'inspection.cancelled',
     'report.published', 'invoice.created', 'payment.received', 'agreement.signed',
     'agreement.viewed', 'agreement.declined', 'agreement.expired',
+    'event.created', 'event.completed',
 ] as const;
 
 const AUTOMATION_RECIPIENTS = ['client', 'buying_agent', 'selling_agent', 'inspector', 'all'] as const;

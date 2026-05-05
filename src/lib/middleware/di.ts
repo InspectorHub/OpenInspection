@@ -20,6 +20,7 @@ import { MessageService } from '../../services/message.service';
 import { NotificationService } from '../../services/notification.service';
 import { WidgetService } from '../../services/widget.service';
 import { RecommendationService } from '../../services/recommendation.service';
+import { EventService } from '../../services/event.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -120,6 +121,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'recommendation':
                     target.recommendation = new RecommendationService(c.env.DB);
+                    break;
+                case 'event':
+                    target.event = new EventService(c.env.DB);
                     break;
             }
             return target[prop];

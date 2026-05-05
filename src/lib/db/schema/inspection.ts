@@ -171,6 +171,7 @@ export const automations = sqliteTable('automations', {
             'inspection.created', 'inspection.confirmed', 'inspection.cancelled',
             'report.published', 'invoice.created', 'payment.received', 'agreement.signed',
             'agreement.viewed', 'agreement.declined', 'agreement.expired',
+            'event.created', 'event.completed',
         ],
     }).notNull(),
     recipient: text('recipient', {
