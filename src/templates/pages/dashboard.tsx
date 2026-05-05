@@ -69,6 +69,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 {/* Collapsible Inspection Sections */}
                 <div x-data="dashboard()" x-init="init()" class="space-y-4 mt-8">
 
+                    {/* Spec 4E — offline cache progress pill */}
+                    <div x-show="cacheProgress" {...{ 'x-cloak': true }} class="text-xs text-slate-500 inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-full">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                        <span x-text="cacheProgress"></span>
+                    </div>
+
                     {/* Loading spinner */}
                     <div x-show="loading" class="flex items-center justify-center py-16">
                         <div class="relative w-12 h-12">
@@ -435,6 +441,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 <script src="/js/action-menu.js"></script>
                 <script src="/js/dashboard.js"></script>
                 <script type="module" src="/js/contact-selector.js"></script>
+                <script type="module" src="/js/dashboard-prefetch.js"></script>
             </div>
         </MainLayout>
     );

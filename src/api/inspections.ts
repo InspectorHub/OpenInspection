@@ -896,6 +896,29 @@ inspectionsRoutes.get('/:id/report', async (c) => {
 });
 
 /**
+ * GET /api/inspections/:id/full — Spec 4E
+ * Returns combined { inspection, template, results } for offline prefetch.
+ * Avoids 3 separate fetches per inspection (saves ~150 round-trips for 50 inspections).
+ */
+inspectionsRoutes.get('/:id/full', requireRole(['owner', 'admin', 'inspector']), async (c) => {
+    const id       = c.req.param('id') as string;
+    const tenantId = c.get('tenantId');
+    const svc      = c.var.services.inspection;
+    try {
+        const { inspection, template } = await svc.getInspection(id, tenantId);
+        const db = drizzle(c.env.DB);
+        const results = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
+        return c.json({ success: true, data: { inspection, template: template || null, results: results || null, base: null } });
+    } catch (err) {
+        if (err instanceof Error && err.message.includes('not found')) {
+            return c.json({ success: false, error: 'Inspection not found' }, 404);
+        }
+        throw err;
+    }
+});
+
+/**
  * GET /api/inspections/:id/sign-status (public — check if client already signed)
  */
 inspectionsRoutes.get('/:id/sign-status', async (c) => {

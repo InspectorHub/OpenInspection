@@ -405,6 +405,8 @@ function dashboardFactory() {
         // Spec 4D.T10 — Today's events bucket
         todayEvents: [],
         eventTypes: [],
+        // Spec 4E — prefetch progress pill
+        cacheProgress: null,
 
         async init() {
             await this.reload();
