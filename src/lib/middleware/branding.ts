@@ -48,7 +48,8 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             logoUrl: tenantConfigs.logoUrl,
             supportEmail: tenantConfigs.supportEmail,
             billingUrl: tenantConfigs.billingUrl,
-            gaMeasurementId: tenantConfigs.gaMeasurementId
+            gaMeasurementId: tenantConfigs.gaMeasurementId,
+            reportTheme: tenantConfigs.reportTheme
         })
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
@@ -60,7 +61,8 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             logoUrl: config.logoUrl,
             supportEmail: config.supportEmail || defaultBranding.supportEmail,
             billingUrl: config.billingUrl || defaultBranding.billingUrl,
-            gaMeasurementId: config.gaMeasurementId || defaultBranding.gaMeasurementId
+            gaMeasurementId: config.gaMeasurementId || defaultBranding.gaMeasurementId,
+            reportTheme: (config.reportTheme || 'modern') as 'modern' | 'classic' | 'minimal'
         } : defaultBranding;
         
         c.set('branding', branding);
