@@ -488,6 +488,83 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 </div>
             </div>
 
+            {/* Inspection Events (Spec 4D.T9) */}
+            <section x-data={`inspectionEventsSection('${inspectionId}')`} x-init="load()" class="mx-6 mt-3 rounded-2xl bg-white p-5 ring-1 ring-slate-200">
+                <header class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-slate-900">Events</h2>
+                        <span class="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-500" x-show="events.length > 0" x-text="events.length + ' total'"></span>
+                    </div>
+                    <button type="button" x-on:click="openCreate()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">+ Add event</button>
+                </header>
+                <ul class="mt-3 space-y-2">
+                    <template x-for="ev in events" {...{ 'x-bind:key': 'ev.id' }}>
+                        <li class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg text-sm">
+                            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" {...{ 'x-bind:style': "'background:' + eventTypeColor(ev.eventTypeId)" }}></span>
+                            <span class="font-bold text-slate-900" x-text="eventTypeName(ev.eventTypeId)"></span>
+                            <span class="text-slate-500 text-xs" x-text="formatDate(ev.scheduledAt)"></span>
+                            <span class="text-slate-400 text-xs" x-show="ev.durationMin" x-text="(ev.durationMin || 0) + ' min'"></span>
+                            <span class="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" x-text="(ev.status || '').replace('_', ' ')" {...{ 'x-bind:class': 'statusBadgeClass(ev.status)' }}></span>
+                            <button type="button" x-show="ev.status === 'scheduled'" x-on:click="markComplete(ev.id)" class="text-emerald-600 text-xs font-bold hover:underline" title="Mark complete">&#10003;</button>
+                            <button type="button" x-on:click="del(ev.id)" class="text-rose-600 text-xs font-bold hover:underline" title="Delete">&times;</button>
+                        </li>
+                    </template>
+                    <li x-show="!events.length && !loading" class="text-xs text-slate-400">No events yet. Add a radon pickup, sewer scope, follow-up visit, etc.</li>
+                </ul>
+
+                {/* Create modal */}
+                <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) showCreate = false' }}>
+                    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                        <h3 class="text-lg font-bold text-slate-900 mb-4">New event</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Type</label>
+                                <select x-model="form.eventTypeId" x-on:change="onTypeChange()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">
+                                    <option value="">— Select —</option>
+                                    <template x-for="t in types" {...{ 'x-bind:key': 't.id' }}>
+                                        <option {...{ 'x-bind:value': 't.id' }} x-text="t.name"></option>
+                                    </template>
+                                </select>
+                                <p x-show="!types.length" class="text-[10px] text-amber-600 mt-1">No event types defined. <a href="/settings/event-types" class="underline">Create one</a> first.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Date &amp; time</label>
+                                <input type="datetime-local" x-model="form.scheduledAt" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Duration (min)</label>
+                                    <input type="number" {...{ 'x-model.number': 'form.durationMin' }} min="1" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Price (cents)</label>
+                                    <input type="number" {...{ 'x-model.number': 'form.priceCents' }} min="0" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Inspector (optional)</label>
+                                <select x-model="form.inspectorId" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">
+                                    <option value="">Unassigned</option>
+                                    <template x-for="i in inspectors" {...{ 'x-bind:key': 'i.id' }}>
+                                        <option {...{ 'x-bind:value': 'i.id' }} x-text="i.name || i.email"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Notes (optional)</label>
+                                <textarea x-model="form.notes" rows={2} class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"></textarea>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 justify-end mt-5">
+                            <button type="button" x-on:click="showCreate = false" class="px-4 py-2 rounded-lg ring-2 ring-slate-200 text-slate-600 text-xs font-bold">Cancel</button>
+                            <button type="button" x-on:click="submitCreate()" {...{ 'x-bind:disabled': 'saving' }} class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold disabled:opacity-50">
+                                <span x-text="saving ? 'Saving...' : 'Add event'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* Card Grid */}
             <div class="p-6 grid grid-cols-2 xl:grid-cols-3 gap-4">
               <template x-for="item in currentSectionItems" x-bind:key="item.id">
@@ -781,6 +858,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
       <script src="/js/comments-library.js"></script>
       <script src="/js/toast.js"></script>
       <script src="/js/inspection-edit.js"></script>
+      <script src="/js/inspection-events.js"></script>
       {/* Phase T (T14) — Konva-based photo annotator. konva.min.js (~150KB) is
           lazy-loaded by photo-annotator.js on the first `annotate` event so it
           doesn't block first paint of the inspection edit page. */}
