@@ -123,4 +123,60 @@ api.post('/tenants/:subdomain/stripe-connect', verifyPortalSignature, async (c) 
     }
 });
 
+/**
+ * POST /api/integration/tenants/:subdomain/data-export
+ * Triggered by Portal during offboarding workflow. Returns ZIP stream.
+ */
+api.post('/tenants/:subdomain/data-export', verifyPortalSignature, async (c) => {
+    const subdomain = c.req.param('subdomain');
+    const { drizzle } = await import('drizzle-orm/d1');
+    const { eq } = await import('drizzle-orm');
+    const { tenants } = await import('../lib/db/schema');
+    const d = drizzle(c.env.DB);
+    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.subdomain, subdomain as string)).get();
+    if (!t) return c.json({ error: 'Tenant not found' }, 404);
+
+    const { DataExportService } = await import('../services/data-export.service');
+    const svc = new DataExportService(c.env.DB, c.env.PHOTOS);
+    try {
+        const { buffer, manifest } = await svc.buildZip(t.id as string);
+        // Wrap Uint8Array in Blob (BodyInit-compatible across Node + Workers)
+        const blob = new Blob([buffer as BlobPart], { type: 'application/zip' });
+        return new Response(blob, {
+            headers: {
+                'content-type':        'application/zip',
+                'content-disposition': `attachment; filename="export-${subdomain}.zip"`,
+                'x-export-manifest':   JSON.stringify(manifest),
+            },
+        });
+    } catch (error: unknown) {
+        logger.error('Data export failed', { subdomain }, error instanceof Error ? error : undefined);
+        return c.json({ error: 'Export failed' }, 500);
+    }
+});
+
+/**
+ * POST /api/integration/tenants/:subdomain/purge
+ * Triggered by Portal at end of offboarding grace period. Cascade-deletes all tenant data.
+ */
+api.post('/tenants/:subdomain/purge', verifyPortalSignature, async (c) => {
+    const subdomain = c.req.param('subdomain');
+    const { drizzle } = await import('drizzle-orm/d1');
+    const { eq } = await import('drizzle-orm');
+    const { tenants } = await import('../lib/db/schema');
+    const d = drizzle(c.env.DB);
+    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.subdomain, subdomain as string)).get();
+    if (!t) return c.json({ error: 'Tenant not found' }, 404);
+
+    const { TenantPurgeService } = await import('../services/tenant-purge.service');
+    const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE);
+    try {
+        const result = await svc.purge(t.id as string);
+        return c.json({ success: true, data: result });
+    } catch (error: unknown) {
+        logger.error('Tenant purge failed', { subdomain }, error instanceof Error ? error : undefined);
+        return c.json({ error: 'Purge failed' }, 500);
+    }
+});
+
 export default api;
