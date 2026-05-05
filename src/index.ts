@@ -45,6 +45,7 @@ import { InspectionEditPage } from './templates/pages/inspection-edit';
 import { SettingsAutomationsPage } from './templates/pages/settings-automations';
 import { SettingsWidgetPage } from './templates/pages/settings-widget';
 import { SettingsServicesPage } from './templates/pages/settings-services';
+import { SettingsEventTypesPage } from './templates/pages/settings-event-types';
 import { MetricsPage } from './templates/pages/metrics';
 import { SettingsDataPage } from './templates/pages/settings-data';
 import { MessagesPublicPage } from './templates/pages/messages-public';
@@ -526,6 +527,10 @@ app.get('/settings/widget', htmlAuthGuard(['owner', 'admin']), (c) => {
 app.get('/settings/services', htmlAuthGuard(['owner', 'admin']), (c) => {
     const b = c.get('branding');
     return c.html(SettingsServicesPage(b ? { branding: b } : {}));
+});
+app.get('/settings/event-types', htmlAuthGuard(['owner', 'admin']), (c) => {
+    const b = c.get('branding');
+    return c.html(SettingsEventTypesPage(b ? { branding: b } : {}));
 });
 app.get('/metrics', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MetricsPage({ branding: c.get('branding') })));
 app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.html(TeamPage({ branding: c.get('branding') })));
