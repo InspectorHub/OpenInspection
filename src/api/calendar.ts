@@ -320,4 +320,113 @@ export async function createCalendarEvent(
     }
 }
 
+/**
+ * Spec 4D.T11 — Google Calendar sync for inspection events.
+ *
+ * Lists every inspection event in the next 90 days (via EventService.listEventsByDateRange)
+ * and pushes each one as a separate calendar entry. Each event is summarised as
+ * "<eventType.name> — <inspection.propertyAddress>" with start = scheduledAt and
+ * end = scheduledAt + durationMin*60s.
+ *
+ * The function is best-effort: per-event push failures are logged but do not abort
+ * the loop. A returned summary lets callers report counts back to the user. A future
+ * enhancement should also persist a `gcalEventId` per inspection event so we can
+ * update / delete the remote entry when status changes — see TODO below.
+ */
+export async function syncEventsToGcal(
+    db: D1Database,
+    tenantId: string,
+    clientId: string,
+    clientSecret: string,
+    refreshToken: string,
+    calendarId: string,
+): Promise<{ pushed: number; skipped: number; failed: number; totalEvents: number }> {
+    if (!clientId || !clientSecret || !refreshToken) {
+        logger.warn('[calendar] syncEventsToGcal missing credentials', { tenantId });
+        return { pushed: 0, skipped: 0, failed: 0, totalEvents: 0 };
+    }
+
+    // Lazy import to avoid circular dependency between api/calendar.ts and services.
+    const { EventService } = await import('../services/event.service');
+    const { eventTypes, inspections } = await import('../lib/db/schema');
+    const eventService = new EventService(db);
+
+    const fromTs = Date.now();
+    const toTs   = fromTs + 90 * 24 * 60 * 60 * 1000;
+    const events = await eventService.listEventsByDateRange(tenantId, fromTs, toTs);
+
+    if (events.length === 0) {
+        return { pushed: 0, skipped: 0, failed: 0, totalEvents: 0 };
+    }
+
+    let accessToken: string;
+    try {
+        accessToken = await refreshAccessToken(clientId, clientSecret, refreshToken);
+    } catch (e) {
+        logger.error('[calendar] syncEventsToGcal token refresh failed', { tenantId }, e instanceof Error ? e : undefined);
+        return { pushed: 0, skipped: 0, failed: events.length, totalEvents: events.length };
+    }
+
+    // Pre-load event-type names + inspection addresses to avoid an N+1 fetch loop.
+    const drizzleDb = drizzle(db);
+    const allTypes = await drizzleDb.select({ id: eventTypes.id, name: eventTypes.name })
+        .from(eventTypes).where(eq(eventTypes.tenantId, tenantId)).all();
+    const typeNameById = new Map<string, string>(allTypes.map(t => [t.id as string, t.name as string]));
+    const allInspections = await drizzleDb.select({ id: inspections.id, propertyAddress: inspections.propertyAddress })
+        .from(inspections).where(eq(inspections.tenantId, tenantId)).all();
+    const addressById = new Map<string, string>(allInspections.map(i => [i.id as string, (i.propertyAddress as string) || '']));
+
+    let pushed = 0, skipped = 0, failed = 0;
+
+    for (const ev of events) {
+        // Skip cancelled / completed events — they shouldn't appear on the calendar.
+        if (ev.status === 'cancelled' || ev.status === 'completed') {
+            skipped++;
+            continue;
+        }
+        const typeName = typeNameById.get(ev.eventTypeId as string) || 'Inspection event';
+        const address  = addressById.get(ev.inspectionId as string) || '';
+        const summary  = address ? `${typeName} — ${address}` : typeName;
+        const start    = new Date(ev.scheduledAt as Date);
+        const durationSec = ((ev.durationMin as number | null) ?? 30) * 60;
+        const end      = new Date(start.getTime() + durationSec * 1000);
+
+        try {
+            const res = await fetch(
+                `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type':  'application/json',
+                    },
+                    body: JSON.stringify({
+                        summary,
+                        location: address || undefined,
+                        description: (ev.notes as string | null) || undefined,
+                        start: { dateTime: start.toISOString() },
+                        end:   { dateTime: end.toISOString() },
+                    }),
+                },
+            );
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+                logger.error('[calendar] Failed to push event', { eventId: ev.id, detail: err.error?.message });
+                failed++;
+                continue;
+            }
+            pushed++;
+            // TODO: complete Google Calendar event push — persist returned event.id back to
+            // inspection_events.gcalEventId so we can PATCH/DELETE on later status changes.
+            // Current schema lacks this column; add via a migration in a follow-up PR.
+        } catch (e) {
+            logger.error('[calendar] syncEventsToGcal push error', { eventId: ev.id }, e instanceof Error ? e : undefined);
+            failed++;
+        }
+    }
+
+    logger.info('[calendar] syncEventsToGcal complete', { tenantId, pushed, skipped, failed, totalEvents: events.length });
+    return { pushed, skipped, failed, totalEvents: events.length };
+}
+
 export default calendarRoutes;
