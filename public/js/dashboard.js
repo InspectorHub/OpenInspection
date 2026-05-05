@@ -396,11 +396,15 @@ function dashboardFactory() {
         sections: {
             needsAttention: true,
             today: true,
+            todayEvents: true,
             thisWeek: true,
             later: false,
             recentReports: false,
             cancelled: false,
         },
+        // Spec 4D.T10 — Today's events bucket
+        todayEvents: [],
+        eventTypes: [],
 
         async init() {
             await this.reload();
@@ -410,10 +414,17 @@ function dashboardFactory() {
         async reload() {
             this.loading = true;
             try {
-                const res = await fetch('/api/inspections/dashboard', { credentials: 'include' });
-                if (res.status === 401) { window.location.href = '/login'; return; }
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const json = await res.json();
+                // Parallel fetch dashboard buckets + today's events + event types (for name lookup).
+                // Event-type fetch runs in parallel; failures (e.g. inspector role lacking permission)
+                // gracefully fall back to showing the raw eventTypeId.
+                const [boardRes, eventsRes, typesRes] = await Promise.all([
+                    fetch('/api/inspections/dashboard', { credentials: 'include' }),
+                    fetch('/api/events/upcoming?days=1',  { credentials: 'include' }).catch(() => null),
+                    fetch('/api/event-types',             { credentials: 'include' }).catch(() => null),
+                ]);
+                if (boardRes.status === 401) { window.location.href = '/login'; return; }
+                if (!boardRes.ok) throw new Error('HTTP ' + boardRes.status);
+                const json = await boardRes.json();
                 if (json.data) {
                     this.buckets = {
                         needsAttention: json.data.needsAttention || [],
@@ -424,6 +435,14 @@ function dashboardFactory() {
                         recentReports: json.data.recentReports || [],
                         cancelled: json.data.cancelled || [],
                     };
+                }
+                if (eventsRes && eventsRes.ok) {
+                    const ej = await eventsRes.json().catch(() => ({ data: [] }));
+                    this.todayEvents = ej.data || [];
+                }
+                if (typesRes && typesRes.ok) {
+                    const tj = await typesRes.json().catch(() => ({ data: [] }));
+                    this.eventTypes = tj.data || [];
                 }
                 // Auto-expand needsAttention or today if they have items; collapse others if empty
                 if (this.buckets.needsAttention.length > 0) this.sections.needsAttention = true;
@@ -436,6 +455,11 @@ function dashboardFactory() {
             } finally {
                 this.loading = false;
             }
+        },
+
+        eventTypeName(id) {
+            const t = this.eventTypes.find(function(x) { return x.id === id; });
+            return t ? t.name : id;
         },
 
         computeStats() {

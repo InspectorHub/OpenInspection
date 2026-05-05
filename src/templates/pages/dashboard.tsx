@@ -139,6 +139,29 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </div>
                     </section>
 
+                    {/* Section: Today's events (Spec 4D.T10) */}
+                    <section x-show="!loading && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                        <button type="button" x-on:click="sections.todayEvents = !sections.todayEvents"
+                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                            <div class="flex items-center gap-3">
+                                <span class="text-purple-600">&#128203;</span>
+                                <span class="font-bold text-slate-900">Today's events</span>
+                                <span class="text-xs font-bold text-purple-700 bg-purple-100 rounded-full px-2 py-0.5" x-text="todayEvents.length"></span>
+                            </div>
+                            <span x-text="sections.todayEvents ? '−' : '+'" class="text-slate-400 text-xl"></span>
+                        </button>
+                        <div x-show="sections.todayEvents" {...{ 'x-collapse': true }}>
+                            <template x-for="e in todayEvents" {...{ 'x-bind:key': 'e.id' }}>
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3 text-sm">
+                                    <span class="font-mono text-xs text-slate-500" x-text="new Date(e.scheduledAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})"></span>
+                                    <span class="font-bold text-slate-900" x-text="eventTypeName(e.eventTypeId)"></span>
+                                    <span class="text-slate-400 text-xs" x-show="e.durationMin" x-text="(e.durationMin || 0) + ' min'"></span>
+                                    <a x-bind:href="'/inspections/' + e.inspectionId + '/edit'" class="ml-auto text-indigo-600 text-xs font-bold hover:underline">Open</a>
+                                </div>
+                            </template>
+                        </div>
+                    </section>
+
                     {/* Section: This Week */}
                     <section x-show="!loading && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
                         <button type="button" x-on:click="sections.thisWeek = !sections.thisWeek"
