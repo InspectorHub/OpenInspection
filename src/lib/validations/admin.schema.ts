@@ -10,6 +10,7 @@ export const UpdateBrandingSchema = z.object({
     supportEmail: z.string().email('Invalid email address').optional().openapi({ example: 'support@example.com' }),
     billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }),
     gaMeasurementId: z.string().regex(/^G-[A-Z0-9]+$/, 'Invalid GA Measurement ID').or(z.literal('')).optional().openapi({ example: 'G-12345678' }),
+    reportTheme: z.enum(['modern', 'classic', 'minimal']).optional().openapi({ example: 'modern' }),
 }).openapi('UpdateBranding');
 
 /**

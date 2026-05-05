@@ -7,6 +7,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
     const primaryColor = branding?.primaryColor || '#6366f1';
     const logoUrl = branding?.logoUrl;
     const gaMeasurementId = branding?.gaMeasurementId || '';
+    const reportTheme = branding?.reportTheme || 'modern';
 
     const sectionIcon = (path: string, color: string) => (
         <div class={`w-14 h-14 ${color} rounded-2xl flex items-center justify-center shadow-sm`}>
@@ -137,6 +138,46 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                 Save Branding
                             </button>
                         </div>
+                    </section>
+
+                    {/* ── Report Theme ── */}
+                    <section
+                        class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-6"
+                        x-data={`{
+                            theme: '${reportTheme}',
+                            saving: false,
+                            async save() {
+                                this.saving = true;
+                                try {
+                                    await fetch('/api/admin/branding', {
+                                        method: 'POST',
+                                        credentials: 'include',
+                                        headers: { 'content-type': 'application/json' },
+                                        body: JSON.stringify({ reportTheme: this.theme })
+                                    });
+                                } finally { this.saving = false; }
+                            }
+                        }`}
+                    >
+                        <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
+                            {sectionIcon('M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01', 'bg-fuchsia-600/10 text-fuchsia-600')}
+                            <div>
+                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Report Theme</h2>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Default visual style for client-facing reports</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <template x-for="t in ['modern','classic','minimal']" {...{ 'x-bind:key': 't' }}>
+                                <button
+                                    type="button"
+                                    x-on:click="theme = t; save()"
+                                    x-bind:class="theme === t ? 'ring-2 ring-fuchsia-500 bg-fuchsia-50' : 'ring-1 ring-slate-200 bg-white hover:ring-slate-300'"
+                                    class="p-5 rounded-2xl text-sm font-black uppercase tracking-[0.2em] capitalize transition-all"
+                                    x-text="t"
+                                ></button>
+                            </template>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-bold ml-1">Per-inspection override is available on the inspection edit page.</p>
                     </section>
 
                     {/* ── Analytics ── */}
