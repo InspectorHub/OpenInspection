@@ -24,7 +24,10 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
 
                 <div class="glass-panel rounded-[2.5rem] shadow-xl shadow-slate-100/50 overflow-hidden">
                     <template x-if="items.length === 0 && !loading">
-                        <div class="py-24 text-center text-slate-400 font-semibold">No notifications yet — events will appear here as they happen.</div>
+                        <div class="py-24 text-center space-y-3">
+                            <div class="text-slate-400 font-semibold">No notifications yet — events will appear here as they happen.</div>
+                            <div class="text-xs text-slate-400">Tip: trigger your first booking on <a href="/book" class="text-indigo-600 font-bold hover:underline">/book</a> to see this inbox light up.</div>
+                        </div>
                     </template>
                     <template x-for="n in items" x-bind:key="n.id">
                         <div class="flex items-start gap-4 p-6 border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-all" x-bind:class="!n.readAt && 'bg-indigo-50/40'">

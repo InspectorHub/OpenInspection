@@ -26,7 +26,7 @@ import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/t
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { AggregatedRecommendationsResponseSchema } from '../lib/validations/recommendation.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, agreementRequests } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, agreementRequests, users } from '../lib/db/schema';
 import { eq, inArray, and } from 'drizzle-orm';
 
 const inspectionsRoutes = new OpenAPIHono<HonoConfig>();
@@ -835,6 +835,16 @@ inspectionsRoutes.get('/:id/report', async (c) => {
     const companyName = branding?.siteName || c.env.APP_NAME || 'InspectorHub';
     const primaryColor = branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1';
 
+    let inspectorName: string | null = null;
+    if (inspection.inspectorId) {
+        const dbForName = drizzle(c.env.DB as any);
+        const inspectorRow = await dbForName.select({ name: users.name })
+            .from(users)
+            .where(and(eq(users.id, inspection.inspectorId), eq(users.tenantId, c.get('tenantId'))))
+            .get();
+        inspectorName = inspectorRow?.name ?? null;
+    }
+
     if (inspection.paymentRequired === true && inspection.paymentStatus !== 'paid') {
         return c.html(ReportGatePage({
             reason: 'payment',
@@ -842,7 +852,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
             actionUrl: `${baseUrl}/invoices?inspection=${id}`,
             actionLabel: 'View Invoice & Pay',
             propertyAddress: inspection.propertyAddress ?? null,
-            inspectorName:   null, // TODO: requires join to users table
+            inspectorName,
             scheduledDate:   inspection.date ?? null,
         }) as string);
     }
@@ -863,7 +873,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
                 actionUrl: `${baseUrl}/sign/${id}`,
                 actionLabel: 'Sign Agreement',
                 propertyAddress: inspection.propertyAddress ?? null,
-                inspectorName:   null, // TODO: requires join to users table
+                inspectorName,
                 scheduledDate:   inspection.date ?? null,
             }) as string);
         }
