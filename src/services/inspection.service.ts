@@ -610,8 +610,9 @@ export class InspectionService {
             .where(eq(inspections.tenantId, tenantId));
 
         const now           = Date.now();
-        const startOfToday  = new Date(); startOfToday.setHours(0, 0, 0, 0);
-        const endOfToday    = new Date(); endOfToday.setHours(23, 59, 59, 999);
+        // Use UTC boundaries to match the `date` column which stores "YYYY-MM-DD" (UTC midnight when parsed).
+        const startOfToday  = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
+        const endOfToday    = new Date(); endOfToday.setUTCHours(23, 59, 59, 999);
         const in48h         = new Date(now + 48 * 3600 * 1000);
         const in7days       = new Date(now + 7 * 86400 * 1000);
         const minus30days   = new Date(now - 30 * 86400 * 1000);
