@@ -14,6 +14,8 @@ export {
     discountCodes,
     automations,
     automationLogs,
+    eventTypes,
+    inspectionEvents,
 } from './inspection';
 export { contacts } from './contact';
 export { recommendations } from './recommendation';

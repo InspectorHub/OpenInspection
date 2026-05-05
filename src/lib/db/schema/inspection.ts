@@ -194,4 +194,37 @@ export const automationLogs = sqliteTable('automation_logs', {
     deliveredAt: text('delivered_at'),
     status: text('status', { enum: ['pending', 'sent', 'failed', 'skipped'] }).notNull().default('pending'),
     error: text('error'),
+    eventId: text('event_id'),
+});
+
+// Spec 4D — Inspection Events
+
+export const eventTypes = sqliteTable('event_types', {
+    id:                 text('id').primaryKey(),
+    tenantId:           text('tenant_id').notNull().references(() => tenants.id),
+    name:               text('name').notNull(),
+    slug:               text('slug').notNull(),
+    defaultDurationMin: integer('default_duration_min').notNull().default(30),
+    defaultPriceCents:  integer('default_price_cents').notNull().default(0),
+    color:              text('color').notNull().default('#6366f1'),
+    sortOrder:          integer('sort_order').notNull().default(0),
+    active:             integer('active', { mode: 'boolean' }).notNull().default(true),
+    createdAt:          integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const inspectionEvents = sqliteTable('inspection_events', {
+    id:                text('id').primaryKey(),
+    tenantId:          text('tenant_id').notNull().references(() => tenants.id),
+    inspectionId:      text('inspection_id').notNull().references(() => inspections.id, { onDelete: 'cascade' }),
+    eventTypeId:       text('event_type_id').notNull().references(() => eventTypes.id),
+    inspectorId:       text('inspector_id').references(() => users.id),
+    scheduledAt:       integer('scheduled_at', { mode: 'timestamp' }).notNull(),
+    durationMin:       integer('duration_min').notNull(),
+    priceCents:        integer('price_cents').notNull().default(0),
+    status:            text('status', { enum: ['scheduled', 'completed', 'results_received', 'cancelled'] }).notNull().default('scheduled'),
+    notes:             text('notes'),
+    completedAt:       integer('completed_at', { mode: 'timestamp' }),
+    resultsReceivedAt: integer('results_received_at', { mode: 'timestamp' }),
+    cancelledAt:       integer('cancelled_at', { mode: 'timestamp' }),
+    createdAt:         integer('created_at', { mode: 'timestamp' }).notNull(),
 });

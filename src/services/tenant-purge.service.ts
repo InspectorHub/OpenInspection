@@ -6,10 +6,12 @@ import {
     agreements, agreementRequests, services, inspectionServices, discountCodes,
     recommendations, comments, contacts, users, tenantConfigs, tenants,
     availability, availabilityOverrides, inspectionAgreements,
+    eventTypes, inspectionEvents,
 } from '../lib/db/schema';
 
 const TENANT_TABLES = [
-    inspectionAgreements, agreementRequests, agreements, automationLogs, automations,
+    inspectionAgreements, agreementRequests, agreements, automationLogs,
+    inspectionEvents, eventTypes, automations,
     inspectionServices, services, discountCodes, recommendations, comments, contacts,
     availabilityOverrides, availability, inspectionResults, inspections, templates,
     users, tenantConfigs, tenants,
