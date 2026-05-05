@@ -15,10 +15,12 @@ export function renderProfessionalReport(data: {
     template: TemplateRecord,
     results: { data: Record<string, ResultItem> } | undefined,
     branding?: BrandingConfig | undefined,
-    isAuthenticated?: boolean | undefined
+    isAuthenticated?: boolean | undefined,
+    resolvedTheme?: 'modern' | 'classic' | 'minimal' | undefined
 }): JSX.Element {
     const { inspection, template, results, branding } = data;
     const isAuthenticated = data.isAuthenticated ?? false;
+    const resolvedTheme: 'modern' | 'classic' | 'minimal' = data.resolvedTheme || 'modern';
     const siteName = branding?.siteName || 'OpenInspection';
     const logoUrl = branding?.logoUrl;
     const rawSchema = typeof template.schema === 'string' ? JSON.parse(template.schema) as { sections: SchemaSectionRaw[]; ratingSystem?: { levels: RatingLevel[] } } : template.schema as { sections: SchemaSectionRaw[]; ratingSystem?: { levels: RatingLevel[] } };
@@ -79,8 +81,10 @@ export function renderProfessionalReport(data: {
     return BareLayout({
         title: `Inspection Report - ${inspection.propertyAddress}`,
         branding,
+        dataTheme: resolvedTheme,
         extraHead: (
             <>
+                <link rel="stylesheet" href="/css/report-themes.css" />
                 <script defer src="/vendor/alpine.min.js">{''}</script>
                 <script src="/js/signature_pad.umd.min.js">{''}</script>
             </>

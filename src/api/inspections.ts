@@ -818,12 +818,14 @@ inspectionsRoutes.get('/:id/report', async (c) => {
         const db = drizzle(c.env.DB);
         const results = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, resolved.tenantId))).get();
+        const resolvedTheme = c.var.services.branding.resolveReportTheme(inspection, c.get('branding'));
         return c.html(renderProfessionalReport({
             inspection: { ...inspection, internalNotes: null, paymentStatus: null, paymentRequired: false } as never,
             template: template as never,
             results: (results || { data: {} }) as never,
             branding: c.get('branding'),
             isAuthenticated: false,
+            resolvedTheme,
         }));
     }
 
@@ -882,12 +884,14 @@ inspectionsRoutes.get('/:id/report', async (c) => {
     const db = drizzle(c.env.DB);
     const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
 
+    const resolvedTheme = c.var.services.branding.resolveReportTheme(inspection, c.get('branding'));
     return c.html(renderProfessionalReport({
         inspection: inspection as never,
         template: template as never,
         results: (results || { data: {} }) as never,
         branding: c.get('branding'),
-        isAuthenticated: true
+        isAuthenticated: true,
+        resolvedTheme,
     }));
 });
 

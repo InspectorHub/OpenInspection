@@ -68,11 +68,11 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
     );
 }
 
-export const BareLayout = (props: { title: string, children: unknown, branding?: BrandingConfig | undefined, extraHead?: JSX.Element }): JSX.Element => {
-    const { title, children, branding, extraHead } = props;
+export const BareLayout = (props: { title: string, children: unknown, branding?: BrandingConfig | undefined, extraHead?: JSX.Element, dataTheme?: 'modern' | 'classic' | 'minimal' }): JSX.Element => {
+    const { title, children, branding, extraHead, dataTheme } = props;
 
     return (
-        <html lang="en" class="scroll-smooth">
+        <html lang="en" class="scroll-smooth" {...(dataTheme ? { 'data-theme': dataTheme } : {})}>
             <SharedHead
                 title={title}
                 primaryColor={sanitizePrimaryColor(branding)}
