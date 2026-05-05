@@ -370,6 +370,13 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
         logger.error('Auto-seed event types failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
     }
 
+    // Spec 4F — Auto-seed default 6 templates (residential, pre-listing, new-construction, sewer-scope, radon, mold)
+    try {
+        await c.var.services.templateSeed.bulkSeed(tenantId);
+    } catch (seedErr) {
+        logger.error('Auto-seed templates failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
+    }
+
     // 4. Issue a JWT for the new admin so the caller can authenticate immediately
     const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
     if (newUser) {

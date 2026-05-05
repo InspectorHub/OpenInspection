@@ -3,6 +3,7 @@
   "name": "Radon Measurement Report",
   "description": "Short-term radon measurement protocol — captures device placement, closed-house conditions, and post-test calculation of pCi/L average.",
   "version": 1,
+  "featured": true,
   "schema": {
     "sections": [
       {

@@ -22,6 +22,7 @@ import { WidgetService } from '../../services/widget.service';
 import { RecommendationService } from '../../services/recommendation.service';
 import { EventService } from '../../services/event.service';
 import { TotpService } from '../../services/totp.service';
+import { TemplateSeedService } from '../../services/template-seed.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -128,6 +129,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'totp':
                     target.totp = new TotpService();
+                    break;
+                case 'templateSeed':
+                    target.templateSeed = new TemplateSeedService(c.env.DB);
                     break;
             }
             return target[prop];

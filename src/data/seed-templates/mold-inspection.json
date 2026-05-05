@@ -1,0 +1,56 @@
+{
+  "id": "seed_mold_inspection_v1",
+  "name": "Mold Inspection",
+  "description": "Visual mold inspection with moisture mapping and air-quality sampling guidance.",
+  "version": 1,
+  "featured": true,
+  "schema": {
+    "sections": [
+      {
+        "id": "s_visible", "title": "Visible Mold",
+        "items": [
+          { "id": "i_basement_mold", "label": "Basement Visible Mold",       "type": "rating" },
+          { "id": "i_attic_mold",    "label": "Attic Visible Mold",          "type": "rating" },
+          { "id": "i_crawlspace",    "label": "Crawl Space Visible Mold",    "type": "rating" },
+          { "id": "i_living",        "label": "Living Areas Visible Mold",   "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_moisture", "title": "Moisture Sources",
+        "items": [
+          { "id": "i_roof_leak",  "label": "Roof / Attic Leak Indicators",   "type": "rating" },
+          { "id": "i_plumb_leak", "label": "Plumbing Leak Indicators",       "type": "rating" },
+          { "id": "i_grading",    "label": "Exterior Grading / Drainage",    "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_hvac", "title": "HVAC",
+        "items": [
+          { "id": "i_coil",       "label": "Evaporator Coil Condition", "type": "rating" },
+          { "id": "i_drain_pan",  "label": "Condensate Drain Pan",      "type": "rating" },
+          { "id": "i_ductwork",   "label": "Ductwork Visible Mold",     "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_basement", "title": "Basement",
+        "items": [
+          { "id": "i_b_efflorescence", "label": "Efflorescence on Walls",        "type": "rating" },
+          { "id": "i_b_humidity",      "label": "Relative Humidity (% reading)", "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_kitchen", "title": "Kitchen",
+        "items": [
+          { "id": "i_k_under_sink", "label": "Under-Sink Cabinet Moisture", "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_bath", "title": "Bath",
+        "items": [
+          { "id": "i_bath_caulk", "label": "Caulking & Grout Condition", "type": "rating" },
+          { "id": "i_bath_vent",  "label": "Exhaust Fan Operation",      "type": "rating" }
+        ]
+      }
+    ]
+  }
+}

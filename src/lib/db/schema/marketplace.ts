@@ -9,6 +9,7 @@ export const marketplaceTemplates = sqliteTable('marketplace_templates', {
   authorId:      text('author_id').notNull().default('system'),
   changelog:     text('changelog'),
   downloadCount: integer('download_count').notNull().default(0),
+  featured:      integer('featured', { mode: 'boolean' }).notNull().default(false),
   createdAt:     text('created_at').notNull(),
   updatedAt:     text('updated_at').notNull(),
 });

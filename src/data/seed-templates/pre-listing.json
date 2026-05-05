@@ -1,0 +1,62 @@
+{
+  "id": "seed_pre_listing_v1",
+  "name": "Pre-Listing Inspection",
+  "description": "Seller-focused inspection identifying issues before listing the home, allowing proactive remediation.",
+  "version": 1,
+  "featured": true,
+  "schema": {
+    "sections": [
+      {
+        "id": "s_curb_appeal", "title": "Curb Appeal & Exterior",
+        "items": [
+          { "id": "i_landscaping", "label": "Landscaping First Impression",   "type": "rating" },
+          { "id": "i_paint",       "label": "Exterior Paint Condition",       "type": "rating" },
+          { "id": "i_walkways",    "label": "Walkways & Driveway",            "type": "rating" },
+          { "id": "i_entry_door",  "label": "Front Entry Door",               "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_roof", "title": "Roof",
+        "items": [
+          { "id": "i_roof_age",     "label": "Roof Age (Years)",              "type": "rating" },
+          { "id": "i_roof_visible", "label": "Visible Damage / Missing Tabs", "type": "rating" },
+          { "id": "i_gutters",      "label": "Gutters & Downspouts",          "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_systems_quick", "title": "Systems Quick-Check",
+        "items": [
+          { "id": "i_hvac_age",   "label": "HVAC Age & Service History", "type": "rating" },
+          { "id": "i_water_heat", "label": "Water Heater Age",           "type": "rating" },
+          { "id": "i_electrical", "label": "Electrical Panel Condition", "type": "rating" },
+          { "id": "i_plumb",      "label": "Visible Plumbing Issues",    "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_interior", "title": "Interior",
+        "items": [
+          { "id": "i_walls",     "label": "Walls & Ceilings",          "type": "rating" },
+          { "id": "i_floor",     "label": "Flooring Condition",        "type": "rating" },
+          { "id": "i_windows",   "label": "Windows & Doors",           "type": "rating" },
+          { "id": "i_lighting",  "label": "Lighting & Fixtures",       "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_kitchen", "title": "Kitchen & Baths",
+        "items": [
+          { "id": "i_kitchen_appliances", "label": "Kitchen Appliances",      "type": "rating" },
+          { "id": "i_bath_fixtures",      "label": "Bathroom Fixtures",       "type": "rating" },
+          { "id": "i_caulk_grout",        "label": "Caulking & Grout",        "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_seller_recos", "title": "Pre-Listing Recommendations",
+        "items": [
+          { "id": "i_quick_wins",  "label": "Quick Wins (Under $500)", "type": "rating" },
+          { "id": "i_address",     "label": "Items to Address",        "type": "rating" },
+          { "id": "i_disclose",    "label": "Items to Disclose",       "type": "rating" }
+        ]
+      }
+    ]
+  }
+}

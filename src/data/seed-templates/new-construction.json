@@ -3,6 +3,7 @@
   "name": "New Construction Pre-Drywall Inspection",
   "description": "Pre-drywall (mid-build) inspection template — captures framing, rough plumbing, rough electrical, and waterproofing before walls are closed up.",
   "version": 1,
+  "featured": true,
   "schema": {
     "sections": [
       {

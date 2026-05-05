@@ -70,6 +70,7 @@ import { WidgetService } from '../services/widget.service';
 import { RecommendationService } from '../services/recommendation.service';
 import { EventService } from '../services/event.service';
 import { TotpService } from '../services/totp.service';
+import { TemplateSeedService } from '../services/template-seed.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -99,6 +100,7 @@ export interface AppServices {
     recommendation: RecommendationService;
     event: EventService;
     totp: TotpService;
+    templateSeed: TemplateSeedService;
 }
 
 /**

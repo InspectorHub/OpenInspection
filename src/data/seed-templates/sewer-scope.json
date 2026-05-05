@@ -1,0 +1,35 @@
+{
+  "id": "seed_sewer_scope_v1",
+  "name": "Sewer Scope Inspection",
+  "description": "Camera inspection of main sewer line from cleanout to municipal connection.",
+  "version": 1,
+  "featured": true,
+  "schema": {
+    "sections": [
+      {
+        "id": "s_access", "title": "Access Point",
+        "items": [
+          { "id": "i_cleanout_loc",  "label": "Cleanout Location Identified", "type": "rating" },
+          { "id": "i_cleanout_cap",  "label": "Cleanout Cap Condition",       "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_line", "title": "Line Condition",
+        "items": [
+          { "id": "i_pipe_material", "label": "Pipe Material (Cast/PVC/Clay)",        "type": "rating" },
+          { "id": "i_root_intrusion","label": "Root Intrusion Observed",              "type": "rating" },
+          { "id": "i_belly",         "label": "Belly / Sag Observed",                  "type": "rating" },
+          { "id": "i_breaks",        "label": "Breaks / Cracks Observed",              "type": "rating" },
+          { "id": "i_blockage",      "label": "Active Blockage / Standing Water",      "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_reco", "title": "Recommendations",
+        "items": [
+          { "id": "i_immediate_action", "label": "Immediate Action Required", "type": "rating" },
+          { "id": "i_monitor",          "label": "Monitor at Future Visit",   "type": "rating" }
+        ]
+      }
+    ]
+  }
+}

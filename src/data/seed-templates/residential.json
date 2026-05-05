@@ -3,6 +3,7 @@
   "name": "Standard Residential Inspection",
   "description": "InterNACHI-aligned residential inspection template covering all major home systems.",
   "version": 1,
+  "featured": true,
   "schema": {
     "sections": [
       {

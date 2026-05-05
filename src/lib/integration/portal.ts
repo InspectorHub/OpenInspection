@@ -66,6 +66,15 @@ export class PortalProvider implements IntegrationProvider {
             } catch (seedErr) {
                 logger.error('Auto-seed event types failed in portal provider', { tenantId: newTenantId }, seedErr instanceof Error ? seedErr : undefined);
             }
+
+            // Spec 4F — Auto-seed default 6 templates
+            try {
+                const { TemplateSeedService } = await import('../../services/template-seed.service');
+                const seedSvc = new TemplateSeedService(this.db);
+                await seedSvc.bulkSeed(newTenantId);
+            } catch (seedErr) {
+                logger.error('Auto-seed templates failed in portal provider', { tenantId: newTenantId }, seedErr instanceof Error ? seedErr : undefined);
+            }
         } else {
             await db.update(tenants)
                 .set({

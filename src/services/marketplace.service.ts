@@ -20,11 +20,12 @@ export class MarketplaceService {
     if (category) conditions.push(eq(marketplaceTemplates.category, category));
     if (search)   conditions.push(like(marketplaceTemplates.name, `%${search}%`));
 
+    // Spec 4F — featured templates always sort first; within tier, sort by download count.
     const rows = await this.db
       .select()
       .from(marketplaceTemplates)
       .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(marketplaceTemplates.downloadCount))
+      .orderBy(desc(marketplaceTemplates.featured), desc(marketplaceTemplates.downloadCount))
       .limit(pageSize)
       .offset(offset);
 

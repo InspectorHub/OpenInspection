@@ -34,15 +34,19 @@ try {
 
 const SEED_DIR = join(__dirname, '../src/data/seed-templates');
 
+// Spec 4F — `featured: 1` flags Spectora-parity defaults for marketplace top-sort + auto-seed on tenant init.
 const TEMPLATES = [
-  { file: 'residential.json',      name: 'Standard Residential Inspection',         category: 'residential',       changelog: 'Initial release: standard US residential home inspection template.' },
-  { file: 'trec-rei-7-6.json',     name: 'TREC REI 7-6 Inspection Report',          category: 'trec',              changelog: 'Initial release: Texas Real Estate Commission REI 7-6 compliant template.' },
-  { file: 'commercial.json',       name: 'Commercial Property Inspection',          category: 'commercial',        changelog: 'Initial release: light commercial property inspection template.' },
-  { file: 'condo.json',            name: 'Condominium Inspection',                  category: 'condo',             changelog: 'Initial release: condo unit-focused inspection (HOA boundary aware).' },
-  { file: 'new-construction.json', name: 'New Construction Pre-Drywall Inspection', category: 'new_construction',  changelog: 'Initial release: pre-drywall mid-build inspection (framing/plumbing/electrical/envelope).' },
-  { file: 'wind-mitigation.json',  name: 'Wind Mitigation Survey',                  category: 'residential',       changelog: 'Initial release: Florida-style Uniform Mitigation Verification (OIR-B1-1802).' },
-  { file: 'septic.json',           name: 'Septic System Inspection',                category: 'residential',       changelog: 'Initial release: septic tank, distribution, and drain field add-on.' },
-  { file: 'radon.json',            name: 'Radon Measurement Report',                category: 'residential',       changelog: 'Initial release: short-term radon test protocol with EPA 4.0 pCi/L threshold check.' },
+  { file: 'residential.json',       name: 'Standard Residential Inspection',         category: 'residential',       featured: 1, changelog: 'Initial release: standard US residential home inspection template.' },
+  { file: 'pre-listing.json',       name: 'Pre-Listing Inspection',                  category: 'residential',       featured: 1, changelog: 'Spec 4F: seller-focused pre-listing inspection.' },
+  { file: 'trec-rei-7-6.json',      name: 'TREC REI 7-6 Inspection Report',          category: 'trec',              featured: 0, changelog: 'Initial release: Texas Real Estate Commission REI 7-6 compliant template.' },
+  { file: 'commercial.json',        name: 'Commercial Property Inspection',          category: 'commercial',        featured: 0, changelog: 'Initial release: light commercial property inspection template.' },
+  { file: 'condo.json',             name: 'Condominium Inspection',                  category: 'condo',             featured: 0, changelog: 'Initial release: condo unit-focused inspection (HOA boundary aware).' },
+  { file: 'new-construction.json',  name: 'New Construction Pre-Drywall Inspection', category: 'new_construction',  featured: 1, changelog: 'Initial release: pre-drywall mid-build inspection (framing/plumbing/electrical/envelope).' },
+  { file: 'wind-mitigation.json',   name: 'Wind Mitigation Survey',                  category: 'residential',       featured: 0, changelog: 'Initial release: Florida-style Uniform Mitigation Verification (OIR-B1-1802).' },
+  { file: 'septic.json',            name: 'Septic System Inspection',                category: 'residential',       featured: 0, changelog: 'Initial release: septic tank, distribution, and drain field add-on.' },
+  { file: 'sewer-scope.json',       name: 'Sewer Scope Inspection',                  category: 'residential',       featured: 1, changelog: 'Spec 4F: camera inspection of main sewer line.' },
+  { file: 'radon.json',             name: 'Radon Measurement Report',                category: 'residential',       featured: 1, changelog: 'Initial release: short-term radon test protocol with EPA 4.0 pCi/L threshold check.' },
+  { file: 'mold-inspection.json',   name: 'Mold Inspection',                         category: 'residential',       featured: 1, changelog: 'Spec 4F: visual mold inspection + moisture mapping.' },
 ];
 
 if (count >= TEMPLATES.length) {
@@ -74,7 +78,9 @@ for (const t of TEMPLATES) {
   // De-dupe by name (not id) since id is regenerated on every run. Without
   // this guard, re-running after adding new templates would duplicate the
   // already-seeded ones.
-  const sql = `INSERT INTO marketplace_templates (id, name, category, semver, schema, author_id, changelog, download_count, created_at, updated_at) SELECT '${id}', '${safeName}', '${t.category}', '1.0.0', '${safeSchema}', 'system', '${safeChangelog}', 0, '${now}', '${now}' WHERE NOT EXISTS (SELECT 1 FROM marketplace_templates WHERE name = '${safeName}');`;
+  const featured = t.featured ? 1 : 0;
+  // Two-statement script: insert if missing, then ensure featured flag is set correctly (idempotent).
+  const sql = `INSERT INTO marketplace_templates (id, name, category, semver, schema, author_id, changelog, download_count, featured, created_at, updated_at) SELECT '${id}', '${safeName}', '${t.category}', '1.0.0', '${safeSchema}', 'system', '${safeChangelog}', 0, ${featured}, '${now}', '${now}' WHERE NOT EXISTS (SELECT 1 FROM marketplace_templates WHERE name = '${safeName}'); UPDATE marketplace_templates SET featured = ${featured} WHERE name = '${safeName}';`;
 
   const sqlFile = join(tmpDir, `${t.category}.sql`);
   writeFileSync(sqlFile, sql, 'utf8');
