@@ -269,6 +269,20 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                   <span x-bind:class="inspection.agreementRequired ? 'translate-x-3' : 'translate-x-0.5'" class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform" />
                 </button>
               </label>
+              <div class="mt-2">
+                <label class="block text-[10px] font-mono font-semibold uppercase tracking-wide mb-1" style="color: #908a83">Report Theme Override</label>
+                <select
+                  x-bind:value="inspection.reportThemeOverride || ''"
+                  x-on:change={`const v=$event.target.value||null;authFetch('/api/inspections/${inspectionId}', {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reportThemeOverride:v})}).then(r=>r.json()).then(d=>{if(d.success)inspection.reportThemeOverride=v;});`}
+                  class="w-full px-2 py-1 text-xs border rounded bg-white"
+                  style="border-color: rgba(232,228,221,0.6); color: #46423c"
+                >
+                  <option value="">Use tenant default</option>
+                  <option value="modern">Modern</option>
+                  <option value="classic">Classic</option>
+                  <option value="minimal">Minimal</option>
+                </select>
+              </div>
               <div class="mt-1">
                 <span x-show="inspection.paymentStatus === 'paid'" class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background: #dcfce7; color: #16a34a">Paid</span>
                 <span x-show="inspection.paymentStatus !== 'paid'" class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background: #fee2e2; color: #dc2626" x-text="'Unpaid · $' + ((inspection.price || 0) / 100).toFixed(2)"></span>

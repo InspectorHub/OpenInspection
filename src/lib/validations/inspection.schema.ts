@@ -68,6 +68,7 @@ export const UpdateInspectionSchema = z.object({
     bathrooms:      z.number().min(0).max(20).nullable().optional().openapi({ example: 2.5 }),
     unit:           z.string().max(50).nullable().optional(),
     county:         z.string().max(100).nullable().optional(),
+    reportThemeOverride: z.enum(['modern', 'classic', 'minimal']).nullable().optional().openapi({ example: 'classic' }),
 }).openapi('UpdateInspection');
 
 export const CancellationReasonSchema = z.enum([
