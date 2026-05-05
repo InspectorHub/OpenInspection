@@ -51,7 +51,7 @@ export class BrandingService {
      */
     resolveReportTheme(
         inspection: { reportThemeOverride?: string | null },
-        branding?: { reportTheme?: string }
+        branding?: { reportTheme?: string | undefined }
     ): 'modern' | 'classic' | 'minimal' {
         return (inspection.reportThemeOverride ?? branding?.reportTheme ?? 'modern') as 'modern' | 'classic' | 'minimal';
     }

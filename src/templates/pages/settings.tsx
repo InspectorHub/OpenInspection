@@ -149,13 +149,14 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             async save() {
                                 this.saving = true;
                                 try {
-                                    await fetch('/api/admin/branding', {
+                                    const r = await authFetch('/api/admin/branding', {
                                         method: 'POST',
-                                        credentials: 'include',
                                         headers: { 'content-type': 'application/json' },
                                         body: JSON.stringify({ reportTheme: this.theme })
                                     });
-                                } finally { this.saving = false; }
+                                    if (!r.ok) alert('Failed to save theme');
+                                } catch (e) { alert('Failed to save theme'); }
+                                finally { this.saving = false; }
                             }
                         }`}
                     >

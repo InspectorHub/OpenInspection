@@ -13,7 +13,7 @@ export interface BrandingConfig {
     supportEmail: string;
     billingUrl: string;
     gaMeasurementId?: string | null | undefined;
-    reportTheme?: 'modern' | 'classic' | 'minimal';
+    reportTheme?: 'modern' | 'classic' | 'minimal' | undefined;
 }
 
 import { ScopedDB } from '../lib/db/scoped';
