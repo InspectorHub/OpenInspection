@@ -50,8 +50,10 @@ const TEMPLATES = [
   { file: 'mold-inspection.json',   name: 'Mold Inspection',                         category: 'residential',       featured: 1, changelog: 'Spec 4F: visual mold inspection + moisture mapping.' },
 ];
 
-if (count >= TEMPLATES.length) {
-  console.log(`Seed skipped: ${count} marketplace templates already exist (target ${TEMPLATES.length}).`);
+// Spec 4F polish: when count matches but featured flags need backfill, allow --force to proceed.
+const FORCE = process.argv.includes('--force');
+if (count >= TEMPLATES.length && !FORCE) {
+  console.log(`Seed skipped: ${count} marketplace templates already exist (target ${TEMPLATES.length}). Pass --force to re-run UPDATE statements (e.g., to backfill featured flags).`);
   process.exit(0);
 }
 

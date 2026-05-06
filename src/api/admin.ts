@@ -1060,4 +1060,46 @@ adminRoutes.openapi(icsTokenRoute, async (c) => {
     return c.json({ success: true as const, data: { url: `${baseUrl}/api/ics/${token}` } }, 200);
 });
 
+/**
+ * POST /api/admin/backfill-default-templates — Spec 4F polish backfill.
+ * One-shot M2M endpoint: loops through every tenant and seeds the 7 default templates
+ * (idempotent — TemplateSeedService.bulkSeed skips existing names per tenant).
+ *
+ * Auth: PORTAL_M2M_SECRET via Authorization: Bearer.
+ * Use case: existing tenants that pre-date Spec 4F's auto-seed-on-tenant-init hook.
+ */
+adminRoutes.openapi({
+    method: 'post',
+    path: '/backfill-default-templates',
+    tags: ['Admin'],
+    summary: 'Backfill default 7 templates for every tenant (one-shot, idempotent)',
+    responses: {
+        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'OK' },
+        401: { description: 'Unauthorized' },
+    },
+}, async (c) => {
+    const auth = c.req.header('authorization');
+    if (auth !== `Bearer ${c.env.PORTAL_M2M_SECRET}`) throw Errors.Unauthorized();
+
+    const { tenants } = await import('../lib/db/schema');
+    const { TemplateSeedService } = await import('../services/template-seed.service');
+    const db = drizzle(c.env.DB);
+    const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).all();
+    const svc = new TemplateSeedService(c.env.DB);
+
+    const results: { tenantId: string; name: string; seeded: number; skipped: number }[] = [];
+    for (const t of allTenants) {
+        try {
+            const r = await svc.bulkSeed(t.id as string);
+            results.push({ tenantId: t.id as string, name: (t.name as string) ?? '', ...r });
+        } catch (err) {
+            logger.error('Backfill failed for tenant', { tenantId: t.id }, err instanceof Error ? err : undefined);
+        }
+    }
+    const totalSeeded = results.reduce((sum, r) => sum + r.seeded, 0);
+    const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
+    logger.info('Backfill complete', { tenantCount: results.length, totalSeeded, totalSkipped });
+    return c.json({ success: true as const, data: { success: true } }, 200);
+});
+
 export default adminRoutes;
