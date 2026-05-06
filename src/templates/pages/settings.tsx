@@ -64,6 +64,39 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                 <div class="space-y-12">
 
+                    {/* R7-01/02: Sub-pages that used to live in the top-level
+                        sidebar — surfaced here as quick-jump cards so they
+                        stay discoverable after the sidebar trim. */}
+                    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <a href="/settings/services" class="glass-panel rounded-2xl p-5 hover:shadow-lg hover:scale-[1.02] transition-all flex items-start gap-3" title="Pricing & inspection types">
+                            <div class="w-10 h-10 rounded-xl bg-amber-600/10 text-amber-600 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                            </div>
+                            <div>
+                                <div class="font-bold text-slate-900 text-sm">Services & Pricing</div>
+                                <div class="text-xs text-slate-500 mt-0.5">Inspection types, fees, discounts</div>
+                            </div>
+                        </a>
+                        <a href="/settings/event-types" class="glass-panel rounded-2xl p-5 hover:shadow-lg hover:scale-[1.02] transition-all flex items-start gap-3" title="Add-on services and follow-ups">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h6"></path></svg>
+                            </div>
+                            <div>
+                                <div class="font-bold text-slate-900 text-sm">Event Types</div>
+                                <div class="text-xs text-slate-500 mt-0.5">Radon, sewer scope, follow-ups</div>
+                            </div>
+                        </a>
+                        <a href="/settings/security" class="glass-panel rounded-2xl p-5 hover:shadow-lg hover:scale-[1.02] transition-all flex items-start gap-3" title="2FA and account security">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                            </div>
+                            <div>
+                                <div class="font-bold text-slate-900 text-sm">Security</div>
+                                <div class="text-xs text-slate-500 mt-0.5">Two-factor auth, sessions</div>
+                            </div>
+                        </a>
+                    </section>
+
                     {/* ── Profile ── */}
                     <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 space-y-10">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
