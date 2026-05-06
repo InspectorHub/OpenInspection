@@ -17,9 +17,37 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
         </div>
     );
 
+    const tocLinks = [
+        { id: 'sec-profile',   label: 'Profile' },
+        { id: 'sec-branding',  label: 'Branding' },
+        { id: 'sec-theme',     label: 'Report Theme' },
+        { id: 'sec-telemetry', label: 'Telemetry' },
+        { id: 'sec-email',     label: 'Email' },
+        { id: 'sec-bot',       label: 'Bot Protection' },
+        { id: 'sec-ai',        label: 'AI' },
+        { id: 'sec-integrations', label: 'Integrations' },
+        { id: 'sec-payments',  label: 'Payments' },
+        { id: 'sec-calendar',  label: 'Apple Calendar' },
+        { id: 'sec-password',  label: 'Password' },
+    ];
+
     return (
         <MainLayout title={`${siteName} | Settings`} branding={branding}>
             <div class="max-w-5xl mx-auto space-y-16 animate-fade-in">
+                {/* Sticky TOC — Top 5 polish #3. Auto-hide below 1280px to avoid clipping side nav. */}
+                <aside class="hidden xl:block fixed right-6 top-32 z-30 w-44 text-xs">
+                    <div class="bg-white/80 backdrop-blur-md ring-1 ring-slate-200 rounded-2xl p-3 shadow-md">
+                        <div class="font-bold uppercase tracking-widest text-slate-400 mb-2 text-[10px] px-2">On this page</div>
+                        <ul class="space-y-0.5">
+                            {tocLinks.map(t => (
+                                <li>
+                                    <a href={`#${t.id}`} class="block px-2 py-1 rounded-lg text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition">{t.label}</a>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </aside>
+
                 {/* Resume-setup banner — shown by JS when onboarding was skipped */}
                 <div id="resumeSetupBanner" class="hidden mb-6 px-5 py-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
                     <span class="text-sm text-amber-800 font-semibold">Setup is incomplete. Finish configuring your workspace to unlock all features.</span>
@@ -41,7 +69,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', 'bg-teal-600/10 text-teal-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Profile</h2>
+                                <h2 id="sec-profile" class="text-2xl font-black text-slate-900 tracking-tightest">Profile</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inspector Identity · Shown on Reports</p>
                             </div>
                         </div>
@@ -82,7 +110,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z', 'bg-indigo-600/10 text-indigo-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Branding</h2>
+                                <h2 id="sec-branding" class="text-2xl font-black text-slate-900 tracking-tightest">Branding</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Workspace Visual Identity</p>
                             </div>
                         </div>
@@ -163,7 +191,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01', 'bg-fuchsia-600/10 text-fuchsia-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Report Theme</h2>
+                                <h2 id="sec-theme" class="text-2xl font-black text-slate-900 tracking-tightest">Report Theme</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Default visual style for client-facing reports</p>
                             </div>
                         </div>
@@ -186,7 +214,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'bg-sky-600/10 text-sky-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Telemetry</h2>
+                                <h2 id="sec-telemetry" class="text-2xl font-black text-slate-900 tracking-tightest">Telemetry</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Google Analytics 4</p>
                             </div>
                         </div>
@@ -223,7 +251,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', 'bg-emerald-600/10 text-emerald-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Email Delivery</h2>
+                                <h2 id="sec-email" class="text-2xl font-black text-slate-900 tracking-tightest">Email Delivery</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resend · Password resets, invitations, reports</p>
                             </div>
                         </div>
@@ -253,7 +281,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', 'bg-amber-600/10 text-amber-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Bot Protection</h2>
+                                <h2 id="sec-bot" class="text-2xl font-black text-slate-900 tracking-tightest">Bot Protection</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cloudflare Turnstile · Public booking form</p>
                             </div>
                         </div>
@@ -281,7 +309,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M13 10V3L4 14h7v7l9-11h-7z', 'bg-violet-600/10 text-violet-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">AI Features</h2>
+                                <h2 id="sec-ai" class="text-2xl font-black text-slate-900 tracking-tightest">AI Features</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Google Gemini · Comment assist, inspection summary</p>
                             </div>
                         </div>
@@ -303,7 +331,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'bg-rose-600/10 text-rose-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Integrations</h2>
+                                <h2 id="sec-integrations" class="text-2xl font-black text-slate-900 tracking-tightest">Integrations</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Google Calendar OAuth · App URL</p>
                             </div>
                         </div>
@@ -339,7 +367,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                     {/* ── Payments (Stripe Connect) ── */}
                     <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4" x-data="stripeConnectPanel()" x-init="load()">
-                        <h3 class="font-bold text-slate-900 flex items-center gap-2">
+                        <h3 id="sec-payments" class="font-bold text-slate-900 flex items-center gap-2">
                             Payments (Stripe Connect)
                             <span x-show="connected" class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Connected</span>
                             <span x-show="!connected" class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Not connected</span>
@@ -365,7 +393,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'bg-slate-600/10 text-slate-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Apple Calendar</h2>
+                                <h2 id="sec-calendar" class="text-2xl font-black text-slate-900 tracking-tightest">Apple Calendar</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">ICS Subscription · Read-only</p>
                             </div>
                         </div>
@@ -387,7 +415,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', 'bg-slate-600/10 text-slate-600')}
                             <div>
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Change Password</h2>
+                                <h2 id="sec-password" class="text-2xl font-black text-slate-900 tracking-tightest">Change Password</h2>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Account Security</p>
                             </div>
                         </div>
