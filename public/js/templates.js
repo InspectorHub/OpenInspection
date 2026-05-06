@@ -92,7 +92,7 @@ function renderTemplates() {
                     <a href="/templates/${t.id}/edit" class="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors">${t.name}</a>
                     ${t.source === 'marketplace' ? '<span class="text-[9px] font-black uppercase tracking-widest text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">Marketplace</span>' : ''}
                   </div>
-                  <p class="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: ${t.id.split('-')[0]}</p>
+                  <p class="text-[10px] text-slate-400 font-medium" title="${t.id}">${itemCount} items · v${t.version}.0${t.source === 'marketplace' ? ' · Imported from Marketplace' : ''}</p>
                 </div>
               </div>
             </td>

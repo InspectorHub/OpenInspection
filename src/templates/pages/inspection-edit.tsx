@@ -293,19 +293,36 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                   <span x-bind:class="inspection.agreementRequired ? 'translate-x-3' : 'translate-x-0.5'" class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform" />
                 </button>
               </label>
-              <div class="mt-2">
-                <label class="block text-[10px] font-mono font-semibold uppercase tracking-wide mb-1" style="color: #908a83">Report Theme Override</label>
-                <select
-                  x-bind:value="inspection.reportThemeOverride || ''"
-                  x-on:change={`const v=$event.target.value||null;authFetch('/api/inspections/${inspectionId}', {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reportThemeOverride:v})}).then(r=>r.json()).then(d=>{if(d.success)inspection.reportThemeOverride=v;});`}
-                  class="w-full px-2 py-1 text-xs border rounded bg-white"
-                  style="border-color: rgba(232,228,221,0.6); color: #46423c"
+              {/* R7-19 fix: Theme Override is rare per-inspection use. Collapse
+                  by default; only expanded if a non-default theme is already set
+                  or the inspector clicks "Advanced". Keeps Spectora-style focus
+                  on common per-inspection actions (Require Payment / Agreement). */}
+              <div class="mt-2" x-data={`{ open: !!inspection.reportThemeOverride }`}>
+                <button
+                  type="button"
+                  x-on:click="open = !open"
+                  class="flex items-center gap-1 text-[10px] font-mono font-semibold uppercase tracking-wide hover:underline"
+                  style="color: #908a83"
+                  title="Override the default report theme for this inspection only"
                 >
-                  <option value="">Use tenant default</option>
-                  <option value="modern">Modern</option>
-                  <option value="classic">Classic</option>
-                  <option value="minimal">Minimal</option>
-                </select>
+                  <svg class="w-2.5 h-2.5 transition-transform" x-bind:class="open ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                  <span>Advanced</span>
+                  <span x-show="!open && inspection.reportThemeOverride" class="text-[9px] font-bold ml-1 px-1 rounded" style="background: #f3f0ea; color: #46423c" x-text="inspection.reportThemeOverride"></span>
+                </button>
+                <div x-show="open" class="mt-2">
+                  <label class="block text-[10px] font-mono font-semibold uppercase tracking-wide mb-1" style="color: #908a83">Report Theme Override</label>
+                  <select
+                    x-bind:value="inspection.reportThemeOverride || ''"
+                    x-on:change={`const v=$event.target.value||null;authFetch('/api/inspections/${inspectionId}', {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reportThemeOverride:v})}).then(r=>r.json()).then(d=>{if(d.success)inspection.reportThemeOverride=v;});`}
+                    class="w-full px-2 py-1 text-xs border rounded bg-white"
+                    style="border-color: rgba(232,228,221,0.6); color: #46423c"
+                  >
+                    <option value="">Use tenant default</option>
+                    <option value="modern">Modern</option>
+                    <option value="classic">Classic</option>
+                    <option value="minimal">Minimal</option>
+                  </select>
+                </div>
               </div>
               <div class="mt-1">
                 <span x-show="inspection.paymentStatus === 'paid'" class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background: #dcfce7; color: #16a34a">Paid</span>
@@ -475,17 +492,20 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                         x-show="inspection.status === 'scheduled' || inspection.status === 'draft'"
                         x-on:click={`authFetch('/api/inspections/${inspectionId}/confirm',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)inspection.status='confirmed'})`}
                         class="text-[11px] bg-blue-600 text-white px-3 py-1 rounded-lg font-bold"
+                        title="Confirm this inspection — locks the schedule and sends client notification"
                     >Confirm</button>
                     <button
                         x-show="inspection.status !== 'cancelled' && inspection.status !== 'completed'"
                         x-on:click="showCancelModal=true"
                         class="text-[11px] border text-red-600 px-3 py-1 rounded-lg font-bold"
                         style="border-color: #fecaca; background: #fef2f2"
+                        title="Cancel this inspection — you'll be asked for a reason and refund handling"
                     >Cancel</button>
                     <button
                         x-show="inspection.status === 'cancelled'"
                         x-on:click={`authFetch('/api/inspections/${inspectionId}/uncancel',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)inspection.status='scheduled'})`}
                         class="text-[11px] bg-slate-100 text-slate-700 px-3 py-1 rounded-lg font-bold"
+                        title="Restore this cancelled inspection back to scheduled state"
                     >Restore</button>
                 </div>
                 {/* Cancel Modal */}
