@@ -1284,6 +1284,100 @@ inspectionsRoutes.openapi(publishRoute, async (c) => {
     return c.json({ success: true, data: result }, 200);
 });
 
+// ── Spec 5A.6 — POST /api/inspections/:id/pdf/refresh ──────────────────────────
+// Re-enqueue Summary + Full PDF rendering. Inspector / admin only.
+// Returns 202 with current status so the client can poll the same row via GET.
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/pdf/refresh',
+    tags: ['Inspections'],
+    summary: 'Refresh PDF renders (Summary + Full)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        202: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({
+                status: z.string(),
+                summary: z.string(),
+                full: z.string(),
+            })) } },
+            description: 'PDF renders enqueued',
+        },
+    },
+}), async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const reportPdf = c.var.services.reportPdf;
+    const baseUrl = getBaseUrl(c);
+    const reportUrl = `${baseUrl}/report/${id}`;
+    const sourceVersion = Date.now();
+
+    await Promise.all([
+        reportPdf.markQueued(id, tenantId, 'summary'),
+        reportPdf.markQueued(id, tenantId, 'full'),
+    ]);
+    c.executionCtx.waitUntil((async () => {
+        try {
+            await Promise.allSettled([
+                reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion }),
+                reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion }),
+            ]);
+        } catch (err) {
+            logger.error('[pdf/refresh] background render failed', { inspectionId: id }, err instanceof Error ? err : undefined);
+        }
+    })());
+
+    return c.json({ success: true, data: { status: 'queued', summary: 'queued', full: 'queued' } }, 202);
+});
+
+// ── Spec 5A.7 — GET /api/inspections/:id/pdf?type=summary|full ─────────────────
+// Streams the PDF from R2. Returns 404 if record missing, 202 with status
+// payload if PDF still rendering / failed (client polls). Auth: any caller
+// with a tenant context (logged-in inspector or branding-resolved request);
+// public-share-token support follows the existing /report/:id pattern.
+inspectionsRoutes.openapi(createRoute({
+    method: 'get', path: '/{id}/pdf',
+    tags: ['Inspections'],
+    summary: 'Download report PDF (Summary or Full)',
+    request: {
+        params: z.object({ id: z.string() }),
+        query: z.object({ type: z.enum(['summary', 'full']).default('full') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/pdf': { schema: z.any() } },
+            description: 'PDF bytes',
+        },
+        202: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({
+                status: z.string(),
+                error: z.string().nullable().optional(),
+            })) } },
+            description: 'PDF still rendering',
+        },
+    },
+}), async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    if (!tenantId) return c.json({ success: false, error: { message: 'Tenant required' } }, 400);
+    const { id } = c.req.valid('param');
+    const { type } = c.req.valid('query');
+    const reportPdf = c.var.services.reportPdf;
+    const record = await reportPdf.getPdfRecord(id, tenantId, type);
+    if (!record) return c.json({ success: false, error: { message: 'PDF not found' } }, 404);
+    if (record.status !== 'ready') {
+        return c.json({ success: true, data: { status: record.status, error: record.error ?? null } }, 202);
+    }
+    const obj = await reportPdf.streamPdf(record);
+    if (!obj) return c.json({ success: false, error: { message: 'PDF object missing in storage' } }, 404);
+    return new Response(obj.body, {
+        status: 200,
+        headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="report-${id}-${type}.pdf"`,
+            'Cache-Control': 'private, max-age=300',
+        },
+    });
+});
+
 // POST /api/inspections/:id/agent-token — generates a shareable agent view token
 inspectionsRoutes.openapi(createRoute({
     method: 'post', path: '/{id}/agent-token',

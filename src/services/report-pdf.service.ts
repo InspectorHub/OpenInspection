@@ -115,15 +115,21 @@ export class ReportPdfService {
     }
 
     /**
-     * Generate a short-lived signed URL pointing at R2. Caller redirects (302).
-     * TTL default 1h matches PHOTOS bucket convention.
+     * Stream a PDF object from R2. Proxy pattern (mirrors PHOTOS bucket usage):
+     * caller — typically GET /api/inspections/:id/pdf — returns the body as a
+     * Response with the right Content-Type. Returning the R2ObjectBody (rather
+     * than a presigned URL) avoids needing the S3-compatible API creds.
      *
-     * NOTE: Cloudflare R2 presigned URLs are generated via the S3-compatible API,
-     * not via the binding directly. Implementation wired in task 5A.7 (download
-     * endpoint) — for now this throws so the test harness flags unwired callers.
+     * Returns null when the object is missing in R2 (rare — shouldn't happen
+     * if the D1 row says status='ready', but guard anyway).
      */
-    async getSignedUrl(_record: ReportPdf, _ttlSeconds = 3600): Promise<string> {
-        throw new Error('Not implemented: getSignedUrl wired in Spec 5A.7 (download endpoint task)');
+    async streamPdf(record: ReportPdf): Promise<R2ObjectBody | null> {
+        if (!this.r2) throw Errors.BadRequest('PDF storage unavailable: REPORTS bucket binding not configured');
+        if (record.status !== 'ready') {
+            throw Errors.BadRequest(`PDF not ready (status=${record.status})`);
+        }
+        const obj = await this.r2.get(record.r2Key);
+        return obj;
     }
 
     /**

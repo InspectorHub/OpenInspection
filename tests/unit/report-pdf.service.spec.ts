@@ -108,4 +108,22 @@ describe('ReportPdfService', () => {
         // r2Key preserved across requeue (existing PDF still serveable)
         expect(row?.r2Key).toBe(`${TENANT_A}/${INSP_1}/full.pdf`);
     });
+
+    it('streamPdf returns R2 object body for ready PDF', async () => {
+        const fakeBody = { body: 'STREAM' } as unknown as R2ObjectBody;
+        const r2WithGet = {
+            put: vi.fn(async () => undefined),
+            get: vi.fn(async () => fakeBody),
+        } as unknown as R2Bucket;
+        const s = new ReportPdfService({} as D1Database, mockBrowser, r2WithGet);
+        const rec = await s.renderAndStore(INSP_1, TENANT_A, 'full', { reportUrl: 'u', sourceVersion: 1 });
+        const obj = await s.streamPdf(rec);
+        expect(obj).toBe(fakeBody);
+    });
+
+    it('streamPdf throws when record is not ready', async () => {
+        await svc.markQueued(INSP_1, TENANT_A, 'full');
+        const rec = await svc.getPdfRecord(INSP_1, TENANT_A, 'full');
+        await expect(svc.streamPdf(rec!)).rejects.toThrow(/not ready/);
+    });
 });
