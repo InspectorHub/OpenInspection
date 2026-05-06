@@ -358,13 +358,17 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div x-data="contactSelector" class="relative mb-3">
-                                    <label class="block text-xs font-bold text-slate-600 mb-1">Search or create contact</label>
+                                    {/* R7-08 fix: clarify that this autocompletes existing contacts
+                                        and auto-fills Name/Email/Phone below. Without this hint,
+                                        users wonder whether to type here OR fill the fields below. */}
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Client</label>
+                                    <p class="text-[10px] text-slate-400 mb-2 leading-tight">Search a saved contact (auto-fills Name / Email / Phone), or skip to type a new one below.</p>
                                     <input
                                         type="text"
                                         x-model="searchText"
                                         x-on:input="onInput()"
                                         x-on:focus="showDropdown = searchText.length > 0"
-                                        placeholder="Type contact name to search..."
+                                        placeholder="Search saved contacts…"
                                         class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"
                                         autocomplete="off"
                                     />

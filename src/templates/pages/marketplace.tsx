@@ -12,6 +12,15 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                         <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Template Marketplace</span>
                         <h1 class="text-5xl font-black tracking-tight text-slate-900">Marketplace</h1>
                         <p class="text-lg text-slate-500 font-semibold mt-2">Browse and import community inspection templates.</p>
+                        {/* R7-25: Spell out the import / update relationship so
+                            inspectors aren't unsure whether importing creates a
+                            copy they own or links to a remote template. */}
+                        <div class="mt-3 inline-flex items-start gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 max-w-2xl">
+                            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div>
+                                <strong>Import = your own copy.</strong> When the publisher updates the template, you'll see "Update available" and can pull the new version (or keep your customizations).
+                            </div>
+                        </div>
                     </div>
                 </div>
 

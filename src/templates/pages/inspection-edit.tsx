@@ -256,9 +256,11 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <h2 class="text-sm font-bold font-heading" style="color: #1a1815" x-text="inspection.propertyAddress || 'Loading...'"></h2>
               <p class="text-[10px] font-mono mt-1" style="color: #b0aaa3" x-text="formattedDate"></p>
             </div>
-            <div class="px-5 py-3">
+            {/* R7-20: surface what the progress bar measures so inspectors
+                stop wondering how it's computed. */}
+            <div class="px-5 py-3" title="Percent of inspection items that have a rating set (Sat / Mon / Defect / NI / NP).">
               <div class="flex justify-between text-[10px] font-mono mb-1" style="color: #908a83">
-                <span>Progress</span>
+                <span>Progress · items rated</span>
                 <span x-text="completionPercent + '%'"></span>
               </div>
               <div class="h-1.5 rounded-full" style="background: #e8e4dd">
