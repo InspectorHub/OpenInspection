@@ -13,21 +13,25 @@ export class TemplateService {
         return drizzle(this.db);
     }
 
-    private countSchemaItems(schema: string | null): number {
+    private countSchemaItems(schema: string | object | null | undefined): number {
         if (!schema) return 0;
-        try {
-            const parsed = JSON.parse(schema);
-            if (Array.isArray(parsed)) return parsed.length;
-            if (Array.isArray(parsed?.sections)) {
-                return parsed.sections.reduce(
-                    (acc: number, sec: { items?: unknown[] }) => acc + (Array.isArray(sec.items) ? sec.items.length : 0),
-                    0
-                );
-            }
-            return 0;
-        } catch {
-            return 0;
+        // Drizzle's `mode: 'json'` auto-parses on read so `schema` may already be an
+        // object. Backfill SQL inserting raw TEXT keeps it as string. Tolerate both.
+        let parsed: unknown;
+        if (typeof schema === 'string') {
+            try { parsed = JSON.parse(schema); } catch { return 0; }
+        } else {
+            parsed = schema;
         }
+        if (Array.isArray(parsed)) return parsed.length;
+        const sections = (parsed as { sections?: unknown })?.sections;
+        if (Array.isArray(sections)) {
+            return sections.reduce(
+                (acc: number, sec) => acc + (Array.isArray((sec as { items?: unknown[] })?.items) ? (sec as { items: unknown[] }).items.length : 0),
+                0
+            );
+        }
+        return 0;
     }
 
     /**
@@ -39,11 +43,19 @@ export class TemplateService {
             .from(templates)
             .where(eq(templates.tenantId, tenantId))
             .all();
+        // Round 4 polish — surface marketplace-import flag so UI can tag rows.
+        const { tenantMarketplaceImports } = await import('../lib/db/schema/marketplace');
+        const imports = await db.select({ localTemplateId: tenantMarketplaceImports.localTemplateId })
+            .from(tenantMarketplaceImports)
+            .where(eq(tenantMarketplaceImports.tenantId, tenantId))
+            .all();
+        const importedIds = new Set(imports.map(i => i.localTemplateId as string));
         return rows.map(row => ({
             id: row.id,
             name: row.name,
             version: row.version,
-            itemCount: this.countSchemaItems(row.schema as string | null),
+            itemCount: this.countSchemaItems(row.schema as never),
+            source: importedIds.has(row.id as string) ? 'marketplace' as const : 'custom' as const,
         }));
     }
 

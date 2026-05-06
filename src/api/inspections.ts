@@ -125,6 +125,8 @@ const listTemplatesRoute = createRoute({
                                 id: z.string(),
                                 name: z.string(),
                                 version: z.number(),
+                                itemCount: z.number().optional(),
+                                source: z.enum(['marketplace', 'custom']).optional(),
                             })),
                         }),
                     }),

@@ -33,6 +33,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                     <select x-model="sort" x-on:change="resort()"
                         class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-500">
                         <option value="featured">Featured first</option>
+                        <option value="recent">Recently added</option>
                         <option value="popular">Most imports</option>
                         <option value="name">Name (A-Z)</option>
                     </select>

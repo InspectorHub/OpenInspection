@@ -50,6 +50,13 @@ function marketplace() {
                 t.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             } else if (this.sort === 'popular') {
                 t.sort((a, b) => (b.downloadCount || 0) - (a.downloadCount || 0));
+            } else if (this.sort === 'recent') {
+                // Round 4 polish — sort by createdAt descending (newest first)
+                t.sort((a, b) => {
+                    const ca = new Date(a.createdAt || 0).getTime();
+                    const cb = new Date(b.createdAt || 0).getTime();
+                    return cb - ca;
+                });
             } else {
                 // featured first
                 t.sort((a, b) => {

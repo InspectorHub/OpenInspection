@@ -34,8 +34,8 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
     return (
         <MainLayout title={`${siteName} | Settings`} branding={branding}>
             <div class="max-w-5xl mx-auto space-y-16 animate-fade-in">
-                {/* Sticky TOC — Top 5 polish #3. Auto-hide below 1280px to avoid clipping side nav. */}
-                <aside class="hidden xl:block fixed right-6 top-32 z-30 w-44 text-xs">
+                {/* Sticky TOC — Polish #3 (Round 4 widened from xl: to lg: per laptop coverage). */}
+                <aside class="hidden lg:block fixed right-6 top-32 z-30 w-44 text-xs">
                     <div class="bg-white/80 backdrop-blur-md ring-1 ring-slate-200 rounded-2xl p-3 shadow-md">
                         <div class="font-bold uppercase tracking-widest text-slate-400 mb-2 text-[10px] px-2">On this page</div>
                         <ul class="space-y-0.5">
