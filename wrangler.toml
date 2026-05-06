@@ -56,6 +56,15 @@ enabled = true
 binding = "PHOTOS"
 bucket_name = "openinspection-standalone-photos"
 
+# Spec 5A — Report PDF Pipeline. Stores Summary + Full Report PDFs
+# pre-rendered at publish time, served via signed URLs to client viewer.
+# Pattern mirrors Spectora's S3-based PDF distribution (see
+# docs/competitors/07_spectora_analysis.md F.3). Uses BROWSER binding
+# below to render report HTML -> PDF.
+[[r2_buckets]]
+binding = "REPORTS"
+bucket_name = "openinspection-standalone-reports"
+
 # Cloudflare Browser Rendering API — used by src/lib/pdf.ts to render
 # /report/:id into a PDF for email delivery. Beta as of 2026-05; free tier
 # 1000 requests/day on Workers Paid plan ($5/mo). If the binding is absent
