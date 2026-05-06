@@ -23,3 +23,5 @@ export { invoices } from './invoice';
 export { marketplaceTemplates, tenantMarketplaceImports } from './marketplace';
 export { customerMessages } from './message';
 export type { MessageAttachment } from './message';
+export { reportPdfs } from './report-pdf';
+export type { ReportPdf, NewReportPdf } from './report-pdf';

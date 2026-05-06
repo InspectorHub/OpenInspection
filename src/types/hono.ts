@@ -44,6 +44,10 @@ export interface AppEnv {
     // PDF Generation (Cloudflare Browser Rendering — beta)
     BROWSER?: Fetcher;
 
+    // Report PDF storage (Spec 5A) — pre-rendered Summary + Full Report PDFs.
+    // Optional during local dev so the worker boots without the binding.
+    REPORTS?: R2Bucket;
+
     // SaaS Portal Integration
     PORTAL_API_URL?: string;
     PORTAL_M2M_SECRET?: string;
@@ -71,6 +75,7 @@ import { RecommendationService } from '../services/recommendation.service';
 import { EventService } from '../services/event.service';
 import { TotpService } from '../services/totp.service';
 import { TemplateSeedService } from '../services/template-seed.service';
+import { ReportPdfService } from '../services/report-pdf.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -101,6 +106,7 @@ export interface AppServices {
     event: EventService;
     totp: TotpService;
     templateSeed: TemplateSeedService;
+    reportPdf: ReportPdfService;
 }
 
 /**

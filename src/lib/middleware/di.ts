@@ -23,6 +23,7 @@ import { RecommendationService } from '../../services/recommendation.service';
 import { EventService } from '../../services/event.service';
 import { TotpService } from '../../services/totp.service';
 import { TemplateSeedService } from '../../services/template-seed.service';
+import { ReportPdfService } from '../../services/report-pdf.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -132,6 +133,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'templateSeed':
                     target.templateSeed = new TemplateSeedService(c.env.DB);
+                    break;
+                case 'reportPdf':
+                    target.reportPdf = new ReportPdfService(c.env.DB, c.env.BROWSER, c.env.REPORTS);
                     break;
             }
             return target[prop];
