@@ -29,15 +29,25 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
                 </div>
 
-                {/* Statistics Grid */}
+                {/* Statistics Grid — R7-04 fix: each card is now a button
+                    that opens the matching bucket section + scrolls into
+                    view. anchor maps to a section in the inspections list
+                    rendered below. */}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     {[
-                        { label: 'Active Jobs', id: 'statActive', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: 'indigo' },
-                        { label: 'In Progress', id: 'statProgress', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
-                        { label: 'Ready for Review', id: 'statReview', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', color: 'amber' },
-                        { label: 'Completed', id: 'statCompleted', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', color: 'emerald' }
+                        { label: 'Active Jobs',     id: 'statActive',    target: 'today',          icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: 'indigo' },
+                        { label: 'In Progress',     id: 'statProgress',  target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
+                        { label: 'Ready for Review',id: 'statReview',    target: 'needsAttention', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', color: 'amber' },
+                        { label: 'Completed',       id: 'statCompleted', target: 'recentReports', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', color: 'emerald' }
                     ].map((stat, i) => (
-                        <div key={stat.id} class="glass-card group p-8 rounded-[2.5rem] animate-fade-in" style={`animation-delay: ${0.1 + i * 0.05}s`}>
+                        <button
+                            key={stat.id}
+                            type="button"
+                            x-on:click={`sections['${stat.target}']=true; $nextTick(()=>{ const el=document.getElementById('bucket-${stat.target}'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); })`}
+                            class="glass-card group p-8 rounded-[2.5rem] animate-fade-in text-left hover:scale-[1.02] transition-transform cursor-pointer"
+                            style={`animation-delay: ${0.1 + i * 0.05}s`}
+                            title={`Jump to ${stat.label}`}
+                        >
                             <div class="flex items-center justify-between mb-6">
                                 <div class={`w-14 h-14 rounded-2xl bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-${stat.color}-600 group-hover:text-white transition-all duration-300 shadow-sm`}>
                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
@@ -46,7 +56,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             </div>
                             <h3 class="text-4xl font-black text-slate-900 tracking-tightest mb-1" id={stat.id}>0</h3>
                             <p class="text-sm font-bold text-slate-500 uppercase tracking-tight">{stat.label}</p>
-                        </div>
+                        </button>
                     ))}
                 </div>
 
@@ -84,7 +94,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
 
                     {/* Section: Needs Attention */}
-                    <section x-show="!loading && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section id="bucket-needsAttention" x-show="!loading && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
                         <button type="button" x-on:click="sections.needsAttention = !sections.needsAttention"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -115,7 +125,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Today */}
-                    <section x-show="!loading && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section id="bucket-today" x-show="!loading && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
                         <button type="button" x-on:click="sections.today = !sections.today"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -169,7 +179,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: This Week */}
-                    <section x-show="!loading && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section id="bucket-thisWeek" x-show="!loading && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
                         <button type="button" x-on:click="sections.thisWeek = !sections.thisWeek"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -236,7 +246,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Recent Reports */}
-                    <section x-show="!loading && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section id="bucket-recentReports" x-show="!loading && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
                         <button type="button" x-on:click="sections.recentReports = !sections.recentReports"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">

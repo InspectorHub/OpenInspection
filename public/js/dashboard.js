@@ -449,6 +449,15 @@ function dashboardFactory() {
                 // Auto-expand needsAttention or today if they have items; collapse others if empty
                 if (this.buckets.needsAttention.length > 0) this.sections.needsAttention = true;
                 if (this.buckets.today.length > 0) this.sections.today = true;
+                // R7-05 fix: when all the "above the fold" buckets are empty
+                // but Later has items, auto-expand Later so the inspector
+                // doesn't see a dashboard that looks empty when it isn't.
+                const aboveFoldEmpty = this.buckets.needsAttention.length === 0
+                    && this.buckets.today.length === 0
+                    && this.buckets.thisWeek.length === 0;
+                if (aboveFoldEmpty && this.buckets.later.length > 0) {
+                    this.sections.later = true;
+                }
                 this.computeStats();
             } catch (e) {
                 if (typeof window.showToast === 'function') {
