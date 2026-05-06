@@ -208,6 +208,30 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             </template>
           </div>
 
+          {/* Spec 4D mobile — Inspection Events compact list */}
+          <section x-data={`inspectionEventsSection('${inspectionId}')`} x-init="load()" class="mx-4 mb-24 mt-3 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+            <header class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-bold text-slate-900">Events</h2>
+                <span class="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-500" x-show="events.length > 0" x-text="events.length"></span>
+              </div>
+              <button type="button" x-on:click="openCreate()" class="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[11px] font-bold">+ Add</button>
+            </header>
+            <ul class="mt-2 space-y-1.5">
+              <template x-for="ev in events" {...{ 'x-bind:key': 'ev.id' }}>
+                <li class="flex items-center gap-2 p-2 bg-slate-50 rounded-lg text-xs">
+                  <span class="w-2 h-2 rounded-full flex-shrink-0" {...{ 'x-bind:style': "'background:' + eventTypeColor(ev.eventTypeId)" }}></span>
+                  <span class="font-bold text-slate-900 truncate" x-text="eventTypeName(ev.eventTypeId)"></span>
+                  <span class="text-slate-500 text-[10px]" x-text="formatDate(ev.scheduledAt)"></span>
+                  <span class="ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full" x-text="(ev.status || '').replace('_', ' ')" {...{ 'x-bind:class': 'statusBadgeClass(ev.status)' }}></span>
+                  <button type="button" x-show="ev.status === 'scheduled'" x-on:click="markComplete(ev.id)" class="text-emerald-600 text-xs font-bold" title="Done">&#10003;</button>
+                  <button type="button" x-on:click="del(ev.id)" class="text-rose-600 text-xs font-bold" title="Delete">&times;</button>
+                </li>
+              </template>
+              <li x-show="!events.length && !loading" class="text-[10px] text-slate-400 px-2">No events yet.</li>
+            </ul>
+          </section>
+
           {/* Bottom Bar */}
           <div class="fixed bottom-0 left-0 right-0 z-40 px-4 py-3 flex gap-3" style="background: rgba(255,253,250,0.90); backdrop-filter: blur(16px); border-top: 1px solid rgba(232,228,221,0.5);">
             <button x-on:click="previewReport()" class="flex-1 py-3 text-sm font-semibold rounded-xl border" style="border-color: #e8e4dd; color: #46423c">Preview</button>

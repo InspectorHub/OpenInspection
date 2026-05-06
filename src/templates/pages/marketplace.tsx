@@ -34,10 +34,13 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                 {/* Grid */}
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <template x-for="t in templates" {...{ 'x-bind:key': 't.id' }}>
-                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 hover:shadow-lg transition">
+                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 hover:shadow-lg transition" x-bind:class="t.featured ? 'ring-2 ring-amber-400/60' : ''">
                             <div class="flex items-start justify-between">
                                 <div>
-                                    <h3 class="font-black text-slate-900 text-lg" x-text="t.name"></h3>
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="font-black text-slate-900 text-lg" x-text="t.name"></h3>
+                                        <span x-show="t.featured" class="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">★ Featured</span>
+                                    </div>
                                     <div class="flex items-center gap-2 mt-1">
                                         <span class="text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full capitalize" x-text="t.category.replace('_',' ')"></span>
                                         <span class="text-xs text-slate-400 font-mono" x-text="'v' + t.semver"></span>

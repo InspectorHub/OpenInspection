@@ -7,8 +7,8 @@ describe('TemplateSeedService', () => {
         expect(typeof svc.bulkSeed).toBe('function');
     });
 
-    it('DEFAULT_AUTO_SEED_NAMES contains exactly 6 entries', () => {
-        expect(DEFAULT_AUTO_SEED_NAMES).toHaveLength(6);
+    it('DEFAULT_AUTO_SEED_NAMES contains exactly 7 entries', () => {
+        expect(DEFAULT_AUTO_SEED_NAMES).toHaveLength(7);
     });
 
     it('DEFAULT_AUTO_SEED_NAMES has stable seed names', () => {
@@ -16,6 +16,7 @@ describe('TemplateSeedService', () => {
             'Standard Residential Inspection',
             'Pre-Listing Inspection',
             'New Construction Pre-Drywall Inspection',
+            'New Construction Final Walkthrough',
             'Sewer Scope Inspection',
             'Radon Measurement Report',
             'Mold Inspection',

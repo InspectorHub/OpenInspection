@@ -3,14 +3,15 @@ import { eq, and } from 'drizzle-orm';
 import { templates } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 
-import residential     from '../data/seed-templates/residential.json';
-import preListing      from '../data/seed-templates/pre-listing.json';
-import newConstruction from '../data/seed-templates/new-construction.json';
-import sewerScope      from '../data/seed-templates/sewer-scope.json';
-import radon           from '../data/seed-templates/radon.json';
-import moldInspection  from '../data/seed-templates/mold-inspection.json';
+import residential          from '../data/seed-templates/residential.json';
+import preListing           from '../data/seed-templates/pre-listing.json';
+import newConstruction      from '../data/seed-templates/new-construction.json';
+import newConstructionFinal from '../data/seed-templates/new-construction-final.json';
+import sewerScope           from '../data/seed-templates/sewer-scope.json';
+import radon                from '../data/seed-templates/radon.json';
+import moldInspection       from '../data/seed-templates/mold-inspection.json';
 
-const SEEDS = [residential, preListing, newConstruction, sewerScope, radon, moldInspection];
+const SEEDS = [residential, preListing, newConstruction, newConstructionFinal, sewerScope, radon, moldInspection];
 export const DEFAULT_AUTO_SEED_NAMES = SEEDS.map(s => s.name);
 
 export class TemplateSeedService {

@@ -227,5 +227,6 @@ export const inspectionEvents = sqliteTable('inspection_events', {
     completedAt:       integer('completed_at', { mode: 'timestamp' }),
     resultsReceivedAt: integer('results_received_at', { mode: 'timestamp' }),
     cancelledAt:       integer('cancelled_at', { mode: 'timestamp' }),
+    gcalEventId:       text('gcal_event_id'),
     createdAt:         integer('created_at', { mode: 'timestamp' }).notNull(),
 });

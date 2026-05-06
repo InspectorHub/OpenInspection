@@ -1,0 +1,65 @@
+{
+  "id": "seed_new_construction_final_v1",
+  "name": "New Construction Final Walkthrough",
+  "description": "Pre-closing walkthrough for new construction homes — exterior finishes, interior finishes, system commissioning, and punch list compilation.",
+  "version": 1,
+  "featured": true,
+  "schema": {
+    "sections": [
+      {
+        "id": "s_exterior_finish", "title": "Exterior Finishes",
+        "items": [
+          { "id": "i_siding",       "label": "Siding & Trim Installation",    "type": "rating" },
+          { "id": "i_paint_ext",    "label": "Exterior Paint Coverage",       "type": "rating" },
+          { "id": "i_roof_visible", "label": "Roof — Visible from Ground",    "type": "rating" },
+          { "id": "i_grading",      "label": "Final Grading & Drainage",      "type": "rating" },
+          { "id": "i_walkways",     "label": "Walkways & Driveway Finish",    "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_interior_finish", "title": "Interior Finishes",
+        "items": [
+          { "id": "i_drywall",      "label": "Drywall Finish & Texture",      "type": "rating" },
+          { "id": "i_paint_int",    "label": "Interior Paint Coverage",       "type": "rating" },
+          { "id": "i_flooring",     "label": "Flooring Installation",         "type": "rating" },
+          { "id": "i_trim",         "label": "Trim, Baseboards, Casings",     "type": "rating" },
+          { "id": "i_doors",        "label": "Interior Doors & Hardware",     "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_kitchen_baths", "title": "Kitchen & Baths",
+        "items": [
+          { "id": "i_cabinets",     "label": "Cabinets — Alignment & Hardware", "type": "rating" },
+          { "id": "i_countertops",  "label": "Countertops — Seams & Edges",   "type": "rating" },
+          { "id": "i_appliances",   "label": "Appliance Installation",        "type": "rating" },
+          { "id": "i_caulk",        "label": "Caulking — Tubs / Sinks / Tile","type": "rating" }
+        ]
+      },
+      {
+        "id": "s_systems_commission", "title": "Systems Commissioning",
+        "items": [
+          { "id": "i_hvac_op",      "label": "HVAC — Heating & Cooling Test", "type": "rating" },
+          { "id": "i_water_heat",   "label": "Water Heater — Operation",      "type": "rating" },
+          { "id": "i_outlets",      "label": "All Outlets — Test (incl. GFCI)","type": "rating" },
+          { "id": "i_fixtures",     "label": "Plumbing Fixtures — All Operate","type": "rating" }
+        ]
+      },
+      {
+        "id": "s_safety", "title": "Safety",
+        "items": [
+          { "id": "i_smoke",        "label": "Smoke Detectors — Each Bedroom + Hall","type": "rating" },
+          { "id": "i_co",           "label": "CO Detectors (per code)",       "type": "rating" },
+          { "id": "i_handrails",    "label": "Handrails — Stairs & Decks",    "type": "rating" }
+        ]
+      },
+      {
+        "id": "s_punch", "title": "Punch List",
+        "items": [
+          { "id": "i_punch_critical","label": "Critical Items (block closing)","type": "rating" },
+          { "id": "i_punch_cosmetic","label": "Cosmetic Items (post-closing)","type": "rating" },
+          { "id": "i_warranty",      "label": "Items for Builder Warranty",   "type": "rating" }
+        ]
+      }
+    ]
+  }
+}

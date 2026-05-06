@@ -348,7 +348,7 @@ export async function syncEventsToGcal(
 
     // Lazy import to avoid circular dependency between api/calendar.ts and services.
     const { EventService } = await import('../services/event.service');
-    const { eventTypes, inspections } = await import('../lib/db/schema');
+    const { eventTypes, inspections, inspectionEvents } = await import('../lib/db/schema');
     const eventService = new EventService(db);
 
     const fromTs = Date.now();
@@ -384,6 +384,12 @@ export async function syncEventsToGcal(
             skipped++;
             continue;
         }
+        // Idempotency: skip events already pushed (have gcal_event_id).
+        // Use PATCH endpoint instead in future polish — for now skip to avoid duplicates.
+        if (ev.gcalEventId) {
+            skipped++;
+            continue;
+        }
         const typeName = typeNameById.get(ev.eventTypeId as string) || 'Inspection event';
         const address  = addressById.get(ev.inspectionId as string) || '';
         const summary  = address ? `${typeName} — ${address}` : typeName;
@@ -415,10 +421,14 @@ export async function syncEventsToGcal(
                 failed++;
                 continue;
             }
+            // Persist gcal_event_id for future PATCH/DELETE.
+            const created = await res.json().catch(() => ({})) as { id?: string };
+            if (created.id) {
+                await drizzleDb.update(inspectionEvents)
+                    .set({ gcalEventId: created.id })
+                    .where(eq(inspectionEvents.id, ev.id as string));
+            }
             pushed++;
-            // TODO: complete Google Calendar event push — persist returned event.id back to
-            // inspection_events.gcalEventId so we can PATCH/DELETE on later status changes.
-            // Current schema lacks this column; add via a migration in a follow-up PR.
         } catch (e) {
             logger.error('[calendar] syncEventsToGcal push error', { eventId: ev.id }, e instanceof Error ? e : undefined);
             failed++;
@@ -428,5 +438,31 @@ export async function syncEventsToGcal(
     logger.info('[calendar] syncEventsToGcal complete', { tenantId, pushed, skipped, failed, totalEvents: events.length });
     return { pushed, skipped, failed, totalEvents: events.length };
 }
+
+/**
+ * POST /api/calendar/sync-events — Spec 4D polish.
+ * Pushes all upcoming inspection_events to the user's connected Google Calendar.
+ */
+calendarRoutes.post('/sync-events', async (c) => {
+    const jwtUser = c.get('user');
+    if (!jwtUser) return c.json({ error: 'Not authenticated' }, 401);
+
+    const db = drizzle(c.env.DB);
+    const userResult = await db.select().from(users).where(eq(users.id, jwtUser.sub)).limit(1);
+    const dbUser = userResult[0];
+    if (!dbUser?.googleRefreshToken) {
+        return c.json({ error: 'Google Calendar not connected' }, 400);
+    }
+
+    const result = await syncEventsToGcal(
+        c.env.DB,
+        dbUser.tenantId as string,
+        c.env.GOOGLE_CLIENT_ID,
+        c.env.GOOGLE_CLIENT_SECRET,
+        dbUser.googleRefreshToken,
+        dbUser.googleCalendarId ?? 'primary',
+    );
+    return c.json({ success: true, data: result });
+});
 
 export default calendarRoutes;
