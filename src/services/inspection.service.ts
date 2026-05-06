@@ -209,6 +209,7 @@ export class InspectionService {
             status,
             date,
             referredByAgentId: (data.referredByAgentId as string | null) || null,
+            sellingAgentId: (data.sellingAgentId as string | null) || null,
             createdAt
         };
 

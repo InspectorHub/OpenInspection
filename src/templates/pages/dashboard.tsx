@@ -411,6 +411,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         <option value="">None</option>
                                     </select>
                                 </div>
+                                {/* R7-09: Buyer's Agent — separate field from Listing Agent so
+                                    inspectors can record both sides of the transaction. Maps to
+                                    inspections.sellingAgentId. Both selects share populateAgents(). */}
+                                <div class="space-y-2">
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Buyer's Agent</label>
+                                    <select id="buyerAgentId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                        <option value="">None</option>
+                                    </select>
+                                </div>
                             </div>
 
                             {/* Services selection */}

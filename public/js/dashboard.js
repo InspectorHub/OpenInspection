@@ -230,13 +230,17 @@ async function populateAgents() {
     if (!res.ok) return;
     const data = await res.json();
     const agents = data.data?.contacts || [];
-    const select = document.getElementById('agentId');
-    if (!select || agents.length === 0) return;
-    agents.forEach(a => {
-        const opt = document.createElement('option');
-        opt.value = a.id;
-        opt.innerText = a.name || a.email || a.id;
-        select.appendChild(opt);
+    // R7-09: same agent list populates Listing Agent + Buyer's Agent dropdowns.
+    const targets = [document.getElementById('agentId'), document.getElementById('buyerAgentId')];
+    if (agents.length === 0) return;
+    targets.forEach(select => {
+        if (!select) return;
+        agents.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            opt.innerText = a.name || a.email || a.id;
+            select.appendChild(opt);
+        });
     });
 }
 
@@ -314,6 +318,7 @@ async function submitInspection() {
         inspectorId: document.getElementById('inspectorId')?.value || undefined,
         date: rawDate ? new Date(rawDate).toISOString() : undefined,
         referredByAgentId: document.getElementById('agentId')?.value || undefined,
+        sellingAgentId: document.getElementById('buyerAgentId')?.value || undefined,
         serviceIds: selectedServiceIds.length > 0 ? [...selectedServiceIds] : undefined,
         price: selectedServiceIds.length > 0 ? calcTotal() : undefined,
         discountCodeId: discountResult?.valid ? discountResult.discountCodeId : undefined,
@@ -352,6 +357,8 @@ async function submitInspection() {
            document.getElementById('inspectionDate').value = '';
            document.getElementById('inspectorId').value = '';
            document.getElementById('agentId').value = '';
+           const buyerAg = document.getElementById('buyerAgentId');
+           if (buyerAg) buyerAg.value = '';
 
            if (newId) {
                window.location.href = '/inspections/' + newId + '/edit';

@@ -42,6 +42,8 @@ export const CreateInspectionSchema = z.object({
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }),
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }),
     referredByAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }),
+    // R7-09: Buyer's Agent — separate from listing agent. Maps to inspections.sellingAgentId column.
+    sellingAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440004' }),
     serviceIds:     z.array(z.string()).optional(),
     discountCodeId: z.string().nullable().optional(),
     discountAmount: z.number().int().nullable().optional(),
