@@ -143,10 +143,12 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                     </div>
                 </div>
 
-                {/* Toast */}
-                <div x-show="toast" x-transition class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 z-50">
+                {/* Toast — Bug #7 (4-30 review) fix: pre-Alpine render leaks the
+                    static "View" anchor text. Default style=display:none keeps toast
+                    hidden until Alpine flips x-show on a real toast event. */}
+                <div x-show="toast" style="display:none" x-transition class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 z-50">
                     <span x-text="toast"></span>
-                    <a x-show="toastLink" x-bind:href="toastLink" class="text-violet-400 font-bold text-sm underline">View</a>
+                    <a x-show="toastLink" style="display:none" x-bind:href="toastLink" class="text-violet-400 font-bold text-sm underline">View</a>
                 </div>
             </div>
 
