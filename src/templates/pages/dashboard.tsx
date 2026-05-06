@@ -318,8 +318,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     <CancelModal />
                 </div>
 
-                {/* Create Inspection Modal */}
-                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto">
+                {/* Create Inspection Modal — R7-11 fix: add overflow-x-hidden so
+                    in-modal vertical scroll doesn't spill into page-level
+                    horizontal scroll on narrow viewports. */}
+                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto overflow-x-hidden">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl transition-opacity animate-fade-in" onclick="closeModal()"></div>
                     <div class="flex min-h-full items-center justify-center p-6">
                         <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-[3.5rem] bg-white p-12 text-left shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] animate-fade-in border border-white/40">
