@@ -15,6 +15,18 @@ export const inspections = sqliteTable('inspections', {
     tenantId:            text('tenant_id').notNull().references(() => tenants.id),
     inspectorId:         text('inspector_id').references(() => users.id),
     propertyAddress:     text('property_address').notNull(),
+    // Spec 5D — geocoded address fields populated by Google Places Details
+    // when the inspector picks an autocomplete result. All nullable so legacy
+    // inspections (free-text address only) load without backfill.
+    addressPlaceId:      text('address_place_id'),
+    addressStreet:       text('address_street'),
+    addressCity:         text('address_city'),
+    addressState:        text('address_state'),
+    addressZip:          text('address_zip'),
+    addressCounty:       text('address_county'),
+    addressLat:          real('address_lat'),
+    addressLng:          real('address_lng'),
+    addressGeocodedAt:   integer('address_geocoded_at'),
     clientName:          text('client_name'),
     clientEmail:         text('client_email'),
     clientPhone:         text('client_phone'),

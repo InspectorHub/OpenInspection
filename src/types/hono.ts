@@ -51,6 +51,11 @@ export interface AppEnv {
     // SaaS Portal Integration
     PORTAL_API_URL?: string;
     PORTAL_M2M_SECRET?: string;
+
+    // Spec 5D — Address Autofill. Server-side proxy holds the API key so it
+    // never leaks to the client. Optional: when absent, dashboard.tsx falls
+    // back to a free-text address input (no autocomplete dropdown).
+    GOOGLE_PLACES_API_KEY?: string;
 }
 
 import { AdminService } from '../services/admin.service';
