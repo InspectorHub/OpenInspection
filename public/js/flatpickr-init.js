@@ -33,10 +33,11 @@ document.addEventListener('alpine:init', () => {
 
 // Catch inputs that didn't exist on alpine:init (modal contents, dynamic
 // forms). Capture phase + focusin so the picker is ready by the time the
-// browser would otherwise show the native UI.
+// browser would otherwise show the native UI. applyFlatpickr is idempotent
+// via the el._flatpickrApplied property — no attribute selector needed.
 document.addEventListener('focusin', (e) => {
     const t = e.target;
-    if (t && t.matches && t.matches('[data-flatpickr]:not([_flatpickr-applied])')) {
+    if (t && t.matches && t.matches('input[data-flatpickr]')) {
         applyFlatpickr(t);
     }
 }, true);
