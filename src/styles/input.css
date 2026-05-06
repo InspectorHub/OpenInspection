@@ -167,8 +167,29 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
     }
 }
 
+/* Print-only block — visible only when @media print matches (PDF render). */
+.print-only { display: none; }
+
 @media print {
-    @page { margin: 15mm; size: A4 portrait; }
+    /* Spec 5A.4 — letter-size to match Spectora's default; if customers
+       want A4 we'll add a per-tenant toggle (not in scope yet). */
+    @page {
+        margin: 18mm 15mm 22mm 15mm;
+        size: Letter portrait;
+
+        @bottom-center {
+            content: "Page " counter(page) " of " counter(pages);
+            font-family: 'Inter', sans-serif;
+            font-size: 9pt;
+            color: #64748b;
+        }
+        @bottom-right {
+            content: string(report-id);
+            font-family: 'Inter', sans-serif;
+            font-size: 8pt;
+            color: #94a3b8;
+        }
+    }
 
     body {
         background: white !important;
@@ -180,13 +201,45 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
     }
 
     .no-print { display: none !important; }
+    .print-only { display: block !important; }
 
     .max-w-5xl { max-width: none !important; margin: 0 !important; }
     .shadow-xl { box-shadow: none !important; }
     .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
 
+    /* Spec 5A.4 — explicit page-break utilities used by report-card-stack
+       cover page + section dividers. */
     .page-break  { page-break-after: always;  break-after: page; }
+    .page-break-before { page-break-before: always; break-before: page; }
     .avoid-break { page-break-inside: avoid;  break-inside: avoid; }
+
+    /* Cover page — first page only, full Letter sheet centred content. */
+    .print-cover {
+        height: 95vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        page-break-after: always;
+        break-after: page;
+    }
+    .print-cover .cover-eyebrow {
+        font-size: 9pt; letter-spacing: 0.3em; color: #64748b;
+        text-transform: uppercase; margin-bottom: 2rem;
+    }
+    .print-cover .cover-address {
+        font-size: 28pt; font-weight: 800; color: #0f172a;
+        line-height: 1.15; margin-bottom: 1.5rem; max-width: 80%;
+    }
+    .print-cover .cover-meta {
+        font-size: 11pt; color: #475569; line-height: 1.8;
+    }
+    .print-cover .cover-meta strong { color: #0f172a; font-weight: 600; }
+
+    /* Each section starts on a new page in PDF output. */
+    .report-section { page-break-before: always; break-before: page; }
+    .report-section:first-of-type { page-break-before: auto; break-before: auto; }
 
     img { max-height: 250px; object-fit: contain; }
     .grid { display: flex !important; flex-wrap: wrap; gap: 1rem; }
