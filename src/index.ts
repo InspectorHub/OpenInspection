@@ -179,9 +179,15 @@ app.use('*', async (c, next) => {
             const db = drizzle(c.env.DB);
             const user = await db.select().from(users).limit(1).get();
             if (!user) {
-                // Use CSPRNG instead of Math.random so the one-hour bootstrap code isn't predictable.
-                const rand = crypto.getRandomValues(new Uint32Array(1))[0];
-                const newCode = (100000 + (rand % 900000)).toString();
+                // Use CSPRNG with rejection sampling so the one-hour bootstrap code is unbiased
+                // and unpredictable. CodeQL js/biased-cryptographic-random — modulo on
+                // crypto.getRandomValues introduces non-uniform distribution; reject any value
+                // beyond the largest multiple of RANGE that still fits in Uint32.
+                const RANGE = 900000;
+                const MAX = Math.floor(0xFFFFFFFF / RANGE) * RANGE;
+                let rand: number;
+                do { rand = crypto.getRandomValues(new Uint32Array(1))[0]!; } while (rand >= MAX);
+                const newCode = (100000 + (rand % RANGE)).toString();
                 await c.env.TENANT_CACHE.put('setup_verification_code', newCode, { expirationTtl: 3600 });
                 logger.warn('New system detected. System initialization code generated.');
                 logger.info('Initialization code stored in KV. Use SETUP_CODE env var in production.');

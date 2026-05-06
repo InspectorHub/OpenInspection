@@ -26,6 +26,22 @@ const step = (msg) => { console.log(`\n▶ ${msg}`); };
 const warn = (msg) => console.warn(`  ⚠ ${msg}`);
 const die = (msg) => { console.error(`\n  ✗ ERROR: ${msg}`); process.exit(1); };
 
+// CodeQL js/shell-command-injection-from-environment — restore.js builds wrangler/r2 commands
+// with file/key/table names that originate from on-disk backup directories and `sqlite_master`
+// query results. While operators control these inputs in practice, defense-in-depth: callers
+// MUST pre-validate any non-constant interpolation through `safeShellArg(s)` below before
+// embedding into a `run(...)` template literal. This helper rejects any value containing
+// shell metacharacters; safe values are returned as-is.
+function safeShellArg(value) {
+    if (typeof value !== 'string') throw new Error(`safeShellArg: expected string, got ${typeof value}`);
+    // Allow: alnum, dash, underscore, dot, slash, equals, colon, plus, space, parens, brackets.
+    // Reject: backtick, dollar, semicolon, ampersand, pipe, redirect, quote, backslash, newline.
+    if (!/^[A-Za-z0-9_.\-/=:+ ()[\]]+$/.test(value)) {
+        throw new Error(`safeShellArg: rejected value containing shell metacharacters: ${JSON.stringify(value).slice(0, 80)}`);
+    }
+    return value;
+}
+
 function run(cmd, options = {}) {
     try {
         return execSync(cmd, { encoding: 'utf8', stdio: options.silent ? 'pipe' : 'inherit', ...options });
@@ -86,7 +102,7 @@ async function executeRestore() {
     // 0. Pre-restore: Drop existing tables to avoid CREATE TABLE collisions
     step(`Purging existing tables in ${DB_NAME} to ensure a clean restore...`);
     try {
-        const tablesJson = run(`npx wrangler d1 execute ${DB_NAME} --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';" --json -c ${TOML_PATH}`, { silent: true });
+        const tablesJson = run(`npx wrangler d1 execute ${safeShellArg(DB_NAME)} --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%';" --json -c ${safeShellArg(TOML_PATH)}`, { silent: true });
         
         // Wrangler JSON output can be nested or contain metadata
         const parsed = JSON.parse(tablesJson);
@@ -118,7 +134,7 @@ async function executeRestore() {
             ];
 
             for (const table of sortedTables) {
-                run(`npx wrangler d1 execute ${DB_NAME} --remote --command "DROP TABLE IF EXISTS \\"${table}\\";" --yes -c ${TOML_PATH}`, { silent: true });
+                run(`npx wrangler d1 execute ${safeShellArg(DB_NAME)} --remote --command "DROP TABLE IF EXISTS \\"${safeShellArg(table)}\\";" --yes -c ${safeShellArg(TOML_PATH)}`, { silent: true });
                 console.log(`    - Dropped: ${table}`);
             }
             info("Environment purged.");
@@ -134,7 +150,7 @@ async function executeRestore() {
     if (fs.existsSync(sqlFile)) {
         step(`Restoring D1 Database: ${DB_NAME}`);
         // Note: Batch mode is recommended for large imports
-        run(`npx wrangler d1 execute ${DB_NAME} --remote --file "${sqlFile}" -c ${TOML_PATH}`);
+        run(`npx wrangler d1 execute ${safeShellArg(DB_NAME)} --remote --file "${safeShellArg(sqlFile)}" -c ${safeShellArg(TOML_PATH)}`);
         info("Database restored.");
     } else {
         warn("No database.sql found in backup folder. Skipping DB restore.");
@@ -175,7 +191,7 @@ async function executeRestore() {
                 const relativePath = path.relative(bucketDir, filePath);
                 const key = relativePath.replace(/\\/g, '/'); // Ensure forward slashes for R2 keys
                 
-                run(`npx wrangler r2 object put "${bucket}/${key}" --file "${filePath}"`, { silent: true });
+                run(`npx wrangler r2 object put "${safeShellArg(bucket)}/${safeShellArg(key)}" --file "${safeShellArg(filePath)}"`, { silent: true });
                 console.log(`    - ${key}`);
             }
             info(`Bucket ${bucket} restored.`);

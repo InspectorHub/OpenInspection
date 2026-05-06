@@ -24,7 +24,12 @@ function sanitizeAgreementHtml(html: string): string {
     }
 
     // Remove HTML comments (could hide payload like <!--><script>...)
-    out = out.replace(/<!--[\s\S]*?-->/g, '');
+    // CodeQL js/incomplete-multi-character-sanitization — single pass can leave reconstructed
+    // <!-- after a partial removal. Loop until stable.
+    {
+        let prev;
+        do { prev = out; out = out.replace(/<!--[\s\S]*?-->/g, ''); } while (out !== prev);
+    }
 
     // Allow-listed tags. Anything else gets stripped (tags only, content preserved).
     const allowed = new Set(['p', 'strong', 'em', 'u', 'b', 'i', 'h2', 'h3', 'ol', 'ul', 'li', 'br', 'span']);
@@ -48,7 +53,15 @@ function sanitizeAgreementHtml(html: string): string {
     });
 
     // Strip any remaining `javascript:`, `data:`, or event-handler attribute leftovers (defense in depth)
-    out = out.replace(/\s+on\w+\s*=\s*"[^"]*"/gi, '').replace(/\s+on\w+\s*=\s*'[^']*'/gi, '');
+    // CodeQL js/incomplete-multi-character-sanitization — loop until stable so chained on*
+    // attributes (e.g., on  x  on  click=...) are fully removed.
+    {
+        let prev;
+        do {
+            prev = out;
+            out = out.replace(/\s+on\w+\s*=\s*"[^"]*"/gi, '').replace(/\s+on\w+\s*=\s*'[^']*'/gi, '');
+        } while (out !== prev);
+    }
 
     return out;
 }

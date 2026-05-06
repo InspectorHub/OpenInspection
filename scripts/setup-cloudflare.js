@@ -154,7 +154,10 @@ function seedDatabase() {
     const remoteFlag = isLocal ? '--local' : '--remote';
 
     try {
-        run(`npx wrangler d1 execute ${targetDb} ${remoteFlag} --command "${sql.replace(/"/g, '\\"')}" -c ${TOML_PATH}`);
+        // CodeQL js/incomplete-sanitization — escape backslash BEFORE double-quote so a
+        // literal `\` in input doesn't break out of the shell quote. Order matters.
+        const escapedSql = sql.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        run(`npx wrangler d1 execute ${targetDb} ${remoteFlag} --command "${escapedSql}" -c ${TOML_PATH}`);
         info("Database seeded successfully.");
     } catch (e) {
         warn(`Failed to seed database: ${e.message}`);

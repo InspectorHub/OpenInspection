@@ -130,7 +130,7 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
             </div>
 
             <script dangerouslySetInnerHTML={{ __html: `
-                var TOKEN = '${token.replace(/'/g, "\\'")}';
+                var TOKEN = ${JSON.stringify(token)};
                 var canvas = document.getElementById('sigCanvas');
                 var ctx = canvas ? canvas.getContext('2d') : null;
                 var drawing = false;
