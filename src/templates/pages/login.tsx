@@ -19,8 +19,6 @@ export const LoginPage = ({ branding }: { branding?: BrandingConfig | undefined 
                         --primary-light: ${primaryColor}18;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-                    /* Spec 4A — Hide both forms until Alpine boots so x-show=step==='password'/'2fa' takes effect cleanly. */
-                    [x-cloak] { display: none !important; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
                         background: #fafaf9;
@@ -326,7 +324,7 @@ export const LoginPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <h1 class="login-heading enter-up delay-1" x-text="step === 'password' ? 'Sign in to your workspace' : 'Enter your 2FA code'"></h1>
                             <p class="login-sub enter-up delay-1" x-text="step === 'password' ? 'Enter your credentials to access inspections, reports, and team tools.' : 'Open your authenticator app and enter the 6-digit code.'"></p>
 
-                            <form id="loginForm" autocomplete="on" x-show="step === 'password'" x-cloak>
+                            <form id="loginForm" autocomplete="on" x-show="step === 'password'">
                                 <div class="form-group enter-up delay-2">
                                     <label class="form-label" for="email">Email address</label>
                                     <input class="form-input" id="email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" />
@@ -346,7 +344,7 @@ export const LoginPage = ({ branding }: { branding?: BrandingConfig | undefined 
                                 </button>
                             </form>
 
-                            <form id="twofaForm" x-show="step === '2fa'" x-cloak>
+                            <form id="twofaForm" x-show="step === '2fa'" style="display:none">
                                 <div class="form-group">
                                     <label class="form-label" for="twofaCode">Verification code</label>
                                     <input class="form-input" id="twofaCode" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" required placeholder="123456 or XXXX-XXXX" style="font-family:monospace; letter-spacing:0.3em; text-align:center;" />
