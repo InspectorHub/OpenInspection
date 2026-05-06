@@ -392,7 +392,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     </select>
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Referring Agent</label>
+                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Listing Agent</label>
                                     <select id="agentId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>

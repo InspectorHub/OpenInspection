@@ -29,6 +29,7 @@ export function RatingButtons({ itemId, levels, modelPath, size = 'md' }: Rating
           x-bind:class={`${modelPath} === '${level.id}' ? 'text-white border-transparent shadow-sm' : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'`}
           x-bind:style={`${modelPath} === '${level.id}' ? 'background:${level.color}' : ''`}
           aria-label={level.label}
+          title={level.label}
         >
           {level.abbreviation}
         </button>
