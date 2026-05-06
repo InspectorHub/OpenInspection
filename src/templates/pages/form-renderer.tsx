@@ -96,6 +96,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                         <button
                                                             x-on:click="setItemStatus(item.id, status)"
                                                             {...{ 'x-bind:data-status': "status.toLowerCase()" }}
+                                                            {...{ 'x-bind:title': "{ Satisfactory: 'Satisfactory — observed in serviceable condition; no defect noted', Monitor: 'Monitor — minor wear or future-attention item; not currently a defect', Defect: 'Defect — material deficiency requiring repair or further evaluation' }[status]" }}
                                                             class="py-4 px-3 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-2 active:scale-95 shadow-sm"
                                                             x-bind:class="{
                                                               'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-emerald-100': results[item.id]?.status === 'Satisfactory' && status === 'Satisfactory',

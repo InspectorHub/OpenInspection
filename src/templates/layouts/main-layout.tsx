@@ -48,6 +48,12 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
                 }
                 body { font-family: 'Inter', sans-serif; }
                 .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+                /* Alpine x-cloak gotcha: Alpine v3 only removes the x-cloak attribute
+                   from the x-data root element, not descendants. x-cloak on a nested
+                   modal/form combined with this rule keeps it hidden even when
+                   x-show=true. Rule: x-cloak only on outermost x-data element; for
+                   nested hide-on-load use style=display:none + x-show. See ESLint
+                   rule no-restricted-syntax + Spec 4 commits 17a75d7, a753af5. */
                 [x-cloak] { display: none !important; }
             ` }} />
 

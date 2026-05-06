@@ -34,9 +34,11 @@ export class WidgetService {
             if (wildcardCount > 1) {
                 throw new Error(`Origin pattern may contain at most one wildcard: ${o}`);
             }
-            // Validate as URL (replace `*` placeholder so URL constructor accepts it)
+            // Validate as URL (replace `*` placeholder so URL constructor accepts it).
+            // CodeQL js/incomplete-sanitization — replaceAll for safety even though
+            // wildcardCount<=1 is already enforced above.
             try {
-                const u = new URL(o.replace('*', 'wildcard'));
+                const u = new URL(o.replaceAll('*', 'wildcard'));
                 if (u.protocol !== 'http:' && u.protocol !== 'https:') {
                     throw new Error(`Origin must be http or https: ${o}`);
                 }
@@ -89,11 +91,15 @@ export class WidgetService {
 function matchOrigin(pattern: string, candidate: string): boolean {
     if (!pattern.includes('*')) return pattern === candidate;
     try {
-        const pUrl = new URL(pattern.replace('*', 'wildcard'));
+        // CodeQL js/incomplete-sanitization — replaceAll for both substitutions.
+        // Also escape ALL regex metacharacters in hostname (not just `.`) before
+        // injecting the wildcard placeholder.
+        const pUrl = new URL(pattern.replaceAll('*', 'wildcard'));
         const cUrl = new URL(candidate);
         if (pUrl.protocol !== cUrl.protocol) return false;
         if (pUrl.port !== cUrl.port) return false;
-        const hostRegex = new RegExp('^' + pUrl.hostname.replace(/\./g, '\\.').replace('wildcard', '[^.]+') + '$');
+        const escaped = pUrl.hostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const hostRegex = new RegExp('^' + escaped.replaceAll('wildcard', '[^.]+') + '$');
         return hostRegex.test(cUrl.hostname);
     } catch {
         return false;

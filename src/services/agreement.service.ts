@@ -53,13 +53,16 @@ function sanitizeAgreementHtml(html: string): string {
     });
 
     // Strip any remaining `javascript:`, `data:`, or event-handler attribute leftovers (defense in depth)
-    // CodeQL js/incomplete-multi-character-sanitization — loop until stable so chained on*
-    // attributes (e.g., on  x  on  click=...) are fully removed.
+    // CodeQL js/incomplete-multi-character-sanitization — broaden boundary from \s+ to
+    // (?:\s|^|>) so on* attributes flush against tag opening (e.g., `<a"on click=x>`)
+    // are also caught. Then loop until stable for chained removals.
     {
         let prev;
         do {
             prev = out;
-            out = out.replace(/\s+on\w+\s*=\s*"[^"]*"/gi, '').replace(/\s+on\w+\s*=\s*'[^']*'/gi, '');
+            out = out
+                .replace(/(?:\s|^|>)on\w+\s*=\s*"[^"]*"/gi, m => m.startsWith('>') ? '>' : '')
+                .replace(/(?:\s|^|>)on\w+\s*=\s*'[^']*'/gi, m => m.startsWith('>') ? '>' : '');
         } while (out !== prev);
     }
 
