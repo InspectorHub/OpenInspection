@@ -96,8 +96,11 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                         class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold disabled:opacity-40">Next</button>
                 </div>
 
-                {/* Polish 5 — Preview modal */}
-                <div x-show="previewOpen" x-cloak x-transition class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click.self': 'previewOpen = false' }}>
+                {/* Polish 5 — Preview modal. NOTE: NO x-cloak here — Alpine doesn't auto-remove
+                    x-cloak from descendant elements, so combining it with main-layout's
+                    [x-cloak] { display: none !important } would permanently hide the modal even
+                    when previewOpen=true. x-show alone correctly toggles display. */}
+                <div x-show="previewOpen" style="display:none" x-transition class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click.self': 'previewOpen = false' }}>
                     <div class="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col">
                         <header class="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
                             <div>
