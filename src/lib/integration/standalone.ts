@@ -84,13 +84,19 @@ export class StandaloneProvider implements IntegrationProvider {
                     createdAt: now,
                 });
 
-                // Default Template
+                // Default Template — empty starter. Renamed from "Standard
+                // Home Inspection" (R7-23) because it collided semantically
+                // with the Marketplace template "Standard Residential
+                // Inspection" — inspector saw two near-identical names and
+                // couldn't tell which was the empty starter vs. the curated
+                // 40-item residential template. The "(Blank)" suffix makes
+                // it obvious this is the user's own scratch template.
                 await db.insert(templates).values({
                     id: crypto.randomUUID(),
                     tenantId,
-                    name: 'Standard Home Inspection',
+                    name: 'My Inspection Template (Blank)',
                     version: 1,
-                    schema: JSON.stringify({ title: 'Standard Home Inspection', sections: [] }),
+                    schema: JSON.stringify({ title: 'My Inspection Template (Blank)', sections: [] }),
                     createdAt: now,
                 });
 
