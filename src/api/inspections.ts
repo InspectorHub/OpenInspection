@@ -1256,6 +1256,31 @@ inspectionsRoutes.openapi(publishRoute, async (c) => {
     const body = c.req.valid('json');
     const service = c.var.services.inspection;
     const result = await service.publishInspection(id, tenantId, body);
+
+    // Spec 5A.5 — enqueue + background-render Summary + Full PDFs after
+    // publish. Best-effort: failures log but never block the publish
+    // response. Persistent record in report_pdfs lets the client UI poll
+    // (status: queued -> rendering -> ready) and offer Refresh PDFs.
+    const baseUrl = getBaseUrl(c);
+    const reportUrl = `${baseUrl}/report/${id}`;
+    const sourceVersion = Date.now();
+    const reportPdf = c.var.services.reportPdf;
+    const renderBoth = async () => {
+        try {
+            await Promise.all([
+                reportPdf.markQueued(id, tenantId, 'summary'),
+                reportPdf.markQueued(id, tenantId, 'full'),
+            ]);
+            await Promise.allSettled([
+                reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion }),
+                reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion }),
+            ]);
+        } catch (err) {
+            logger.error('[publish] PDF render enqueue failed', { inspectionId: id }, err instanceof Error ? err : undefined);
+        }
+    };
+    c.executionCtx.waitUntil(renderBoth());
+
     return c.json({ success: true, data: result }, 200);
 });
 
