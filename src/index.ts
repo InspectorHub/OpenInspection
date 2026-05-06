@@ -480,6 +480,10 @@ app.get('/report/:id', async (c) => {
     const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
     if (!tenantId) return c.text('Not found', 404);
 
+    // Spec 5A.3 — ?summary=1 filters to defects-only (used by PDF Summary
+    // renderer). ?print=1 already supported by main-layout (hides nav).
+    const summaryMode = c.req.query('summary') === '1';
+
     try {
         const service = c.var.services.inspection;
         const data = await service.getReportData(id, tenantId as string);
@@ -499,6 +503,7 @@ app.get('/report/:id', async (c) => {
             sections: data.sections,
             ratingLevels: data.ratingLevels as import('./lib/report-utils').RatingLevel[],
             branding: c.get('branding'),
+            summaryMode,
         }));
     } catch {
         return c.text('Report not found', 404);

@@ -36,6 +36,11 @@ interface ReportPageProps {
   sections: ReportSection[];
   ratingLevels: RatingLevel[];
   branding?: BrandingConfig | undefined;
+  // Spec 5A.3 — when true, render server-side filtered to defects-only
+  // (drops sections with zero defects + drops non-defect items). Used by
+  // the PDF renderer (?summary=1) so the captured PDF doesn't depend on
+  // Alpine hydration state.
+  summaryMode?: boolean;
 }
 
 const SECTION_ICONS: Record<string, string> = {
@@ -52,7 +57,15 @@ function getSectionIcon(title: string): string {
 }
 
 export function ReportCardStackPage(props: ReportPageProps) {
-  const { inspectionId, address, date, inspectorName, theme, stats, sections, branding } = props;
+  const { inspectionId, address, date, inspectorName, theme, stats, branding, summaryMode } = props;
+  // Server-side defect filter for ?summary=1 (PDF Summary mode).
+  // Keeps only sections with at least one defect, and within each kept
+  // section, only items whose severityBucket maps to defect.
+  const sections = summaryMode
+    ? props.sections
+        .filter(s => s.defectCount > 0)
+        .map(s => ({ ...s, items: s.items.filter(i => /defect|safety|major/i.test(i.severityBucket)) }))
+    : props.sections;
 
   return BareLayout({
     title: `Report - ${address}`,
