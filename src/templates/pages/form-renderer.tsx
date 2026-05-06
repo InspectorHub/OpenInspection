@@ -8,7 +8,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
     
     return (
         <BareLayout title="Inspection Field Tool" branding={branding}>
-            <div class="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden relative" x-data={`inspectionForm('${inspectionId}')`}>
+            <div class="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden relative" x-data={`inspectionForm('${inspectionId}')`} data-test="form-renderer-root">
                 <AtmosphericBg />
 
                 {/* Main Viewport */}
@@ -95,6 +95,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                     <template x-for="status in ['Satisfactory', 'Monitor', 'Defect']">
                                                         <button
                                                             x-on:click="setItemStatus(item.id, status)"
+                                                            {...{ 'x-bind:data-status': "status.toLowerCase()" }}
                                                             class="py-4 px-3 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-2 active:scale-95 shadow-sm"
                                                             x-bind:class="{
                                                               'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-emerald-100': results[item.id]?.status === 'Satisfactory' && status === 'Satisfactory',

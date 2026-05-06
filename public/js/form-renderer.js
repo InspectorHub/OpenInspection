@@ -185,9 +185,23 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    removePhoto(itemId, index) {
+    async removePhoto(itemId, index) {
       this.results[itemId].photos.splice(index, 1);
       this.results[itemId].updatedAt = Date.now();
+      // B4 trigger Task 2 — enqueue a photo.delete op so the sync engine hits
+      // DELETE /api/inspections/:id/items/:itemId/photos/:photoIndex once online.
+      try {
+        await openOfflineDb();
+        await offlineDb.syncQueue.add({
+          id: crypto.randomUUID(),
+          op: 'photo.delete',
+          payload: { inspectionId: this.inspectionId, itemId, photoIndex: index },
+          attempts: 0,
+          createdAt: Date.now(),
+        });
+      } catch (err) {
+        console.error('[form-renderer] photo.delete enqueue failed', err);
+      }
       this.saveLocally();
     },
 
