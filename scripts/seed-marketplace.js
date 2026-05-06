@@ -19,11 +19,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_NAME = process.env.DB_NAME || 'DB';
 const LOCAL = process.argv.includes('--local');
 const flag = LOCAL ? '--local' : '--remote';
+// Polish 5 — support targeting saas (or any wrangler.*.toml) via --config flag
+const configIdx = process.argv.indexOf('--config');
+const CONFIG = configIdx > -1 ? `-c ${process.argv[configIdx + 1]}` : '';
 
 let count = 0;
 try {
   const result = execSync(
-    `npx wrangler d1 execute ${DB_NAME} ${flag} --json --command "SELECT COUNT(*) as c FROM marketplace_templates"`,
+    `npx wrangler d1 execute ${DB_NAME} ${flag} ${CONFIG} --json --command "SELECT COUNT(*) as c FROM marketplace_templates"`,
     { encoding: 'utf8' }
   );
   const jsonStart = result.indexOf('[');
@@ -90,7 +93,7 @@ for (const t of TEMPLATES) {
 
   try {
     execSync(
-      `npx wrangler d1 execute ${DB_NAME} ${flag} --file "${sqlFile}"`,
+      `npx wrangler d1 execute ${DB_NAME} ${flag} ${CONFIG} --file "${sqlFile}"`,
       { encoding: 'utf8', stdio: 'inherit' }
     );
     console.log(`  Seeded: ${t.name}`);
