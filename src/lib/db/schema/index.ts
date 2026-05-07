@@ -20,7 +20,7 @@ export {
 export { contacts } from './contact';
 export { recommendations } from './recommendation';
 export { invoices } from './invoice';
-export { marketplaceTemplates, tenantMarketplaceImports } from './marketplace';
+export { marketplaceTemplates, tenantMarketplaceImports, marketplaceLibraries, tenantLibraryImports } from './marketplace';
 export { customerMessages } from './message';
 export type { MessageAttachment } from './message';
 export { reportPdfs } from './report-pdf';

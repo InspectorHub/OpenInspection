@@ -64,4 +64,49 @@ marketplaceRoutes.openapi(createRoute({
     }
 });
 
+// Spec 5G M2 — Library marketplace (comments, snippets)
+marketplaceRoutes.openapi(createRoute({
+    method: 'get', path: '/libraries',
+    tags: ['Marketplace'],
+    summary: 'List marketplace libraries (comment packs, snippet packs)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        query: z.object({ kind: z.enum(['comments', 'snippets']).optional() }),
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.array(z.any()) }) } }, description: 'OK' },
+    },
+}), async (c) => {
+    const q = c.req.valid('query');
+    const data = await c.var.services.marketplace.listLibraries(q.kind ? { kind: q.kind } : {});
+    return c.json({ success: true, data });
+});
+
+marketplaceRoutes.openapi(createRoute({
+    method: 'post', path: '/libraries/{id}/import',
+    tags: ['Marketplace'],
+    summary: 'Import marketplace library into tenant',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        201: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ rowCount: z.number(), localFirstId: z.string() }) }) } }, description: 'Imported' },
+        404: { description: 'Not found' },
+    },
+}), async (c) => {
+    const { id } = c.req.valid('param');
+    try {
+        const result = await c.var.services.marketplace.importLibrary(id);
+        return c.json({ success: true, data: result }, 201);
+    } catch (err) {
+        if (err instanceof Error && err.message === 'Marketplace library not found') {
+            throw Errors.NotFound('Marketplace library not found');
+        }
+        // Diagnostic: surface real error to caller for debugging
+        const msg = err instanceof Error ? err.message : String(err);
+        const stack = err instanceof Error ? (err.stack || '').slice(0, 500) : '';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return c.json({ success: false, error: { code: 'import_failed', message: msg, stack } }, 500) as any;
+    }
+});
+
 export default marketplaceRoutes;

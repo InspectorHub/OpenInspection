@@ -1,14 +1,16 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
-import { marketplaceTemplates, tenantMarketplaceImports } from '../lib/db/schema/marketplace';
-import { templates, comments } from '../lib/db/schema';
+import { marketplaceTemplates, tenantMarketplaceImports, marketplaceLibraries, tenantLibraryImports } from '../lib/db/schema/marketplace';
+import { templates } from '../lib/db/schema';
 
 export class MarketplaceService {
   private db: ReturnType<typeof drizzle<any>>;
+  private rawDb: D1Database;
   private tenantId: string;
 
   constructor(db: D1Database, tenantId: string) {
     this.db = drizzle(db as any);
+    this.rawDb = db;
     this.tenantId = tenantId;
   }
 
@@ -67,51 +69,24 @@ export class MarketplaceService {
       return existing.localTemplateId;
     }
 
+    const newTemplateId = crypto.randomUUID();
     const now = new Date().toISOString();
-    let localId: string;
 
-    // Spec 5G M2 — Comment Library distribution. When the marketplace row
-    // is a comment library (schema = { comments: [...] }) bulk-INSERT each
-    // entry into tenants/comments table instead of creating a template.
-    if (mkt.category === 'Comment Library') {
-      const schema = (mkt.schema as { comments?: Array<{ text: string; section?: string; rating?: string }> }) || {};
-      const commentEntries = Array.isArray(schema.comments) ? schema.comments : [];
-      // Sentinel id captures "first comment id" for the imports row's
-      // localTemplateId column (re-uses existing column name; future
-      // schema may rename to localResourceId).
-      const firstId = crypto.randomUUID();
-      localId = firstId;
-      const rows = commentEntries.map((c, i) => ({
-        id:        i === 0 ? firstId : crypto.randomUUID(),
-        tenantId:  this.tenantId,
-        text:      c.text,
-        category:  c.section ?? null,
-        createdAt: new Date(now),
-      }));
-      // D1 batch insert — chunk to avoid SQL too long
-      for (let i = 0; i < rows.length; i += 50) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await this.db.insert(comments).values(rows.slice(i, i + 50) as any);
-      }
-    } else {
-      // Default: import as Template
-      localId = crypto.randomUUID();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await this.db.insert(templates as any).values({
-        id:        localId,
-        tenantId:  this.tenantId,
-        name:      mkt.name,
-        schema:    mkt.schema,
-        createdAt: new Date(now),
-      });
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await this.db.insert(templates as any).values({
+      id:        newTemplateId,
+      tenantId:  this.tenantId,
+      name:      mkt.name,
+      schema:    mkt.schema,
+      createdAt: new Date(now),
+    });
 
     await this.db.insert(tenantMarketplaceImports).values({
       id:                    crypto.randomUUID(),
       tenantId:              this.tenantId,
       marketplaceTemplateId: marketplaceId,
       importedSemver:        mkt.semver,
-      localTemplateId:       localId,
+      localTemplateId:       newTemplateId,
       importedAt:            now,
     });
 
@@ -120,6 +95,121 @@ export class MarketplaceService {
       .set({ downloadCount: sql`${marketplaceTemplates.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceTemplates.id, marketplaceId));
 
-    return localId;
+    return newTemplateId;
   }
+
+  // ─── Spec 5G M2 — Library marketplace (comments, snippets, etc) ───
+
+  async listLibraries(opts: { kind?: string } = {}) {
+    const conditions: ReturnType<typeof eq>[] = [];
+    if (opts.kind) conditions.push(eq(marketplaceLibraries.kind, opts.kind as 'comments' | 'snippets'));
+    const list = await this.db
+      .select()
+      .from(marketplaceLibraries)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(marketplaceLibraries.featured), desc(marketplaceLibraries.downloadCount));
+
+    const imports = await this.db
+      .select({ libraryId: tenantLibraryImports.libraryId, importedSemver: tenantLibraryImports.importedSemver })
+      .from(tenantLibraryImports)
+      .where(eq(tenantLibraryImports.tenantId, this.tenantId));
+    const importMap = new Map(imports.map((i) => [i.libraryId, i.importedSemver]));
+
+    return list.map((l) => ({
+      ...l,
+      importedSemver: importMap.get(l.id) ?? null,
+      hasUpdate: importMap.has(l.id) && importMap.get(l.id) !== l.semver,
+      itemCount: countLibrarySchemaItems(l.schema as unknown),
+    }));
+  }
+
+  async importLibrary(libraryId: string): Promise<{ rowCount: number; localFirstId: string }> {
+    const [lib] = await this.db
+      .select()
+      .from(marketplaceLibraries)
+      .where(eq(marketplaceLibraries.id, libraryId))
+      .limit(1);
+    if (!lib) throw new Error('Marketplace library not found');
+
+    // Idempotent: if already imported, return the previous import meta
+    const [existing] = await this.db
+      .select()
+      .from(tenantLibraryImports)
+      .where(and(
+        eq(tenantLibraryImports.tenantId, this.tenantId),
+        eq(tenantLibraryImports.libraryId, libraryId),
+      ))
+      .limit(1);
+    if (existing) {
+      return { rowCount: existing.rowCount, localFirstId: existing.id };
+    }
+
+    const now = new Date().toISOString();
+    let rowCount = 0;
+    const firstId = crypto.randomUUID();
+
+    if (lib.kind === 'comments') {
+      // schema may arrive as parsed object (Drizzle json mode) or raw string
+      // (some D1 driver / json encoding paths). Handle both.
+      let schema: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
+      if (typeof lib.schema === 'string') {
+        try { schema = JSON.parse(lib.schema); } catch { schema = {}; }
+      } else if (lib.schema && typeof lib.schema === 'object') {
+        schema = lib.schema as typeof schema;
+      }
+      const entries = Array.isArray(schema.comments) ? schema.comments : [];
+      // Use raw SQL with placeholder list — single statement per chunk
+      // is dramatically faster than 248 individual inserts. D1 caps SQL
+      // statement size and bound-parameter count, so chunk to 25 rows
+      // (25 × 5 = 125 placeholders, well under D1 limits).
+      const CHUNK = 25;
+      const nowSec = Math.floor(Date.now() / 1000);
+      for (let i = 0; i < entries.length; i += CHUNK) {
+        const batch = entries.slice(i, i + CHUNK);
+        const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(', ');
+        const params: (string | number | null)[] = [];
+        for (let j = 0; j < batch.length; j++) {
+          const c = batch[j];
+          const isFirst = i === 0 && j === 0;
+          params.push(
+            isFirst ? firstId : crypto.randomUUID(),
+            this.tenantId,
+            c.text,
+            c.section ?? null,
+            nowSec,
+          );
+        }
+        const stmt = `INSERT INTO comments (id, tenant_id, text, category, created_at) VALUES ${placeholders}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (this.rawDb as any).prepare(stmt).bind(...params).run();
+        rowCount += batch.length;
+      }
+    } else {
+      // 'snippets' or future kinds — extend with their target tables here
+      throw new Error(`Library kind '${lib.kind}' not yet supported for import`);
+    }
+
+    await this.db.insert(tenantLibraryImports).values({
+      id:             crypto.randomUUID(),
+      tenantId:       this.tenantId,
+      libraryId,
+      importedSemver: lib.semver,
+      importedAt:     now,
+      rowCount,
+    });
+    await this.db
+      .update(marketplaceLibraries)
+      .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
+      .where(eq(marketplaceLibraries.id, libraryId));
+
+    return { rowCount, localFirstId: firstId };
+  }
+}
+
+function countLibrarySchemaItems(schema: unknown): number {
+  if (!schema || typeof schema !== 'object') return 0;
+  const s = schema as Record<string, unknown>;
+  if (Array.isArray(s.comments)) return s.comments.length;
+  if (Array.isArray(s.snippets)) return s.snippets.length;
+  return 0;
 }
