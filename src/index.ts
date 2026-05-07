@@ -4,7 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers';
 import { deleteCookie, getCookie } from 'hono/cookie';
 import { verify } from 'hono/jwt';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, asc } from 'drizzle-orm';
 import { users } from './lib/db/schema';
 import * as schema from './lib/db/schema';
 
@@ -35,6 +35,7 @@ import { TeamPage } from './templates/pages/team';
 import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
 import { AgreementPrintablePage } from './templates/pages/agreement-printable';
+import { CertTemplatePage } from './templates/pages/cert.template';
 import { CalendarPage } from './templates/pages/calendar';
 import { ContactsPage } from './templates/pages/contacts';
 import { RecommendationsPage } from './templates/pages/recommendations';
@@ -168,7 +169,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/internal/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
@@ -494,13 +495,12 @@ app.get('/agreements/sign/:token', async (c) => {
 });
 
 // Spec 5H P1 — Internal render route consumed by SignCompletionWorkflow.
-// M2M-authed via Authorization: Bearer JWT_SECRET. Returns the canonical
-// signed agreement HTML which Browser Rendering captures as signed.pdf.
-app.get('/internal/agreement-render/:token', async (c) => {
-    const auth = c.req.header('authorization');
-    if (!auth || auth !== `Bearer ${c.env.JWT_SECRET}`) {
-        return c.text('Unauthorized', 401);
-    }
+// Auth model: token IS the secret (256-bit hex from createSigningRequest).
+// Originally M2M-authed via Bearer JWT_SECRET, but CF Browser Rendering
+// doesn't forward custom Authorization headers reliably -> 404. The token
+// itself is unguessable, so its secrecy is sufficient (same model as the
+// public /agreements/sign/{token} route).
+app.get('/m2m/agreement-render/:token', async (c) => {
     const token = c.req.param('token') as string;
     try {
         const { request, agreement } = await c.var.services.agreement.getAgreementByToken(token);
@@ -559,6 +559,81 @@ app.get('/internal/agreement-render/:token', async (c) => {
     } catch (e) {
         logger.error('agreement-render: failed', { token: token.slice(0, 8) }, e instanceof Error ? e : undefined);
         return c.text('Render failed', 500);
+    }
+});
+
+// Spec 5H P1.1 — Certificate of Completion render route. M2M-authed.
+// Workflow Step 2 (render-certificate-pdf) hits this; Browser Rendering
+// captures the response as cert.pdf. Reads esign_audit_logs to build
+// the event timeline + signing_keys for the cryptographic proof block.
+app.get('/m2m/cert-render/:token', async (c) => {
+    // Same auth model as agreement-render — token secrecy gates access.
+    const token = c.req.param('token') as string;
+    try {
+        const { request, agreement } = await c.var.services.agreement.getAgreementByToken(token);
+
+        // Load full audit chain for this envelope
+        const db = drizzle(c.env.DB, { schema });
+        const auditRows = await db.select().from(schema.esignAuditLogs)
+            .where(and(eq(schema.esignAuditLogs.tenantId, request.tenantId), eq(schema.esignAuditLogs.requestId, request.id)))
+            .orderBy(asc(schema.esignAuditLogs.createdAt))
+            .all();
+
+        const timelineEvents = auditRows.map((r) => {
+            let payload: Record<string, unknown> = {};
+            try { payload = JSON.parse(r.payloadJson); } catch (_) { /* ignore */ }
+            return {
+                event: r.event,
+                timestampUtc: new Date(r.createdAt).toISOString(),
+                actor: typeof payload.actorId === 'string' ? payload.actorId : undefined,
+                ip: typeof payload.ip === 'string' ? payload.ip : null,
+                country: typeof payload.country === 'string' ? payload.country : null,
+                ua: typeof payload.ua === 'string' ? payload.ua : null,
+            };
+        });
+
+        // Find document hash + signature image hash from existing audit rows
+        let documentHash: string | null = null;
+        let signatureImageHash: string | null = null;
+        for (const r of auditRows) {
+            try {
+                const p = JSON.parse(r.payloadJson) as Record<string, unknown>;
+                if (r.event === 'agreement.signed' && typeof p.signatureImageHash === 'string') {
+                    signatureImageHash = (p.signatureImageHash as string).replace(/^sha256:/, '');
+                }
+                if (r.event === 'workflow.complete' && typeof p.signedPdfHash === 'string') {
+                    documentHash = (p.signedPdfHash as string).replace(/^sha256:/, '');
+                }
+            } catch (_) { /* ignore parse errors */ }
+        }
+
+        // Tenant signing key fingerprint (any audit row's key_fingerprint works since rotation is rare)
+        const keyFingerprint = auditRows[0]?.keyFingerprint ?? null;
+
+        const verifyBase = c.env.ESIGN_PUBLIC_VERIFY_BASE || 'https://openinspection-standalone.important-new.workers.dev';
+        const verifyUrl = `${verifyBase}/verify/${request.id}`;
+        const branding = c.get('branding');
+        const siteName = branding?.siteName || 'OpenInspection';
+
+        return c.html(CertTemplatePage({
+            envelopeId: request.id,
+            documentTitle: agreement.name,
+            documentHash,
+            recipientName: request.clientName,
+            recipientEmail: request.clientEmail,
+            identityMethod: 'Email link verification (token only)',
+            signatureImageHash,
+            signatureBase64: request.signatureBase64,
+            events: timelineEvents,
+            keyFingerprint,
+            keyAlgorithm: 'Ed25519',
+            verifyUrl,
+            siteName,
+            generatedAtUtcIso: new Date().toISOString(),
+        }));
+    } catch (e) {
+        logger.error('cert-render: failed', { token: token.slice(0, 8) }, e instanceof Error ? e : undefined);
+        return c.text('Cert render failed', 500);
     }
 });
 

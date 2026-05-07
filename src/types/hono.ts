@@ -53,6 +53,9 @@ export interface AppEnv {
     // Spec 5H P1 — async sign-completion pipeline (signed.pdf + cert.pdf + audit append)
     SIGN_COMPLETION_WORKFLOW?: Workflow;
 
+    // Spec 5H — Public verifier base URL embedded in Certificate of Completion
+    ESIGN_PUBLIC_VERIFY_BASE?: string;
+
     // SaaS Portal Integration
     PORTAL_API_URL?: string;
     PORTAL_M2M_SECRET?: string;

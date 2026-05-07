@@ -354,7 +354,7 @@ bookingsRoutes.openapi(signAgreementRoute, async (c) => {
             try {
                 await c.env.SIGN_COMPLETION_WORKFLOW!.create({
                     id: request.id, // workflow id = requestId for idempotency / re-run
-                    params: { requestId: request.id, tenantId: request.tenantId },
+                    params: { requestId: request.id, tenantId: request.tenantId, token },
                 });
             } catch (e) {
                 logger.warn('sign-workflow.create.failed', { requestId: request.id, error: (e as Error).message });

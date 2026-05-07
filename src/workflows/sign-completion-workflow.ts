@@ -2,10 +2,12 @@ import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:work
 import type { AppEnv } from '../types/hono';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
+import { generatePdfFromUrl } from '../lib/pdf';
 
 export interface SignCompletionParams {
     requestId: string;
     tenantId: string;
+    token: string;            // public agreement-request token (used for /m2m/* render routes)
 }
 
 /**
@@ -29,16 +31,16 @@ export interface SignCompletionParams {
  */
 export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompletionParams> {
     async run(event: WorkflowEvent<SignCompletionParams>, step: WorkflowStep) {
-        const { requestId, tenantId } = event.payload;
+        const { requestId, tenantId, token } = event.payload;
         const env = this.env;
 
-        // Step 1 — render canonical signed PDF
+        // Step 1 — render canonical signed PDF (route is /m2m/agreement-render/:token)
         const signedPdfMeta = await step.do('render-canonical-pdf', {
             retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
             timeout: '2 minutes',
         }, async () => {
             return renderPdfToR2(env, {
-                renderUrl: `${baseUrl(env)}/internal/agreement-render/${requestId}`,
+                renderUrl: `${baseUrl(env)}/m2m/agreement-render/${token}`,
                 r2Key: `tenants/${tenantId}/agreements/${requestId}/signed.pdf`,
             });
         });
@@ -49,7 +51,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
             timeout: '2 minutes',
         }, async () => {
             return renderPdfToR2(env, {
-                renderUrl: `${baseUrl(env)}/internal/cert-render/${requestId}`,
+                renderUrl: `${baseUrl(env)}/m2m/cert-render/${token}`,
                 r2Key: `tenants/${tenantId}/agreements/${requestId}/certificate.pdf`,
             });
         });
@@ -75,37 +77,24 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
 
 /**
  * Use Browser Rendering to capture a URL as PDF, write to R2, return key + sha256.
- * The internal render URLs (/internal/agreement-render/{token}, /internal/cert-render/{token})
+ * The internal render URLs (/m2m/agreement-render/{token}, /m2m/cert-render/{token})
  * are gated by M2M auth (Bearer JWT_SECRET) — see src/index.ts. Browser Rendering
  * fetches them with the Authorization header set via the launch options.
  */
 async function renderPdfToR2(env: AppEnv, opts: { renderUrl: string; r2Key: string }): Promise<{ r2Key: string; sha256: string; sizeBytes: number }> {
-    if (!env.BROWSER) throw new Error('Browser Rendering binding (BROWSER) not configured');
     if (!env.REPORTS) throw new Error('REPORTS R2 bucket not configured');
-
-    const m2mSecret = env.JWT_SECRET;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browser = await (env.BROWSER as any).launch();
-    try {
-        const page = await browser.newPage();
-        await page.setExtraHTTPHeaders({ Authorization: `Bearer ${m2mSecret}` });
-        await page.goto(opts.renderUrl, { waitUntil: 'networkidle0', timeout: 90_000 });
-        const pdfBuffer: ArrayBuffer = await page.pdf({
-            format: 'Letter',
-            printBackground: true,
-            margin: { top: '0.5in', bottom: '0.5in', left: '0.5in', right: '0.5in' },
-        });
-        const bytes = new Uint8Array(pdfBuffer);
-        const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer));
-        const sha256 = Array.from(hash).map((b) => b.toString(16).padStart(2, '0')).join('');
-        await env.REPORTS.put(opts.r2Key, bytes, {
-            httpMetadata: { contentType: 'application/pdf' },
-            customMetadata: { sha256 },
-        });
-        return { r2Key: opts.r2Key, sha256, sizeBytes: bytes.byteLength };
-    } finally {
-        await browser.close();
-    }
+    // Diagnostic — capture exact URL passed to BR (visible in `wrangler tail` log)
+    console.info('[sign-workflow] BR fetch', { renderUrl: opts.renderUrl, hasBrowser: !!env.BROWSER });
+    // Use the proven generatePdfFromUrl helper (also adds ?print=1 hint).
+    const pdfBuffer = await generatePdfFromUrl(env.BROWSER, opts.renderUrl);
+    const bytes = new Uint8Array(pdfBuffer);
+    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer));
+    const sha256 = Array.from(hash).map((b) => b.toString(16).padStart(2, '0')).join('');
+    await env.REPORTS.put(opts.r2Key, bytes, {
+        httpMetadata: { contentType: 'application/pdf' },
+        customMetadata: { sha256 },
+    });
+    return { r2Key: opts.r2Key, sha256, sizeBytes: bytes.byteLength };
 }
 
 function baseUrl(env: AppEnv): string {
