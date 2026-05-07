@@ -116,6 +116,27 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             </div>
           </div>
 
+          {/* Round 32 — one-time gesture hint surfaces R23 swipe nav.
+              Auto-dismisses on first successful swipe; tap × to dismiss
+              manually. Persisted via localStorage `oi:swipeHint`. */}
+          <div
+            x-show="!swipeHintDismissed && sections.length > 1"
+            x-cloak
+            {...{ 'x-transition.opacity': '' }}
+            class="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium"
+            style="background: rgba(74,114,255,0.08); color: #4a72ff; border: 1px solid rgba(74,114,255,0.18)"
+          >
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7l-4 4m0 0l4 4m-4-4h16" />
+            </svg>
+            <span class="flex-1">Swipe left or right to switch sections</span>
+            <button x-on:click="dismissSwipeHint()" class="w-5 h-5 rounded-md flex items-center justify-center hover:bg-white/40" aria-label="Dismiss tip">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
           {/* Item Cards */}
           <div class="px-4 py-4 space-y-3 pb-24">
             <template x-for="item in currentSectionItems" x-bind:key="item.id">

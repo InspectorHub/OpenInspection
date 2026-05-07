@@ -72,6 +72,10 @@ function inspectionEditor(inspectionId) {
     isDesktop: window.innerWidth >= 1024,
     saveTimer: null,
     saveState: 'idle',
+    // Round 32 — one-time mobile gesture-discovery hint for R23 swipe nav
+    swipeHintDismissed: (function () {
+      try { return localStorage.getItem('oi:swipeHint') === 'dismissed'; } catch (_) { return false; }
+    })(),
     _reportStats: { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
     aiSuggestions: [],
     aiTargetField: null,
@@ -120,12 +124,14 @@ function inspectionEditor(inspectionId) {
           var nextItems = this.currentSectionItems || [];
           if (nextItems.length) this.activeItemId = nextItems[0].id;
           if (typeof showToast === 'function') showToast('Section: ' + (this.currentSection?.title || ''));
+          this.dismissSwipeHint();
         } else if (dx > 0 && this.currentSectionIdx > 0) {
           // swipe right → previous section
           this.currentSectionIdx -= 1;
           var prevItems = this.currentSectionItems || [];
           if (prevItems.length) this.activeItemId = prevItems[0].id;
           if (typeof showToast === 'function') showToast('Section: ' + (this.currentSection?.title || ''));
+          this.dismissSwipeHint();
         }
       }, { passive: true });
 
@@ -562,6 +568,12 @@ function inspectionEditor(inspectionId) {
 
     setActiveItem(itemId) {
       this.activeItemId = itemId;
+    },
+
+    dismissSwipeHint() {
+      if (this.swipeHintDismissed) return;
+      this.swipeHintDismissed = true;
+      try { localStorage.setItem('oi:swipeHint', 'dismissed'); } catch (_) { /* ignore */ }
     },
 
     setViewMode(mode) {
