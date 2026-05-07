@@ -22,31 +22,82 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                     </button>
                 </div>
 
-                {/* Agreements List */}
-                <div class="glass-panel rounded-xl overflow-hidden shadow-md/5 flex-1 flex flex-col">
-                    <div class="overflow-x-auto flex-1">
-                        <table class="min-w-full h-full">
-                            <thead>
-                                <tr class="bg-slate-50/50">
-                                    <th scope="col" class="py-6 pl-10 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Agreement Name</th>
-                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Version</th>
-                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Effective Date</th>
-                                    <th scope="col" class="relative py-6 pl-3 pr-10"><span class="sr-only">Actions</span></th>
-                                </tr>
-                            </thead>
-                            <tbody id="agreementsList" class="divide-y divide-slate-100">
-                                <tr id="loadingRow">
-                                    <td colspan={4} class="py-32 text-center">
-                                        <div class="flex flex-col items-center gap-4">
-                                            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-md"></div>
-                                            <p class="text-sm font-bold text-slate-400 animate-pulse">Loading...</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                {/* Tabs: Templates / Signing Requests (Spec 5H P2) */}
+                <div x-data="{ tab: 'templates', requests: [], reqLoading: false, async loadRequests() { if (this.requests.length) return; this.reqLoading = true; try { const r = await authFetch('/api/admin/agreements/requests'); const j = await r.json(); this.requests = j.data?.requests || []; } finally { this.reqLoading = false; } } }" class="flex-1 flex flex-col">
+                    <div class="flex items-center gap-1 mb-4 border-b border-slate-200">
+                        <button x-on:click="tab = 'templates'" x-bind:class="tab === 'templates' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                            class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors">Templates</button>
+                        <button x-on:click="tab = 'requests'; loadRequests()" x-bind:class="tab === 'requests' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                            class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors">Signing Requests</button>
                     </div>
-                 </div>
+
+                    {/* Templates list */}
+                    <div x-show="tab === 'templates'" class="glass-panel rounded-xl overflow-hidden shadow-md/5 flex-1 flex flex-col">
+                        <div class="overflow-x-auto flex-1">
+                            <table class="min-w-full h-full">
+                                <thead>
+                                    <tr class="bg-slate-50/50">
+                                        <th scope="col" class="py-6 pl-10 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Agreement Name</th>
+                                        <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Version</th>
+                                        <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Effective Date</th>
+                                        <th scope="col" class="relative py-6 pl-3 pr-10"><span class="sr-only">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="agreementsList" class="divide-y divide-slate-100">
+                                    <tr id="loadingRow">
+                                        <td colspan={4} class="py-32 text-center">
+                                            <div class="flex flex-col items-center gap-4">
+                                                <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-md"></div>
+                                                <p class="text-sm font-bold text-slate-400 animate-pulse">Loading...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Signing Requests list */}
+                    <div x-show="tab === 'requests'" x-cloak class="glass-panel rounded-xl overflow-hidden shadow-md/5 flex-1 flex flex-col">
+                        <div class="overflow-x-auto flex-1">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="bg-slate-50/50">
+                                        <th class="py-4 pl-6 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Client</th>
+                                        <th class="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Agreement</th>
+                                        <th class="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
+                                        <th class="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Sent</th>
+                                        <th class="px-4 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Signed</th>
+                                        <th class="px-4 py-4 pr-6"><span class="sr-only">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr x-show="reqLoading"><td colspan={6} class="py-16 text-center text-sm text-slate-400 italic">Loading…</td></tr>
+                                    <tr x-show="!reqLoading && requests.length === 0"><td colspan={6} class="py-16 text-center text-sm text-slate-400 italic">No signing requests yet. Use a template's "Send" action.</td></tr>
+                                    <template x-for="r in requests" x-bind:key="r.id">
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="py-3 pl-6 pr-3 text-sm">
+                                                <div class="font-semibold text-slate-900" x-text="r.clientName || '—'"></div>
+                                                <div class="text-[11px] text-slate-500" x-text="r.clientEmail"></div>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-slate-700" x-text="r.agreementName || '—'"></td>
+                                            <td class="px-4 py-3">
+                                                <span class="ih-pill"
+                                                    x-bind:style="r.status === 'signed' ? 'background:#dcfce7;color:#15803d' : (r.status === 'declined' ? 'background:#fee2e2;color:#b91c1c' : (r.status === 'viewed' ? 'background:#dbeafe;color:#1d4ed8' : 'background:#fef3c7;color:#b45309'))"
+                                                    x-text="r.status"></span>
+                                            </td>
+                                            <td class="px-4 py-3 text-[11px] font-mono text-slate-500" x-text="r.sentAt ? new Date(r.sentAt).toLocaleString() : '—'"></td>
+                                            <td class="px-4 py-3 text-[11px] font-mono text-slate-500" x-text="r.signedAt ? new Date(r.signedAt).toLocaleString() : '—'"></td>
+                                            <td class="px-4 py-3 pr-6 text-right">
+                                                <a x-bind:href="'/verify/' + r.id" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline">Verify ›</a>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Create Agreement Modal */}
                 <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-6 sm:px-0">

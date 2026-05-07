@@ -36,6 +36,7 @@ import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
 import { AgreementPrintablePage } from './templates/pages/agreement-printable';
 import { CertTemplatePage } from './templates/pages/cert.template';
+import { VerifyPage } from './templates/pages/verify';
 import { CalendarPage } from './templates/pages/calendar';
 import { ContactsPage } from './templates/pages/contacts';
 import { RecommendationsPage } from './templates/pages/recommendations';
@@ -169,7 +170,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
@@ -635,6 +636,111 @@ app.get('/m2m/cert-render/:token', async (c) => {
         logger.error('cert-render: failed', { token: token.slice(0, 8) }, e instanceof Error ? e : undefined);
         return c.text('Cert render failed', 500);
     }
+});
+
+// Spec 5H P2 — Public verifier (no-auth, court-friendly).
+// HTML page at /verify/{envelopeId} + JSON API at /api/public/verify/*
+async function loadVerifyData(c: any, envelopeId: string) {
+    const db = drizzle(c.env.DB, { schema });
+    const reqRow = await db.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, envelopeId)).get();
+    if (!reqRow) return null;
+    const agreement = await db.select().from(schema.agreements).where(eq(schema.agreements.id, reqRow.agreementId)).get();
+    const auditRows = await db.select().from(schema.esignAuditLogs)
+        .where(and(eq(schema.esignAuditLogs.tenantId, reqRow.tenantId), eq(schema.esignAuditLogs.requestId, envelopeId)))
+        .orderBy(asc(schema.esignAuditLogs.createdAt))
+        .all();
+    const verify = await c.var.services.auditLog.verifyChain(reqRow.tenantId, envelopeId);
+    const pubKey = await c.var.services.signingKey.getPublicKey(reqRow.tenantId);
+    return { reqRow, agreement, auditRows, verify, pubKey };
+}
+
+app.get('/verify/:envelopeId', async (c) => {
+    const envelopeId = c.req.param('envelopeId') as string;
+    const data = await loadVerifyData(c, envelopeId);
+    const branding = c.get('branding');
+    const siteName = branding?.siteName || 'OpenInspection';
+    const apiBase = c.env.ESIGN_PUBLIC_VERIFY_BASE || 'https://openinspection-standalone.important-new.workers.dev';
+    if (!data) {
+        return c.html(VerifyPage({
+            envelopeId, found: false, chainValid: false, chainReason: null,
+            documentTitle: null, clientName: null, clientEmail: null,
+            keyFingerprint: null, keyAlgorithm: 'Ed25519', eventCount: 0, events: [],
+            siteName, apiBase,
+        }));
+    }
+    const events = data.auditRows.map((r) => {
+        let payload: Record<string, unknown> = {};
+        try { payload = JSON.parse(r.payloadJson); } catch (_) { /* ignore */ }
+        return {
+            event: r.event, createdAtUtc: new Date(r.createdAt).toISOString(),
+            valid: data.verify.valid, payload, hash: r.hash,
+        };
+    });
+    return c.html(VerifyPage({
+        envelopeId,
+        found: true,
+        chainValid: data.verify.valid,
+        chainReason: data.verify.valid ? null : (data.verify.reason as string),
+        documentTitle: data.agreement?.name ?? null,
+        clientName: data.reqRow.clientName,
+        clientEmail: data.reqRow.clientEmail,
+        keyFingerprint: data.pubKey?.fingerprint ?? null,
+        keyAlgorithm: 'Ed25519',
+        eventCount: events.length,
+        events,
+        siteName, apiBase,
+    }));
+});
+
+app.get('/api/public/verify/:envelopeId', async (c) => {
+    const envelopeId = c.req.param('envelopeId') as string;
+    const data = await loadVerifyData(c, envelopeId);
+    if (!data) return c.json({ success: false, error: { message: 'Envelope not found', code: 'NOT_FOUND' } }, 404);
+    return c.json({
+        success: true,
+        data: {
+            envelopeId,
+            documentTitle: data.agreement?.name ?? null,
+            clientName: data.reqRow.clientName,
+            clientEmail: data.reqRow.clientEmail,
+            chainValid: data.verify.valid,
+            chainReason: data.verify.valid ? null : (data.verify.reason as string),
+            keyFingerprint: data.pubKey?.fingerprint ?? null,
+            keyAlgorithm: 'Ed25519',
+            eventCount: data.auditRows.length,
+        },
+    });
+});
+
+app.get('/api/public/verify/:envelopeId/public-key', async (c) => {
+    const envelopeId = c.req.param('envelopeId') as string;
+    const data = await loadVerifyData(c, envelopeId);
+    if (!data || !data.pubKey) return c.text('Not found', 404);
+    c.header('Content-Type', 'application/x-pem-file');
+    c.header('Content-Disposition', `attachment; filename="pubkey-${envelopeId.slice(0, 8)}.pem"`);
+    return c.body(data.pubKey.pem);
+});
+
+app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
+    const envelopeId = c.req.param('envelopeId') as string;
+    const data = await loadVerifyData(c, envelopeId);
+    if (!data) return c.json({ error: 'Not found' }, 404);
+    const payload = {
+        envelopeId,
+        algorithm: 'Ed25519',
+        publicKeyPem: data.pubKey?.pem ?? null,
+        keyFingerprint: data.pubKey?.fingerprint ?? null,
+        events: data.auditRows.map((r) => ({
+            id: r.id, event: r.event, createdAt: r.createdAt,
+            payloadJson: r.payloadJson, prevHash: r.prevHash,
+            hash: r.hash, signature: r.signature, keyFingerprint: r.keyFingerprint,
+        })),
+        chainValid: data.verify.valid,
+        exportedAt: new Date().toISOString(),
+    };
+    c.header('Content-Type', 'application/json');
+    c.header('Content-Disposition', `attachment; filename="audit-${envelopeId.slice(0, 8)}.json"`);
+    return c.body(JSON.stringify(payload, null, 2));
 });
 
 // Public report page (no auth required)

@@ -314,6 +314,27 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                   <span x-bind:class="inspection.agreementRequired ? 'translate-x-3' : 'translate-x-0.5'" class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform" />
                 </button>
               </label>
+              {/* Spec 5H P2 — Agreement Status badge: shows latest signing request state for this inspection */}
+              <div x-show="inspection.agreementRequired"
+                   x-data={`{ req: null, async load() { try { const r = await authFetch('/api/admin/agreements/requests'); const j = await r.json(); const all = j.data?.requests || []; this.req = all.find(x => x.inspectionId === '${inspectionId}') || null; } catch(_) {} } }`}
+                   x-init="load()"
+                   class="mt-2">
+                <template x-if="req">
+                  <a x-bind:href="'/verify/' + req.id" target="_blank" class="block rounded-lg border p-2 transition hover:shadow-sm"
+                     x-bind:style="req.status === 'signed' ? 'border-color:#a7f3d0; background:#ecfdf5' : (req.status === 'declined' ? 'border-color:#fecaca; background:#fef2f2' : (req.status === 'viewed' ? 'border-color:#bfdbfe; background:#eff6ff' : 'border-color:#fde68a; background:#fffbeb'))">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[10px] font-bold uppercase tracking-wide"
+                            x-bind:style="req.status === 'signed' ? 'color:#15803d' : (req.status === 'declined' ? 'color:#b91c1c' : (req.status === 'viewed' ? 'color:#1d4ed8' : 'color:#b45309'))"
+                            x-text="req.status"></span>
+                      <span class="text-[9px] text-slate-400" x-text="req.signedAt ? new Date(req.signedAt).toLocaleDateString() : (req.sentAt ? 'sent ' + new Date(req.sentAt).toLocaleDateString() : '')"></span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">Verify → opens public chain</div>
+                  </a>
+                </template>
+                <template x-if="!req">
+                  <p class="text-[10px] italic text-slate-400 px-1">No signing request sent yet</p>
+                </template>
+              </div>
               {/* R7-19 fix: Theme Override is rare per-inspection use. Collapse
                   by default; only expanded if a non-default theme is already set
                   or the inspector clicks "Advanced". Keeps Spectora-style focus
