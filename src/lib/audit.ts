@@ -21,6 +21,8 @@ export type AuditAction =
     | 'template.create'
     | 'template.update'
     | 'template.delete'
+    | 'template.marketplace.updated'
+    | 'library.marketplace.updated'
     | 'user.invite'
     | 'user.join'
     | 'user.password_change'

@@ -19,6 +19,12 @@ function marketplace() {
         // Spec 5B P3 — aggregate counts across all sections.
         previewCannedTotal: 0,
         previewDefectTotal: 0,
+        // Round 37 — update confirm modal state. `updateTarget` holds either
+        // a template or library object; `updateKind` is 'template' | 'library'
+        // so the same modal can serve both card types.
+        updateConfirmOpen: false,
+        updateTarget: null,
+        updateKind: '',
 
         async init() {
             await this.load();
@@ -121,6 +127,53 @@ function marketplace() {
             const t = this.templates.find(t => t.id === id);
             if (t) { t.importedSemver = t.semver; t.hasUpdate = false; }
             this.showToast('Template imported!', localId ? `/templates/${localId}/edit` : '');
+        },
+
+        // Round 37 — open the confirm modal for a template or library update.
+        // We intentionally do NOT POST here: the user must confirm the
+        // "creates a new copy" semantics before we mutate anything.
+        openUpdateConfirm(target, kind) {
+            this.updateTarget = target;
+            this.updateKind = kind;
+            this.updateConfirmOpen = true;
+        },
+
+        closeUpdateConfirm() {
+            this.updateConfirmOpen = false;
+            this.updateTarget = null;
+            this.updateKind = '';
+        },
+
+        async confirmUpdate() {
+            if (!this.updateTarget) return;
+            const t = this.updateTarget;
+            const kind = this.updateKind;
+            this.updateConfirmOpen = false;
+            if (kind === 'template') {
+                const res = await authFetch(`/api/templates/marketplace/${t.id}/update`, { method: 'POST' });
+                if (!res.ok) {
+                    this.showToast('Update failed. Please try again.', '');
+                    return;
+                }
+                const data = await res.json();
+                const newId = data.data && data.data.newLocalId;
+                const cardT = this.templates.find((x) => x.id === t.id);
+                if (cardT) { cardT.importedSemver = cardT.semver; cardT.hasUpdate = false; }
+                this.showToast(`Updated to v${t.semver} — old copy preserved`, newId ? `/templates/${newId}/edit` : '');
+            } else if (kind === 'library') {
+                const res = await authFetch(`/api/templates/marketplace/libraries/${t.id}/update`, { method: 'POST' });
+                if (!res.ok) {
+                    this.showToast('Library update failed. Please try again.', '');
+                    return;
+                }
+                const data = await res.json();
+                const added = (data.data && data.data.rowsAdded) || 0;
+                const cardL = this.libraries.find((x) => x.id === t.id);
+                if (cardL) { cardL.importedSemver = cardL.semver; cardL.hasUpdate = false; }
+                this.showToast(`Added ${added} new entries — old entries preserved`, '/comments');
+            }
+            this.updateTarget = null;
+            this.updateKind = '';
         },
 
         // Polish 5 + Spec 5B P3 — open preview modal with parsed schema

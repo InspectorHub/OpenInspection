@@ -2,7 +2,8 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { HonoConfig } from '../types/hono';
-import { Errors } from '../lib/errors';
+import { Errors, AppError } from '../lib/errors';
+import { auditFromContext } from '../lib/audit';
 
 const marketplaceRoutes = new OpenAPIHono<HonoConfig>();
 
@@ -82,6 +83,61 @@ marketplaceRoutes.openapi(createRoute({
     return c.json({ success: true, data });
 });
 
+// Round 37 — Update an already-imported template to the latest marketplace
+// semver. Scheme 2: creates a NEW local copy with a "(vX.Y.Z)" suffix and
+// re-points the import marker; the old local row is preserved so existing
+// inspections do not break.
+marketplaceRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/update',
+    tags: ['Marketplace'],
+    summary: 'Update tenant copy to latest marketplace version (creates new local copy)',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.boolean(),
+                data: z.object({
+                    newLocalId: z.string(),
+                    newName: z.string(),
+                    fromSemver: z.string(),
+                    toSemver: z.string(),
+                }),
+            }) } },
+            description: 'Updated',
+        },
+        400: { description: 'No update available' },
+        404: { description: 'Not found' },
+    },
+}), async (c) => {
+    const { id } = c.req.valid('param');
+    try {
+        const result = await c.var.services.marketplace.updateTemplateImport(id);
+        auditFromContext(c, 'template.marketplace.updated', 'template', {
+            entityId: result.newLocalId,
+            metadata: {
+                marketplaceId: id,
+                fromSemver:    result.fromSemver,
+                toSemver:      result.toSemver,
+                oldLocalId:    result.oldLocalId,
+                newLocalId:    result.newLocalId,
+            },
+        });
+        return c.json({
+            success: true,
+            data: {
+                newLocalId: result.newLocalId,
+                newName:    result.newName,
+                fromSemver: result.fromSemver,
+                toSemver:   result.toSemver,
+            },
+        }, 200);
+    } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw err;
+    }
+});
+
 marketplaceRoutes.openapi(createRoute({
     method: 'post', path: '/libraries/{id}/import',
     tags: ['Marketplace'],
@@ -106,6 +162,57 @@ marketplaceRoutes.openapi(createRoute({
         const stack = err instanceof Error ? (err.stack || '').slice(0, 500) : '';
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return c.json({ success: false, error: { code: 'import_failed', message: msg, stack } }, 500) as any;
+    }
+});
+
+// Round 37 — Update an already-imported library to the latest marketplace
+// semver. Scheme 2: appends new rows; does NOT delete previous import.
+marketplaceRoutes.openapi(createRoute({
+    method: 'post', path: '/libraries/{id}/update',
+    tags: ['Marketplace'],
+    summary: 'Update tenant library import to latest marketplace version (adds new rows)',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.boolean(),
+                data: z.object({
+                    rowsAdded:  z.number(),
+                    newSemver:  z.string(),
+                    fromSemver: z.string(),
+                }),
+            }) } },
+            description: 'Updated',
+        },
+        400: { description: 'No update available' },
+        404: { description: 'Not found' },
+    },
+}), async (c) => {
+    const { id } = c.req.valid('param');
+    try {
+        const result = await c.var.services.marketplace.updateLibraryImport(id);
+        auditFromContext(c, 'library.marketplace.updated', 'library', {
+            entityId: id,
+            metadata: {
+                libraryId:   id,
+                libraryName: result.libraryName,
+                fromSemver:  result.fromSemver,
+                toSemver:    result.toSemver,
+                rowsAdded:   result.rowsAdded,
+            },
+        });
+        return c.json({
+            success: true,
+            data: {
+                rowsAdded:  result.rowsAdded,
+                newSemver:  result.toSemver,
+                fromSemver: result.fromSemver,
+            },
+        }, 200);
+    } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw err;
     }
 });
 

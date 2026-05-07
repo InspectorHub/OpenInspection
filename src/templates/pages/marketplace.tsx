@@ -71,11 +71,21 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                                 <p class="text-sm text-slate-500" x-text="l.changelog || 'Standard library pack.'"></p>
                                 <div class="flex items-center justify-between mt-auto">
                                     <span class="text-[11px] text-slate-400" x-text="l.downloadCount + ' imports'"></span>
-                                    <button x-on:click="importLibrary(l.id)"
-                                        x-bind:disabled="!!l.importedSemver && !l.hasUpdate"
-                                        class="px-4 py-1.5 text-sm rounded-md font-bold transition"
-                                        x-bind:class="l.importedSemver && !l.hasUpdate ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
-                                        x-text="l.importedSemver ? (l.hasUpdate ? 'Update' : 'Imported') : 'Import'"></button>
+                                    {/* Round 37 — split button by state so Update routes through the confirm modal. */}
+                                    <template x-if="!l.importedSemver">
+                                        <button x-on:click="importLibrary(l.id)"
+                                            class="px-4 py-1.5 text-sm rounded-md font-bold transition bg-indigo-600 text-white hover:bg-indigo-700">
+                                            Import
+                                        </button>
+                                    </template>
+                                    <template x-if="l.importedSemver && !l.hasUpdate">
+                                        <span class="px-4 py-1.5 text-sm rounded-md font-bold bg-slate-100 text-slate-400">Imported</span>
+                                    </template>
+                                    <template x-if="l.hasUpdate">
+                                        <button x-on:click="openUpdateConfirm(l, 'library')"
+                                            class="px-4 py-1.5 text-sm rounded-md font-bold transition bg-amber-500 text-white hover:bg-amber-600"
+                                            x-text="'Update to v' + l.semver"></button>
+                                    </template>
                                 </div>
                             </div>
                         </template>
@@ -116,11 +126,12 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                                     <template x-if="t.importedSemver && !t.hasUpdate">
                                         <span class="px-4 py-1.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-bold">Imported</span>
                                     </template>
+                                    {/* Round 37 — Update flow (Scheme 2). Opens a confirm
+                                        modal explaining "creates a new copy" before POSTing. */}
                                     <template x-if="t.hasUpdate">
-                                        <button x-on:click="importTemplate(t.id)"
-                                            class="px-4 py-1.5 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition">
-                                            Update available
-                                        </button>
+                                        <button x-on:click="openUpdateConfirm(t, 'template')"
+                                            class="px-4 py-1.5 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition"
+                                            x-text="'Update to v' + t.semver"></button>
                                     </template>
                                 </div>
                             </div>
@@ -195,6 +206,49 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                                 class="px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold">
                                 Import this template
                             </button>
+                        </footer>
+                    </div>
+                </div>
+
+                {/* Round 37 — Update confirm modal. Explains the "new copy"
+                    semantics (Scheme 2) so the inspector knows their existing
+                    template/library entries are preserved. */}
+                <div x-show="updateConfirmOpen" style="display:none" x-transition class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click.self': 'closeUpdateConfirm()' }}>
+                    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                        <header class="px-6 py-4 border-b border-slate-100">
+                            <h2 class="text-lg font-black text-slate-900">
+                                <span x-text="updateKind === 'library' ? 'Update library?' : 'Update template?'"></span>
+                            </h2>
+                        </header>
+                        <div class="px-6 py-5 space-y-3 text-sm text-slate-700">
+                            <p>
+                                <strong x-text="updateTarget?.name || ''"></strong>
+                                <span class="text-slate-500"> will move from </span>
+                                <span class="font-mono text-xs text-slate-700" x-text="'v' + (updateTarget?.importedSemver || '?')"></span>
+                                <span class="text-slate-500"> to </span>
+                                <span class="font-mono text-xs font-bold text-amber-700" x-text="'v' + (updateTarget?.semver || '?')"></span>.
+                            </p>
+                            <template x-if="updateKind === 'template'">
+                                <p class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
+                                    A new copy will be created with the suffix
+                                    <span class="font-mono font-bold" x-text="'(v' + (updateTarget?.semver || '?') + ')'"></span>.
+                                    Your current copy is <strong>preserved</strong> so existing
+                                    inspections keep working. You can compare side-by-side or
+                                    delete the old copy later.
+                                </p>
+                            </template>
+                            <template x-if="updateKind === 'library'">
+                                <p class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
+                                    The new pack's entries will be <strong>added</strong> alongside
+                                    your existing ones. Old entries are <strong>not deleted</strong>.
+                                    If you want a clean state, delete the old entries from
+                                    <a href="/comments" class="underline">/comments</a> after updating.
+                                </p>
+                            </template>
+                        </div>
+                        <footer class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                            <button x-on:click="closeUpdateConfirm()" class="px-4 py-2 rounded-lg ring-2 ring-slate-200 text-slate-600 text-xs font-bold">Cancel</button>
+                            <button x-on:click="confirmUpdate()" class="px-4 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600">Continue</button>
                         </footer>
                     </div>
                 </div>
