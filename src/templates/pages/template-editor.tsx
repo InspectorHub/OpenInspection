@@ -255,7 +255,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                         <template x-if="!selectedSection">
                             <div class="flex items-center justify-center h-full text-center animate-fade-in">
                                 <div>
-                                    <div class="w-24 h-24 rounded-3xl bg-surface-100 flex items-center justify-center mx-auto mb-6 rotate-3">
+                                    <div class="w-24 h-24 rounded-lg bg-surface-100 flex items-center justify-center mx-auto mb-6 rotate-3">
                                         <svg class="w-12 h-12 text-ink-300" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                     </div>
                                     <h3 class="text-xl font-display font-700 text-ink-700 mb-2">Select a Section</h3>
@@ -432,7 +432,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
                     <div class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" {...{'@click': 'showRatingModal = false'}}></div>
-                    <div class="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl animate-scale-in max-h-[85vh] overflow-hidden flex flex-col">
+                    <div class="relative w-full max-w-xl bg-white rounded-lg shadow-2xl animate-scale-in max-h-[85vh] overflow-hidden flex flex-col">
                         <div class="px-8 pt-8 pb-4 border-b border-surface-100">
                             <h3 class="text-2xl font-display font-700 text-ink-900">Rating System</h3>
                             <p class="text-sm text-ink-400 mt-1">Configure the rating levels for this template</p>

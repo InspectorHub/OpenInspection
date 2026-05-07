@@ -140,7 +140,7 @@ export function renderProfessionalReport(data: {
                 <div class="px-12 py-12 bg-white relative no-print overflow-hidden group">
                     <div class="absolute inset-0 bg-indigo-600/[0.02] transition-colors group-hover:bg-indigo-600/[0.04]"></div>
                     <div class="relative z-10 flex items-start gap-8">
-                        <div class="flex-shrink-0 w-16 h-16 bg-white border border-indigo-100 rounded-3xl flex items-center justify-center shadow-xl shadow-indigo-100/30">
+                        <div class="flex-shrink-0 w-16 h-16 bg-white border border-indigo-100 rounded-lg flex items-center justify-center shadow-xl shadow-indigo-100/30">
                              <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                         </div>
                         <div>
@@ -259,13 +259,13 @@ export function renderProfessionalReport(data: {
                                         {res.photos && res.photos.length > 0 ? (
                                             <div class="lg:w-[480px] shrink-0 grid grid-cols-2 gap-4 avoid-break">
                                                 {res.photos.map((p: { key: string }) => (
-                                                    <div class="aspect-square bg-slate-50 rounded-[2rem] overflow-hidden border-4 border-white shadow-2xl shadow-indigo-100/20 group/photo transition-transform hover:scale-[1.02]" key={p.key}>
+                                                    <div class="aspect-square bg-slate-50 rounded-lg overflow-hidden border-4 border-white shadow-2xl shadow-indigo-100/20 group/photo transition-transform hover:scale-[1.02]" key={p.key}>
                                                         <img src={`/api/inspections/files/${p.key}`} class="w-full h-full object-cover grayscale-[0.2] transition-all group-hover/photo:grayscale-0" />
                                                     </div>
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div class="lg:w-[480px] shrink-0 h-40 border-2 border-dashed border-slate-50 rounded-[2rem] flex items-center justify-center grayscale opacity-20">
+                                            <div class="lg:w-[480px] shrink-0 h-40 border-2 border-dashed border-slate-50 rounded-lg flex items-center justify-center grayscale opacity-20">
                                                 <span class="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-300">No photos</span>
                                             </div>
                                         )}
@@ -310,7 +310,7 @@ export function renderProfessionalReport(data: {
         <div class="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-2xl">
             <div class="bg-white rounded-2xl shadow-[0_60px_120px_-20px_rgba(0,0,0,0.6)] max-w-3xl w-full p-16 space-y-12 animate-slide-in">
                 <div class="text-center">
-                    <div class="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-200">
+                    <div class="w-20 h-20 bg-indigo-600 rounded-lg flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-200">
                         <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     </div>
                     <h2 class="text-5xl font-black tracking-tightest text-slate-900 mb-4">Agreement Review</h2>
@@ -324,13 +324,13 @@ export function renderProfessionalReport(data: {
                         <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Electronic Signature Authorization</h4>
                         <button {...{'@click': 'clearSignature'}} class="text-[10px] font-bold text-rose-500 hover:text-rose-600 uppercase tracking-[0.2em] transition-colors">Reset Input</button>
                     </div>
-                    <div class="bg-slate-50 border-2 border-slate-100 rounded-[2rem] overflow-hidden group focus-within:border-indigo-600 transition-all shadow-sm">
+                    <div class="bg-slate-50 border-2 border-slate-100 rounded-lg overflow-hidden group focus-within:border-indigo-600 transition-all shadow-sm">
                         <canvas x-ref="canvas" class="w-full h-48 cursor-crosshair touch-none"></canvas>
                     </div>
                 </div>
 
                 <p x-show="signError" x-text="signError" class="text-red-500 text-sm font-semibold text-center mb-3"></p>
-                <button {...{'@click': 'submitSignature'}} class="premium-button w-full py-6 bg-slate-900 text-white rounded-[2rem] text-lg font-black tracking-tightest shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-4 group">
+                <button {...{'@click': 'submitSignature'}} class="premium-button w-full py-6 bg-slate-900 text-white rounded-lg text-lg font-black tracking-tightest shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-4 group">
                     <span>Accept and View Report</span>
                     <svg class="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>

@@ -20,7 +20,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
 
                     <div class="flex items-center gap-4">
-                        <button type="button" onclick="showCreateModal()" class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-10 py-5 rounded-[1.5rem] bg-indigo-600 text-white font-bold shadow-2xl shadow-indigo-100 hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
+                        <button type="button" onclick="showCreateModal()" class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-2 rounded-md bg-indigo-600 text-white font-bold shadow-2xl shadow-indigo-100 hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
                             <svg class="w-5 h-5 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                             </svg>
@@ -309,7 +309,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
 
                     {/* Empty state */}
                     <div x-show="!loading && allBucketsEmpty" {...{ 'x-cloak': true }} class="text-center py-16 text-slate-400">
-                        <div class="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
+                        <div class="w-20 h-20 rounded-lg bg-indigo-50 flex items-center justify-center mx-auto mb-4">
                             <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                         </div>
                         <p class="text-sm">No inspections yet. Create one above to get started.</p>
@@ -343,7 +343,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2 md:col-span-2 relative">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Property Address</label>
                                     <input type="text" id="propAddress" placeholder="Start typing — autocomplete via Google" autocomplete="off" data-places-autocomplete
-                                        class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                     {/* Spec 5D — Google Places autocomplete dropdown.
                                         Hidden until at least 2 chars typed. Falls back to
                                         plain text input when GOOGLE_PLACES_API_KEY absent. */}
@@ -359,7 +359,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Template</label>
-                                    <select id="templateId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="templateId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Select a template...</option>
                                     </select>
                                     <p id="noTemplateHint" class="hidden text-xs text-amber-600 font-semibold mt-1 ml-1">
@@ -369,7 +369,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Inspection Date &amp; Time</label>
                                     <input type="text" id="inspectionDate" data-flatpickr data-min-date="today" autocomplete="off" placeholder="Pick date and time"
-                                        class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div x-data="contactSelector" class="relative mb-3">
                                     {/* R7-08 fix: clarify that this autocompletes existing contacts
@@ -401,27 +401,27 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Name</label>
                                     <input type="text" id="clientName" placeholder="e.g., John Doe"
-                                        class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Email</label>
                                     <input type="email" id="clientEmail" placeholder="e.g., john@example.com"
-                                        class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Phone</label>
                                     <input type="tel" id="clientPhone" placeholder="e.g., (555) 123-4567"
-                                        class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Assign Inspector</label>
-                                    <select id="inspectorId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="inspectorId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Self-assignment</option>
                                     </select>
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Listing Agent</label>
-                                    <select id="agentId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="agentId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
                                 </div>
@@ -430,7 +430,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     inspections.sellingAgentId. Both selects share populateAgents(). */}
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Buyer's Agent</label>
-                                    <select id="buyerAgentId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="buyerAgentId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
                                 </div>

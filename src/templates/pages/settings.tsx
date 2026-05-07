@@ -132,7 +132,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                         <div class="flex justify-end pt-2">
                             <button onclick="saveProfile()" id="saveProfileBtn"
-                                class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
+                                class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
                                 Save Profile
                             </button>
                         </div>
@@ -173,7 +173,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="space-y-4">
                             <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Company Logo</label>
                             <div class="flex flex-col sm:flex-row items-center gap-6 p-6 bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200 group hover:border-indigo-300 transition-colors">
-                                <div class="w-32 h-32 bg-white rounded-3xl border border-slate-100 shadow-xl flex items-center justify-center overflow-hidden">
+                                <div class="w-32 h-32 bg-white rounded-lg border border-slate-100 shadow-xl flex items-center justify-center overflow-hidden">
                                     {logoUrl ? (
                                         <img id="logoPreview" src={logoUrl} class="w-full h-full object-contain p-4" />
                                     ) : (
@@ -185,7 +185,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                 <div class="space-y-4 flex-1 text-center sm:text-left">
                                     <input type="file" id="logoInput" class="hidden" accept="image/*" onchange="handleLogoSelect(event)" />
                                     <button onclick="document.getElementById('logoInput').click()"
-                                        class="premium-button px-8 py-4 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-sm hover:border-indigo-600 hover:text-indigo-600 transition-all active:scale-95">
+                                        class="premium-button px-4 py-2 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-sm hover:border-indigo-600 hover:text-indigo-600 transition-all active:scale-95">
                                         Upload Asset
                                     </button>
                                     <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">PNG/SVG recommended</p>
@@ -195,7 +195,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                         <div class="flex justify-end pt-2">
                             <button onclick="saveBranding()" id="saveBrandingBtn"
-                                class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
+                                class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
                                 Save Branding
                             </button>
                         </div>
@@ -257,7 +257,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                 class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-sky-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" />
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveBranding()" class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveBranding()" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
                                 Save
                             </button>
                         </div>
@@ -303,7 +303,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveSecrets('email')" class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveSecrets('email')" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
                                 Save
                             </button>
                         </div>
@@ -331,7 +331,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveSecrets('turnstile')" class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveSecrets('turnstile')" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
                                 Save
                             </button>
                         </div>
@@ -353,7 +353,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             <p class="text-[10px] text-slate-400 font-bold ml-1">Get a key at <span class="text-slate-600">aistudio.google.com</span>. Stored encrypted.</p>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveSecrets('ai')" class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveSecrets('ai')" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
                                 Save
                             </button>
                         </div>
@@ -389,7 +389,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveIntegration()" class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveIntegration()" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
                                 Save
                             </button>
                         </div>
@@ -436,7 +436,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                 class="flex-1 px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 bg-slate-50 text-slate-600 font-mono text-xs"
                                 placeholder="Loading subscription URL..." />
                             <button onclick="copyIcsUrl()" id="copyIcsBtn"
-                                class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                                class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
                                 Copy Link
                             </button>
                         </div>
@@ -470,7 +470,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="changePassword()" class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="changePassword()" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
                                 Update Password
                             </button>
                         </div>

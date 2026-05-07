@@ -111,7 +111,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                     [x-cloak] { display: none !important } would permanently hide the modal even
                     when previewOpen=true. x-show alone correctly toggles display. */}
                 <div x-show="previewOpen" style="display:none" x-transition class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click.self': 'previewOpen = false' }}>
-                    <div class="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+                    <div class="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col">
                         <header class="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
                             <div>
                                 <h2 class="text-xl font-black text-slate-900" x-text="previewTemplate?.name || 'Preview'"></h2>
@@ -141,7 +141,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                                 </details>
                             </template>
                         </div>
-                        <footer class="px-8 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                        <footer class="px-4 py-2 border-t border-slate-100 flex items-center justify-end gap-3">
                             <button x-on:click="previewOpen = false" class="px-4 py-2 rounded-lg ring-2 ring-slate-200 text-slate-600 text-xs font-bold">Close</button>
                             <button x-show="previewTemplate && !previewTemplate.importedSemver"
                                 x-on:click="importTemplate(previewTemplate.id); previewOpen = false"

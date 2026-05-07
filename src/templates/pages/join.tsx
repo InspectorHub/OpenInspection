@@ -28,7 +28,7 @@ export const JoinPage = ({ token, branding }: { token?: string, branding?: Brand
                             <div class="space-y-2">
                                 <label for="password" class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Create Your Password</label>
                                 <input id="password" name="password" type="password" autocomplete="new-password" required placeholder="••••••••"
-                                    class="premium-input w-full px-6 py-4.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
+                                    class="premium-input w-full px-3 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
                             </div>
 
                             <button type="submit" id="submitBtn" class="premium-button w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold shadow-2xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-3 group">

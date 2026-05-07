@@ -13,7 +13,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
 
                 {/* Floating Navigation */}
                 <nav class="sticky top-6 mx-auto max-w-7xl px-6 z-50">
-                    <div class="glass-panel flex h-20 items-center justify-between px-8 rounded-[2rem] shadow-2xl shadow-indigo-100/20">
+                    <div class="glass-panel flex h-20 items-center justify-between px-8 rounded-lg shadow-2xl shadow-indigo-100/20">
                         <div class="flex items-center gap-8">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
@@ -43,7 +43,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                                 <p class="text-xl text-slate-400 font-medium max-w-2xl leading-relaxed">Track shared inspections and follow up on client reports in real-time.</p>
                             </div>
                             
-                            <div class="glass-panel p-6 rounded-3xl min-w-[240px]">
+                            <div class="glass-panel p-6 rounded-lg min-w-[240px]">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Total Referrals</p>
                                 <h2 id="statTotal" class="text-4xl font-black text-slate-900 tabular-nums">0</h2>
                             </div>

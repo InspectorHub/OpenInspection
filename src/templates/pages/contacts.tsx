@@ -25,7 +25,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         >
                             Import CSV
                         </button>
-                        <button onclick="showCreateModal()" class="premium-button flex items-center gap-2 px-8 py-4 rounded-2xl bg-indigo-600 text-white font-bold shadow-xl hover:bg-slate-900 transition">
+                        <button onclick="showCreateModal()" class="premium-button flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-600 text-white font-bold shadow-xl hover:bg-slate-900 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                             Add Contact
                         </button>
@@ -103,7 +103,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     {...{ 'x-on:click': 'if ($event.target === $el) close()' }}
                 >
                     <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                        <header class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                        <header class="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
                             <h2 class="text-lg font-bold text-slate-900">Import contacts from CSV</h2>
                             <button x-on:click="close()" class="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
                         </header>

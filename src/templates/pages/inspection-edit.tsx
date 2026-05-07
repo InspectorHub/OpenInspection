@@ -36,7 +36,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
         {/* P2 — AI Suggest Comment popover (shared scope with inspectionEditor) */}
         <div x-cloak x-show="showAiPopover" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div {...{ 'x-on:click.stop': '$event' }}
-               class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 space-y-4"
+               class="w-full max-w-md bg-white rounded-lg shadow-2xl p-6 space-y-4"
                {...{ 'x-transition:enter': 'transition ease-out duration-150', 'x-transition:enter-start': 'opacity-0 scale-95', 'x-transition:enter-end': 'opacity-100 scale-100' }}>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
@@ -436,7 +436,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           {/* Center Content */}
           <main class="flex-1 min-w-0">
             {/* Toolbar */}
-            <div class="sticky top-0 z-40 px-6 py-3 flex items-center justify-between" style="background: rgba(255,253,250,0.82); backdrop-filter: blur(16px) saturate(1.5); border-bottom: 1px solid rgba(232,228,221,0.5);">
+            <div class="sticky top-0 z-40 px-3 py-2 flex items-center justify-between" style="background: rgba(255,253,250,0.82); backdrop-filter: blur(16px) saturate(1.5); border-bottom: 1px solid rgba(232,228,221,0.5);">
               <div class="flex items-center gap-3">
                 <h2 class="text-2xl font-bold font-heading" style="color: #1a1815" x-text="currentSection?.title || ''"></h2>
                 <span class="text-xs font-mono px-2 py-1 rounded-lg" style="background: #f3f1ed; color: #908a83" x-text="'SECTION ' + (currentSectionIdx + 1) + '/' + sections.length"></span>
@@ -731,7 +731,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
         {/* ===== Publish Modal ===== */}
         <div {...{'x-cloak': ''}} x-show="showPublishModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div class="w-full max-w-md rounded-3xl p-6 shadow-xl" style="background: rgba(255,253,250,0.95); backdrop-filter: blur(20px);" x-on:click="if ($event.target === $el) showPublishModal = false">
+          <div class="w-full max-w-md rounded-lg p-6 shadow-xl" style="background: rgba(255,253,250,0.95); backdrop-filter: blur(20px);" x-on:click="if ($event.target === $el) showPublishModal = false">
             <h3 class="text-lg font-bold mb-4 font-heading" style="color: #1a1815">Publish Report</h3>
             <div class="space-y-4">
               <div class="p-3 rounded-xl" style="background: #f3f1ed">
@@ -791,7 +791,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
         {/* Onboarding overlay (T6) */}
         <div x-data="inspectionOnboarding()" {...{'x-on:rating-levels-ready.window': 'init($event.detail)'}}>
             <div x-show="active" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,23,42,0.78);backdrop-filter:blur(6px);">
-                <div class="rounded-3xl p-8 max-w-md w-full shadow-2xl" style="background:rgba(255,253,250,0.96);border:1px solid rgba(255,255,255,0.6);">
+                <div class="rounded-lg p-8 max-w-md w-full shadow-2xl" style="background:rgba(255,253,250,0.96);border:1px solid rgba(255,255,255,0.6);">
                     <div class="flex items-center gap-3 mb-4">
                         <span x-show="currentStep.abbr" class="px-3 py-1 rounded-lg text-white font-mono font-bold text-sm"
                               x-bind:style="'background:' + currentStep.color"

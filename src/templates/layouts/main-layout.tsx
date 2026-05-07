@@ -324,7 +324,7 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                         document.getElementById('logoutBtn')?.click();
                     });
                 ` }} />
-                <div id="statusToast" class="fixed bottom-8 right-8 hidden items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold text-white z-50 transition-all"></div>
+                <div id="statusToast" class="fixed bottom-8 right-8 hidden items-center gap-3 px-3 py-2 rounded-2xl shadow-2xl text-sm font-bold text-white z-50 transition-all"></div>
                 {/* Phase T (T25) — sidebar unread message badge polling */}
                 <script dangerouslySetInnerHTML={{ __html: `
                     (function() {

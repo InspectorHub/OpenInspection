@@ -20,7 +20,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                     
                     <div class="flex flex-col items-end gap-4">
                         <button type="button" id="openInviteModalBtn"
-                            class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-10 py-5 rounded-[1.5rem] bg-indigo-600 text-white font-bold shadow-2xl shadow-indigo-100 hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
+                            class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-2 rounded-md bg-indigo-600 text-white font-bold shadow-2xl shadow-indigo-100 hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                             Invite Member
                         </button>
@@ -116,7 +116,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                         </select>
                                     </div>
                                 </div>
-                                <div id="inviteResult" class="hidden text-sm font-bold text-red-600 px-6 py-4 bg-red-50 rounded-2xl border border-red-100 animate-fade-in"></div>
+                                <div id="inviteResult" class="hidden text-sm font-bold text-red-600 px-3 py-2 bg-red-50 rounded-2xl border border-red-100 animate-fade-in"></div>
                             </form>
 
                             <div class="mt-10 flex flex-col sm:flex-row gap-4">

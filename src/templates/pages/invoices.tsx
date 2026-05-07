@@ -12,7 +12,7 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <h1 class="text-5xl font-black tracking-tight text-slate-900">Invoices</h1>
                         <p class="text-lg text-slate-500 font-semibold mt-2">Track and manage client invoices.</p>
                     </div>
-                    <button onclick="showCreateModal()" class="premium-button flex items-center gap-2 px-8 py-4 rounded-2xl bg-indigo-600 text-white font-bold shadow-xl hover:bg-slate-900 transition">
+                    <button onclick="showCreateModal()" class="premium-button flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-600 text-white font-bold shadow-xl hover:bg-slate-900 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         New Invoice
                     </button>
@@ -20,19 +20,19 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                 {/* Stats */}
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="glass-panel rounded-3xl p-6">
+                    <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Total</p>
                         <p id="statTotal" class="text-3xl font-black text-slate-900">—</p>
                     </div>
-                    <div class="glass-panel rounded-3xl p-6">
+                    <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Unpaid</p>
                         <p id="statUnpaid" class="text-3xl font-black text-amber-600">—</p>
                     </div>
-                    <div class="glass-panel rounded-3xl p-6">
+                    <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Paid</p>
                         <p id="statPaid" class="text-3xl font-black text-emerald-600">—</p>
                     </div>
-                    <div class="glass-panel rounded-3xl p-6">
+                    <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Revenue</p>
                         <p id="statRevenue" class="text-3xl font-black text-indigo-600">—</p>
                     </div>

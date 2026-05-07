@@ -21,16 +21,16 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                         class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all font-mono text-sm placeholder:text-slate-300"
                         placeholder={'https://www.acmeinspections.com\nhttps://*.acmeinspections.com'}></textarea>
                     <div class="flex justify-end">
-                        <button id="saveOriginsBtn" class="premium-button px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">Save Origins</button>
+                        <button id="saveOriginsBtn" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">Save Origins</button>
                     </div>
                 </section>
 
                 <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
                     <h2 class="text-2xl font-black text-slate-900 tracking-tightest">2 · Style</h2>
                     <div class="flex gap-3 flex-wrap">
-                        <button class="widget-style-btn px-6 py-3 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="light">☀ Light</button>
-                        <button class="widget-style-btn px-6 py-3 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="dark">🌙 Dark</button>
-                        <button class="widget-style-btn px-6 py-3 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="branded">🎨 Branded</button>
+                        <button class="widget-style-btn px-3 py-2 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="light">☀ Light</button>
+                        <button class="widget-style-btn px-3 py-2 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="dark">🌙 Dark</button>
+                        <button class="widget-style-btn px-3 py-2 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="branded">🎨 Branded</button>
                     </div>
                 </section>
 

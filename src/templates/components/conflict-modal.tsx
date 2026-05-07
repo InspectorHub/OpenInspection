@@ -10,7 +10,7 @@ export const ConflictModal = () => (
         class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
         {...{ 'x-on:click.self': 'open = false' }}
     >
-        <div class="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <header class="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
                 <div>
                     <h2 class="text-xl font-black text-slate-900">Sync Conflict</h2>

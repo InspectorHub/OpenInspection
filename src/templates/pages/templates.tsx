@@ -16,7 +16,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                         <h1 class="text-5xl font-black tracking-tightest text-slate-900 mb-4">Templates</h1>
                         <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage your inspection checklists.</p>
                     </div>
-                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-8 py-4 rounded-2xl shadow-2xl shadow-indigo-100/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
+                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-2xl shadow-2xl shadow-indigo-100/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         New Template
                     </button>
@@ -66,7 +66,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Template Name</label>
                                     <input type="text" id="tplName" placeholder="e.g., Luxury Residential Standard"
-                                        class="premium-input w-full px-6 py-4.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
+                                        class="premium-input w-full px-3 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
                                 </div>
                                 <p class="text-sm text-slate-400 font-medium leading-relaxed">
                                     After creating the template, you will be taken to the visual editor where you can add sections and inspection items.
