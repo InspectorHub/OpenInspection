@@ -14,6 +14,14 @@ function networkPillFactory() {
         pendingItems: [],
         popoverOpen: false,
         tier: null,
+        // Round 39 — hide on routes that have their own visible save state.
+        // The inspection editor's per-section header already shows
+        // 'Saving…/Saved/Error' inline, and its top-right corner is taken
+        // by Preview / Publish buttons that the global pill was overlapping.
+        get suppressed() {
+            try { return /^\/inspections\/[^/]+\/edit$/.test(location.pathname); }
+            catch (_) { return false; }
+        },
 
         async init() {
             await openDb();

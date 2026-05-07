@@ -866,19 +866,29 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       ></button>
                     </template>
                   </div>
-                  <div class="flex items-center gap-3 text-[10px] font-mono" style="color: #b0aaa3" x-on:click="$event.stopPropagation()">
-                    {/* R7-18: quick photo shortcut — adds a photo to this
-                        item without first expanding the card. Same
-                        uploadPhoto handler used by the expanded Camera
-                        button. capture="environment" launches rear
-                        camera on mobile so inspector with phone in
-                        attic can shoot in one tap. */}
-                    <label class="flex items-center gap-1 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition" title="Add photo to this item">
+                  {/* Round 39 — formerly the whole row had stopPropagation,
+                      so '0 photos / 0 notes' looked clickable but actually
+                      ate the click instead of expanding the card. Now only
+                      the camera <label> stops propagation (its hidden file
+                      <input> still opens the picker via native click); the
+                      rest of the row falls through to the parent's expand
+                      handler, and a chevron hints the card is expandable. */}
+                  <div class="flex items-center gap-3 text-[10px] font-mono" style="color: #b0aaa3">
+                    <label
+                      x-on:click="$event.stopPropagation()"
+                      class="flex items-center gap-1 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition"
+                      title="Add photo to this item">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       <span x-text="getPhotoCount(item.id) + ' photos'"></span>
                       <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="uploadPhoto(item.id, $event)" />
                     </label>
                     <span x-text="getItemNotes(item.id) ? '1 note' : '0 notes'"></span>
+                    <svg class="w-3 h-3 ml-auto opacity-40 transition-transform"
+                         x-bind:class="expanded[item.id] ? 'rotate-180' : ''"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
                   </div>
 
                   {/* Expanded Detail (desktop) */}

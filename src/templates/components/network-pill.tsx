@@ -7,6 +7,7 @@ export const NetworkPill = () => (
     <div
         x-data="networkPill"
         x-cloak
+        x-show="!suppressed"
         class="fixed top-4 right-4 z-40"
     >
         <button

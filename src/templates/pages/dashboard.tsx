@@ -497,11 +497,20 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </div>
                             </div>
 
-                            <div class="pt-4 flex gap-4">
-                                <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all">
+                            {/* Round 39 — match Publish Report modal canonical
+                                button row: h-10 / px-4 / rounded-xl / text-sm
+                                font-semibold / normal-case. Cancel = white +
+                                border (secondary), Create = indigo solid
+                                (primary). Removes legacy py-4.5 + text-[10px]
+                                tracking-[0.2em] + font-black. */}
+                            <div class="pt-4 flex gap-3">
+                                <button type="button" onclick="closeModal()"
+                                    class="flex-1 h-10 px-4 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+                                    style="border-color: #e2e8f0">
                                     Cancel
                                 </button>
-                                <button type="button" onclick="submitInspection()" id="submitInsBtn" class="premium-button flex-[2] py-4.5 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-900 transition-all active:scale-95">
+                                <button type="button" onclick="submitInspection()" id="submitInsBtn"
+                                    class="flex-[2] h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-all active:scale-95">
                                     Create Inspection
                                 </button>
                             </div>
