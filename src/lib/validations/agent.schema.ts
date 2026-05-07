@@ -26,7 +26,10 @@ export const AgentReportsResponseSchema = createApiResponseSchema(
  */
 export const LeaderboardEntrySchema = z.object({
     agentId: z.string().uuid().nullable(),
-    total: z.number().openapi({ example: 42 }),
+    name:    z.string().nullable().optional(),
+    agency:  z.string().nullable().optional(),
+    email:   z.string().nullable().optional(),
+    total:   z.number().openapi({ example: 42 }),
 }).openapi('LeaderboardEntry');
 
 export const LeaderboardResponseSchema = createApiResponseSchema(

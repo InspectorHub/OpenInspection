@@ -76,6 +76,22 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                             </div>
                         </div>
 
+                        {/* Spec 5G — Leaderboard card (closes Round 27 audit
+                            orphan). Shows top 10 agents by referral count.
+                            Renders even when this user has no referrals — useful
+                            social context. */}
+                        <div class="mt-6 glass-panel rounded-2xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-bold text-slate-900">Office Leaderboard</h3>
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Top 10 by referrals</span>
+                            </div>
+                            <table class="min-w-full">
+                                <tbody id="leaderboardList">
+                                    <tr><td colspan={4} class="py-12 text-center text-xs text-slate-400 italic">Loading leaderboard…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
                         {/* Empty State Template (handled by JS) */}
                         <div id="emptyState" class="hidden py-40 text-center">
                             <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-slate-100 shadow-inner">

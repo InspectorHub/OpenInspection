@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, sql } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { inspections } from '../lib/db/schema/inspection';
+import { contacts } from '../lib/db/schema/contact';
 import { HonoConfig } from '../types/hono';
 import { 
     AgentReportsQuerySchema, 
@@ -94,27 +95,33 @@ const getLeaderboardRoute = createRoute({
 });
 
 agentRoutes.openapi(getLeaderboardRoute, async (c) => {
-    await requireRole(['admin', 'inspector', 'office_staff'])(c, async () => {});
+    await requireRole(['owner', 'admin', 'inspector', 'agent'])(c, async () => {});
 
     const tenantId = c.get('tenantId');
     const db = drizzle(c.env.DB);
 
+    // JOIN contacts to surface agent name + agency in one query (Round 28
+    // — UI was an orphan; now leaderboard card needs displayable rows).
     const rows = await db
         .select({
             agentId: inspections.referredByAgentId,
-            total: sql<number>`count(*)`,
+            name:    contacts.name,
+            agency:  contacts.agency,
+            email:   contacts.email,
+            total:   sql<number>`count(*)`,
         })
         .from(inspections)
+        .leftJoin(contacts, eq(inspections.referredByAgentId, contacts.id))
         .where(eq(inspections.tenantId, tenantId))
-        .groupBy(inspections.referredByAgentId)
+        .groupBy(inspections.referredByAgentId, contacts.name, contacts.agency, contacts.email)
         .orderBy(sql`count(*) DESC`);
 
     // Exclude rows where agentId is null (un-referred inspections)
     const leaderboard = rows.filter((r) => r.agentId !== null);
 
-    return c.json({ 
-        success: true, 
-        data: { leaderboard } 
+    return c.json({
+        success: true,
+        data: { leaderboard }
     }, 200);
 });
 
