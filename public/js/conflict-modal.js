@@ -11,8 +11,21 @@ function conflictModalFactory() {
 
         async init() {
             await openDb();
+            // Round 37 — defensive filter + one-shot cleanup of stale empty
+            // conflict rows. A row with no base/ours/theirs content is not a
+            // real merge conflict (it pops an empty 3-column modal that the
+            // user can't act on). Seen in the wild on /templates page load.
+            const isEmpty = (c) => !((c?.base ?? '').toString().trim() ||
+                                     (c?.ours ?? '').toString().trim() ||
+                                     (c?.theirs ?? '').toString().trim());
+            try {
+                const all = await db.conflicts.toArray();
+                for (const c of all) if (isEmpty(c)) await db.conflicts.delete(c.id);
+            } catch (_) { /* idb open race — refresh below will retry */ }
+
             const refresh = async () => {
-                this.conflicts = await db.conflicts.orderBy('createdAt').toArray();
+                const all = await db.conflicts.orderBy('createdAt').toArray();
+                this.conflicts = all.filter((c) => !isEmpty(c));
                 this.open = this.conflicts.length > 0;
                 if (this.index >= this.conflicts.length) this.index = 0;
             };
