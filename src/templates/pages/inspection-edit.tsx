@@ -138,13 +138,15 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 {/* Rating Buttons — `data-rating-row` is the anchor target the
                     onboarding overlay (T6 / step 0) highlights so the user
                     knows which buttons the tour is talking about. */}
+                {/* Spec 5G mobile field-flow (Round 12) — 44px+ tap target on
+                    mobile per Apple HIG; desktop keeps compact 28px height. */}
                 <div data-rating-row class="flex flex-wrap gap-1.5 mb-3">
                   <template x-for="level in ratingLevels" x-bind:key="level.id">
                     <button
                       x-on:click="setRating(item.id, level.id)"
                       x-bind:title="level.description ? level.label + ' — ' + level.description : level.label"
                       x-bind:aria-label="level.label"
-                      class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all"
+                      class="px-4 py-2.5 min-h-[44px] lg:min-h-0 lg:px-3 lg:py-1.5 text-sm lg:text-xs font-semibold rounded-lg border transition-all"
                       x-bind:class="getItemRating(item.id) === level.id ? 'text-white border-transparent' : 'text-gray-400 hover:text-gray-600'"
                       x-bind:style="getItemRating(item.id) === level.id ? 'background:' + level.color + ';border-color:transparent' : 'border-color: #e8e4dd'"
                       x-text="level.abbreviation"
@@ -248,12 +250,14 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </section>
 
           {/* Bottom Bar */}
-          <div class="fixed bottom-0 left-0 right-0 z-40 px-4 py-3 flex gap-3" style="background: rgba(255,253,250,0.90); backdrop-filter: blur(16px); border-top: 1px solid rgba(232,228,221,0.5);">
-            <button x-on:click="previewReport()" class="flex-1 py-3 text-sm font-semibold rounded-xl border" style="border-color: #e8e4dd; color: #46423c">Preview</button>
+          {/* Spec 5G mobile field-flow (Round 12) — pad-bottom honors iOS
+              safe-area (home indicator) so Publish never sits under it. */}
+          <div class="fixed bottom-0 left-0 right-0 z-40 px-4 pt-3 flex gap-3" style="background: rgba(255,253,250,0.90); backdrop-filter: blur(16px); border-top: 1px solid rgba(232,228,221,0.5); padding-bottom: max(12px, env(safe-area-inset-bottom));">
+            <button x-on:click="previewReport()" class="flex-1 min-h-[44px] py-3 text-sm font-semibold rounded-xl border" style="border-color: #e8e4dd; color: #46423c">Preview</button>
             <button
               x-on:click="showPublishModal = true"
               x-bind:disabled="completionPercent < 100"
-              class="flex-1 py-3 text-sm font-bold rounded-xl text-white disabled:opacity-40"
+              class="flex-1 min-h-[44px] py-3 text-sm font-bold rounded-xl text-white disabled:opacity-40"
               style="background: #4f46e5"
             >Publish</button>
           </div>
