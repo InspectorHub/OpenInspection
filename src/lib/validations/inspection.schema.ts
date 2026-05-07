@@ -44,6 +44,15 @@ export const CreateInspectionSchema = z.object({
     referredByAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }),
     // R7-09: Buyer's Agent — separate from listing agent. Maps to inspections.sellingAgentId column.
     sellingAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440004' }),
+    // Spec 5D — geocoded address fields (set when client picked from Places autocomplete).
+    addressPlaceId: z.string().min(1).max(200).optional().nullable(),
+    addressStreet:  z.string().max(200).optional().nullable(),
+    addressCity:    z.string().max(100).optional().nullable(),
+    addressState:   z.string().max(10).optional().nullable(),
+    addressZip:     z.string().max(20).optional().nullable(),
+    addressCounty:  z.string().max(100).optional().nullable(),
+    addressLat:     z.number().min(-90).max(90).optional().nullable(),
+    addressLng:     z.number().min(-180).max(180).optional().nullable(),
     serviceIds:     z.array(z.string()).optional(),
     discountCodeId: z.string().nullable().optional(),
     discountAmount: z.number().int().nullable().optional(),

@@ -340,10 +340,22 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                <div class="space-y-2 md:col-span-2">
+                                <div class="space-y-2 md:col-span-2 relative">
                                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Property Address</label>
-                                    <input type="text" id="propAddress" placeholder="e.g., 742 Evergreen Terrace, Springfield"
+                                    <input type="text" id="propAddress" placeholder="Start typing — autocomplete via Google" autocomplete="off" data-places-autocomplete
                                         class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                    {/* Spec 5D — Google Places autocomplete dropdown.
+                                        Hidden until at least 2 chars typed. Falls back to
+                                        plain text input when GOOGLE_PLACES_API_KEY absent. */}
+                                    <div id="propAddressDropdown" class="hidden absolute left-0 right-0 top-full z-50 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-72 overflow-y-auto"></div>
+                                    <input type="hidden" id="propPlaceId" />
+                                    <input type="hidden" id="propAddrStreet" />
+                                    <input type="hidden" id="propAddrCity" />
+                                    <input type="hidden" id="propAddrState" />
+                                    <input type="hidden" id="propAddrZip" />
+                                    <input type="hidden" id="propAddrCounty" />
+                                    <input type="hidden" id="propLat" />
+                                    <input type="hidden" id="propLng" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Template</label>

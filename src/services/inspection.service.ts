@@ -210,6 +210,16 @@ export class InspectionService {
             date,
             referredByAgentId: (data.referredByAgentId as string | null) || null,
             sellingAgentId: (data.sellingAgentId as string | null) || null,
+            // Spec 5D — geocoded fields, all optional (legacy free-text addresses ok)
+            addressPlaceId:    (data.addressPlaceId as string | null) || null,
+            addressStreet:     (data.addressStreet as string | null) || null,
+            addressCity:       (data.addressCity as string | null) || null,
+            addressState:      (data.addressState as string | null) || null,
+            addressZip:        (data.addressZip as string | null) || null,
+            addressCounty:     (data.addressCounty as string | null) || null,
+            addressLat:        (data.addressLat as number | null) ?? null,
+            addressLng:        (data.addressLng as number | null) ?? null,
+            addressGeocodedAt: data.addressPlaceId ? Date.now() : null,
             createdAt
         };
 
