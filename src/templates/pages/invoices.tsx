@@ -5,7 +5,7 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Invoices`} branding={branding}>
-            <div class="space-y-10 animate-fade-in">
+            <div class="space-y-6 animate-fade-in">
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
                         <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-bold text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Invoices</span>
@@ -22,19 +22,19 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Total</p>
-                        <p id="statTotal" class="text-3xl font-black text-slate-900">—</p>
+                        <p id="statTotal" class="text-xl font-bold text-slate-900">—</p>
                     </div>
                     <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Unpaid</p>
-                        <p id="statUnpaid" class="text-3xl font-black text-amber-600">—</p>
+                        <p id="statUnpaid" class="text-xl font-bold text-amber-600">—</p>
                     </div>
                     <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Paid</p>
-                        <p id="statPaid" class="text-3xl font-black text-emerald-600">—</p>
+                        <p id="statPaid" class="text-xl font-bold text-emerald-600">—</p>
                     </div>
                     <div class="glass-panel rounded-lg p-6">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Revenue</p>
-                        <p id="statRevenue" class="text-3xl font-black text-indigo-600">—</p>
+                        <p id="statRevenue" class="text-xl font-bold text-indigo-600">—</p>
                     </div>
                 </div>
 

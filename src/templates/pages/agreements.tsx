@@ -59,11 +59,11 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                 </button>
                             </div>
                             <div class="mb-6">
-                                <h3 id="modalAgreementTitle" class="text-3xl font-black text-slate-900 mb-3 tracking-tight leading-tight">Create Professional Agreement</h3>
+                                <h3 id="modalAgreementTitle" class="text-xl font-bold text-slate-900 mb-3 tracking-tight leading-tight">Create Professional Agreement</h3>
                                 <p class="text-lg text-slate-400 font-medium">Draft a new service agreement or liability waiver.</p>
                             </div>
                             <input type="hidden" id="editAgreementId" />
-                            <div class="space-y-8">
+                            <div class="space-y-4">
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Agreement Name</label>
                                     <input type="text" id="agreementName" placeholder="e.g., Standard Home Inspection Version 2.0"

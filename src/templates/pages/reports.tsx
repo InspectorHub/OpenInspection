@@ -5,7 +5,7 @@ export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Reports`} branding={branding}>
-            <div class="space-y-10 animate-fade-in">
+            <div class="space-y-6 animate-fade-in">
                 <div class="flex flex-col gap-3">
                     <span class="self-start px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-[0.2em]">Reports</span>
                     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">

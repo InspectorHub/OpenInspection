@@ -9,9 +9,9 @@ interface Props { branding?: BrandingConfig; }
  */
 export const SettingsSecurityPage = ({ branding }: Props): JSX.Element => (
     <MainLayout title="Security & 2FA" {...(branding ? { branding } : {})}>
-        <div x-data="settingsSecurity" x-init="init()" class="space-y-10 max-w-3xl">
+        <div x-data="settingsSecurity" x-init="init()" class="space-y-6 max-w-3xl">
             <header>
-                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Security &amp; 2FA</h1>
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight">Security &amp; 2FA</h1>
                 <p class="text-sm text-slate-500 mt-1">Add a second login factor with an authenticator app like 1Password, Authy, or Google Authenticator.</p>
             </header>
 

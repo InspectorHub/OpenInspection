@@ -51,7 +51,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                     </tr>
                                 </thead>
                                 <tbody id="membersList" class="divide-y divide-slate-100/50">
-                                    <tr><td colspan={3} class="px-10 py-16 text-sm font-bold text-center text-slate-300 uppercase tracking-[0.2em]">Loading...</td></tr>
+                                    <tr><td colspan={3} class="px-10 py-10 text-sm font-bold text-center text-slate-300 uppercase tracking-[0.2em]">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -91,11 +91,11 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                 <div class="w-16 h-16 bg-indigo-600/10 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                                 </div>
-                                <h3 class="text-4xl font-black text-slate-900 tracking-tight mb-3 leading-none">Invite Team Member</h3>
+                                <h3 class="text-2xl font-bold text-slate-900 tracking-tight mb-3 leading-none">Invite Team Member</h3>
                                 <p class="text-base text-slate-500 font-semibold tracking-tight">Send an invitation to join your workspace.</p>
                             </div>
 
-                            <form id="inviteForm" class="space-y-8">
+                            <form id="inviteForm" class="space-y-4">
                                 <div class="space-y-3">
                                     <label for="inviteEmail" class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Email Address</label>
                                     <div class="relative group">

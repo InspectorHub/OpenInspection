@@ -8,13 +8,13 @@ export const SettingsServicesPage = ({ branding }: Props): JSX.Element => (
         <div x-data="settingsServices" x-init="init()" class="space-y-12">
             <header class="flex items-start justify-between flex-wrap gap-4">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Service Catalog</h1>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Service Catalog</h1>
                     <p class="text-sm text-slate-500 mt-1">Define the services you offer (e.g. Standard Inspection, Pre-Listing) and their prices.</p>
                 </div>
                 <button x-on:click="openCreateService()" class="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black">+ Add service</button>
             </header>
 
-            <div x-show="services.length === 0 && !loading" class="text-center py-16 bg-slate-50 rounded-2xl">
+            <div x-show="services.length === 0 && !loading" class="text-center py-10 bg-slate-50 rounded-2xl">
                 <p class="text-slate-500 font-semibold">No services yet.</p>
                 <p class="text-slate-400 text-sm mt-2">Click "Add service" to define your first service.</p>
             </div>

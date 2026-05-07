@@ -106,7 +106,7 @@ export function renderProfessionalReport(data: {
     >
         <div class="bg-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] rounded-xl overflow-hidden border border-white relative">
             {/* Header / Cover Tier */}
-            <div class="bg-slate-900 px-12 py-20 relative overflow-hidden">
+            <div class="bg-slate-900 px-12 py-12 relative overflow-hidden">
                 <div class="absolute top-0 right-0 w-[400px] h-full bg-gradient-to-l from-indigo-500/20 to-transparent skew-x-[-20deg] translate-x-32"></div>
                 
                 <div class="relative z-10 flex flex-col md:flex-row justify-between items-end gap-6">
@@ -122,13 +122,13 @@ export function renderProfessionalReport(data: {
                             Per handoff README, font-black is retained ONLY on Report Cover H1
                             + stat numbers; the size moved from text-7xl (72px) → text-4xl
                             (36px), still hero-scale but no longer Spectora-mockingly oversized. */}
-                        <h1 class="text-3xl md:text-4xl font-black tracking-tight text-white leading-[1.1]">{inspection.propertyAddress}</h1>
+                        <h1 class="text-3xl md:text-2xl font-bold tracking-tight text-white leading-[1.1]">{inspection.propertyAddress}</h1>
                         <p class="mt-8 text-xl text-slate-400 font-medium tracking-tight">Home Inspection Report</p>
                     </div>
                     
                     <div class="flex flex-col items-start md:items-end gap-2 border-l-2 md:border-l-0 md:border-r-2 border-indigo-500/40 pl-8 md:pl-0 md:pr-8 py-2">
                         <span class="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400">Inspection Date</span>
-                        <span class="text-3xl font-black text-white tabular-nums tracking-tight">
+                        <span class="text-xl font-bold text-white tabular-nums tracking-tight">
                             {new Date(inspection.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase()}
                         </span>
                     </div>
@@ -156,7 +156,7 @@ export function renderProfessionalReport(data: {
             </template>
 
             {/* Technical Overview Tier */}
-            <div class="px-12 py-16 grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-50/30 relative">
+            <div class="px-12 py-10 grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-50/30 relative">
                 <div class="md:col-span-1">
                     <div class="flex items-center gap-2 mb-8">
                         <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
@@ -195,7 +195,7 @@ export function renderProfessionalReport(data: {
                            <div class="w-1.5 h-6 bg-slate-900 rounded-full"></div>
                            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Client</h3>
                        </div>
-                       <p class="text-3xl font-black tracking-tight text-slate-900">{inspection.clientName || 'Private Client'}</p>
+                       <p class="text-xl font-bold tracking-tight text-slate-900">{inspection.clientName || 'Private Client'}</p>
                        <p class="mt-2 text-lg text-indigo-600 font-bold uppercase tracking-tight">{inspection.clientEmail || 'REDACTED'}</p>
                        <div class="mt-6 pt-6 border-t border-slate-100 flex gap-4">
                            <div class="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-500">Standard Inspection</div>
@@ -206,7 +206,7 @@ export function renderProfessionalReport(data: {
                            <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
                            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Inspector</h3>
                        </div>
-                       <p class="text-3xl font-black tracking-tight text-slate-900">{branding?.siteName || siteName}</p>
+                       <p class="text-xl font-bold tracking-tight text-slate-900">{branding?.siteName || siteName}</p>
                        <p class="mt-2 text-lg text-slate-500 font-medium">Report #{inspection.id.substring(0, 8).toUpperCase()}</p>
                        <div class="mt-6 flex items-center gap-3">
                            <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
@@ -228,7 +228,7 @@ export function renderProfessionalReport(data: {
                             <span class="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-300">Section {schema.sections.indexOf(section) + 1}</span>
                         </div>
 
-                        <div class="space-y-10">
+                        <div class="space-y-6">
                             {section.items.map((item: SchemaItem) => {
                                 const res: ResultItem = resultData[item.id] || {};
                                 const bucketConfigs: Record<string, { bg: string, text: string, dot: string }> = {
@@ -246,7 +246,7 @@ export function renderProfessionalReport(data: {
                                     <div class="flex flex-col lg:flex-row gap-16 avoid-break group" key={item.id}>
                                         <div class="flex-grow">
                                             <div class="flex justify-between items-start gap-4 mb-6">
-                                                <h3 class="text-3xl font-black tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
+                                                <h3 class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
                                                 <div class={`${conf.bg} ${conf.text} px-4 py-2 rounded-2xl flex items-center gap-3 border border-current/10 shadow-sm`}>
                                                     <div class={`w-2 h-2 rounded-full ${conf.dot} shadow-sm animate-pulse`}></div>
                                                     <span class="text-[10px] font-bold uppercase tracking-[0.2em]">{displayLabel}</span>
@@ -284,7 +284,7 @@ export function renderProfessionalReport(data: {
                     <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-white">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                     </div>
-                    <h2 class="text-4xl font-black tracking-tight text-white mb-6">Report Complete</h2>
+                    <h2 class="text-2xl font-bold tracking-tight text-white mb-6">Report Complete</h2>
                     <p class="text-indigo-200/60 text-lg font-medium mb-6 uppercase tracking-[0.2em] leading-relaxed">This report documents the condition of the property at the time of inspection.</p>
                     
                     <div class="flex flex-col sm:flex-row justify-center gap-6">

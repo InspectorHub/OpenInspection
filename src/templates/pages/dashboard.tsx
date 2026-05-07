@@ -54,7 +54,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </div>
                                 <span class="sr-only">Live</span>
                             </div>
-                            <h3 class="text-4xl font-black text-slate-900 tracking-tight mb-1" id={stat.id}>0</h3>
+                            <h3 class="text-2xl font-bold text-slate-900 tracking-tight mb-1" id={stat.id}>0</h3>
                             <p class="text-sm font-bold text-slate-500 uppercase tracking-tight">{stat.label}</p>
                         </button>
                     ))}
@@ -64,15 +64,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 <div x-data="dashboardEarnings()" x-init="loadEarnings()" x-show="earnings.paid > 0 || earnings.pending > 0" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" style="display: none;">
                     <div>
                         <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paid this period</div>
-                        <div class="mt-1 text-3xl font-black text-emerald-600" x-text="formatCurrency(earnings.paid)"></div>
+                        <div class="mt-1 text-xl font-bold text-emerald-600" x-text="formatCurrency(earnings.paid)"></div>
                     </div>
                     <div>
                         <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pending</div>
-                        <div class="mt-1 text-3xl font-black text-amber-600" x-text="formatCurrency(earnings.pending)"></div>
+                        <div class="mt-1 text-xl font-bold text-amber-600" x-text="formatCurrency(earnings.pending)"></div>
                     </div>
                     <div>
                         <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paid invoices</div>
-                        <div class="mt-1 text-3xl font-black text-slate-900" x-text="earnings.count"></div>
+                        <div class="mt-1 text-xl font-bold text-slate-900" x-text="earnings.count"></div>
                     </div>
                 </div>
 
@@ -86,7 +86,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
 
                     {/* Loading spinner */}
-                    <div x-show="loading" class="flex items-center justify-center py-16">
+                    <div x-show="loading" class="flex items-center justify-center py-10">
                         <div class="relative w-12 h-12">
                             <div class="absolute inset-0 border-4 border-indigo-50 rounded-full"></div>
                             <div class="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
@@ -308,7 +308,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Empty state */}
-                    <div x-show="!loading && allBucketsEmpty" {...{ 'x-cloak': true }} class="text-center py-16 text-slate-400">
+                    <div x-show="!loading && allBucketsEmpty" {...{ 'x-cloak': true }} class="text-center py-10 text-slate-400">
                         <div class="w-20 h-20 rounded-lg bg-indigo-50 flex items-center justify-center mx-auto mb-4">
                             <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                         </div>
@@ -335,7 +335,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="w-14 h-14 bg-emerald-600/10 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
                                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                                 </div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tight mb-2 leading-none">New Inspection</h3>
+                                <h3 class="text-xl font-bold text-slate-900 tracking-tight mb-2 leading-none">New Inspection</h3>
                                 <p class="text-sm text-slate-500 font-semibold tracking-tight">Enter the details for this inspection.</p>
                             </div>
 

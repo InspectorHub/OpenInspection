@@ -23,7 +23,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                 {...(isEmbed ? { style: `--widget-brand:${brandColor}` } : {})}
                 class={isEmbed
                     ? 'oi-widget-embed relative min-h-screen py-8 px-4 font-sans'
-                    : 'relative min-h-screen py-20 px-6 lg:px-8 font-sans overflow-hidden'}
+                    : 'relative min-h-screen py-12 px-6 lg:px-8 font-sans overflow-hidden'}
             >
                 {!isEmbed && <AtmosphericBg />}
 
@@ -51,7 +51,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
 
                         <form id="bookingForm" class="space-y-12">
                             {/* Property Details */}
-                            <div class="space-y-8">
+                            <div class="space-y-4">
                                 <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase I: Property Parameters</h3>
                                 <div class="grid grid-cols-1 gap-4">
                                     <div class="space-y-3">
@@ -66,7 +66,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                             </div>
 
                             {/* Client Details */}
-                            <div class="space-y-8">
+                            <div class="space-y-4">
                                 <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase II: Client Information</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="space-y-3">
@@ -89,7 +89,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                             </div>
 
                             {/* Scheduling */}
-                            <div class="space-y-8">
+                            <div class="space-y-4">
                                 <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase III: Scheduling</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="space-y-3">
@@ -124,7 +124,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                             </button>
                         </form>
 
-                        <div id="message" class="mt-12 p-6 rounded-2xl text-center font-black text-sm uppercase tracking-widest hidden animate-fade-in"></div>
+                        <div id="message" class="mt-12 p-4 rounded-lg text-center font-black text-sm uppercase tracking-widest hidden animate-fade-in"></div>
                     </div>
                 </div>
 

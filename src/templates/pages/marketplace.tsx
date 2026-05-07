@@ -5,7 +5,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Marketplace`} branding={branding}>
-            <div class="space-y-8 animate-fade-in" x-data="marketplace()">
+            <div class="space-y-4 animate-fade-in" x-data="marketplace()">
                 {/* Header */}
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
@@ -90,10 +90,10 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                         </div>
                     </template>
                     <template x-if="templates.length === 0 && !loading">
-                        <div class="col-span-3 py-16 text-center text-slate-400 font-semibold">No templates found. Try a different search or category.</div>
+                        <div class="col-span-3 py-10 text-center text-slate-400 font-semibold">No templates found. Try a different search or category.</div>
                     </template>
                     <template x-if="loading">
-                        <div class="col-span-3 py-16 text-center text-slate-400 font-semibold">Loading...</div>
+                        <div class="col-span-3 py-10 text-center text-slate-400 font-semibold">Loading...</div>
                     </template>
                 </div>
 

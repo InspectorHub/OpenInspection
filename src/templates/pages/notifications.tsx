@@ -7,7 +7,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Notifications`} {...(branding ? { branding } : {})}>
-            <div class="space-y-8 animate-fade-in" x-data="notificationsApp()" x-init="load()">
+            <div class="space-y-4 animate-fade-in" x-data="notificationsApp()" x-init="load()">
                 <div class="flex items-end justify-between flex-wrap gap-4">
                     <div>
                         <span class="px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em]">Inbox</span>

@@ -71,7 +71,7 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                         {/* Title bar */}
                         <div class="px-10 py-8 border-b border-slate-100">
                             <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600 mb-2">Document for Signature</p>
-                            <h1 class="text-3xl font-black text-slate-900 tracking-tight">{agreementName}</h1>
+                            <h1 class="text-xl font-bold text-slate-900 tracking-tight">{agreementName}</h1>
                             {clientName && <p class="text-slate-500 font-semibold mt-1">Hi, {clientName}</p>}
                         </div>
 

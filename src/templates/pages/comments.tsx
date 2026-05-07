@@ -5,10 +5,10 @@ interface Props { branding?: BrandingConfig; }
 
 export const CommentsPage = ({ branding }: Props): JSX.Element => (
     <MainLayout title="Comments Library" branding={branding}>
-        <div x-data="commentsAdmin" x-init="init()" class="space-y-8">
+        <div x-data="commentsAdmin" x-init="init()" class="space-y-4">
             <header class="flex items-start justify-between flex-wrap gap-4">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Comments Library</h1>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Comments Library</h1>
                     <p class="text-sm text-slate-500 mt-1">Pre-written comment snippets. Inspectors attach these to inspection items during field work.</p>
                 </div>
                 <button x-on:click="openCreate()" class="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black">+ Add comment</button>
@@ -23,7 +23,7 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                 </select>
             </div>
 
-            <div x-show="items.length === 0 && !loading" class="text-center py-20 bg-slate-50 rounded-2xl">
+            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 rounded-2xl">
                 <p class="text-slate-500 font-semibold">No comments yet.</p>
                 <p class="text-slate-400 text-sm mt-2">Click "+ Add comment" above to create your first comment snippet.</p>
             </div>

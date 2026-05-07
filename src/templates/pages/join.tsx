@@ -18,11 +18,11 @@ export const JoinPage = ({ token, branding }: { token?: string, branding?: Brand
                             <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl shadow-md mb-6 group hover:rotate-6 transition-transform">
                                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                             </div>
-                            <h1 class="text-4xl font-black tracking-tight text-slate-900 mb-2">Join Team</h1>
+                            <h1 class="text-2xl font-bold tracking-tight text-slate-900 mb-2">Join Team</h1>
                             <p class="text-slate-400 font-medium leading-relaxed">You've been invited to collaborate on <span class="text-indigo-600 font-bold">{siteName}</span>.</p>
                         </div>
                         
-                        <form id="joinForm" class="space-y-8">
+                        <form id="joinForm" class="space-y-4">
                             <input type="hidden" id="token" name="token" value={token || ''} />
                             
                             <div class="space-y-2">

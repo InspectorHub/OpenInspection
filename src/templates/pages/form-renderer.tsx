@@ -59,7 +59,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     <TemplateDriftBanner />
 
                     {/* Inspection Architecture Loop */}
-                    <div class="space-y-8 animate-slide-in">
+                    <div class="space-y-4 animate-slide-in">
                         <template x-for="section in templateSchema.sections" x-bind:key="section.id">
                             <div class="glass-panel rounded-xl overflow-hidden shadow-md/10 border-white/40 transition-all duration-500"
                                 x-bind:class="openSections.includes(section.id) ? 'ring-2 ring-indigo-500/10' : ''">
@@ -242,7 +242,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <div class="w-20 h-20 bg-emerald-500 rounded-lg flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-emerald-200 group hover:rotate-6 transition-transform">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
-                                <h3 class="text-3xl font-black tracking-tight text-slate-900 mb-3">Inspection Complete</h3>
+                                <h3 class="text-xl font-bold tracking-tight text-slate-900 mb-3">Inspection Complete</h3>
                                 <p class="text-lg text-slate-500 font-medium max-w-md mx-auto">The inspection has been finalized and the report is ready for download.</p>
                             </div>
                             <a
@@ -271,7 +271,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             {/* Modal High-End Header */}
                             <div class="px-12 py-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
                                 <div>
-                                    <h3 class="text-3xl font-black tracking-tight text-slate-900">Annotation Studio</h3>
+                                    <h3 class="text-xl font-bold tracking-tight text-slate-900">Annotation Studio</h3>
                                     <p class="text-sm text-slate-400 font-medium">Precision markup engine for evidence clarification</p>
                                 </div>
                                 <button x-on:click="showAnnotationModal = false" class="w-12 h-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all active:scale-95">
@@ -296,7 +296,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             </div>
 
                             {/* Control Surface */}
-                            <div class="px-12 py-10 bg-white space-y-8">
+                            <div class="px-12 py-10 bg-white space-y-4">
                                 <div class="flex items-center justify-between">
                                     <div class="flex gap-4">
                                         <button

@@ -229,7 +229,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                         </div>
                                     </template>
 
-                                    <div x-show="!selectedSection.items.length" class="text-center py-20 animate-fade-in">
+                                    <div x-show="!selectedSection.items.length" class="text-center py-12 animate-fade-in">
                                         <div class="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mx-auto mb-4">
                                             <svg class="w-8 h-8 text-ink-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                         </div>

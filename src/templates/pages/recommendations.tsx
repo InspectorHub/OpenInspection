@@ -5,10 +5,10 @@ interface Props { branding?: BrandingConfig; }
 
 export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
     <MainLayout title="Recommendations Library" branding={branding}>
-        <div x-data="recommendationsLibrary" x-init="init()" class="space-y-8">
+        <div x-data="recommendationsLibrary" x-init="init()" class="space-y-4">
             <header class="flex items-start justify-between flex-wrap gap-4">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Recommendations Library</h1>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Recommendations Library</h1>
                     <p class="text-sm text-slate-500 mt-1">Pre-written repair recommendations with estimate ranges. Inspectors attach these to inspection items by clicking chips.</p>
                 </div>
                 <div class="flex gap-3">
@@ -32,7 +32,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                 </select>
             </div>
 
-            <div x-show="items.length === 0 && !loading" class="text-center py-20 bg-slate-50 rounded-2xl">
+            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 rounded-2xl">
                 <p class="text-slate-500 font-semibold">No recommendations yet.</p>
                 <p class="text-slate-400 text-sm mt-2">Click "Seed defaults" above to load 80 starter entries, or add your own.</p>
             </div>

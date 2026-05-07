@@ -59,10 +59,10 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </button>
                             </div>
                             <div class="mb-6">
-                                <h3 class="text-3xl font-black text-slate-900 mb-3 tracking-tight leading-tight">New Template</h3>
+                                <h3 class="text-xl font-bold text-slate-900 mb-3 tracking-tight leading-tight">New Template</h3>
                                 <p class="text-lg text-slate-400 font-medium">Create an inspection checklist.</p>
                             </div>
-                            <div class="space-y-8">
+                            <div class="space-y-4">
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Template Name</label>
                                     <input type="text" id="tplName" placeholder="e.g., Luxury Residential Standard"

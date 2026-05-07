@@ -23,7 +23,7 @@ export function MetricsPage({ appName, branding }: MetricsPageProps) {
                     </div>
                 </div>
 
-                <div x-show="loading" class="text-sm text-slate-400 text-center py-16">Loading...</div>
+                <div x-show="loading" class="text-sm text-slate-400 text-center py-10">Loading...</div>
 
                 <div x-show="!loading && data">
                     {/* KPI cards */}

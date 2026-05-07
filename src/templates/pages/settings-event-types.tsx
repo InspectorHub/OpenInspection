@@ -5,10 +5,10 @@ interface Props { branding?: BrandingConfig; }
 
 export const SettingsEventTypesPage = ({ branding }: Props): JSX.Element => (
     <MainLayout title="Event Types" branding={branding}>
-        <div x-data="settingsEventTypes" x-init="init()" class="space-y-8">
+        <div x-data="settingsEventTypes" x-init="init()" class="space-y-4">
             <header class="flex items-start justify-between flex-wrap gap-4">
                 <div>
-                    <h1 class="text-3xl font-black text-slate-900 tracking-tight">Event Types</h1>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Event Types</h1>
                     <p class="text-sm text-slate-500 mt-1">Define ancillary inspection events (radon test pickup, sewer scope, follow-up visit, etc.) that can be attached to an inspection.</p>
                 </div>
                 <div class="flex gap-2">
@@ -19,7 +19,7 @@ export const SettingsEventTypesPage = ({ branding }: Props): JSX.Element => (
                 </div>
             </header>
 
-            <div x-show="types.length === 0 && !loading" class="text-center py-16 bg-slate-50 rounded-2xl">
+            <div x-show="types.length === 0 && !loading" class="text-center py-10 bg-slate-50 rounded-2xl">
                 <p class="text-slate-500 font-semibold">No event types yet.</p>
                 <p class="text-slate-400 text-sm mt-2">Click "Seed defaults" to install a starter set, or "Add type" to define your own.</p>
             </div>

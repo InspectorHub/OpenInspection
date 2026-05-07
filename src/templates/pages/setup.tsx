@@ -16,13 +16,13 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                         </div>
                     </div>
-                    <h2 class="text-center text-4xl font-black tracking-tight text-slate-900 leading-tight">Welcome to {siteName}</h2>
+                    <h2 class="text-center text-2xl font-bold tracking-tight text-slate-900 leading-tight">Welcome to {siteName}</h2>
                     <p class="mt-4 text-center text-sm font-semibold text-slate-500 uppercase tracking-widest">First-Time Setup</p>
                 </div>
 
                 <div class="mt-12 sm:mx-auto sm:w-full sm:max-w-[480px] animate-fade-in" style="animation-delay: 0.1s;">
-                    <div class="glass-panel px-10 py-16 rounded-xl">
-                        <form id="setupForm" class="space-y-8">
+                    <div class="glass-panel px-10 py-10 rounded-xl">
+                        <form id="setupForm" class="space-y-4">
                             <div>
                                 <label for="companyName" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Business Name</label>
                                 <div class="relative group">

@@ -5,7 +5,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Contacts`} branding={branding}>
-            <div class="space-y-10 animate-fade-in">
+            <div class="space-y-6 animate-fade-in">
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
                         <span class="inline-flex items-center rounded-lg bg-emerald-600/10 px-3 py-1 text-[10px] font-bold text-emerald-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-emerald-600/20 mb-4">Contacts</span>
@@ -123,15 +123,15 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div x-show="step === 'preview'" class="p-6 space-y-4">
                             <div class="grid grid-cols-3 gap-4 text-center">
                                 <div class="p-4 bg-emerald-50 rounded-lg">
-                                    <div class="text-3xl font-black text-emerald-700" x-text="previewResult?.imported || 0"></div>
+                                    <div class="text-xl font-bold text-emerald-700" x-text="previewResult?.imported || 0"></div>
                                     <div class="text-xs text-emerald-700 mt-1">New contacts</div>
                                 </div>
                                 <div class="p-4 bg-amber-50 rounded-lg">
-                                    <div class="text-3xl font-black text-amber-700" x-text="previewResult?.skipped || 0"></div>
+                                    <div class="text-xl font-bold text-amber-700" x-text="previewResult?.skipped || 0"></div>
                                     <div class="text-xs text-amber-700 mt-1">Duplicates (skipped)</div>
                                 </div>
                                 <div class="p-4 bg-rose-50 rounded-lg">
-                                    <div class="text-3xl font-black text-rose-700" x-text="previewResult?.errors?.length || 0"></div>
+                                    <div class="text-xl font-bold text-rose-700" x-text="previewResult?.errors?.length || 0"></div>
                                     <div class="text-xs text-rose-700 mt-1">Errors</div>
                                 </div>
                             </div>

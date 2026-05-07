@@ -13,7 +13,7 @@ export const NotFoundPage = (props: {
 
     return (
         <BareLayout title={`${siteName} | ${title}`} branding={branding}>
-            <div class="relative min-h-screen flex items-center justify-center py-20 px-6 lg:px-8 font-sans overflow-hidden">
+            <div class="relative min-h-screen flex items-center justify-center py-12 px-6 lg:px-8 font-sans overflow-hidden">
                 <AtmosphericBg />
 
                 <div class="max-w-xl w-full text-center animate-fade-in">
