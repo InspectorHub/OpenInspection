@@ -99,6 +99,20 @@ function inspectionEditor(inspectionId) {
           this.navigateItem(-1);
           return;
         }
+        // P = add photo to active item (triggers global hidden file input)
+        if (e.key === 'p' || e.key === 'P') {
+          if (!this.activeItem) {
+            if (typeof showToast === 'function') showToast('Select an item first to add a photo');
+            e.preventDefault();
+            return;
+          }
+          var photoInput = document.getElementById('hotkey-photo-input');
+          if (photoInput) {
+            e.preventDefault();
+            photoInput.click();
+          }
+          return;
+        }
         var key = e.key.toLowerCase();
         var idx = -1;
         if (key === '1') idx = 0;

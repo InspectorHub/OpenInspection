@@ -33,6 +33,16 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
         class="min-h-screen"
         style="background: #faf9f7; background-image: radial-gradient(circle, #d5d0c8 0.6px, transparent 0.6px); background-size: 20px 20px;"
       >
+        {/* Spec 5G M1.1 — Global hotkey photo input. P key triggers .click()
+            on this hidden input; uploadPhoto reads activeItemId. */}
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          class="hidden"
+          id="hotkey-photo-input"
+          x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }"
+        />
         {/* P2 — AI Suggest Comment popover (shared scope with inspectionEditor) */}
         <div x-cloak x-show="showAiPopover" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div {...{ 'x-on:click.stop': '$event' }}
