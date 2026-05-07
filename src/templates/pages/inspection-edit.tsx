@@ -259,8 +259,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
         {/* ===== Desktop View ===== */}
         <div x-show="isDesktop" class="hidden lg:flex min-h-screen">
-          {/* Left Sidebar */}
-          <aside class="w-[220px] sticky top-0 h-screen flex-shrink-0 flex flex-col border-r overflow-y-auto" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(232,228,221,0.5);">
+          {/* Left Sidebar — hidden in focus mode (⌘2) */}
+          <aside x-show="viewMode !== 'focus'" class="w-[220px] sticky top-0 h-screen flex-shrink-0 flex flex-col border-r overflow-y-auto" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(232,228,221,0.5);">
             <div class="px-5 pt-6 pb-4 border-b" style="border-color: rgba(232,228,221,0.4)">
               <a href="/dashboard" class="flex items-center gap-2 text-xs mb-3 hover:text-blue-600 transition-colors" style="color: #908a83">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
@@ -825,6 +825,68 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     </div>
                 </div>
             </div>
+        </div>
+
+        {/* Spec 5G M2 — Comment Library slide-out (right drawer) */}
+        <div x-cloak x-show="showCommentLibrary" class="fixed inset-0 z-[100]" {...{'x-transition.opacity': ''}}>
+          <div class="absolute inset-0 bg-slate-900/40" x-on:click="showCommentLibrary = false"></div>
+          <aside
+            class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col"
+            {...{
+              'x-transition:enter': 'transition ease-out duration-200 transform',
+              'x-transition:enter-start': 'translate-x-full',
+              'x-transition:enter-end': 'translate-x-0',
+              'x-transition:leave': 'transition ease-in duration-150 transform',
+              'x-transition:leave-start': 'translate-x-0',
+              'x-transition:leave-end': 'translate-x-full',
+            }}
+          >
+            <header class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Comment Library</h2>
+                <p class="text-xs text-slate-500 mt-0.5">
+                  Inserting into <span class="font-semibold" x-text="activeItem?.label || activeItem?.name || ''"></span>
+                </p>
+              </div>
+              <button x-on:click="showCommentLibrary = false" class="text-slate-400 hover:text-slate-700 text-2xl leading-none" aria-label="Close">&times;</button>
+            </header>
+            <div class="px-5 pt-3 flex gap-1 border-b border-slate-100">
+              <button x-on:click="commentLibraryTab = 'comments'"
+                x-bind:class="commentLibraryTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                class="px-3 py-2 text-xs font-semibold border-b-2 transition-colors">Comments</button>
+              <button x-on:click="commentLibraryTab = 'snippets'"
+                x-bind:class="commentLibraryTab === 'snippets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                class="px-3 py-2 text-xs font-semibold border-b-2 transition-colors">Snippets</button>
+            </div>
+            <div class="px-5 py-3 flex flex-wrap gap-1.5 border-b border-slate-100">
+              <template x-for="f in ['all','satisfactory','monitor','defect']" x-bind:key="f">
+                <button x-on:click="commentLibraryFilter = f"
+                  x-bind:class="commentLibraryFilter === f ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                  class="px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide"
+                  x-text="f"></button>
+              </template>
+            </div>
+            <div class="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+              <template x-for="(c, i) in commentLibraryItems" x-bind:key="i">
+                <button
+                  x-on:click="insertComment(c.text)"
+                  class="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                >
+                  <div class="flex items-start gap-2">
+                    <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded text-white shrink-0"
+                      x-bind:style="c.rating === 'satisfactory' ? 'background:#10b981' : (c.rating === 'monitor' ? 'background:#f59e0b' : (c.rating === 'defect' ? 'background:#ef4444' : 'background:#64748b'))"
+                      x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
+                    <span class="text-xs text-slate-700 leading-snug" x-text="c.text"></span>
+                  </div>
+                </button>
+              </template>
+              <p x-show="commentLibraryItems.length === 0" class="text-xs text-slate-400 text-center py-8 italic">No comments match this filter.</p>
+            </div>
+            <footer class="px-5 py-3 border-t border-slate-100 text-[10px] text-slate-400 italic flex items-center justify-between">
+              <span>Press <kbd class="px-1.5 py-0.5 bg-slate-100 border rounded text-[10px]">Esc</kbd> to close</span>
+              <span>Auto-filtered by current rating</span>
+            </footer>
+          </aside>
         </div>
 
         {/* Photo Annotator Modal (T13) */}

@@ -53,6 +53,15 @@ function inspectionEditor(inspectionId) {
     expanded: {},
     activeItemId: null,
     currentSectionIdx: 0,
+    // Spec 5G M1.1 — view modes (⌘1=split, ⌘2=focus, ⌘3=preview)
+    viewMode: 'split',
+    // Spec 5G M2 — Comment Library slide-out
+    showCommentLibrary: false,
+    commentLibraryTab: 'comments', // 'comments' or 'snippets'
+    commentLibraryFilter: 'all',
+    // GS prefix — set true after pressing G; next digit jumps to that section
+    gPrefix: false,
+    gPrefixTimer: null,
     batchMode: false,
     batchSelected: {},
     showMenu: false,
@@ -83,10 +92,88 @@ function inspectionEditor(inspectionId) {
       // Skip when typing in form fields. Operates on the active (last
       // interacted) item, falling back to the first item in current section.
       window.addEventListener('keydown', (e) => {
-        if (e.metaKey || e.ctrlKey || e.altKey) return;
-        var tag = (document.activeElement && document.activeElement.tagName) || '';
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        if (document.activeElement && document.activeElement.isContentEditable) return;
+        var inField = (function () {
+          var t = (document.activeElement && document.activeElement.tagName) || '';
+          if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return true;
+          if (document.activeElement && document.activeElement.isContentEditable) return true;
+          return false;
+        })();
+        var meta = e.metaKey || e.ctrlKey;
+        // Meta-prefixed hotkeys work even when typing in fields
+        if (meta) {
+          // ⌘S = save now
+          if (e.key === 's' || e.key === 'S') {
+            e.preventDefault();
+            this.saveResults();
+            if (typeof showToast === 'function') showToast('Saved');
+            return;
+          }
+          // ⌘⇧P = publish modal
+          if ((e.key === 'p' || e.key === 'P') && e.shiftKey) {
+            e.preventDefault();
+            this.showPublishModal = true;
+            return;
+          }
+          // ⌘1 = split, ⌘2 = focus, ⌘3 = preview
+          if (e.key === '1') { e.preventDefault(); this.setViewMode('split'); return; }
+          if (e.key === '2') { e.preventDefault(); this.setViewMode('focus'); return; }
+          if (e.key === '3') { e.preventDefault(); this.setViewMode('preview'); return; }
+          // ⌘K = command palette (stub for now)
+          if (e.key === 'k' || e.key === 'K') {
+            e.preventDefault();
+            if (typeof showToast === 'function') showToast('Command palette coming soon');
+            return;
+          }
+          return;
+        }
+        if (e.altKey) return;
+        if (inField) {
+          // Esc inside a field still closes Comment Library if open
+          if (e.key === 'Escape' && this.showCommentLibrary) {
+            this.showCommentLibrary = false;
+          }
+          return;
+        }
+        // Esc closes Comment Library
+        if (e.key === 'Escape' && this.showCommentLibrary) {
+          e.preventDefault();
+          this.showCommentLibrary = false;
+          return;
+        }
+        // GS prefix — G then 0-9 jumps to that section
+        if (this.gPrefix && /^[0-9]$/.test(e.key)) {
+          e.preventDefault();
+          this.gPrefix = false;
+          clearTimeout(this.gPrefixTimer);
+          this.gotoSection(parseInt(e.key, 10));
+          return;
+        }
+        if (e.key === 'g' || e.key === 'G') {
+          e.preventDefault();
+          this.gPrefix = true;
+          if (typeof showToast === 'function') showToast('Press 0–9 to jump to section');
+          clearTimeout(this.gPrefixTimer);
+          this.gPrefixTimer = setTimeout(() => { this.gPrefix = false; }, 1500);
+          return;
+        }
+        // / = open Comment Library
+        if (e.key === '/') {
+          e.preventDefault();
+          this.openCommentLibrary('comments');
+          return;
+        }
+        // ; = open Snippets tab
+        if (e.key === ';') {
+          e.preventDefault();
+          this.openCommentLibrary('snippets');
+          return;
+        }
+        // T = tag (stub — no tag schema yet)
+        if (e.key === 't' || e.key === 'T') {
+          e.preventDefault();
+          if (typeof showToast === 'function') showToast('Tags coming soon');
+          return;
+        }
         // Navigation: ArrowUp / ArrowDown move active item up/down,
         // Enter advances to next, Shift+Enter goes to previous.
         if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) {
@@ -385,6 +472,100 @@ function inspectionEditor(inspectionId) {
 
     setActiveItem(itemId) {
       this.activeItemId = itemId;
+    },
+
+    setViewMode(mode) {
+      // 'split' (default desktop), 'focus' (single active card centered),
+      // 'preview' (open the public viewer in a new tab).
+      if (mode === 'preview') {
+        window.open('/inspections/' + this.inspectionId + '/preview', '_blank');
+        return;
+      }
+      this.viewMode = mode;
+      if (typeof showToast === 'function') {
+        showToast(mode === 'focus' ? 'Focus mode' : 'Split view');
+      }
+    },
+
+    gotoSection(idx) {
+      if (idx < 0 || idx >= this.sections.length) {
+        if (typeof showToast === 'function') showToast('No section ' + idx);
+        return;
+      }
+      this.currentSectionIdx = idx;
+      var items = this.currentSectionItems || [];
+      if (items.length) this.activeItemId = items[0].id;
+      var sec = this.sections[idx];
+      if (typeof showToast === 'function') showToast('Section: ' + (sec.title || sec.name || ('#' + idx)));
+    },
+
+    openCommentLibrary(tab) {
+      if (!this.activeItem) {
+        if (typeof showToast === 'function') showToast('Select an item first');
+        return;
+      }
+      this.commentLibraryTab = tab || 'comments';
+      // Auto-filter by current item rating if any
+      var r = this.results[this.activeItemId]?.rating;
+      if (r) {
+        for (var i = 0; i < this.ratingLevels.length; i++) {
+          if (this.ratingLevels[i].id === r) {
+            var name = (this.ratingLevels[i].name || '').toLowerCase();
+            if (name.indexOf('sat') >= 0) { this.commentLibraryFilter = 'satisfactory'; break; }
+            if (name.indexOf('mon') >= 0 || name.indexOf('marg') >= 0) { this.commentLibraryFilter = 'monitor'; break; }
+            if (name.indexOf('def') >= 0 || name.indexOf('rep') >= 0) { this.commentLibraryFilter = 'defect'; break; }
+          }
+        }
+      } else {
+        this.commentLibraryFilter = 'all';
+      }
+      this.showCommentLibrary = true;
+    },
+
+    insertComment(text) {
+      if (!this.activeItemId) return;
+      if (!this.results[this.activeItemId]) {
+        this.results[this.activeItemId] = { rating: null, notes: '', photos: [] };
+      }
+      var existing = this.results[this.activeItemId].notes || '';
+      this.results[this.activeItemId].notes = existing
+        ? (existing.trimEnd() + '\n' + text)
+        : text;
+      this.expanded[this.activeItemId] = true; // ensure notes textarea visible
+      this.debounceSave();
+      this.showCommentLibrary = false;
+      if (typeof showToast === 'function') showToast('Comment inserted');
+    },
+
+    get commentLibraryItems() {
+      var COMMENTS = window.__OI_COMMENT_LIBRARY || [
+        { rating: 'satisfactory', text: 'Functional and operating as intended at the time of inspection.' },
+        { rating: 'satisfactory', text: 'No deficiencies observed.' },
+        { rating: 'satisfactory', text: 'Appears to be properly installed and in working order.' },
+        { rating: 'monitor', text: 'Recommend monitoring for further deterioration.' },
+        { rating: 'monitor', text: 'Minor wear noted; consider preventive maintenance.' },
+        { rating: 'monitor', text: 'Cosmetic defects observed; functional but recommend repair when convenient.' },
+        { rating: 'defect', text: 'Recommend repair or replacement by a qualified contractor.' },
+        { rating: 'defect', text: 'Active leak observed; recommend immediate professional attention.' },
+        { rating: 'defect', text: 'Safety hazard noted; recommend correction prior to occupancy.' },
+        { rating: 'defect', text: 'Not functioning at time of inspection; further evaluation recommended.' },
+        { rating: 'all', text: 'Further evaluation recommended by a qualified specialist.' },
+        { rating: 'all', text: 'Recommend a licensed professional review the condition for cost estimate.' },
+      ];
+      var SNIPPETS = (function () {
+        try {
+          var raw = localStorage.getItem('oi:snippets');
+          if (raw) return JSON.parse(raw);
+        } catch (_) {}
+        return [
+          { rating: 'all', text: 'See attached photos for documentation.' },
+          { rating: 'all', text: 'Inspection performed in accordance with InterNACHI Standards of Practice.' },
+          { rating: 'all', text: 'Hidden conditions may exist that were not visible at the time of inspection.' },
+        ];
+      })();
+      var pool = this.commentLibraryTab === 'snippets' ? SNIPPETS : COMMENTS;
+      if (this.commentLibraryFilter === 'all') return pool;
+      return pool.filter(function (c) { return c.rating === 'all' || c.rating === this.commentLibraryFilter; }, this);
     },
 
     navigateItem(dir) {
