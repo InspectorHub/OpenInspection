@@ -352,7 +352,10 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                         }
                     })();
                 ` }} />
-                {/* B3 — notifications inbox unread badge polling */}
+                {/* B3 — notifications inbox unread badge polling.
+                    Exposed as window.__oiPollNotify so pages that mutate the
+                    unread state (e.g. notifications.js markAllRead) can force
+                    an immediate refresh instead of waiting for the 60s tick. */}
                 <script dangerouslySetInnerHTML={{ __html: `
                     (function() {
                         async function pollNotify() {
@@ -370,6 +373,7 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                                 });
                             } catch {}
                         }
+                        window.__oiPollNotify = pollNotify;
                         if (typeof authFetch !== 'undefined') {
                             document.addEventListener('DOMContentLoaded', pollNotify);
                             setInterval(pollNotify, 60000);

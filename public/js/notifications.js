@@ -32,17 +32,20 @@ function notificationsApp() {
             });
             const it = this.items.find(x => x.id === id);
             if (it) it.readAt = new Date().toISOString();
+            if (typeof window.__oiPollNotify === 'function') window.__oiPollNotify();
         },
 
         async markAllRead() {
             await authFetch('/api/notifications/mark-all-read', { method: 'POST' });
             this.items.forEach(it => { if (!it.readAt) it.readAt = new Date().toISOString(); });
+            if (typeof window.__oiPollNotify === 'function') window.__oiPollNotify();
             if (typeof showToast === 'function') showToast('All notifications marked read.');
         },
 
         async archive(id) {
             await authFetch('/api/notifications/' + encodeURIComponent(id), { method: 'DELETE' });
             this.items = this.items.filter(x => x.id !== id);
+            if (typeof window.__oiPollNotify === 'function') window.__oiPollNotify();
         },
 
         formatTime(iso) {

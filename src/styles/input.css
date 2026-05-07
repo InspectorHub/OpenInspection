@@ -473,3 +473,22 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
 button, a, [role="button"] {
     touch-action: manipulation;
 }
+
+/* Round 35 — sidebar nav links are full-page <a href> SSR loads (no SPA),
+   so each click triggers a full HTTP round-trip + browser repaint = visible
+   flicker. View Transitions API masks the swap with a 200ms cross-fade in
+   Chrome 126+ / Edge 126+ / Safari 18+. Other browsers (Firefox) silently
+   fall back to current behavior — net zero regression. */
+@view-transition {
+    navigation: auto;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 200ms;
+    animation-timing-function: ease-out;
+}
+/* Pin a stable background on the root so the cross-fade does not flash a
+   white intermediate between two pages with different bg colors. */
+html {
+    background-color: var(--ih-bg-app, #f8fafc);
+}
