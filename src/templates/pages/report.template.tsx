@@ -118,7 +118,11 @@ export function renderProfessionalReport(data: {
                             <div class="h-8 w-px bg-white/20"></div>
                             <span class="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Inspection Report</span>
                         </div>
-                        <h1 class="text-5xl md:text-7xl font-black tracking-tightest text-white leading-[1.05]">{inspection.propertyAddress}</h1>
+                        {/* Spec 5F.2 — Cover H1 sized to v3 (--ih-text-hero 40px ≈ text-4xl).
+                            Per handoff README, font-black is retained ONLY on Report Cover H1
+                            + stat numbers; the size moved from text-7xl (72px) → text-4xl
+                            (36px), still hero-scale but no longer Spectora-mockingly oversized. */}
+                        <h1 class="text-3xl md:text-4xl font-black tracking-tightest text-white leading-[1.1]">{inspection.propertyAddress}</h1>
                         <p class="mt-8 text-xl text-slate-400 font-medium tracking-tight">Home Inspection Report</p>
                     </div>
                     
