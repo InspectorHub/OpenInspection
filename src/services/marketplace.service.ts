@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
 import { marketplaceTemplates, tenantMarketplaceImports } from '../lib/db/schema/marketplace';
-import { templates } from '../lib/db/schema';
+import { templates, comments } from '../lib/db/schema';
 
 export class MarketplaceService {
   private db: ReturnType<typeof drizzle<any>>;
@@ -63,27 +63,55 @@ export class MarketplaceService {
       .limit(1);
 
     if (existing) {
-      // Already imported — return existing local template id
+      // Already imported — return existing local id (template or first comment)
       return existing.localTemplateId;
     }
 
-    const newTemplateId = crypto.randomUUID();
     const now = new Date().toISOString();
+    let localId: string;
 
-    await this.db.insert(templates as any).values({
-      id:        newTemplateId,
-      tenantId:  this.tenantId,
-      name:      mkt.name,
-      schema:    mkt.schema,
-      createdAt: new Date(now),
-    });
+    // Spec 5G M2 — Comment Library distribution. When the marketplace row
+    // is a comment library (schema = { comments: [...] }) bulk-INSERT each
+    // entry into tenants/comments table instead of creating a template.
+    if (mkt.category === 'Comment Library') {
+      const schema = (mkt.schema as { comments?: Array<{ text: string; section?: string; rating?: string }> }) || {};
+      const commentEntries = Array.isArray(schema.comments) ? schema.comments : [];
+      // Sentinel id captures "first comment id" for the imports row's
+      // localTemplateId column (re-uses existing column name; future
+      // schema may rename to localResourceId).
+      const firstId = crypto.randomUUID();
+      localId = firstId;
+      const rows = commentEntries.map((c, i) => ({
+        id:        i === 0 ? firstId : crypto.randomUUID(),
+        tenantId:  this.tenantId,
+        text:      c.text,
+        category:  c.section ?? null,
+        createdAt: new Date(now),
+      }));
+      // D1 batch insert — chunk to avoid SQL too long
+      for (let i = 0; i < rows.length; i += 50) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await this.db.insert(comments).values(rows.slice(i, i + 50) as any);
+      }
+    } else {
+      // Default: import as Template
+      localId = crypto.randomUUID();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await this.db.insert(templates as any).values({
+        id:        localId,
+        tenantId:  this.tenantId,
+        name:      mkt.name,
+        schema:    mkt.schema,
+        createdAt: new Date(now),
+      });
+    }
 
     await this.db.insert(tenantMarketplaceImports).values({
       id:                    crypto.randomUUID(),
       tenantId:              this.tenantId,
       marketplaceTemplateId: marketplaceId,
       importedSemver:        mkt.semver,
-      localTemplateId:       newTemplateId,
+      localTemplateId:       localId,
       importedAt:            now,
     });
 
@@ -92,6 +120,6 @@ export class MarketplaceService {
       .set({ downloadCount: sql`${marketplaceTemplates.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceTemplates.id, marketplaceId));
 
-    return newTemplateId;
+    return localId;
   }
 }
