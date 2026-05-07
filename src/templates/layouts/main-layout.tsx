@@ -1,6 +1,7 @@
 import { BrandingConfig } from '../../types/auth';
 import { NetworkPill } from '../components/network-pill';
 import { ConflictModal } from '../components/conflict-modal';
+import { KeyboardHUD } from '../components/keyboard-hud';
 
 function sanitizePrimaryColor(branding?: BrandingConfig): string {
     const raw = branding?.primaryColor || '#6366f1';
@@ -89,6 +90,7 @@ export const BareLayout = (props: { title: string, children: unknown, branding?:
                 {children}
                 <NetworkPill />
                 <ConflictModal />
+                <KeyboardHUD />
             </body>
         </html>
     );
@@ -387,6 +389,7 @@ navigator.serviceWorker?.addEventListener('message', function(e) {
 ` }} />
                 <NetworkPill />
                 <ConflictModal />
+                <KeyboardHUD />
             </body>
         </html>
     );
