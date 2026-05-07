@@ -20,11 +20,40 @@ export const NetworkPill = () => (
         <div
             x-show="popoverOpen"
             {...{ 'x-on:click.outside': 'popoverOpen = false' }}
-            class="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl ring-1 ring-slate-200 p-4 text-sm"
+            class="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl ring-1 ring-slate-200 p-4 text-sm"
         >
-            <div class="font-bold text-slate-900 mb-2" x-text="`Tier ${tier?.id} — ${tier?.label}`"></div>
-            <div x-show="pendingItems.length === 0" class="text-slate-500">No pending changes.</div>
-            <ul x-show="pendingItems.length > 0" class="space-y-2 max-h-60 overflow-y-auto">
+            {/* Round 38 — replace 'Tier E — Android / Other' technical jargon
+                with a plain-English status line. Tier-specific guidance only
+                surfaces when actionable (offline, low-storage iOS device,
+                cap-approaching). When online with no pending changes there is
+                nothing for the user to do — show a single calm status only. */}
+            <div class="font-semibold text-slate-900 mb-2"
+                 x-text="!online ? 'Working offline' : (pendingItems.length > 0 ? `Syncing ${pendingItems.length} change${pendingItems.length === 1 ? '' : 's'}` : 'All synced')">
+            </div>
+
+            <div x-show="online && pendingItems.length === 0" class="text-xs text-slate-500">
+                Your work auto-saves to this device and uploads automatically.
+            </div>
+
+            <div x-show="!online" class="text-xs text-slate-600 mb-2">
+                Your work is being saved on this device. It will upload as soon
+                as you're back online.
+            </div>
+
+            {/* Tier-specific advice — only shown when storage actually matters */}
+            <div x-show="!online && tier?.id === 'C'" class="text-xs text-amber-700 bg-amber-50 rounded-md p-2 mb-2">
+                On iOS Safari you can store about 75 photos per inspection while offline.
+                For unlimited offline storage, install this app: Share → Add to Home Screen.
+            </div>
+            <div x-show="!online && tier?.id === 'D'" class="text-xs text-amber-700 bg-amber-50 rounded-md p-2 mb-2">
+                Your iOS version stores about 30 photos per inspection while offline.
+                Updating iOS will lift this limit.
+            </div>
+            <div x-show="online && tier?.id === 'B'" class="text-xs text-slate-500 mb-2">
+                Tip: install this app from your browser menu so the device keeps your data permanently.
+            </div>
+
+            <ul x-show="pendingItems.length > 0" class="space-y-2 max-h-60 overflow-y-auto mt-2 border-t border-slate-100 pt-2">
                 <template x-for="it in pendingItems" {...{ 'x-bind:key': 'it.id' }}>
                     <li class="flex items-start justify-between gap-2 text-xs">
                         <span x-text="`${it.op} · ${new Date(it.createdAt).toLocaleTimeString()}`"></span>
@@ -32,7 +61,11 @@ export const NetworkPill = () => (
                     </li>
                 </template>
             </ul>
-            <button x-show="pendingItems.length > 0" x-on:click="syncNow()" class="mt-3 w-full px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black">Sync now</button>
+            <button x-show="pendingItems.length > 0"
+                x-on:click="syncNow()"
+                class="mt-3 w-full h-9 px-4 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-all">
+                Sync now
+            </button>
         </div>
     </div>
 );

@@ -1207,19 +1207,34 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 </div>
               </div>
             </div>
+            {/* Round 38 — unified button row: 40px height, text-sm semibold,
+                normal case. Cancel = secondary (border); Send PDF = tertiary
+                (light tinted); Confirm = primary (indigo solid). All three
+                share the same h-10/rounded-xl/text-sm shape so the modal
+                reads as a single design language. */}
             <div class="flex gap-3 mt-6">
-              <button x-on:click="showPublishModal = false" class="flex-1 py-3 text-sm font-semibold rounded-xl border" style="border-color: #e8e4dd; color: #46423c">Cancel</button>
+              <button
+                x-on:click="showPublishModal = false"
+                class="flex-1 h-10 px-4 text-sm font-semibold rounded-xl border bg-white hover:bg-slate-50 transition-all"
+                style="border-color: #e8e4dd; color: #46423c"
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 {...{ 'x-on:click': 'sendReportPdf()' }}
                 {...{ 'x-bind:disabled': 'sendingPdf' }}
-                class="px-5 py-3 rounded-xl bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 transition-all"
               >
-                <span x-show="!sendingPdf">📧 Send PDF to Client</span>
+                <span x-show="!sendingPdf">Send PDF</span>
                 <span x-show="sendingPdf">Sending…</span>
               </button>
-              <button x-on:click="publish()" class="flex-1 py-3 text-sm font-bold rounded-xl text-white" style="background: #4f46e5" x-bind:disabled="publishing">
-                <span x-text="publishing ? 'Publishing...' : 'Confirm Publish'"></span>
+              <button
+                x-on:click="publish()"
+                x-bind:disabled="publishing"
+                class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all"
+              >
+                <span x-text="publishing ? 'Publishing…' : 'Confirm Publish'"></span>
               </button>
             </div>
           </div>
