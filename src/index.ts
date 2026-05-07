@@ -54,6 +54,11 @@ import { SettingsDataPage } from './templates/pages/settings-data';
 import { MessagesPublicPage } from './templates/pages/messages-public';
 import { NotificationsPage } from './templates/pages/notifications';
 import { SettingsSecurityPage } from './templates/pages/settings-security';
+import { SettingsProfilePage } from './templates/pages/settings-profile';
+import { SettingsWorkspacePage } from './templates/pages/settings-workspace';
+import { SettingsCommunicationPage } from './templates/pages/settings-communication';
+import { SettingsAccountPage } from './templates/pages/settings-account';
+import { SettingsAdvancedPage } from './templates/pages/settings-advanced';
 
 
 import coreAuthRoutes from './api/auth';
@@ -808,26 +813,63 @@ app.get('/templates/:id/edit', htmlAuthGuard(['owner', 'admin']), (c) => {
     return c.html(TemplateEditorPage({ templateId: id, branding: c.get('branding') }));
 });
 app.get('/marketplace', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MarketplacePage({ branding: c.get('branding') })));
+// Settings hub (group cards)
 app.get('/settings', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsPage({ branding: c.get('branding') })));
-app.get('/settings/automations', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsAutomationsPage({ branding: c.get('branding') })));
-app.get('/settings/data', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsDataPage({ branding: c.get('branding') })));
-app.get('/settings/widget', htmlAuthGuard(['owner', 'admin']), (c) => {
-    const b = c.get('branding');
-    return c.html(SettingsWidgetPage(b ? { branding: b } : {}));
-});
-app.get('/settings/services', htmlAuthGuard(['owner', 'admin']), (c) => {
+
+// Profile group (single sub-page; group page IS the sub-page)
+app.get('/settings/profile', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsProfilePage({ branding: c.get('branding') })));
+
+// Workspace group
+app.get('/settings/workspace', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/workspace/branding'));
+app.get('/settings/workspace/branding', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'branding' })));
+app.get('/settings/workspace/theme', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'theme' })));
+app.get('/settings/workspace/telemetry', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'telemetry' })));
+
+// Catalog group
+app.get('/settings/catalog', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/catalog/services'));
+app.get('/settings/catalog/services', htmlAuthGuard(['owner', 'admin']), (c) => {
     const b = c.get('branding');
     return c.html(SettingsServicesPage(b ? { branding: b } : {}));
 });
-app.get('/settings/event-types', htmlAuthGuard(['owner', 'admin']), (c) => {
+app.get('/settings/catalog/event-types', htmlAuthGuard(['owner', 'admin']), (c) => {
     const b = c.get('branding');
     return c.html(SettingsEventTypesPage(b ? { branding: b } : {}));
 });
-// Spec 4A — TOTP 2FA settings page (per-user, all roles allowed).
-app.get('/settings/security', htmlAuthGuard(), (c) => {
+app.get('/settings/catalog/widget', htmlAuthGuard(['owner', 'admin']), (c) => {
+    const b = c.get('branding');
+    return c.html(SettingsWidgetPage(b ? { branding: b } : {}));
+});
+
+// Communication group
+app.get('/settings/communication', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/communication/email'));
+app.get('/settings/communication/email', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsCommunicationPage({ branding: c.get('branding'), subPage: 'email' })));
+app.get('/settings/communication/automations', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsAutomationsPage({ branding: c.get('branding') })));
+app.get('/settings/communication/calendar', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsCommunicationPage({ branding: c.get('branding'), subPage: 'calendar' })));
+app.get('/settings/communication/integrations', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsCommunicationPage({ branding: c.get('branding'), subPage: 'integrations' })));
+
+// Account group (per-user, all roles allowed)
+app.get('/settings/account', htmlAuthGuard(), (c) => c.redirect('/settings/account/password'));
+app.get('/settings/account/password', htmlAuthGuard(), (c) => c.html(SettingsAccountPage({ branding: c.get('branding'), subPage: 'password' })));
+app.get('/settings/account/security', htmlAuthGuard(), (c) => {
     const b = c.get('branding');
     return c.html(SettingsSecurityPage(b ? { branding: b } : {}));
 });
+app.get('/settings/account/bot-protection', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsAccountPage({ branding: c.get('branding'), subPage: 'bot-protection' })));
+
+// Advanced group
+app.get('/settings/advanced', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/advanced/payments'));
+app.get('/settings/advanced/payments', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsAdvancedPage({ branding: c.get('branding'), subPage: 'payments' })));
+app.get('/settings/advanced/ai', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsAdvancedPage({ branding: c.get('branding'), subPage: 'ai' })));
+app.get('/settings/advanced/data', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsDataPage({ branding: c.get('branding') })));
+
+// Deep-link aliases — preserve old URLs that might be bookmarked or hard-coded in JS
+app.get('/settings/services', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/catalog/services'));
+app.get('/settings/event-types', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/catalog/event-types'));
+app.get('/settings/widget', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/catalog/widget'));
+app.get('/settings/automations', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/communication/automations'));
+// Spec 4A — TOTP 2FA settings page (per-user, all roles allowed).
+app.get('/settings/security', htmlAuthGuard(), (c) => c.redirect('/settings/account/security'));
+app.get('/settings/data', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/advanced/data'));
 app.get('/metrics', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MetricsPage({ branding: c.get('branding') })));
 app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.html(TeamPage({ branding: c.get('branding') })));
 app.get('/agreements', htmlAuthGuard(['owner', 'admin', 'agent']), (c) => c.html(AgreementsPage({ branding: c.get('branding') })));

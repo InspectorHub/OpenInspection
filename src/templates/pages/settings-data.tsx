@@ -1,4 +1,4 @@
-import { MainLayout } from '../layouts/main-layout';
+import { SettingsLayout } from '../components/settings-layout';
 import { BrandingConfig } from '../../types/auth';
 
 interface SettingsDataPageProps {
@@ -7,38 +7,43 @@ interface SettingsDataPageProps {
 
 export function SettingsDataPage({ branding }: SettingsDataPageProps) {
     return (
-        <MainLayout title="Data Import / Export" branding={branding}>
-            <div x-data="dataExport" class="max-w-2xl">
-                <h1 class="text-xl font-bold text-slate-900 mb-6">Data Import / Export</h1>
-
+        <SettingsLayout
+            branding={branding}
+            title="Settings | Data Import / Export"
+            group="advanced"
+            subPage="data"
+            pageTitle="Data Import / Export"
+            pageSubtitle="Download your data as CSV, or import contacts from Spectora / Inspector Toolbelt exports."
+        >
+            <div x-data="dataExport" class="max-w-2xl space-y-5">
                 {/* Export */}
-                <div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
-                    <h2 class="text-sm font-bold text-slate-900 mb-1">Export</h2>
-                    <p class="text-xs text-slate-500 mb-4">Download your data as CSV. All historical records are included.</p>
-                    <div class="flex gap-3">
+                <section class="bg-white border border-surface-200 rounded-lg p-6">
+                    <h2 class="text-sm font-bold text-ink-900 mb-1">Export</h2>
+                    <p class="text-xs text-ink-500 mb-4">Download your data as CSV. All historical records are included.</p>
+                    <div class="flex gap-3 flex-wrap">
                         <button
                             x-on:click="downloadExport('inspections')"
-                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors"
+                            class="px-4 py-2 bg-blueprint-500 text-white rounded-md text-sm font-bold hover:bg-blueprint-700 active:scale-[.98] transition-all"
                         >Download Inspections CSV</button>
                         <button
                             x-on:click="downloadExport('contacts')"
-                            class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 transition-colors"
+                            class="px-4 py-2 rounded-md border border-surface-200 bg-white text-ink-700 text-sm font-semibold hover:bg-surface-100 transition-all"
                         >Download Contacts CSV</button>
                     </div>
-                </div>
+                </section>
 
                 {/* Import */}
-                <div class="bg-white border border-slate-200 rounded-xl p-6">
-                    <h2 class="text-sm font-bold text-slate-900 mb-1">Import Contacts</h2>
-                    <p class="text-xs text-slate-500 mb-4">
+                <section class="bg-white border border-surface-200 rounded-lg p-6">
+                    <h2 class="text-sm font-bold text-ink-900 mb-1">Import Contacts</h2>
+                    <p class="text-xs text-ink-500 mb-4">
                         Supports Spectora and Inspector Toolbelt export formats. Duplicates (same email) are skipped automatically.
                     </p>
                     <label class="block cursor-pointer">
                         <div class="inline-flex items-center gap-3">
-                            <div class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 transition-colors">
+                            <div class="px-4 py-2 rounded-md border border-surface-200 bg-white text-ink-700 text-sm font-semibold hover:bg-surface-100 transition-all">
                                 <span x-text="importing ? 'Importing...' : 'Choose CSV file'" />
                             </div>
-                            <span class="text-xs text-slate-400">Max 5 MB, UTF-8 encoded</span>
+                            <span class="text-xs text-ink-500">Max 5 MB, UTF-8 encoded</span>
                         </div>
                         <input
                             type="file"
@@ -49,20 +54,20 @@ export function SettingsDataPage({ branding }: SettingsDataPageProps) {
                         />
                     </label>
 
-                    <div x-show="importResult" class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
-                        <span class="font-bold text-green-800" x-text="`Imported ${importResult?.imported} contacts`" />
-                        <span class="text-green-600 ml-2" x-text="importResult?.skipped ? `(${importResult.skipped} skipped — already exist)` : ''" />
-                        <ul x-show="importResult?.errors?.length" class="mt-2 text-xs text-red-600 space-y-0.5">
+                    <div x-show="importResult" class="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-sm">
+                        <span class="font-bold text-emerald-800" x-text="`Imported ${importResult?.imported} contacts`" />
+                        <span class="text-emerald-700 ml-2" x-text="importResult?.skipped ? `(${importResult.skipped} skipped — already exist)` : ''" />
+                        <ul x-show="importResult?.errors?.length" class="mt-2 text-xs text-rose-600 space-y-0.5">
                             <template x-for="err in importResult?.errors?.slice(0, 5)" x-key="err">
                                 <li x-text="err" />
                             </template>
                         </ul>
                     </div>
-                    <div x-show="importError" x-text="importError" class="mt-4 text-sm text-red-600" />
-                </div>
+                    <div x-show="importError" x-text="importError" class="mt-4 text-sm text-rose-600" />
+                </section>
             </div>
             <script src="/js/auth.js" />
             <script src="/js/data.js" />
-        </MainLayout>
+        </SettingsLayout>
     );
 }
