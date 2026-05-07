@@ -1,0 +1,100 @@
+/* ============================================================
+   OpenInspection Design Tokens — v3 (compact / Spectora-like)
+   ============================================================
+   Sourced from D:\Documents\Downloads\OpenInspection Design System.zip
+   (design_handoff_openinspection_v3/colors_and_type.css), with all
+   spacing / radius / type shrunk to v3 "极致紧凑" values per the
+   handoff README's roadmap step R1.1 ("直接覆写 :root token 为 v3
+   值, codemod, 1 day").
+
+   Two-token strategy is intentionally NOT used. The handoff says
+   "不再保留双 token，不要走 html.density-compact scope" — every
+   render gets v3 immediately.
+
+   Loaded by tailwind.config / styles/input.css via @import.
+   ============================================================ */
+
+:root {
+    /* ─── Brand / Accent ──────────────────────────────────── */
+    --ih-primary:           #6366f1;   /* indigo-500 — brand accent */
+    --ih-primary-600:       #4f46e5;   /* indigo-600 — primary actions */
+    --ih-primary-700:       #4338ca;
+    --ih-primary-glow:      #6366f140; /* 25% alpha — focus ring */
+    --ih-primary-tint:      #6366f11a; /* 10% alpha — icon tile bg */
+    --ih-primary-gradient:  linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    --ih-accent-gradient:   linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+
+    /* ─── Slate scale (foreground / background) ───────────── */
+    --ih-slate-50:    #f8fafc;
+    --ih-slate-100:   #f1f5f9;
+    --ih-slate-200:   #e2e8f0;
+    --ih-slate-300:   #cbd5e1;
+    --ih-slate-400:   #94a3b8;
+    --ih-slate-500:   #64748b;
+    --ih-slate-600:   #475569;
+    --ih-slate-700:   #334155;
+    --ih-slate-800:   #1e293b;
+    --ih-slate-900:   #0f172a;
+    --ih-slate-950:   #020617;
+
+    --ih-fg-1:        var(--ih-slate-900);  /* headlines */
+    --ih-fg-2:        var(--ih-slate-600);  /* body */
+    --ih-fg-3:        var(--ih-slate-500);  /* muted body */
+    --ih-fg-4:        var(--ih-slate-400);  /* metadata / eyebrow */
+    --ih-fg-5:        var(--ih-slate-300);  /* decorative */
+    --ih-fg-inverse:  #ffffff;
+
+    --ih-bg-app:      #f8fafc;
+    --ih-bg-page:     #fdfdfd;
+    --ih-bg-card:     #ffffff;
+    --ih-bg-muted:    #f1f5f9;
+    --ih-bg-inverse:  #0f172a;
+
+    /* ─── Status / Rating colors ──────────────────────────── */
+    --ih-status-ok:       #10b981;
+    --ih-status-ok-bg:    #ecfdf5;
+    --ih-status-ok-fg:    #047857;
+    --ih-status-watch:    #f59e0b;
+    --ih-status-watch-bg: #fffbeb;
+    --ih-status-watch-fg: #b45309;
+    --ih-status-bad:      #ef4444;
+    --ih-status-bad-bg:   #fef2f2;
+    --ih-status-bad-fg:   #be123c;
+
+    --ih-hue-indigo:  #6366f1;
+    --ih-hue-sky:     #0284c7;
+    --ih-hue-violet:  #7c3aed;
+    --ih-hue-emerald: #059669;
+
+    /* ─── Spacing (v3 compact) ────────────────────────────── */
+    --ih-space-card:    12px;   /* was 32 */
+    --ih-space-section: 40px;   /* was 128 */
+    --ih-space-page:    24px;   /* was 48 */
+    --ih-pad-button-x:  16px;   /* was 40 */
+    --ih-pad-button-y:  8px;    /* was 20 */
+    --ih-pad-input-x:   12px;   /* was 24 */
+    --ih-pad-input-y:   8px;    /* was 16 */
+
+    /* ─── Radius (v3 compact) ─────────────────────────────── */
+    --ih-radius-card:    8px;   /* was 32 */
+    --ih-radius-modal:   12px;  /* was 48 */
+    --ih-radius-photo:   6px;   /* was 32 */
+    --ih-radius-pill:    4px;   /* was 16 */
+    --ih-radius-button:  6px;   /* was 16 */
+
+    /* ─── Type scale (v3 compact) ─────────────────────────── */
+    --ih-text-hero:     40px;   /* was 72 */
+    --ih-text-section:  22px;   /* was 48 */
+    --ih-text-item:     15px;   /* was 30 */
+    --ih-text-body:     13px;   /* was 20 */
+
+    /* ─── Type weights ────────────────────────────────────── */
+    --ih-weight-body:    400;   /* was 500 */
+    --ih-weight-bold:    700;   /* was 900 (font-black) */
+    --ih-letter-spacing: -0.015em;  /* was -0.04em */
+
+    /* ─── Shadow (v3 compact — slate, no indigo tint) ─────── */
+    --ih-shadow-card:    0 1px 3px rgba(15, 23, 42, 0.08);
+    --ih-shadow-modal:   0 8px 32px rgba(15, 23, 42, 0.12);
+    --ih-shadow-cta:     0 0 16px rgba(99, 102, 241, 0.30);  /* indigo only on hover */
+}

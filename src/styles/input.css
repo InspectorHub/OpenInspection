@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* v3 design tokens — compact, Spectora-aligned. See README in
+   D:\Documents\Downloads\OpenInspection Design System.zip for full
+   roadmap. v3.1 adds the :root tokens; v3.2+ migrate templates
+   off oversized utilities (text-7xl / rounded-[3rem] / p-12 / etc)
+   to use these tokens. */
+@import './colors_and_type.css';
+
 /* ============================================================
    Base
    ============================================================ */
