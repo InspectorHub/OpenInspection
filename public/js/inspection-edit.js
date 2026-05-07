@@ -87,6 +87,18 @@ function inspectionEditor(inspectionId) {
         var tag = (document.activeElement && document.activeElement.tagName) || '';
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
         if (document.activeElement && document.activeElement.isContentEditable) return;
+        // Navigation: ArrowUp / ArrowDown move active item up/down,
+        // Enter advances to next, Shift+Enter goes to previous.
+        if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) {
+          e.preventDefault();
+          this.navigateItem(1);
+          return;
+        }
+        if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) {
+          e.preventDefault();
+          this.navigateItem(-1);
+          return;
+        }
         var key = e.key.toLowerCase();
         var idx = -1;
         if (key === '1') idx = 0;
@@ -359,6 +371,44 @@ function inspectionEditor(inspectionId) {
 
     setActiveItem(itemId) {
       this.activeItemId = itemId;
+    },
+
+    navigateItem(dir) {
+      var items = this.currentSectionItems || [];
+      if (!items.length) return;
+      var curIdx = -1;
+      if (this.activeItemId) {
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].id === this.activeItemId) { curIdx = i; break; }
+        }
+      }
+      var nextIdx = curIdx === -1 ? (dir > 0 ? 0 : items.length - 1) : curIdx + dir;
+      // Wrap to next/prev section when overflowing
+      if (nextIdx >= items.length) {
+        if (this.currentSectionIdx < this.sections.length - 1) {
+          this.currentSectionIdx += 1;
+          var nextItems = this.currentSectionItems || [];
+          if (nextItems.length) this.activeItemId = nextItems[0].id;
+        }
+      } else if (nextIdx < 0) {
+        if (this.currentSectionIdx > 0) {
+          this.currentSectionIdx -= 1;
+          var prevItems = this.currentSectionItems || [];
+          if (prevItems.length) this.activeItemId = prevItems[prevItems.length - 1].id;
+        }
+      } else {
+        this.activeItemId = items[nextIdx].id;
+      }
+      // Scroll the active card into view
+      if (this.activeItemId) {
+        var idAttr = this.activeItemId;
+        setTimeout(function () {
+          var card = document.querySelector('[data-item-id="' + idAttr + '"]');
+          if (card && card.scrollIntoView) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 0);
+      }
     },
 
     get activeItem() {
