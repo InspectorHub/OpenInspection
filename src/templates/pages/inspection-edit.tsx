@@ -90,8 +90,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <span x-show="saveState === 'saved'" x-cloak class="text-[10px] font-semibold text-emerald-500">Saved</span>
                 <span x-show="saveState === 'error'" x-cloak class="text-[10px] font-semibold text-red-500">Error</span>
                 <span class="text-xs font-mono font-semibold px-2 py-1 rounded-lg" style="background: #eef4ff; color: #4a72ff" x-text="completionPercent + '%'"></span>
-                <button x-on:click="showMenu = !showMenu" class="w-8 h-8 rounded-xl bg-white/60 flex items-center justify-center">
-                  <svg class="w-4 h-4" style="color: #6b6560" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01" /></svg>
+                <button x-on:click="toggleCheatsheet()" class="w-8 h-8 rounded-xl bg-white/60 flex items-center justify-center" aria-label="Gesture help">
+                  <svg class="w-4 h-4" style="color: #6b6560" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </button>
               </div>
             </div>
@@ -143,10 +143,13 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <div
                 x-bind:data-item-id="item.id"
                 class="rounded-2xl p-4 transition-all cursor-pointer"
-                style="background: rgba(255,253,250,0.82); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); border-left: 3px solid transparent;"
+                style="background: rgba(255,253,250,0.82); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); border-left: 3px solid transparent; touch-action: manipulation;"
                 x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-left-color: ' + getRatingColor(getItemRating(item.id))"
                 x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
                 x-on:click="setActiveItem(item.id)"
+                x-on:touchstart="onItemTouchStart(item.id, $event)"
+                x-on:touchmove="onItemTouchMove($event)"
+                x-on:touchend="onItemTouchEnd(item.id)"
               >
                 <div class="flex items-start justify-between mb-3">
                   <div>
@@ -227,6 +230,50 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       Suggest
                     </button>
                   </div>
+
+                  {/* Spec 5B mobile — Canned Comment Tabs (compact). */}
+                  <div x-show="item.tabs && (item.tabs.information || item.tabs.limitations || item.tabs.defects)" class="mt-4 rounded-xl border" style="border-color: #e8e4dd; background: rgba(255,255,255,0.6);">
+                    <div class="flex items-center gap-1 px-2 py-1.5 border-b overflow-x-auto" style="border-color: #e8e4dd;">
+                      <template x-for="tabName in ['information','limitations','defects']" x-bind:key="tabName">
+                        <button type="button"
+                          x-on:click="setActiveItemTab(tabName); activeItemId = item.id"
+                          x-bind:class="(activeItemTab === tabName && activeItemId === item.id) ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'"
+                          class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase capitalize">
+                          <span x-text="tabName"></span>
+                          <span class="text-[10px] font-mono opacity-80"
+                            x-text="tabIncludedCount(item.id, tabName) + '/' + tabTotalCount(item.id, tabName)"></span>
+                        </button>
+                      </template>
+                    </div>
+                    <div class="p-2 space-y-2">
+                      <template x-for="entry in getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information'))" x-bind:key="entry.cannedId">
+                        <div class="rounded-lg border p-2"
+                          x-bind:class="entry.included ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'">
+                          <label class="flex items-start gap-2 cursor-pointer">
+                            <input type="checkbox"
+                              x-bind:checked="entry.included"
+                              x-on:change="toggleCannedComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), entry.cannedId)"
+                              class="mt-1 rounded text-indigo-600" />
+                            <div class="flex-1 min-w-0">
+                              <span class="text-xs font-bold text-slate-900" x-text="entry.title"></span>
+                              <p x-show="!entry.included" class="text-[11px] italic text-slate-500 line-clamp-2 mt-0.5" x-text="entry.comment"></p>
+                              <textarea x-show="entry.included"
+                                x-bind:value="entry.effectiveComment"
+                                x-on:input="setCannedCommentText(item.id, (activeItemId === item.id ? activeItemTab : 'information'), entry.cannedId, $event.target.value)"
+                                rows={2}
+                                class="mt-1 w-full px-2 py-1.5 text-[12px] rounded border bg-white resize-y"
+                                style="border-color: #e8e4dd"></textarea>
+                            </div>
+                          </label>
+                        </div>
+                      </template>
+                      <p x-show="getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0"
+                         class="text-[11px] italic text-slate-400 text-center py-2">
+                        No canned comments in this tab.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Phase T (T15) — photo thumbnails with Annotate overlay */}
                   <div x-show="(results[item.id]?.photos || []).length > 0" class="mt-3 grid grid-cols-3 gap-2">
                     <template x-for="(photo, pi) in (results[item.id]?.photos || [])" x-bind:key="pi">
@@ -281,6 +328,44 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               class="flex-1 min-h-[44px] py-3 text-sm font-bold rounded-xl text-white disabled:opacity-40"
               style="background: #4f46e5"
             >Publish</button>
+          </div>
+
+          {/* Round 33 — Quick Rating Sheet (long-press fires this).
+              Bottom-sheet with large rating buttons. Tap a level → applies +
+              closes. Tap backdrop → close without change. */}
+          <div
+            x-show="showQuickRating"
+            x-cloak
+            class="fixed inset-0 z-[60] flex items-end"
+            {...{ 'x-on:click.self': 'closeQuickRating()' }}
+            style="background: rgba(0,0,0,0.4)"
+          >
+            <div class="w-full rounded-t-3xl p-5 pb-8" style="background: #fffdfa; box-shadow: 0 -8px 32px rgba(0,0,0,0.15)">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-base font-bold" style="color: #1a1815">Quick Rate</h3>
+                <button x-on:click="closeQuickRating()" class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center" aria-label="Close">
+                  <svg class="w-4 h-4" style="color: #6b6560" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <template x-for="level in ratingLevels" x-bind:key="level.id">
+                  <button
+                    x-on:click="setQuickRating(level.id)"
+                    class="px-4 py-4 rounded-xl text-sm font-semibold text-white border transition-all"
+                    x-bind:style="'background:' + level.color + '; border-color: transparent'"
+                  >
+                    <span x-text="level.label"></span>
+                  </button>
+                </template>
+                <button
+                  x-on:click="setQuickRating(null)"
+                  class="col-span-2 px-4 py-3 rounded-xl text-sm font-semibold text-gray-500 border"
+                  style="background: #f3f1ed; border-color: #e8e4dd"
+                >
+                  Clear rating
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -778,6 +863,90 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                         Suggest
                       </button>
                     </div>
+
+                    {/* Spec 5B — Canned Comment Tabs (Information / Limitations / Defects).
+                        Only render for v2 'rich' items that ship template-side canned tabs. */}
+                    <div x-show="item.tabs && (item.tabs.information || item.tabs.limitations || item.tabs.defects)" class="mt-4 rounded-xl border" style="border-color: #e8e4dd; background: rgba(255,255,255,0.6);">
+                      <div class="flex items-center gap-1 px-2 py-1.5 border-b" style="border-color: #e8e4dd;">
+                        <template x-for="tabName in ['information','limitations','defects']" x-bind:key="tabName">
+                          <button type="button"
+                            x-on:click="setActiveItemTab(tabName); activeItemId = item.id"
+                            x-bind:class="(activeItemTab === tabName && activeItemId === item.id) ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wide capitalize">
+                            <span x-text="tabName"></span>
+                            <span class="text-[10px] font-mono opacity-80"
+                              x-text="tabIncludedCount(item.id, tabName) + '/' + tabTotalCount(item.id, tabName)"></span>
+                          </button>
+                        </template>
+                      </div>
+                      <div class="p-3 space-y-2">
+                        <template x-for="entry in getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information'))" x-bind:key="entry.cannedId">
+                          <div class="rounded-lg border p-2.5"
+                            x-bind:class="entry.included ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'">
+                            <div class="flex items-start gap-2">
+                              <input type="checkbox"
+                                x-bind:checked="entry.included"
+                                x-on:change="toggleCannedComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), entry.cannedId)"
+                                class="mt-1 rounded text-indigo-600"
+                                aria-label="Include this comment" />
+                              <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                  <span class="text-xs font-bold text-slate-900" x-text="entry.title"></span>
+                                  {/* Defect-only category pill */}
+                                  <template x-if="(activeItemId === item.id ? activeItemTab : 'information') === 'defects'">
+                                    <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded text-white"
+                                      x-bind:style="entry.category === 'safety' ? 'background:#dc2626' : (entry.category === 'recommendation' ? 'background:#f59e0b' : 'background:#0ea5e9')"
+                                      x-text="entry.category || ''"></span>
+                                  </template>
+                                </div>
+                                {/* Comment override input — full-width textarea when included */}
+                                <textarea
+                                  x-show="entry.included"
+                                  x-bind:value="entry.effectiveComment"
+                                  x-on:input="setCannedCommentText(item.id, (activeItemId === item.id ? activeItemTab : 'information'), entry.cannedId, $event.target.value)"
+                                  rows={2}
+                                  class="mt-1.5 w-full px-2 py-1.5 text-[12px] rounded border bg-white resize-y"
+                                  style="border-color: #e8e4dd; color: #2d2a26"
+                                  placeholder="Edit comment text..."></textarea>
+                                {/* Read-only preview when not included */}
+                                <p x-show="!entry.included" class="mt-1 text-[11px] italic text-slate-500 line-clamp-2" x-text="entry.comment"></p>
+                                {/* Defect-only location + category override */}
+                                <template x-if="entry.included && (activeItemId === item.id ? activeItemTab : 'information') === 'defects'">
+                                  <div class="mt-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Location</label>
+                                      <input type="text"
+                                        x-bind:value="entry.location"
+                                        x-on:input="setDefectLocation(item.id, entry.cannedId, $event.target.value)"
+                                        placeholder="Northwest corner"
+                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                        style="border-color: #e8e4dd" />
+                                    </div>
+                                    <div>
+                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Category</label>
+                                      <select
+                                        x-bind:value="entry.category"
+                                        x-on:change="setDefectCategory(item.id, entry.cannedId, $event.target.value)"
+                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                        style="border-color: #e8e4dd">
+                                        <option value="maintenance">Maintenance</option>
+                                        <option value="recommendation">Recommendation</option>
+                                        <option value="safety">Safety</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                </template>
+                              </div>
+                            </div>
+                          </div>
+                        </template>
+                        <p x-show="getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0"
+                           class="text-[11px] italic text-slate-400 text-center py-2">
+                          No canned comments in this tab.
+                        </p>
+                      </div>
+                    </div>
+
                     {/* Phase T (T15) — photo thumbnails with Annotate overlay */}
                     <div x-show="(results[item.id]?.photos || []).length > 0" class="mt-3 grid grid-cols-4 gap-2">
                       <template x-for="(photo, pi) in (results[item.id]?.photos || [])" x-bind:key="pi">
@@ -1121,6 +1290,57 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     </div>
                 </div>
             </div>
+        </div>
+
+        {/* Round 33 — Cheatsheet HUD (mobile help button + desktop ? key).
+            Centered modal with two columns: gestures (mobile) + hotkeys
+            (desktop). Same modal shown on both platforms; user gets context
+            for the device they're on. */}
+        <div
+          x-show="showCheatsheet"
+          x-cloak
+          class="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          {...{ 'x-on:click.self': 'showCheatsheet = false', 'x-on:keydown.escape.window': 'showCheatsheet = false' }}
+          style="background: rgba(0,0,0,0.5)"
+        >
+          <div class="w-full max-w-md rounded-2xl p-6 max-h-[85vh] overflow-y-auto" style="background: #fffdfa; box-shadow: 0 16px 48px rgba(0,0,0,0.25)">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-bold" style="color: #1a1815">Gestures &amp; Shortcuts</h3>
+              <button x-on:click="showCheatsheet = false" class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center" aria-label="Close">
+                <svg class="w-4 h-4" style="color: #6b6560" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div x-show="!isDesktop">
+              <p class="text-xs uppercase tracking-wide font-semibold mb-3" style="color: #908a83">Mobile Gestures</p>
+              <ul class="space-y-3 text-sm" style="color: #1a1815">
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Swipe ←/→</span><span>Switch to next / previous section</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Long-press item</span><span>Open Quick Rating sheet</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Double-tap item</span><span>Enter Focus mode</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Tap section chip</span><span>Jump directly to that section</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Tap rating button</span><span>Set Sat / Mon / Def / N/A inline</span></li>
+              </ul>
+            </div>
+
+            <div x-show="isDesktop">
+              <p class="text-xs uppercase tracking-wide font-semibold mb-3" style="color: #908a83">Keyboard Shortcuts</p>
+              <ul class="space-y-2 text-sm" style="color: #1a1815">
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">1 / 2 / 3</span><span>Set rating Satisfactory / Monitor / Defect</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">0</span><span>Clear rating · <span class="font-mono">N</span> = N/A</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">↑ / ↓</span><span>Move active item · Enter = next · Shift+Enter = prev</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">G + 0–9</span><span>Jump to section by index</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">/</span><span>Open Comment Library · <span class="font-mono">;</span> = My Snippets</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">P</span><span>Add photo to active item</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">⌘1 / ⌘2 / ⌘3</span><span>Split / Focus / Preview view mode</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">⌘K</span><span>Command palette (coming soon)</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">?</span><span>Toggle this cheatsheet · <span class="font-mono">Esc</span> = close</span></li>
+              </ul>
+            </div>
+
+            <div class="mt-5 pt-4 border-t text-xs" style="color: #908a83; border-color: #e8e4dd">
+              Tip: most shortcuts work even when not focused on an input. Press <span class="font-mono font-semibold">?</span> any time to reopen.
+            </div>
+          </div>
         </div>
       </div>
       <div id="commentPicker" class="hidden fixed z-[200] bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 w-72 max-h-64 overflow-y-auto"></div>

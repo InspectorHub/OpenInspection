@@ -294,7 +294,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                         <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Input Type</label>
                                         <select x-model="selectedItem.type" class="w-full px-3 py-2.5 text-sm font-500 rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors appearance-none"
                                             style="background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 viewBox=%220 0 24 24%22 stroke=%22%236b6560%22%3E%3Cpath stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%222%22 d=%22M19 9l-7 7-7-7%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px;">
-                                            <option value="rating">Rating (buttons)</option>
+                                            <option value="rich">Rich (rating + tabs)</option>
                                             <option value="boolean">Boolean (yes/no)</option>
                                             <option value="text">Text (single line)</option>
                                             <option value="textarea">Textarea (multi-line)</option>

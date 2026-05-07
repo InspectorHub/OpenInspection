@@ -31,10 +31,17 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
     it('imports a marketplace template with its sections intact (post-Spec1 fix)', async () => {
         // Seed marketplace_templates with the CORRECT shape that seed-marketplace.js now produces:
         // {sections: [...]} at the top level (not nested under a second .schema key).
+        // Spec 5B — v2 schema shape: schemaVersion: 2 + rich items with tabs.
+        const richItem = (id: string, label: string) => ({
+            id, label, type: 'rich' as const,
+            ratingOptions: ['Inspected', 'Not Inspected', 'Not Present', 'Repair', 'Safety Hazard'],
+            tabs: { information: [], limitations: [], defects: [] },
+        });
         const correctSchema = JSON.stringify({
+            schemaVersion: 2,
             sections: [
-                { id: 'sec1', title: 'Section 1', items: [{ id: 'i1', label: 'Item 1', type: 'rating' }] },
-                { id: 'sec2', title: 'Section 2', items: [{ id: 'i2', label: 'Item 2', type: 'rating' }] },
+                { id: 'sec1', title: 'Section 1', items: [richItem('i1', 'Item 1')] },
+                { id: 'sec2', title: 'Section 2', items: [richItem('i2', 'Item 2')] },
             ],
         });
         const marketplaceId = crypto.randomUUID();

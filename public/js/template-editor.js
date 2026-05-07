@@ -115,7 +115,9 @@ function templateEditor() {
             if (!this.selectedSection) return;
             const id = 'item_' + Date.now();
             this.selectedSection.items.push({
-                id, label: 'New Item', description: '', type: 'rating',
+                id, label: 'New Item', description: '', type: 'rich',
+                ratingOptions: ['Inspected', 'Not Inspected', 'Not Present', 'Repair', 'Safety Hazard'],
+                tabs: { information: [], limitations: [], defects: [] },
                 options: { min: null, max: null, unit: '', step: null, placeholder: '', maxLength: null, choices: [], minPhotos: null },
                 required: false, priority: this.selectedSection.items.length, isSafety: false,
                 defaultRecommendation: '', defaultEstimateMin: null, defaultEstimateMax: null,

@@ -2,65 +2,1399 @@
   "id": "seed_trec_rei_7_6_v1",
   "name": "Texas TREC REI 7-6",
   "description": "Texas Real Estate Commission required residential inspection form (REI 7-6, 2024).",
-  "version": 1,
+  "version": 2,
   "schema": {
+    "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_structural", "title": "I. Structural Systems",
+        "id": "s_structural",
+        "title": "I. Structural Systems",
         "items": [
-          { "id": "i_foundations", "label": "A. Foundations",             "type": "rating" },
-          { "id": "i_grading_dr",  "label": "B. Grading & Drainage",      "type": "rating" },
-          { "id": "i_roof_cover",  "label": "C. Roof Covering Materials", "type": "rating" },
-          { "id": "i_roof_struct", "label": "D. Roof Structure & Attic",  "type": "rating" },
-          { "id": "i_walls_ext",   "label": "E. Walls (Exterior)",        "type": "rating" },
-          { "id": "i_walls_int",   "label": "F. Walls (Interior)",        "type": "rating" },
-          { "id": "i_ceilings",    "label": "G. Ceilings & Floors",       "type": "rating" },
-          { "id": "i_doors_ext",   "label": "H. Doors (Exterior)",        "type": "rating" },
-          { "id": "i_doors_int",   "label": "I. Doors (Interior)",        "type": "rating" },
-          { "id": "i_windows",     "label": "J. Windows",                 "type": "rating" },
-          { "id": "i_stairways",   "label": "K. Stairways",               "type": "rating" },
-          { "id": "i_fireplace",   "label": "L. Fireplaces & Chimneys",   "type": "rating" },
-          { "id": "i_porches",     "label": "M. Porches, Balconies, Decks & Carports", "type": "rating" },
-          { "id": "i_other_str",   "label": "N. Other",                   "type": "text" }
+          {
+            "id": "i_foundations",
+            "label": "A. Foundations",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_foundations_ok",
+                  "title": "Condition",
+                  "comment": "A. Foundations was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_foundations_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_foundations_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A. Foundations requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_foundations_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "A. Foundations presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_grading_dr",
+            "label": "B. Grading & Drainage",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_grading_dr_ok",
+                  "title": "Condition",
+                  "comment": "B. Grading & Drainage was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_grading_dr_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_grading_dr_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "B. Grading & Drainage requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_grading_dr_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "B. Grading & Drainage presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_roof_cover",
+            "label": "C. Roof Covering Materials",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_cover_ok",
+                  "title": "Condition",
+                  "comment": "C. Roof Covering Materials was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_cover_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_cover_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "C. Roof Covering Materials requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_cover_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "C. Roof Covering Materials presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_roof_struct",
+            "label": "D. Roof Structure & Attic",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_struct_ok",
+                  "title": "Condition",
+                  "comment": "D. Roof Structure & Attic was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_struct_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_struct_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "D. Roof Structure & Attic requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_struct_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "D. Roof Structure & Attic presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_walls_ext",
+            "label": "E. Walls (Exterior)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_walls_ext_ok",
+                  "title": "Condition",
+                  "comment": "E. Walls (Exterior) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_walls_ext_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_walls_ext_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "E. Walls (Exterior) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_walls_ext_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "E. Walls (Exterior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_walls_int",
+            "label": "F. Walls (Interior)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_walls_int_ok",
+                  "title": "Condition",
+                  "comment": "F. Walls (Interior) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_walls_int_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_walls_int_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "F. Walls (Interior) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_walls_int_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "F. Walls (Interior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_ceilings",
+            "label": "G. Ceilings & Floors",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ceilings_ok",
+                  "title": "Condition",
+                  "comment": "G. Ceilings & Floors was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ceilings_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ceilings_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "G. Ceilings & Floors requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_ceilings_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "G. Ceilings & Floors presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_doors_ext",
+            "label": "H. Doors (Exterior)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_doors_ext_ok",
+                  "title": "Condition",
+                  "comment": "H. Doors (Exterior) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_doors_ext_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_doors_ext_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "H. Doors (Exterior) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_doors_ext_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "H. Doors (Exterior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_doors_int",
+            "label": "I. Doors (Interior)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_doors_int_ok",
+                  "title": "Condition",
+                  "comment": "I. Doors (Interior) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_doors_int_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_doors_int_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "I. Doors (Interior) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_doors_int_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "I. Doors (Interior) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_windows",
+            "label": "J. Windows",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_windows_ok",
+                  "title": "Condition",
+                  "comment": "J. Windows was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_windows_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_windows_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "J. Windows requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_windows_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "J. Windows presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_stairways",
+            "label": "K. Stairways",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_stairways_ok",
+                  "title": "Condition",
+                  "comment": "K. Stairways was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_stairways_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_stairways_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "K. Stairways requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_stairways_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "K. Stairways presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_fireplace",
+            "label": "L. Fireplaces & Chimneys",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fireplace_ok",
+                  "title": "Condition",
+                  "comment": "L. Fireplaces & Chimneys was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fireplace_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fireplace_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "L. Fireplaces & Chimneys requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fireplace_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "L. Fireplaces & Chimneys presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_porches",
+            "label": "M. Porches, Balconies, Decks & Carports",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_porches_ok",
+                  "title": "Condition",
+                  "comment": "M. Porches, Balconies, Decks & Carports was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_porches_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_porches_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "M. Porches, Balconies, Decks & Carports requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_porches_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "M. Porches, Balconies, Decks & Carports presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_other_str",
+            "label": "N. Other",
+            "type": "text"
+          }
         ]
       },
       {
-        "id": "s_electrical", "title": "II. Electrical Systems",
+        "id": "s_electrical",
+        "title": "II. Electrical Systems",
         "items": [
-          { "id": "i_service",   "label": "A. Service Entrance & Panels",       "type": "rating" },
-          { "id": "i_branch",    "label": "B. Branch Circuits",                 "type": "rating" },
-          { "id": "i_connected", "label": "C. Connected Devices & Fixtures",    "type": "rating" }
+          {
+            "id": "i_service",
+            "label": "A. Service Entrance & Panels",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_service_ok",
+                  "title": "Condition",
+                  "comment": "A. Service Entrance & Panels was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_service_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_service_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A. Service Entrance & Panels requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_service_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "A. Service Entrance & Panels presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_branch",
+            "label": "B. Branch Circuits",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_branch_ok",
+                  "title": "Condition",
+                  "comment": "B. Branch Circuits was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_branch_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_branch_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "B. Branch Circuits requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_branch_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "B. Branch Circuits presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_connected",
+            "label": "C. Connected Devices & Fixtures",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_connected_ok",
+                  "title": "Condition",
+                  "comment": "C. Connected Devices & Fixtures was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_connected_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_connected_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "C. Connected Devices & Fixtures requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_connected_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "C. Connected Devices & Fixtures presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
         ]
       },
       {
-        "id": "s_hvac_trec", "title": "III. HVAC Systems",
+        "id": "s_hvac_trec",
+        "title": "III. HVAC Systems",
         "items": [
-          { "id": "i_heating", "label": "A. Heating", "type": "rating" },
-          { "id": "i_cooling", "label": "B. Cooling", "type": "rating" }
+          {
+            "id": "i_heating",
+            "label": "A. Heating",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_heating_ok",
+                  "title": "Condition",
+                  "comment": "A. Heating was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_heating_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_heating_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A. Heating requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_heating_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "A. Heating presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_cooling",
+            "label": "B. Cooling",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_cooling_ok",
+                  "title": "Condition",
+                  "comment": "B. Cooling was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_cooling_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_cooling_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "B. Cooling requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_cooling_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "B. Cooling presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
         ]
       },
       {
-        "id": "s_plumbing_trec", "title": "IV. Plumbing System",
+        "id": "s_plumbing_trec",
+        "title": "IV. Plumbing System",
         "items": [
-          { "id": "i_supply_p", "label": "A. Plumbing Supply",        "type": "rating" },
-          { "id": "i_drain_p",  "label": "B. Plumbing Drains",        "type": "rating" },
-          { "id": "i_wh_trec",  "label": "C. Water Heaters",          "type": "rating" },
-          { "id": "i_hydro",    "label": "D. Hydro-Massage Therapy",  "type": "rating" }
+          {
+            "id": "i_supply_p",
+            "label": "A. Plumbing Supply",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_supply_p_ok",
+                  "title": "Condition",
+                  "comment": "A. Plumbing Supply was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_supply_p_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_supply_p_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A. Plumbing Supply requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_supply_p_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "A. Plumbing Supply presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_drain_p",
+            "label": "B. Plumbing Drains",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_drain_p_ok",
+                  "title": "Condition",
+                  "comment": "B. Plumbing Drains was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_drain_p_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_drain_p_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "B. Plumbing Drains requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_drain_p_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "B. Plumbing Drains presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_wh_trec",
+            "label": "C. Water Heaters",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_wh_trec_ok",
+                  "title": "Condition",
+                  "comment": "C. Water Heaters was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_wh_trec_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_wh_trec_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "C. Water Heaters requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_wh_trec_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "C. Water Heaters presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_hydro",
+            "label": "D. Hydro-Massage Therapy",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_hydro_ok",
+                  "title": "Condition",
+                  "comment": "D. Hydro-Massage Therapy was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_hydro_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_hydro_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "D. Hydro-Massage Therapy requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_hydro_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "D. Hydro-Massage Therapy presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
         ]
       },
       {
-        "id": "s_appliances_trec", "title": "V. Appliances",
+        "id": "s_appliances_trec",
+        "title": "V. Appliances",
         "items": [
-          { "id": "i_dishwasher", "label": "A. Dishwasher",            "type": "rating" },
-          { "id": "i_disposal",   "label": "B. Food Waste Disposer",   "type": "rating" },
-          { "id": "i_range",      "label": "C. Range/Oven/Microwave",  "type": "rating" }
+          {
+            "id": "i_dishwasher",
+            "label": "A. Dishwasher",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_dishwasher_ok",
+                  "title": "Condition",
+                  "comment": "A. Dishwasher was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_dishwasher_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_dishwasher_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A. Dishwasher requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_dishwasher_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "A. Dishwasher presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_disposal",
+            "label": "B. Food Waste Disposer",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_disposal_ok",
+                  "title": "Condition",
+                  "comment": "B. Food Waste Disposer was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_disposal_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_disposal_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "B. Food Waste Disposer requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_disposal_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "B. Food Waste Disposer presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_range",
+            "label": "C. Range/Oven/Microwave",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_range_ok",
+                  "title": "Condition",
+                  "comment": "C. Range/Oven/Microwave was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_range_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_range_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "C. Range/Oven/Microwave requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_range_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "C. Range/Oven/Microwave presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
         ]
       },
       {
-        "id": "s_optional", "title": "VI. Optional Systems",
+        "id": "s_optional",
+        "title": "VI. Optional Systems",
         "items": [
-          { "id": "i_pool", "label": "A. Lawn Sprinkler Systems",  "type": "rating" },
-          { "id": "i_gas",  "label": "B. Gas Distribution System", "type": "rating" }
+          {
+            "id": "i_pool",
+            "label": "A. Lawn Sprinkler Systems",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_pool_ok",
+                  "title": "Condition",
+                  "comment": "A. Lawn Sprinkler Systems was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_pool_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_pool_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "A. Lawn Sprinkler Systems requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_pool_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "A. Lawn Sprinkler Systems presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "i_gas",
+            "label": "B. Gas Distribution System",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_gas_ok",
+                  "title": "Condition",
+                  "comment": "B. Gas Distribution System was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_gas_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_gas_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "B. Gas Distribution System requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_gas_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "B. Gas Distribution System presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
         ]
       }
     ]

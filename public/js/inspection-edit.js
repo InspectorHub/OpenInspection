@@ -76,6 +76,13 @@ function inspectionEditor(inspectionId) {
     swipeHintDismissed: (function () {
       try { return localStorage.getItem('oi:swipeHint') === 'dismissed'; } catch (_) { return false; }
     })(),
+    // Round 33 — mobile gesture stack (long-press / double-tap) + Cheatsheet HUD
+    _itemTouch: null,        // { itemId, startX, startY, startTime }
+    _itemLpTimer: null,      // long-press timer handle
+    _itemLastTap: null,      // { itemId, time } for double-tap detection
+    quickRatingItemId: null, // when long-press fires, target item id
+    showQuickRating: false,  // bottom-sheet visibility
+    showCheatsheet: false,   // ? HUD visibility (mobile menu button + desktop ?)
     _reportStats: { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
     aiSuggestions: [],
     aiTargetField: null,
@@ -242,6 +249,12 @@ function inspectionEditor(inspectionId) {
           if (typeof showToast === 'function') showToast('Press 0–9 to jump to section');
           clearTimeout(this.gPrefixTimer);
           this.gPrefixTimer = setTimeout(() => { this.gPrefix = false; }, 1500);
+          return;
+        }
+        // ? = toggle Cheatsheet HUD (Round 33)
+        if (e.key === '?') {
+          e.preventDefault();
+          this.toggleCheatsheet();
           return;
         }
         // / = open Comment Library (auto-filter by item rating)
@@ -560,6 +573,126 @@ function inspectionEditor(inspectionId) {
       this.debounceSave();
     },
 
+    // Spec 5B — Defect Model + Canned Comment Library (v2 schema).
+    // Per-item state is { rating, notes, photos, tabs: { information,
+    // limitations, defects } }. Tab arrays hold one entry per template
+    // canned-comment id with { cannedId, included, comment? } and (defects
+    // only) { category, location, photos }. We lazy-init missing nodes on
+    // each toggle so Alpine reactivity stays clean.
+    _ensureItemState(itemId) {
+      if (!this.results[itemId]) this.results[itemId] = { rating: null, notes: '', photos: [] };
+      if (!this.results[itemId].tabs) this.results[itemId].tabs = { information: [], limitations: [], defects: [] };
+      var t = this.results[itemId].tabs;
+      if (!Array.isArray(t.information)) t.information = [];
+      if (!Array.isArray(t.limitations)) t.limitations = [];
+      if (!Array.isArray(t.defects))     t.defects     = [];
+      return this.results[itemId];
+    },
+
+    // Returns the merged view for one tab: each canned entry from the
+    // template, augmented with `included` (toggle state) + `effectiveComment`
+    // (override or template comment). Used by the editor panel.
+    getTabEntries(itemId, tabName) {
+      var item = this._findItemById(itemId);
+      if (!item || !item.tabs) return [];
+      var canned = (item.tabs[tabName] || []).slice();
+      var state = (this.results[itemId] && this.results[itemId].tabs && this.results[itemId].tabs[tabName]) || [];
+      var stateMap = {};
+      for (var i = 0; i < state.length; i++) stateMap[state[i].cannedId] = state[i];
+      return canned.map(function (c) {
+        var s = stateMap[c.id];
+        var included = s ? !!s.included : !!c.default;
+        var override = (s && typeof s.comment === 'string' && s.comment.length > 0) ? s.comment : null;
+        return {
+          cannedId: c.id,
+          title: c.title,
+          comment: c.comment,
+          effectiveComment: override !== null ? override : c.comment,
+          included: included,
+          // defect-only fields:
+          category: (s && s.category) || c.category || null,
+          location: (s && typeof s.location === 'string' && s.location.length > 0) ? s.location : (c.location || ''),
+          photos: (s && Array.isArray(s.photos)) ? s.photos : [],
+        };
+      });
+    },
+
+    _findItemById(itemId) {
+      for (var s = 0; s < this.sections.length; s++) {
+        var items = this.sections[s].items || [];
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].id === itemId) return items[i];
+        }
+      }
+      return null;
+    },
+
+    _findStateEntry(itemId, tabName, cannedId) {
+      var st = this._ensureItemState(itemId);
+      var arr = st.tabs[tabName];
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].cannedId === cannedId) return arr[i];
+      }
+      return null;
+    },
+
+    _upsertStateEntry(itemId, tabName, cannedId, patch) {
+      var st = this._ensureItemState(itemId);
+      var arr = st.tabs[tabName];
+      var existing = null;
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].cannedId === cannedId) { existing = arr[i]; break; }
+      }
+      if (existing) {
+        Object.assign(existing, patch);
+      } else {
+        arr.push(Object.assign({ cannedId: cannedId, included: false }, patch));
+      }
+    },
+
+    toggleCannedComment(itemId, tabName, cannedId) {
+      var current = this._findStateEntry(itemId, tabName, cannedId);
+      var item = this._findItemById(itemId);
+      var canned = item && item.tabs && (item.tabs[tabName] || []).find(function (c) { return c.id === cannedId; });
+      // Flip: if no state row, derive from template default.
+      var nowIncluded = current ? !current.included : !(canned && canned.default);
+      this._upsertStateEntry(itemId, tabName, cannedId, { included: nowIncluded });
+      this.debounceSave();
+    },
+
+    setCannedCommentText(itemId, tabName, cannedId, text) {
+      this._upsertStateEntry(itemId, tabName, cannedId, { comment: text });
+      this.debounceSave();
+    },
+
+    setDefectLocation(itemId, cannedId, location) {
+      this._upsertStateEntry(itemId, 'defects', cannedId, { location: location });
+      this.debounceSave();
+    },
+
+    setDefectCategory(itemId, cannedId, category) {
+      this._upsertStateEntry(itemId, 'defects', cannedId, { category: category });
+      this.debounceSave();
+    },
+
+    activeItemTab: 'information',
+    setActiveItemTab(tabName) {
+      this.activeItemTab = tabName;
+    },
+
+    tabIncludedCount(itemId, tabName) {
+      var entries = this.getTabEntries(itemId, tabName);
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) if (entries[i].included) n++;
+      return n;
+    },
+
+    tabTotalCount(itemId, tabName) {
+      var item = this._findItemById(itemId);
+      if (!item || !item.tabs) return 0;
+      return (item.tabs[tabName] || []).length;
+    },
+
     toggleExpand(itemId) {
       this.expanded[itemId] = !this.expanded[itemId];
       if (this.expanded[itemId]) this.activeItemId = itemId;
@@ -574,6 +707,75 @@ function inspectionEditor(inspectionId) {
       if (this.swipeHintDismissed) return;
       this.swipeHintDismissed = true;
       try { localStorage.setItem('oi:swipeHint', 'dismissed'); } catch (_) { /* ignore */ }
+    },
+
+    // Round 33 — long-press (500ms, no movement) + double-tap (within 300ms)
+    onItemTouchStart(itemId, e) {
+      if (this.isDesktop) return;
+      if (!e.touches || e.touches.length !== 1) return;
+      var t = e.touches[0];
+      this._itemTouch = { itemId: itemId, startX: t.clientX, startY: t.clientY, startTime: Date.now() };
+      if (this._itemLpTimer) clearTimeout(this._itemLpTimer);
+      var self = this;
+      this._itemLpTimer = setTimeout(function () {
+        if (self._itemTouch && self._itemTouch.itemId === itemId) {
+          self.quickRatingItemId = itemId;
+          self.showQuickRating = true;
+          self.activeItemId = itemId;
+          if (navigator.vibrate) try { navigator.vibrate(20); } catch (_) { /* ignore */ }
+          self._itemTouch = null;  // mark consumed so touchend ignores it
+        }
+      }, 500);
+    },
+
+    onItemTouchMove(e) {
+      if (!this._itemTouch || !e.touches || !e.touches[0]) return;
+      var t = e.touches[0];
+      var dx = Math.abs(t.clientX - this._itemTouch.startX);
+      var dy = Math.abs(t.clientY - this._itemTouch.startY);
+      if (dx > 10 || dy > 10) {
+        if (this._itemLpTimer) { clearTimeout(this._itemLpTimer); this._itemLpTimer = null; }
+        this._itemTouch = null;
+      }
+    },
+
+    onItemTouchEnd(itemId) {
+      if (this._itemLpTimer) { clearTimeout(this._itemLpTimer); this._itemLpTimer = null; }
+      if (!this._itemTouch) return;  // long-press fired or move cancelled
+      var now = Date.now();
+      if (this._itemLastTap && this._itemLastTap.itemId === itemId && (now - this._itemLastTap.time) < 300) {
+        // double-tap → focus mode
+        this.activeItemId = itemId;
+        this.setViewMode('focus');
+        this._itemLastTap = null;
+      } else {
+        this._itemLastTap = { itemId: itemId, time: now };
+      }
+      this._itemTouch = null;
+    },
+
+    setQuickRating(levelId) {
+      if (!this.quickRatingItemId) { this.showQuickRating = false; return; }
+      if (levelId === null) {
+        if (!this.results[this.quickRatingItemId]) {
+          this.results[this.quickRatingItemId] = { rating: null, notes: '', photos: [] };
+        }
+        this.results[this.quickRatingItemId].rating = null;
+        this.debounceSave();
+      } else {
+        this.setRating(this.quickRatingItemId, levelId);
+      }
+      this.showQuickRating = false;
+      this.quickRatingItemId = null;
+    },
+
+    closeQuickRating() {
+      this.showQuickRating = false;
+      this.quickRatingItemId = null;
+    },
+
+    toggleCheatsheet() {
+      this.showCheatsheet = !this.showCheatsheet;
     },
 
     setViewMode(mode) {

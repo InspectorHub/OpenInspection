@@ -2,32 +2,167 @@
   "id": "seed_sewer_scope_v1",
   "name": "Sewer Scope Inspection",
   "description": "Camera inspection of main sewer line from cleanout to municipal connection.",
-  "version": 1,
+  "version": 2,
   "featured": true,
   "schema": {
+    "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_access", "title": "Access Point",
+        "id": "s_access",
+        "title": "Access Point",
         "items": [
-          { "id": "i_cleanout_loc",  "label": "Cleanout Location Identified", "type": "rating" },
-          { "id": "i_cleanout_cap",  "label": "Cleanout Cap Condition",       "type": "rating" }
+          {
+            "id": "i_cleanout_loc",
+            "label": "Cleanout Location Identified",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_co_loc", "title": "Location", "comment": "Cleanout located and accessed for camera entry.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_co_buried", "title": "Buried cleanouts", "comment": "Buried or concealed cleanouts not investigated.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_co_none", "title": "No cleanout", "category": "recommendation", "location": "", "comment": "No accessible cleanout found; recommend installation for future maintenance access.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "i_cleanout_cap",
+            "label": "Cleanout Cap Condition",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_cap_ok", "title": "Cap intact", "comment": "Cleanout cap is intact and properly sealed.", "default": true }
+              ],
+              "limitations": [],
+              "defects": [
+                { "id": "rd_cap_dam", "title": "Cap damaged", "category": "maintenance", "location": "", "comment": "Cleanout cap is cracked or missing; recommend replacement.", "photos": [], "default": false }
+              ]
+            }
+          }
         ]
       },
       {
-        "id": "s_line", "title": "Line Condition",
+        "id": "s_line",
+        "title": "Line Condition",
         "items": [
-          { "id": "i_pipe_material", "label": "Pipe Material (Cast/PVC/Clay)",        "type": "rating" },
-          { "id": "i_root_intrusion","label": "Root Intrusion Observed",              "type": "rating" },
-          { "id": "i_belly",         "label": "Belly / Sag Observed",                  "type": "rating" },
-          { "id": "i_breaks",        "label": "Breaks / Cracks Observed",              "type": "rating" },
-          { "id": "i_blockage",      "label": "Active Blockage / Standing Water",      "type": "rating" }
+          {
+            "id": "i_pipe_material",
+            "label": "Pipe Material (Cast/PVC/Clay)",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_pm_id", "title": "Material identified", "comment": "Sewer line material visually identified during scope.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_pm_dist", "title": "Distance limit", "comment": "Camera reach limited by line geometry; not all sections traversed.", "default": true }
+              ],
+              "defects": [
+                { "id": "rd_pm_clay", "title": "Clay tile", "category": "recommendation", "location": "", "comment": "Clay tile pipe susceptible to root intrusion and joint failures over time; recommend planning for future replacement.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "i_root_intrusion",
+            "label": "Root Intrusion Observed",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_root_none", "title": "None observed", "comment": "No root intrusion observed during camera inspection.", "default": true }
+              ],
+              "limitations": [],
+              "defects": [
+                { "id": "rd_root_minor", "title": "Minor roots", "category": "maintenance",    "location": "", "comment": "Minor root intrusion observed; recommend periodic mechanical clearing.", "photos": [], "default": false },
+                { "id": "rd_root_major", "title": "Major roots", "category": "recommendation", "location": "", "comment": "Significant root intrusion observed restricting flow; recommend evaluation for spot repair or lining.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "i_belly",
+            "label": "Belly / Sag Observed",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_belly_none", "title": "No belly", "comment": "No significant belly or sag observed.", "default": true }
+              ],
+              "limitations": [],
+              "defects": [
+                { "id": "rd_belly_pool", "title": "Standing water", "category": "recommendation", "location": "", "comment": "Belly observed retaining standing water; recommend evaluation by a licensed plumber.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "i_breaks",
+            "label": "Breaks / Cracks Observed",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_brk_none", "title": "Intact", "comment": "Pipe walls appear intact with no significant breaks observed.", "default": true }
+              ],
+              "limitations": [],
+              "defects": [
+                { "id": "rd_brk_yes", "title": "Break observed", "category": "safety", "location": "", "comment": "Visible break or significant crack in sewer line; recommend immediate evaluation and repair.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "i_blockage",
+            "label": "Active Blockage / Standing Water",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_blk_clear", "title": "Clear flow", "comment": "Line appears clear with normal flow characteristics.", "default": true }
+              ],
+              "limitations": [],
+              "defects": [
+                { "id": "rd_blk_active", "title": "Active blockage", "category": "safety", "location": "", "comment": "Active blockage observed preventing camera passage; recommend immediate professional drain service.", "photos": [], "default": false }
+              ]
+            }
+          }
         ]
       },
       {
-        "id": "s_reco", "title": "Recommendations",
+        "id": "s_reco",
+        "title": "Recommendations",
         "items": [
-          { "id": "i_immediate_action", "label": "Immediate Action Required", "type": "rating" },
-          { "id": "i_monitor",          "label": "Monitor at Future Visit",   "type": "rating" }
+          {
+            "id": "i_immediate_action",
+            "label": "Immediate Action Required",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_ia_none", "title": "None", "comment": "No immediate action required at this time.", "default": true }
+              ],
+              "limitations": [],
+              "defects": [
+                { "id": "rd_ia_yes", "title": "Action required", "category": "safety", "location": "", "comment": "Immediate professional sewer service recommended based on findings above.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "i_monitor",
+            "label": "Monitor at Future Visit",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_mon_ok", "title": "Re-scope", "comment": "Recommend re-scoping line in 2-3 years to monitor changes.", "default": true }
+              ],
+              "limitations": [],
+              "defects": [
+                { "id": "rd_mon_soon", "title": "Sooner re-scope", "category": "maintenance", "location": "", "comment": "Recommend re-scoping line in 12 months due to noted concerns.", "photos": [], "default": false }
+              ]
+            }
+          }
         ]
       }
     ]

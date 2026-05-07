@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { templates, inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
 
 /**
  * Service to manage inspection templates.
@@ -32,6 +33,24 @@ export class TemplateService {
             );
         }
         return 0;
+    }
+
+    /**
+     * Spec 5B — validate a template schema (v2). Throws AppError(BadRequest)
+     * with a Zod-flattened message on failure. Used by create/update.
+     */
+    private validateSchema(schema: string | Record<string, unknown>): Record<string, unknown> {
+        const parsed = typeof schema === 'string' ? (() => {
+            try { return JSON.parse(schema) as unknown; }
+            catch { throw Errors.BadRequest('Template schema is not valid JSON'); }
+        })() : schema;
+        const result = TemplateSchemaV2Schema.safeParse(parsed);
+        if (!result.success) {
+            const first = result.error.issues[0];
+            const path = first?.path?.join('.') || 'schema';
+            throw Errors.BadRequest(`Template schema invalid (v2 required): ${path} — ${first?.message ?? 'invalid'}`);
+        }
+        return result.data as unknown as Record<string, unknown>;
     }
 
     /**
@@ -72,16 +91,17 @@ export class TemplateService {
     }
 
     /**
-     * Creates a new template.
+     * Creates a new template. Spec 5B: schema MUST validate as v2.
      */
     async createTemplate(tenantId: string, name: string, schema: string | Record<string, unknown>) {
         const db = this.getDrizzle();
+        const validated = this.validateSchema(schema);
         const newTemplate = {
             id: crypto.randomUUID(),
             tenantId,
             name,
             version: 1,
-            schema: typeof schema === 'string' ? schema : JSON.stringify(schema),
+            schema: JSON.stringify(validated),
             createdAt: new Date(),
         };
 
@@ -91,14 +111,19 @@ export class TemplateService {
 
     /**
      * Updates an existing template, incrementing the version.
+     * Spec 5B: when schema is supplied it MUST validate as v2.
      */
     async updateTemplate(id: string, tenantId: string, name?: string, schema?: string | Record<string, unknown>) {
         const db = this.getDrizzle();
         const existing = await this.getTemplate(id, tenantId);
 
+        const nextSchema = schema !== undefined
+            ? JSON.stringify(this.validateSchema(schema))
+            : existing.schema;
+
         const updateData = {
             name: name ??  existing.name,
-            schema: schema ? (typeof schema === 'string' ? schema : JSON.stringify(schema)) : existing.schema,
+            schema: nextSchema,
             version: (existing.version as number) + 1,
         };
 

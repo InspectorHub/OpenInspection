@@ -429,11 +429,30 @@ export class InspectionService {
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
 
-        interface SchemaItem { id: string; label: string; icon?: string }
-        interface SchemaSection { id: string; title: string; icon?: string; items: SchemaItem[] }
-        interface SchemaData { sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
-        interface PhotoEntry { key: string; annotatedKey?: string; annotationsJson?: string }
-        interface ResultEntry { rating?: string; notes?: string; photos?: PhotoEntry[]; recommendation?: string; estimateMin?: number; estimateMax?: number }
+        // Spec 5B — v2 schema is the authoritative shape. Items are 'rich'
+        // (rating + 3 tabs of canned comments) or 'text' (free-text notes).
+        interface CannedInfoComment { id: string; title: string; comment: string; default: boolean }
+        interface CannedDefect      { id: string; title: string; category: 'maintenance' | 'recommendation' | 'safety'; location: string; comment: string; photos: string[]; default: boolean }
+        interface ItemTabs          { information: CannedInfoComment[]; limitations: CannedInfoComment[]; defects: CannedDefect[] }
+        interface SchemaItem        { id: string; label: string; icon?: string; type?: string; ratingOptions?: string[]; tabs?: ItemTabs; number?: string }
+        interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[] }
+        interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
+        interface PhotoEntry        { key: string; annotatedKey?: string; annotationsJson?: string }
+        interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[] }
+        interface CannedState       { cannedId: string; included: boolean; comment?: string | null }
+        interface ResultEntry {
+            rating?:         string;
+            notes?:          string;
+            photos?:         PhotoEntry[];
+            recommendation?: string;
+            estimateMin?:    number;
+            estimateMax?:    number;
+            tabs?: {
+                information?: CannedState[];
+                limitations?: CannedState[];
+                defects?:     DefectState[];
+            };
+        }
 
         const rawSchema = template?.schema
             ? (typeof template.schema === 'string' ? JSON.parse(template.schema) : template.schema)
@@ -449,6 +468,28 @@ export class InspectionService {
             : {};
 
         const stats = computeReportStats(schemaData.sections, resultData, levels);
+
+        // Spec 5B helper — for a given item, resolve the effective set of
+        // included comments per tab. Honors per-inspection toggles + text
+        // overrides, falling back to the template's `default: true` flag.
+        function resolveTab<T extends CannedInfoComment | CannedDefect>(
+            templateEntries: T[] | undefined,
+            states: CannedState[] | DefectState[] | undefined,
+        ): Array<T & { included: boolean; effectiveComment: string }> {
+            if (!templateEntries) return [];
+            const stateMap = new Map<string, CannedState | DefectState>();
+            for (const s of states ?? []) stateMap.set(s.cannedId, s);
+            return templateEntries.map(e => {
+                const st = stateMap.get(e.id);
+                const included = st ? !!st.included : !!e.default;
+                const override = st && typeof st.comment === 'string' && st.comment.length > 0 ? st.comment : null;
+                return {
+                    ...e,
+                    included,
+                    effectiveComment: override ?? e.comment,
+                };
+            });
+        }
 
         const sections = schemaData.sections.map((sec: SchemaSection) => ({
             id: sec.id,
@@ -471,9 +512,44 @@ export class InspectionService {
                     };
                 });
 
+                // Spec 5B — resolve the three canned-comment tabs.
+                const information = resolveTab(item.tabs?.information, res.tabs?.information);
+                const limitations = resolveTab(item.tabs?.limitations, res.tabs?.limitations);
+                // For defects, also let inspector override category, location, and attach photos.
+                const defectStates = res.tabs?.defects ?? [];
+                const defectStateMap = new Map<string, DefectState>();
+                for (const s of defectStates) defectStateMap.set(s.cannedId, s);
+                const defects = (item.tabs?.defects ?? []).map(d => {
+                    const st = defectStateMap.get(d.id);
+                    const included = st ? !!st.included : !!d.default;
+                    const override = st && typeof st.comment === 'string' && st.comment.length > 0 ? st.comment : null;
+                    return {
+                        ...d,
+                        included,
+                        effectiveComment: override ?? d.comment,
+                        effectiveCategory: st?.category ?? d.category,
+                        effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
+                        defectPhotos: (st?.photos ?? []).map(p => {
+                            const displayKey = p.annotatedKey || p.key;
+                            return {
+                                key: displayKey,
+                                originalKey: p.key,
+                                url: `/api/inspections/${inspectionId}/photos/${encodeURIComponent(displayKey)}`,
+                            };
+                        }),
+                    };
+                });
+
                 return {
                     id: item.id,
                     label: item.label || (item as unknown as Record<string, string>).name || 'Untitled',
+                    type:  item.type ?? 'rich',
+                    ratingOptions: item.ratingOptions ?? null,
+                    // Spec 5B — pass the raw template canned tabs through so
+                    // the editor can render checkbox toggles. Per-state
+                    // resolution happens client-side; the resolved view is
+                    // also exposed under `resolvedTabs` for report renderers.
+                    tabs: item.tabs ?? null,
                     rating: ratingId,
                     ratingColor: getRatingColor(ratingId, levels),
                     ratingLabel: level?.label ?? ratingId,
@@ -483,6 +559,13 @@ export class InspectionService {
                     recommendation: res.recommendation ?? null,
                     estimateMin: res.estimateMin ?? null,
                     estimateMax: res.estimateMax ?? null,
+                    // Spec 5B v2 resolved tab payload — report PDFs render
+                    // only entries where `included === true`.
+                    resolvedTabs: {
+                        information,
+                        limitations,
+                        defects,
+                    },
                 };
             }),
         }));
