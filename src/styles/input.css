@@ -62,6 +62,35 @@ textarea {
     resize: none;
 }
 
+/* ============================================================
+   Spec 5F R1 Step 5 — Canonical .ih-pill (status pill / chip / badge)
+   Replaces 4 prior variants (rounded-full / rounded-2xl + various
+   sizes) with a single 24px-tall pill at radius 4px. Use this for
+   any status indicator: rating chips (Sat/Mon/Defect), payment
+   status, completion badges, etc. Color is set via inline style or
+   one of the .ih-pill--* modifiers below.
+   ============================================================ */
+.ih-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: var(--ih-radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.ih-pill--sat     { background:#dcfce7; color:#15803d; }
+.ih-pill--monitor { background:#fef3c7; color:#b45309; }
+.ih-pill--defect  { background:#fee2e2; color:#b91c1c; }
+.ih-pill--ni      { background:#e2e8f0; color:#475569; }
+.ih-pill--np      { background:#f1f5f9; color:#64748b; }
+.ih-pill--gen     { background:#f1f5f9; color:#475569; }
+
 /* Phase T — voice input mic button active state */
 .mic-recording {
     background-color: #ef4444 !important;

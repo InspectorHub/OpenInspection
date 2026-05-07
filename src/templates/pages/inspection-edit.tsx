@@ -653,7 +653,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       <span class="text-[10px] font-mono" style="color: #b0aaa3" x-text="item.number"></span>
                     </div>
                     <span
-                      class="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase"
+                      class="ih-pill"
                       x-show="getItemRating(item.id)"
                       x-text="getRatingLabel(getItemRating(item.id))"
                       x-bind:style="'background:' + getRatingColor(getItemRating(item.id)) + '20; color:' + getRatingColor(getItemRating(item.id))"
