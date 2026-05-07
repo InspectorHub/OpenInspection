@@ -121,8 +121,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 x-bind:data-item-id="item.id"
                 class="rounded-2xl p-4 transition-all cursor-pointer"
                 style="background: rgba(255,253,250,0.82); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); border-left: 3px solid transparent;"
-                x-bind:style="'border-left-color:' + getRatingColor(getItemRating(item.id))"
-                x-bind:class="activeItemId === item.id ? 'ring-2 ring-blue-500/40 ring-offset-1' : ''"
+                x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-left-color: ' + getRatingColor(getItemRating(item.id))"
+                x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
                 x-on:click="setActiveItem(item.id)"
               >
                 <div class="flex items-start justify-between mb-3">
@@ -453,6 +453,13 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <div class="flex items-center gap-3">
                 <h2 class="text-2xl font-bold font-heading" style="color: #1a1815" x-text="currentSection?.title || ''"></h2>
                 <span class="text-xs font-mono px-2 py-1 rounded-lg" style="background: #f3f1ed; color: #908a83" x-text="'SECTION ' + (currentSectionIdx + 1) + '/' + sections.length"></span>
+                {/* Spec 5G M1 — keyboard hints inline next to section title (Mockup 01) */}
+                <span class="hidden lg:flex items-center gap-1.5 text-[10px] text-slate-400 ml-2" title="Keyboard shortcuts (press ? for full HUD)">
+                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">↑↓</kbd> nav
+                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">1-3</kbd> rate
+                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">/</kbd> lib
+                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">⏎</kbd> next
+                </span>
                 <button
                   x-on:click="batchMode = !batchMode"
                   class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all"
@@ -633,8 +640,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                   x-bind:data-item-id="item.id"
                   class="rounded-2xl p-4 transition-all cursor-pointer group"
                   style="background: rgba(255,253,250,0.82); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7);"
-                  x-bind:style="'border-top: 4px solid ' + getRatingColor(getItemRating(item.id))"
-                  x-bind:class="activeItemId === item.id ? 'ring-2 ring-blue-500/40 ring-offset-1' : ''"
+                  x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-top: 4px solid ' + getRatingColor(getItemRating(item.id))"
+                  x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
                   x-on:click="batchMode ? toggleBatchSelect(item.id) : (setActiveItem(item.id), toggleExpand(item.id))"
                 >
                   <div x-show="batchMode" class="mb-2">
