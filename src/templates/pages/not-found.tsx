@@ -17,13 +17,13 @@ export const NotFoundPage = (props: {
                 <AtmosphericBg />
 
                 <div class="max-w-xl w-full text-center animate-fade-in">
-                    <div class="glass-panel p-6 md:p-20 rounded-2xl shadow-2xl shadow-slate-200/50 border border-white/40">
+                    <div class="glass-panel p-6 md:p-20 rounded-2xl shadow-md border border-white/40">
                         <div class="mb-6">
                             <div class="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center mx-auto mb-6 shadow-inner group">
                                 <svg class="w-10 h-10 text-slate-400 group-hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                             </div>
                             
-                            <h1 class="text-3xl font-bold text-slate-900 tracking-tightest mb-6 leading-none text-gradient">{title}</h1>
+                            <h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-6 leading-none text-gradient">{title}</h1>
                             <p class="text-slate-500 text-lg font-semibold tracking-tight leading-relaxed max-w-sm mx-auto">
                                 {message || 'The application signature for this domain could not be resolved within our current cluster.'}
                             </p>

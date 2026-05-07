@@ -13,13 +13,13 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
 
                 {/* Floating Navigation */}
                 <nav class="sticky top-6 mx-auto max-w-7xl px-6 z-50">
-                    <div class="glass-panel flex h-20 items-center justify-between px-8 rounded-lg shadow-2xl shadow-indigo-100/20">
-                        <div class="flex items-center gap-8">
+                    <div class="glass-panel flex h-20 items-center justify-between px-8 rounded-lg shadow-md/20">
+                        <div class="flex items-center gap-4">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
                                     <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                                 </div>
-                                <span class="text-2xl font-black tracking-tightest text-slate-900">{siteName}</span>
+                                <span class="text-xl font-bold tracking-tight text-slate-900">{siteName}</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-6">
@@ -33,13 +33,13 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                 {/* Main Content */}
                 <main class="py-16 animate-slide-in relative z-10">
                     <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                        <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+                        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-16">
                             <div>
                                 <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
                                     <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></span>
                                     Agent Portal
                                 </div>
-                                <h1 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Referral Dashboard</h1>
+                                <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4">Referral Dashboard</h1>
                                 <p class="text-xl text-slate-400 font-medium max-w-2xl leading-relaxed">Track shared inspections and follow up on client reports in real-time.</p>
                             </div>
                             
@@ -50,7 +50,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                         </div>
 
                         {/* Referral List */}
-                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-indigo-100/10">
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-md/10">
                             <div class="overflow-x-auto">
                                 <table class="min-w-full">
                                     <thead>
@@ -66,7 +66,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                                         <tr id="loadingRow">
                                             <td colspan={5} class="py-32 text-center">
                                                 <div class="flex flex-col items-center gap-4">
-                                                    <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-xl shadow-indigo-100"></div>
+                                                    <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-md"></div>
                                                     <p class="text-sm font-bold text-slate-400 animate-pulse">Loading...</p>
                                                 </div>
                                             </td>
@@ -81,7 +81,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                             <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-slate-100 shadow-inner">
                                 <svg class="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                             </div>
-                            <h3 class="text-2xl font-black text-slate-900 mb-2">No Referrals Found</h3>
+                            <h3 class="text-xl font-bold text-slate-900 mb-2">No Referrals Found</h3>
                             <p class="text-slate-400 font-medium">Inspections referred by you will appear here once they are scheduled.</p>
                         </div>
                     </div>

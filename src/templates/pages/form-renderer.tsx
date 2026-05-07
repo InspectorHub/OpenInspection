@@ -15,9 +15,9 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                 <div class="max-w-4xl mx-auto px-6 py-8 relative z-10">
                     {/* Sticky Professional Header */}
                     <div class="sticky top-6 z-50 mb-6 transition-all duration-500" x-bind:class="{ 'translate-y-[-12px]': scrolled }">
-                        <div class="glass-panel flex items-center justify-between px-8 py-5 rounded-xl shadow-2xl shadow-indigo-100/30 ring-1 ring-white/60">
+                        <div class="glass-panel flex items-center justify-between px-8 py-5 rounded-xl shadow-md/30 ring-1 ring-white/60">
                             <div>
-                                <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Loading...'"></h1>
+                                <h1 class="text-xl font-bold tracking-tight text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Loading...'"></h1>
                                 <div class="flex items-center gap-2 mt-1">
                                     <span class="text-[10px] font-bold uppercase tracking-widest text-indigo-600/60" x-text="template?.name || 'Inspection Template'"></span>
                                     <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
@@ -33,7 +33,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                     </span>
                                 </div>
                                 <button x-on:click="syncData" 
-                                    class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white shadow-xl shadow-indigo-100/20 hover:bg-slate-50 transition-all active:scale-95 group"
+                                    class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white shadow-md/20 hover:bg-slate-50 transition-all active:scale-95 group"
                                     x-bind:disabled="syncing" 
                                     x-bind:class="{ 'opacity-50': syncing }">
                                     <svg class="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" x-bind:class="{ 'animate-spin': syncing }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -61,7 +61,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     {/* Inspection Architecture Loop */}
                     <div class="space-y-8 animate-slide-in">
                         <template x-for="section in templateSchema.sections" x-bind:key="section.id">
-                            <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-indigo-100/10 border-white/40 transition-all duration-500"
+                            <div class="glass-panel rounded-xl overflow-hidden shadow-md/10 border-white/40 transition-all duration-500"
                                 x-bind:class="openSections.includes(section.id) ? 'ring-2 ring-indigo-500/10' : ''">
                                 
                                 <button x-on:click="toggleSection(section.id)" class="w-full px-10 py-8 flex justify-between items-center bg-white/40 hover:bg-white/60 transition-all group">
@@ -69,7 +69,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                         <div class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-6">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                                         </div>
-                                        <h2 class="text-2xl font-black tracking-tightest text-slate-900" x-text="section.title"></h2>
+                                        <h2 class="text-xl font-bold tracking-tight text-slate-900" x-text="section.title"></h2>
                                     </div>
                                     <div class="flex items-center gap-4">
                                         <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400" x-text="section.items ? section.items.length + ' points' : ''"></span>
@@ -85,7 +85,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                             <div class="pt-10 first:pt-0">
                                                 <div class="flex justify-between items-start mb-6">
                                                     <div class="max-w-xl">
-                                                        <h3 class="text-lg font-black tracking-tightest text-slate-900" x-text="item.label"></h3>
+                                                        <h3 class="text-lg font-black tracking-tight text-slate-900" x-text="item.label"></h3>
                                                         <p class="mt-2 text-sm text-slate-400 font-medium leading-relaxed" x-text="item.description" x-show="item.description"></p>
                                                     </div>
                                                 </div>
@@ -128,7 +128,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                     {/* AI Synthesis Intelligence */}
                                                     <button
                                                         x-on:click="assistComment(item.id, item.label)"
-                                                        class="absolute bottom-4 right-4 py-2 px-4 bg-white shadow-2xl shadow-indigo-200 text-indigo-600 rounded-2xl opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all border border-indigo-100 hover:bg-indigo-50 active:scale-95 flex items-center gap-2 ring-4 ring-white"
+                                                        class="absolute bottom-4 right-4 py-2 px-4 bg-white shadow-md text-indigo-600 rounded-2xl opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all border border-indigo-100 hover:bg-indigo-50 active:scale-95 flex items-center gap-2 ring-4 ring-white"
                                                         title="AI Professionalize"
                                                     >
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
@@ -158,7 +158,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                     <div class="flex items-center gap-4">
                                                         <button
                                                             x-on:click={`$refs['file_input_' + item.id].click()`}
-                                                            class="flex items-center gap-3 px-3 py-2 bg-indigo-600 text-white rounded-[1.25rem] text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95"
+                                                            class="flex items-center gap-3 px-3 py-2 bg-indigo-600 text-white rounded-[1.25rem] text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 shadow-md transition-all active:scale-95"
                                                             x-bind:disabled="uploading[item.id]"
                                                         >
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="!uploading[item.id]"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -178,7 +178,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                     {/* Optimized Horizontal Evidence Grid */}
                                                     <div class="flex gap-4 overflow-x-auto pb-4 pt-2 -mx-2 px-2 scrollbar-hide">
                                                         <template x-for="(photo, index) in (results[item.id].photos || [])" x-bind:key="photo.key">
-                                                            <div class="relative flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-slate-100 group shadow-2xl shadow-indigo-100/10 border-4 border-white">
+                                                            <div class="relative flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-slate-100 group shadow-md/10 border-4 border-white">
                                                                 <img x-bind:src="photo.pending && photo.dataUrl ? photo.dataUrl : '/api/inspections/files/' + photo.key" class="w-full h-full object-cover" />
 
                                                                 {/* Photo Metadata Overlay */}
@@ -223,7 +223,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     </div>
 
                     {/* Inspection Completion */}
-                    <div class="mt-20 flex flex-col gap-8 pb-32">
+                    <div class="mt-20 flex flex-col gap-4 pb-32">
                         <div x-show="!isDelivered && inspection?.status !== 'completed'">
                             <button
                                 x-on:click="finishInspection"
@@ -231,7 +231,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 x-bind:class="{ 'opacity-50 pointer-events-none': !isComplete }"
                                 x-bind:disabled="syncing"
                             >
-                                <span class="text-xl tracking-tightest" x-text="syncing ? 'Submitting...' : 'Complete Inspection'"></span>
+                                <span class="text-xl tracking-tight" x-text="syncing ? 'Submitting...' : 'Complete Inspection'"></span>
                                 <svg class="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="!syncing"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 <svg class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="syncing"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             </button>
@@ -242,15 +242,15 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <div class="w-20 h-20 bg-emerald-500 rounded-lg flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-emerald-200 group hover:rotate-6 transition-transform">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
-                                <h3 class="text-3xl font-black tracking-tightest text-slate-900 mb-3">Inspection Complete</h3>
+                                <h3 class="text-3xl font-black tracking-tight text-slate-900 mb-3">Inspection Complete</h3>
                                 <p class="text-lg text-slate-500 font-medium max-w-md mx-auto">The inspection has been finalized and the report is ready for download.</p>
                             </div>
                             <a
                                 x-bind:href={`'/api/inspections/' + inspectionId + '/report'`}
                                 target="_blank"
-                                class="premium-button w-full py-6 bg-indigo-600 text-white rounded-xl font-bold shadow-2xl shadow-indigo-100 active:scale-95 transition-all hover:bg-indigo-700 flex items-center justify-center gap-4"
+                                class="premium-button w-full py-6 bg-indigo-600 text-white rounded-xl font-bold shadow-md active:scale-95 transition-all hover:bg-indigo-700 flex items-center justify-center gap-4"
                             >
-                                <span class="text-xl tracking-tightest">Review Certified Documentation</span>
+                                <span class="text-xl tracking-tight">Review Certified Documentation</span>
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             </a>
                         </div>
@@ -271,7 +271,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             {/* Modal High-End Header */}
                             <div class="px-12 py-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
                                 <div>
-                                    <h3 class="text-3xl font-black tracking-tightest text-slate-900">Annotation Studio</h3>
+                                    <h3 class="text-3xl font-black tracking-tight text-slate-900">Annotation Studio</h3>
                                     <p class="text-sm text-slate-400 font-medium">Precision markup engine for evidence clarification</p>
                                 </div>
                                 <button x-on:click="showAnnotationModal = false" class="w-12 h-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all active:scale-95">
@@ -331,11 +331,11 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                     </button>
                                     <button
                                         x-on:click="saveAnnotation"
-                                        class="flex-[2] premium-button py-5 bg-indigo-600 text-white rounded-md font-bold shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                                        class="flex-[2] premium-button py-5 bg-indigo-600 text-white rounded-md font-bold shadow-md hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
                                         x-bind:disabled="syncing"
                                     >
                                         <svg x-show="syncing" class="w-5 h-5 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                        <span class="tracking-tightest text-lg" x-text="syncing ? 'Saving...' : 'Save Markup'"></span>
+                                        <span class="tracking-tight text-lg" x-text="syncing ? 'Saving...' : 'Save Markup'"></span>
                                     </button>
                                 </div>
                             </div>

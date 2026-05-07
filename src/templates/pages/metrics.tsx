@@ -30,15 +30,15 @@ export function MetricsPage({ appName, branding }: MetricsPageProps) {
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                         <div class="bg-white border border-slate-200 rounded-xl p-5">
                             <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Revenue</div>
-                            <div class="text-2xl font-black text-slate-900" x-text="data ? fmt(data.totalRevenue) : '—'" />
+                            <div class="text-xl font-bold text-slate-900" x-text="data ? fmt(data.totalRevenue) : '—'" />
                         </div>
                         <div class="bg-white border border-slate-200 rounded-xl p-5">
                             <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Inspections</div>
-                            <div class="text-2xl font-black text-slate-900" x-text="data ? data.totalInspections : '—'" />
+                            <div class="text-xl font-bold text-slate-900" x-text="data ? data.totalInspections : '—'" />
                         </div>
                         <div class="bg-white border border-slate-200 rounded-xl p-5">
                             <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Avg Order Value</div>
-                            <div class="text-2xl font-black text-slate-900" x-text="data ? fmt(data.avgOrderValue) : '—'" />
+                            <div class="text-xl font-bold text-slate-900" x-text="data ? fmt(data.avgOrderValue) : '—'" />
                         </div>
                     </div>
 

@@ -98,11 +98,11 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Profile ── */}
-                    <section class="glass-panel p-6 rounded-2xl shadow-2xl shadow-slate-200/50 space-y-10">
+                    <section class="glass-panel p-6 rounded-2xl shadow-md space-y-10">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', 'bg-teal-600/10 text-teal-600')}
                             <div>
-                                <h2 id="sec-profile" class="text-2xl font-black text-slate-900 tracking-tightest">Profile</h2>
+                                <h2 id="sec-profile" class="text-xl font-bold text-slate-900 tracking-tight">Profile</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inspector Identity · Shown on Reports</p>
                             </div>
                         </div>
@@ -139,11 +139,11 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Branding ── */}
-                    <section class="glass-panel p-6 rounded-2xl shadow-2xl shadow-slate-200/50 space-y-10">
+                    <section class="glass-panel p-6 rounded-2xl shadow-md space-y-10">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z', 'bg-indigo-600/10 text-indigo-600')}
                             <div>
-                                <h2 id="sec-branding" class="text-2xl font-black text-slate-900 tracking-tightest">Branding</h2>
+                                <h2 id="sec-branding" class="text-xl font-bold text-slate-900 tracking-tight">Branding</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Workspace Visual Identity</p>
                             </div>
                         </div>
@@ -224,7 +224,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01', 'bg-fuchsia-600/10 text-fuchsia-600')}
                             <div>
-                                <h2 id="sec-theme" class="text-2xl font-black text-slate-900 tracking-tightest">Report Theme</h2>
+                                <h2 id="sec-theme" class="text-xl font-bold text-slate-900 tracking-tight">Report Theme</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Default visual style for client-facing reports</p>
                             </div>
                         </div>
@@ -247,7 +247,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'bg-sky-600/10 text-sky-600')}
                             <div>
-                                <h2 id="sec-telemetry" class="text-2xl font-black text-slate-900 tracking-tightest">Telemetry</h2>
+                                <h2 id="sec-telemetry" class="text-xl font-bold text-slate-900 tracking-tight">Telemetry</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Google Analytics 4</p>
                             </div>
                         </div>
@@ -271,7 +271,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             <div class="flex items-center gap-5">
                                 {sectionIcon('M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', 'bg-slate-700/10 text-slate-700')}
                                 <div>
-                                    <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Workspace Integrations</h2>
+                                    <h2 class="text-xl font-bold text-slate-900 tracking-tight">Workspace Integrations</h2>
                                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email · Bot Protection · AI · Google Calendar · Admin keys</p>
                                 </div>
                             </div>
@@ -284,11 +284,11 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', 'bg-emerald-600/10 text-emerald-600')}
                             <div>
-                                <h2 id="sec-email" class="text-2xl font-black text-slate-900 tracking-tightest">Email Delivery</h2>
+                                <h2 id="sec-email" class="text-xl font-bold text-slate-900 tracking-tight">Email Delivery</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Resend · Password resets, invitations, reports</p>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Sender Email</label>
                                 <input type="email" id="senderEmail" placeholder="Reports &lt;reports@yourdomain.com&gt;"
@@ -314,11 +314,11 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', 'bg-amber-600/10 text-amber-600')}
                             <div>
-                                <h2 id="sec-bot" class="text-2xl font-black text-slate-900 tracking-tightest">Bot Protection</h2>
+                                <h2 id="sec-bot" class="text-xl font-bold text-slate-900 tracking-tight">Bot Protection</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cloudflare Turnstile · Public booking form</p>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Site Key <span class="text-slate-400 normal-case font-normal">(public)</span></label>
                                 <input type="text" id="turnstileSiteKey" placeholder="0x4AAAA..."
@@ -342,7 +342,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M13 10V3L4 14h7v7l9-11h-7z', 'bg-violet-600/10 text-violet-600')}
                             <div>
-                                <h2 id="sec-ai" class="text-2xl font-black text-slate-900 tracking-tightest">AI Features</h2>
+                                <h2 id="sec-ai" class="text-xl font-bold text-slate-900 tracking-tight">AI Features</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Google Gemini · Comment assist, inspection summary</p>
                             </div>
                         </div>
@@ -364,18 +364,18 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'bg-rose-600/10 text-rose-600')}
                             <div>
-                                <h2 id="sec-integrations" class="text-2xl font-black text-slate-900 tracking-tightest">Integrations</h2>
+                                <h2 id="sec-integrations" class="text-xl font-bold text-slate-900 tracking-tight">Integrations</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Google Calendar OAuth · App URL</p>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 gap-8">
+                        <div class="grid grid-cols-1 gap-4">
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">App Base URL</label>
                                 <input type="url" id="appBaseUrl" placeholder="https://inspect.yourdomain.com"
                                     class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-rose-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" />
                                 <p class="text-[10px] text-slate-400 font-bold ml-1">Used for OAuth redirect URIs and email links.</p>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div class="space-y-3">
                                     <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Google Client ID <span class="text-slate-400 normal-case font-normal">(public)</span></label>
                                     <input type="text" id="googleClientId" placeholder="00000000-xxxx.apps.googleusercontent.com"
@@ -426,7 +426,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'bg-slate-600/10 text-slate-600')}
                             <div>
-                                <h2 id="sec-calendar" class="text-2xl font-black text-slate-900 tracking-tightest">Apple Calendar</h2>
+                                <h2 id="sec-calendar" class="text-xl font-bold text-slate-900 tracking-tight">Apple Calendar</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ICS Subscription · Read-only</p>
                             </div>
                         </div>
@@ -448,11 +448,11 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', 'bg-slate-600/10 text-slate-600')}
                             <div>
-                                <h2 id="sec-password" class="text-2xl font-black text-slate-900 tracking-tightest">Change Password</h2>
+                                <h2 id="sec-password" class="text-xl font-bold text-slate-900 tracking-tight">Change Password</h2>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Account Security</p>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Current Password</label>
                                 <input type="password" id="currentPassword"

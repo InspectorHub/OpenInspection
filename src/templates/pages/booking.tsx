@@ -31,21 +31,21 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                     {!isEmbed && (
                         <nav class="mb-16 flex items-center justify-between">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-100">
+                                <div class="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
                                      <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </div>
-                                <span class="text-2xl font-black text-slate-900 tracking-tightest">{siteName}</span>
+                                <span class="text-xl font-bold text-slate-900 tracking-tight">{siteName}</span>
                             </div>
                         </nav>
                     )}
 
-                    <div class="glass-panel p-6 md:p-16 rounded-2xl shadow-2xl shadow-slate-200/50 border border-white/40">
+                    <div class="glass-panel p-6 md:p-16 rounded-2xl shadow-md border border-white/40">
                         <div class="mb-16">
                             <div class="flex items-center gap-2 mb-4">
                                 <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
                                 <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.3em]">Book Inspection</span>
                             </div>
-                            <h1 class="text-3xl font-bold text-slate-900 tracking-tightest mb-4 leading-none">Schedule Inspection</h1>
+                            <h1 class="text-3xl font-bold text-slate-900 tracking-tight mb-4 leading-none">Schedule Inspection</h1>
                             <p class="text-slate-500 text-lg font-semibold tracking-tight">Professional property analysis configured for high-fidelity reporting.</p>
                         </div>
 
@@ -53,7 +53,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                             {/* Property Details */}
                             <div class="space-y-8">
                                 <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase I: Property Parameters</h3>
-                                <div class="grid grid-cols-1 gap-8">
+                                <div class="grid grid-cols-1 gap-4">
                                     <div class="space-y-3">
                                         <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-widest">Site Address</label>
                                         <div class="relative group">
@@ -68,7 +68,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                             {/* Client Details */}
                             <div class="space-y-8">
                                 <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase II: Client Information</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="space-y-3">
                                         <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-widest">Full Name</label>
                                         <div class="relative group">
@@ -91,7 +91,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                             {/* Scheduling */}
                             <div class="space-y-8">
                                 <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-[0.3em] ml-1">Phase III: Scheduling</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="space-y-3">
                                         <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-widest">Inspection Date</label>
                                         <div class="relative group">

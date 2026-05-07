@@ -7,23 +7,23 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
     return (
         <MainLayout title={`${siteName} | Agreements`} branding={branding}>
             <div class="animate-slide-in flex flex-col" style="min-height: calc(100vh - 5rem);">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-6">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
                     <div>
                         <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
                             <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
                             Legal Compliance
                         </div>
-                        <h1 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Agreements</h1>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4">Agreements</h1>
                         <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage liability waivers and professional service agreements for your clients.</p>
                     </div>
-                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-2xl shadow-2xl shadow-indigo-100/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
+                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-2xl shadow-md/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         New Agreement
                     </button>
                 </div>
 
                 {/* Agreements List */}
-                <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-indigo-100/5 flex-1 flex flex-col">
+                <div class="glass-panel rounded-xl overflow-hidden shadow-md/5 flex-1 flex flex-col">
                     <div class="overflow-x-auto flex-1">
                         <table class="min-w-full h-full">
                             <thead>
@@ -38,7 +38,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                 <tr id="loadingRow">
                                     <td colspan={4} class="py-32 text-center">
                                         <div class="flex flex-col items-center gap-4">
-                                            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-xl shadow-indigo-100"></div>
+                                            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-md"></div>
                                             <p class="text-sm font-bold text-slate-400 animate-pulse">Loading...</p>
                                         </div>
                                     </td>
@@ -59,7 +59,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                 </button>
                             </div>
                             <div class="mb-6">
-                                <h3 id="modalAgreementTitle" class="text-3xl font-black text-slate-900 mb-3 tracking-tightest leading-tight">Create Professional Agreement</h3>
+                                <h3 id="modalAgreementTitle" class="text-3xl font-black text-slate-900 mb-3 tracking-tight leading-tight">Create Professional Agreement</h3>
                                 <p class="text-lg text-slate-400 font-medium">Draft a new service agreement or liability waiver.</p>
                             </div>
                             <input type="hidden" id="editAgreementId" />
@@ -82,7 +82,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                     <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-slate-400 hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest">
                                         Discard
                                     </button>
-                                    <button type="button" onclick="submitAgreement()" id="submitAgreementBtn" class="flex-[2] premium-button py-4.5 rounded-2xl bg-indigo-600 text-white font-bold shadow-2xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">
+                                    <button type="button" onclick="submitAgreement()" id="submitAgreementBtn" class="flex-[2] premium-button py-4.5 rounded-2xl bg-indigo-600 text-white font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition-all">
                                         Publish Agreement
                                     </button>
                                 </div>
@@ -96,7 +96,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onclick="closeSendModal()"></div>
                     <div class="flex min-h-full items-center justify-center">
                         <div class="relative w-full max-w-md bg-white rounded-xl p-6 shadow-2xl">
-                            <h3 class="text-2xl font-black text-slate-900 mb-2">Send for Signature</h3>
+                            <h3 class="text-xl font-bold text-slate-900 mb-2">Send for Signature</h3>
                             <p class="text-sm text-slate-400 font-semibold mb-8">Client will receive an email with a link to review and sign.</p>
                             <input type="hidden" id="sendAgreementId" />
                             <div class="space-y-4">

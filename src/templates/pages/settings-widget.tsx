@@ -15,7 +15,7 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                 </div>
 
                 <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
-                    <h2 class="text-2xl font-black text-slate-900 tracking-tightest">1 · Allowed Origins</h2>
+                    <h2 class="text-xl font-bold text-slate-900 tracking-tight">1 · Allowed Origins</h2>
                     <p class="text-sm text-slate-500">List the domains where you'll embed the widget. One per line. Use <code>{'https://*.example.com'}</code> for wildcard subdomains.</p>
                     <textarea id="widgetOrigins" rows={6}
                         class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all font-mono text-sm placeholder:text-slate-300"
@@ -26,7 +26,7 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                 </section>
 
                 <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
-                    <h2 class="text-2xl font-black text-slate-900 tracking-tightest">2 · Style</h2>
+                    <h2 class="text-xl font-bold text-slate-900 tracking-tight">2 · Style</h2>
                     <div class="flex gap-3 flex-wrap">
                         <button class="widget-style-btn px-3 py-2 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="light">☀ Light</button>
                         <button class="widget-style-btn px-3 py-2 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="dark">🌙 Dark</button>
@@ -35,7 +35,7 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                 </section>
 
                 <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
-                    <h2 class="text-2xl font-black text-slate-900 tracking-tightest">3 · Snippet</h2>
+                    <h2 class="text-xl font-bold text-slate-900 tracking-tight">3 · Snippet</h2>
                     <p class="text-sm text-slate-500">Copy and paste this into your site where the booking form should appear.</p>
                     <pre id="widgetSnippet" class="bg-slate-900 text-emerald-300 p-5 rounded-2xl overflow-x-auto text-xs font-mono"></pre>
                     <div class="flex justify-end gap-3">
@@ -44,7 +44,7 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                 </section>
 
                 <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
-                    <h2 class="text-2xl font-black text-slate-900 tracking-tightest">4 · Live Preview</h2>
+                    <h2 class="text-xl font-bold text-slate-900 tracking-tight">4 · Live Preview</h2>
                     <iframe id="widgetPreview" class="w-full min-h-[700px] rounded-2xl border border-slate-200" loading="lazy"></iframe>
                 </section>
 

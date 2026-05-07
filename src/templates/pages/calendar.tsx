@@ -13,7 +13,7 @@ export const CalendarPage = ({ branding }: { branding?: BrandingConfig | undefin
                     <p class="text-lg text-slate-500 font-semibold mt-2">View scheduled inspections by month, week, or day.</p>
                 </div>
                 {/* FullCalendar mount point */}
-                <div class="glass-panel rounded-lg overflow-hidden shadow-xl shadow-slate-200/50 p-4">
+                <div class="glass-panel rounded-lg overflow-hidden shadow-md p-4">
                     <div id="calendar"></div>
                 </div>
             </div>

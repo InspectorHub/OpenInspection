@@ -10,7 +10,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
             <div class="space-y-6 animate-fade-in">
 
                 {/* Header Section */}
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div class="space-y-4">
                         <div class="flex items-center gap-3">
                             <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
@@ -20,7 +20,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
 
                     <div class="flex items-center gap-4">
-                        <button type="button" onclick="showCreateModal()" class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-2 rounded-md bg-indigo-600 text-white font-bold shadow-2xl shadow-indigo-100 hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
+                        <button type="button" onclick="showCreateModal()" class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-2 rounded-md bg-indigo-600 text-white font-bold shadow-md hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
                             <svg class="w-5 h-5 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                             </svg>
@@ -33,7 +33,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     that opens the matching bucket section + scrolls into
                     view. anchor maps to a section in the inspections list
                     rendered below. */}
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
                         { label: 'Active Jobs',     id: 'statActive',    target: 'today',          icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: 'indigo' },
                         { label: 'In Progress',     id: 'statProgress',  target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
@@ -54,7 +54,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </div>
                                 <span class="sr-only">Live</span>
                             </div>
-                            <h3 class="text-4xl font-black text-slate-900 tracking-tightest mb-1" id={stat.id}>0</h3>
+                            <h3 class="text-4xl font-black text-slate-900 tracking-tight mb-1" id={stat.id}>0</h3>
                             <p class="text-sm font-bold text-slate-500 uppercase tracking-tight">{stat.label}</p>
                         </button>
                     ))}
@@ -335,7 +335,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="w-14 h-14 bg-emerald-600/10 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
                                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                                 </div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tightest mb-2 leading-none">New Inspection</h3>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tight mb-2 leading-none">New Inspection</h3>
                                 <p class="text-sm text-slate-500 font-semibold tracking-tight">Enter the details for this inspection.</p>
                             </div>
 

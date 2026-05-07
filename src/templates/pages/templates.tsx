@@ -7,23 +7,23 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
     return (
         <MainLayout title={`${siteName} | Templates`} branding={branding}>
             <div class="animate-slide-in space-y-12">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                         <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
                             <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
                             Templates
                         </div>
-                        <h1 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Templates</h1>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4">Templates</h1>
                         <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage your inspection checklists.</p>
                     </div>
-                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-2xl shadow-2xl shadow-indigo-100/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
+                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-2xl shadow-md/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         New Template
                     </button>
                 </div>
 
                 {/* Templates List */}
-                <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-indigo-100/5">
+                <div class="glass-panel rounded-xl overflow-hidden shadow-md/5">
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
@@ -38,7 +38,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <tr id="loadingRow">
                                     <td colspan={4} class="py-32 text-center">
                                         <div class="flex flex-col items-center gap-4">
-                                            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-xl shadow-indigo-100"></div>
+                                            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-md"></div>
                                             <p class="text-sm font-bold text-slate-400 animate-pulse">Loading templates...</p>
                                         </div>
                                     </td>
@@ -59,7 +59,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </button>
                             </div>
                             <div class="mb-6">
-                                <h3 class="text-3xl font-black text-slate-900 mb-3 tracking-tightest leading-tight">New Template</h3>
+                                <h3 class="text-3xl font-black text-slate-900 mb-3 tracking-tight leading-tight">New Template</h3>
                                 <p class="text-lg text-slate-400 font-medium">Create an inspection checklist.</p>
                             </div>
                             <div class="space-y-8">
@@ -75,7 +75,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-slate-400 hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest">
                                         Cancel
                                     </button>
-                                    <button type="button" onclick="submitTemplate()" id="submitTplBtn" class="flex-[2] premium-button py-4.5 rounded-2xl bg-indigo-600 text-white font-bold shadow-2xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">
+                                    <button type="button" onclick="submitTemplate()" id="submitTplBtn" class="flex-[2] premium-button py-4.5 rounded-2xl bg-indigo-600 text-white font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition-all">
                                         Create Template
                                     </button>
                                 </div>
