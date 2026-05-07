@@ -34,12 +34,19 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     that opens the matching bucket section + scrolls into
                     view. anchor maps to a section in the inspections list
                     rendered below. */}
+                {/* R45 fix — labels, count semantics, and click targets now
+                    align. Each card's number, name, and the bucket it scrolls
+                    to all reference the same dataset. Was previously a 3-way
+                    mismatch (Active = today+thisWeek+later but click jumps to
+                    just `today`; Ready for Review = recentReports but click
+                    jumps to needsAttention; Completed double-counted recent
+                    reports as both 'review' and 'completed'). */}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                        { label: 'Active Jobs',     id: 'statActive',    target: 'today',          icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: 'indigo' },
-                        { label: 'In Progress',     id: 'statProgress',  target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
-                        { label: 'Ready for Review',id: 'statReview',    target: 'needsAttention', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', color: 'amber' },
-                        { label: 'Completed',       id: 'statCompleted', target: 'recentReports', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', color: 'emerald' }
+                        { label: 'Upcoming',        id: 'statUpcoming',   target: 'later',          icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'indigo' },
+                        { label: 'In Progress',     id: 'statInProgress', target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
+                        { label: 'Needs Attention', id: 'statNeedsAttn',  target: 'needsAttention', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', color: 'amber' },
+                        { label: 'Recent Reports',  id: 'statRecentRpt',  target: 'recentReports',  icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', color: 'emerald' }
                     ].map((stat, i) => (
                         <button
                             key={stat.id}

@@ -609,20 +609,16 @@ function dashboardFactory() {
         },
 
         computeStats() {
+            // R45 — each stat's number, label, and click-target bucket are now
+            // aligned. No more double-counting recentReports as both 'review'
+            // and 'completed'. No more renaming the same number under two
+            // different headers.
             const b = this.buckets;
-            const allActive = [...b.today, ...b.thisWeek, ...b.later];
             const inProgressItems = [
                 ...b.needsAttention.filter(i => i.status === 'in_progress'),
                 ...b.today.filter(i => i.status === 'in_progress'),
                 ...b.thisWeek.filter(i => i.status === 'in_progress'),
                 ...b.later.filter(i => i.status === 'in_progress'),
-            ];
-            const completedItems = [
-                ...b.needsAttention.filter(i => i.status === 'completed'),
-                ...b.today.filter(i => i.status === 'completed'),
-                ...b.thisWeek.filter(i => i.status === 'completed'),
-                ...b.later.filter(i => i.status === 'completed'),
-                ...b.recentReports,
             ];
             const dedupCount = (rows) => new Set(rows.map(r => r.id)).size;
 
@@ -631,10 +627,15 @@ function dashboardFactory() {
                 if (el) el.textContent = String(val);
             };
 
-            setText('statActive',    allActive.length);
-            setText('statProgress',  dedupCount(inProgressItems));
-            setText('statReview',    b.recentReports.length);
-            setText('statCompleted', dedupCount(completedItems));
+            // Upcoming = scheduled work (today + thisWeek + later, dedup'd)
+            setText('statUpcoming',   dedupCount([...b.today, ...b.thisWeek, ...b.later]));
+            // In Progress = inspections currently being worked on
+            setText('statInProgress', dedupCount(inProgressItems));
+            // Needs Attention = inspections flagged as needing review
+            setText('statNeedsAttn',  b.needsAttention.length);
+            // Recent Reports = published reports (was previously double-named
+            // 'Ready for Review' AND 'Completed' for the same dataset)
+            setText('statRecentRpt',  b.recentReports.length);
         },
 
         async loadAllLater() {
