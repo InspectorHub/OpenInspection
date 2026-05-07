@@ -309,7 +309,7 @@ function inspectionEditor(inspectionId) {
         var dataRes = await authFetch('/api/inspections/' + this.inspectionId + '/report-data');
         if (dataRes.ok) {
           var dataJson = await dataRes.json();
-          this.sections = (dataJson.data?.sections || []).map(function(sec) {
+          var newSections = (dataJson.data?.sections || []).map(function(sec) {
             var s = Object.assign({}, sec);
             if (!s.title && s.name) { s.title = s.name; }
             if (s.items && Array.isArray(s.items)) {
@@ -321,25 +321,33 @@ function inspectionEditor(inspectionId) {
             }
             return s;
           });
+          // Pre-fill results stubs BEFORE assigning sections so Alpine
+          // x-model bindings (e.g. results[item.id].notes) don't read
+          // undefined while /results is still being fetched.
+          for (var s = 0; s < newSections.length; s++) {
+            var sec = newSections[s];
+            for (var i = 0; i < sec.items.length; i++) {
+              var item = sec.items[i];
+              if (!this.results[item.id]) {
+                this.results[item.id] = { rating: null, notes: '', photos: [] };
+              }
+            }
+          }
+          this.sections = newSections;
           this.ratingLevels = backfillLevelDescriptions(dataJson.data?.ratingLevels || []);
           this._reportStats = dataJson.data?.stats || this._reportStats;
           window.dispatchEvent(new CustomEvent('rating-levels-ready', { detail: this.ratingLevels }));
         }
 
-        // Load existing results
+        // Load existing results — merge into stubs so we preserve any
+        // entries the stub-fill seeded above.
         var resultsRes = await authFetch('/api/inspections/' + this.inspectionId + '/results');
         if (resultsRes.ok) {
           var rJson = await resultsRes.json();
-          this.results = rJson.data?.data || {};
-        }
-
-        // Ensure every item has a results entry
-        for (var s = 0; s < this.sections.length; s++) {
-          var sec = this.sections[s];
-          for (var i = 0; i < sec.items.length; i++) {
-            var item = sec.items[i];
-            if (!this.results[item.id]) {
-              this.results[item.id] = { rating: null, notes: '', photos: [] };
+          var loaded = rJson.data?.data || {};
+          for (var k in loaded) {
+            if (Object.prototype.hasOwnProperty.call(loaded, k)) {
+              this.results[k] = loaded[k];
             }
           }
         }
