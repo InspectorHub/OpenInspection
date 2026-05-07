@@ -39,7 +39,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
 
             <div x-show="items.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <template x-for="rec in items" {...{ 'x-bind:key': 'rec.id' }}>
-                    <div class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition">
+                    <div class="p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1">

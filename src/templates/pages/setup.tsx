@@ -28,7 +28,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="companyName" name="companyName" type="text" required placeholder="Acme Inspections"
-                                        class="premium-input relative block w-full rounded-2xl border-0 py-5 text-slate-900 ring-2 ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-600 sm:text-sm sm:leading-6 pl-6 transition-all" />
+                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>
                             </div>
 
@@ -37,7 +37,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="email" name="email" type="email" autocomplete="email" required placeholder="admin@company.com"
-                                        class="premium-input relative block w-full rounded-2xl border-0 py-5 text-slate-900 ring-2 ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-600 sm:text-sm sm:leading-6 pl-6 transition-all" />
+                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>
                             </div>
 
@@ -46,7 +46,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="password" name="password" type="password" required placeholder="••••••••"
-                                        class="premium-input relative block w-full rounded-2xl border-0 py-5 text-slate-900 ring-2 ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-600 sm:text-sm sm:leading-6 pl-6 transition-all" />
+                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>
                                 <p class="mt-2 ml-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Minimum 8 characters</p>
                             </div>
@@ -56,7 +56,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="verificationCode" name="verificationCode" type="text" required placeholder="000000"
-                                        class="premium-input relative block w-full rounded-2xl border-0 py-5 text-slate-900 ring-2 ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-orange-600 sm:text-sm sm:leading-6 pl-6 transition-all" />
+                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>
                                 <p class="mt-2 ml-1 text-[11px] text-slate-500 font-medium leading-relaxed">
                                     Find the 6-digit code in your Cloudflare deployment logs,
@@ -66,7 +66,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
 
                             <div>
                                 <button type="submit" id="submitBtn"
-                                    class="premium-button flex w-full justify-center rounded-2xl bg-emerald-600 px-6 py-5 text-base font-bold text-white shadow-xl shadow-emerald-100 hover:bg-slate-900 hover:shadow-emerald-200 active:scale-95 disabled:bg-slate-300 transition-all">
+                                    class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed flex justify-center">
                                     Create Account
                                 </button>
                             </div>

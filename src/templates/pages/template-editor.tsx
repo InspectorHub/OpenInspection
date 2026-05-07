@@ -15,9 +15,9 @@ const EDITOR_CSS = `
 .icon-picker-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
 .icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; transition: all 0.15s; border: 2px solid transparent; }
 .icon-btn:hover { background: #eef4ff; border-color: #bcd2ff; }
-.icon-btn.active { background: #eef4ff; border-color: #4a72ff; }
+.icon-btn.active { background: #eef4ff; border-color: var(--ih-primary, #6366f1); }
 [x-cloak] { display: none !important; }
-.section-accent { border-left: 3px solid var(--section-color, #4a72ff); }
+.section-accent { border-left: 3px solid var(--section-color, var(--ih-primary, #6366f1)); }
 .rating-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 3px rgba(74, 114, 255, 0.15); }
 `;

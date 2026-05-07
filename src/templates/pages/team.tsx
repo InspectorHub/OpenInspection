@@ -101,7 +101,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                     <div class="relative group">
                                          <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                          <input type="email" id="inviteEmail" name="email" required placeholder="colleague@example.com"
-                                            class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all placeholder:text-slate-300 font-bold text-sm" />
+                                            class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 font-medium text-sm" />
                                     </div>
                                 </div>
                                 <div class="space-y-3">
@@ -109,7 +109,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                     <div class="relative group">
                                          <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                          <select id="inviteRole" name="role"
-                                            class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all appearance-none cursor-pointer font-bold text-sm bg-no-repeat bg-[right_1.5rem_center]">
+                                            class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all appearance-none cursor-pointer font-medium text-sm bg-no-repeat bg-[right_1.5rem_center]">
                                             <option value="admin">Admin</option>
                                             <option value="inspector">Inspector</option>
                                             <option value="office_staff">Office Staff</option>
@@ -121,11 +121,11 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
 
                             <div class="mt-10 flex flex-col sm:flex-row gap-4">
                                 <button type="button" id="submitInviteBtn"
-                                    class="premium-button flex-[2] py-5 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-95">
+                                    class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">
                                     Send Invitation
                                 </button>
                                 <button type="button" id="closeInviteModalBtn"
-                                    class="flex-1 py-5 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all">
+                                    class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">
                                     Cancel
                                 </button>
                             </div>

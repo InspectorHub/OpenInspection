@@ -125,8 +125,8 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                                         <canvas id="sigCanvas" width="580" height="180" class="w-full cursor-crosshair block"></canvas>
                                     </div>
                                     <div class="flex gap-3">
-                                        <button onclick="clearSig()" class="flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 border border-slate-200 transition">Clear</button>
-                                        <button onclick="submitSignature()" id="submitSigBtn" class="flex-[2] py-3 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-slate-900 transition">Sign Agreement</button>
+                                        <button onclick="clearSig()" class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">Clear</button>
+                                        <button onclick="submitSignature()" id="submitSigBtn" class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">Sign Agreement</button>
                                     </div>
                                     <details class="mt-6">
                                         <summary class="cursor-pointer text-xs text-rose-600 hover:underline font-semibold">Decline this agreement</summary>

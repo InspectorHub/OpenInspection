@@ -13,7 +13,7 @@ export function MessagesPublicPage({ token, branding }: MessagesPublicProps) {
         title: `${siteName} | Messages`,
         branding,
         children: (
-            <div class="min-h-screen" style="background:#faf9f7;">
+            <div class="min-h-screen bg-slate-50">
                 <div class="max-w-2xl mx-auto py-8 px-4" x-data={`messagesPublic('${token}')`} x-init="init()">
                     <h1 class="text-2xl font-bold mb-2 text-slate-900">Messages</h1>
                     <p x-show="inspection" class="text-sm text-slate-500 mb-6">

@@ -184,7 +184,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
               </button>
             </div>
           </div>
-          <h1 class="text-4xl sm:text-5xl font-bold theme-font-display leading-tight mb-2">{address}</h1>
+          <h1 class="text-2xl sm:text-3xl font-bold theme-font-display leading-tight mb-2">{address}</h1>
           <p class="theme-text-secondary text-sm">{date} · Inspector: {inspectorName || 'N/A'}</p>
         </div>
 

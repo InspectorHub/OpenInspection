@@ -49,7 +49,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             title={`Jump to ${stat.label}`}
                         >
                             <div class="flex items-center justify-between mb-6">
-                                <div class={`w-14 h-14 rounded-2xl bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-${stat.color}-600 group-hover:text-white transition-all duration-300 shadow-sm`}>
+                                <div class={`w-12 h-12 rounded-lg bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-${stat.color}-600 group-hover:text-white transition-all duration-300 shadow-sm`}>
                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
                                 </div>
                                 <span class="sr-only">Live</span>

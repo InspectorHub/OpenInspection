@@ -59,7 +59,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                             <input type="text" name="address" required placeholder="123 Inspection Way, City, State"
-                                                class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all placeholder:text-slate-300 font-bold text-sm" />
+                                                class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 font-medium text-sm" />
                                         </div>
                                     </div>
                                 </div>
@@ -74,7 +74,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                             <input type="text" name="clientName" required placeholder="John Doe"
-                                                class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all placeholder:text-slate-300 font-bold text-sm" />
+                                                class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 font-medium text-sm" />
                                         </div>
                                     </div>
                                     <div class="space-y-3">
@@ -82,7 +82,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                             <input type="email" name="clientEmail" required placeholder="john@example.com"
-                                                class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all placeholder:text-slate-300 font-bold text-sm" />
+                                                class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 font-medium text-sm" />
                                         </div>
                                     </div>
                                 </div>
@@ -97,14 +97,14 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                             <input type="date" name="date" required
-                                                class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all font-bold text-sm" />
+                                                class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                                         </div>
                                     </div>
                                     <div class="space-y-3">
                                         <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-widest">Window Preference</label>
                                         <div class="relative group">
                                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
-                                            <select name="timeSlot" required class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all appearance-none bg-no-repeat bg-[right_1.5rem_center] cursor-pointer font-bold text-sm">
+                                            <select name="timeSlot" required class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all appearance-none bg-no-repeat bg-[right_1.5rem_center] cursor-pointer font-medium text-sm">
                                                 <option value="morning">Morning (8:00 AM - 12:00 PM)</option>
                                                 <option value="afternoon">Afternoon (1:00 PM - 5:00 PM)</option>
                                             </select>
@@ -119,7 +119,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                             </div>
 
                             <button type="submit" id="submitBtn"
-                                class="premium-button w-full py-6 px-10 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-[0.3em] shadow-[0_20px_50px_rgba(0,0,0,0.2)] hover:bg-black transition-all active:scale-95 disabled:bg-slate-300 disabled:pointer-events-none">
+                                class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">
                                 Submit Request
                             </button>
                         </form>

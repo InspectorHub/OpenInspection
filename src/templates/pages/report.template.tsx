@@ -106,7 +106,7 @@ export function renderProfessionalReport(data: {
     >
         <div class="bg-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] rounded-xl overflow-hidden border border-white relative">
             {/* Header / Cover Tier */}
-            <div class="bg-slate-900 px-12 py-12 relative overflow-hidden">
+            <div class="bg-slate-900 px-6 py-8 md:px-10 md:py-10 relative overflow-hidden">
                 <div class="absolute top-0 right-0 w-[400px] h-full bg-gradient-to-l from-indigo-500/20 to-transparent skew-x-[-20deg] translate-x-32"></div>
                 
                 <div class="relative z-10 flex flex-col md:flex-row justify-between items-end gap-6">
@@ -219,7 +219,7 @@ export function renderProfessionalReport(data: {
             </div>
 
             {/* Inspection Details */}
-            <div class="px-12 py-24 space-y-12 bg-white">
+            <div class="px-6 py-10 md:px-10 md:py-12 space-y-10 bg-white">
                 {/* Spec 5F.9 — section + item wrappers gain report-pdf-* classes
                     that ONLY apply in @media print (defined in input.css). On
                     screen, no styling change. In PDF render, sections collapse
@@ -237,15 +237,9 @@ export function renderProfessionalReport(data: {
                         <div class="space-y-6 report-pdf-grid">
                             {section.items.map((item: SchemaItem) => {
                                 const res: ResultItem = resultData[item.id] || {};
-                                const bucketConfigs: Record<string, { bg: string, text: string, dot: string }> = {
-                                    'good': { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-                                    'marginal': { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
-                                    'defect': { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' }
-                                };
                                 const itemRatingId = res.rating || res.status;
                                 const bucket = resolveSeverity(itemRatingId);
                                 const level = itemRatingId ? levelMap.get(itemRatingId) : undefined;
-                                const conf = bucketConfigs[bucket ?? ''] || { bg: 'bg-slate-50', text: 'text-slate-400', dot: 'bg-slate-300' };
                                 const displayLabel = level?.label || itemRatingId || 'NO DATA';
                                 const itemClass = bucket === 'defect' ? 'report-pdf-item report-pdf-item--defect' : 'report-pdf-item';
                                 const photos = res.photos || [];
@@ -256,10 +250,7 @@ export function renderProfessionalReport(data: {
                                         <div class="flex-grow">
                                             <div class="flex justify-between items-start gap-4 mb-6">
                                                 <h3 class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
-                                                <div class={`${conf.bg} ${conf.text} px-4 py-2 rounded-2xl flex items-center gap-3 border border-current/10 shadow-sm`}>
-                                                    <div class={`w-2 h-2 rounded-full ${conf.dot} shadow-sm animate-pulse`}></div>
-                                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em]">{displayLabel}</span>
-                                                </div>
+                                                <span class={`ih-pill ${bucket === 'good' ? 'ih-pill--sat' : bucket === 'marginal' ? 'ih-pill--monitor' : bucket === 'defect' ? 'ih-pill--defect' : 'ih-pill--gen'}`}>{displayLabel}</span>
                                             </div>
                                             <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl item-notes">{res.notes || 'No notes recorded.'}</p>
                                         </div>
@@ -290,7 +281,7 @@ export function renderProfessionalReport(data: {
             </div>
 
             {/* Document Finalization Tier */}
-            <div class="bg-slate-900 p-16 md:p-24 text-center relative overflow-hidden no-print">
+            <div class="bg-slate-900 p-8 md:p-12 text-center relative overflow-hidden no-print">
                 <div class="absolute inset-0 bg-indigo-600/10 mix-blend-overlay"></div>
                 <div class="relative z-10 max-w-3xl mx-auto">
                     <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-white">

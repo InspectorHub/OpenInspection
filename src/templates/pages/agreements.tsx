@@ -118,7 +118,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Agreement Name</label>
                                     <input type="text" id="agreementName" placeholder="e.g., Standard Home Inspection Version 2.0"
-                                        class="premium-input w-full px-3 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
+                                        class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
@@ -130,10 +130,10 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                     <p class="text-[10px] text-slate-400 font-semibold ml-1 mt-1">Tip: variables like {'{{client_name}}'}, {'{{property_address}}'}, {'{{inspection_date}}'}, {'{{inspector_name}}'}, and {'{{inspector_license}}'} will be substituted on the sign page.</p>
                                 </div>
                                 <div class="pt-4 flex gap-6">
-                                    <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-slate-400 hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest">
+                                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">
                                         Discard
                                     </button>
-                                    <button type="button" onclick="submitAgreement()" id="submitAgreementBtn" class="flex-[2] premium-button py-4.5 rounded-2xl bg-indigo-600 text-white font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition-all">
+                                    <button type="button" onclick="submitAgreement()" id="submitAgreementBtn" class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">
                                         Publish Agreement
                                     </button>
                                 </div>
@@ -153,16 +153,16 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Email *</label>
-                                    <input type="email" id="sendClientEmail" placeholder="client@example.com" class="premium-input w-full px-5 py-4 rounded-2xl border-2 border-slate-50 focus:border-indigo-500 outline-none font-bold text-sm" />
+                                    <input type="email" id="sendClientEmail" placeholder="client@example.com" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Name</label>
-                                    <input type="text" id="sendClientName" placeholder="John Smith" class="premium-input w-full px-5 py-4 rounded-2xl border-2 border-slate-50 focus:border-indigo-500 outline-none font-bold text-sm" />
+                                    <input type="text" id="sendClientName" placeholder="John Smith" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                                 </div>
                             </div>
                             <div class="mt-8 flex gap-4">
-                                <button onclick="closeSendModal()" class="flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition">Cancel</button>
-                                <button onclick="submitSend()" id="submitSendBtn" class="flex-[2] py-4 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-900 transition">Send Request</button>
+                                <button onclick="closeSendModal()" class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">Cancel</button>
+                                <button onclick="submitSend()" id="submitSendBtn" class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">Send Request</button>
                             </div>
                         </div>
                     </div>

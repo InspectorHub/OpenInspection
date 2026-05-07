@@ -113,26 +113,26 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input type="text" id="profileName" placeholder="John Smith"
-                                        class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                                        class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                                 </div>
                                 <p class="text-[10px] text-slate-400 font-bold ml-1">Displayed on inspection reports.</p>
                             </div>
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Phone</label>
                                 <input type="tel" id="profilePhone" placeholder="(555) 123-4567"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">License #</label>
                                 <input type="text" id="profileLicense" placeholder="HI-12345"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-teal-600 outline-none transition-all font-bold text-sm" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                                 <p class="text-[10px] text-slate-400 font-bold ml-1">State inspector license number.</p>
                             </div>
                         </div>
 
                         <div class="flex justify-end pt-2">
                             <button onclick="saveProfile()" id="saveProfileBtn"
-                                class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">
                                 Save Profile
                             </button>
                         </div>
@@ -154,7 +154,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input type="text" id="siteName" value={siteName}
-                                        class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all font-bold text-sm" />
+                                        class="relative w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                                 </div>
                             </div>
                             <div class="space-y-3">
@@ -164,7 +164,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                         class="h-16 w-24 rounded-2xl border-0 ring-2 ring-slate-100 p-1.5 cursor-pointer bg-white transition-all hover:scale-105" />
                                     <div class="flex-1 relative group">
                                         <input type="text" value={primaryColor} readonly
-                                            class="premium-input relative w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 bg-slate-50 text-slate-500 font-black text-xs uppercase tracking-widest cursor-default" />
+                                            class="relative w-full px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-slate-500 font-medium text-sm cursor-default" />
                                     </div>
                                 </div>
                             </div>
@@ -185,7 +185,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                                 <div class="space-y-4 flex-1 text-center sm:text-left">
                                     <input type="file" id="logoInput" class="hidden" accept="image/*" onchange="handleLogoSelect(event)" />
                                     <button onclick="document.getElementById('logoInput').click()"
-                                        class="premium-button px-4 py-2 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-sm hover:border-indigo-600 hover:text-indigo-600 transition-all active:scale-95">
+                                        class="px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">
                                         Upload Asset
                                     </button>
                                     <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">PNG/SVG recommended</p>
@@ -195,7 +195,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                         <div class="flex justify-end pt-2">
                             <button onclick="saveBranding()" id="saveBrandingBtn"
-                                class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-slate-300">
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">
                                 Save Branding
                             </button>
                         </div>
@@ -254,10 +254,10 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="space-y-3">
                             <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">GA Measurement ID</label>
                             <input type="text" id="gaMeasurementId" value={gaMeasurementId} placeholder="G-XXXXXXXXXX"
-                                class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-sky-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" />
+                                class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" />
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveBranding()" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveBranding()" class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
                                 Save
                             </button>
                         </div>
@@ -292,18 +292,18 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Sender Email</label>
                                 <input type="email" id="senderEmail" placeholder="Reports &lt;reports@yourdomain.com&gt;"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" />
                                 <p class="text-[10px] text-slate-400 font-bold ml-1">Used as "From" address. Domain must be verified in Resend.</p>
                             </div>
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Resend API Key</label>
                                 <input type="password" id="resendApiKey" placeholder="re_••••••••"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-emerald-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" autocomplete="off" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" autocomplete="off" />
                                 <p class="text-[10px] text-slate-400 font-bold ml-1">Stored encrypted. Leave blank to keep existing key.</p>
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveSecrets('email')" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveSecrets('email')" class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
                                 Save
                             </button>
                         </div>
@@ -322,16 +322,16 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Site Key <span class="text-slate-400 normal-case font-normal">(public)</span></label>
                                 <input type="text" id="turnstileSiteKey" placeholder="0x4AAAA..."
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-amber-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" />
                             </div>
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Secret Key <span class="text-slate-400 normal-case font-normal">(encrypted)</span></label>
                                 <input type="password" id="turnstileSecretKey" placeholder="••••••••"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-amber-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" autocomplete="off" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" autocomplete="off" />
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveSecrets('turnstile')" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveSecrets('turnstile')" class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
                                 Save
                             </button>
                         </div>
@@ -349,11 +349,11 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="space-y-3 max-w-xl">
                             <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Gemini API Key</label>
                             <input type="password" id="geminiApiKey" placeholder="AIza••••••••"
-                                class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-violet-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" autocomplete="off" />
+                                class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" autocomplete="off" />
                             <p class="text-[10px] text-slate-400 font-bold ml-1">Get a key at <span class="text-slate-600">aistudio.google.com</span>. Stored encrypted.</p>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveSecrets('ai')" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveSecrets('ai')" class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
                                 Save
                             </button>
                         </div>
@@ -372,24 +372,24 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">App Base URL</label>
                                 <input type="url" id="appBaseUrl" placeholder="https://inspect.yourdomain.com"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-rose-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" />
                                 <p class="text-[10px] text-slate-400 font-bold ml-1">Used for OAuth redirect URIs and email links.</p>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div class="space-y-3">
                                     <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Google Client ID <span class="text-slate-400 normal-case font-normal">(public)</span></label>
                                     <input type="text" id="googleClientId" placeholder="00000000-xxxx.apps.googleusercontent.com"
-                                        class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-rose-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" />
+                                        class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" />
                                 </div>
                                 <div class="space-y-3">
                                     <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Google Client Secret <span class="text-slate-400 normal-case font-normal">(encrypted)</span></label>
                                     <input type="password" id="googleClientSecret" placeholder="GOCSP••••••••"
-                                        class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-rose-600 outline-none transition-all font-bold text-sm placeholder:text-slate-300" autocomplete="off" />
+                                        class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-300" autocomplete="off" />
                                 </div>
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="saveIntegration()" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="saveIntegration()" class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
                                 Save
                             </button>
                         </div>
@@ -433,10 +433,10 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <p class="text-sm text-slate-500 max-w-2xl">Subscribe to your inspections in Apple Calendar, Google Calendar, or any app that supports ICS feeds.</p>
                         <div class="flex flex-col sm:flex-row gap-4">
                             <input id="icsUrl" type="text" readonly
-                                class="flex-1 px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 bg-slate-50 text-slate-600 font-mono text-xs"
+                                class="flex-1 px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-slate-600 font-mono text-xs"
                                 placeholder="Loading subscription URL..." />
                             <button onclick="copyIcsUrl()" id="copyIcsBtn"
-                                class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
                                 Copy Link
                             </button>
                         </div>
@@ -456,21 +456,21 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Current Password</label>
                                 <input type="password" id="currentPassword"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-slate-600 outline-none transition-all font-bold text-sm" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">New Password</label>
                                 <input type="password" id="newPassword"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-slate-600 outline-none transition-all font-bold text-sm" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
                             <div class="space-y-3">
                                 <label class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Confirm New Password</label>
                                 <input type="password" id="confirmPassword"
-                                    class="premium-input w-full px-7 py-5 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-slate-600 outline-none transition-all font-bold text-sm" />
+                                    class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
                         </div>
                         <div class="flex justify-end">
-                            <button onclick="changePassword()" class="premium-button px-4 py-2 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95">
+                            <button onclick="changePassword()" class="px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
                                 Update Password
                             </button>
                         </div>

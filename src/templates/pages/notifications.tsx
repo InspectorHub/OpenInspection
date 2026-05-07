@@ -14,7 +14,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                         <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Notifications</h1>
                         <p class="mt-2 text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Activity from your workspace — bookings, reports, agreements, messages.</p>
                     </div>
-                    <button x-on:click="markAllRead()" class="px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-bold uppercase tracking-[0.2em] hover:bg-black transition-all active:scale-95">Mark all read</button>
+                    <button x-on:click="markAllRead()" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-all">Mark all read</button>
                 </div>
 
                 <div class="flex gap-2">

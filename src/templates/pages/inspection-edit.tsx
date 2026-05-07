@@ -89,7 +89,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <span x-show="saveState === 'saving'" x-cloak class="text-[10px] font-semibold text-amber-500">Saving...</span>
                 <span x-show="saveState === 'saved'" x-cloak class="text-[10px] font-semibold text-emerald-500">Saved</span>
                 <span x-show="saveState === 'error'" x-cloak class="text-[10px] font-semibold text-red-500">Error</span>
-                <span class="text-xs font-mono font-semibold px-2 py-1 rounded-lg" style="background: #eef4ff; color: #4a72ff" x-text="completionPercent + '%'"></span>
+                <span class="text-xs font-mono font-semibold px-2 py-1 rounded-lg" style="background: #eef4ff; color: var(--ih-primary, #6366f1)" x-text="completionPercent + '%'"></span>
                 <button x-on:click="toggleCheatsheet()" class="w-8 h-8 rounded-xl bg-white/60 flex items-center justify-center" aria-label="Gesture help">
                   <svg class="w-4 h-4" style="color: #6b6560" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </button>
@@ -103,7 +103,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                   x-on:click="selectSection(idx)"
                   class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap"
                   x-bind:class="currentSectionIdx === idx ? 'text-white' : 'bg-white/60 text-gray-600'"
-                  x-bind:style="currentSectionIdx === idx ? 'background: #4a72ff' : ''"
+                  x-bind:style="currentSectionIdx === idx ? 'background: var(--ih-primary, #6366f1)' : ''"
                 >
                   <span x-show="getSectionIconSvg(sec.icon)" x-html="getSectionIconSvg(sec.icon, 'w-3.5 h-3.5')"></span>
                   <span x-show="!getSectionIconSvg(sec.icon)" class="text-[10px] font-bold" x-text="(sec.title || '').charAt(0)"></span>
@@ -124,7 +124,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             x-cloak
             {...{ 'x-transition.opacity': '' }}
             class="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium"
-            style="background: rgba(74,114,255,0.08); color: #4a72ff; border: 1px solid rgba(74,114,255,0.18)"
+            style="background: rgba(74,114,255,0.08); color: var(--ih-primary, #6366f1); border: 1px solid rgba(74,114,255,0.18)"
           >
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7l-4 4m0 0l4 4m-4-4h16" />
@@ -213,7 +213,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     </button>
                   </div>
                   <div class="mt-2 flex gap-2 flex-wrap">
-                    <label class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer" style="background: #eef4ff; color: #4a72ff">
+                    <label class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       Camera
                       <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="uploadPhoto(item.id, $event)" />
@@ -449,7 +449,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <span x-text="completionPercent + '%'"></span>
               </div>
               <div class="h-1.5 rounded-full" style="background: #e8e4dd">
-                <div class="h-full rounded-full transition-all duration-500" x-bind:style="'width:' + completionPercent + '%; background: #4a72ff'"></div>
+                <div class="h-full rounded-full transition-all duration-500" x-bind:style="'width:' + completionPercent + '%; background: var(--ih-primary, #6366f1)'"></div>
               </div>
               <div class="mt-2 text-[10px] font-mono" style="color: #908a83">
                 <span x-show="saveState === 'saving'" x-cloak class="text-amber-500">Saving...</span>
@@ -616,7 +616,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <button
                   x-on:click="selectSection(idx)"
                   class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
-                  x-bind:style="currentSectionIdx === idx ? 'background: #eef4ff; color: #4a72ff' : 'color: #6b6560'"
+                  x-bind:style="currentSectionIdx === idx ? 'background: #eef4ff; color: var(--ih-primary, #6366f1)' : 'color: #6b6560'"
                 >
                   <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                     x-bind:style="currentSectionIdx === idx ? 'background: rgba(74,114,255,0.12)' : 'background: #f3f1ed'">
@@ -656,7 +656,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <button
                   x-on:click="batchMode = !batchMode"
                   class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all"
-                  x-bind:style="batchMode ? 'background: #eef4ff; color: #4a72ff; border-color: #bcd2ff' : 'border-color: #e8e4dd; color: #6b6560'"
+                  x-bind:style="batchMode ? 'background: #eef4ff; color: var(--ih-primary, #6366f1); border-color: #bcd2ff' : 'border-color: #e8e4dd; color: #6b6560'"
                 >Batch</button>
               </div>
               <div class="flex items-center gap-2">
@@ -677,8 +677,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
             {/* Batch Mode Toolbar */}
             <div x-show="batchMode" class="px-6 py-2 flex items-center gap-3 text-sm" style="background: #eef4ff; border-bottom: 1px solid #bcd2ff">
-              <span class="font-semibold" style="color: #4a72ff" x-text="'Selected ' + selectedBatchCount + '/' + currentSectionItems.length"></span>
-              <button x-on:click="batchSelectAll()" class="px-3 py-1 rounded-lg text-xs font-semibold" style="background: white; color: #4a72ff">Select All</button>
+              <span class="font-semibold" style="color: var(--ih-primary, #6366f1)" x-text="'Selected ' + selectedBatchCount + '/' + currentSectionItems.length"></span>
+              <button x-on:click="batchSelectAll()" class="px-3 py-1 rounded-lg text-xs font-semibold" style="background: white; color: var(--ih-primary, #6366f1)">Select All</button>
               <template x-for="level in ratingLevels" x-bind:key="level.id">
                 <button x-on:click="batchSetRating(level.id)" class="px-3 py-1 rounded-lg text-xs font-semibold" style="background: white; color: #46423c" x-text="'Set ' + level.abbreviation"></button>
               </template>
@@ -916,7 +916,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       </button>
                     </div>
                     <div class="mt-2 flex gap-2 flex-wrap">
-                      <label class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer" style="background: #eef4ff; color: #4a72ff">
+                      <label class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         Camera
                         <input type="file" accept="image/*" class="hidden" x-on:change="uploadPhoto(item.id, $event)" />
@@ -1210,7 +1210,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     <button
                       x-on:click="publishOptions.theme = t"
                       class="px-4 py-2 text-xs font-semibold rounded-lg border capitalize transition-all"
-                      x-bind:style="publishOptions.theme === t ? 'background: #4a72ff; color: white; border-color: transparent' : 'border-color: #e8e4dd; color: #6b6560'"
+                      x-bind:style="publishOptions.theme === t ? 'background: var(--ih-primary, #6366f1); color: white; border-color: transparent' : 'border-color: #e8e4dd; color: #6b6560'"
                       x-text="t"
                     ></button>
                   </template>
@@ -1265,7 +1265,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                         <span class="text-xs font-mono" style="color:#b0aaa3" x-text="(stepIdx + 1) + ' / ' + totalSteps"></span>
                         <div class="flex gap-2">
                             <button x-on:click="skip()" class="px-4 py-2 rounded-xl text-sm" style="color:#6b6560">Skip</button>
-                            <button x-on:click="next()" class="px-5 py-2 rounded-xl text-white text-sm font-semibold" style="background:#4a72ff">
+                            <button x-on:click="next()" class="px-5 py-2 rounded-xl text-white text-sm font-semibold" style="background:var(--ih-primary, #6366f1)">
                                 <span x-text="stepIdx + 1 === totalSteps ? 'Done' : 'Next'"></span>
                             </button>
                         </div>
@@ -1390,7 +1390,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
         {/* Phase T (T23) — Inspector Messages panel (slide-in from right) */}
         <div x-data={`messagesInspector('${inspectionId}')`} x-init="init()">
             {/* Floating button */}
-            <button x-on:click="open = !open" class="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl text-white flex items-center justify-center" style="background:#4a72ff;">
+            <button x-on:click="open = !open" class="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl text-white flex items-center justify-center" style="background:var(--ih-primary, #6366f1);">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                 <span x-show="messages.length > 0" class="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center" x-text="messages.length"></span>
             </button>
@@ -1438,7 +1438,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                         </label>
                         <button x-on:click="send()" x-bind:disabled="!composeBody || sending"
                             class="px-4 py-2 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
-                            style="background:#4a72ff;">
+                            style="background:var(--ih-primary, #6366f1);">
                             <span x-text="sending ? 'Sending...' : 'Send'"></span>
                         </button>
                     </div>
@@ -1468,26 +1468,26 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             <div x-show="!isDesktop">
               <p class="text-xs uppercase tracking-wide font-semibold mb-3" style="color: #908a83">Mobile Gestures</p>
               <ul class="space-y-3 text-sm" style="color: #1a1815">
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Swipe ←/→</span><span>Switch to next / previous section</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Long-press item</span><span>Open Quick Rating sheet</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Double-tap item</span><span>Enter Focus mode</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Tap section chip</span><span>Jump directly to that section</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">Tap rating button</span><span>Set Sat / Mon / Def / N/A inline</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">Swipe ←/→</span><span>Switch to next / previous section</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">Long-press item</span><span>Open Quick Rating sheet</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">Double-tap item</span><span>Enter Focus mode</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">Tap section chip</span><span>Jump directly to that section</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">Tap rating button</span><span>Set Sat / Mon / Def / N/A inline</span></li>
               </ul>
             </div>
 
             <div x-show="isDesktop">
               <p class="text-xs uppercase tracking-wide font-semibold mb-3" style="color: #908a83">Keyboard Shortcuts</p>
               <ul class="space-y-2 text-sm" style="color: #1a1815">
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">1 / 2 / 3</span><span>Set rating Satisfactory / Monitor / Defect</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">0</span><span>Clear rating · <span class="font-mono">N</span> = N/A</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">↑ / ↓</span><span>Move active item · Enter = next · Shift+Enter = prev</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">G + 0–9</span><span>Jump to section by index</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">/</span><span>Open Comment Library · <span class="font-mono">;</span> = My Snippets</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">P</span><span>Add photo to active item</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">⌘1 / ⌘2 / ⌘3</span><span>Split / Focus / Preview view mode</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">⌘K</span><span>Command palette (coming soon)</span></li>
-                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: #4a72ff">?</span><span>Toggle this cheatsheet · <span class="font-mono">Esc</span> = close</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">1 / 2 / 3</span><span>Set rating Satisfactory / Monitor / Defect</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">0</span><span>Clear rating · <span class="font-mono">N</span> = N/A</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">↑ / ↓</span><span>Move active item · Enter = next · Shift+Enter = prev</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">G + 0–9</span><span>Jump to section by index</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">/</span><span>Open Comment Library · <span class="font-mono">;</span> = My Snippets</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">P</span><span>Add photo to active item</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">⌘1 / ⌘2 / ⌘3</span><span>Split / Focus / Preview view mode</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">⌘K</span><span>Command palette (coming soon)</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef4ff; color: var(--ih-primary, #6366f1)">?</span><span>Toggle this cheatsheet · <span class="font-mono">Esc</span> = close</span></li>
               </ul>
             </div>
 
