@@ -34,6 +34,7 @@ import { MarketplacePage } from './templates/pages/marketplace';
 import { TeamPage } from './templates/pages/team';
 import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
+import { AgreementPrintablePage } from './templates/pages/agreement-printable';
 import { CalendarPage } from './templates/pages/calendar';
 import { ContactsPage } from './templates/pages/contacts';
 import { RecommendationsPage } from './templates/pages/recommendations';
@@ -167,7 +168,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/internal/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
@@ -489,6 +490,75 @@ app.get('/agreements/sign/:token', async (c) => {
         }));
     } catch {
         return c.text('Agreement not found or link has expired.', 404);
+    }
+});
+
+// Spec 5H P1 — Internal render route consumed by SignCompletionWorkflow.
+// M2M-authed via Authorization: Bearer JWT_SECRET. Returns the canonical
+// signed agreement HTML which Browser Rendering captures as signed.pdf.
+app.get('/internal/agreement-render/:token', async (c) => {
+    const auth = c.req.header('authorization');
+    if (!auth || auth !== `Bearer ${c.env.JWT_SECRET}`) {
+        return c.text('Unauthorized', 401);
+    }
+    const token = c.req.param('token') as string;
+    try {
+        const { request, agreement } = await c.var.services.agreement.getAgreementByToken(token);
+
+        // Substitute placeholders the same way agreement-sign does
+        const vars: Record<string, string> = {
+            client_name: request.clientName ?? '',
+            property_address: '',
+            inspection_date: '',
+            inspector_name: '',
+            inspector_license: '',
+        };
+        if (request.inspectionId) {
+            try {
+                const db = drizzle(c.env.DB, { schema });
+                const insp = await db.select().from(schema.inspections)
+                    .where(and(eq(schema.inspections.id, request.inspectionId), eq(schema.inspections.tenantId, request.tenantId)))
+                    .get();
+                if (insp) {
+                    vars.property_address = insp.propertyAddress ?? '';
+                    vars.inspection_date = insp.date ?? '';
+                    if (!vars.client_name) vars.client_name = insp.clientName ?? '';
+                    if (insp.inspectorId) {
+                        const inspector = await db.select().from(schema.users)
+                            .where(and(eq(schema.users.id, insp.inspectorId), eq(schema.users.tenantId, request.tenantId)))
+                            .get();
+                        if (inspector) {
+                            vars.inspector_name = inspector.name ?? inspector.email ?? '';
+                            vars.inspector_license = inspector.licenseNumber ?? '';
+                        }
+                    }
+                }
+            } catch (e) {
+                logger.warn('agreement-render: vars load failed', { token: token.slice(0, 8), error: (e as Error).message });
+            }
+        }
+
+        // Inline HTML body substitution (mirror agreement-sign.tsx logic)
+        const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const trimmed = (agreement.content || '').trimStart();
+        const html = trimmed.startsWith('<')
+            ? agreement.content
+            : '<p>' + escapeHtml(agreement.content || '').replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+        const bodyHtml = html.replace(/\{\{(client_name|property_address|inspection_date|inspector_name|inspector_license)\}\}/g,
+            (_m, k: string) => escapeHtml(vars[k] ?? ''));
+
+        return c.html(AgreementPrintablePage({
+            agreementName: agreement.name,
+            bodyHtml,
+            clientName: request.clientName,
+            clientEmail: request.clientEmail,
+            signatureBase64: request.signatureBase64,
+            signedAtUtcIso: request.signedAt ? new Date(request.signedAt).toISOString() : null,
+            envelopeId: request.id,
+        }));
+    } catch (e) {
+        logger.error('agreement-render: failed', { token: token.slice(0, 8) }, e instanceof Error ? e : undefined);
+        return c.text('Render failed', 500);
     }
 });
 
