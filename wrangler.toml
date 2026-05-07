@@ -71,3 +71,14 @@ bucket_name = "openinspection-standalone-reports"
 # at runtime, src/api/inspections.ts falls back to text-only email.
 [browser]
 binding = "BROWSER"
+
+# Spec 5H P1 — Sign-completion async pipeline (5 steps):
+# 1. Render canonical signed.pdf via Browser Rendering -> R2
+# 2. Render Certificate of Completion PDF -> R2
+# 3. Build evidence.zip (signed.pdf + cert.pdf + audit-trail.json + public-key.pem) -> R2
+# 4. Append 'workflow.complete' to esign_audit_logs (chain extension)
+# 5. Email both parties via Resend
+[[workflows]]
+binding = "SIGN_COMPLETION_WORKFLOW"
+name = "sign-completion-workflow"
+class_name = "SignCompletionWorkflow"

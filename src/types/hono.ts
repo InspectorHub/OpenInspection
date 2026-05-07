@@ -50,6 +50,9 @@ export interface AppEnv {
     // Optional during local dev so the worker boots without the binding.
     REPORTS?: R2Bucket;
 
+    // Spec 5H P1 — async sign-completion pipeline (signed.pdf + cert.pdf + audit append)
+    SIGN_COMPLETION_WORKFLOW?: Workflow;
+
     // SaaS Portal Integration
     PORTAL_API_URL?: string;
     PORTAL_M2M_SECRET?: string;

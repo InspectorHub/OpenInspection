@@ -605,3 +605,4 @@ app.get('/', (c) => c.redirect('/dashboard'));
 
 export default app;
 export { scheduled } from './scheduled';
+export { SignCompletionWorkflow } from './workflows/sign-completion-workflow';

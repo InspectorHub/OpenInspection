@@ -346,6 +346,22 @@ bookingsRoutes.openapi(signAgreementRoute, async (c) => {
 
     const signed = await svc.signRequest(token, signatureBase64);
 
+    // Spec 5H P1 — trigger async sign-completion workflow (renders signed.pdf
+    // + Certificate of Completion + appends 'workflow.complete' to audit chain).
+    // Fire-and-forget: client doesn't wait. Workflow has its own retry policy.
+    if (request && c.env.SIGN_COMPLETION_WORKFLOW) {
+        c.executionCtx.waitUntil((async () => {
+            try {
+                await c.env.SIGN_COMPLETION_WORKFLOW!.create({
+                    id: request.id, // workflow id = requestId for idempotency / re-run
+                    params: { requestId: request.id, tenantId: request.tenantId },
+                });
+            } catch (e) {
+                logger.warn('sign-workflow.create.failed', { requestId: request.id, error: (e as Error).message });
+            }
+        })());
+    }
+
     // Round 14 free-tier structured log — kept alongside the persisted audit
     // for redundancy in case D1 write fails after Workers commit.
     logger.info('agreement.signed.audit', {
