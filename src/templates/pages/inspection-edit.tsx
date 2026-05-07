@@ -1107,6 +1107,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
       <script src="/js/modal-dialog.js"></script>
       <script src="/js/comments-library.js"></script>
       <script src="/js/toast.js"></script>
+      {/* Spec 5G M2 — load 248 canned comments before editor inits */}
+      <script src="/js/canned-comments.js"></script>
       <script src="/js/inspection-edit.js"></script>
       <script src="/js/inspection-events.js"></script>
       {/* Phase T (T14) — Konva-based photo annotator. konva.min.js (~150KB) is
