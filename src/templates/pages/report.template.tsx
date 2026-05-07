@@ -94,11 +94,7 @@ export function renderProfessionalReport(data: {
     x-data={`reportGatekeeper('${inspection.id}')`}
     class="min-h-screen bg-slate-50/50 antialiased py-6 px-6 relative"
 >
-    {/* Atmospheric Background */}
-    <div class="fixed inset-0 pointer-events-none overflow-hidden select-none no-print">
-        <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/5 blur-[120px] rounded-full"></div>
-        <div class="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full"></div>
-    </div>
+    {/* Spec 5F R2 Step 6 — atmospheric blobs removed (audit P1-4). */}
 
     <div
         {...{':class': "(showAgreement || (signed && showPayment && !paid)) ? 'blur-content' : ''"}}

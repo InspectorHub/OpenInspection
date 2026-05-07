@@ -55,7 +55,7 @@ function fmtUa(ua: string | null | undefined): string {
 }
 
 function eventLabel(ev: string): string {
-    return ev.replace(/\./g, '.').replace(/_/g, ' ');
+    return ev.replace(/_/g, ' ');
 }
 
 export function CertTemplatePage(props: CertTemplateProps): JSX.Element {

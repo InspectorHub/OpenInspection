@@ -1212,10 +1212,13 @@ function inspectionEditor(inspectionId) {
       var file = event.target.files && event.target.files[0];
       if (!file) return;
       var formData = new FormData();
-      formData.append('photo', file);
+      // Server endpoint is POST /api/inspections/:id/upload with form field
+      // 'file' + 'itemId' (see src/api/inspections.ts:760). Earlier client
+      // versions used /photos + 'photo' which 404'd silently.
+      formData.append('file', file);
       formData.append('itemId', itemId);
       try {
-        var res = await authFetch('/api/inspections/' + this.inspectionId + '/photos', {
+        var res = await authFetch('/api/inspections/' + this.inspectionId + '/upload', {
           method: 'POST',
           body: formData,
         });

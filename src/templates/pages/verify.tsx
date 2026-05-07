@@ -7,6 +7,8 @@
  * "vendor must testify to its own integrity" weakness).
  */
 
+import { BareLayout } from '../layouts/main-layout';
+
 interface VerifierEvent {
     event: string;
     createdAtUtc: string;
@@ -40,13 +42,12 @@ function shortHash(hex: string | null): string {
 export function VerifyPage(props: VerifierProps): JSX.Element {
     if (!props.found) {
         return (
-            <html>
-                <head><meta charSet="utf-8" /><title>Envelope not found · Verify</title></head>
-                <body style="font-family:Inter,sans-serif;padding:48px;text-align:center;color:#475569">
-                    <h1 style="font-size:20px;font-weight:700;color:#dc2626">Envelope not found</h1>
+            <BareLayout title={`Envelope not found · Verify · ${props.siteName}`}>
+                <div style="padding:48px;text-align:center;color:var(--ih-fg-2, #475569)">
+                    <h1 style="font-size:20px;font-weight:700;color:#dc2626">Envelope not found</h1> {/* dc2626: no token equivalent */}
                     <p style="margin-top:8px">The envelope ID <code>{props.envelopeId}</code> does not exist.</p>
-                </body>
-            </html>
+                </div>
+            </BareLayout>
         );
     }
     return (
@@ -56,29 +57,29 @@ export function VerifyPage(props: VerifierProps): JSX.Element {
                 <title>Verify {props.envelopeId.slice(0, 8)} · {props.siteName}</title>
                 <style dangerouslySetInnerHTML={{ __html: `
                     *{box-sizing:border-box}
-                    body{font-family:-apple-system,BlinkMacSystemFont,Inter,sans-serif;color:#1e293b;background:#f8fafc;margin:0;padding:32px}
+                    body{font-family:-apple-system,BlinkMacSystemFont,Inter,sans-serif;color:var(--ih-slate-800, #1e293b);background:var(--ih-bg-app, #f8fafc);margin:0;padding:32px}
                     .container{max-width:760px;margin:0 auto}
                     .verdict{padding:18px 24px;border-radius:8px;border:1px solid;font-weight:600;font-size:14px;margin-bottom:24px;display:flex;align-items:center;gap:12px}
-                    .verdict.valid{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}
-                    .verdict.invalid{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+                    .verdict.valid{background:var(--ih-status-ok-bg, #ecfdf5);border-color:#a7f3d0;color:var(--ih-status-ok-fg, #047857)} /* a7f3d0: no token equivalent */
+                    .verdict.invalid{background:var(--ih-status-bad-bg, #fef2f2);border-color:#fecaca;color:#991b1b} /* fecaca, 991b1b: no token equivalent */
                     .icon{font-size:20px}
-                    .panel{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px 24px;margin-bottom:16px}
-                    .panel-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;margin:0 0 12px}
+                    .panel{background:var(--ih-bg-card, #fff);border:1px solid var(--ih-slate-200, #e2e8f0);border-radius:8px;padding:20px 24px;margin-bottom:16px}
+                    .panel-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--ih-fg-3, #64748b);margin:0 0 12px}
                     .row{display:grid;grid-template-columns:160px 1fr;gap:12px;margin-bottom:6px}
-                    .row-key{font-size:12px;color:#64748b}
-                    .row-val{font-size:13px;color:#1e293b;word-break:break-all}
+                    .row-key{font-size:12px;color:var(--ih-fg-3, #64748b)}
+                    .row-val{font-size:13px;color:var(--ih-slate-800, #1e293b);word-break:break-all}
                     .row-val.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px}
                     table.events{width:100%;border-collapse:collapse;font-size:12px}
-                    table.events th{text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:9px}
-                    table.events td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:top}
-                    .evt-ok{color:#10b981}
-                    .evt-bad{color:#ef4444}
+                    table.events th{text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ih-fg-3, #64748b);padding:6px 8px;border-bottom:1px solid var(--ih-slate-200, #e2e8f0);font-size:9px}
+                    table.events td{padding:8px;border-bottom:1px solid var(--ih-bg-muted, #f1f5f9);vertical-align:top}
+                    .evt-ok{color:var(--ih-status-ok, #10b981)}
+                    .evt-bad{color:var(--ih-status-bad, #ef4444)}
                     .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-                    .btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;border:1px solid #e2e8f0;color:#1e293b;background:#fff}
-                    .btn:hover{background:#f1f5f9}
-                    .footer{margin-top:32px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:10px;color:#64748b;line-height:1.6}
-                    code{background:#f1f5f9;padding:1px 6px;border-radius:4px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px}
-                    pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;font-size:11px;overflow-x:auto;line-height:1.5}
+                    .btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 14px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;border:1px solid var(--ih-slate-200, #e2e8f0);color:var(--ih-slate-800, #1e293b);background:var(--ih-bg-card, #fff)}
+                    .btn:hover{background:var(--ih-bg-muted, #f1f5f9)}
+                    .footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--ih-slate-200, #e2e8f0);font-size:10px;color:var(--ih-fg-3, #64748b);line-height:1.6}
+                    code{background:var(--ih-bg-muted, #f1f5f9);padding:1px 6px;border-radius:4px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px}
+                    pre{background:var(--ih-slate-900, #0f172a);color:var(--ih-slate-200, #e2e8f0);padding:12px;border-radius:6px;font-size:11px;overflow-x:auto;line-height:1.5}
                 `}} />
             </head>
             <body>
@@ -106,7 +107,7 @@ export function VerifyPage(props: VerifierProps): JSX.Element {
                             <tbody>
                                 {props.events.map((ev, i) => (
                                     <tr key={i}>
-                                        <td style="font-family:monospace;font-size:11px;color:#475569;white-space:nowrap">{ev.createdAtUtc}</td>
+                                        <td style="font-family:monospace;font-size:11px;color:var(--ih-fg-2, #475569);white-space:nowrap">{ev.createdAtUtc}</td>
                                         <td style="font-weight:600">{ev.event}</td>
                                         <td class="row-val mono">{shortHash(ev.hash)}</td>
                                         <td class={ev.valid ? 'evt-ok' : 'evt-bad'} style="font-weight:600">{ev.valid ? '✓ valid' : '✗ invalid'}</td>
@@ -130,7 +131,7 @@ export function VerifyPage(props: VerifierProps): JSX.Element {
 
                     <div class="panel">
                         <h2 class="panel-title">Verify Yourself</h2>
-                        <p style="font-size:12px;color:#475569;margin:0 0 12px">Re-run the verification offline using openssl + the public key:</p>
+                        <p style="font-size:12px;color:var(--ih-fg-2, #475569);margin:0 0 12px">Re-run the verification offline using openssl + the public key:</p>
                         <pre>{`# 1. Download public key + audit JSON\ncurl -o pubkey.pem ${props.apiBase}/api/public/verify/${props.envelopeId}/public-key\ncurl -o audit.json ${props.apiBase}/api/public/verify/${props.envelopeId}/audit-trail\n\n# 2. For each event in audit.json, decode hash + signature, then:\n#   openssl pkeyutl -verify -pubin -inkey pubkey.pem \\\n#     -sigfile event.sig -in event.hash`}</pre>
                     </div>
 
