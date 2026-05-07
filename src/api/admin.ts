@@ -737,11 +737,35 @@ adminRoutes.openapi(sendAgreementRoute, async (c) => {
     });
     const signUrl = `${getBaseUrl(c)}/agreements/sign/${request.token}`;
 
+    // Spec 5H D-patch — fetch the agreement HTML at send-time to compute its
+    // content hash. This is the "what was the client agreed to" anchor for
+    // the audit chain — recomputable later to prove the DB version matches.
+    let agreementContentHash: string | null = null;
+    let agreementName: string | null = null;
+    try {
+        const agreement = await drizzle(c.env.DB, { schema })
+            .select({ name: schema.agreements.name, content: schema.agreements.content })
+            .from(schema.agreements)
+            .where(eq(schema.agreements.id, body.agreementId))
+            .get();
+        if (agreement) {
+            agreementName = agreement.name;
+            const bytes = new TextEncoder().encode(agreement.content || '');
+            const buf = await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer);
+            const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+            agreementContentHash = `sha256:${hex}`;
+        }
+    } catch (e) {
+        logger.warn('audit.agreement.hash.failed', { agreementId: body.agreementId, error: (e as Error).message });
+    }
+
     // Spec 5H P0.1 — append request.created to the audit chain
     try {
         await c.var.services.auditLog.append(tenantId, request.id, 'request.created', {
             actorId: c.get('user')?.sub ?? null,
+            agreementContentHash,
             agreementId: body.agreementId,
+            agreementName,
             clientEmail: body.clientEmail,
             clientName: body.clientName ?? null,
             envelopeId: request.id,

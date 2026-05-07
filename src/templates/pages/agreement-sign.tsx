@@ -59,6 +59,20 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
 
     return (
         <BareLayout title={`Sign Agreement | ${siteName}`} branding={branding}>
+            {/* Spec 5H D-patch — print-mode CSS so window.print() produces a clean
+                PDF: hide page chrome, expand the document container, show the
+                signature image inline. */}
+            <style dangerouslySetInnerHTML={{ __html: `
+                @media print {
+                    body { background: #fff !important; }
+                    .no-print, button, header > a { display: none !important; }
+                    .min-h-screen { min-height: 0 !important; padding: 0 !important; }
+                    .max-w-2xl { max-width: none !important; }
+                    .bg-white, .rounded-lg, .shadow-md { box-shadow: none !important; border: none !important; }
+                    .max-h-96 { max-height: none !important; overflow: visible !important; }
+                    @page { margin: 0.5in; }
+                }
+            `}} />
             <div class="min-h-screen bg-slate-50 py-6 px-4 font-sans">
                 <div class="max-w-2xl mx-auto">
                     {/* Header */}
@@ -94,7 +108,14 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                                     <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
                                 <h2 class="text-xl font-black text-slate-900 mb-2">Already Signed</h2>
-                                <p class="text-slate-500 font-semibold">This agreement has been signed. Thank you!</p>
+                                <p class="text-slate-500 font-semibold mb-6">This agreement has been signed. Thank you!</p>
+                                {/* Spec 5H D-patch — Download as PDF (browser print → save as PDF) */}
+                                <button onclick="window.print()"
+                                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 active:scale-95 transition-all shadow-md">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    Download Signed PDF
+                                </button>
+                                <p class="text-[11px] text-slate-400 italic mt-3">In the print dialog, choose "Save as PDF" as destination.</p>
                             </div>
                         ) : (
                             <>

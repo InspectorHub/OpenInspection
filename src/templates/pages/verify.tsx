@@ -123,6 +123,7 @@ export function VerifyPage(props: VerifierProps): JSX.Element {
                         <div class="actions">
                             <a class="btn" href={`${props.apiBase}/api/public/verify/${props.envelopeId}/public-key`}>Download Public Key</a>
                             <a class="btn" href={`${props.apiBase}/api/public/verify/${props.envelopeId}/audit-trail`}>Download Audit JSON</a>
+                            <a class="btn" href={`${props.apiBase}/api/public/verify/${props.envelopeId}/document`} target="_blank">View Signed Document</a>
                             <a class="btn" href={`${props.apiBase}/api/public/verify/${props.envelopeId}`}>JSON API</a>
                         </div>
                     </div>

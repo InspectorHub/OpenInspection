@@ -721,6 +721,16 @@ app.get('/api/public/verify/:envelopeId/public-key', async (c) => {
     return c.body(data.pubKey.pem);
 });
 
+// Spec 5H D-patch — view the signed document. Looks up the envelope's
+// public token and redirects to /agreements/sign/{token} which renders
+// the same printable agreement (now with Download PDF button on signed status).
+app.get('/api/public/verify/:envelopeId/document', async (c) => {
+    const envelopeId = c.req.param('envelopeId') as string;
+    const data = await loadVerifyData(c, envelopeId);
+    if (!data) return c.text('Not found', 404);
+    return c.redirect(`/agreements/sign/${data.reqRow.token}`, 302);
+});
+
 app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
     const envelopeId = c.req.param('envelopeId') as string;
     const data = await loadVerifyData(c, envelopeId);
