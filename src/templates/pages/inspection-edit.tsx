@@ -17,8 +17,10 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
       <>
         <link rel="stylesheet" href="/fonts.css" />
         <style dangerouslySetInnerHTML={{ __html: `
-          body { font-family: 'DM Sans', system-ui, sans-serif; }
-          .font-heading { font-family: 'Bricolage Grotesque', system-ui, sans-serif; }
+          /* Spec 5G consistency fix (Round 11) — drop the per-page DM Sans
+             override; inherit Inter from main-layout. .font-heading kept as
+             alias of body Inter so existing class usages don't break. */
+          .font-heading { font-family: 'Inter', sans-serif; font-weight: 700; }
           .font-mono { font-family: 'JetBrains Mono', monospace; }
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -252,7 +254,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               x-on:click="showPublishModal = true"
               x-bind:disabled="completionPercent < 100"
               class="flex-1 py-3 text-sm font-bold rounded-xl text-white disabled:opacity-40"
-              style="background: #4a72ff"
+              style="background: #4f46e5"
             >Publish</button>
           </div>
         </div>
@@ -474,7 +476,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <button
                   x-on:click="showPublishModal = true"
                   class="flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-xl text-white"
-                  style="background: #4a72ff"
+                  style="background: #4f46e5"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                   Publish
@@ -872,7 +874,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 <span x-show="!sendingPdf">📧 Send PDF to Client</span>
                 <span x-show="sendingPdf">Sending…</span>
               </button>
-              <button x-on:click="publish()" class="flex-1 py-3 text-sm font-bold rounded-xl text-white" style="background: #4a72ff" x-bind:disabled="publishing">
+              <button x-on:click="publish()" class="flex-1 py-3 text-sm font-bold rounded-xl text-white" style="background: #4f46e5" x-bind:disabled="publishing">
                 <span x-text="publishing ? 'Publishing...' : 'Confirm Publish'"></span>
               </button>
             </div>

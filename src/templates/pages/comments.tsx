@@ -8,10 +8,10 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
         <div x-data="commentsAdmin" x-init="init()" class="space-y-4">
             <header class="flex items-start justify-between flex-wrap gap-4">
                 <div>
-                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Comments Library</h1>
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Comments Library</h1>
                     <p class="text-sm text-slate-500 mt-1">Pre-written comment snippets. Inspectors attach these to inspection items during field work.</p>
                 </div>
-                <button x-on:click="openCreate()" class="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black">+ Add comment</button>
+                <button x-on:click="openCreate()" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-bold uppercase tracking-wide hover:bg-indigo-700">+ Add comment</button>
             </header>
 
             <div class="flex gap-3 flex-wrap">

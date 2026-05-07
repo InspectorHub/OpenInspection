@@ -15,7 +15,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         <div class="flex items-center gap-3">
                             <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
                         </div>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-gradient">Inspections</h1>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Inspections</h1>
                         <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage your inspections.</p>
                     </div>
 

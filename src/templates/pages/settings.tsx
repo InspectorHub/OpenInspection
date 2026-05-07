@@ -58,7 +58,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     <div class="flex items-center gap-3">
                         <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Settings</span>
                     </div>
-                    <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-gradient">Settings</h1>
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Settings</h1>
                     <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Configure your workspace, integrations, and API credentials.</p>
                 </div>
 
