@@ -357,7 +357,9 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     bedrooms: inspection.bedrooms || '',
                     bathrooms: inspection.bathrooms || '',
                     unit: inspection.unit || '',
-                    county: inspection.county || ''
+                    /* Spec 5D — auto-fill county from geocoded place
+                       when user hasn't manually overridden. */
+                    county: inspection.county || inspection.addressCounty || ''
                 }`}
                 class="px-4 py-3 border-t space-y-2"
                 style="border-color: rgba(232,228,221,0.4)"
