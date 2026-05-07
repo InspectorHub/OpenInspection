@@ -89,6 +89,46 @@ function inspectionEditor(inspectionId) {
       window.addEventListener('resize', () => {
         this.isDesktop = window.innerWidth >= 1024;
       });
+
+      // Spec 5G M1.1 mobile — horizontal swipe between sections (analog of
+      // desktop ↑↓ keyboard nav). Mobile-only: skip on desktop (lg+).
+      // Detection: horizontal distance > 50px, vertical < 40px, time < 500ms,
+      // and started outside form fields. Avoids conflict with vertical scroll.
+      var swipeStart = null;
+      window.addEventListener('touchstart', (e) => {
+        if (this.isDesktop) return;
+        var t = (e.target && e.target.tagName) || '';
+        if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || t === 'BUTTON') return;
+        if (e.target && e.target.closest && e.target.closest('button, input, textarea, [data-no-swipe]')) return;
+        if (!e.touches || e.touches.length !== 1) return;
+        swipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+      }, { passive: true });
+      window.addEventListener('touchend', (e) => {
+        if (!swipeStart || this.isDesktop) return;
+        var endTouch = e.changedTouches && e.changedTouches[0];
+        if (!endTouch) { swipeStart = null; return; }
+        var dx = endTouch.clientX - swipeStart.x;
+        var dy = endTouch.clientY - swipeStart.y;
+        var dt = Date.now() - swipeStart.t;
+        swipeStart = null;
+        if (dt > 500) return;
+        if (Math.abs(dy) > 40) return;
+        if (Math.abs(dx) < 50) return;
+        if (dx < 0 && this.currentSectionIdx < this.sections.length - 1) {
+          // swipe left → next section
+          this.currentSectionIdx += 1;
+          var nextItems = this.currentSectionItems || [];
+          if (nextItems.length) this.activeItemId = nextItems[0].id;
+          if (typeof showToast === 'function') showToast('Section: ' + (this.currentSection?.title || ''));
+        } else if (dx > 0 && this.currentSectionIdx > 0) {
+          // swipe right → previous section
+          this.currentSectionIdx -= 1;
+          var prevItems = this.currentSectionItems || [];
+          if (prevItems.length) this.activeItemId = prevItems[0].id;
+          if (typeof showToast === 'function') showToast('Section: ' + (this.currentSection?.title || ''));
+        }
+      }, { passive: true });
+
       // Spec 5G M1.1 — Rating hotkeys (1=Sat, 2=Mon, 3=Defect, 0=Clear, N=N/A)
       // Skip when typing in form fields. Operates on the active (last
       // interacted) item, falling back to the first item in current section.
