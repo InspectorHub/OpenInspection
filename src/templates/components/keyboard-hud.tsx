@@ -77,7 +77,7 @@ export function KeyboardHUD(): JSX.Element {
             aria-modal="true"
             aria-label="Keyboard shortcuts"
         >
-            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" x-on:click="open = false"></div>
+            <div class="absolute inset-0 bg-slate-900/85 backdrop-blur-sm" x-on:click="open = false"></div>
 
             <div class="relative bg-white rounded-lg shadow-md border border-slate-200 max-w-4xl w-full max-h-[85vh] overflow-y-auto">
                 <header class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
