@@ -551,19 +551,8 @@ function inspectionEditor(inspectionId) {
       if (initialFilter === 'my-snippets') {
         this.commentLibraryFilter = 'my-snippets';
       } else {
-        // Auto-filter by current item rating if any
         var r = this.results[this.activeItemId]?.rating;
-        this.commentLibraryFilter = 'all';
-        if (r) {
-          for (var i = 0; i < this.ratingLevels.length; i++) {
-            if (this.ratingLevels[i].id === r) {
-              var name = (this.ratingLevels[i].name || '').toLowerCase();
-              if (name.indexOf('sat') >= 0) { this.commentLibraryFilter = 'satisfactory'; break; }
-              if (name.indexOf('mon') >= 0 || name.indexOf('marg') >= 0) { this.commentLibraryFilter = 'monitor'; break; }
-              if (name.indexOf('def') >= 0 || name.indexOf('rep') >= 0) { this.commentLibraryFilter = 'defect'; break; }
-            }
-          }
-        }
+        this.commentLibraryFilter = this._bucketForRatingId(r);
       }
       this.showCommentLibrary = true;
       // Focus search input after render
@@ -599,19 +588,7 @@ function inspectionEditor(inspectionId) {
         if (typeof showToast === 'function') showToast('No notes to save');
         return;
       }
-      // Determine rating bucket from current item
-      var r = this.results[this.activeItemId]?.rating;
-      var bucket = 'all';
-      if (r) {
-        for (var i = 0; i < this.ratingLevels.length; i++) {
-          if (this.ratingLevels[i].id === r) {
-            var nm = (this.ratingLevels[i].name || '').toLowerCase();
-            if (nm.indexOf('sat') >= 0) { bucket = 'satisfactory'; break; }
-            if (nm.indexOf('mon') >= 0 || nm.indexOf('marg') >= 0) { bucket = 'monitor'; break; }
-            if (nm.indexOf('def') >= 0 || nm.indexOf('rep') >= 0) { bucket = 'defect'; break; }
-          }
-        }
-      }
+      var bucket = this._bucketForRatingId(this.results[this.activeItemId]?.rating);
       var existing = [];
       try {
         var raw = localStorage.getItem('oi:snippets');
@@ -677,6 +654,38 @@ function inspectionEditor(inspectionId) {
         filtered = filtered.filter(function (c) { return c.text.toLowerCase().indexOf(q) >= 0; });
       }
       return filtered;
+    },
+
+    // Spec 5G M1 — bucket inference. Tries name substring, falls back to
+    // abbreviation and rating id ('S'/'M'/'D'/'Sat'/'Mon'/'NI'/'NP').
+    _bucketForRatingId(ratingId) {
+      if (!ratingId) return 'all';
+      for (var i = 0; i < this.ratingLevels.length; i++) {
+        if (this.ratingLevels[i].id !== ratingId) continue;
+        var lvl = this.ratingLevels[i];
+        var nm = (lvl.name || '').toLowerCase();
+        var ab = (lvl.abbreviation || '').toUpperCase();
+        var id = (lvl.id || '').toUpperCase();
+        if (nm.indexOf('sat') >= 0 || ab === 'SAT' || ab === 'S' || id === 'S') return 'satisfactory';
+        if (nm.indexOf('mon') >= 0 || nm.indexOf('marg') >= 0 || ab === 'MON' || ab === 'M' || id === 'M') return 'monitor';
+        if (nm.indexOf('def') >= 0 || nm.indexOf('rep') >= 0 || ab === 'DEF' || ab === 'D' || id === 'D') return 'defect';
+        break;
+      }
+      return 'all';
+    },
+
+    // Spec 5G M1 — right-pane inline quick comments. Auto-filters by
+    // the active item's current rating so inspectors get the right pool
+    // without opening the full library drawer.
+    get quickCommentsForActive() {
+      var pool = this._commentLibraryPool;
+      var bucket = 'all';
+      if (this.activeItemId) {
+        var r = this.results[this.activeItemId]?.rating;
+        bucket = this._bucketForRatingId(r);
+      }
+      if (bucket === 'all') return pool.slice(0, 6);
+      return pool.filter(function (c) { return c.rating === 'all' || c.rating === bucket; }).slice(0, 6);
     },
 
     get commentLibraryCount() {

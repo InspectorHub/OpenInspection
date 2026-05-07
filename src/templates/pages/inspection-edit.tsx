@@ -742,6 +742,75 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               </template>
             </div>
           </main>
+
+          {/* Spec 5G M1 — Right pane: active item photos + quick comments.
+              Hidden in focus mode (⌘2) and on screens narrower than xl. */}
+          <aside x-show="viewMode !== 'focus' && activeItem" class="hidden lg:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(232,228,221,0.5);">
+            <header class="px-4 py-3 border-b" style="border-color: rgba(232,228,221,0.4);">
+              <h3 class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Active Item</h3>
+              <p class="text-sm font-bold text-slate-900 mt-0.5 leading-tight" x-text="activeItem?.label || activeItem?.name || ''"></p>
+              <p class="text-[10px] font-mono text-slate-400 mt-0.5" x-text="activeItem?.number || ''"></p>
+            </header>
+
+            {/* Photos */}
+            <section class="px-4 py-3 border-b" style="border-color: rgba(232,228,221,0.4);">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Photos · <span x-text="(results[activeItemId]?.photos || []).length"></span></span>
+                <label class="text-[10px] text-blue-500 hover:underline cursor-pointer">
+                  + Add
+                  <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }" />
+                </label>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5" x-show="(results[activeItemId]?.photos || []).length > 0">
+                <template x-for="(photo, pi) in (results[activeItemId]?.photos || []).slice(0, 8)" x-bind:key="pi">
+                  <div class="aspect-[4/3] rounded overflow-hidden bg-slate-100 relative group">
+                    <img x-bind:src="'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.annotatedKey || photo.key)" class="w-full h-full object-cover" alt="Photo" />
+                    <button
+                      x-on:click="window.dispatchEvent(new CustomEvent('annotate', { detail: { inspectionId, itemId: activeItemId, photoIndex: pi, imageUrl: '/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.key), existingNodesJson: photo.annotationsJson || null } }))"
+                      class="absolute bottom-0.5 right-0.5 px-1.5 py-0.5 rounded bg-white/90 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Annotate"
+                    >✎</button>
+                  </div>
+                </template>
+              </div>
+              <p x-show="(results[activeItemId]?.photos || []).length === 0" class="text-[11px] italic text-slate-400 py-2">
+                No photos. Press <kbd class="px-1 bg-slate-100 border rounded font-mono">P</kbd> to add.
+              </p>
+            </section>
+
+            {/* Quick comments */}
+            <section class="px-4 py-3 flex-1 overflow-y-auto">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Quick Comments</span>
+                <button x-on:click="openCommentLibrary()" class="text-[10px] text-blue-500 hover:underline">Browse all</button>
+              </div>
+              <div class="space-y-1">
+                <template x-for="(c, i) in quickCommentsForActive" x-bind:key="i">
+                  <button x-on:click="insertComment(c.text)" class="w-full text-left p-2 rounded text-[11px] text-slate-700 leading-snug border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all">
+                    <div class="flex items-start gap-1.5">
+                      <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0 mt-0.5"
+                        x-bind:style="c.rating === 'satisfactory' ? 'background:#10b981' : (c.rating === 'monitor' ? 'background:#f59e0b' : (c.rating === 'defect' ? 'background:#ef4444' : 'background:#64748b'))"
+                        x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
+                      <span x-text="c.text"></span>
+                    </div>
+                  </button>
+                </template>
+              </div>
+              <p class="text-[10px] text-slate-400 italic mt-3">
+                Press <kbd class="px-1 bg-slate-100 border rounded font-mono">/</kbd> for full library
+              </p>
+            </section>
+
+            {/* Keyboard hint footer */}
+            <footer class="px-4 py-2 border-t text-[10px] text-slate-400" style="border-color: rgba(232,228,221,0.4);">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <kbd class="px-1 bg-slate-100 border rounded font-mono">↑↓</kbd> nav
+                <kbd class="px-1 bg-slate-100 border rounded font-mono">1-3</kbd> rate
+                <kbd class="px-1 bg-slate-100 border rounded font-mono">/</kbd> lib
+                <kbd class="px-1 bg-slate-100 border rounded font-mono">?</kbd> all
+              </div>
+            </footer>
+          </aside>
         </div>
 
         {/* ===== Publish Modal ===== */}
