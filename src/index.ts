@@ -60,6 +60,7 @@ import aiRoutes from './api/ai';
 import bookingsRoutes from './api/bookings';
 import adminRoutes from './api/admin';
 import agentRoutes from './api/agent';
+import placesRoutes from './api/places';
 import availabilityRoutes from './api/availability';
 import calendarRoutes from './api/calendar';
 import calendarEventsRoutes from './api/calendar-events';
@@ -314,6 +315,7 @@ app.route('/api/public', bookingsRoutes);
 app.route('/api/public/widget', widgetRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/agent', agentRoutes);
+app.route('/api/places', placesRoutes);
 app.route('/api/availability', availabilityRoutes);
 // Mount /api/calendar/events BEFORE /api/calendar so the more-specific path takes precedence.
 app.route('/api/calendar/events', calendarEventsRoutes);
