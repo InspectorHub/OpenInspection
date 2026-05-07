@@ -111,6 +111,28 @@ textarea {
         cursor: not-allowed;
     }
 
+    /* Spec 5F.6 — flat surface aliases for the 18 templates that use
+       glass-card / glass-panel. Per handoff README, drop atmospheric
+       blob + glass-morphism. Keeping the class names lets us flip
+       all 18 files at once via CSS rather than per-template churn. */
+    .glass-card,
+    .glass-panel {
+        background: var(--ih-bg-card, #ffffff);
+        border: 1px solid var(--ih-slate-200, #e2e8f0);
+        border-radius: var(--ih-radius-card, 8px);
+        box-shadow: var(--ih-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.08));
+        backdrop-filter: none;
+    }
+
+    /* Spec 5F.7 — kill atmospheric indigo glow blobs. The .ih-atmosphere
+       class never had its own definition in input.css; it relied on
+       inline styles (huge blurred indigo radials) on body / page wrappers.
+       We override it here to no-op. */
+    .ih-atmosphere {
+        background: none !important;
+        filter: none !important;
+    }
+
     /* Gradient text */
     .gradient-text {
         background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);

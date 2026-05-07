@@ -23,7 +23,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                 </div>
 
                 {/* Templates List */}
-                <div class="glass-panel rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-100/5">
+                <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-indigo-100/5">
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
@@ -52,7 +52,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                 <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-12 sm:px-0">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" onclick="closeModal()"></div>
                     <div class="flex min-h-full items-center justify-center">
-                        <div role="dialog" aria-modal="true" class="relative w-full max-w-xl transform overflow-hidden rounded-[2.5rem] bg-white p-12 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
+                        <div role="dialog" aria-modal="true" class="relative w-full max-w-xl transform overflow-hidden rounded-xl bg-white p-12 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
                             <div class="absolute top-8 right-8">
                                 <button onclick="closeModal()" aria-label="Close dialog" class="p-3 text-slate-400 hover:text-slate-900 rounded-2xl hover:bg-slate-50 transition-all active:scale-95">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>

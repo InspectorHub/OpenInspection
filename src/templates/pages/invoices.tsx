@@ -38,7 +38,7 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </div>
                 </div>
 
-                <div class="glass-panel rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-200/50">
+                <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-slate-200/50">
                     <table class="w-full text-left">
                         <thead class="bg-slate-50/40">
                             <tr>
@@ -59,7 +59,7 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
                 <div id="invoiceModal" class="fixed inset-0 z-[100] hidden overflow-y-auto">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl" onclick="closeInvoiceModal()"></div>
                     <div class="flex min-h-full items-center justify-center p-6">
-                        <div class="relative w-full max-w-lg bg-white rounded-[3rem] p-10 shadow-2xl">
+                        <div class="relative w-full max-w-lg bg-white rounded-xl p-10 shadow-2xl">
                             <h3 class="text-2xl font-black text-slate-900 mb-8">New Invoice</h3>
                             <div class="space-y-5">
                                 <div class="grid grid-cols-2 gap-4">

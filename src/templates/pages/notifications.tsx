@@ -22,7 +22,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                     <button x-on:click="setFilter('unread')" x-bind:class="filter==='unread' ? 'bg-indigo-600 text-white' : 'ring-2 ring-slate-200 text-slate-600'" class="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">Unread</button>
                 </div>
 
-                <div class="glass-panel rounded-[2.5rem] shadow-xl shadow-slate-100/50 overflow-hidden">
+                <div class="glass-panel rounded-xl shadow-xl shadow-slate-100/50 overflow-hidden">
                     <template x-if="items.length === 0 && !loading">
                         <div class="py-24 text-center space-y-3">
                             <div class="text-slate-400 font-semibold">No notifications yet — events will appear here as they happen.</div>

@@ -15,7 +15,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                 <div class="max-w-4xl mx-auto px-6 py-8 relative z-10">
                     {/* Sticky Professional Header */}
                     <div class="sticky top-6 z-50 mb-10 transition-all duration-500" x-bind:class="{ 'translate-y-[-12px]': scrolled }">
-                        <div class="glass-panel flex items-center justify-between px-8 py-5 rounded-[2.5rem] shadow-2xl shadow-indigo-100/30 ring-1 ring-white/60">
+                        <div class="glass-panel flex items-center justify-between px-8 py-5 rounded-xl shadow-2xl shadow-indigo-100/30 ring-1 ring-white/60">
                             <div>
                                 <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Loading...'"></h1>
                                 <div class="flex items-center gap-2 mt-1">
@@ -61,7 +61,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     {/* Inspection Architecture Loop */}
                     <div class="space-y-8 animate-slide-in">
                         <template x-for="section in templateSchema.sections" x-bind:key="section.id">
-                            <div class="glass-panel rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-100/10 border-white/40 transition-all duration-500"
+                            <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-indigo-100/10 border-white/40 transition-all duration-500"
                                 x-bind:class="openSections.includes(section.id) ? 'ring-2 ring-indigo-500/10' : ''">
                                 
                                 <button x-on:click="toggleSection(section.id)" class="w-full px-10 py-8 flex justify-between items-center bg-white/40 hover:bg-white/60 transition-all group">
@@ -227,7 +227,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                         <div x-show="!isDelivered && inspection?.status !== 'completed'">
                             <button
                                 x-on:click="finishInspection"
-                                class="premium-button w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-bold shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] active:scale-95 transition-all hover:bg-black flex items-center justify-center gap-4 group"
+                                class="premium-button w-full py-6 bg-slate-900 text-white rounded-xl font-bold shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] active:scale-95 transition-all hover:bg-black flex items-center justify-center gap-4 group"
                                 x-bind:class="{ 'opacity-50 pointer-events-none': !isComplete }"
                                 x-bind:disabled="syncing"
                             >
@@ -238,7 +238,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                         </div>
 
                         <div x-show="isDelivered || inspection?.status === 'completed'" class="animate-slide-in">
-                            <div class="glass-panel p-10 rounded-[2.5rem] text-center mb-8 border-emerald-100 shadow-2xl shadow-emerald-100/20 bg-emerald-50/10">
+                            <div class="glass-panel p-10 rounded-xl text-center mb-8 border-emerald-100 shadow-2xl shadow-emerald-100/20 bg-emerald-50/10">
                                 <div class="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-emerald-200 group hover:rotate-6 transition-transform">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
@@ -248,7 +248,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             <a
                                 x-bind:href={`'/api/inspections/' + inspectionId + '/report'`}
                                 target="_blank"
-                                class="premium-button w-full py-6 bg-indigo-600 text-white rounded-[2.5rem] font-bold shadow-2xl shadow-indigo-100 active:scale-95 transition-all hover:bg-indigo-700 flex items-center justify-center gap-4"
+                                class="premium-button w-full py-6 bg-indigo-600 text-white rounded-xl font-bold shadow-2xl shadow-indigo-100 active:scale-95 transition-all hover:bg-indigo-700 flex items-center justify-center gap-4"
                             >
                                 <span class="text-xl tracking-tightest">Review Certified Documentation</span>
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -267,7 +267,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                         x-cloak="true"
                         class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl"
                     >
-                        <div class="bg-white rounded-[3rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col relative animate-slide-in">
+                        <div class="bg-white rounded-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col relative animate-slide-in">
                             {/* Modal High-End Header */}
                             <div class="px-12 py-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
                                 <div>

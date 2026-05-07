@@ -44,7 +44,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             key={stat.id}
                             type="button"
                             x-on:click={`sections['${stat.target}']=true; $nextTick(()=>{ const el=document.getElementById('bucket-${stat.target}'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); })`}
-                            class="glass-card group p-8 rounded-[2.5rem] animate-fade-in text-left hover:scale-[1.02] transition-transform cursor-pointer"
+                            class="glass-card group p-8 rounded-xl animate-fade-in text-left hover:scale-[1.02] transition-transform cursor-pointer"
                             style={`animation-delay: ${0.1 + i * 0.05}s`}
                             title={`Jump to ${stat.label}`}
                         >
@@ -324,7 +324,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto overflow-x-hidden">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl transition-opacity animate-fade-in" onclick="closeModal()"></div>
                     <div class="flex min-h-full items-center justify-center p-6">
-                        <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-[3.5rem] bg-white p-12 text-left shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] animate-fade-in border border-white/40">
+                        <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-12 text-left shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] animate-fade-in border border-white/40">
                             <div class="absolute top-10 right-10">
                                 <button onclick="closeModal()" aria-label="Close dialog" class="group p-3 text-slate-300 hover:text-slate-900 rounded-2xl hover:bg-slate-50 transition-all">
                                     <svg class="w-6 h-6 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>

@@ -34,7 +34,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
 
                 <div class="grid grid-cols-1 gap-12">
                     {/* Active Members */}
-                    <div class="glass-panel rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-200/50">
+                    <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-slate-200/50">
                         <div class="px-10 py-8 border-b border-slate-100/50 bg-slate-50/30 flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Active Directory</h2>
@@ -58,7 +58,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                     </div>
 
                     {/* Pending Invites */}
-                    <div class="glass-panel rounded-[3rem] overflow-hidden shadow-xl shadow-slate-100/50 border-dashed border-2 border-slate-200 bg-slate-50/10">
+                    <div class="glass-panel rounded-xl overflow-hidden shadow-xl shadow-slate-100/50 border-dashed border-2 border-slate-200 bg-slate-50/10">
                         <div class="px-10 py-8 border-b border-slate-100/50 bg-white/30 flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <h2 class="text-xl font-black text-slate-400 tracking-tightest">Pending Invitations</h2>
@@ -86,7 +86,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                 <div id="inviteModal" class="fixed inset-0 z-[100] hidden overflow-y-auto">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl transition-opacity animate-fade-in"></div>
                     <div class="fixed inset-0 flex items-center justify-center p-6">
-                        <div role="dialog" aria-modal="true" class="relative bg-white rounded-[3.5rem] shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] w-full max-w-xl p-12 overflow-hidden border border-white/40 animate-fade-in">
+                        <div role="dialog" aria-modal="true" class="relative bg-white rounded-2xl shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] w-full max-w-xl p-12 overflow-hidden border border-white/40 animate-fade-in">
                             <div class="mb-12">
                                 <div class="w-16 h-16 bg-indigo-600/10 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>

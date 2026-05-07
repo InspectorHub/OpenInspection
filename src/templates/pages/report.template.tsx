@@ -104,7 +104,7 @@ export function renderProfessionalReport(data: {
         {...{':class': "(showAgreement || (signed && showPayment && !paid)) ? 'blur-content' : ''"}}
         class="max-w-6xl mx-auto relative z-10"
     >
-        <div class="bg-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] rounded-[3rem] overflow-hidden border border-white relative">
+        <div class="bg-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] rounded-xl overflow-hidden border border-white relative">
             {/* Header / Cover Tier */}
             <div class="bg-slate-900 px-12 py-20 relative overflow-hidden">
                 <div class="absolute top-0 right-0 w-[400px] h-full bg-gradient-to-l from-indigo-500/20 to-transparent skew-x-[-20deg] translate-x-32"></div>
@@ -308,7 +308,7 @@ export function renderProfessionalReport(data: {
     {/* Report Paywall Gate */}
     <template x-if="showAgreement">
         <div class="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-2xl">
-            <div class="bg-white rounded-[3.5rem] shadow-[0_60px_120px_-20px_rgba(0,0,0,0.6)] max-w-3xl w-full p-16 space-y-12 animate-slide-in">
+            <div class="bg-white rounded-2xl shadow-[0_60px_120px_-20px_rgba(0,0,0,0.6)] max-w-3xl w-full p-16 space-y-12 animate-slide-in">
                 <div class="text-center">
                     <div class="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-200">
                         <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -317,7 +317,7 @@ export function renderProfessionalReport(data: {
                     <p class="text-xl text-slate-400 font-medium">Authentication required. Please authorize the inspection terms of service.</p>
                 </div>
 
-                <div class="prose prose-indigo prose-lg max-h-80 overflow-y-auto p-10 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 text-slate-600 leading-relaxed font-medium shadow-inner" x-html="agreementContent"></div>
+                <div class="prose prose-indigo prose-lg max-h-80 overflow-y-auto p-10 bg-slate-50/50 rounded-xl border border-slate-100 text-slate-600 leading-relaxed font-medium shadow-inner" x-html="agreementContent"></div>
 
                 <div class="space-y-6">
                     <div class="flex justify-between items-end">
@@ -340,8 +340,8 @@ export function renderProfessionalReport(data: {
 
     <template x-if="signed && showPayment && !paid">
         <div class="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-2xl">
-            <div class="bg-white rounded-[3.5rem] shadow-[0_60px_120px_-20px_rgba(0,0,0,0.6)] max-w-xl w-full p-16 text-center space-y-12 animate-slide-in">
-                <div class="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-xl shadow-indigo-100/50">
+            <div class="bg-white rounded-2xl shadow-[0_60px_120px_-20px_rgba(0,0,0,0.6)] max-w-xl w-full p-16 text-center space-y-12 animate-slide-in">
+                <div class="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-100/50">
                     <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                 </div>
                 <div>
@@ -352,7 +352,7 @@ export function renderProfessionalReport(data: {
                     </p>
                 </div>
 
-                <button {...{'@click': 'redirectToCheckout'}} class="premium-button w-full py-6 bg-indigo-600 text-white rounded-[2.5rem] text-lg font-black tracking-tightest shadow-2xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
+                <button {...{'@click': 'redirectToCheckout'}} class="premium-button w-full py-6 bg-indigo-600 text-white rounded-xl text-lg font-black tracking-tightest shadow-2xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
                     Pay to View Report
                 </button>
 

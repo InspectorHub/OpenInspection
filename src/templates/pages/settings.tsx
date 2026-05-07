@@ -98,7 +98,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Profile ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 space-y-10">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-2xl shadow-slate-200/50 space-y-10">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', 'bg-teal-600/10 text-teal-600')}
                             <div>
@@ -139,7 +139,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Branding ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 space-y-10">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-2xl shadow-slate-200/50 space-y-10">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z', 'bg-indigo-600/10 text-indigo-600')}
                             <div>
@@ -172,7 +172,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                         <div class="space-y-4">
                             <label class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Company Logo</label>
-                            <div class="flex flex-col sm:flex-row items-center gap-10 p-10 bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-200 group hover:border-indigo-300 transition-colors">
+                            <div class="flex flex-col sm:flex-row items-center gap-10 p-10 bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200 group hover:border-indigo-300 transition-colors">
                                 <div class="w-32 h-32 bg-white rounded-3xl border border-slate-100 shadow-xl flex items-center justify-center overflow-hidden">
                                     {logoUrl ? (
                                         <img id="logoPreview" src={logoUrl} class="w-full h-full object-contain p-4" />
@@ -203,7 +203,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                     {/* ── Report Theme ── */}
                     <section
-                        class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-6"
+                        class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6"
                         x-data={`{
                             theme: '${reportTheme}',
                             saving: false,
@@ -243,7 +243,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Analytics ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'bg-sky-600/10 text-sky-600')}
                             <div>
@@ -266,7 +266,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     {/* Workspace admin / API key sections — collapsed by default to keep the
                         inspector-facing settings (Profile / Branding / Telemetry / Apple Calendar /
                         Password) above the fold. Open this group when wiring up integrations. */}
-                    <details class="glass-panel rounded-[3.5rem] shadow-xl shadow-slate-100/50 [&>summary]:list-none">
+                    <details class="glass-panel rounded-2xl shadow-xl shadow-slate-100/50 [&>summary]:list-none">
                         <summary class="cursor-pointer p-8 md:p-10 flex items-center justify-between gap-5">
                             <div class="flex items-center gap-5">
                                 {sectionIcon('M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', 'bg-slate-700/10 text-slate-700')}
@@ -280,7 +280,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                         <div class="px-8 md:px-10 pb-10 space-y-8 border-t border-slate-100/50 pt-8">
 
                     {/* ── Email ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', 'bg-emerald-600/10 text-emerald-600')}
                             <div>
@@ -310,7 +310,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Bot Protection ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', 'bg-amber-600/10 text-amber-600')}
                             <div>
@@ -338,7 +338,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── AI ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M13 10V3L4 14h7v7l9-11h-7z', 'bg-violet-600/10 text-violet-600')}
                             <div>
@@ -360,7 +360,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Integrations ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'bg-rose-600/10 text-rose-600')}
                             <div>
@@ -422,7 +422,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Apple Calendar / ICS Subscription ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 'bg-slate-600/10 text-slate-600')}
                             <div>
@@ -444,7 +444,7 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </section>
 
                     {/* ── Password ── */}
-                    <section class="glass-panel p-10 md:p-12 rounded-[3.5rem] shadow-xl shadow-slate-100/50 space-y-8">
+                    <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-8">
                         <div class="flex items-center gap-5 pb-6 border-b border-slate-100/50">
                             {sectionIcon('M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', 'bg-slate-600/10 text-slate-600')}
                             <div>

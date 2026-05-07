@@ -21,7 +21,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                 </div>
 
                 <div class="mt-12 sm:mx-auto sm:w-full sm:max-w-[480px] animate-fade-in" style="animation-delay: 0.1s;">
-                    <div class="glass-panel px-10 py-16 rounded-[3rem]">
+                    <div class="glass-panel px-10 py-16 rounded-xl">
                         <form id="setupForm" class="space-y-8">
                             <div>
                                 <label for="companyName" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Business Name</label>

@@ -27,7 +27,7 @@ export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
                     <button data-status="signed" class="report-tab text-slate-500 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white transition-all">Signed <span id="report-count-signed" class="ml-1.5 text-violet-500">0</span></button>
                 </div>
 
-                <div class="glass-panel relative overflow-hidden rounded-[3rem] min-h-[400px] shadow-2xl shadow-slate-200/50">
+                <div class="glass-panel relative overflow-hidden rounded-xl min-h-[400px] shadow-2xl shadow-slate-200/50">
                     <div class="hidden md:block">
                         <table class="w-full">
                             <thead>

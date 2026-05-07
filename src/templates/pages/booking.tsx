@@ -39,7 +39,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                         </nav>
                     )}
 
-                    <div class="glass-panel p-10 md:p-16 rounded-[3.5rem] shadow-2xl shadow-slate-200/50 border border-white/40">
+                    <div class="glass-panel p-10 md:p-16 rounded-2xl shadow-2xl shadow-slate-200/50 border border-white/40">
                         <div class="mb-16">
                             <div class="flex items-center gap-2 mb-4">
                                 <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>

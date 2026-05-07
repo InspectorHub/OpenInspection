@@ -50,7 +50,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                         </div>
 
                         {/* Referral List */}
-                        <div class="glass-panel rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-100/10">
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-indigo-100/10">
                             <div class="overflow-x-auto">
                                 <table class="min-w-full">
                                     <thead>
