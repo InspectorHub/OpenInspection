@@ -736,8 +736,36 @@ adminRoutes.openapi(sendAgreementRoute, async (c) => {
     });
     const signUrl = `${getBaseUrl(c)}/agreements/sign/${request.token}`;
 
+    // Spec 5H P0.1 — append request.created to the audit chain
+    try {
+        await c.var.services.auditLog.append(tenantId, request.id, 'request.created', {
+            actorId: c.get('user')?.sub ?? null,
+            agreementId: body.agreementId,
+            clientEmail: body.clientEmail,
+            clientName: body.clientName ?? null,
+            envelopeId: request.id,
+            inspectionId: body.inspectionId ?? null,
+            tenantId,
+            tsMs: Date.now(),
+        });
+    } catch (e) {
+        logger.warn('audit.append.created.failed', { requestId: request.id, error: (e as Error).message });
+    }
+
     await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl)
         .catch(e => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+
+    // Append request.sent only after email is dispatched (or attempted)
+    try {
+        await c.var.services.auditLog.append(tenantId, request.id, 'request.sent', {
+            envelopeId: request.id,
+            recipientEmail: body.clientEmail,
+            signUrl,
+            tsMs: Date.now(),
+        });
+    } catch (e) {
+        logger.warn('audit.append.sent.failed', { requestId: request.id, error: (e as Error).message });
+    }
 
     auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, clientEmail: body.clientEmail } });
     return c.json({ success: true as const, data: { token: request.token, signUrl } }, 200);
