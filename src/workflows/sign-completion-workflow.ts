@@ -2,7 +2,6 @@ import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:work
 import type { AppEnv } from '../types/hono';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
-import { generatePdfFromUrl } from '../lib/pdf';
 
 export interface SignCompletionParams {
     requestId: string;
@@ -34,38 +33,51 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         const { requestId, tenantId, token } = event.payload;
         const env = this.env;
 
-        // Step 1 — render canonical signed PDF (route is /m2m/agreement-render/:token)
+        // Step 1 — render canonical signed PDF (best-effort; if BR is not
+        // provisioned at the account level, returns null + chain still extends)
         const signedPdfMeta = await step.do('render-canonical-pdf', {
-            retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
+            retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
             timeout: '2 minutes',
         }, async () => {
-            return renderPdfToR2(env, {
-                renderUrl: `${baseUrl(env)}/m2m/agreement-render/${token}`,
-                r2Key: `tenants/${tenantId}/agreements/${requestId}/signed.pdf`,
-            });
+            try {
+                return await renderPdfToR2(env, {
+                    renderUrl: `${baseUrl(env)}/m2m/agreement-render/${token}`,
+                    r2Key: `tenants/${tenantId}/agreements/${requestId}/signed.pdf`,
+                });
+            } catch (e) {
+                console.warn('[sign-workflow] render-canonical-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
+                return null;
+            }
         });
 
-        // Step 2 — render Certificate of Completion PDF
+        // Step 2 — render Certificate of Completion PDF (also best-effort)
         const certPdfMeta = await step.do('render-certificate-pdf', {
-            retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
+            retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
             timeout: '2 minutes',
         }, async () => {
-            return renderPdfToR2(env, {
-                renderUrl: `${baseUrl(env)}/m2m/cert-render/${token}`,
-                r2Key: `tenants/${tenantId}/agreements/${requestId}/certificate.pdf`,
-            });
+            try {
+                return await renderPdfToR2(env, {
+                    renderUrl: `${baseUrl(env)}/m2m/cert-render/${token}`,
+                    r2Key: `tenants/${tenantId}/agreements/${requestId}/certificate.pdf`,
+                });
+            } catch (e) {
+                console.warn('[sign-workflow] render-certificate-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
+                return null;
+            }
         });
 
-        // Step 4 (P1) — append workflow.complete to the audit chain
-        // Step 3 + 5 (evidence pack + email) ship in P2.
+        // Step 4 — append workflow.complete to the audit chain regardless of
+        // PDF render success. The legally-meaningful 'agreement.signed' row is
+        // already in the chain; this row records the post-sign workflow status.
         await step.do('append-workflow-complete', async () => {
             const signing = new SigningKeyService(env.DB, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET);
             const auditLog = new AuditLogService(env.DB, signing);
             await auditLog.append(tenantId, requestId, 'workflow.complete', {
-                certPdfHash: `sha256:${certPdfMeta.sha256}`,
+                certPdfHash: certPdfMeta ? `sha256:${certPdfMeta.sha256}` : null,
                 envelopeId: requestId,
                 evidenceZipHash: null, // filled in P2
-                signedPdfHash: `sha256:${signedPdfMeta.sha256}`,
+                pdfRenderStatus: signedPdfMeta && certPdfMeta ? 'ok' : 'failed_pdf_render',
+                signedPdfHash: signedPdfMeta ? `sha256:${signedPdfMeta.sha256}` : null,
                 tsMs: Date.now(),
                 workflowId: event.instanceId,
             });
@@ -83,10 +95,21 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
  */
 async function renderPdfToR2(env: AppEnv, opts: { renderUrl: string; r2Key: string }): Promise<{ r2Key: string; sha256: string; sizeBytes: number }> {
     if (!env.REPORTS) throw new Error('REPORTS R2 bucket not configured');
-    // Diagnostic — capture exact URL passed to BR (visible in `wrangler tail` log)
-    console.info('[sign-workflow] BR fetch', { renderUrl: opts.renderUrl, hasBrowser: !!env.BROWSER });
-    // Use the proven generatePdfFromUrl helper (also adds ?print=1 hint).
-    const pdfBuffer = await generatePdfFromUrl(env.BROWSER, opts.renderUrl);
+    if (!env.BROWSER) throw new Error('BROWSER binding not configured');
+
+    // DIAGNOSTIC ROUND 20.2: call BR directly + capture full response body.
+    // This bypasses pdf.ts so we can see the raw error.
+    console.info('[sign-workflow] BR fetch', { renderUrl: opts.renderUrl });
+    const res = await env.BROWSER.fetch(opts.renderUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/pdf' },
+    });
+    if (!res.ok) {
+        const body = await res.text().catch(() => '<unreadable>');
+        console.error('[sign-workflow] BR error', { status: res.status, headers: Object.fromEntries(res.headers.entries()), body: body.slice(0, 1000) });
+        throw new Error(`BR ${res.status}: ${body.slice(0, 500)}`);
+    }
+    const pdfBuffer = await res.arrayBuffer();
     const bytes = new Uint8Array(pdfBuffer);
     const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer));
     const sha256 = Array.from(hash).map((b) => b.toString(16).padStart(2, '0')).join('');
