@@ -1,4 +1,5 @@
 import { MainLayout } from '../layouts/main-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -56,44 +57,45 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
                 </div>
 
                 {/* Create Modal */}
-                <div id="invoiceModal" class="fixed inset-0 z-[100] hidden overflow-y-auto">
-                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl" onclick="closeInvoiceModal()"></div>
-                    <div class="flex min-h-full items-center justify-center p-6">
-                        <div class="relative w-full max-w-lg bg-white rounded-xl p-6 shadow-2xl">
-                            <h3 class="text-xl font-bold text-slate-900 mb-8">New Invoice</h3>
-                            <div class="space-y-5">
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Name *</label>
-                                        <input type="text" id="invClientName" placeholder="John Smith" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Email</label>
-                                        <input type="email" id="invClientEmail" placeholder="john@example.com" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                    </div>
-                                </div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Amount ($)</label>
-                                        <input type="number" id="invAmount" min="0" step="0.01" placeholder="350.00" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Due Date</label>
-                                        <input type="date" id="invDueDate" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Notes</label>
-                                    <textarea id="invNotes" rows={3} placeholder="Optional notes..." class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm resize-none"></textarea>
-                                </div>
+                <Modal
+                    id="invoiceModal"
+                    title="New Invoice"
+                    size="lg"
+                    footer={
+                        <ModalFooter
+                            onCancelJs="closeInvoiceModal()"
+                            onConfirmJs="submitInvoice()"
+                            confirmText="Create"
+                        />
+                    }
+                >
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Name *</label>
+                                <input type="text" id="invClientName" placeholder="John Smith" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
-                            <div class="mt-8 flex gap-4">
-                                <button onclick="closeInvoiceModal()" class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">Cancel</button>
-                                <button onclick="submitInvoice()" class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">Create</button>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Email</label>
+                                <input type="email" id="invClientEmail" placeholder="john@example.com" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
                         </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Amount ($)</label>
+                                <input type="number" id="invAmount" min="0" step="0.01" placeholder="350.00" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Due Date</label>
+                                <input type="date" id="invDueDate" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Notes</label>
+                            <textarea id="invNotes" rows={3} placeholder="Optional notes..." class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm resize-none"></textarea>
+                        </div>
                     </div>
-                </div>
+                </Modal>
 
                 <script src="/js/modal-dialog.js"></script>
                 <script src="/js/auth.js"></script>

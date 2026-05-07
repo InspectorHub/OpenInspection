@@ -1,4 +1,5 @@
 import { MainLayout } from '../layouts/main-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig; }
@@ -60,10 +61,20 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
             </div>
 
             {/* Create / Edit modal */}
-            <div x-show="modalOpen" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) modalOpen = false' }}>
-                <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
-                    <h2 class="text-lg font-bold text-slate-900 mb-4" x-text="editingId ? 'Edit recommendation' : 'New recommendation'"></h2>
-                    <div class="space-y-3">
+            <Modal
+                name="modalOpen"
+                titleExpr="editingId ? 'Edit recommendation' : 'New recommendation'"
+                size="lg"
+                footer={
+                    <ModalFooter
+                        onCancel="modalOpen = false"
+                        onConfirm="save()"
+                        confirmDisabled="saving"
+                        confirmTextExpr="saving ? 'Saving...' : 'Save'"
+                    />
+                }
+            >
+                <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-bold text-slate-600 mb-1">Category</label>
                             <input
@@ -107,15 +118,8 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                             <label class="block text-xs font-bold text-slate-600 mb-1">Repair summary</label>
                             <textarea x-model="form.defaultRepairSummary" required rows={4} placeholder="Recommend evaluation by licensed contractor..." class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"></textarea>
                         </div>
-                    </div>
-                    <div class="flex gap-3 justify-end mt-6">
-                        <button x-on:click="modalOpen = false" class="px-5 py-2 rounded-lg ring-2 ring-slate-300 text-slate-700 text-xs font-bold">Cancel</button>
-                        <button x-on:click="save()" {...{ 'x-bind:disabled': 'saving' }} class="px-5 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black disabled:opacity-50">
-                            <span x-text="saving ? 'Saving...' : 'Save'"></span>
-                        </button>
-                    </div>
                 </div>
-            </div>
+            </Modal>
         </div>
 
         <script src="/js/auth.js"></script>

@@ -1,4 +1,5 @@
 import { BareLayout } from '../layouts/main-layout';
+import { Modal } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 const EDITOR_CSS = `
@@ -427,80 +428,83 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                     </aside>
                 </div>
 
-                {/* Rating System Modal */}
-                <div x-show="showRatingModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-6"
-                    x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-                    <div class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" {...{'@click': 'showRatingModal = false'}}></div>
-                    <div class="relative w-full max-w-xl bg-white rounded-lg shadow-2xl animate-scale-in max-h-[85vh] overflow-hidden flex flex-col">
-                        <div class="px-8 pt-8 pb-4 border-b border-surface-100">
-                            <h3 class="text-2xl font-display font-700 text-ink-900">Rating System</h3>
-                            <p class="text-sm text-ink-400 mt-1">Configure the rating levels for this template</p>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-8 space-y-4">
-                            <div class="space-y-2">
-                                <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Preset</label>
-                                <div class="flex flex-wrap gap-2">
-                                    <template x-for="preset in ratingPresets" x-bind:key="preset.name">
-                                        <button {...{'@click': 'applyRatingPreset(preset)'}} class="px-3 py-1.5 text-sm rounded-lg border transition-colors"
-                                            x-bind:class="template.ratingSystem.name === preset.name ? 'border-blueprint-500 bg-blueprint-50 text-blueprint-700 font-600' : 'border-surface-200 text-ink-500 hover:border-surface-300'"
-                                            x-text="preset.name"></button>
-                                    </template>
-                                </div>
-                            </div>
-                            <hr class="border-surface-100" />
-                            <div class="space-y-1.5">
-                                <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">System Name</label>
-                                <input type="text" x-model="template.ratingSystem.name" class="w-full px-3 py-2.5 text-sm font-500 rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors" />
-                            </div>
-                            <div class="space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Levels</label>
-                                    <button {...{'@click': 'addRatingLevel()'}} class="text-[10px] font-600 text-blueprint-600 hover:text-blueprint-700 flex items-center gap-1">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14m7-7H5"/></svg>
-                                        Add Level
-                                    </button>
-                                </div>
-                                <template x-for="(level, li) in template.ratingSystem.levels" x-bind:key="level.id">
-                                    <div class="space-y-2 p-3 rounded-xl bg-surface-50 group animate-scale-in">
-                                        <div class="flex items-center gap-3">
-                                            <input type="color" x-model="level.color" class="w-8 h-8 rounded-lg border-0 cursor-pointer" />
-                                            <div class="flex-1 grid grid-cols-4 gap-2">
-                                                <input type="text" x-model="level.id" class="text-[10px] font-mono px-2 py-1.5 rounded-md border border-surface-200 bg-white uppercase font-600" placeholder="ID" />
-                                                <input type="text" x-model="level.label" class="col-span-2 text-sm px-2 py-1.5 rounded-md border border-surface-200 bg-white font-500" placeholder="Label" />
-                                                <input type="text" x-model="level.abbreviation" class="text-[10px] font-mono px-2 py-1.5 rounded-md border border-surface-200 bg-white" placeholder="Abbr" />
-                                            </div>
-                                            <select x-model="level.severity" class="text-[10px] font-mono px-2 py-1.5 rounded-md border border-surface-200 bg-white">
-                                                <option value="good">good</option>
-                                                <option value="marginal">marginal</option>
-                                                <option value="significant">significant</option>
-                                                <option value="minor">minor</option>
-                                            </select>
-                                            <label class="flex items-center gap-1 text-[10px] text-ink-400 whitespace-nowrap">
-                                                <input type="checkbox" x-model="level.isDefect" class="w-3 h-3 rounded" /> defect
-                                            </label>
-                                            <label class="flex items-center gap-1 text-[10px] text-ink-400 whitespace-nowrap">
-                                                <input type="radio" name="default_level" x-bind:value="level.id" x-model="template.ratingSystem.defaultLevelId" class="w-3 h-3" /> default
-                                            </label>
-                                            <button {...{'@click': 'template.ratingSystem.levels.splice(li, 1)'}} class="text-ink-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                            </button>
-                                        </div>
-                                        <input type="text"
-                                            x-model="level.description"
-                                            aria-label="Level description"
-                                            maxlength={120}
-                                            class="w-full text-xs px-2 py-1.5 rounded-md border border-surface-200 bg-white text-ink-600"
-                                            placeholder="Description (shown in tooltip & onboarding)" />
-                                    </div>
+                {/* Rating System Modal — single-button (Close) footer, inlined. */}
+                <Modal
+                    name="showRatingModal"
+                    title="Rating System"
+                    subtitle="Configure the rating levels for this template"
+                    size="xl"
+                    footer={
+                        <button
+                            type="button"
+                            {...{'@click': 'showRatingModal = false'}}
+                            class="h-10 px-6 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+                            style="border-color: #e2e8f0"
+                        >
+                            Close
+                        </button>
+                    }
+                >
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Preset</label>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="preset in ratingPresets" x-bind:key="preset.name">
+                                    <button {...{'@click': 'applyRatingPreset(preset)'}} class="px-3 py-1.5 text-sm rounded-lg border transition-colors"
+                                        x-bind:class="template.ratingSystem.name === preset.name ? 'border-blueprint-500 bg-blueprint-50 text-blueprint-700 font-600' : 'border-surface-200 text-ink-500 hover:border-surface-300'"
+                                        x-text="preset.name"></button>
                                 </template>
                             </div>
                         </div>
-                        <div class="px-8 py-5 border-t border-surface-100 flex justify-end gap-3">
-                            <button {...{'@click': 'showRatingModal = false'}} class="px-5 py-2.5 rounded-xl text-sm font-600 text-ink-500 hover:bg-surface-100 transition-colors">Close</button>
+                        <hr class="border-surface-100" />
+                        <div class="space-y-1.5">
+                            <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">System Name</label>
+                            <input type="text" x-model="template.ratingSystem.name" class="w-full px-3 py-2.5 text-sm font-500 rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors" />
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Levels</label>
+                                <button {...{'@click': 'addRatingLevel()'}} class="text-[10px] font-600 text-blueprint-600 hover:text-blueprint-700 flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14m7-7H5"/></svg>
+                                    Add Level
+                                </button>
+                            </div>
+                            <template x-for="(level, li) in template.ratingSystem.levels" x-bind:key="level.id">
+                                <div class="space-y-2 p-3 rounded-xl bg-surface-50 group animate-scale-in">
+                                    <div class="flex items-center gap-3">
+                                        <input type="color" x-model="level.color" class="w-8 h-8 rounded-lg border-0 cursor-pointer" />
+                                        <div class="flex-1 grid grid-cols-4 gap-2">
+                                            <input type="text" x-model="level.id" class="text-[10px] font-mono px-2 py-1.5 rounded-md border border-surface-200 bg-white uppercase font-600" placeholder="ID" />
+                                            <input type="text" x-model="level.label" class="col-span-2 text-sm px-2 py-1.5 rounded-md border border-surface-200 bg-white font-500" placeholder="Label" />
+                                            <input type="text" x-model="level.abbreviation" class="text-[10px] font-mono px-2 py-1.5 rounded-md border border-surface-200 bg-white" placeholder="Abbr" />
+                                        </div>
+                                        <select x-model="level.severity" class="text-[10px] font-mono px-2 py-1.5 rounded-md border border-surface-200 bg-white">
+                                            <option value="good">good</option>
+                                            <option value="marginal">marginal</option>
+                                            <option value="significant">significant</option>
+                                            <option value="minor">minor</option>
+                                        </select>
+                                        <label class="flex items-center gap-1 text-[10px] text-ink-400 whitespace-nowrap">
+                                            <input type="checkbox" x-model="level.isDefect" class="w-3 h-3 rounded" /> defect
+                                        </label>
+                                        <label class="flex items-center gap-1 text-[10px] text-ink-400 whitespace-nowrap">
+                                            <input type="radio" name="default_level" x-bind:value="level.id" x-model="template.ratingSystem.defaultLevelId" class="w-3 h-3" /> default
+                                        </label>
+                                        <button {...{'@click': 'template.ratingSystem.levels.splice(li, 1)'}} class="text-ink-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                    </div>
+                                    <input type="text"
+                                        x-model="level.description"
+                                        aria-label="Level description"
+                                        maxlength={120}
+                                        class="w-full text-xs px-2 py-1.5 rounded-md border border-surface-200 bg-white text-ink-600"
+                                        placeholder="Description (shown in tooltip & onboarding)" />
+                                </div>
+                            </template>
                         </div>
                     </div>
-                </div>
+                </Modal>
 
                 {/* Canned Comments Slide Panel */}
                 <div x-show="showCannedPanel" x-cloak

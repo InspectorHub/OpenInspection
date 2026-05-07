@@ -1,4 +1,5 @@
 import { MainLayout } from '../layouts/main-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -99,74 +100,83 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                     </div>
                 </div>
 
-                {/* Create Agreement Modal */}
-                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-6 sm:px-0">
-                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" onclick="closeModal()"></div>
-                    <div class="flex min-h-full items-center justify-center">
-                        <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-xl bg-white p-6 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
-                            <div class="absolute top-8 right-8">
-                                <button onclick="closeModal()" aria-label="Close dialog" class="p-3 text-slate-400 hover:text-slate-900 rounded-2xl hover:bg-slate-50 transition-all active:scale-95">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </button>
+                {/* Create Agreement Modal — external JS toggles the title via
+                    id="modalAgreementTitle" (Create vs Edit), so the Modal renders
+                    with hideHeader and a custom in-body header keeps the id intact. */}
+                <Modal
+                    id="createModal"
+                    size="2xl"
+                    hideHeader={true}
+                    footer={
+                        <ModalFooter
+                            cancelText="Discard"
+                            onCancelJs="closeModal()"
+                            onConfirmJs="submitAgreement()"
+                            confirmText="Publish Agreement"
+                            confirmId="submitAgreementBtn"
+                        />
+                    }
+                >
+                    <header class="flex items-start justify-between gap-3 mb-4">
+                        <div class="min-w-0 flex-1">
+                            <h2 id="modalAgreementTitle" class="text-lg font-bold text-slate-900">Create Professional Agreement</h2>
+                            <p class="text-sm text-slate-500 mt-0.5">Draft a new service agreement or liability waiver.</p>
+                        </div>
+                        <button
+                            type="button"
+                            aria-label="Close dialog"
+                            onclick="closeModal()"
+                            class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 flex-shrink-0"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </header>
+                    <input type="hidden" id="editAgreementId" />
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Agreement Name</label>
+                            <input type="text" id="agreementName" placeholder="e.g., Standard Home Inspection Version 2.0"
+                                class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
+                            <link rel="stylesheet" href="/vendor/quill/quill.snow.css" />
+                            <div class="rounded-2xl border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
+                                <div id="agreementEditor" style="min-height: 280px; font-size: 15px;"></div>
                             </div>
-                            <div class="mb-6">
-                                <h3 id="modalAgreementTitle" class="text-xl font-bold text-slate-900 mb-3 tracking-tight leading-tight">Create Professional Agreement</h3>
-                                <p class="text-lg text-slate-400 font-medium">Draft a new service agreement or liability waiver.</p>
-                            </div>
-                            <input type="hidden" id="editAgreementId" />
-                            <div class="space-y-4">
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Agreement Name</label>
-                                    <input type="text" id="agreementName" placeholder="e.g., Standard Home Inspection Version 2.0"
-                                        class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                </div>
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
-                                    <link rel="stylesheet" href="/vendor/quill/quill.snow.css" />
-                                    <div class="rounded-2xl border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
-                                        <div id="agreementEditor" style="min-height: 280px; font-size: 15px;"></div>
-                                    </div>
-                                    <input type="hidden" id="agreementContent" />
-                                    <p class="text-[10px] text-slate-400 font-semibold ml-1 mt-1">Tip: variables like {'{{client_name}}'}, {'{{property_address}}'}, {'{{inspection_date}}'}, {'{{inspector_name}}'}, and {'{{inspector_license}}'} will be substituted on the sign page.</p>
-                                </div>
-                                <div class="pt-4 flex gap-6">
-                                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">
-                                        Discard
-                                    </button>
-                                    <button type="button" onclick="submitAgreement()" id="submitAgreementBtn" class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">
-                                        Publish Agreement
-                                    </button>
-                                </div>
-                            </div>
+                            <input type="hidden" id="agreementContent" />
+                            <p class="text-[10px] text-slate-400 font-semibold ml-1 mt-1">Tip: variables like {'{{client_name}}'}, {'{{property_address}}'}, {'{{inspection_date}}'}, {'{{inspector_name}}'}, and {'{{inspector_license}}'} will be substituted on the sign page.</p>
                         </div>
                     </div>
-                </div>
+                </Modal>
 
                 {/* Send Agreement Modal */}
-                <div id="sendModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-6 sm:px-0">
-                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onclick="closeSendModal()"></div>
-                    <div class="flex min-h-full items-center justify-center">
-                        <div class="relative w-full max-w-md bg-white rounded-xl p-6 shadow-2xl">
-                            <h3 class="text-xl font-bold text-slate-900 mb-2">Send for Signature</h3>
-                            <p class="text-sm text-slate-400 font-semibold mb-8">Client will receive an email with a link to review and sign.</p>
-                            <input type="hidden" id="sendAgreementId" />
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Email *</label>
-                                    <input type="email" id="sendClientEmail" placeholder="client@example.com" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Name</label>
-                                    <input type="text" id="sendClientName" placeholder="John Smith" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                </div>
-                            </div>
-                            <div class="mt-8 flex gap-4">
-                                <button onclick="closeSendModal()" class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">Cancel</button>
-                                <button onclick="submitSend()" id="submitSendBtn" class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">Send Request</button>
-                            </div>
+                <Modal
+                    id="sendModal"
+                    title="Send for Signature"
+                    subtitle="Client will receive an email with a link to review and sign."
+                    size="md"
+                    footer={
+                        <ModalFooter
+                            onCancelJs="closeSendModal()"
+                            onConfirmJs="submitSend()"
+                            confirmText="Send Request"
+                            confirmId="submitSendBtn"
+                        />
+                    }
+                >
+                    <input type="hidden" id="sendAgreementId" />
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Email *</label>
+                            <input type="email" id="sendClientEmail" placeholder="client@example.com" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Name</label>
+                            <input type="text" id="sendClientName" placeholder="John Smith" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                         </div>
                     </div>
-                </div>
+                </Modal>
 
                 <script src="/js/modal-dialog.js"></script>
                 <script src="/js/auth.js"></script>

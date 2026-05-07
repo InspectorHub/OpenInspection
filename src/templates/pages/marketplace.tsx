@@ -1,4 +1,5 @@
 import { MainLayout } from '../layouts/main-layout';
+import { Modal } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -154,104 +155,120 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                         class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold disabled:opacity-40">Next</button>
                 </div>
 
-                {/* Polish 5 — Preview modal. NOTE: NO x-cloak here — Alpine doesn't auto-remove
-                    x-cloak from descendant elements, so combining it with main-layout's
-                    [x-cloak] { display: none !important } would permanently hide the modal even
-                    when previewOpen=true. x-show alone correctly toggles display. */}
-                <div x-show="previewOpen" style="display:none" x-transition class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click.self': 'previewOpen = false' }}>
-                    <div class="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col">
-                        <header class="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
-                            <div>
-                                <h2 class="text-xl font-black text-slate-900" x-text="previewTemplate?.name || 'Preview'"></h2>
-                                <p class="text-xs text-slate-500" x-text="previewTemplate?.changelog || ''"></p>
-                            </div>
-                            <button x-on:click="previewOpen = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
-                        </header>
-                        <div class="flex-1 overflow-y-auto p-6 space-y-3">
-                            {/* Spec 5B P3 — totals row: items, canned comments, defects */}
-                            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">
-                                <span x-text="previewSchema?.sections?.length || 0"></span> sections ·
-                                <span x-text="previewItemCount"></span> items ·
-                                <span x-text="previewCannedTotal"></span> canned comments ·
-                                <span class="text-rose-500" x-text="previewDefectTotal + ' defects'"></span>
-                            </p>
-                            <template x-for="sec in (previewSchema?.sections || [])" {...{ 'x-bind:key': 'sec.id' }}>
-                                <details class="bg-slate-50 rounded-xl p-3" open>
-                                    <summary class="cursor-pointer font-bold text-sm text-slate-800 flex items-center justify-between">
-                                        <span x-text="sec.title || sec.name || sec.id"></span>
-                                        <span class="text-xs text-slate-400" x-text="(sec.items?.length || 0) + ' items'"></span>
-                                    </summary>
-                                    <ul class="mt-2 space-y-1 text-xs text-slate-600 pl-3">
-                                        <template x-for="it in (sec.items || [])" {...{ 'x-bind:key': 'it.id' }}>
-                                            <li class="flex items-center gap-2 flex-wrap py-1">
-                                                <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span class="font-semibold text-slate-700" x-text="it.label || it.name || it.id"></span>
-                                                {/* Spec 5B P3 — rating type pill */}
-                                                <span class="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600" x-text="it.type || 'rich'"></span>
-                                                {/* Tab counts (info / lim / def). Only render
-                                                    when the template ships any canned content. */}
-                                                <span x-show="it._info > 0" class="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded" x-text="'info: ' + it._info"></span>
-                                                <span x-show="it._lim > 0" class="text-[10px] font-mono text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded" x-text="'lim: ' + it._lim"></span>
-                                                <span x-show="it._def > 0" class="text-[10px] font-mono text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded" x-text="'def: ' + it._def"></span>
-                                            </li>
-                                        </template>
-                                    </ul>
-                                </details>
-                            </template>
-                        </div>
-                        <footer class="px-4 py-2 border-t border-slate-100 flex items-center justify-end gap-3">
-                            <button x-on:click="previewOpen = false" class="px-4 py-2 rounded-lg ring-2 ring-slate-200 text-slate-600 text-xs font-bold">Close</button>
-                            <button x-show="previewTemplate && !previewTemplate.importedSemver"
+                {/* Polish 5 — Preview modal. Footer has Close + Import (conditional),
+                    so it's inlined rather than using ModalFooter. */}
+                <Modal
+                    name="previewOpen"
+                    titleExpr="previewTemplate?.name || 'Preview'"
+                    subtitleExpr="previewTemplate?.changelog || ''"
+                    size="3xl"
+                    footer={
+                        <>
+                            <button
+                                type="button"
+                                x-on:click="previewOpen = false"
+                                class="h-10 px-4 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+                                style="border-color: #e2e8f0"
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="button"
+                                x-show="previewTemplate && !previewTemplate.importedSemver"
                                 x-on:click="importTemplate(previewTemplate.id); previewOpen = false"
-                                class="px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold">
+                                class="h-10 px-4 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-all"
+                            >
                                 Import this template
                             </button>
-                        </footer>
+                        </>
+                    }
+                >
+                    <div class="space-y-3">
+                        {/* Spec 5B P3 — totals row: items, canned comments, defects */}
+                        <p class="text-xs font-bold uppercase tracking-widest text-slate-400">
+                            <span x-text="previewSchema?.sections?.length || 0"></span> sections ·
+                            <span x-text="previewItemCount"></span> items ·
+                            <span x-text="previewCannedTotal"></span> canned comments ·
+                            <span class="text-rose-500" x-text="previewDefectTotal + ' defects'"></span>
+                        </p>
+                        <template x-for="sec in (previewSchema?.sections || [])" {...{ 'x-bind:key': 'sec.id' }}>
+                            <details class="bg-slate-50 rounded-xl p-3" open>
+                                <summary class="cursor-pointer font-bold text-sm text-slate-800 flex items-center justify-between">
+                                    <span x-text="sec.title || sec.name || sec.id"></span>
+                                    <span class="text-xs text-slate-400" x-text="(sec.items?.length || 0) + ' items'"></span>
+                                </summary>
+                                <ul class="mt-2 space-y-1 text-xs text-slate-600 pl-3">
+                                    <template x-for="it in (sec.items || [])" {...{ 'x-bind:key': 'it.id' }}>
+                                        <li class="flex items-center gap-2 flex-wrap py-1">
+                                            <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                                            <span class="font-semibold text-slate-700" x-text="it.label || it.name || it.id"></span>
+                                            <span class="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600" x-text="it.type || 'rich'"></span>
+                                            <span x-show="it._info > 0" class="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded" x-text="'info: ' + it._info"></span>
+                                            <span x-show="it._lim > 0" class="text-[10px] font-mono text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded" x-text="'lim: ' + it._lim"></span>
+                                            <span x-show="it._def > 0" class="text-[10px] font-mono text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded" x-text="'def: ' + it._def"></span>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </details>
+                        </template>
                     </div>
-                </div>
+                </Modal>
 
                 {/* Round 37 — Update confirm modal. Explains the "new copy"
                     semantics (Scheme 2) so the inspector knows their existing
-                    template/library entries are preserved. */}
-                <div x-show="updateConfirmOpen" style="display:none" x-transition class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click.self': 'closeUpdateConfirm()' }}>
-                    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-                        <header class="px-6 py-4 border-b border-slate-100">
-                            <h2 class="text-lg font-black text-slate-900">
-                                <span x-text="updateKind === 'library' ? 'Update library?' : 'Update template?'"></span>
-                            </h2>
-                        </header>
-                        <div class="px-6 py-5 space-y-3 text-sm text-slate-700">
-                            <p>
-                                <strong x-text="updateTarget?.name || ''"></strong>
-                                <span class="text-slate-500"> will move from </span>
-                                <span class="font-mono text-xs text-slate-700" x-text="'v' + (updateTarget?.importedSemver || '?')"></span>
-                                <span class="text-slate-500"> to </span>
-                                <span class="font-mono text-xs font-bold text-amber-700" x-text="'v' + (updateTarget?.semver || '?')"></span>.
+                    template/library entries are preserved. Custom amber Continue
+                    button — inlined rather than using ModalFooter. */}
+                <Modal
+                    name="updateConfirmOpen"
+                    titleExpr="updateKind === 'library' ? 'Update library?' : 'Update template?'"
+                    size="md"
+                    footer={
+                        <>
+                            <button
+                                type="button"
+                                x-on:click="closeUpdateConfirm()"
+                                class="flex-1 h-10 px-4 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+                                style="border-color: #e2e8f0"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                x-on:click="confirmUpdate()"
+                                class="flex-1 h-10 px-4 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-all"
+                            >
+                                Continue
+                            </button>
+                        </>
+                    }
+                >
+                    <div class="space-y-3 text-sm text-slate-700">
+                        <p>
+                            <strong x-text="updateTarget?.name || ''"></strong>
+                            <span class="text-slate-500"> will move from </span>
+                            <span class="font-mono text-xs text-slate-700" x-text="'v' + (updateTarget?.importedSemver || '?')"></span>
+                            <span class="text-slate-500"> to </span>
+                            <span class="font-mono text-xs font-bold text-amber-700" x-text="'v' + (updateTarget?.semver || '?')"></span>.
+                        </p>
+                        <template x-if="updateKind === 'template'">
+                            <p class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
+                                A new copy will be created with the suffix
+                                <span class="font-mono font-bold" x-text="'(v' + (updateTarget?.semver || '?') + ')'"></span>.
+                                Your current copy is <strong>preserved</strong> so existing
+                                inspections keep working. You can compare side-by-side or
+                                delete the old copy later.
                             </p>
-                            <template x-if="updateKind === 'template'">
-                                <p class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
-                                    A new copy will be created with the suffix
-                                    <span class="font-mono font-bold" x-text="'(v' + (updateTarget?.semver || '?') + ')'"></span>.
-                                    Your current copy is <strong>preserved</strong> so existing
-                                    inspections keep working. You can compare side-by-side or
-                                    delete the old copy later.
-                                </p>
-                            </template>
-                            <template x-if="updateKind === 'library'">
-                                <p class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
-                                    The new pack's entries will be <strong>added</strong> alongside
-                                    your existing ones. Old entries are <strong>not deleted</strong>.
-                                    If you want a clean state, delete the old entries from
-                                    <a href="/comments" class="underline">/comments</a> after updating.
-                                </p>
-                            </template>
-                        </div>
-                        <footer class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                            <button x-on:click="closeUpdateConfirm()" class="px-4 py-2 rounded-lg ring-2 ring-slate-200 text-slate-600 text-xs font-bold">Cancel</button>
-                            <button x-on:click="confirmUpdate()" class="px-4 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600">Continue</button>
-                        </footer>
+                        </template>
+                        <template x-if="updateKind === 'library'">
+                            <p class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
+                                The new pack's entries will be <strong>added</strong> alongside
+                                your existing ones. Old entries are <strong>not deleted</strong>.
+                                If you want a clean state, delete the old entries from
+                                <a href="/comments" class="underline">/comments</a> after updating.
+                            </p>
+                        </template>
                     </div>
-                </div>
+                </Modal>
 
                 {/* Toast — Bug #7 (4-30 review) fix: pre-Alpine render leaks the
                     static "View" anchor text. Default style=display:none keeps toast

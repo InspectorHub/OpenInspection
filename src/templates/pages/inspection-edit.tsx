@@ -1,5 +1,6 @@
 // src/templates/pages/inspection-edit.tsx
 import { BareLayout } from '../layouts/main-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import type { BrandingConfig } from '../../types/auth';
 
 interface InspectionEditProps {
@@ -44,31 +45,33 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           id="hotkey-photo-input"
           x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }"
         />
-        {/* P2 — AI Suggest Comment popover (shared scope with inspectionEditor) */}
-        <div x-cloak x-show="showAiPopover" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div {...{ 'x-on:click.stop': '$event' }}
-               class="w-full max-w-md bg-white rounded-lg shadow-2xl p-6 space-y-4"
-               {...{ 'x-transition:enter': 'transition ease-out duration-150', 'x-transition:enter-start': 'opacity-0 scale-95', 'x-transition:enter-end': 'opacity-100 scale-100' }}>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                <h3 class="font-bold text-slate-900">AI Suggestions</h3>
-              </div>
-              <button type="button" x-on:click="showAiPopover = false" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="Close">×</button>
-            </div>
-            <p class="text-xs text-slate-500">Pick one to insert into the notes field.</p>
-            <div class="space-y-2">
-              <template x-for="(s, idx) in aiSuggestions" x-bind:key="idx">
-                <button type="button" x-on:click="insertSuggestion(s)" class="w-full text-left p-3 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all text-sm text-slate-700">
-                  <span x-text="s"></span>
+        {/* P2 — AI Suggest Comment popover (shared scope with inspectionEditor).
+            Single-button footer (Cancel only — picking a suggestion inserts and
+            closes), inlined since ModalFooter assumes a Cancel + Confirm pair. */}
+        <Modal
+            name="showAiPopover"
+            title="AI Suggestions"
+            subtitle="Pick one to insert into the notes field."
+            size="md"
+            footer={
+                <button
+                    type="button"
+                    x-on:click="showAiPopover = false"
+                    class="h-10 px-6 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+                    style="border-color: #e2e8f0"
+                >
+                    Cancel
                 </button>
-              </template>
+            }
+        >
+            <div class="space-y-2">
+                <template x-for="(s, idx) in aiSuggestions" x-bind:key="idx">
+                    <button type="button" x-on:click="insertSuggestion(s)" class="w-full text-left p-3 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all text-sm text-slate-700">
+                        <span x-text="s"></span>
+                    </button>
+                </template>
             </div>
-            <div class="flex justify-end pt-2">
-              <button type="button" x-on:click="showAiPopover = false" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-slate-100">Cancel</button>
-            </div>
-          </div>
-        </div>
+        </Modal>
 
         {/* ===== Mobile View ===== */}
         <div x-show="!isDesktop" class="lg:hidden">
@@ -725,27 +728,30 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     >Restore</button>
                 </div>
                 {/* Cancel Modal */}
-                <div x-show="showCancelModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" {...{'x-cloak': ''}}>
-                    <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
-                        <h3 class="text-base font-bold mb-4" style="color: #0f172a">Cancel Inspection</h3>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Reason</label>
-                        <select x-model="cancelReason" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 bg-white">
-                            <option value="client_cancelled">Client Cancelled</option>
-                            <option value="scheduling_conflict">Scheduling Conflict</option>
-                            <option value="weather">Weather</option>
-                            <option value="other">Other</option>
-                        </select>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Notes (optional)</label>
-                        <textarea x-model="cancelNotes" rows={3} class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-4" />
-                        <div class="flex gap-2">
-                            <button
-                                x-on:click={`authFetch('/api/inspections/${inspectionId}/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:cancelReason,notes:cancelNotes||undefined})}).then(r=>r.json()).then(d=>{if(d.success){inspection.status='cancelled';showCancelModal=false;}})`}
-                                class="flex-1 bg-red-600 text-white rounded-lg py-2 text-sm font-bold"
-                            >Cancel Inspection</button>
-                            <button x-on:click="showCancelModal=false" class="px-4 text-slate-500 text-sm">Back</button>
-                        </div>
-                    </div>
-                </div>
+                <Modal
+                    name="showCancelModal"
+                    title="Cancel Inspection"
+                    size="sm"
+                    footer={
+                        <ModalFooter
+                            cancelText="Back"
+                            onCancel="showCancelModal = false"
+                            onConfirm={`authFetch('/api/inspections/${inspectionId}/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:cancelReason,notes:cancelNotes||undefined})}).then(r=>r.json()).then(d=>{if(d.success){inspection.status='cancelled';showCancelModal=false;}})`}
+                            confirmText="Cancel Inspection"
+                            danger={true}
+                        />
+                    }
+                >
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Reason</label>
+                    <select x-model="cancelReason" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 bg-white">
+                        <option value="client_cancelled">Client Cancelled</option>
+                        <option value="scheduling_conflict">Scheduling Conflict</option>
+                        <option value="weather">Weather</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Notes (optional)</label>
+                    <textarea x-model="cancelNotes" rows={3} class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                </Modal>
             </div>
 
             {/* Inspection Events (Spec 4D.T9) */}
@@ -773,56 +779,59 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 </ul>
 
                 {/* Create modal */}
-                <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) showCreate = false' }}>
-                    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-                        <h3 class="text-lg font-bold text-slate-900 mb-4">New event</h3>
-                        <div class="space-y-3">
+                <Modal
+                    name="showCreate"
+                    title="New event"
+                    size="md"
+                    footer={
+                        <ModalFooter
+                            onCancel="showCreate = false"
+                            onConfirm="submitCreate()"
+                            confirmDisabled="saving"
+                            confirmTextExpr="saving ? 'Saving...' : 'Add event'"
+                        />
+                    }
+                >
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Type</label>
+                            <select x-model="form.eventTypeId" x-on:change="onTypeChange()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">
+                                <option value="">— Select —</option>
+                                <template x-for="t in types" {...{ 'x-bind:key': 't.id' }}>
+                                    <option {...{ 'x-bind:value': 't.id' }} x-text="t.name"></option>
+                                </template>
+                            </select>
+                            <p x-show="!types.length" class="text-[10px] text-amber-600 mt-1">No event types defined. <a href="/settings/event-types" class="underline">Create one</a> first.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Date &amp; time</label>
+                            <input type="datetime-local" x-model="form.scheduledAt" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1">Type</label>
-                                <select x-model="form.eventTypeId" x-on:change="onTypeChange()" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">
-                                    <option value="">— Select —</option>
-                                    <template x-for="t in types" {...{ 'x-bind:key': 't.id' }}>
-                                        <option {...{ 'x-bind:value': 't.id' }} x-text="t.name"></option>
-                                    </template>
-                                </select>
-                                <p x-show="!types.length" class="text-[10px] text-amber-600 mt-1">No event types defined. <a href="/settings/event-types" class="underline">Create one</a> first.</p>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Duration (min)</label>
+                                <input type="number" {...{ 'x-model.number': 'form.durationMin' }} min="1" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1">Date &amp; time</label>
-                                <input type="datetime-local" x-model="form.scheduledAt" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-600 mb-1">Duration (min)</label>
-                                    <input type="number" {...{ 'x-model.number': 'form.durationMin' }} min="1" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-600 mb-1">Price (cents)</label>
-                                    <input type="number" {...{ 'x-model.number': 'form.priceCents' }} min="0" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1">Inspector (optional)</label>
-                                <select x-model="form.inspectorId" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">
-                                    <option value="">Unassigned</option>
-                                    <template x-for="i in inspectors" {...{ 'x-bind:key': 'i.id' }}>
-                                        <option {...{ 'x-bind:value': 'i.id' }} x-text="i.name || i.email"></option>
-                                    </template>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1">Notes (optional)</label>
-                                <textarea x-model="form.notes" rows={2} class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"></textarea>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Price (cents)</label>
+                                <input type="number" {...{ 'x-model.number': 'form.priceCents' }} min="0" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
                             </div>
                         </div>
-                        <div class="flex gap-3 justify-end mt-5">
-                            <button type="button" x-on:click="showCreate = false" class="px-4 py-2 rounded-lg ring-2 ring-slate-200 text-slate-600 text-xs font-bold">Cancel</button>
-                            <button type="button" x-on:click="submitCreate()" {...{ 'x-bind:disabled': 'saving' }} class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold disabled:opacity-50">
-                                <span x-text="saving ? 'Saving...' : 'Add event'"></span>
-                            </button>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Inspector (optional)</label>
+                            <select x-model="form.inspectorId" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">
+                                <option value="">Unassigned</option>
+                                <template x-for="i in inspectors" {...{ 'x-bind:key': 'i.id' }}>
+                                    <option {...{ 'x-bind:value': 'i.id' }} x-text="i.name || i.email"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Notes (optional)</label>
+                            <textarea x-model="form.notes" rows={2} class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"></textarea>
                         </div>
                     </div>
-                </div>
+                </Modal>
             </section>
 
             {/* Card Grid */}
@@ -1175,79 +1184,81 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </aside>
         </div>
 
-        {/* ===== Publish Modal ===== */}
-        <div {...{'x-cloak': ''}} x-show="showPublishModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div class="w-full max-w-md rounded-lg p-6 shadow-xl" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(20px);" x-on:click="if ($event.target === $el) showPublishModal = false">
-            <h3 class="text-lg font-bold mb-4" style="color: #0f172a">Publish Report</h3>
-            <div class="space-y-4">
-              <div class="p-3 rounded-xl" style="background: #f1f5f9">
-                <div class="text-xs font-mono" style="color: #94a3b8">Report Summary</div>
-                <div class="text-sm mt-1" style="color: #1e293b" x-text="reportStats.total + ' items  |  ' + reportStats.defect + ' defects  |  ' + reportStats.monitor + ' monitors'"></div>
-              </div>
-              <div class="space-y-3">
-                <label class="flex items-center justify-between">
-                  <span class="text-sm" style="color: #475569">Email client</span>
-                  <input type="checkbox" x-model="publishOptions.notifyClient" class="rounded" checked />
-                </label>
-                <label class="flex items-center justify-between">
-                  <span class="text-sm" style="color: #475569">Email agent</span>
-                  <input type="checkbox" x-model="publishOptions.notifyAgent" class="rounded" checked />
-                </label>
-                <label class="flex items-center justify-between">
-                  <span class="text-sm" style="color: #475569">Require signature</span>
-                  <input type="checkbox" x-model="publishOptions.requireSignature" class="rounded" />
-                </label>
-                <label class="flex items-center justify-between">
-                  <span class="text-sm" style="color: #475569">Require payment</span>
-                  <input type="checkbox" x-model="publishOptions.requirePayment" class="rounded" />
-                </label>
-              </div>
-              <div>
-                <div class="text-xs font-semibold mb-2" style="color: #94a3b8">THEME</div>
-                <div class="flex gap-2">
-                  <template x-for="t in ['modern', 'classic', 'minimal']" x-bind:key="t">
+        {/* ===== Publish Modal — 3 distinct buttons (Cancel, Send PDF [tertiary
+             emerald], Confirm Publish), so footer is inlined rather than using
+             ModalFooter. All three share the canonical h-10/rounded-xl shape. */}
+        <Modal
+            name="showPublishModal"
+            title="Publish Report"
+            size="md"
+            footer={
+                <>
                     <button
-                      x-on:click="publishOptions.theme = t"
-                      class="px-4 py-2 text-xs font-semibold rounded-lg border capitalize transition-all"
-                      x-bind:style="publishOptions.theme === t ? 'background: var(--ih-primary, #6366f1); color: white; border-color: transparent' : 'border-color: #e2e8f0; color: #64748b'"
-                      x-text="t"
-                    ></button>
-                  </template>
+                        type="button"
+                        x-on:click="showPublishModal = false"
+                        class="flex-1 h-10 px-4 text-sm font-semibold rounded-xl border bg-white hover:bg-slate-50 transition-all"
+                        style="border-color: #e2e8f0; color: #475569"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        {...{ 'x-on:click': 'sendReportPdf()' }}
+                        {...{ 'x-bind:disabled': 'sendingPdf' }}
+                        class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 transition-all"
+                    >
+                        <span x-show="!sendingPdf">Send PDF</span>
+                        <span x-show="sendingPdf">Sending…</span>
+                    </button>
+                    <button
+                        type="button"
+                        x-on:click="publish()"
+                        x-bind:disabled="publishing"
+                        class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all"
+                    >
+                        <span x-text="publishing ? 'Publishing…' : 'Confirm Publish'"></span>
+                    </button>
+                </>
+            }
+        >
+            <div class="space-y-4">
+                <div class="p-3 rounded-xl" style="background: #f1f5f9">
+                    <div class="text-xs font-mono" style="color: #94a3b8">Report Summary</div>
+                    <div class="text-sm mt-1" style="color: #1e293b" x-text="reportStats.total + ' items  |  ' + reportStats.defect + ' defects  |  ' + reportStats.monitor + ' monitors'"></div>
                 </div>
-              </div>
+                <div class="space-y-3">
+                    <label class="flex items-center justify-between">
+                        <span class="text-sm" style="color: #475569">Email client</span>
+                        <input type="checkbox" x-model="publishOptions.notifyClient" class="rounded" checked />
+                    </label>
+                    <label class="flex items-center justify-between">
+                        <span class="text-sm" style="color: #475569">Email agent</span>
+                        <input type="checkbox" x-model="publishOptions.notifyAgent" class="rounded" checked />
+                    </label>
+                    <label class="flex items-center justify-between">
+                        <span class="text-sm" style="color: #475569">Require signature</span>
+                        <input type="checkbox" x-model="publishOptions.requireSignature" class="rounded" />
+                    </label>
+                    <label class="flex items-center justify-between">
+                        <span class="text-sm" style="color: #475569">Require payment</span>
+                        <input type="checkbox" x-model="publishOptions.requirePayment" class="rounded" />
+                    </label>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold mb-2" style="color: #94a3b8">THEME</div>
+                    <div class="flex gap-2">
+                        <template x-for="t in ['modern', 'classic', 'minimal']" x-bind:key="t">
+                            <button
+                                x-on:click="publishOptions.theme = t"
+                                class="px-4 py-2 text-xs font-semibold rounded-lg border capitalize transition-all"
+                                x-bind:style="publishOptions.theme === t ? 'background: var(--ih-primary, #6366f1); color: white; border-color: transparent' : 'border-color: #e2e8f0; color: #64748b'"
+                                x-text="t"
+                            ></button>
+                        </template>
+                    </div>
+                </div>
             </div>
-            {/* Round 38 — unified button row: 40px height, text-sm semibold,
-                normal case. Cancel = secondary (border); Send PDF = tertiary
-                (light tinted); Confirm = primary (indigo solid). All three
-                share the same h-10/rounded-xl/text-sm shape so the modal
-                reads as a single design language. */}
-            <div class="flex gap-3 mt-6">
-              <button
-                x-on:click="showPublishModal = false"
-                class="flex-1 h-10 px-4 text-sm font-semibold rounded-xl border bg-white hover:bg-slate-50 transition-all"
-                style="border-color: #e2e8f0; color: #475569"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                {...{ 'x-on:click': 'sendReportPdf()' }}
-                {...{ 'x-bind:disabled': 'sendingPdf' }}
-                class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 transition-all"
-              >
-                <span x-show="!sendingPdf">Send PDF</span>
-                <span x-show="sendingPdf">Sending…</span>
-              </button>
-              <button
-                x-on:click="publish()"
-                x-bind:disabled="publishing"
-                class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all"
-              >
-                <span x-text="publishing ? 'Publishing…' : 'Confirm Publish'"></span>
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
 
         {/* Onboarding overlay (T6) */}
         <div x-data="inspectionOnboarding()" {...{'x-on:rating-levels-ready.window': 'init($event.detail)'}}>

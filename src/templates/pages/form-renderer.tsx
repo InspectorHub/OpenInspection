@@ -1,6 +1,7 @@
 import { BareLayout } from '../layouts/main-layout';
 import { AtmosphericBg } from '../components/atmospheric-bg';
 import { TemplateDriftBanner } from '../components/template-drift-banner';
+import { Modal } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 export const FormRendererPage = (props: { inspectionId: string, branding?: BrandingConfig | undefined }): JSX.Element => {
@@ -258,99 +259,101 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                         <button x-on:click="backToDashboard" class="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors py-4">Return to Operational Control</button>
                     </div>
 
-                    {/* Annotation Intelligence Interface */}
-                    <div
-                        x-show="showAnnotationModal"
-                        {...{ 'x-transition:enter': 'transition ease-out duration-300' }}
-                        {...{ 'x-transition:enter-start': 'opacity-0 scale-95' }}
-                        {...{ 'x-transition:enter-end': 'opacity-100 scale-100' }}
-                        x-cloak="true"
-                        class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl"
+                    {/* Annotation Intelligence Interface — full-app modal w/ canvas.
+                        Inlined custom controls (drawing-mode toggles, two-button save row)
+                        rather than ModalFooter; kept original size (max-w-5xl). */}
+                    <Modal
+                        name="showAnnotationModal"
+                        title="Annotation Studio"
+                        subtitle="Precision markup engine for evidence clarification"
+                        size="5xl"
+                        footer={
+                            <>
+                                <button
+                                    type="button"
+                                    x-on:click="showAnnotationModal = false"
+                                    class="flex-1 h-10 px-4 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+                                    style="border-color: #e2e8f0"
+                                >
+                                    Discard Changes
+                                </button>
+                                <button
+                                    type="button"
+                                    x-on:click="saveAnnotation"
+                                    x-bind:disabled="syncing"
+                                    class="flex-[2] h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-all"
+                                >
+                                    <span x-text="syncing ? 'Saving...' : 'Save Markup'"></span>
+                                </button>
+                            </>
+                        }
                     >
-                        <div class="bg-white rounded-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col relative animate-slide-in">
-                            {/* Modal High-End Header */}
-                            <div class="px-12 py-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-                                <div>
-                                    <h3 class="text-xl font-bold tracking-tight text-slate-900">Annotation Studio</h3>
-                                    <p class="text-sm text-slate-400 font-medium">Precision markup engine for evidence clarification</p>
-                                </div>
-                                <button x-on:click="showAnnotationModal = false" class="w-12 h-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all active:scale-95">
-                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        {/* Canvas Simulation Tier */}
+                        <div class="bg-slate-100 flex items-center justify-center relative shadow-inner rounded-xl overflow-hidden">
+                            <div class="relative bg-white shadow-2xl rounded-2xl overflow-hidden ring-8 ring-white">
+                                <canvas
+                                    x-ref="annotationCanvas"
+                                    x-on:mousedown="handleCanvasStart"
+                                    x-on:mousemove="handleCanvasMove"
+                                    x-on:mouseup="handleCanvasEnd"
+                                    {...{ 'x-on:touchstart.passive': 'handleCanvasStart' }}
+                                    {...{ 'x-on:touchmove.passive': 'handleCanvasMove' }}
+                                    {...{ 'x-on:touchend.passive': 'handleCanvasEnd' }}
+                                    class="cursor-crosshair touch-none max-w-full h-auto"
+                                ></canvas>
+                            </div>
+                        </div>
+
+                        {/* Control Surface */}
+                        <div class="mt-4 flex items-center justify-between">
+                            <div class="flex gap-4">
+                                <button
+                                    type="button"
+                                    x-on:click="drawingMode = 'circle'"
+                                    class="flex items-center gap-3 px-4 py-2 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
+                                    x-bind:class="drawingMode === 'circle' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
+                                >
+                                    <div class="w-3 h-3 rounded-full border-2 border-current"></div>
+                                    Elliptical Highlight
+                                </button>
+                                <button
+                                    type="button"
+                                    x-on:click="drawingMode = 'arrow'"
+                                    class="flex items-center gap-3 px-4 py-2 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
+                                    x-bind:class="drawingMode === 'arrow' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                                    Vector Pointer
                                 </button>
                             </div>
 
-                            {/* Canvas Simulation Tier */}
-                            <div class="flex-1 overflow-auto bg-slate-100 flex items-center justify-center relative shadow-inner">
-                                <div class="relative bg-white shadow-2xl rounded-2xl overflow-hidden ring-8 ring-white">
-                                    <canvas
-                                        x-ref="annotationCanvas"
-                                        x-on:mousedown="handleCanvasStart"
-                                        x-on:mousemove="handleCanvasMove"
-                                        x-on:mouseup="handleCanvasEnd"
-                                        {...{ 'x-on:touchstart.passive': 'handleCanvasStart' }}
-                                        {...{ 'x-on:touchmove.passive': 'handleCanvasMove' }}
-                                        {...{ 'x-on:touchend.passive': 'handleCanvasEnd' }}
-                                        class="cursor-crosshair touch-none max-w-full h-auto"
-                                    ></canvas>
-                                </div>
-                            </div>
-
-                            {/* Control Surface */}
-                            <div class="px-12 py-10 bg-white space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex gap-4">
-                                        <button
-                                            x-on:click="drawingMode = 'circle'"
-                                            class="flex items-center gap-3 px-4 py-2 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
-                                            x-bind:class="drawingMode === 'circle' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
-                                        >
-                                            <div class="w-3 h-3 rounded-full border-2 border-current"></div>
-                                            Elliptical Highlight
-                                        </button>
-                                        <button
-                                            x-on:click="drawingMode = 'arrow'"
-                                            class="flex items-center gap-3 px-4 py-2 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
-                                            x-bind:class="drawingMode === 'arrow' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
-                                        >
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                                            Vector Pointer
-                                        </button>
-                                    </div>
-
-                                    <button x-on:click="clearAnnotation" class="text-[10px] font-bold text-slate-300 hover:text-rose-500 transition-colors uppercase tracking-[0.2em]">
-                                        Clear Drawing Layer
-                                    </button>
-                                </div>
-
-                                <div class="flex gap-6">
-                                    <button
-                                        x-on:click="showAnnotationModal = false"
-                                        class="flex-1 py-5 rounded-md text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-all"
-                                    >
-                                        Discard Changes
-                                    </button>
-                                    <button
-                                        x-on:click="saveAnnotation"
-                                        class="flex-[2] premium-button py-5 bg-indigo-600 text-white rounded-md font-bold shadow-md hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
-                                        x-bind:disabled="syncing"
-                                    >
-                                        <svg x-show="syncing" class="w-5 h-5 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                        <span class="tracking-tight text-lg" x-text="syncing ? 'Saving...' : 'Save Markup'"></span>
-                                    </button>
-                                </div>
-                            </div>
+                            <button type="button" x-on:click="clearAnnotation" class="text-[10px] font-bold text-slate-300 hover:text-rose-500 transition-colors uppercase tracking-[0.2em]">
+                                Clear Drawing Layer
+                            </button>
                         </div>
-                    </div>
+                    </Modal>
                 </div>
-                
-                {/* Recommendation Picker Overlay */}
-                <div x-data="recommendationPicker" x-cloak x-show="open" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) close()' }}>
-                    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col">
-                        <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-                            <h2 class="text-lg font-bold text-slate-900">Attach recommendation</h2>
-                            <button x-on:click="close()" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
-                        </div>
-                        <div class="p-5 space-y-3 border-b border-slate-100">
+
+                {/* Recommendation Picker Overlay — single Close button (selecting an
+                    item attaches and closes), so footer is inlined. The `recommendationPicker`
+                    Alpine component owns `open`, so x-data wraps the Modal. */}
+                <div x-data="recommendationPicker">
+                    <Modal
+                        name="open"
+                        title="Attach recommendation"
+                        size="3xl"
+                        footer={
+                            <button
+                                type="button"
+                                x-on:click="close()"
+                                class="h-10 px-6 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+                                style="border-color: #e2e8f0"
+                            >
+                                Close
+                            </button>
+                        }
+                    >
+                        <div class="space-y-3">
                             <input type="text" x-model="search" x-on:input="applyFilter()" placeholder="Search recommendations..." class="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm" />
                             <div class="flex gap-3 flex-wrap">
                                 <select x-model="categoryFilter" x-on:change="applyFilter()" class="px-3 py-2 rounded-lg border border-slate-200 text-sm">
@@ -366,25 +369,25 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                     <option value="defect">Defect</option>
                                 </select>
                             </div>
-                        </div>
-                        <div class="p-5 flex-1 overflow-y-auto">
-                            <p x-show="loading" class="text-sm text-slate-400 italic">Loading library...</p>
-                            <p x-show="!loading && results.length === 0" class="text-sm text-slate-400 italic">No matching recommendations.</p>
-                            <div class="space-y-2">
-                                <template x-for="rec in results" {...{ 'x-bind:key': 'rec.id' }}>
-                                    <button type="button" x-on:click="attach(rec)" class="block w-full text-left p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full" x-bind:class="severityClass(rec.severity)" x-text="rec.severity"></span>
-                                            <span class="text-xs text-slate-500" x-text="rec.category || '(no category)'"></span>
-                                            <span class="text-xs font-bold text-slate-700 ml-auto" x-text="estimateLabel(rec)"></span>
-                                        </div>
-                                        <p class="font-bold text-slate-900" x-text="rec.name"></p>
-                                        <p class="text-xs text-slate-500 mt-1 line-clamp-2" x-text="rec.defaultRepairSummary"></p>
-                                    </button>
-                                </template>
+                            <div class="overflow-y-auto" style="max-height: 50vh">
+                                <p x-show="loading" class="text-sm text-slate-400 italic">Loading library...</p>
+                                <p x-show="!loading && results.length === 0" class="text-sm text-slate-400 italic">No matching recommendations.</p>
+                                <div class="space-y-2">
+                                    <template x-for="rec in results" {...{ 'x-bind:key': 'rec.id' }}>
+                                        <button type="button" x-on:click="attach(rec)" class="block w-full text-left p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full" x-bind:class="severityClass(rec.severity)" x-text="rec.severity"></span>
+                                                <span class="text-xs text-slate-500" x-text="rec.category || '(no category)'"></span>
+                                                <span class="text-xs font-bold text-slate-700 ml-auto" x-text="estimateLabel(rec)"></span>
+                                            </div>
+                                            <p class="font-bold text-slate-900" x-text="rec.name"></p>
+                                            <p class="text-xs text-slate-500 mt-1 line-clamp-2" x-text="rec.defaultRepairSummary"></p>
+                                        </button>
+                                    </template>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </Modal>
                 </div>
 
                 <script src="/js/modal-dialog.js"></script>

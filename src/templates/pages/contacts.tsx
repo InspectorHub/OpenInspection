@@ -1,4 +1,5 @@
 import { MainLayout } from '../layouts/main-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -51,47 +52,60 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </table>
                 </div>
 
-                {/* Create/Edit Modal */}
-                <div id="contactModal" class="fixed inset-0 z-[100] hidden overflow-y-auto">
-                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl" onclick="closeContactModal()"></div>
-                    <div class="flex min-h-full items-center justify-center p-6">
-                        <div class="relative w-full max-w-lg bg-white rounded-xl p-6 shadow-2xl">
-                            <h3 id="contactModalTitle" class="text-xl font-bold text-slate-900 mb-8">Add Contact</h3>
-                            <input type="hidden" id="editContactId" />
-                            <div class="space-y-5">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Type</label>
-                                    <select id="contactType" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm bg-white">
-                                        <option value="agent">Agent</option>
-                                        <option value="client">Client</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Full Name *</label>
-                                    <input type="text" id="contactName" placeholder="Jane Smith" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                </div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Email</label>
-                                        <input type="email" id="contactEmail" placeholder="jane@realty.com" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Phone</label>
-                                        <input type="tel" id="contactPhone" placeholder="(555) 123-4567" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Agency</label>
-                                    <input type="text" id="contactAgency" placeholder="Sunrise Realty" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
-                                </div>
+                {/* Create/Edit Modal — contacts.js toggles #contactModalTitle text
+                    so we keep that id on a custom in-body header (hideHeader=true). */}
+                <Modal
+                    id="contactModal"
+                    size="lg"
+                    hideHeader={true}
+                    footer={
+                        <ModalFooter
+                            onCancelJs="closeContactModal()"
+                            onConfirmJs="submitContact()"
+                            confirmText="Save"
+                        />
+                    }
+                >
+                    <header class="flex items-start justify-between gap-3 mb-4">
+                        <h3 id="contactModalTitle" class="text-lg font-bold text-slate-900 flex-1">Add Contact</h3>
+                        <button
+                            type="button"
+                            aria-label="Close dialog"
+                            onclick="closeContactModal()"
+                            class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 flex-shrink-0"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </header>
+                    <input type="hidden" id="editContactId" />
+                    <div class="space-y-5">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Type</label>
+                            <select id="contactType" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm bg-white">
+                                <option value="agent">Agent</option>
+                                <option value="client">Client</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Full Name *</label>
+                            <input type="text" id="contactName" placeholder="Jane Smith" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Email</label>
+                                <input type="email" id="contactEmail" placeholder="jane@realty.com" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
-                            <div class="mt-8 flex gap-4">
-                                <button onclick="closeContactModal()" class="flex-1 px-4 py-2 rounded-md border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all">Cancel</button>
-                                <button onclick="submitContact()" class="flex-[2] px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all disabled:bg-slate-300 disabled:cursor-not-allowed">Save</button>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Phone</label>
+                                <input type="tel" id="contactPhone" placeholder="(555) 123-4567" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
                             </div>
                         </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Agency</label>
+                            <input type="text" id="contactAgency" placeholder="Sunrise Realty" class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm" />
+                        </div>
                     </div>
-                </div>
+                </Modal>
 
                 {/* CSV import modal — mounted at page root */}
                 <div

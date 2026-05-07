@@ -1,4 +1,5 @@
 import { SettingsLayout } from '../components/settings-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig; }
@@ -64,10 +65,20 @@ export const SettingsEventTypesPage = ({ branding }: Props): JSX.Element => (
             </div>
 
             {/* Create / edit modal */}
-            <div x-show="modalOpen" x-cloak class="fixed inset-0 z-50 bg-ink-900/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) modalOpen = false' }}>
-                <div class="bg-white rounded-lg border border-surface-200 max-w-lg w-full p-6">
-                    <h2 class="text-lg font-bold text-ink-900 mb-4" x-text="editingId ? 'Edit event type' : 'New event type'"></h2>
-                    <div class="space-y-3">
+            <Modal
+                name="modalOpen"
+                titleExpr="editingId ? 'Edit event type' : 'New event type'"
+                size="lg"
+                footer={
+                    <ModalFooter
+                        onCancel="modalOpen = false"
+                        onConfirm="save()"
+                        confirmDisabled="saving"
+                        confirmTextExpr="saving ? 'Saving...' : 'Save'"
+                    />
+                }
+            >
+                <div class="space-y-3">
                         <div>
                             <label class="block text-xs font-bold text-ink-700 mb-1 uppercase tracking-[0.2em]">Name</label>
                             <input type="text" x-model="form.name" required placeholder="e.g., Radon Test — Pickup" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm" />
@@ -100,15 +111,8 @@ export const SettingsEventTypesPage = ({ branding }: Props): JSX.Element => (
                                 <input type="number" {...{ 'x-model.number': 'form.sortOrder' }} min="0" placeholder="0" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm" />
                             </div>
                         </div>
-                    </div>
-                    <div class="flex gap-3 justify-end mt-6">
-                        <button x-on:click="modalOpen = false" class="px-4 py-2 rounded-md border border-surface-200 bg-white text-ink-700 text-sm font-semibold hover:bg-surface-100 transition-all">Cancel</button>
-                        <button x-on:click="save()" {...{ 'x-bind:disabled': 'saving' }} class="px-4 py-2 bg-blueprint-500 text-white rounded-md font-bold text-sm hover:bg-blueprint-700 active:scale-[.98] transition-all disabled:opacity-50">
-                            <span x-text="saving ? 'Saving...' : 'Save'"></span>
-                        </button>
-                    </div>
                 </div>
-            </div>
+            </Modal>
         </div>
 
         <script src="/js/auth.js"></script>

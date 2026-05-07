@@ -1,4 +1,5 @@
 import { SettingsLayout } from '../components/settings-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig; }
@@ -40,11 +41,9 @@ export const SettingsSecurityPage = ({ branding }: Props): JSX.Element => (
                 </div>
             </div>
 
-            {/* Enable modal */}
-            <div x-show="enableModalOpen" x-cloak class="fixed inset-0 z-50 bg-ink-900/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) closeEnable()' }}>
-                <div class="bg-white rounded-lg border border-surface-200 max-w-md w-full p-6 space-y-4">
-                    <h2 class="text-lg font-bold text-ink-900">Enable two-factor authentication</h2>
-
+            {/* Enable modal — two-step body (qr / recovery), so footer is inlined per step. */}
+            <Modal name="enableModalOpen" title="Enable two-factor authentication" size="md">
+                <div class="space-y-4">
                     <div x-show="enableStep === 'qr'" class="space-y-4">
                         <p class="text-sm text-ink-700">Scan this QR code with your authenticator app, then enter the 6-digit code it shows.</p>
                         <div class="flex justify-center">
@@ -59,11 +58,13 @@ export const SettingsSecurityPage = ({ branding }: Props): JSX.Element => (
                             <input type="text" x-model="enableCode" inputmode="numeric" autocomplete="one-time-code" maxlength={6} placeholder="123456" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm font-mono tracking-widest text-center" />
                         </div>
                         <p x-show="enableError" class="text-xs text-rose-600" x-text="enableError"></p>
-                        <div class="flex gap-3 justify-end">
-                            <button x-on:click="closeEnable()" class="px-4 py-2 rounded-md border border-surface-200 bg-white text-ink-700 text-sm font-semibold hover:bg-surface-100 transition-all">Cancel</button>
-                            <button x-on:click="verifyEnable()" {...{ 'x-bind:disabled': 'busy || enableCode.length !== 6' }} class="px-4 py-2 bg-blueprint-500 text-white rounded-md font-bold text-sm hover:bg-blueprint-700 active:scale-[.98] transition-all disabled:opacity-50">
-                                <span x-text="busy ? 'Verifying...' : 'Verify &amp; Enable'"></span>
-                            </button>
+                        <div class="flex gap-3 mt-2">
+                            <ModalFooter
+                                onCancel="closeEnable()"
+                                onConfirm="verifyEnable()"
+                                confirmDisabled="busy || enableCode.length !== 6"
+                                confirmTextExpr="busy ? 'Verifying...' : 'Verify &amp; Enable'"
+                            />
                         </div>
                     </div>
 
@@ -76,20 +77,32 @@ export const SettingsSecurityPage = ({ branding }: Props): JSX.Element => (
                             </template>
                         </div>
                         <div class="flex gap-3">
-                            <button x-on:click="downloadRecoveryCodes()" class="text-xs font-bold text-blueprint-700 hover:underline">Download as .txt</button>
-                            <button x-on:click="copyRecoveryCodes()" class="text-xs font-bold text-blueprint-700 hover:underline">Copy all</button>
+                            <button type="button" x-on:click="downloadRecoveryCodes()" class="text-xs font-bold text-blueprint-700 hover:underline">Download as .txt</button>
+                            <button type="button" x-on:click="copyRecoveryCodes()" class="text-xs font-bold text-blueprint-700 hover:underline">Copy all</button>
                         </div>
-                        <div class="flex justify-end">
-                            <button x-on:click="closeEnable()" class="px-4 py-2 bg-blueprint-500 text-white rounded-md font-bold text-sm hover:bg-blueprint-700 active:scale-[.98] transition-all">Done</button>
+                        <div class="flex justify-end mt-2">
+                            <button type="button" x-on:click="closeEnable()" class="h-10 px-6 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-all">Done</button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </Modal>
 
             {/* Disable modal */}
-            <div x-show="disableModalOpen" x-cloak class="fixed inset-0 z-50 bg-ink-900/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) disableModalOpen = false' }}>
-                <div class="bg-white rounded-lg border border-surface-200 max-w-md w-full p-6 space-y-4">
-                    <h2 class="text-lg font-bold text-ink-900">Disable two-factor authentication</h2>
+            <Modal
+                name="disableModalOpen"
+                title="Disable two-factor authentication"
+                size="md"
+                footer={
+                    <ModalFooter
+                        onCancel="disableModalOpen = false"
+                        onConfirm="confirmDisable()"
+                        confirmDisabled="busy || !disableForm.password || !disableForm.code"
+                        confirmTextExpr="busy ? 'Disabling...' : 'Disable 2FA'"
+                        danger={true}
+                    />
+                }
+            >
+                <div class="space-y-4">
                     <p class="text-sm text-ink-700">Enter your password and a current 2FA code (or recovery code) to confirm.</p>
                     <div>
                         <label class="block text-xs font-bold text-ink-700 mb-1 uppercase tracking-[0.2em]">Current password</label>
@@ -100,56 +113,52 @@ export const SettingsSecurityPage = ({ branding }: Props): JSX.Element => (
                         <input type="text" x-model="disableForm.code" autocomplete="one-time-code" placeholder="123456 or XXXX-XXXX" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm font-mono" />
                     </div>
                     <p x-show="disableError" class="text-xs text-rose-600" x-text="disableError"></p>
-                    <div class="flex gap-3 justify-end">
-                        <button x-on:click="disableModalOpen = false" class="px-4 py-2 rounded-md border border-surface-200 bg-white text-ink-700 text-sm font-semibold hover:bg-surface-100 transition-all">Cancel</button>
-                        <button x-on:click="confirmDisable()" {...{ 'x-bind:disabled': 'busy || !disableForm.password || !disableForm.code' }} class="px-4 py-2 bg-rose-600 text-white rounded-md font-bold text-sm hover:bg-rose-700 transition-all disabled:opacity-50">
-                            <span x-text="busy ? 'Disabling...' : 'Disable 2FA'"></span>
-                        </button>
+                </div>
+            </Modal>
+
+            {/* Regenerate modal — two-step (verify / show) so footer is inlined per step. */}
+            <Modal
+                name="regenModalOpen"
+                titleExpr="regenStep === 'verify' ? 'Regenerate recovery codes' : 'New recovery codes'"
+                size="md"
+            >
+                <div x-show="regenStep === 'verify'" class="space-y-4">
+                    <p class="text-sm text-ink-700">Old recovery codes will be invalidated immediately.</p>
+                    <div>
+                        <label class="block text-xs font-bold text-ink-700 mb-1 uppercase tracking-[0.2em]">Current password</label>
+                        <input type="password" x-model="regenForm.password" autocomplete="current-password" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-ink-700 mb-1 uppercase tracking-[0.2em]">2FA code or recovery code</label>
+                        <input type="text" x-model="regenForm.code" autocomplete="one-time-code" placeholder="123456 or XXXX-XXXX" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm font-mono" />
+                    </div>
+                    <p x-show="regenError" class="text-xs text-rose-600" x-text="regenError"></p>
+                    <div class="flex gap-3 mt-2">
+                        <ModalFooter
+                            onCancel="regenModalOpen = false"
+                            onConfirm="confirmRegen()"
+                            confirmDisabled="busy || !regenForm.password || !regenForm.code"
+                            confirmTextExpr="busy ? 'Regenerating...' : 'Regenerate'"
+                        />
                     </div>
                 </div>
-            </div>
 
-            {/* Regenerate modal */}
-            <div x-show="regenModalOpen" x-cloak class="fixed inset-0 z-50 bg-ink-900/50 flex items-center justify-center p-4" {...{ 'x-on:click': 'if ($event.target === $el) regenModalOpen = false' }}>
-                <div class="bg-white rounded-lg border border-surface-200 max-w-md w-full p-6 space-y-4">
-                    <h2 class="text-lg font-bold text-ink-900" x-text="regenStep === 'verify' ? 'Regenerate recovery codes' : 'New recovery codes'"></h2>
-
-                    <div x-show="regenStep === 'verify'" class="space-y-4">
-                        <p class="text-sm text-ink-700">Old recovery codes will be invalidated immediately.</p>
-                        <div>
-                            <label class="block text-xs font-bold text-ink-700 mb-1 uppercase tracking-[0.2em]">Current password</label>
-                            <input type="password" x-model="regenForm.password" autocomplete="current-password" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-ink-700 mb-1 uppercase tracking-[0.2em]">2FA code or recovery code</label>
-                            <input type="text" x-model="regenForm.code" autocomplete="one-time-code" placeholder="123456 or XXXX-XXXX" class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none text-sm font-mono" />
-                        </div>
-                        <p x-show="regenError" class="text-xs text-rose-600" x-text="regenError"></p>
-                        <div class="flex gap-3 justify-end">
-                            <button x-on:click="regenModalOpen = false" class="px-4 py-2 rounded-md border border-surface-200 bg-white text-ink-700 text-sm font-semibold hover:bg-surface-100 transition-all">Cancel</button>
-                            <button x-on:click="confirmRegen()" {...{ 'x-bind:disabled': 'busy || !regenForm.password || !regenForm.code' }} class="px-4 py-2 bg-blueprint-500 text-white rounded-md font-bold text-sm hover:bg-blueprint-700 active:scale-[.98] transition-all disabled:opacity-50">
-                                <span x-text="busy ? 'Regenerating...' : 'Regenerate'"></span>
-                            </button>
-                        </div>
+                <div x-show="regenStep === 'show'" class="space-y-4">
+                    <p class="text-xs text-ink-500">Save these in a safe place — your old codes no longer work.</p>
+                    <div class="bg-surface-50 border border-surface-200 rounded-md p-4 grid grid-cols-2 gap-2 font-mono text-sm">
+                        <template x-for="code in regenData.recoveryCodes" {...{ 'x-bind:key': 'code' }}>
+                            <code class="select-all" x-text="code"></code>
+                        </template>
                     </div>
-
-                    <div x-show="regenStep === 'show'" class="space-y-4">
-                        <p class="text-xs text-ink-500">Save these in a safe place — your old codes no longer work.</p>
-                        <div class="bg-surface-50 border border-surface-200 rounded-md p-4 grid grid-cols-2 gap-2 font-mono text-sm">
-                            <template x-for="code in regenData.recoveryCodes" {...{ 'x-bind:key': 'code' }}>
-                                <code class="select-all" x-text="code"></code>
-                            </template>
-                        </div>
-                        <div class="flex gap-3">
-                            <button x-on:click="downloadRecoveryCodes(regenData.recoveryCodes)" class="text-xs font-bold text-blueprint-700 hover:underline">Download as .txt</button>
-                            <button x-on:click="copyRecoveryCodes(regenData.recoveryCodes)" class="text-xs font-bold text-blueprint-700 hover:underline">Copy all</button>
-                        </div>
-                        <div class="flex justify-end">
-                            <button x-on:click="regenModalOpen = false" class="px-4 py-2 bg-blueprint-500 text-white rounded-md font-bold text-sm hover:bg-blueprint-700 active:scale-[.98] transition-all">Done</button>
-                        </div>
+                    <div class="flex gap-3">
+                        <button type="button" x-on:click="downloadRecoveryCodes(regenData.recoveryCodes)" class="text-xs font-bold text-blueprint-700 hover:underline">Download as .txt</button>
+                        <button type="button" x-on:click="copyRecoveryCodes(regenData.recoveryCodes)" class="text-xs font-bold text-blueprint-700 hover:underline">Copy all</button>
+                    </div>
+                    <div class="flex justify-end mt-2">
+                        <button type="button" x-on:click="regenModalOpen = false" class="h-10 px-6 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-all">Done</button>
                     </div>
                 </div>
-            </div>
+            </Modal>
         </div>
 
         <script src="/js/auth.js"></script>

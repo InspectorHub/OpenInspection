@@ -1,4 +1,5 @@
 import { MainLayout } from '../layouts/main-layout';
+import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -49,40 +50,31 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                 </div>
 
                 {/* Create Template Modal */}
-                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-6 sm:px-0">
-                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" onclick="closeModal()"></div>
-                    <div class="flex min-h-full items-center justify-center">
-                        <div role="dialog" aria-modal="true" class="relative w-full max-w-xl transform overflow-hidden rounded-xl bg-white p-6 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
-                            <div class="absolute top-8 right-8">
-                                <button onclick="closeModal()" aria-label="Close dialog" class="p-3 text-slate-400 hover:text-slate-900 rounded-2xl hover:bg-slate-50 transition-all active:scale-95">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </button>
-                            </div>
-                            <div class="mb-6">
-                                <h3 class="text-xl font-bold text-slate-900 mb-3 tracking-tight leading-tight">New Template</h3>
-                                <p class="text-lg text-slate-400 font-medium">Create an inspection checklist.</p>
-                            </div>
-                            <div class="space-y-4">
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Template Name</label>
-                                    <input type="text" id="tplName" placeholder="e.g., Luxury Residential Standard"
-                                        class="premium-input w-full px-3 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
-                                </div>
-                                <p class="text-sm text-slate-400 font-medium leading-relaxed">
-                                    After creating the template, you will be taken to the visual editor where you can add sections and inspection items.
-                                </p>
-                                <div class="pt-4 flex gap-6">
-                                    <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-slate-400 hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest">
-                                        Cancel
-                                    </button>
-                                    <button type="button" onclick="submitTemplate()" id="submitTplBtn" class="flex-[2] premium-button py-4.5 rounded-2xl bg-indigo-600 text-white font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition-all">
-                                        Create Template
-                                    </button>
-                                </div>
-                            </div>
+                <Modal
+                    id="createModal"
+                    title="New Template"
+                    subtitle="Create an inspection checklist."
+                    size="xl"
+                    footer={
+                        <ModalFooter
+                            onCancelJs="closeModal()"
+                            onConfirmJs="submitTemplate()"
+                            confirmText="Create Template"
+                            confirmId="submitTplBtn"
+                        />
+                    }
+                >
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Template Name</label>
+                            <input type="text" id="tplName" placeholder="e.g., Luxury Residential Standard"
+                                class="premium-input w-full px-3 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
                         </div>
+                        <p class="text-sm text-slate-400 font-medium leading-relaxed">
+                            After creating the template, you will be taken to the visual editor where you can add sections and inspection items.
+                        </p>
                     </div>
-                </div>
+                </Modal>
 
                 <script src="/js/modal-dialog.js"></script>
                 <script src="/js/auth.js"></script>

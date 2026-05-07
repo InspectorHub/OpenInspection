@@ -39,6 +39,7 @@ declare global {
             'x-on:click.self'?: string;
             'x-on:click.stop'?: string;
             'x-on:click.outside'?: string;
+            'x-on:keydown.escape.window'?: string;
             'x-on:submit'?: string;
             'x-on:input'?: string;
             'x-on:input.debounce.500ms'?: string;
