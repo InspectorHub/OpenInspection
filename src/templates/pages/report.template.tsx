@@ -220,15 +220,21 @@ export function renderProfessionalReport(data: {
 
             {/* Inspection Details */}
             <div class="px-12 py-24 space-y-12 bg-white">
+                {/* Spec 5F.9 — section + item wrappers gain report-pdf-* classes
+                    that ONLY apply in @media print (defined in input.css). On
+                    screen, no styling change. In PDF render, sections collapse
+                    to a 2-col grid with hairline borders; defect items break
+                    back to full-row red bg; photos shrink to 4-col mini grid
+                    capped at 8 per item. */}
                 {schema.sections.map((section: SchemaSection) => (
-                    <section class="page-break" key={section.title}>
+                    <section class="page-break report-pdf-section" key={section.title}>
                         <div class="flex items-center gap-4 mb-16">
                             <h2 class="text-3xl font-bold tracking-tight text-slate-900 shrink-0">{section.title}</h2>
                             <div class="flex-grow h-0.5 bg-gradient-to-r from-slate-100 to-transparent"></div>
                             <span class="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-300">Section {schema.sections.indexOf(section) + 1}</span>
                         </div>
 
-                        <div class="space-y-6">
+                        <div class="space-y-6 report-pdf-grid">
                             {section.items.map((item: SchemaItem) => {
                                 const res: ResultItem = resultData[item.id] || {};
                                 const bucketConfigs: Record<string, { bg: string, text: string, dot: string }> = {
@@ -241,9 +247,12 @@ export function renderProfessionalReport(data: {
                                 const level = itemRatingId ? levelMap.get(itemRatingId) : undefined;
                                 const conf = bucketConfigs[bucket ?? ''] || { bg: 'bg-slate-50', text: 'text-slate-400', dot: 'bg-slate-300' };
                                 const displayLabel = level?.label || itemRatingId || 'NO DATA';
+                                const itemClass = bucket === 'defect' ? 'report-pdf-item report-pdf-item--defect' : 'report-pdf-item';
+                                const photos = res.photos || [];
+                                const photoCap = 8;
 
                                 return (
-                                    <div class="flex flex-col lg:flex-row gap-16 avoid-break group" key={item.id}>
+                                    <div class={`flex flex-col lg:flex-row gap-16 avoid-break group ${itemClass}`} key={item.id}>
                                         <div class="flex-grow">
                                             <div class="flex justify-between items-start gap-4 mb-6">
                                                 <h3 class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
@@ -252,17 +261,20 @@ export function renderProfessionalReport(data: {
                                                     <span class="text-[10px] font-bold uppercase tracking-[0.2em]">{displayLabel}</span>
                                                 </div>
                                             </div>
-                                            <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl">{res.notes || 'No notes recorded.'}</p>
+                                            <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl item-notes">{res.notes || 'No notes recorded.'}</p>
                                         </div>
 
                                         {/* High-Resolution Evidence Architecture */}
-                                        {res.photos && res.photos.length > 0 ? (
-                                            <div class="lg:w-[480px] shrink-0 grid grid-cols-2 gap-4 avoid-break">
-                                                {res.photos.map((p: { key: string }) => (
+                                        {photos.length > 0 ? (
+                                            <div class="lg:w-[480px] shrink-0 grid grid-cols-2 gap-4 avoid-break report-pdf-photos">
+                                                {photos.slice(0, photoCap).map((p: { key: string }) => (
                                                     <div class="aspect-square bg-slate-50 rounded-lg overflow-hidden border-4 border-white shadow-md/20 group/photo transition-transform hover:scale-[1.02]" key={p.key}>
                                                         <img src={`/api/inspections/files/${p.key}`} class="w-full h-full object-cover grayscale-[0.2] transition-all group-hover/photo:grayscale-0" />
                                                     </div>
                                                 ))}
+                                                {photos.length > photoCap && (
+                                                    <div class="hidden print:block col-span-full text-[8pt] text-slate-400 italic">+{photos.length - photoCap} more in web report</div>
+                                                )}
                                             </div>
                                         ) : (
                                             <div class="lg:w-[480px] shrink-0 h-40 border-2 border-dashed border-slate-50 rounded-lg flex items-center justify-center grayscale opacity-20">

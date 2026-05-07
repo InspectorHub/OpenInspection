@@ -308,6 +308,64 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
     img { max-height: 250px; object-fit: contain; }
     .grid { display: flex !important; flex-wrap: wrap; gap: 1rem; }
     .grid > div { flex: 1 1 calc(50% - 1rem); }
+
+    /* Spec 5F.9 — Report PDF tabular re-layout. These rules ONLY fire in
+       the PDF render path; the screen view keeps the existing card-stack
+       layout. Goal: 30-page report -> ~18 pages, attachment 30MB -> 12MB. */
+    .report-pdf-section h2 {
+        font-size: 14pt !important;
+        font-weight: 700 !important;
+        margin: 14px 0 8px !important;
+        border-bottom: 2px solid #0f172a !important;
+        padding-bottom: 2px !important;
+    }
+    .report-pdf-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px !important;
+        space-y: 0 !important;
+    }
+    .report-pdf-item {
+        padding: 8px 10px !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 6px !important;
+        page-break-inside: avoid;
+        background: #fff !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+    }
+    .report-pdf-item h3 {
+        font-size: 11pt !important;
+        font-weight: 600 !important;
+        margin: 0 0 4px !important;
+    }
+    .report-pdf-item .item-notes {
+        font-size: 9pt !important;
+        line-height: 1.35 !important;
+        color: #334155 !important;
+        margin: 0 0 4px !important;
+    }
+    .report-pdf-item--defect {
+        grid-column: 1 / -1 !important;
+        border-color: #ef4444 !important;
+        background: #fef2f2 !important;
+    }
+    .report-pdf-photos {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 4px !important;
+        width: auto !important;
+    }
+    .report-pdf-photos > div {
+        aspect-ratio: 4 / 3 !important;
+        border: none !important;
+        border-radius: 4px !important;
+    }
+    .report-pdf-photos img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
 }
 
 /* ============================================================
