@@ -117,6 +117,13 @@ export const comments = sqliteTable('comments', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     text: text('text').notNull(),
     category: text('category'),
+    // Spec 2026-05-07 — rating bucket so user snippets stack alongside the
+    // 248 seeded library entries in the inspection-edit Library drawer.
+    // 'satisfactory' | 'monitor' | 'defect' | null (= uncategorized / "All")
+    ratingBucket: text('rating_bucket'),
+    // Section label (Roof, Electrical, ...) — same shape as canned-comments.js
+    // entries. Free-text so tenants can grow their own taxonomy.
+    section: text('section'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

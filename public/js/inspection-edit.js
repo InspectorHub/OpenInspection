@@ -87,6 +87,11 @@ function inspectionEditor(inspectionId) {
     aiSuggestions: [],
     aiTargetField: null,
     showAiPopover: false,
+    // Spec 2026-05-07 — user snippets fetched from /api/admin/comments
+    // (the same data source as the /comments page). Lets MY SNIPPETS show
+    // bucket-classified user comments, so /comments + Library drawer agree.
+    // Keeps localStorage-only snippets as a fallback (offline / older saves).
+    _userSnippets: [],
 
     publishOptions: {
       theme: 'modern',
@@ -353,7 +358,34 @@ function inspectionEditor(inspectionId) {
           photos[photoIndex] = Object.assign({}, photos[photoIndex], { annotatedKey });
         }
       });
+      // Spec 2026-05-07 — user snippets from the unified comments table.
+      // Fire-and-forget: the drawer falls back to localStorage snippets if
+      // this fails (e.g. offline reload).
+      this.loadUserSnippets();
+
       await this.loadData();
+    },
+
+    async loadUserSnippets() {
+      try {
+        var res = await authFetch('/api/admin/comments');
+        if (!res.ok) return;
+        var json = await res.json();
+        var rows = (json.data && json.data.comments) || [];
+        // Map server schema to the in-memory snippet shape consumed by
+        // _commentLibraryPool / commentLibraryItems. Use 'all' for the
+        // null-bucket case so the seeded "All" filter still surfaces them.
+        this._userSnippets = rows.map(function (r) {
+          return {
+            id: r.id,
+            rating: r.ratingBucket || 'all',
+            section: r.section || null,
+            category: r.category || null,
+            text: r.text,
+            source: 'snippet',
+          };
+        });
+      } catch (_) { /* non-fatal */ }
     },
 
     async loadData() {
@@ -1047,12 +1079,22 @@ function inspectionEditor(inspectionId) {
         { rating: 'all', text: 'Item was not accessible during the inspection; recommend re-evaluation when accessible.' },
       ];
       COMMENTS = COMMENTS.map(function (c) { return Object.assign({}, c, { source: 'preset' }); });
-      var SNIPPETS = [];
+      // Spec 2026-05-07 — server-backed user snippets (from /api/admin/comments)
+      // are the canonical source for MY SNIPPETS. Fall back to localStorage
+      // snippets (kept for offline + older saves) and dedupe on `text`.
+      var SERVER = (this._userSnippets || []).slice();
+      var seen = {};
+      for (var i = 0; i < SERVER.length; i++) seen[SERVER[i].text] = true;
+      var LOCAL = [];
       try {
         var raw = localStorage.getItem('oi:snippets');
-        if (raw) SNIPPETS = JSON.parse(raw).map(function (c) { return Object.assign({}, c, { source: 'snippet' }); });
+        if (raw) {
+          LOCAL = JSON.parse(raw)
+            .filter(function (c) { return c && !seen[c.text]; })
+            .map(function (c) { return Object.assign({}, c, { source: 'snippet' }); });
+        }
       } catch (_) {}
-      return COMMENTS.concat(SNIPPETS);
+      return COMMENTS.concat(SERVER, LOCAL);
     },
 
     get commentLibraryItems() {

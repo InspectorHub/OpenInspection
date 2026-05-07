@@ -27,6 +27,7 @@ import {
     CommentSchema,
     CommentResponseSchema,
     UpdateCommentSchema,
+    ListCommentsQuerySchema,
     StripeConnectAccountSchema,
 } from '../lib/validations/admin.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -953,6 +954,19 @@ adminRoutes.openapi(downloadAuditTrailRoute, async (c) => {
 
 // --- Comments Library ---
 
+// Spec 2026-05-07 — narrow Drizzle's generic `string | null` for
+// `ratingBucket` down to the Zod enum shape the OpenAPI response schema
+// declares. The DB column is just TEXT (column constraint isn't enforced
+// at the SQLite layer), so we cast at the response boundary.
+type RatingBucketResp = 'satisfactory' | 'monitor' | 'defect' | null;
+function commentRowToResponse(r: typeof comments.$inferSelect) {
+    return {
+        ...r,
+        ratingBucket: (r.ratingBucket as RatingBucketResp) ?? null,
+        createdAt: safeISODate(r.createdAt),
+    };
+}
+
 const listCommentsRoute = createRoute({
     method: 'get',
     path: '/comments',
@@ -961,6 +975,7 @@ const listCommentsRoute = createRoute({
     // Inspectors need read access so the inspection-edit picker (T7+1) can
     // populate. Create/delete remain admin-only further below.
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    request: { query: ListCommentsQuerySchema },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comments: z.array(CommentResponseSchema) }) }) } },
@@ -972,9 +987,20 @@ const listCommentsRoute = createRoute({
 
 adminRoutes.openapi(listCommentsRoute, async (c) => {
     const tenantId = c.get('tenantId');
+    const { rating, section, search } = c.req.valid('query');
     const db = drizzle(c.env.DB);
-    const rows = await db.select().from(comments).where(eq(comments.tenantId, tenantId)).all();
-    return c.json({ success: true as const, data: { comments: rows.map(r => ({ ...r, createdAt: safeISODate(r.createdAt) })) } }, 200);
+    // Filters layered defensively: tenantId always first (multi-tenant
+    // isolation rule from CLAUDE.md), then optional rating bucket / section
+    // / free-text search.
+    const conditions = [eq(comments.tenantId, tenantId)];
+    if (rating) conditions.push(eq(comments.ratingBucket, rating));
+    if (section) conditions.push(eq(comments.section, section));
+    let rows = await db.select().from(comments).where(and(...conditions)).all();
+    if (search && search.trim()) {
+        const needle = search.trim().toLowerCase();
+        rows = rows.filter(r => r.text.toLowerCase().includes(needle));
+    }
+    return c.json({ success: true as const, data: { comments: rows.map(commentRowToResponse) } }, 200);
 });
 
 const createCommentRoute = createRoute({
@@ -995,11 +1021,19 @@ const createCommentRoute = createRoute({
 
 adminRoutes.openapi(createCommentRoute, async (c) => {
     const tenantId = c.get('tenantId');
-    const { text, category } = c.req.valid('json');
+    const { text, category, ratingBucket, section } = c.req.valid('json');
     const db = drizzle(c.env.DB);
-    const row = { id: crypto.randomUUID(), tenantId, text, category: category ?? null, createdAt: new Date() };
+    const row = {
+        id: crypto.randomUUID(),
+        tenantId,
+        text,
+        category: category ?? null,
+        ratingBucket: ratingBucket ?? null,
+        section: section ?? null,
+        createdAt: new Date(),
+    };
     await db.insert(comments).values(row);
-    return c.json({ success: true as const, data: { comment: { ...row, createdAt: safeISODate(row.createdAt) } } }, 201);
+    return c.json({ success: true as const, data: { comment: commentRowToResponse(row) } }, 201);
 });
 
 const deleteCommentRoute = createRoute({
@@ -1053,20 +1087,31 @@ const updateCommentRoute = createRoute({
 adminRoutes.openapi(updateCommentRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const { id } = c.req.valid('param');
-    const { text, category } = c.req.valid('json');
+    const { text, category, ratingBucket, section } = c.req.valid('json');
     const db = drizzle(c.env.DB);
     const existing = await db.select().from(comments)
         .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
     if (!existing) throw Errors.NotFound('Comment not found');
+    const patch = {
+        text,
+        category: category ?? null,
+        ratingBucket: ratingBucket ?? null,
+        section: section ?? null,
+    };
     await db.update(comments)
-        .set({ text, category: category ?? null })
+        .set(patch)
         .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
-    const updated = { ...existing, text, category: category ?? null };
+    const updated = { ...existing, ...patch };
     auditFromContext(c, 'comment.updated', 'comment', {
         entityId: id,
-        metadata: { category: category ?? null, textPreview: text.slice(0, 80) },
+        metadata: {
+            category: category ?? null,
+            ratingBucket: ratingBucket ?? null,
+            section: section ?? null,
+            textPreview: text.slice(0, 80),
+        },
     });
-    return c.json({ success: true as const, data: { comment: { ...updated, createdAt: safeISODate(updated.createdAt) } } }, 200);
+    return c.json({ success: true as const, data: { comment: commentRowToResponse(updated) } }, 200);
 });
 
 // --- Widget Origin Allowlist ---

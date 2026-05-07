@@ -208,14 +208,25 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
     })),
 })).openapi('TeamMembersResponse');
 
+// Spec 2026-05-07 — Comments Library unification.
+// `ratingBucket` aligns user snippets with the seeded 248-entry library so
+// both surfaces (the /comments page and the inspection-edit Library drawer)
+// classify entries identically. `section` is free-text so tenants can grow
+// their own taxonomy alongside the seeded sections (Roof / Electrical / …).
+const RatingBucketSchema = z.enum(['satisfactory', 'monitor', 'defect']);
+
 export const CommentSchema = z.object({
     text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }),
     category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }),
+    ratingBucket: RatingBucketSchema.optional().nullable().openapi({ example: 'defect' }),
+    section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }),
 }).openapi('Comment');
 
 export const UpdateCommentSchema = z.object({
     text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }),
     category: z.string().max(50).nullable().optional().openapi({ example: 'Roofing' }),
+    ratingBucket: RatingBucketSchema.nullable().optional().openapi({ example: 'defect' }),
+    section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }),
 }).openapi('UpdateComment');
 
 export const CommentResponseSchema = z.object({
@@ -223,5 +234,13 @@ export const CommentResponseSchema = z.object({
     tenantId: z.string().uuid(),
     text: z.string(),
     category: z.string().nullable(),
+    ratingBucket: RatingBucketSchema.nullable(),
+    section: z.string().nullable(),
     createdAt: z.string(),
 }).openapi('CommentResponse');
+
+export const ListCommentsQuerySchema = z.object({
+    rating: RatingBucketSchema.optional().openapi({ example: 'defect' }),
+    section: z.string().max(64).optional().openapi({ example: 'Roof' }),
+    search: z.string().max(200).optional(),
+}).openapi('ListCommentsQuery');
