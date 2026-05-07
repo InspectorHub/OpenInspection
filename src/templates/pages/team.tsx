@@ -20,7 +20,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                     
                     <div class="flex flex-col items-end gap-4">
                         <button type="button" id="openInviteModalBtn"
-                            class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-2 rounded-md bg-indigo-600 text-white font-bold shadow-md hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
+                            class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-1.5 text-sm rounded-md bg-indigo-600 text-white font-bold shadow-md hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                             Invite Member
                         </button>

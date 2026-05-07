@@ -16,7 +16,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                         <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4">Agreements</h1>
                         <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage liability waivers and professional service agreements for your clients.</p>
                     </div>
-                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-md shadow-md/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
+                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-1.5 text-sm rounded-md shadow-md/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         New Agreement
                     </button>

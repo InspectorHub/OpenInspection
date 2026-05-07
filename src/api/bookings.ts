@@ -309,6 +309,20 @@ bookingsRoutes.openapi(signAgreementRoute, async (c) => {
     const svc = c.var.services.agreement;
     const signed = await svc.signRequest(token, signatureBase64);
 
+    // Spec 2A audit-trail (Round 14) — structured log for forensic
+    // reconstruction. Free first-pass before adding DB columns; CF
+    // logs aggregator can be queried by `event=agreement.signed.audit`.
+    logger.info('agreement.signed.audit', {
+        event: 'agreement.signed.audit',
+        token: token.slice(0, 8) + '…',
+        tenantId: signed.tenantId,
+        clientName: signed.clientName ?? null,
+        signedAt: new Date().toISOString(),
+        signerIp: c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null,
+        signerUserAgent: (c.req.header('user-agent') || '').slice(0, 200) || null,
+        signerCountry: c.req.header('cf-ipcountry') || null,
+    });
+
     // B3: in-app notification — fetch agreement name for richer title
     c.executionCtx.waitUntil((async () => {
         try {
