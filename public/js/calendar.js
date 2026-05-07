@@ -39,9 +39,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         dateClick: function(info) {
-            // Click empty slot in week/day view → create new inspection
+            // Click empty slot in week/day view → open New Inspection modal
+            // on dashboard. /inspections/new is not a real route — the create
+            // form is a modal on /dashboard. Pass date through query string
+            // so dashboard.js can pre-fill the date picker.
             if (calendar.view.type === 'dayGridMonth') return;
-            window.location.href = '/inspections/new?date=' + encodeURIComponent(info.dateStr);
+            window.location.href = '/dashboard?newInspection=1&date=' + encodeURIComponent(info.dateStr);
         },
         eventDidMount: function(info) {
             // Visually distinguish Google events

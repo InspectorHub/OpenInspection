@@ -223,6 +223,29 @@ async function fetchPrerequisites() {
     } catch (e) {
         console.error('populateAgents failed:', e);
     }
+
+    // R7-NEW-1: calendar's dateClick navigates here with ?newInspection=1&date=...
+    // Auto-open the New Inspection modal + pre-fill the date input.
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('newInspection') === '1') {
+            showCreateModal();
+            const d = params.get('date');
+            const dateInput = document.getElementById('inspectionDate');
+            if (dateInput && d) {
+                // Flatpickr accepts ISO strings; setting .value works because
+                // flatpickr-init.js binds on focusin and reads the current value.
+                dateInput.value = d.replace('T', ' ').slice(0, 16);
+            }
+            // Clean URL so refresh doesn't reopen.
+            const url = new URL(window.location.href);
+            url.searchParams.delete('newInspection');
+            url.searchParams.delete('date');
+            window.history.replaceState({}, '', url.toString());
+        }
+    } catch (e) {
+        console.error('newInspection deep-link failed:', e);
+    }
 }
 
 async function populateAgents() {
