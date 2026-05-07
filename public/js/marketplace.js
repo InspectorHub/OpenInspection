@@ -16,6 +16,9 @@ function marketplace() {
         previewTemplate: null,
         previewSchema: null,
         previewItemCount: 0,
+        // Spec 5B P3 — aggregate counts across all sections.
+        previewCannedTotal: 0,
+        previewDefectTotal: 0,
 
         async init() {
             await this.load();
@@ -120,7 +123,10 @@ function marketplace() {
             this.showToast('Template imported!', localId ? `/templates/${localId}/edit` : '');
         },
 
-        // Polish 5 — open preview modal with parsed schema tree
+        // Polish 5 + Spec 5B P3 — open preview modal with parsed schema
+        // tree, plus aggregate counts of canned comments & defects so the
+        // marketplace browser can see "what's in this template" before
+        // importing.
         openPreview(t) {
             this.previewTemplate = t;
             // Marketplace API returns schema as JSON string OR object — normalize
@@ -128,8 +134,28 @@ function marketplace() {
             if (typeof schema === 'string') {
                 try { schema = JSON.parse(schema); } catch { schema = null; }
             }
-            this.previewSchema = schema;
-            this.previewItemCount = (schema?.sections || []).reduce((sum, s) => sum + (s.items?.length || 0), 0);
+            // Decorate every item with per-tab counts so the template can
+            // render badges without re-walking the schema each render.
+            const sections = (schema?.sections || []).map((sec) => ({
+                ...sec,
+                items: (sec.items || []).map((it) => {
+                    const t = it.tabs || {};
+                    const info = (t.information || []).length;
+                    const lim  = (t.limitations || []).length;
+                    const def  = (t.defects || []).length;
+                    return { ...it, _info: info, _lim: lim, _def: def };
+                }),
+            }));
+            this.previewSchema = schema ? { ...schema, sections } : null;
+            this.previewItemCount = sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
+            this.previewCannedTotal = sections.reduce(
+                (sum, s) => sum + (s.items || []).reduce((a, it) => a + (it._info || 0) + (it._lim || 0) + (it._def || 0), 0),
+                0
+            );
+            this.previewDefectTotal = sections.reduce(
+                (sum, s) => sum + (s.items || []).reduce((a, it) => a + (it._def || 0), 0),
+                0
+            );
             this.previewOpen = true;
         },
 

@@ -241,7 +241,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                           class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase capitalize">
                           <span x-text="tabName"></span>
                           <span class="text-[10px] font-mono opacity-80"
-                            x-text="tabIncludedCount(item.id, tabName) + '/' + tabTotalCount(item.id, tabName)"></span>
+                            x-text="tabBadgeCount(item.id, tabName) + '/' + tabBadgeTotal(item.id, tabName)"></span>
                         </button>
                       </template>
                     </div>
@@ -263,14 +263,74 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                                 rows={2}
                                 class="mt-1 w-full px-2 py-1.5 text-[12px] rounded border bg-white resize-y"
                                 style="border-color: #e8e4dd"></textarea>
+                              {/* Spec 5B P2B — AI Rewrite (mobile). */}
+                              <div x-show="entry.included" class="mt-1 flex justify-end">
+                                <button type="button"
+                                  {...{ 'x-on:click.stop.prevent': 'rewriteCannedComment(item.id, (activeItemId === item.id ? activeItemTab : "information"), entry.cannedId, $event)' }}
+                                  class="text-[10px] font-bold text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-50">
+                                  ✨ Rewrite
+                                </button>
+                              </div>
                             </div>
                           </label>
                         </div>
                       </template>
-                      <p x-show="getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0"
+                      <p x-show="getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0 && getCustomEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0"
                          class="text-[11px] italic text-slate-400 text-center py-2">
                         No canned comments in this tab.
                       </p>
+                      {/* Spec 5B P2B — Custom comments (mobile). */}
+                      <template x-for="custom in getCustomEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information'))" x-bind:key="custom.id">
+                        <div class="rounded-lg border-2 border-dashed p-2 bg-amber-50/40" style="border-color: #fcd34d">
+                          <div class="flex items-start gap-1.5">
+                            <span class="mt-0.5 text-[8px] font-bold uppercase text-amber-700 bg-amber-100 px-1 py-0.5 rounded">Custom</span>
+                            <div class="flex-1 min-w-0 space-y-1">
+                              <input type="text"
+                                x-bind:value="custom.title"
+                                x-on:input="setCustomCommentTitle(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event.target.value)"
+                                placeholder="Title"
+                                class="w-full px-1.5 py-0.5 text-[11px] font-bold rounded border bg-white"
+                                style="border-color: #e8e4dd" />
+                              <textarea
+                                x-bind:value="custom.comment"
+                                x-on:input="setCustomCommentText(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event.target.value)"
+                                rows={2}
+                                class="w-full px-1.5 py-1 text-[11px] rounded border bg-white resize-y"
+                                style="border-color: #e8e4dd"
+                                placeholder="Comment..."></textarea>
+                              <template x-if="(activeItemId === item.id ? activeItemTab : 'information') === 'defects'">
+                                <div class="grid grid-cols-2 gap-1.5">
+                                  <input type="text"
+                                    x-bind:value="custom.location || ''"
+                                    x-on:input="setCustomCommentLocation(item.id, custom.id, $event.target.value)"
+                                    placeholder="Location"
+                                    class="w-full px-1.5 py-0.5 text-[10px] rounded border bg-white"
+                                    style="border-color: #e8e4dd" />
+                                  <select
+                                    x-bind:value="custom.category || 'maintenance'"
+                                    x-on:change="setCustomCommentCategory(item.id, custom.id, $event.target.value)"
+                                    class="w-full px-1.5 py-0.5 text-[10px] rounded border bg-white"
+                                    style="border-color: #e8e4dd">
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="recommendation">Recommendation</option>
+                                    <option value="safety">Safety</option>
+                                  </select>
+                                </div>
+                              </template>
+                            </div>
+                            <button type="button"
+                              x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
+                              class="text-rose-500 px-1 text-xs font-bold"
+                              title="Delete">×</button>
+                          </div>
+                        </div>
+                      </template>
+                      <button type="button"
+                        x-on:click="addCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'))"
+                        class="w-full mt-1 py-1 text-[10px] font-bold rounded-lg border-2 border-dashed text-slate-500 hover:bg-white/60"
+                        style="border-color: #e8e4dd">
+                        + Add custom comment
+                      </button>
                     </div>
                   </div>
 
@@ -875,7 +935,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                             class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wide capitalize">
                             <span x-text="tabName"></span>
                             <span class="text-[10px] font-mono opacity-80"
-                              x-text="tabIncludedCount(item.id, tabName) + '/' + tabTotalCount(item.id, tabName)"></span>
+                              x-text="tabBadgeCount(item.id, tabName) + '/' + tabBadgeTotal(item.id, tabName)"></span>
                           </button>
                         </template>
                       </div>
@@ -908,6 +968,16 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                                   class="mt-1.5 w-full px-2 py-1.5 text-[12px] rounded border bg-white resize-y"
                                   style="border-color: #e8e4dd; color: #2d2a26"
                                   placeholder="Edit comment text..."></textarea>
+                                {/* Spec 5B P2B — AI Rewrite button (canned). */}
+                                <div x-show="entry.included" class="mt-1 flex items-center justify-end">
+                                  <button type="button"
+                                    x-on:click="rewriteCannedComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), entry.cannedId, $event)"
+                                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold text-amber-700 hover:bg-amber-50 transition"
+                                    title="Rewrite with AI">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                                    Rewrite
+                                  </button>
+                                </div>
                                 {/* Read-only preview when not included */}
                                 <p x-show="!entry.included" class="mt-1 text-[11px] italic text-slate-500 line-clamp-2" x-text="entry.comment"></p>
                                 {/* Defect-only location + category override */}
@@ -940,10 +1010,69 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                             </div>
                           </div>
                         </template>
-                        <p x-show="getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0"
+                        <p x-show="getTabEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0 && getCustomEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information')).length === 0"
                            class="text-[11px] italic text-slate-400 text-center py-2">
                           No canned comments in this tab.
                         </p>
+                        {/* Spec 5B P2B — Custom (per-inspection) comments. */}
+                        <template x-for="custom in getCustomEntries(item.id, (activeItemId === item.id ? activeItemTab : 'information'))" x-bind:key="custom.id">
+                          <div class="rounded-lg border-2 border-dashed p-2.5 bg-amber-50/40"
+                            style="border-color: #fcd34d">
+                            <div class="flex items-start gap-2">
+                              <span class="mt-1 text-[9px] font-bold uppercase text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Custom</span>
+                              <div class="flex-1 min-w-0 space-y-1.5">
+                                <input type="text"
+                                  x-bind:value="custom.title"
+                                  x-on:input="setCustomCommentTitle(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event.target.value)"
+                                  placeholder="Title (e.g. Vegetation overgrowth)"
+                                  class="w-full px-2 py-1 text-xs font-bold rounded border bg-white"
+                                  style="border-color: #e8e4dd; color: #2d2a26" />
+                                <textarea
+                                  x-bind:value="custom.comment"
+                                  x-on:input="setCustomCommentText(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event.target.value)"
+                                  rows={2}
+                                  class="w-full px-2 py-1.5 text-[12px] rounded border bg-white resize-y"
+                                  style="border-color: #e8e4dd; color: #2d2a26"
+                                  placeholder="Comment text..."></textarea>
+                                <template x-if="(activeItemId === item.id ? activeItemTab : 'information') === 'defects'">
+                                  <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Location</label>
+                                      <input type="text"
+                                        x-bind:value="custom.location || ''"
+                                        x-on:input="setCustomCommentLocation(item.id, custom.id, $event.target.value)"
+                                        placeholder="Northwest corner"
+                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                        style="border-color: #e8e4dd" />
+                                    </div>
+                                    <div>
+                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Category</label>
+                                      <select
+                                        x-bind:value="custom.category || 'maintenance'"
+                                        x-on:change="setCustomCommentCategory(item.id, custom.id, $event.target.value)"
+                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                        style="border-color: #e8e4dd">
+                                        <option value="maintenance">Maintenance</option>
+                                        <option value="recommendation">Recommendation</option>
+                                        <option value="safety">Safety</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                </template>
+                              </div>
+                              <button type="button"
+                                x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
+                                class="text-rose-500 hover:bg-rose-50 rounded p-1 text-xs font-bold"
+                                title="Delete custom comment">×</button>
+                            </div>
+                          </div>
+                        </template>
+                        <button type="button"
+                          x-on:click="addCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'))"
+                          class="w-full mt-1 py-1.5 text-[11px] font-bold rounded-lg border-2 border-dashed text-slate-500 hover:text-slate-800 hover:bg-white/60 transition"
+                          style="border-color: #e8e4dd">
+                          + Add custom comment
+                        </button>
                       </div>
                     </div>
 

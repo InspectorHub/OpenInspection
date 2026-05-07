@@ -2,6 +2,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
 import { marketplaceTemplates, tenantMarketplaceImports, marketplaceLibraries, tenantLibraryImports } from '../lib/db/schema/marketplace';
 import { templates } from '../lib/db/schema';
+import { Errors } from '../lib/errors';
+import { TemplateService } from './template.service';
 
 export class MarketplaceService {
   private db: ReturnType<typeof drizzle<any>>;
@@ -67,6 +69,21 @@ export class MarketplaceService {
     if (existing) {
       // Already imported — return existing local id (template or first comment)
       return existing.localTemplateId;
+    }
+
+    // Spec 5B P3 — gate marketplace imports on v2 schema validation. The
+    // marketplace can technically host any JSON; without this check, a v1
+    // (legacy `type: 'rating'`) template would leak into a tenant and break
+    // the editor. validateSchema throws Errors.BadRequest with a Zod-style
+    // message on failure.
+    try {
+      const tplSvc = new TemplateService(this.rawDb);
+      tplSvc.validateSchema(mkt.schema as string | Record<string, unknown>);
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Template schema invalid')) {
+        throw Errors.BadRequest('Invalid template schema (must be v2): ' + err.message);
+      }
+      throw err;
     }
 
     const newTemplateId = crypto.randomUUID();

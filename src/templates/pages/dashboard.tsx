@@ -110,6 +110,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
                                         <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
                                         <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
+                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
+                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
+                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
+                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
+                                        </div>
                                     </a>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
@@ -141,6 +147,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
                                         <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
                                         <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
+                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
+                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
+                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
+                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
+                                        </div>
                                     </a>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
@@ -195,6 +207,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
                                         <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
                                         <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
+                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
+                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
+                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
+                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
+                                        </div>
                                     </a>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
@@ -226,6 +244,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
                                         <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
                                         <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
+                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
+                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
+                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
+                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
+                                        </div>
                                     </a>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
@@ -262,6 +286,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
                                         <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
                                         <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
+                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
+                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
+                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
+                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
+                                        </div>
                                     </a>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
@@ -293,6 +323,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
                                         <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
                                         <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
+                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
+                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
+                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
+                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
+                                        </div>
                                     </a>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>

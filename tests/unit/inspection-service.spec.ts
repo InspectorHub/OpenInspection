@@ -77,6 +77,67 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
         expect(buckets.needsAttention[0].id).toBe('insp-attention-1');
     });
 
+    it('Spec 5B P2B — getDefectStatsBatch counts canned + custom defects per inspection', async () => {
+        // Template snapshot with 3 canned defects (1 default-included, 2 default-off).
+        const snap = {
+            schemaVersion: 2,
+            sections: [{
+                id: 's', title: 'S', items: [{
+                    id: 'item-roof', label: 'Roof', type: 'rich',
+                    ratingOptions: ['Inspected'],
+                    tabs: {
+                        information: [],
+                        limitations: [],
+                        defects: [
+                            { id: 'd_safety',   title: 'Cracking',     category: 'safety',         location: '', comment: 'c1', photos: [], default: true  },
+                            { id: 'd_recommend',title: 'Aging',        category: 'recommendation', location: '', comment: 'c2', photos: [], default: false },
+                            { id: 'd_maint',    title: 'Cleaning',     category: 'maintenance',    location: '', comment: 'c3', photos: [], default: false },
+                        ],
+                    },
+                }],
+            }],
+        };
+        const insId = 'insp-stats-1';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await testDb.insert(schema.inspections).values(makeInspection({
+            id: insId, date: todayStr(), status: 'in_progress',
+            templateSnapshot: snap as any,
+        }));
+        // Per-inspection state: turn ON d_recommend, leave d_safety default-on,
+        // leave d_maint OFF; add a custom safety defect that should also count.
+        await testDb.insert(schema.inspectionResults).values({
+            id:            'res-1',
+            inspectionId:  insId,
+            tenantId:      TENANT,
+            data:          {
+                'item-roof': {
+                    tabs: {
+                        defects: [
+                            { cannedId: 'd_recommend', included: true },
+                        ],
+                    },
+                    customComments: {
+                        defects: [
+                            { id: 'cu_x', title: 'Custom safety', comment: 'oops', included: true, category: 'safety' },
+                            { id: 'cu_y', title: 'Custom off',    comment: 'no',   included: false, category: 'maintenance' },
+                        ],
+                    },
+                },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
+            lastSyncedAt:  new Date(),
+        });
+
+        const map = await svc.getDefectStatsBatch(TENANT, [insId]);
+        const stats = map.get(insId);
+        expect(stats).toBeDefined();
+        // Expected: 1 canned safety (default-on) + 1 custom safety = 2 safety;
+        // 1 canned recommend (toggled on) = 1; 0 maintenance.
+        expect(stats!.safety).toBe(2);
+        expect(stats!.recommendation).toBe(1);
+        expect(stats!.maintenance).toBe(0);
+    });
+
     it('caps later at 50 and reports laterTotal', async () => {
         // 55 inspections 30 days out, status confirmed (not cancelled)
         const rows = Array.from({ length: 55 }, (_, i) =>

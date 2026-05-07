@@ -37,9 +37,11 @@ export class TemplateService {
 
     /**
      * Spec 5B — validate a template schema (v2). Throws AppError(BadRequest)
-     * with a Zod-flattened message on failure. Used by create/update.
+     * with a Zod-flattened message on failure. Used by create/update and by
+     * MarketplaceService.importTemplate (Spec 5B P3 — gate v1 templates from
+     * leaking into tenants via marketplace import).
      */
-    private validateSchema(schema: string | Record<string, unknown>): Record<string, unknown> {
+    validateSchema(schema: string | Record<string, unknown>): Record<string, unknown> {
         const parsed = typeof schema === 'string' ? (() => {
             try { return JSON.parse(schema) as unknown; }
             catch { throw Errors.BadRequest('Template schema is not valid JSON'); }

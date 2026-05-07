@@ -665,6 +665,78 @@ function inspectionEditor(inspectionId) {
       this.debounceSave();
     },
 
+    // Spec 5B P2B — AI rewrite of a canned comment row. Asks the inspector
+    // for a one-line instruction ("shorten", "add NW corner detail"…), POSTs
+    // /api/ai/comment/edit, and replaces the row's text with the rewritten
+    // version on success. Errors surface as toasts; the original text is
+    // preserved on any failure path.
+    async rewriteCannedComment(itemId, tabName, cannedId, ev) {
+      const item = this._findItemById(itemId);
+      if (!item) return;
+      const sectionTitle = (() => {
+        for (var s = 0; s < this.sections.length; s++) {
+          var items = this.sections[s].items || [];
+          for (var i = 0; i < items.length; i++) if (items[i].id === itemId) return this.sections[s].title || '';
+        }
+        return '';
+      })();
+
+      // Resolve the current comment text + tab-specific extras from merged view.
+      var entries = this.getTabEntries(itemId, tabName);
+      var entry = entries.find(function (e) { return e.cannedId === cannedId; });
+      if (!entry) return;
+      var originalComment = entry.effectiveComment || entry.comment || '';
+
+      var instruction = (window.prompt(
+        'Rewrite instruction\n\n(e.g. "shorten", "make professional", "add specific NW corner detail")',
+        ''
+      ) || '').trim();
+      if (!instruction) return;
+
+      var btn = ev?.currentTarget || ev?.target;
+      var origText = btn ? btn.textContent : null;
+      if (btn) { btn.textContent = '...'; btn.disabled = true; }
+      var toast = function (m, err) { if (typeof showToast === 'function') showToast(m, err); };
+
+      try {
+        var body = {
+          itemLabel:       item.label,
+          sectionTitle:    sectionTitle,
+          tab:             tabName,
+          originalComment: originalComment,
+          instruction:     instruction,
+        };
+        if (tabName === 'defects') {
+          if (entry.category) body.category = entry.category;
+          if (entry.location) body.location = entry.location;
+        }
+        var res = await authFetch('/api/ai/comment/edit', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+        var json = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          var msg = (json && json.error && json.error.message) || ('AI rewrite failed (' + res.status + ').');
+          toast(msg, true);
+          return;
+        }
+        var rewritten = json && json.data && json.data.rewritten;
+        if (!rewritten) {
+          toast('AI returned no text. Try again.', true);
+          return;
+        }
+        // Ensure included so the textarea is visible, then commit text.
+        this._upsertStateEntry(itemId, tabName, cannedId, { included: true, comment: rewritten });
+        this.debounceSave();
+      } catch (e) {
+        console.error('[AI] rewriteCannedComment error', e);
+        toast('AI rewrite network error.', true);
+      } finally {
+        if (btn && origText !== null) { btn.textContent = origText; btn.disabled = false; }
+      }
+    },
+
     setDefectLocation(itemId, cannedId, location) {
       this._upsertStateEntry(itemId, 'defects', cannedId, { location: location });
       this.debounceSave();
@@ -691,6 +763,89 @@ function inspectionEditor(inspectionId) {
       var item = this._findItemById(itemId);
       if (!item || !item.tabs) return 0;
       return (item.tabs[tabName] || []).length;
+    },
+
+    // Spec 5B P2B — Custom comments (per-inspection, NOT in template).
+    // Stored under results[itemId].customComments[tab] as an array of
+    // { id, title, comment, included, ... } objects. Defects also carry
+    // category + location. The id is generated client-side and prefixed
+    // with 'cu_' so we can distinguish them from template canned IDs.
+    _ensureCustomState(itemId) {
+      this._ensureItemState(itemId);
+      var st = this.results[itemId];
+      if (!st.customComments) st.customComments = { information: [], limitations: [], defects: [] };
+      var c = st.customComments;
+      if (!Array.isArray(c.information)) c.information = [];
+      if (!Array.isArray(c.limitations)) c.limitations = [];
+      if (!Array.isArray(c.defects))     c.defects     = [];
+      return st;
+    },
+
+    getCustomEntries(itemId, tabName) {
+      var st = this._ensureCustomState(itemId);
+      return (st.customComments[tabName] || []).slice();
+    },
+
+    addCustomComment(itemId, tabName) {
+      var st = this._ensureCustomState(itemId);
+      var arr = st.customComments[tabName];
+      var newId = 'cu_' + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2));
+      var entry = { id: newId, title: '', comment: '', included: true };
+      if (tabName === 'defects') {
+        entry.category = 'maintenance';
+        entry.location = '';
+        entry.photos = [];
+      }
+      arr.push(entry);
+      this.debounceSave();
+    },
+
+    removeCustomComment(itemId, tabName, customId) {
+      var st = this._ensureCustomState(itemId);
+      st.customComments[tabName] = (st.customComments[tabName] || []).filter(function (e) { return e.id !== customId; });
+      this.debounceSave();
+    },
+
+    _patchCustom(itemId, tabName, customId, patch) {
+      var st = this._ensureCustomState(itemId);
+      var arr = st.customComments[tabName] || [];
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].id === customId) { Object.assign(arr[i], patch); break; }
+      }
+      this.debounceSave();
+    },
+
+    setCustomCommentTitle(itemId, tabName, customId, value) {
+      this._patchCustom(itemId, tabName, customId, { title: value });
+    },
+
+    setCustomCommentText(itemId, tabName, customId, value) {
+      this._patchCustom(itemId, tabName, customId, { comment: value });
+    },
+
+    setCustomCommentCategory(itemId, customId, value) {
+      this._patchCustom(itemId, 'defects', customId, { category: value });
+    },
+
+    setCustomCommentLocation(itemId, customId, value) {
+      this._patchCustom(itemId, 'defects', customId, { location: value });
+    },
+
+    // Counter helpers used by the tab badges — count canned-included +
+    // any custom row marked `included: true`.
+    tabCustomIncludedCount(itemId, tabName) {
+      var entries = this.getCustomEntries(itemId, tabName);
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) if (entries[i].included !== false) n++;
+      return n;
+    },
+
+    tabBadgeCount(itemId, tabName) {
+      return this.tabIncludedCount(itemId, tabName) + this.tabCustomIncludedCount(itemId, tabName);
+    },
+
+    tabBadgeTotal(itemId, tabName) {
+      return this.tabTotalCount(itemId, tabName) + this.getCustomEntries(itemId, tabName).length;
     },
 
     toggleExpand(itemId) {

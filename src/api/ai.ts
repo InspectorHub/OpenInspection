@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { HonoConfig } from '../types/hono';
 import { requireRole } from '../lib/middleware/rbac';
+import { checkRateLimit } from '../lib/rate-limit';
 import {
     CommentAssistSchema,
     AutoSummarySchema,
@@ -8,6 +9,8 @@ import {
     AutoSummaryResponseSchema,
     SuggestCommentSchema,
     SuggestCommentResponseSchema,
+    CommentEditSchema,
+    CommentEditResponseSchema,
 } from '../lib/validations/ai.schema';
 
 const aiRoutes = new OpenAPIHono<HonoConfig>();
@@ -95,6 +98,44 @@ aiRoutes.openapi(autoSummaryRoute, async (c) => {
  * POST /api/ai/suggest-comment
  * Returns 3 AI-generated professional comments for a specific inspection item.
  */
+/**
+ * POST /api/ai/comment/edit  (Spec 5B P2B)
+ * Rewrites a single canned/custom inspection comment based on a free-form
+ * inspector instruction (e.g. "shorten", "add NW corner detail"). Rate-limited
+ * the same way as login + booking endpoints.
+ */
+aiRoutes.openapi(createRoute({
+    method: 'post',
+    path: '/comment/edit',
+    tags: ['AI'],
+    summary: 'Rewrite a canned comment with AI assistance',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        body: { content: { 'application/json': { schema: CommentEditSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: CommentEditResponseSchema } },
+            description: 'Rewritten comment',
+        },
+    },
+}), async (c) => {
+    await checkRateLimit(c, 'ai-comment-edit');
+    const input = c.req.valid('json');
+    // Strip undefined optional fields so service stays exactOptionalPropertyTypes-clean.
+    const payload = {
+        itemLabel:       input.itemLabel,
+        sectionTitle:    input.sectionTitle,
+        tab:             input.tab,
+        originalComment: input.originalComment,
+        instruction:     input.instruction,
+        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(input.location !== undefined ? { location: input.location } : {}),
+    };
+    const rewritten = await c.var.services.ai.rewriteComment(payload);
+    return c.json({ success: true, data: { rewritten } }, 200);
+});
+
 aiRoutes.openapi(createRoute({
     method: 'post',
     path: '/suggest-comment',

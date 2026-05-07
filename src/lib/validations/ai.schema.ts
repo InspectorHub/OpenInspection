@@ -48,3 +48,25 @@ export const SuggestCommentSchema = z.object({
 export const SuggestCommentResponseSchema = createApiResponseSchema(
     z.array(z.string()).openapi({ example: ['Comment 1.', 'Comment 2.', 'Comment 3.'] })
 ).openapi('SuggestCommentResponse');
+
+/**
+ * Spec 5B P2B — Input for the AI comment-rewrite request.
+ *
+ * Used by the inspection editor's per-canned-comment "Rewrite" button. The
+ * inspector picks a row, supplies an instruction (e.g. "make it more
+ * specific to NW corner damage"), and the server asks Gemini to revise the
+ * comment in-place.
+ */
+export const CommentEditSchema = z.object({
+    itemLabel:       z.string().min(1).max(200).openapi({ example: 'Roof Covering' }),
+    sectionTitle:    z.string().min(1).max(200).openapi({ example: 'Roof' }),
+    tab:             z.enum(['information', 'limitations', 'defects']).openapi({ example: 'defects' }),
+    originalComment: z.string().min(1).max(4000).openapi({ example: 'Cracking observed across the field of the roof.' }),
+    instruction:     z.string().min(1).max(500).openapi({ example: 'Make it more specific to the NW corner damage.' }),
+    category:        z.enum(['safety', 'recommendation', 'maintenance']).optional().openapi({ example: 'safety' }),
+    location:        z.string().max(200).optional().openapi({ example: 'Northwest corner' }),
+}).openapi('CommentEditRequest');
+
+export const CommentEditResponseSchema = createApiResponseSchema(z.object({
+    rewritten: z.string().openapi({ example: 'Major cracking observed at the NW corner of the roof field; recommend evaluation by a licensed roofer.' }),
+})).openapi('CommentEditResponse');

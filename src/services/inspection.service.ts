@@ -694,6 +694,128 @@ export class InspectionService {
     }
 
     /**
+     * Spec 5B P2B — Compute defect category counts for a single inspection.
+     *
+     * Walks the resolved v2 tabs (template canned defects + per-inspection
+     * custom defects) and returns counts of `included` defects bucketed by
+     * category. Used by the inspection list / dashboard cards. Returns
+     * zeros when the inspection has no template / no results.
+     */
+    async getDefectStats(inspectionId: string, tenantId: string): Promise<{ safety: number; recommendation: number; maintenance: number }> {
+        const stats = { safety: 0, recommendation: 0, maintenance: 0 };
+        try {
+            const report = await this.getReportData(inspectionId, tenantId);
+            for (const sec of report.sections) {
+                for (const item of sec.items) {
+                    const tab = item.resolvedTabs?.defects ?? [];
+                    for (const d of tab) {
+                        if (!d.included) continue;
+                        const cat = (d.effectiveCategory ?? 'maintenance') as keyof typeof stats;
+                        if (cat in stats) stats[cat]++;
+                    }
+                }
+            }
+            // Custom defects live on results[itemId].customComments.defects
+            // — getReportData doesn't surface them, so pull them straight
+            // from inspection_results.
+            const resultsRow = await this.getDrizzle().select().from(inspectionResults)
+                .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+                .get();
+            if (resultsRow?.data) {
+                interface CustomDefect { included?: boolean; category?: 'safety' | 'recommendation' | 'maintenance' }
+                const data: Record<string, { customComments?: { defects?: CustomDefect[] } }> = typeof resultsRow.data === 'string'
+                    ? JSON.parse(resultsRow.data)
+                    : resultsRow.data as Record<string, { customComments?: { defects?: CustomDefect[] } }>;
+                for (const itemId of Object.keys(data)) {
+                    const customDefects = data[itemId]?.customComments?.defects ?? [];
+                    for (const d of customDefects) {
+                        if (d.included === false) continue;
+                        const cat = (d.category ?? 'maintenance');
+                        if (cat in stats) stats[cat as keyof typeof stats]++;
+                    }
+                }
+            }
+        } catch {
+            // Inspection lookup may fail (deleted between bucket load + stats
+            // call) — return zero counts rather than crashing the dashboard.
+        }
+        return stats;
+    }
+
+    /**
+     * Spec 5B P2B — Batch defect stats for many inspections at once.
+     *
+     * Single SQL fetch of all inspection_results rows for the given IDs,
+     * then in-memory aggregation. Avoids N+1 round trips when the
+     * dashboard renders 50+ cards. Returns a Map keyed by inspection id.
+     */
+    async getDefectStatsBatch(tenantId: string, inspectionIds: string[]): Promise<Map<string, { safety: number; recommendation: number; maintenance: number }>> {
+        const out = new Map<string, { safety: number; recommendation: number; maintenance: number }>();
+        if (inspectionIds.length === 0) return out;
+
+        const db = this.getDrizzle();
+        // Pull both result rows and template snapshots in parallel.
+        const insRows = await db.select({
+            id:               inspections.id,
+            templateSnapshot: inspections.templateSnapshot,
+        }).from(inspections)
+          .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, inspectionIds)));
+        const resultRows = await db.select({
+            inspectionId: inspectionResults.inspectionId,
+            data:         inspectionResults.data,
+        }).from(inspectionResults)
+          .where(and(eq(inspectionResults.tenantId, tenantId), inArray(inspectionResults.inspectionId, inspectionIds)));
+
+        const tplById   = new Map<string, unknown>();
+        for (const r of insRows) tplById.set(r.id as string, r.templateSnapshot);
+        const dataById  = new Map<string, unknown>();
+        for (const r of resultRows) dataById.set(r.inspectionId as string, r.data);
+
+        interface CannedDefect { id: string; category: 'safety' | 'recommendation' | 'maintenance'; default: boolean }
+        interface DefectState  { cannedId: string; included?: boolean; category?: 'safety' | 'recommendation' | 'maintenance' }
+        interface CustomDefect { included?: boolean; category?: 'safety' | 'recommendation' | 'maintenance' }
+
+        for (const id of inspectionIds) {
+            const stats = { safety: 0, recommendation: 0, maintenance: 0 };
+            const rawTpl = tplById.get(id);
+            const tpl = rawTpl ? (typeof rawTpl === 'string' ? JSON.parse(rawTpl) : rawTpl) : null;
+            const rawData = dataById.get(id);
+            const data: Record<string, { tabs?: { defects?: DefectState[] }; customComments?: { defects?: CustomDefect[] } }> =
+                rawData ? (typeof rawData === 'string' ? JSON.parse(rawData) : rawData) : {};
+
+            // Walk template canned defects, applying state overrides.
+            if (tpl && Array.isArray((tpl as { sections?: unknown }).sections)) {
+                const sections = (tpl as { sections: Array<{ items?: Array<{ id: string; tabs?: { defects?: CannedDefect[] } }> }> }).sections;
+                for (const sec of sections) {
+                    for (const item of (sec.items ?? [])) {
+                        const canned = item.tabs?.defects ?? [];
+                        const stateMap = new Map<string, DefectState>();
+                        for (const s of (data[item.id]?.tabs?.defects ?? [])) stateMap.set(s.cannedId, s);
+                        for (const c of canned) {
+                            const st = stateMap.get(c.id);
+                            const included = st ? !!st.included : !!c.default;
+                            if (!included) continue;
+                            const cat = (st?.category ?? c.category ?? 'maintenance') as keyof typeof stats;
+                            if (cat in stats) stats[cat]++;
+                        }
+                    }
+                }
+            }
+            // Custom defects (per-inspection additions).
+            for (const itemId of Object.keys(data)) {
+                const customDefects = data[itemId]?.customComments?.defects ?? [];
+                for (const d of customDefects) {
+                    if (d.included === false) continue;
+                    const cat = (d.category ?? 'maintenance') as keyof typeof stats;
+                    if (cat in stats) stats[cat]++;
+                }
+            }
+            out.set(id, stats);
+        }
+        return out;
+    }
+
+    /**
      * Returns bucketed inspection lists for the dashboard view.
      * All filtering is done in-process from a single tenant query.
      * Note: uses the `date` column (TEXT "YYYY-MM-DD") for scheduling logic.
@@ -750,7 +872,27 @@ export class InspectionService {
             i.status === 'cancelled' && new Date(i.createdAt) >= minus30days
         ).slice(0, 20);
 
-        return { needsAttention, today, thisWeek, later, laterTotal, recentReports, cancelled };
+        // Spec 5B P2B — annotate every surfaced inspection with defect counts
+        // so the dashboard cards can render colored chips. Only fetch stats
+        // for the IDs that actually appear in the rendered buckets to keep
+        // the query small.
+        const allBucketIds = [
+            ...needsAttention, ...today, ...thisWeek, ...later, ...recentReports, ...cancelled,
+        ].map(i => i.id as string);
+        const uniqueIds = Array.from(new Set(allBucketIds));
+        const statsMap = await this.getDefectStatsBatch(tenantId, uniqueIds);
+        const decorate = <T extends { id: unknown }>(rows: T[]): Array<T & { defectStats: { safety: number; recommendation: number; maintenance: number } }> =>
+            rows.map(r => ({ ...r, defectStats: statsMap.get(r.id as string) ?? { safety: 0, recommendation: 0, maintenance: 0 } }));
+
+        return {
+            needsAttention: decorate(needsAttention),
+            today:          decorate(today),
+            thisWeek:       decorate(thisWeek),
+            later:          decorate(later),
+            laterTotal,
+            recentReports:  decorate(recentReports),
+            cancelled:      decorate(cancelled),
+        };
     }
 
     /**

@@ -157,21 +157,31 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                             <button x-on:click="previewOpen = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
                         </header>
                         <div class="flex-1 overflow-y-auto p-6 space-y-3">
+                            {/* Spec 5B P3 — totals row: items, canned comments, defects */}
                             <p class="text-xs font-bold uppercase tracking-widest text-slate-400">
                                 <span x-text="previewSchema?.sections?.length || 0"></span> sections ·
-                                <span x-text="previewItemCount"></span> items total
+                                <span x-text="previewItemCount"></span> items ·
+                                <span x-text="previewCannedTotal"></span> canned comments ·
+                                <span class="text-rose-500" x-text="previewDefectTotal + ' defects'"></span>
                             </p>
                             <template x-for="sec in (previewSchema?.sections || [])" {...{ 'x-bind:key': 'sec.id' }}>
-                                <details class="bg-slate-50 rounded-xl p-3">
+                                <details class="bg-slate-50 rounded-xl p-3" open>
                                     <summary class="cursor-pointer font-bold text-sm text-slate-800 flex items-center justify-between">
                                         <span x-text="sec.title || sec.name || sec.id"></span>
                                         <span class="text-xs text-slate-400" x-text="(sec.items?.length || 0) + ' items'"></span>
                                     </summary>
-                                    <ul class="mt-2 space-y-0.5 text-xs text-slate-600 pl-3">
+                                    <ul class="mt-2 space-y-1 text-xs text-slate-600 pl-3">
                                         <template x-for="it in (sec.items || [])" {...{ 'x-bind:key': 'it.id' }}>
-                                            <li class="flex items-center gap-2">
+                                            <li class="flex items-center gap-2 flex-wrap py-1">
                                                 <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span x-text="it.label || it.name || it.id"></span>
+                                                <span class="font-semibold text-slate-700" x-text="it.label || it.name || it.id"></span>
+                                                {/* Spec 5B P3 — rating type pill */}
+                                                <span class="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600" x-text="it.type || 'rich'"></span>
+                                                {/* Tab counts (info / lim / def). Only render
+                                                    when the template ships any canned content. */}
+                                                <span x-show="it._info > 0" class="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded" x-text="'info: ' + it._info"></span>
+                                                <span x-show="it._lim > 0" class="text-[10px] font-mono text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded" x-text="'lim: ' + it._lim"></span>
+                                                <span x-show="it._def > 0" class="text-[10px] font-mono text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded" x-text="'def: ' + it._def"></span>
                                             </li>
                                         </template>
                                     </ul>

@@ -96,6 +96,57 @@ Summary:`;
     }
 
     /**
+     * Spec 5B P2B — rewrites a single canned/custom comment based on
+     * inspector instructions, given the surrounding inspection context.
+     *
+     * Behavior mirrors `suggestComment`:
+     *  - Throws 503 ServiceUnavailable when GEMINI_API_KEY is not configured.
+     *  - Returns the rewritten string verbatim (trimmed). On Gemini parse
+     *    failure, throws so the UI can show an error toast (no silent
+     *    overwrite of the inspector's existing text).
+     */
+    async rewriteComment(input: {
+        itemLabel:       string;
+        sectionTitle:    string;
+        tab:             'information' | 'limitations' | 'defects';
+        originalComment: string;
+        instruction:     string;
+        category?:       'safety' | 'recommendation' | 'maintenance';
+        location?:       string;
+    }): Promise<string> {
+        if (!this.apiKey || this.apiKey.includes('your_api_key')) {
+            throw Errors.ServiceUnavailable(
+                'AI Rewrite is not available: GEMINI_API_KEY is not configured. Add the key in Settings → API Keys.'
+            );
+        }
+
+        const ctxLines = [
+            `Item: "${input.itemLabel}"`,
+            `Section: "${input.sectionTitle}"`,
+            `Tab: ${input.tab}`,
+            input.tab === 'defects' && input.category ? `Defect category: ${input.category}` : null,
+            input.tab === 'defects' && input.location ? `Location: ${input.location}` : null,
+        ].filter(Boolean).join('\n');
+
+        const prompt = `You are a certified home inspector revising a single inspection report comment.
+Context:
+${ctxLines}
+
+Original comment:
+"""${input.originalComment}"""
+
+Instruction from the inspector:
+"""${input.instruction}"""
+
+Rewrite the comment to satisfy the instruction while keeping a professional, concise inspection-report tone.
+Return only the rewritten comment text — no preamble, no quotes, no markdown.`;
+
+        const text = await this.callGemini(prompt);
+        // Strip wrapping quotes / markdown the model sometimes adds.
+        return text.replace(/^["'`]+|["'`]+$/g, '').trim();
+    }
+
+    /**
      * Suggests 3 professional inspection comments for a specific form item.
      * Throws 503 ServiceUnavailable when GEMINI_API_KEY is not configured so the
      * UI can surface a clear "set up your API key" message instead of a silent

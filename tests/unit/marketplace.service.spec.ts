@@ -28,6 +28,33 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
         svc = new MarketplaceService({} as any, TENANT);
     });
 
+    it('Spec 5B P3 — rejects v1 marketplace templates with a clear error', async () => {
+        // v1 shape: no schemaVersion, items use type:"rating" — must fail validation.
+        const v1Schema = JSON.stringify({
+            sections: [{ id: 's', title: 'S', items: [{ id: 'i', label: 'I', type: 'rating' }] }],
+        });
+        const marketplaceId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await testDb.insert(marketplaceTemplates).values({
+            id:            marketplaceId,
+            name:          'Legacy v1 Template',
+            category:      'residential',
+            semver:        '0.9.0',
+            schema:        v1Schema,
+            authorId:      'system',
+            changelog:     'legacy',
+            downloadCount: 0,
+            createdAt:     now,
+            updatedAt:     now,
+        });
+
+        await expect(svc.importTemplate(marketplaceId)).rejects.toThrow(/v2/i);
+
+        // Confirm no row leaked into the tenant's templates table.
+        const rows = await testDb.select().from(schema.templates).all();
+        expect(rows.length).toBe(0);
+    });
+
     it('imports a marketplace template with its sections intact (post-Spec1 fix)', async () => {
         // Seed marketplace_templates with the CORRECT shape that seed-marketplace.js now produces:
         // {sections: [...]} at the top level (not nested under a second .schema key).
