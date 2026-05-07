@@ -108,9 +108,11 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           <div class="px-4 py-4 space-y-3 pb-24">
             <template x-for="item in currentSectionItems" x-bind:key="item.id">
               <div
-                class="rounded-2xl p-4 transition-all"
+                class="rounded-2xl p-4 transition-all cursor-pointer"
                 style="background: rgba(255,253,250,0.82); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); border-left: 3px solid transparent;"
                 x-bind:style="'border-left-color:' + getRatingColor(getItemRating(item.id))"
+                x-bind:class="activeItemId === item.id ? 'ring-2 ring-blue-500/40 ring-offset-1' : ''"
+                x-on:click="setActiveItem(item.id)"
               >
                 <div class="flex items-start justify-between mb-3">
                   <div>

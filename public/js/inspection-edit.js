@@ -51,6 +51,7 @@ function inspectionEditor(inspectionId) {
     ratingLevels: [],
     results: {},
     expanded: {},
+    activeItemId: null,
     currentSectionIdx: 0,
     batchMode: false,
     batchSelected: {},
@@ -77,6 +78,56 @@ function inspectionEditor(inspectionId) {
     async init() {
       window.addEventListener('resize', () => {
         this.isDesktop = window.innerWidth >= 1024;
+      });
+      // Spec 5G M1.1 — Rating hotkeys (1=Sat, 2=Mon, 3=Defect, 0=Clear, N=N/A)
+      // Skip when typing in form fields. Operates on the active (last
+      // interacted) item, falling back to the first item in current section.
+      window.addEventListener('keydown', (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        var tag = (document.activeElement && document.activeElement.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (document.activeElement && document.activeElement.isContentEditable) return;
+        var key = e.key.toLowerCase();
+        var idx = -1;
+        if (key === '1') idx = 0;
+        else if (key === '2') idx = 1;
+        else if (key === '3') idx = 2;
+        else if (key === '0') idx = -2; // clear
+        else if (key === 'n') idx = -3; // N/A — rating with abbreviation 'NA' or 'N/A'
+        else return;
+        var item = this.activeItem;
+        if (!item) {
+          if (typeof showToast === 'function') showToast('Expand an item first to use rating shortcuts');
+          return;
+        }
+        var levelId = null;
+        if (idx >= 0) {
+          if (!this.ratingLevels[idx]) return;
+          levelId = this.ratingLevels[idx].id;
+        } else if (idx === -2) {
+          levelId = null;
+        } else if (idx === -3) {
+          for (var i = 0; i < this.ratingLevels.length; i++) {
+            var ab = (this.ratingLevels[i].abbreviation || '').toUpperCase();
+            var nm = (this.ratingLevels[i].name || '').toLowerCase();
+            if (ab === 'NA' || ab === 'N/A' || nm.indexOf('not applicable') >= 0) {
+              levelId = this.ratingLevels[i].id;
+              break;
+            }
+          }
+          if (!levelId) return;
+        }
+        e.preventDefault();
+        this.setRating(item.id, levelId);
+        if (typeof showToast === 'function' && levelId) {
+          var lvl = null;
+          for (var j = 0; j < this.ratingLevels.length; j++) {
+            if (this.ratingLevels[j].id === levelId) { lvl = this.ratingLevels[j]; break; }
+          }
+          showToast((lvl ? lvl.name : 'Rated') + ' → ' + (item.label || item.name));
+        } else if (typeof showToast === 'function') {
+          showToast('Cleared rating → ' + (item.label || item.name));
+        }
       });
       // Phase T (T15): when annotator finishes saving, patch the local photo entry
       // so the thumbnail switches to the annotated key without a page reload.
@@ -302,6 +353,26 @@ function inspectionEditor(inspectionId) {
 
     toggleExpand(itemId) {
       this.expanded[itemId] = !this.expanded[itemId];
+      if (this.expanded[itemId]) this.activeItemId = itemId;
+      else if (this.activeItemId === itemId) this.activeItemId = null;
+    },
+
+    setActiveItem(itemId) {
+      this.activeItemId = itemId;
+    },
+
+    get activeItem() {
+      var items = this.currentSectionItems || [];
+      if (this.activeItemId) {
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].id === this.activeItemId) return items[i];
+        }
+      }
+      // Fall back to last expanded item in current section
+      for (var k = 0; k < items.length; k++) {
+        if (this.expanded[items[k].id]) return items[k];
+      }
+      return null;
     },
 
     toggleBatchSelect(itemId) {
