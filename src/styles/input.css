@@ -1,13 +1,48 @@
+/* Spec 5F.1 — design system v3 tokens. Inlined here (rather than
+   @import'd from colors_and_type.css) because Tailwind 3 CLI does
+   not run postcss-import — @import statements would be passed
+   through to the browser as-is, which on a Worker static asset
+   path returns 500. The standalone file is kept for reference. */
+:root {
+    /* Brand */
+    --ih-primary:           #6366f1;
+    --ih-primary-600:       #4f46e5;
+    --ih-primary-700:       #4338ca;
+    --ih-primary-glow:      #6366f140;
+    --ih-primary-tint:      #6366f11a;
+    /* Slate */
+    --ih-slate-50:#f8fafc; --ih-slate-100:#f1f5f9; --ih-slate-200:#e2e8f0;
+    --ih-slate-300:#cbd5e1; --ih-slate-400:#94a3b8; --ih-slate-500:#64748b;
+    --ih-slate-600:#475569; --ih-slate-700:#334155; --ih-slate-800:#1e293b;
+    --ih-slate-900:#0f172a; --ih-slate-950:#020617;
+    --ih-fg-1: var(--ih-slate-900); --ih-fg-2: var(--ih-slate-600);
+    --ih-fg-3: var(--ih-slate-500); --ih-fg-4: var(--ih-slate-400);
+    --ih-fg-5: var(--ih-slate-300); --ih-fg-inverse: #fff;
+    --ih-bg-app:#f8fafc; --ih-bg-page:#fdfdfd; --ih-bg-card:#fff;
+    --ih-bg-muted:#f1f5f9; --ih-bg-inverse:#0f172a;
+    /* Status / rating */
+    --ih-status-ok:#10b981; --ih-status-ok-bg:#ecfdf5; --ih-status-ok-fg:#047857;
+    --ih-status-watch:#f59e0b; --ih-status-watch-bg:#fffbeb; --ih-status-watch-fg:#b45309;
+    --ih-status-bad:#ef4444; --ih-status-bad-bg:#fef2f2; --ih-status-bad-fg:#be123c;
+    /* v3 spacing (compact) */
+    --ih-space-card:12px; --ih-space-section:40px; --ih-space-page:24px;
+    --ih-pad-button-x:16px; --ih-pad-button-y:8px;
+    --ih-pad-input-x:12px; --ih-pad-input-y:8px;
+    /* v3 radius (compact) */
+    --ih-radius-card:8px; --ih-radius-modal:12px; --ih-radius-photo:6px;
+    --ih-radius-pill:4px; --ih-radius-button:6px;
+    /* v3 type (compact) */
+    --ih-text-hero:40px; --ih-text-section:22px; --ih-text-item:15px; --ih-text-body:13px;
+    --ih-weight-body:400; --ih-weight-bold:700; --ih-letter-spacing:-0.015em;
+    /* v3 shadow (slate, no indigo tint) */
+    --ih-shadow-card: 0 1px 3px rgba(15,23,42,0.08);
+    --ih-shadow-modal: 0 8px 32px rgba(15,23,42,0.12);
+    --ih-shadow-cta:   0 0 16px rgba(99,102,241,0.30);
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* v3 design tokens — compact, Spectora-aligned. See README in
-   D:\Documents\Downloads\OpenInspection Design System.zip for full
-   roadmap. v3.1 adds the :root tokens; v3.2+ migrate templates
-   off oversized utilities (text-7xl / rounded-[3rem] / p-12 / etc)
-   to use these tokens. */
-@import './colors_and_type.css';
 
 /* ============================================================
    Base
