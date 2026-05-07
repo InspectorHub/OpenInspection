@@ -307,11 +307,47 @@ bookingsRoutes.openapi(signAgreementRoute, async (c) => {
     const { token } = c.req.valid('param');
     const { signatureBase64 } = c.req.valid('json');
     const svc = c.var.services.agreement;
+
+    // Spec 5H P0 — append audit BEFORE flipping DB status so chain integrity
+    // survives a partial failure (audit-before-mutation per spec §2.4).
+    // Look up the request to get tenantId + requestId for the chain.
+    const request = await svc.getRequestByToken(token);
+    if (request) {
+        try {
+            const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
+            const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
+            const country = c.req.header('cf-ipcountry') || null;
+            // Hash the signature image for cert reference (full image stored in DB)
+            const sigBytes = (() => {
+                try {
+                    const b64 = signatureBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+                    const bin = atob(b64);
+                    const out = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+                    return out;
+                } catch { return new Uint8Array(); }
+            })();
+            const sigHash = sigBytes.length > 0
+                ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', sigBytes)))
+                    .map((b) => b.toString(16).padStart(2, '0')).join('')
+                : null;
+            await c.var.services.auditLog.append(request.tenantId, request.id, 'agreement.signed', {
+                country,
+                envelopeId: request.id,
+                ip,
+                signatureImageHash: sigHash ? `sha256:${sigHash}` : null,
+                tsMs: Date.now(),
+                ua,
+            });
+        } catch (e) {
+            logger.warn('audit.append.signed.failed', { token: token.slice(0, 8), error: (e as Error).message });
+        }
+    }
+
     const signed = await svc.signRequest(token, signatureBase64);
 
-    // Spec 2A audit-trail (Round 14) — structured log for forensic
-    // reconstruction. Free first-pass before adding DB columns; CF
-    // logs aggregator can be queried by `event=agreement.signed.audit`.
+    // Round 14 free-tier structured log — kept alongside the persisted audit
+    // for redundancy in case D1 write fails after Workers commit.
     logger.info('agreement.signed.audit', {
         event: 'agreement.signed.audit',
         token: token.slice(0, 8) + '…',

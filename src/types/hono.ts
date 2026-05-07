@@ -10,6 +10,8 @@ export interface AppEnv {
     
     // Security & Auth
     JWT_SECRET: string;
+    /** Spec 5H — AES-GCM key for encrypting tenant Ed25519 private keys. Falls back to JWT_SECRET. */
+    KEY_ENCRYPTION_SECRET: string;
     TURNSTILE_SITE_KEY: string;
     TURNSTILE_SECRET_KEY: string;
     GOOGLE_CLIENT_ID: string;
@@ -81,6 +83,8 @@ import { EventService } from '../services/event.service';
 import { TotpService } from '../services/totp.service';
 import { TemplateSeedService } from '../services/template-seed.service';
 import { ReportPdfService } from '../services/report-pdf.service';
+import { SigningKeyService } from '../services/signing-key.service';
+import { AuditLogService } from '../services/audit-log.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -112,6 +116,8 @@ export interface AppServices {
     totp: TotpService;
     templateSeed: TemplateSeedService;
     reportPdf: ReportPdfService;
+    signingKey: SigningKeyService;
+    auditLog: AuditLogService;
 }
 
 /**

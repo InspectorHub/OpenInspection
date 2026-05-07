@@ -25,3 +25,5 @@ export { customerMessages } from './message';
 export type { MessageAttachment } from './message';
 export { reportPdfs } from './report-pdf';
 export type { ReportPdf, NewReportPdf } from './report-pdf';
+export { signingKeys, esignAuditLogs } from './esign';
+export type { SigningKey, NewSigningKey, EsignAuditLog, NewEsignAuditLog } from './esign';

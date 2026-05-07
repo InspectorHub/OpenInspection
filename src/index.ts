@@ -434,6 +434,19 @@ app.get('/agreements/sign/:token', async (c) => {
         const { request, agreement } = await svc.getAgreementByToken(token);
         await svc.markViewed(token);
 
+        // Spec 5H P0 — append request.viewed to the audit chain (best-effort).
+        try {
+            await c.var.services.auditLog.append(request.tenantId, request.id, 'request.viewed', {
+                country: c.req.header('cf-ipcountry') || null,
+                envelopeId: request.id,
+                ip: c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null,
+                tsMs: Date.now(),
+                ua: (c.req.header('user-agent') || '').slice(0, 200) || null,
+            });
+        } catch (e) {
+            logger.warn('audit.append.viewed.failed', { token: token.slice(0, 8), error: (e as Error).message });
+        }
+
         // Best-effort fetch of linked inspection + inspector for placeholder substitution.
         // Scoped to the request's tenantId — public token is the secret, but we still
         // refuse to leak data across tenants.
