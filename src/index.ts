@@ -437,7 +437,7 @@ app.get('/agreements/sign/:token', async (c) => {
         // Best-effort fetch of linked inspection + inspector for placeholder substitution.
         // Scoped to the request's tenantId — public token is the secret, but we still
         // refuse to leak data across tenants.
-        const vars: { client_name?: string; property_address?: string; inspection_date?: string; inspector_name?: string } = {
+        const vars: { client_name?: string; property_address?: string; inspection_date?: string; inspector_name?: string; inspector_license?: string } = {
             client_name: request.clientName ?? '',
         };
         if (request.inspectionId) {
@@ -454,7 +454,10 @@ app.get('/agreements/sign/:token', async (c) => {
                         const inspector = await db.select().from(schema.users)
                             .where(and(eq(schema.users.id, insp.inspectorId), eq(schema.users.tenantId, request.tenantId)))
                             .get();
-                        if (inspector) vars.inspector_name = inspector.name ?? inspector.email ?? '';
+                        if (inspector) {
+                            vars.inspector_name = inspector.name ?? inspector.email ?? '';
+                            vars.inspector_license = inspector.licenseNumber ?? '';
+                        }
                     }
                 }
             } catch (e) {

@@ -14,6 +14,7 @@ interface AgreementSignProps {
         property_address?: string;
         inspection_date?: string;
         inspector_name?: string;
+        inspector_license?: string;
     } | undefined;
 }
 
@@ -28,7 +29,7 @@ function escapeHtml(s: string): string {
 
 /** Replace {{var}} placeholders with the provided values; missing vars become empty strings. */
 function substituteVars(template: string, vars: Record<string, string | undefined>): string {
-    return template.replace(/\{\{(client_name|property_address|inspection_date|inspector_name)\}\}/g,
+    return template.replace(/\{\{(client_name|property_address|inspection_date|inspector_name|inspector_license)\}\}/g,
         (_m, key) => escapeHtml(vars[key] ?? ''));
 }
 
@@ -53,6 +54,7 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
         property_address: vars?.property_address ?? '',
         inspection_date: vars?.inspection_date ?? '',
         inspector_name: vars?.inspector_name ?? '',
+        inspector_license: vars?.inspector_license ?? '',
     });
 
     return (

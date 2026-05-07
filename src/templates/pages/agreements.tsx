@@ -76,7 +76,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                         <div id="agreementEditor" style="min-height: 280px; font-size: 15px;"></div>
                                     </div>
                                     <input type="hidden" id="agreementContent" />
-                                    <p class="text-[10px] text-slate-400 font-semibold ml-1 mt-1">Tip: variables like {'{{client_name}}'}, {'{{property_address}}'}, {'{{inspection_date}}'}, and {'{{inspector_name}}'} will be substituted on the sign page.</p>
+                                    <p class="text-[10px] text-slate-400 font-semibold ml-1 mt-1">Tip: variables like {'{{client_name}}'}, {'{{property_address}}'}, {'{{inspection_date}}'}, {'{{inspector_name}}'}, and {'{{inspector_license}}'} will be substituted on the sign page.</p>
                                 </div>
                                 <div class="pt-4 flex gap-6">
                                     <button type="button" onclick="closeModal()" class="flex-1 py-4.5 rounded-2xl font-black text-slate-400 hover:text-slate-900 transition-all uppercase text-[10px] tracking-widest">
