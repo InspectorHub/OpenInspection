@@ -831,7 +831,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
         <div x-cloak x-show="showCommentLibrary" class="fixed inset-0 z-[100]" {...{'x-transition.opacity': ''}}>
           <div class="absolute inset-0 bg-slate-900/40" x-on:click="showCommentLibrary = false"></div>
           <aside
-            class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col"
+            class="absolute right-0 top-0 bottom-0 w-full bg-white shadow-2xl flex flex-col"
+            style="max-width: 480px;"
             {...{
               'x-transition:enter': 'transition ease-out duration-200 transform',
               'x-transition:enter-start': 'translate-x-full',
@@ -841,50 +842,61 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               'x-transition:leave-end': 'translate-x-full',
             }}
           >
-            <header class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <header class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h2 class="text-base font-bold text-slate-900">Comment Library</h2>
-                <p class="text-xs text-slate-500 mt-0.5">
+                <h2 class="text-sm font-bold text-slate-900">Comment Library</h2>
+                <p class="text-[11px] text-slate-500 mt-0.5">
                   Inserting into <span class="font-semibold" x-text="activeItem?.label || activeItem?.name || ''"></span>
                 </p>
               </div>
-              <button x-on:click="showCommentLibrary = false" class="text-slate-400 hover:text-slate-700 text-2xl leading-none" aria-label="Close">&times;</button>
+              <button x-on:click="showCommentLibrary = false" class="text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Close">&times;</button>
             </header>
-            <div class="px-5 pt-3 flex gap-1 border-b border-slate-100">
-              <button x-on:click="commentLibraryTab = 'comments'"
-                x-bind:class="commentLibraryTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
-                class="px-3 py-2 text-xs font-semibold border-b-2 transition-colors">Comments</button>
-              <button x-on:click="commentLibraryTab = 'snippets'"
-                x-bind:class="commentLibraryTab === 'snippets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
-                class="px-3 py-2 text-xs font-semibold border-b-2 transition-colors">Snippets</button>
+            <div class="px-5 pt-3 pb-2">
+              <div class="relative">
+                <input
+                  id="comment-library-search"
+                  type="text"
+                  x-model="commentLibrarySearch"
+                  x-on:input="commentLibrarySelectedIdx = 0"
+                  placeholder="Search 248 comments…"
+                  class="w-full px-3 py-2 pr-20 text-xs rounded-md border border-slate-200 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                />
+                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400" x-text="commentLibraryCount"></span>
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1.5 italic">Use <kbd class="px-1 py-0.5 bg-slate-100 border rounded font-mono">↑↓</kbd> to navigate, <kbd class="px-1 py-0.5 bg-slate-100 border rounded font-mono">⏎</kbd> to insert</p>
             </div>
-            <div class="px-5 py-3 flex flex-wrap gap-1.5 border-b border-slate-100">
-              <template x-for="f in ['all','satisfactory','monitor','defect']" x-bind:key="f">
-                <button x-on:click="commentLibraryFilter = f"
+            <div class="px-5 pb-2 flex flex-wrap gap-1.5">
+              <template x-for="f in ['all','satisfactory','monitor','defect','my-snippets']" x-bind:key="f">
+                <button x-on:click="commentLibraryFilter = f; commentLibrarySelectedIdx = 0"
                   x-bind:class="commentLibraryFilter === f ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
                   class="px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide"
-                  x-text="f"></button>
+                  x-text="f === 'my-snippets' ? 'My snippets' : f"></button>
               </template>
             </div>
-            <div class="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+            <div class="flex-1 overflow-y-auto px-5 py-2 space-y-1.5 border-t border-slate-100">
               <template x-for="(c, i) in commentLibraryItems" x-bind:key="i">
                 <button
-                  x-on:click="insertComment(c.text)"
-                  class="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                  x-on:click="commentLibrarySelectedIdx = i; insertComment(c.text)"
+                  x-on:mouseenter="commentLibrarySelectedIdx = i"
+                  x-bind:class="commentLibrarySelectedIdx === i ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-100' : 'border-slate-200 hover:border-blue-300'"
+                  class="w-full text-left p-2.5 rounded-md border transition-all"
                 >
                   <div class="flex items-start gap-2">
                     <span class="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded text-white shrink-0"
                       x-bind:style="c.rating === 'satisfactory' ? 'background:#10b981' : (c.rating === 'monitor' ? 'background:#f59e0b' : (c.rating === 'defect' ? 'background:#ef4444' : 'background:#64748b'))"
-                      x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
-                    <span class="text-xs text-slate-700 leading-snug" x-text="c.text"></span>
+                      x-text="c.source === 'snippet' ? '★' : (c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3))"></span>
+                    <span class="text-xs text-slate-700 leading-snug flex-1" x-text="c.text"></span>
+                    <span x-show="commentLibrarySelectedIdx === i" class="text-blue-500 text-xs">⏎</span>
                   </div>
                 </button>
               </template>
               <p x-show="commentLibraryItems.length === 0" class="text-xs text-slate-400 text-center py-8 italic">No comments match this filter.</p>
             </div>
-            <footer class="px-5 py-3 border-t border-slate-100 text-[10px] text-slate-400 italic flex items-center justify-between">
-              <span>Press <kbd class="px-1.5 py-0.5 bg-slate-100 border rounded text-[10px]">Esc</kbd> to close</span>
-              <span>Auto-filtered by current rating</span>
+            <footer class="px-5 py-2.5 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between gap-2 flex-wrap">
+              <span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 bg-slate-100 border rounded font-mono">⏎</kbd> Insert</span>
+              <span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 bg-slate-100 border rounded font-mono">⌘⏎</kbd> Insert+newline</span>
+              <span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 bg-slate-100 border rounded font-mono">⌘D</kbd> Save snippet</span>
+              <span class="flex items-center gap-1"><kbd class="px-1.5 py-0.5 bg-slate-100 border rounded font-mono">Esc</kbd> Close</span>
             </footer>
           </aside>
         </div>

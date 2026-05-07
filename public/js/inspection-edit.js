@@ -57,8 +57,9 @@ function inspectionEditor(inspectionId) {
     viewMode: 'split',
     // Spec 5G M2 — Comment Library slide-out
     showCommentLibrary: false,
-    commentLibraryTab: 'comments', // 'comments' or 'snippets'
-    commentLibraryFilter: 'all',
+    commentLibraryFilter: 'all', // 'all' | 'satisfactory' | 'monitor' | 'defect' | 'my-snippets'
+    commentLibrarySearch: '',
+    commentLibrarySelectedIdx: 0,
     // GS prefix — set true after pressing G; next digit jumps to that section
     gPrefix: false,
     gPrefixTimer: null,
@@ -114,6 +115,20 @@ function inspectionEditor(inspectionId) {
             this.showPublishModal = true;
             return;
           }
+          // ⌘D = save current notes as snippet
+          if (e.key === 'd' || e.key === 'D') {
+            e.preventDefault();
+            this.saveCurrentAsSnippet();
+            return;
+          }
+          // ⌘⏎ inside Library = insert + extra newline
+          if (e.key === 'Enter' && this.showCommentLibrary) {
+            e.preventDefault();
+            var items = this.commentLibraryItems;
+            var sel = items[this.commentLibrarySelectedIdx];
+            if (sel) this.insertComment(sel.text, true);
+            return;
+          }
           // ⌘1 = split, ⌘2 = focus, ⌘3 = preview
           if (e.key === '1') { e.preventDefault(); this.setViewMode('split'); return; }
           if (e.key === '2') { e.preventDefault(); this.setViewMode('focus'); return; }
@@ -125,6 +140,33 @@ function inspectionEditor(inspectionId) {
             return;
           }
           return;
+        }
+        // When Comment Library drawer is open, intercept nav + insert keys
+        if (this.showCommentLibrary) {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            var dnItems = this.commentLibraryItems;
+            this.commentLibrarySelectedIdx = Math.min(this.commentLibrarySelectedIdx + 1, dnItems.length - 1);
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.commentLibrarySelectedIdx = Math.max(this.commentLibrarySelectedIdx - 1, 0);
+            return;
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            var enItems = this.commentLibraryItems;
+            var enSel = enItems[this.commentLibrarySelectedIdx];
+            if (enSel) this.insertComment(enSel.text, false);
+            return;
+          }
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            this.showCommentLibrary = false;
+            return;
+          }
+          // Allow typing in search input — fall through to inField guard
         }
         if (e.altKey) return;
         if (inField) {
@@ -156,16 +198,16 @@ function inspectionEditor(inspectionId) {
           this.gPrefixTimer = setTimeout(() => { this.gPrefix = false; }, 1500);
           return;
         }
-        // / = open Comment Library
+        // / = open Comment Library (auto-filter by item rating)
         if (e.key === '/') {
           e.preventDefault();
-          this.openCommentLibrary('comments');
+          this.openCommentLibrary();
           return;
         }
-        // ; = open Snippets tab
+        // ; = open Comment Library on My snippets filter
         if (e.key === ';') {
           e.preventDefault();
-          this.openCommentLibrary('snippets');
+          this.openCommentLibrary('my-snippets');
           return;
         }
         // T = tag (stub — no tag schema yet)
@@ -499,73 +541,147 @@ function inspectionEditor(inspectionId) {
       if (typeof showToast === 'function') showToast('Section: ' + (sec.title || sec.name || ('#' + idx)));
     },
 
-    openCommentLibrary(tab) {
+    openCommentLibrary(initialFilter) {
       if (!this.activeItem) {
         if (typeof showToast === 'function') showToast('Select an item first');
         return;
       }
-      this.commentLibraryTab = tab || 'comments';
-      // Auto-filter by current item rating if any
-      var r = this.results[this.activeItemId]?.rating;
-      if (r) {
-        for (var i = 0; i < this.ratingLevels.length; i++) {
-          if (this.ratingLevels[i].id === r) {
-            var name = (this.ratingLevels[i].name || '').toLowerCase();
-            if (name.indexOf('sat') >= 0) { this.commentLibraryFilter = 'satisfactory'; break; }
-            if (name.indexOf('mon') >= 0 || name.indexOf('marg') >= 0) { this.commentLibraryFilter = 'monitor'; break; }
-            if (name.indexOf('def') >= 0 || name.indexOf('rep') >= 0) { this.commentLibraryFilter = 'defect'; break; }
+      this.commentLibrarySearch = '';
+      this.commentLibrarySelectedIdx = 0;
+      if (initialFilter === 'my-snippets') {
+        this.commentLibraryFilter = 'my-snippets';
+      } else {
+        // Auto-filter by current item rating if any
+        var r = this.results[this.activeItemId]?.rating;
+        this.commentLibraryFilter = 'all';
+        if (r) {
+          for (var i = 0; i < this.ratingLevels.length; i++) {
+            if (this.ratingLevels[i].id === r) {
+              var name = (this.ratingLevels[i].name || '').toLowerCase();
+              if (name.indexOf('sat') >= 0) { this.commentLibraryFilter = 'satisfactory'; break; }
+              if (name.indexOf('mon') >= 0 || name.indexOf('marg') >= 0) { this.commentLibraryFilter = 'monitor'; break; }
+              if (name.indexOf('def') >= 0 || name.indexOf('rep') >= 0) { this.commentLibraryFilter = 'defect'; break; }
+            }
           }
         }
-      } else {
-        this.commentLibraryFilter = 'all';
       }
       this.showCommentLibrary = true;
+      // Focus search input after render
+      setTimeout(function () {
+        var s = document.getElementById('comment-library-search');
+        if (s) s.focus();
+      }, 50);
     },
 
-    insertComment(text) {
+    insertComment(text, withExtraNewline) {
       if (!this.activeItemId) return;
       if (!this.results[this.activeItemId]) {
         this.results[this.activeItemId] = { rating: null, notes: '', photos: [] };
       }
       var existing = this.results[this.activeItemId].notes || '';
+      var sep = withExtraNewline ? '\n\n' : '\n';
       this.results[this.activeItemId].notes = existing
-        ? (existing.trimEnd() + '\n' + text)
+        ? (existing.trimEnd() + sep + text)
         : text;
-      this.expanded[this.activeItemId] = true; // ensure notes textarea visible
+      this.expanded[this.activeItemId] = true;
       this.debounceSave();
       this.showCommentLibrary = false;
       if (typeof showToast === 'function') showToast('Comment inserted');
     },
 
-    get commentLibraryItems() {
+    saveCurrentAsSnippet() {
+      if (!this.activeItemId) {
+        if (typeof showToast === 'function') showToast('Select an item first');
+        return;
+      }
+      var notes = (this.results[this.activeItemId]?.notes || '').trim();
+      if (!notes) {
+        if (typeof showToast === 'function') showToast('No notes to save');
+        return;
+      }
+      // Determine rating bucket from current item
+      var r = this.results[this.activeItemId]?.rating;
+      var bucket = 'all';
+      if (r) {
+        for (var i = 0; i < this.ratingLevels.length; i++) {
+          if (this.ratingLevels[i].id === r) {
+            var nm = (this.ratingLevels[i].name || '').toLowerCase();
+            if (nm.indexOf('sat') >= 0) { bucket = 'satisfactory'; break; }
+            if (nm.indexOf('mon') >= 0 || nm.indexOf('marg') >= 0) { bucket = 'monitor'; break; }
+            if (nm.indexOf('def') >= 0 || nm.indexOf('rep') >= 0) { bucket = 'defect'; break; }
+          }
+        }
+      }
+      var existing = [];
+      try {
+        var raw = localStorage.getItem('oi:snippets');
+        if (raw) existing = JSON.parse(raw);
+      } catch (_) {}
+      // Dedupe
+      for (var j = 0; j < existing.length; j++) {
+        if (existing[j].text === notes) {
+          if (typeof showToast === 'function') showToast('Snippet already saved');
+          return;
+        }
+      }
+      existing.unshift({ rating: bucket, text: notes, source: 'user' });
+      localStorage.setItem('oi:snippets', JSON.stringify(existing));
+      if (typeof showToast === 'function') showToast('Saved as snippet');
+    },
+
+    get _commentLibraryPool() {
       var COMMENTS = window.__OI_COMMENT_LIBRARY || [
         { rating: 'satisfactory', text: 'Functional and operating as intended at the time of inspection.' },
         { rating: 'satisfactory', text: 'No deficiencies observed.' },
         { rating: 'satisfactory', text: 'Appears to be properly installed and in working order.' },
+        { rating: 'satisfactory', text: 'Cleaning and routine maintenance recommended.' },
         { rating: 'monitor', text: 'Recommend monitoring for further deterioration.' },
         { rating: 'monitor', text: 'Minor wear noted; consider preventive maintenance.' },
         { rating: 'monitor', text: 'Cosmetic defects observed; functional but recommend repair when convenient.' },
+        { rating: 'monitor', text: 'Approaching end of useful service life; budget for replacement.' },
         { rating: 'defect', text: 'Recommend repair or replacement by a qualified contractor.' },
         { rating: 'defect', text: 'Active leak observed; recommend immediate professional attention.' },
         { rating: 'defect', text: 'Safety hazard noted; recommend correction prior to occupancy.' },
         { rating: 'defect', text: 'Not functioning at time of inspection; further evaluation recommended.' },
+        { rating: 'defect', text: 'Improper installation observed; recommend correction by licensed professional.' },
+        { rating: 'defect', text: 'Damaged or deteriorated; replacement recommended.' },
         { rating: 'all', text: 'Further evaluation recommended by a qualified specialist.' },
         { rating: 'all', text: 'Recommend a licensed professional review the condition for cost estimate.' },
+        { rating: 'all', text: 'See attached photos for documentation.' },
+        { rating: 'all', text: 'Inspection performed in accordance with InterNACHI Standards of Practice.' },
+        { rating: 'all', text: 'Hidden conditions may exist that were not visible at the time of inspection.' },
+        { rating: 'all', text: 'Item was not accessible during the inspection; recommend re-evaluation when accessible.' },
       ];
-      var SNIPPETS = (function () {
-        try {
-          var raw = localStorage.getItem('oi:snippets');
-          if (raw) return JSON.parse(raw);
-        } catch (_) {}
-        return [
-          { rating: 'all', text: 'See attached photos for documentation.' },
-          { rating: 'all', text: 'Inspection performed in accordance with InterNACHI Standards of Practice.' },
-          { rating: 'all', text: 'Hidden conditions may exist that were not visible at the time of inspection.' },
-        ];
-      })();
-      var pool = this.commentLibraryTab === 'snippets' ? SNIPPETS : COMMENTS;
-      if (this.commentLibraryFilter === 'all') return pool;
-      return pool.filter(function (c) { return c.rating === 'all' || c.rating === this.commentLibraryFilter; }, this);
+      COMMENTS = COMMENTS.map(function (c) { return Object.assign({}, c, { source: 'preset' }); });
+      var SNIPPETS = [];
+      try {
+        var raw = localStorage.getItem('oi:snippets');
+        if (raw) SNIPPETS = JSON.parse(raw).map(function (c) { return Object.assign({}, c, { source: 'snippet' }); });
+      } catch (_) {}
+      return COMMENTS.concat(SNIPPETS);
+    },
+
+    get commentLibraryItems() {
+      var pool = this._commentLibraryPool;
+      var f = this.commentLibraryFilter;
+      var filtered;
+      if (f === 'my-snippets') {
+        filtered = pool.filter(function (c) { return c.source === 'snippet'; });
+      } else if (f === 'all') {
+        filtered = pool;
+      } else {
+        filtered = pool.filter(function (c) { return c.rating === 'all' || c.rating === f; });
+      }
+      var q = (this.commentLibrarySearch || '').trim().toLowerCase();
+      if (q) {
+        filtered = filtered.filter(function (c) { return c.text.toLowerCase().indexOf(q) >= 0; });
+      }
+      return filtered;
+    },
+
+    get commentLibraryCount() {
+      var pool = this._commentLibraryPool;
+      return this.commentLibraryItems.length + ' of ' + pool.length;
     },
 
     navigateItem(dir) {
