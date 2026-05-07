@@ -10,7 +10,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
                         <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-bold text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Template Marketplace</span>
-                        <h1 class="text-5xl font-black tracking-tight text-slate-900">Marketplace</h1>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Marketplace</h1>
                         <p class="text-lg text-slate-500 font-semibold mt-2">Browse and import community inspection templates.</p>
                         {/* R7-25: Spell out the import / update relationship so
                             inspectors aren't unsure whether importing creates a

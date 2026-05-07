@@ -15,7 +15,7 @@ export const SettingsSecurityPage = ({ branding }: Props): JSX.Element => (
                 <p class="text-sm text-slate-500 mt-1">Add a second login factor with an authenticator app like 1Password, Authy, or Google Authenticator.</p>
             </header>
 
-            <div x-show="loading" class="text-center py-12 text-sm text-slate-500">Loading...</div>
+            <div x-show="loading" class="text-center py-6 text-sm text-slate-500">Loading...</div>
 
             {/* Status card */}
             <div x-show="!loading" class="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">

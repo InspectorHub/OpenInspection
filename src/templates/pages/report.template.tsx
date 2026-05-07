@@ -92,7 +92,7 @@ export function renderProfessionalReport(data: {
         children: (
 <div
     x-data={`reportGatekeeper('${inspection.id}')`}
-    class="min-h-screen bg-slate-50/50 antialiased py-12 px-6 relative"
+    class="min-h-screen bg-slate-50/50 antialiased py-6 px-6 relative"
 >
     {/* Atmospheric Background */}
     <div class="fixed inset-0 pointer-events-none overflow-hidden select-none no-print">
@@ -111,7 +111,7 @@ export function renderProfessionalReport(data: {
                 
                 <div class="relative z-10 flex flex-col md:flex-row justify-between items-end gap-6">
                     <div class="max-w-3xl">
-                        <div class="flex items-center gap-4 mb-10">
+                        <div class="flex items-center gap-4 mb-6">
                             <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl p-1">
                                 <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                             </div>
@@ -137,7 +137,7 @@ export function renderProfessionalReport(data: {
 
             {/* AI Intelligence Synthesis Tier */}
             <template x-if="paid && aiSummary">
-                <div class="px-12 py-12 bg-white relative no-print overflow-hidden group">
+                <div class="px-12 py-6 bg-white relative no-print overflow-hidden group">
                     <div class="absolute inset-0 bg-indigo-600/[0.02] transition-colors group-hover:bg-indigo-600/[0.04]"></div>
                     <div class="relative z-10 flex items-start gap-8">
                         <div class="flex-shrink-0 w-16 h-16 bg-white border border-indigo-100 rounded-lg flex items-center justify-center shadow-xl shadow-indigo-100/30">
@@ -223,7 +223,7 @@ export function renderProfessionalReport(data: {
                 {schema.sections.map((section: SchemaSection) => (
                     <section class="page-break" key={section.title}>
                         <div class="flex items-center gap-8 mb-16">
-                            <h2 class="text-5xl font-black tracking-tightest text-slate-900 shrink-0">{section.title}</h2>
+                            <h2 class="text-3xl font-bold tracking-tightest text-slate-900 shrink-0">{section.title}</h2>
                             <div class="flex-grow h-0.5 bg-gradient-to-r from-slate-100 to-transparent"></div>
                             <span class="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-300">Section {schema.sections.indexOf(section) + 1}</span>
                         </div>
@@ -281,11 +281,11 @@ export function renderProfessionalReport(data: {
             <div class="bg-slate-900 p-16 md:p-24 text-center relative overflow-hidden no-print">
                 <div class="absolute inset-0 bg-indigo-600/10 mix-blend-overlay"></div>
                 <div class="relative z-10 max-w-3xl mx-auto">
-                    <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-10 text-white">
+                    <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-white">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                     </div>
                     <h2 class="text-4xl font-black tracking-tightest text-white mb-6">Report Complete</h2>
-                    <p class="text-indigo-200/60 text-lg font-medium mb-12 uppercase tracking-[0.2em] leading-relaxed">This report documents the condition of the property at the time of inspection.</p>
+                    <p class="text-indigo-200/60 text-lg font-medium mb-6 uppercase tracking-[0.2em] leading-relaxed">This report documents the condition of the property at the time of inspection.</p>
                     
                     <div class="flex flex-col sm:flex-row justify-center gap-6">
                         <button onclick="window.print()" class="px-12 py-5 bg-white text-slate-900 rounded-2xl text-sm font-bold uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-50 active:scale-95 transition-all">Print / Save PDF</button>
@@ -313,7 +313,7 @@ export function renderProfessionalReport(data: {
                     <div class="w-20 h-20 bg-indigo-600 rounded-lg flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-200">
                         <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     </div>
-                    <h2 class="text-5xl font-black tracking-tightest text-slate-900 mb-4">Agreement Review</h2>
+                    <h2 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Agreement Review</h2>
                     <p class="text-xl text-slate-400 font-medium">Authentication required. Please authorize the inspection terms of service.</p>
                 </div>
 
@@ -345,7 +345,7 @@ export function renderProfessionalReport(data: {
                     <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                 </div>
                 <div>
-                    <h2 class="text-5xl font-black tracking-tightest text-slate-900 mb-4">Payment Required</h2>
+                    <h2 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Payment Required</h2>
                     <p class="text-xl text-slate-400 font-medium leading-relaxed">
                         Your inspection is complete. The balance due is 
                         <span class="text-slate-900 font-black tabular-nums tracking-tightest">{`$${(inspection.price / 100).toFixed(2)}`}</span>.

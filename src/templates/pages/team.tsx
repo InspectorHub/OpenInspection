@@ -6,7 +6,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
 
     return (
         <MainLayout title={`${siteName} | Team`} branding={branding}>
-            <div class="space-y-12 animate-fade-in">
+            <div class="space-y-6 animate-fade-in">
     
                 {/* Header */}
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -14,7 +14,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                         <div class="flex items-center gap-3">
                             <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Administration</span>
                         </div>
-                        <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Workspace Team</h1>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-gradient">Workspace Team</h1>
                         <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage members, inspectors, and organizational permissions.</p>
                     </div>
                     
@@ -75,7 +75,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                     </tr>
                                 </thead>
                                 <tbody id="invitesList" class="divide-y divide-slate-100/50">
-                                    <tr><td colspan={3} class="px-10 py-12 text-sm font-bold text-center text-slate-400">No pending deployments found.</td></tr>
+                                    <tr><td colspan={3} class="px-10 py-6 text-sm font-bold text-center text-slate-400">No pending deployments found.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -87,7 +87,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl transition-opacity animate-fade-in"></div>
                     <div class="fixed inset-0 flex items-center justify-center p-6">
                         <div role="dialog" aria-modal="true" class="relative bg-white rounded-2xl shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] w-full max-w-xl p-6 overflow-hidden border border-white/40 animate-fade-in">
-                            <div class="mb-12">
+                            <div class="mb-6">
                                 <div class="w-16 h-16 bg-indigo-600/10 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                                 </div>

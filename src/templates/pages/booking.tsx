@@ -45,7 +45,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                 <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
                                 <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.3em]">Book Inspection</span>
                             </div>
-                            <h1 class="text-5xl font-black text-slate-900 tracking-tightest mb-4 leading-none">Schedule Inspection</h1>
+                            <h1 class="text-3xl font-bold text-slate-900 tracking-tightest mb-4 leading-none">Schedule Inspection</h1>
                             <p class="text-slate-500 text-lg font-semibold tracking-tight">Professional property analysis configured for high-fidelity reporting.</p>
                         </div>
 

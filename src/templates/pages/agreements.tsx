@@ -7,13 +7,13 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
     return (
         <MainLayout title={`${siteName} | Agreements`} branding={branding}>
             <div class="animate-slide-in flex flex-col" style="min-height: calc(100vh - 5rem);">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-6">
                     <div>
                         <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
                             <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
                             Legal Compliance
                         </div>
-                        <h1 class="text-5xl font-black tracking-tightest text-slate-900 mb-4">Agreements</h1>
+                        <h1 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Agreements</h1>
                         <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage liability waivers and professional service agreements for your clients.</p>
                     </div>
                     <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-2xl shadow-2xl shadow-indigo-100/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
@@ -49,7 +49,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                  </div>
 
                 {/* Create Agreement Modal */}
-                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-12 sm:px-0">
+                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-6 sm:px-0">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" onclick="closeModal()"></div>
                     <div class="flex min-h-full items-center justify-center">
                         <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-xl bg-white p-6 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
@@ -58,7 +58,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
-                            <div class="mb-10">
+                            <div class="mb-6">
                                 <h3 id="modalAgreementTitle" class="text-3xl font-black text-slate-900 mb-3 tracking-tightest leading-tight">Create Professional Agreement</h3>
                                 <p class="text-lg text-slate-400 font-medium">Draft a new service agreement or liability waiver.</p>
                             </div>
@@ -92,7 +92,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                 </div>
 
                 {/* Send Agreement Modal */}
-                <div id="sendModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-12 sm:px-0">
+                <div id="sendModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-6 sm:px-0">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onclick="closeSendModal()"></div>
                     <div class="flex min-h-full items-center justify-center">
                         <div class="relative w-full max-w-md bg-white rounded-xl p-6 shadow-2xl">

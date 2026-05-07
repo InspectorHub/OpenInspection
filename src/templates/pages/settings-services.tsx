@@ -46,7 +46,7 @@ export const SettingsServicesPage = ({ branding }: Props): JSX.Element => (
                     <button x-on:click="openCreateDiscount()" class="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black">+ Add code</button>
                 </header>
 
-                <div x-show="discounts.length === 0" class="text-center py-12 bg-slate-50 rounded-2xl">
+                <div x-show="discounts.length === 0" class="text-center py-6 bg-slate-50 rounded-2xl">
                     <p class="text-slate-500 font-semibold text-sm">No discount codes yet.</p>
                 </div>
 

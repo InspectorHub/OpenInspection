@@ -10,7 +10,7 @@ export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
                     <span class="self-start px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-[0.2em]">Reports</span>
                     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                         <div>
-                            <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Reports</h1>
+                            <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-gradient">Reports</h1>
                             <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Published and ready-to-deliver inspection reports.</p>
                         </div>
                         <div class="flex items-center gap-3">

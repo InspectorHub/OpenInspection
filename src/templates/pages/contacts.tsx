@@ -9,7 +9,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
                         <span class="inline-flex items-center rounded-lg bg-emerald-600/10 px-3 py-1 text-[10px] font-bold text-emerald-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-emerald-600/20 mb-4">Contacts</span>
-                        <h1 class="text-5xl font-black tracking-tight text-slate-900">Contacts</h1>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Contacts</h1>
                         <p class="text-lg text-slate-500 font-semibold mt-2">Manage agents and clients.</p>
                     </div>
                     <div class="flex gap-3">

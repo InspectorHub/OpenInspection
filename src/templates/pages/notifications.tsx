@@ -11,7 +11,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                 <div class="flex items-end justify-between flex-wrap gap-4">
                     <div>
                         <span class="px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em]">Inbox</span>
-                        <h1 class="mt-3 text-5xl font-black tracking-tight text-slate-900 sm:text-6xl">Notifications</h1>
+                        <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Notifications</h1>
                         <p class="mt-2 text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Activity from your workspace — bookings, reports, agreements, messages.</p>
                     </div>
                     <button x-on:click="markAllRead()" class="px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-bold uppercase tracking-[0.2em] hover:bg-black transition-all active:scale-95">Mark all read</button>
@@ -47,7 +47,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                         </div>
                     </template>
                     <template x-if="loading">
-                        <div class="py-12 text-center text-slate-400">Loading…</div>
+                        <div class="py-6 text-center text-slate-400">Loading…</div>
                     </template>
                 </div>
 

@@ -39,7 +39,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                                     <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></span>
                                     Agent Portal
                                 </div>
-                                <h1 class="text-5xl font-black tracking-tightest text-slate-900 mb-4">Referral Dashboard</h1>
+                                <h1 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Referral Dashboard</h1>
                                 <p class="text-xl text-slate-400 font-medium max-w-2xl leading-relaxed">Track shared inspections and follow up on client reports in real-time.</p>
                             </div>
                             

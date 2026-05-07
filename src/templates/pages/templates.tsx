@@ -13,7 +13,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                             <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
                             Templates
                         </div>
-                        <h1 class="text-5xl font-black tracking-tightest text-slate-900 mb-4">Templates</h1>
+                        <h1 class="text-3xl font-bold tracking-tightest text-slate-900 mb-4">Templates</h1>
                         <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage your inspection checklists.</p>
                     </div>
                     <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-2 rounded-2xl shadow-2xl shadow-indigo-100/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
@@ -49,7 +49,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                 </div>
 
                 {/* Create Template Modal */}
-                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-12 sm:px-0">
+                <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-6 sm:px-0">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" onclick="closeModal()"></div>
                     <div class="flex min-h-full items-center justify-center">
                         <div role="dialog" aria-modal="true" class="relative w-full max-w-xl transform overflow-hidden rounded-xl bg-white p-6 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
@@ -58,7 +58,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
-                            <div class="mb-10">
+                            <div class="mb-6">
                                 <h3 class="text-3xl font-black text-slate-900 mb-3 tracking-tightest leading-tight">New Template</h3>
                                 <p class="text-lg text-slate-400 font-medium">Create an inspection checklist.</p>
                             </div>

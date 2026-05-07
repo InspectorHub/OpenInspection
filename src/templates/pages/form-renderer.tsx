@@ -14,7 +14,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                 {/* Main Viewport */}
                 <div class="max-w-4xl mx-auto px-6 py-8 relative z-10">
                     {/* Sticky Professional Header */}
-                    <div class="sticky top-6 z-50 mb-10 transition-all duration-500" x-bind:class="{ 'translate-y-[-12px]': scrolled }">
+                    <div class="sticky top-6 z-50 mb-6 transition-all duration-500" x-bind:class="{ 'translate-y-[-12px]': scrolled }">
                         <div class="glass-panel flex items-center justify-between px-8 py-5 rounded-xl shadow-2xl shadow-indigo-100/30 ring-1 ring-white/60">
                             <div>
                                 <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Loading...'"></h1>

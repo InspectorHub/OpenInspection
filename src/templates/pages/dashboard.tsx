@@ -7,7 +7,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
 
     return (
         <MainLayout title={`${siteName} | Dashboard`} branding={branding}>
-            <div class="space-y-12 animate-fade-in">
+            <div class="space-y-6 animate-fade-in">
 
                 {/* Header Section */}
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -15,7 +15,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         <div class="flex items-center gap-3">
                             <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
                         </div>
-                        <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Inspections</h1>
+                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-gradient">Inspections</h1>
                         <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage your inspections.</p>
                     </div>
 
@@ -44,7 +44,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             key={stat.id}
                             type="button"
                             x-on:click={`sections['${stat.target}']=true; $nextTick(()=>{ const el=document.getElementById('bucket-${stat.target}'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); })`}
-                            class="glass-card group p-8 rounded-xl animate-fade-in text-left hover:scale-[1.02] transition-transform cursor-pointer"
+                            class="glass-card group p-4 rounded-lg animate-fade-in text-left hover:scale-[1.02] transition-transform cursor-pointer"
                             style={`animation-delay: ${0.1 + i * 0.05}s`}
                             title={`Jump to ${stat.label}`}
                         >
@@ -331,7 +331,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </button>
                             </div>
 
-                            <div class="mb-10">
+                            <div class="mb-6">
                                 <div class="w-14 h-14 bg-emerald-600/10 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
                                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                                 </div>
