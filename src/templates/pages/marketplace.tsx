@@ -48,6 +48,43 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                     </select>
                 </div>
 
+                {/* Spec 5G M2 — Library packs (comments / snippets). Render
+                    only when at least one library is published. */}
+                <div x-show="libraries.length > 0" class="mt-2 mb-6">
+                    <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Comment & Snippet Libraries</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <template x-for="l in libraries" {...{ 'x-bind:key': 'l.id' }}>
+                            <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 hover:shadow-lg transition" x-bind:class="l.featured ? 'ring-2 ring-amber-400/60' : ''">
+                                <div class="flex items-start justify-between">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="font-bold text-slate-900 text-lg" x-text="l.name"></h3>
+                                            <span x-show="l.featured" class="text-[10px] font-bold uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">★ Featured</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full capitalize" x-text="l.kind"></span>
+                                            <span class="text-xs text-slate-400 font-mono" x-text="'v' + l.semver"></span>
+                                            <span class="text-xs text-slate-500" x-text="l.itemCount + ' entries'"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-slate-500" x-text="l.changelog || 'Standard library pack.'"></p>
+                                <div class="flex items-center justify-between mt-auto">
+                                    <span class="text-[11px] text-slate-400" x-text="l.downloadCount + ' imports'"></span>
+                                    <button x-on:click="importLibrary(l.id)"
+                                        x-bind:disabled="!!l.importedSemver && !l.hasUpdate"
+                                        class="px-4 py-1.5 text-sm rounded-md font-bold transition"
+                                        x-bind:class="l.importedSemver && !l.hasUpdate ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
+                                        x-text="l.importedSemver ? (l.hasUpdate ? 'Update' : 'Imported') : 'Import'"></button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                {/* Templates header — only when libraries also rendered above */}
+                <h2 x-show="libraries.length > 0" class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 mt-2">Inspection Templates</h2>
+
                 {/* Grid */}
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <template x-for="t in templates" {...{ 'x-bind:key': 't.id' }}>

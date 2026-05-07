@@ -1,6 +1,7 @@
 function marketplace() {
     return {
         templates: [],
+        libraries: [],          // Spec 5G M2 — comment / snippet packs
         loading: false,
         search: '',
         category: '',
@@ -23,8 +24,30 @@ function marketplace() {
         async load() {
             this.loading = true;
             this.page = 1;
-            await this._fetch();
+            await Promise.all([this._fetch(), this._fetchLibraries()]);
             this.loading = false;
+        },
+
+        async _fetchLibraries() {
+            try {
+                const res = await authFetch('/api/templates/marketplace/libraries');
+                if (!res.ok) return;
+                const data = await res.json();
+                this.libraries = data.data || [];
+            } catch (_) { /* tolerate */ }
+        },
+
+        async importLibrary(id) {
+            const res = await authFetch(`/api/templates/marketplace/libraries/${id}/import`, { method: 'POST' });
+            if (!res.ok) {
+                this.showToast('Library import failed. Please try again.', '');
+                return;
+            }
+            const data = await res.json();
+            const lib = this.libraries.find((l) => l.id === id);
+            if (lib) { lib.importedSemver = lib.semver; lib.hasUpdate = false; }
+            const count = data.data?.rowCount || 0;
+            this.showToast(`Imported ${count} comments to your library`, '/comments');
         },
 
         async _fetch() {
