@@ -70,7 +70,7 @@ export function KeyboardHUD(): JSX.Element {
                 'x-transition.opacity': '',
                 'x-cloak': '',
             }}
-            class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
             x-show="open"
             style="display:none"
             role="dialog"
