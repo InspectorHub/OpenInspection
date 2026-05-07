@@ -19,9 +19,9 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             <div>
                                 <h1 class="text-2xl font-black tracking-tightest text-slate-900 leading-tight" x-text="inspection?.propertyAddress || 'Loading...'"></h1>
                                 <div class="flex items-center gap-2 mt-1">
-                                    <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600/60" x-text="template?.name || 'Inspection Template'"></span>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest text-indigo-600/60" x-text="template?.name || 'Inspection Template'"></span>
                                     <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
-                                    <span class="text-[10px] font-black uppercase tracking-widest text-slate-400" x-text="inspectionId.substring(0,8).toUpperCase()"></span>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400" x-text="inspectionId.substring(0,8).toUpperCase()"></span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-6">
@@ -29,7 +29,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                     <span class="flex items-center gap-2 px-3 py-1.5 rounded-full ring-1 transition-all duration-300"
                                         x-bind:class="online ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : 'bg-rose-50 text-rose-600 ring-rose-100'">
                                         <span class="w-2 h-2 rounded-full shadow-sm" x-bind:class="online ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
-                                        <span class="text-[10px] font-black uppercase tracking-widest" x-text="online ? 'Live' : 'Local Cache'"></span>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest" x-text="online ? 'Live' : 'Local Cache'"></span>
                                     </span>
                                 </div>
                                 <button x-on:click="syncData" 
@@ -49,8 +49,8 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 </div>
                             </div>
                             <div class="flex justify-between mt-2 px-2">
-                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progress</p>
-                                <p class="text-[10px] font-black text-indigo-600 uppercase tracking-widest tabular-nums" x-text="completionPercentage + '%'"></p>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Progress</p>
+                                <p class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest tabular-nums" x-text="completionPercentage + '%'"></p>
                             </div>
                         </div>
                     </div>
@@ -72,7 +72,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                         <h2 class="text-2xl font-black tracking-tightest text-slate-900" x-text="section.title"></h2>
                                     </div>
                                     <div class="flex items-center gap-4">
-                                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400" x-text="section.items ? section.items.length + ' points' : ''"></span>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400" x-text="section.items ? section.items.length + ' points' : ''"></span>
                                         <div class="w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 bg-slate-50" x-bind:class="{ 'rotate-180': openSections.includes(section.id) }">
                                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                         </div>
@@ -80,7 +80,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 </button>
 
                                 <div x-show="openSections.includes(section.id)" x-collapse="true">
-                                    <div class="p-10 pt-4 space-y-12 divide-y divide-slate-100/50">
+                                    <div class="p-6 pt-4 space-y-12 divide-y divide-slate-100/50">
                                         <template x-for="item in section.items" x-bind:key="item.id">
                                             <div class="pt-10 first:pt-0">
                                                 <div class="flex justify-between items-start mb-6">
@@ -97,7 +97,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                             x-on:click="setItemStatus(item.id, status)"
                                                             {...{ 'x-bind:data-status': "status.toLowerCase()" }}
                                                             {...{ 'x-bind:title': "{ Satisfactory: 'Satisfactory — observed in serviceable condition; no defect noted', Monitor: 'Monitor — minor wear or future-attention item; not currently a defect', Defect: 'Defect — material deficiency requiring repair or further evaluation' }[status]" }}
-                                                            class="py-4 px-3 rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-2 active:scale-95 shadow-sm"
+                                                            class="py-4 px-3 rounded-[1.25rem] text-[10px] font-bold uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-2 active:scale-95 shadow-sm"
                                                             x-bind:class="{
                                                               'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-emerald-100': results[item.id]?.status === 'Satisfactory' && status === 'Satisfactory',
                                                               'bg-amber-50 border-amber-500 text-amber-700 shadow-amber-100': results[item.id]?.status === 'Monitor' && status === 'Monitor',
@@ -132,7 +132,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                         title="AI Professionalize"
                                                     >
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                                        <span class="text-[10px] font-black uppercase tracking-widest">Synthesis</span>
+                                                        <span class="text-[10px] font-bold uppercase tracking-widest">Synthesis</span>
                                                     </button>
                                                 </div>
 
@@ -158,7 +158,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                     <div class="flex items-center gap-4">
                                                         <button
                                                             x-on:click={`$refs['file_input_' + item.id].click()`}
-                                                            class="flex items-center gap-3 px-6 py-3 bg-indigo-600 text-white rounded-[1.25rem] text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95"
+                                                            class="flex items-center gap-3 px-6 py-3 bg-indigo-600 text-white rounded-[1.25rem] text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-95"
                                                             x-bind:disabled="uploading[item.id]"
                                                         >
                                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="!uploading[item.id]"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -183,7 +183,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
 
                                                                 {/* Photo Metadata Overlay */}
                                                                 <div x-show="photo.pending" class="absolute inset-0 bg-amber-600/60 backdrop-blur-[2px] flex items-center justify-center">
-                                                                    <span class="text-[9px] font-black uppercase tracking-[0.2em] text-white">Queued</span>
+                                                                    <span class="text-[9px] font-bold uppercase tracking-[0.2em] text-white">Queued</span>
                                                                 </div>
 
                                                                 {/* Destructive Action Overlay */}
@@ -203,7 +203,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                                     <template x-if="!photo.pending">
                                                                         <div class="flex flex-col items-center justify-center px-4">
                                                                             <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                                                            <span class="text-[9px] font-black uppercase tracking-[0.15em] text-center leading-tight">Annotation Engine</span>
+                                                                            <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-center leading-tight">Annotation Engine</span>
                                                                         </div>
                                                                     </template>
                                                                     <template x-if="photo.pending">
@@ -238,7 +238,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                         </div>
 
                         <div x-show="isDelivered || inspection?.status === 'completed'" class="animate-slide-in">
-                            <div class="glass-panel p-10 rounded-xl text-center mb-8 border-emerald-100 shadow-2xl shadow-emerald-100/20 bg-emerald-50/10">
+                            <div class="glass-panel p-6 rounded-xl text-center mb-8 border-emerald-100 shadow-2xl shadow-emerald-100/20 bg-emerald-50/10">
                                 <div class="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-emerald-200 group hover:rotate-6 transition-transform">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
@@ -255,7 +255,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                             </a>
                         </div>
 
-                        <button x-on:click="backToDashboard" class="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors py-4">Return to Operational Control</button>
+                        <button x-on:click="backToDashboard" class="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors py-4">Return to Operational Control</button>
                     </div>
 
                     {/* Annotation Intelligence Interface */}
@@ -301,7 +301,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                     <div class="flex gap-4">
                                         <button
                                             x-on:click="drawingMode = 'circle'"
-                                            class="flex items-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                                            class="flex items-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
                                             x-bind:class="drawingMode === 'circle' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
                                         >
                                             <div class="w-3 h-3 rounded-full border-2 border-current"></div>
@@ -309,7 +309,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                         </button>
                                         <button
                                             x-on:click="drawingMode = 'arrow'"
-                                            class="flex items-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                                            class="flex items-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
                                             x-bind:class="drawingMode === 'arrow' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
                                         >
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
@@ -317,7 +317,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                         </button>
                                     </div>
 
-                                    <button x-on:click="clearAnnotation" class="text-[10px] font-black text-slate-300 hover:text-rose-500 transition-colors uppercase tracking-[0.2em]">
+                                    <button x-on:click="clearAnnotation" class="text-[10px] font-bold text-slate-300 hover:text-rose-500 transition-colors uppercase tracking-[0.2em]">
                                         Clear Drawing Layer
                                     </button>
                                 </div>
@@ -325,7 +325,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <div class="flex gap-6">
                                     <button
                                         x-on:click="showAnnotationModal = false"
-                                        class="flex-1 py-5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-all"
+                                        class="flex-1 py-5 rounded-[1.5rem] text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-all"
                                     >
                                         Discard Changes
                                     </button>
@@ -374,7 +374,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <template x-for="rec in results" {...{ 'x-bind:key': 'rec.id' }}>
                                     <button type="button" x-on:click="attach(rec)" class="block w-full text-left p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition">
                                         <div class="flex items-center gap-2 mb-1">
-                                            <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full" x-bind:class="severityClass(rec.severity)" x-text="rec.severity"></span>
+                                            <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full" x-bind:class="severityClass(rec.severity)" x-text="rec.severity"></span>
                                             <span class="text-xs text-slate-500" x-text="rec.category || '(no category)'"></span>
                                             <span class="text-xs font-bold text-slate-700 ml-auto" x-text="estimateLabel(rec)"></span>
                                         </div>

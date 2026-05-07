@@ -24,7 +24,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                     <div class="glass-panel px-10 py-16 rounded-xl">
                         <form id="setupForm" class="space-y-8">
                             <div>
-                                <label for="companyName" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Business Name</label>
+                                <label for="companyName" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Business Name</label>
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="companyName" name="companyName" type="text" required placeholder="Acme Inspections"
@@ -33,7 +33,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             </div>
 
                             <div>
-                                <label for="email" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Admin Email</label>
+                                <label for="email" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Admin Email</label>
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="email" name="email" type="email" autocomplete="email" required placeholder="admin@company.com"
@@ -42,7 +42,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             </div>
 
                             <div>
-                                <label for="password" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Password</label>
+                                <label for="password" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Password</label>
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="password" name="password" type="password" required placeholder="••••••••"
@@ -52,7 +52,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             </div>
 
                             <div>
-                                <label for="verificationCode" class="block text-sm font-black text-slate-900 tracking-tight ml-1 mb-3 uppercase">Verification Code</label>
+                                <label for="verificationCode" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Verification Code</label>
                                 <div class="relative group">
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="verificationCode" name="verificationCode" type="text" required placeholder="000000"
@@ -83,7 +83,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
 
                         <div class="mt-12 flex items-center justify-center gap-2">
                              <div class="h-px bg-slate-100 flex-1"></div>
-                             <span class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] px-4">Self-Hosted</span>
+                             <span class="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em] px-4">Self-Hosted</span>
                              <div class="h-px bg-slate-100 flex-1"></div>
                         </div>
                     </div>

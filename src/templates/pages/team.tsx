@@ -12,7 +12,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
                     <div class="space-y-4">
                         <div class="flex items-center gap-3">
-                            <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Administration</span>
+                            <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Administration</span>
                         </div>
                         <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Workspace Team</h1>
                         <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage members, inspectors, and organizational permissions.</p>
@@ -26,32 +26,32 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                         </button>
                         <div id="quotaBadge" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100 shadow-sm transition-all group hover:bg-white hover:border-indigo-100">
                              <div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                             <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Seats: </span>
-                             <span class="text-xs font-black text-slate-900 leading-none">Loading...</span>
+                             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Seats: </span>
+                             <span class="text-xs font-bold text-slate-900 leading-none">Loading...</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-12">
+                <div class="grid grid-cols-1 gap-6">
                     {/* Active Members */}
                     <div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-slate-200/50">
                         <div class="px-10 py-8 border-b border-slate-100/50 bg-slate-50/30 flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <h2 class="text-2xl font-black text-slate-900 tracking-tightest">Active Directory</h2>
-                                <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Team Members</span>
+                                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Team Members</span>
                             </div>
                         </div>
                         <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full text-left">
                                 <thead class="bg-slate-50/50">
                                     <tr>
-                                        <th class="py-6 px-10 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Name</th>
-                                        <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Role</th>
-                                        <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Onboarding Date</th>
+                                        <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Name</th>
+                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Role</th>
+                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Onboarding Date</th>
                                     </tr>
                                 </thead>
                                 <tbody id="membersList" class="divide-y divide-slate-100/50">
-                                    <tr><td colspan={3} class="px-10 py-16 text-sm font-black text-center text-slate-300 uppercase tracking-[0.2em]">Loading...</td></tr>
+                                    <tr><td colspan={3} class="px-10 py-16 text-sm font-bold text-center text-slate-300 uppercase tracking-[0.2em]">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -62,16 +62,16 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                         <div class="px-10 py-8 border-b border-slate-100/50 bg-white/30 flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <h2 class="text-xl font-black text-slate-400 tracking-tightest">Pending Invitations</h2>
-                                <div class="px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-black text-slate-400 uppercase">Incoming</div>
+                                <div class="px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">Incoming</div>
                             </div>
                         </div>
                         <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full text-left">
                                 <thead class="bg-slate-50/20">
                                     <tr>
-                                        <th class="py-6 px-10 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Target Email</th>
-                                        <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Assigned Role</th>
-                                        <th class="py-6 px-8 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Status</th>
+                                        <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Target Email</th>
+                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Assigned Role</th>
+                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="invitesList" class="divide-y divide-slate-100/50">
@@ -86,7 +86,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                 <div id="inviteModal" class="fixed inset-0 z-[100] hidden overflow-y-auto">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl transition-opacity animate-fade-in"></div>
                     <div class="fixed inset-0 flex items-center justify-center p-6">
-                        <div role="dialog" aria-modal="true" class="relative bg-white rounded-2xl shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] w-full max-w-xl p-12 overflow-hidden border border-white/40 animate-fade-in">
+                        <div role="dialog" aria-modal="true" class="relative bg-white rounded-2xl shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] w-full max-w-xl p-6 overflow-hidden border border-white/40 animate-fade-in">
                             <div class="mb-12">
                                 <div class="w-16 h-16 bg-indigo-600/10 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
@@ -97,7 +97,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
 
                             <form id="inviteForm" class="space-y-8">
                                 <div class="space-y-3">
-                                    <label for="inviteEmail" class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Email Address</label>
+                                    <label for="inviteEmail" class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Email Address</label>
                                     <div class="relative group">
                                          <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                          <input type="email" id="inviteEmail" name="email" required placeholder="colleague@example.com"
@@ -105,7 +105,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                     </div>
                                 </div>
                                 <div class="space-y-3">
-                                    <label for="inviteRole" class="block text-xs font-black text-slate-900 ml-1 uppercase tracking-[0.2em]">Role</label>
+                                    <label for="inviteRole" class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Role</label>
                                     <div class="relative group">
                                          <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                          <select id="inviteRole" name="role"
@@ -116,7 +116,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                         </select>
                                     </div>
                                 </div>
-                                <div id="inviteResult" class="hidden text-sm font-black text-red-600 px-6 py-4 bg-red-50 rounded-2xl border border-red-100 animate-fade-in"></div>
+                                <div id="inviteResult" class="hidden text-sm font-bold text-red-600 px-6 py-4 bg-red-50 rounded-2xl border border-red-100 animate-fade-in"></div>
                             </form>
 
                             <div class="mt-10 flex flex-col sm:flex-row gap-4">

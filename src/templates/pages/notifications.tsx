@@ -10,7 +10,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
             <div class="space-y-8 animate-fade-in" x-data="notificationsApp()" x-init="load()">
                 <div class="flex items-end justify-between flex-wrap gap-4">
                     <div>
-                        <span class="px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-[0.2em]">Inbox</span>
+                        <span class="px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em]">Inbox</span>
                         <h1 class="mt-3 text-5xl font-black tracking-tight text-slate-900 sm:text-6xl">Notifications</h1>
                         <p class="mt-2 text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Activity from your workspace — bookings, reports, agreements, messages.</p>
                     </div>

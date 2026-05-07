@@ -19,9 +19,9 @@ export const ConflictModal = () => (
                 <span x-text="`${index + 1} of ${conflicts.length}`" class="text-xs font-bold text-slate-400"></span>
             </header>
             <div class="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <section><h3 class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Base</h3><pre class="bg-slate-50 p-3 rounded-lg text-xs whitespace-pre-wrap" x-text="current?.base"></pre></section>
-                <section><h3 class="text-xs font-black uppercase tracking-widest text-indigo-600 mb-2">Yours</h3><pre class="bg-indigo-50 p-3 rounded-lg text-xs whitespace-pre-wrap" x-text="current?.ours"></pre></section>
-                <section><h3 class="text-xs font-black uppercase tracking-widest text-rose-600 mb-2">Theirs</h3><pre class="bg-rose-50 p-3 rounded-lg text-xs whitespace-pre-wrap" x-text="current?.theirs"></pre></section>
+                <section><h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Base</h3><pre class="bg-slate-50 p-3 rounded-lg text-xs whitespace-pre-wrap" x-text="current?.base"></pre></section>
+                <section><h3 class="text-xs font-bold uppercase tracking-widest text-indigo-600 mb-2">Yours</h3><pre class="bg-indigo-50 p-3 rounded-lg text-xs whitespace-pre-wrap" x-text="current?.ours"></pre></section>
+                <section><h3 class="text-xs font-bold uppercase tracking-widest text-rose-600 mb-2">Theirs</h3><pre class="bg-rose-50 p-3 rounded-lg text-xs whitespace-pre-wrap" x-text="current?.theirs"></pre></section>
             </div>
             <footer class="px-8 py-5 border-t border-slate-100 flex items-center gap-3 justify-end">
                 <button x-on:click="resolve('ours')"   class="px-5 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-indigo-700">Keep Mine</button>

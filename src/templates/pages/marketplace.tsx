@@ -9,7 +9,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                 {/* Header */}
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
-                        <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Template Marketplace</span>
+                        <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-bold text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Template Marketplace</span>
                         <h1 class="text-5xl font-black tracking-tight text-slate-900">Marketplace</h1>
                         <p class="text-lg text-slate-500 font-semibold mt-2">Browse and import community inspection templates.</p>
                         {/* R7-25: Spell out the import / update relationship so
@@ -56,7 +56,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                                 <div>
                                     <div class="flex items-center gap-2">
                                         <h3 class="font-black text-slate-900 text-lg" x-text="t.name"></h3>
-                                        <span x-show="t.featured" class="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">★ Featured</span>
+                                        <span x-show="t.featured" class="text-[10px] font-bold uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">★ Featured</span>
                                     </div>
                                     <div class="flex items-center gap-2 mt-1">
                                         <span class="text-xs font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full capitalize" x-text="t.category.replace('_',' ')"></span>

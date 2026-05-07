@@ -9,7 +9,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
             <div class="animate-slide-in flex flex-col" style="min-height: calc(100vh - 5rem);">
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
                     <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
                             <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
                             Legal Compliance
                         </div>
@@ -28,9 +28,9 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                         <table class="min-w-full h-full">
                             <thead>
                                 <tr class="bg-slate-50/50">
-                                    <th scope="col" class="py-6 pl-10 pr-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Agreement Name</th>
-                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Version</th>
-                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Effective Date</th>
+                                    <th scope="col" class="py-6 pl-10 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Agreement Name</th>
+                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Version</th>
+                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Effective Date</th>
                                     <th scope="col" class="relative py-6 pl-3 pr-10"><span class="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
@@ -52,7 +52,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                 <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-12 sm:px-0">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" onclick="closeModal()"></div>
                     <div class="flex min-h-full items-center justify-center">
-                        <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-xl bg-white p-12 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
+                        <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-xl bg-white p-6 text-left shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] animate-slide-in">
                             <div class="absolute top-8 right-8">
                                 <button onclick="closeModal()" aria-label="Close dialog" class="p-3 text-slate-400 hover:text-slate-900 rounded-2xl hover:bg-slate-50 transition-all active:scale-95">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -65,12 +65,12 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                             <input type="hidden" id="editAgreementId" />
                             <div class="space-y-8">
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Agreement Name</label>
+                                    <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Agreement Name</label>
                                     <input type="text" id="agreementName" placeholder="e.g., Standard Home Inspection Version 2.0"
                                         class="premium-input w-full px-6 py-4.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
+                                    <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
                                     <link rel="stylesheet" href="/vendor/quill/quill.snow.css" />
                                     <div class="rounded-2xl border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
                                         <div id="agreementEditor" style="min-height: 280px; font-size: 15px;"></div>
@@ -95,17 +95,17 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                 <div id="sendModal" class="fixed inset-0 z-[100] hidden overflow-y-auto px-4 py-12 sm:px-0">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onclick="closeSendModal()"></div>
                     <div class="flex min-h-full items-center justify-center">
-                        <div class="relative w-full max-w-md bg-white rounded-xl p-10 shadow-2xl">
+                        <div class="relative w-full max-w-md bg-white rounded-xl p-6 shadow-2xl">
                             <h3 class="text-2xl font-black text-slate-900 mb-2">Send for Signature</h3>
                             <p class="text-sm text-slate-400 font-semibold mb-8">Client will receive an email with a link to review and sign.</p>
                             <input type="hidden" id="sendAgreementId" />
                             <div class="space-y-4">
                                 <div>
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Client Email *</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Email *</label>
                                     <input type="email" id="sendClientEmail" placeholder="client@example.com" class="premium-input w-full px-5 py-4 rounded-2xl border-2 border-slate-50 focus:border-indigo-500 outline-none font-bold text-sm" />
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Client Name</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client Name</label>
                                     <input type="text" id="sendClientName" placeholder="John Smith" class="premium-input w-full px-5 py-4 rounded-2xl border-2 border-slate-50 focus:border-indigo-500 outline-none font-bold text-sm" />
                                 </div>
                             </div>

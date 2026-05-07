@@ -7,7 +7,7 @@ export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
         <MainLayout title={`${siteName} | Reports`} branding={branding}>
             <div class="space-y-10 animate-fade-in">
                 <div class="flex flex-col gap-3">
-                    <span class="self-start px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-[0.2em]">Reports</span>
+                    <span class="self-start px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-[0.2em]">Reports</span>
                     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                         <div>
                             <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Reports</h1>
@@ -32,11 +32,11 @@ export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
                         <table class="w-full">
                             <thead>
                                 <tr class="bg-slate-50/40">
-                                    <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Property</th>
-                                    <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Client</th>
-                                    <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
-                                    <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
-                                    <th class="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment</th>
+                                    <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Property</th>
+                                    <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Client</th>
+                                    <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                                    <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                                    <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Payment</th>
                                     <th class="px-6 py-5"></th>
                                 </tr>
                             </thead>

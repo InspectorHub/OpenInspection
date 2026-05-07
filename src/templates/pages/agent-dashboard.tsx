@@ -35,7 +35,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                     <div class="mx-auto max-w-7xl px-6 lg:px-8">
                         <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
                             <div>
-                                <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
+                                <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
                                     <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></span>
                                     Agent Portal
                                 </div>
@@ -44,7 +44,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                             </div>
                             
                             <div class="glass-panel p-6 rounded-3xl min-w-[240px]">
-                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Total Referrals</p>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Total Referrals</p>
                                 <h2 id="statTotal" class="text-4xl font-black text-slate-900 tabular-nums">0</h2>
                             </div>
                         </div>
@@ -55,11 +55,11 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                                 <table class="min-w-full">
                                     <thead>
                                         <tr class="bg-slate-50/50">
-                                            <th class="py-6 pl-10 pr-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Property Address</th>
-                                            <th class="px-6 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Client Info</th>
-                                            <th class="px-6 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
-                                            <th class="px-6 py-6 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Created</th>
-                                            <th class="px-6 py-6 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 pr-10">Action</th>
+                                            <th class="py-6 pl-10 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Property Address</th>
+                                            <th class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Client Info</th>
+                                            <th class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
+                                            <th class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Created</th>
+                                            <th class="px-6 py-6 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400 pr-10">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="reportsList" class="divide-y divide-slate-100">

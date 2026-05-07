@@ -9,12 +9,12 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
         <MainLayout title={`${siteName} | Embed Booking Widget`} branding={branding}>
             <div class="space-y-10 animate-fade-in">
                 <div>
-                    <span class="px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-[0.2em]">Widget</span>
+                    <span class="px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em]">Widget</span>
                     <h1 class="mt-3 text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Embed Booking Widget</h1>
                     <p class="mt-2 text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Paste a snippet on your marketing site. Bookings flow into your inspections list.</p>
                 </div>
 
-                <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
+                <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
                     <h2 class="text-2xl font-black text-slate-900 tracking-tightest">1 · Allowed Origins</h2>
                     <p class="text-sm text-slate-500">List the domains where you'll embed the widget. One per line. Use <code>{'https://*.example.com'}</code> for wildcard subdomains.</p>
                     <textarea id="widgetOrigins" rows={6}
@@ -25,7 +25,7 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                     </div>
                 </section>
 
-                <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
+                <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
                     <h2 class="text-2xl font-black text-slate-900 tracking-tightest">2 · Style</h2>
                     <div class="flex gap-3 flex-wrap">
                         <button class="widget-style-btn px-6 py-3 rounded-2xl ring-2 ring-slate-200 font-bold text-sm" data-style="light">☀ Light</button>
@@ -34,7 +34,7 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                     </div>
                 </section>
 
-                <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
+                <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
                     <h2 class="text-2xl font-black text-slate-900 tracking-tightest">3 · Snippet</h2>
                     <p class="text-sm text-slate-500">Copy and paste this into your site where the booking form should appear.</p>
                     <pre id="widgetSnippet" class="bg-slate-900 text-emerald-300 p-5 rounded-2xl overflow-x-auto text-xs font-mono"></pre>
@@ -43,7 +43,7 @@ export const SettingsWidgetPage = ({ branding }: Props) => {
                     </div>
                 </section>
 
-                <section class="glass-panel p-10 md:p-12 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
+                <section class="glass-panel p-6 rounded-2xl shadow-xl shadow-slate-100/50 space-y-6">
                     <h2 class="text-2xl font-black text-slate-900 tracking-tightest">4 · Live Preview</h2>
                     <iframe id="widgetPreview" class="w-full min-h-[700px] rounded-2xl border border-slate-200" loading="lazy"></iframe>
                 </section>

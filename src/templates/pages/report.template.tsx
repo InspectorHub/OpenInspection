@@ -109,14 +109,14 @@ export function renderProfessionalReport(data: {
             <div class="bg-slate-900 px-12 py-20 relative overflow-hidden">
                 <div class="absolute top-0 right-0 w-[400px] h-full bg-gradient-to-l from-indigo-500/20 to-transparent skew-x-[-20deg] translate-x-32"></div>
                 
-                <div class="relative z-10 flex flex-col md:flex-row justify-between items-end gap-12">
+                <div class="relative z-10 flex flex-col md:flex-row justify-between items-end gap-6">
                     <div class="max-w-3xl">
                         <div class="flex items-center gap-4 mb-10">
                             <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl p-1">
                                 <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                             </div>
                             <div class="h-8 w-px bg-white/20"></div>
-                            <span class="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Inspection Report</span>
+                            <span class="text-[10px] font-bold uppercase tracking-[0.3em] text-white/60">Inspection Report</span>
                         </div>
                         {/* Spec 5F.2 — Cover H1 sized to v3 (--ih-text-hero 40px ≈ text-4xl).
                             Per handoff README, font-black is retained ONLY on Report Cover H1
@@ -127,7 +127,7 @@ export function renderProfessionalReport(data: {
                     </div>
                     
                     <div class="flex flex-col items-start md:items-end gap-2 border-l-2 md:border-l-0 md:border-r-2 border-indigo-500/40 pl-8 md:pl-0 md:pr-8 py-2">
-                        <span class="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Inspection Date</span>
+                        <span class="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400">Inspection Date</span>
                         <span class="text-3xl font-black text-white tabular-nums tracking-tightest">
                             {new Date(inspection.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase()}
                         </span>
@@ -146,7 +146,7 @@ export function renderProfessionalReport(data: {
                         <div>
                             <div class="flex items-center gap-3 mb-3">
                                 <h3 class="text-indigo-900 font-extrabold text-2xl tracking-tight">AI Summary</h3>
-                                <span class="bg-indigo-600 text-white text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full shadow-lg shadow-indigo-100">Certified AI</span>
+                                <span class="bg-indigo-600 text-white text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full shadow-lg shadow-indigo-100">Certified AI</span>
                             </div>
                             <p class="text-indigo-900/60 leading-[1.8] text-lg font-medium italic max-w-4xl" x-text="aiSummary"></p>
                         </div>
@@ -156,11 +156,11 @@ export function renderProfessionalReport(data: {
             </template>
 
             {/* Technical Overview Tier */}
-            <div class="px-12 py-16 grid grid-cols-1 md:grid-cols-4 gap-12 bg-slate-50/30 relative">
+            <div class="px-12 py-16 grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-50/30 relative">
                 <div class="md:col-span-1">
                     <div class="flex items-center gap-2 mb-8">
                         <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Summary</h3>
+                        <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Summary</h3>
                     </div>
                     <div class="space-y-6">
                         <div class="flex justify-between items-end">
@@ -193,18 +193,18 @@ export function renderProfessionalReport(data: {
                    <div>
                        <div class="flex items-center gap-2 mb-8">
                            <div class="w-1.5 h-6 bg-slate-900 rounded-full"></div>
-                           <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Client</h3>
+                           <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Client</h3>
                        </div>
                        <p class="text-3xl font-black tracking-tightest text-slate-900">{inspection.clientName || 'Private Client'}</p>
                        <p class="mt-2 text-lg text-indigo-600 font-bold uppercase tracking-tightest">{inspection.clientEmail || 'REDACTED'}</p>
                        <div class="mt-6 pt-6 border-t border-slate-100 flex gap-4">
-                           <div class="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-500">Standard Inspection</div>
+                           <div class="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-500">Standard Inspection</div>
                        </div>
                    </div>
                    <div>
                        <div class="flex items-center gap-2 mb-8">
                            <div class="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                           <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Inspector</h3>
+                           <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Inspector</h3>
                        </div>
                        <p class="text-3xl font-black tracking-tightest text-slate-900">{branding?.siteName || siteName}</p>
                        <p class="mt-2 text-lg text-slate-500 font-medium">Report #{inspection.id.substring(0, 8).toUpperCase()}</p>
@@ -212,23 +212,23 @@ export function renderProfessionalReport(data: {
                            <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                            </div>
-                           <span class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Licensed Inspector</span>
+                           <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">Licensed Inspector</span>
                        </div>
                    </div>
                 </div>
             </div>
 
             {/* Inspection Details */}
-            <div class="px-12 py-24 space-y-32 bg-white">
+            <div class="px-12 py-24 space-y-12 bg-white">
                 {schema.sections.map((section: SchemaSection) => (
                     <section class="page-break" key={section.title}>
                         <div class="flex items-center gap-8 mb-16">
                             <h2 class="text-5xl font-black tracking-tightest text-slate-900 shrink-0">{section.title}</h2>
                             <div class="flex-grow h-0.5 bg-gradient-to-r from-slate-100 to-transparent"></div>
-                            <span class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Section {schema.sections.indexOf(section) + 1}</span>
+                            <span class="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-300">Section {schema.sections.indexOf(section) + 1}</span>
                         </div>
 
-                        <div class="space-y-24">
+                        <div class="space-y-10">
                             {section.items.map((item: SchemaItem) => {
                                 const res: ResultItem = resultData[item.id] || {};
                                 const bucketConfigs: Record<string, { bg: string, text: string, dot: string }> = {
@@ -249,7 +249,7 @@ export function renderProfessionalReport(data: {
                                                 <h3 class="text-3xl font-black tracking-tightest text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
                                                 <div class={`${conf.bg} ${conf.text} px-4 py-2 rounded-2xl flex items-center gap-3 border border-current/10 shadow-sm`}>
                                                     <div class={`w-2 h-2 rounded-full ${conf.dot} shadow-sm animate-pulse`}></div>
-                                                    <span class="text-[10px] font-black uppercase tracking-[0.2em]">{displayLabel}</span>
+                                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em]">{displayLabel}</span>
                                                 </div>
                                             </div>
                                             <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl">{res.notes || 'No notes recorded.'}</p>
@@ -266,7 +266,7 @@ export function renderProfessionalReport(data: {
                                             </div>
                                         ) : (
                                             <div class="lg:w-[480px] shrink-0 h-40 border-2 border-dashed border-slate-50 rounded-[2rem] flex items-center justify-center grayscale opacity-20">
-                                                <span class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">No photos</span>
+                                                <span class="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-300">No photos</span>
                                             </div>
                                         )}
                                     </div>
@@ -288,14 +288,14 @@ export function renderProfessionalReport(data: {
                     <p class="text-indigo-200/60 text-lg font-medium mb-12 uppercase tracking-[0.2em] leading-relaxed">This report documents the condition of the property at the time of inspection.</p>
                     
                     <div class="flex flex-col sm:flex-row justify-center gap-6">
-                        <button onclick="window.print()" class="px-12 py-5 bg-white text-slate-900 rounded-2xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-50 active:scale-95 transition-all">Print / Save PDF</button>
-                        <a href="/dashboard" class="px-12 py-5 bg-white/10 text-white border border-white/20 rounded-2xl text-sm font-black uppercase tracking-[0.2em] backdrop-blur-md hover:bg-white/20 active:scale-95 transition-all">Back to Dashboard</a>
+                        <button onclick="window.print()" class="px-12 py-5 bg-white text-slate-900 rounded-2xl text-sm font-bold uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-50 active:scale-95 transition-all">Print / Save PDF</button>
+                        <a href="/dashboard" class="px-12 py-5 bg-white/10 text-white border border-white/20 rounded-2xl text-sm font-bold uppercase tracking-[0.2em] backdrop-blur-md hover:bg-white/20 active:scale-95 transition-all">Back to Dashboard</a>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="text-center mt-12 text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] no-print opacity-40">
+        <div class="text-center mt-12 text-slate-400 text-[10px] font-bold uppercase tracking-[0.4em] no-print opacity-40">
             &copy; {new Date().getFullYear()} {siteName}. All rights reserved.
         </div>
     </div>
@@ -317,12 +317,12 @@ export function renderProfessionalReport(data: {
                     <p class="text-xl text-slate-400 font-medium">Authentication required. Please authorize the inspection terms of service.</p>
                 </div>
 
-                <div class="prose prose-indigo prose-lg max-h-80 overflow-y-auto p-10 bg-slate-50/50 rounded-xl border border-slate-100 text-slate-600 leading-relaxed font-medium shadow-inner" x-html="agreementContent"></div>
+                <div class="prose prose-indigo prose-lg max-h-80 overflow-y-auto p-6 bg-slate-50/50 rounded-xl border border-slate-100 text-slate-600 leading-relaxed font-medium shadow-inner" x-html="agreementContent"></div>
 
                 <div class="space-y-6">
                     <div class="flex justify-between items-end">
-                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Electronic Signature Authorization</h4>
-                        <button {...{'@click': 'clearSignature'}} class="text-[10px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-[0.2em] transition-colors">Reset Input</button>
+                        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Electronic Signature Authorization</h4>
+                        <button {...{'@click': 'clearSignature'}} class="text-[10px] font-bold text-rose-500 hover:text-rose-600 uppercase tracking-[0.2em] transition-colors">Reset Input</button>
                     </div>
                     <div class="bg-slate-50 border-2 border-slate-100 rounded-[2rem] overflow-hidden group focus-within:border-indigo-600 transition-all shadow-sm">
                         <canvas x-ref="canvas" class="w-full h-48 cursor-crosshair touch-none"></canvas>
@@ -357,7 +357,7 @@ export function renderProfessionalReport(data: {
                 </button>
 
                 <div class="flex flex-col items-center gap-4 opacity-40">
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Secure Payment via Stripe</p>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Secure Payment via Stripe</p>
                     <div class="flex gap-4 grayscale opacity-50 scale-75">
                         {/* Fake logos or symbols for visual gravity */}
                         <div class="w-12 h-6 bg-slate-200 rounded"></div>

@@ -70,7 +70,7 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                     <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 overflow-hidden">
                         {/* Title bar */}
                         <div class="px-10 py-8 border-b border-slate-100">
-                            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 mb-2">Document for Signature</p>
+                            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600 mb-2">Document for Signature</p>
                             <h1 class="text-3xl font-black text-slate-900 tracking-tight">{agreementName}</h1>
                             {clientName && <p class="text-slate-500 font-semibold mt-1">Hi, {clientName}</p>}
                         </div>
@@ -108,9 +108,9 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                                     <details class="mt-6">
                                         <summary class="cursor-pointer text-xs text-rose-600 hover:underline font-semibold">Decline this agreement</summary>
                                         <div class="mt-3 p-4 bg-rose-50 rounded-lg border border-rose-100">
-                                            <label class="block text-[10px] font-black text-rose-700 uppercase tracking-widest mb-2">Reason (optional)</label>
+                                            <label class="block text-[10px] font-bold text-rose-700 uppercase tracking-widest mb-2">Reason (optional)</label>
                                             <textarea id="declineReason" rows={3} class="w-full px-3 py-2 rounded-lg border border-rose-200 text-sm" placeholder="Let the inspector know why..."></textarea>
-                                            <button type="button" onclick="declineAgreement()" id="declineBtn" class="mt-3 px-5 py-2 rounded-xl bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition">Decline Agreement</button>
+                                            <button type="button" onclick="declineAgreement()" id="declineBtn" class="mt-3 px-5 py-2 rounded-xl bg-rose-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-rose-700 transition">Decline Agreement</button>
                                         </div>
                                     </details>
                                 </div>

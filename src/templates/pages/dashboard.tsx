@@ -13,7 +13,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
                     <div class="space-y-4">
                         <div class="flex items-center gap-3">
-                            <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
+                            <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
                         </div>
                         <h1 class="text-5xl font-black tracking-tight text-slate-900 sm:text-6xl text-gradient">Inspections</h1>
                         <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage your inspections.</p>
@@ -324,8 +324,8 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 <div id="createModal" class="fixed inset-0 z-[100] hidden overflow-y-auto overflow-x-hidden">
                     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl transition-opacity animate-fade-in" onclick="closeModal()"></div>
                     <div class="flex min-h-full items-center justify-center p-6">
-                        <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-12 text-left shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] animate-fade-in border border-white/40">
-                            <div class="absolute top-10 right-10">
+                        <div role="dialog" aria-modal="true" class="relative w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 text-left shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] animate-fade-in border border-white/40">
+                            <div class="absolute top-6 right-10">
                                 <button onclick="closeModal()" aria-label="Close dialog" class="group p-3 text-slate-300 hover:text-slate-900 rounded-2xl hover:bg-slate-50 transition-all">
                                     <svg class="w-6 h-6 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
@@ -341,7 +341,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div class="space-y-2 md:col-span-2 relative">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Property Address</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Property Address</label>
                                     <input type="text" id="propAddress" placeholder="Start typing — autocomplete via Google" autocomplete="off" data-places-autocomplete
                                         class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                     {/* Spec 5D — Google Places autocomplete dropdown.
@@ -358,7 +358,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     <input type="hidden" id="propLng" />
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Template</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Template</label>
                                     <select id="templateId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Select a template...</option>
                                     </select>
@@ -367,7 +367,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     </p>
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Inspection Date &amp; Time</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Inspection Date &amp; Time</label>
                                     <input type="text" id="inspectionDate" data-flatpickr data-min-date="today" autocomplete="off" placeholder="Pick date and time"
                                         class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
@@ -399,28 +399,28 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     </div>
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Client Name</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Name</label>
                                     <input type="text" id="clientName" placeholder="e.g., John Doe"
                                         class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Client Email</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Email</label>
                                     <input type="email" id="clientEmail" placeholder="e.g., john@example.com"
                                         class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Client Phone</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Phone</label>
                                     <input type="tel" id="clientPhone" placeholder="e.g., (555) 123-4567"
                                         class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Assign Inspector</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Assign Inspector</label>
                                     <select id="inspectorId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Self-assignment</option>
                                     </select>
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Listing Agent</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Listing Agent</label>
                                     <select id="agentId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
@@ -429,7 +429,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     inspectors can record both sides of the transaction. Maps to
                                     inspections.sellingAgentId. Both selects share populateAgents(). */}
                                 <div class="space-y-2">
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Buyer's Agent</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Buyer's Agent</label>
                                     <select id="buyerAgentId" class="premium-input w-full px-6 py-4 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
@@ -438,7 +438,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
 
                             {/* Services selection */}
                             <div id="servicesSection" style="display:none" class="mb-4">
-                                <div class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Services</div>
+                                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Services</div>
                                 <div id="servicesList" class="space-y-2 max-h-48 overflow-y-auto"></div>
                                 <div id="serviceTotalBar" style="display:none" class="mt-3">
                                     <div class="flex items-center gap-2 mb-2">

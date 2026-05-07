@@ -8,7 +8,7 @@ export const CalendarPage = ({ branding }: { branding?: BrandingConfig | undefin
             <div class="space-y-6 animate-fade-in">
                 {/* Header */}
                 <div>
-                    <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-black text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Calendar</span>
+                    <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-bold text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Calendar</span>
                     <h1 class="text-5xl font-black tracking-tight text-slate-900">Calendar</h1>
                     <p class="text-lg text-slate-500 font-semibold mt-2">View scheduled inspections by month, week, or day.</p>
                 </div>

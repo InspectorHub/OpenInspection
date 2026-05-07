@@ -43,7 +43,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full" x-bind:class="severityClass(rec.severity)" x-text="rec.severity"></span>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full" x-bind:class="severityClass(rec.severity)" x-text="rec.severity"></span>
                                     <span class="text-xs text-slate-500" x-text="rec.category || '(no category)'"></span>
                                 </div>
                                 <p class="font-bold text-slate-900" x-text="rec.name"></p>

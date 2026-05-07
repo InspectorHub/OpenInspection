@@ -13,7 +13,7 @@ export const JoinPage = ({ token, branding }: { token?: string, branding?: Brand
                 </div>
 
                 <div class="w-full max-w-md relative z-10 animate-slide-in">
-                    <div class="glass-panel p-10 rounded-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.12)]">
+                    <div class="glass-panel p-6 rounded-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.12)]">
                         <div class="text-center mb-10">
                             <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-200 mb-6 group hover:rotate-6 transition-transform">
                                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
@@ -26,7 +26,7 @@ export const JoinPage = ({ token, branding }: { token?: string, branding?: Brand
                             <input type="hidden" id="token" name="token" value={token || ''} />
                             
                             <div class="space-y-2">
-                                <label for="password" class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Create Your Password</label>
+                                <label for="password" class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Create Your Password</label>
                                 <input id="password" name="password" type="password" autocomplete="new-password" required placeholder="••••••••"
                                     class="premium-input w-full px-6 py-4.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
                             </div>
