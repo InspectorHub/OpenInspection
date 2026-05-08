@@ -39,6 +39,8 @@
     "seed:recommendations:remote": "node scripts/seed-recommendations.js",
     "seed:marketplace": "node scripts/seed-marketplace.js --local",
     "seed:marketplace:remote": "node scripts/seed-marketplace.js",
+    "seed:sandbox": "node scripts/sandbox-seed.js --local",
+    "seed:sandbox:remote": "node scripts/sandbox-seed.js --env=sandbox",
     "prepare": "husky"
   },
   "dependencies": {

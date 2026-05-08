@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a defect, regression, or unexpected behavior in OpenInspection.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug.
+        Before continuing, please:
+        - Search [existing issues](https://github.com/InspectorHub/OpenInspection/issues?q=is%3Aissue) for duplicates.
+        - For *questions* (vs. bugs), use [Q&A Discussions](https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a) instead.
+        - For *security vulnerabilities*, follow [SECURITY.md](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/SECURITY.md) — do **not** open a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: OpenInspection version / commit
+      description: Output of `git rev-parse HEAD` or the version in `package.json`.
+      placeholder: "1.0.0-rc.1 or 9da54b7"
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment target
+      description: Where are you running the worker?
+      options:
+        - Cloudflare Workers (production)
+        - Local dev (npm run dev)
+        - Sandbox (sandbox.inspectorhub.io)
+        - Custom / fork
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior. Paste error messages verbatim.
+      placeholder: "When I clicked Publish, the dashboard showed a 500 error toast."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: "I expected the report to publish and the inspection status to flip to Published."
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps. Include the URL, role, and any seed data needed.
+      placeholder: |
+        1. Go to /dashboard
+        2. Open inspection X
+        3. Click Publish
+        4. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / wrangler tail output
+      description: Paste relevant log lines. Redact JWTs, API keys, and customer PII.
+      render: shell
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, related issues, hypotheses about root cause, etc.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of conduct
+      options:
+        - label: I have read and agree to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md).
+          required: true

@@ -8,7 +8,7 @@ This guide walks you through deploying OpenInspection and completing the initial
 
 Click the button below to deploy directly to your Cloudflare account. Cloudflare will automatically create a D1 database, R2 bucket, and KV namespace, then deploy the Worker.
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/important-new/OpenInspection)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/InspectorHub/OpenInspection)
 
 After the deploy completes:
 

@@ -1,51 +1,90 @@
-# OpenInspection Development Standards
+# Contributing to OpenInspection
 
-Welcome to the OpenInspection core repository. To maintain industrial-grade quality and a premium user experience, all contributions must adhere to the following standards.
+Thanks for considering a contribution. OpenInspection is an open-source home inspection app built on Cloudflare Workers. We welcome bug reports, feature ideas, documentation improvements, and code contributions from anyone running their own deployment or building on top of the codebase.
 
-## 🎨 UI & Design Standards
+## Quick links
 
-We follow a **Glassmorphism** design language.
+- 🐛 [Report a bug](https://github.com/InspectorHub/OpenInspection/issues/new?template=bug_report.yml)
+- 💡 [Suggest a feature](https://github.com/InspectorHub/OpenInspection/issues/new?template=feature_request.yml)
+- 💬 [Ask a question](https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a)
+- 📣 [Roadmap & releases](https://github.com/InspectorHub/OpenInspection/discussions/categories/announcements)
+- 🧪 [Try the sandbox](https://sandbox.inspectorhub.io)
 
-- **Tokens**:
-    - **Backdrop Blur**: `backdrop-blur-md` or `backdrop-blur-xl`.
-    - **Borders**: `border-white/20` or `border-slate-200/50`.
-    - **Shadows**: Large, soft shadows (e.g., `shadow-2xl shadow-indigo-100/30`).
-- **Typography**: Primary font is **Inter**, fallback is **Outfit**. Avoid system defaults.
-- **Tailwind Class Ordering**: We enforce a standard sequence: **Layout → Box Model → Typography → Visual Styles → Interaction/States**. Use the official Prettier plugin for automatic sorting.
-- **Interactivity**: Every button must have a hover/active state (e.g., `active:scale-95`). Use `animate-fade-in` for new entries.
+## Development setup
 
-## 📡 API Development
+```bash
+git clone https://github.com/InspectorHub/OpenInspection.git
+cd OpenInspection
+npm install
+npm run setup:cloudflare    # provisions D1 / R2 / KV (or use --local)
+npm run dev                 # http://localhost:8788
+```
 
-All API endpoints must be defined using **OpenAPIHono**.
+Detailed setup including Cloudflare bindings, environment variables, and the sandbox runbook: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`docs/architecture.md`](docs/architecture.md). Extension cookbook: [`docs/extending.md`](docs/extending.md).
 
-- **Contract-First**: Define Zod schemas in `src/lib/validations/` before writing the controller.
-- **Type Safety**: Routes must be registered using `.openapi()`.
-- **Validation Errors**: Ensure frontend handlers can parse detailed Zod errors. Use the helper logic from `public/js/setup.js`.
+## Code conventions
 
-## 🏗 Infrastructure & Scripts
+These are summarized from `CLAUDE.md` — read that file for the canonical, exhaustive rules.
 
-The `scripts/` directory contains mission-critical automation.
+- **Language**: TypeScript with strict mode. All source code, comments, docs, commit messages, and user-facing strings in **English only**.
+- **Validation**: Every API endpoint uses Zod. Schemas live in `src/lib/validations/*.schema.ts`. No manual `if (!field)` checks.
+- **Auth**: HS256 JWT in HttpOnly cookie, PBKDF2 password hashing. Never use a fallback secret. Read `CLAUDE.md` § JWT & Auth Security Rules.
+- **Multi-tenant**: Every D1 table includes `tenant_id`. Use `c.var.services.xxx` (DI proxy) — services auto-scope to the tenant.
+- **Logging**: Server-side code uses `import { logger } from '../lib/logger'`. Browser-side `console.*` is fine.
+- **CSS**: Tailwind utilities + canonical v3 tokens defined in `src/styles/input.css`. No `font-black` outside stat numbers, no `rounded-2xl`, no `tracking-tightest`. The design system reference is at `docs/superpowers/plans/2026-05-08-sprint1-design-system-reference.md`.
 
-- **Idempotency**: Scripts must be able to run multiple times without side effects (e.g., skip resource creation if ID already exists).
-- **Fault Tolerance**: Any network request must have a **3-retry mechanism with backoff**.
-- **Hygiene**:
-    - Do not commit hardcoded Cloudflare IDs to the repo's base `wrangler.toml` (template).
-    - Use the setup script to patch IDs locally.
+## Commit style
 
-## ✅ Quality Checklist
+```
+<type>(<scope>): <short summary>
 
-- **Hard Blocks**: We have a zero-tolerance policy for:
-    - `any` types (unless explicitly justified and suppressed with comment).
-    - Unused variables or imports (`no-unused-vars`).
-    - TypeScript compilation errors (`npm run type-check`).
-    - Lint warnings (`npm run lint`).
-  All of the above MUST be resolved before pushing or opening a PR.
-- **Logging**: Ensure no `console.trace` or `console.log` remains in production code (use `src/lib/logger.ts` instead).
+<body explaining why, not what>
+```
 
-## 🧪 Testing
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`, `perf`. Scope: `core`, `infra`, `docs`, etc.
 
-- **E2E**: New routes should have an equivalent test case in `tests/e2e/`.
-- **Unit**: Complex logic in `src/lib/` requires `vitest` unit tests.
+Example:
 
----
-*OpenInspection 1.0.0-rc.1 — Professionalizing the Open-Source Inspection Engine.*
+```
+feat(core): item-aware quick comments ranking
+
+Active item gets a 100-point boost; section match adds 10; rating
+bucket adds 5. Avoids the case where Roof comments dominate the
+panel when active item is Gutters & Downspouts.
+```
+
+## Pull requests
+
+1. Fork → branch off `master` → make your changes
+2. Run `npm run type-check && npm run lint && npm run test:unit` (all green)
+3. Manual smoke for any UI change at 1440 px AND 375 px
+4. Open PR using the template — describe **what + why** (not how)
+5. Maintainers aim to review within 7 days
+
+## What gets fast-tracked
+
+- Bug fixes with regression tests
+- Performance improvements with before/after benchmarks
+- Accessibility fixes with reproduction case
+- New seed templates (open-source license, ≥ 8 sections)
+- Translation contributions to public-facing strings (welcomed once i18n lands)
+- Integration scaffolds (Zapier, QuickBooks, Make.com, etc.)
+
+## What gets pushed back
+
+- Library swaps (Drizzle → another ORM, Hono → another framework)
+- Closed-source dependencies
+- Features that lock customers into a single payment or scheduling provider
+- Mass file moves without prior spec discussion
+
+## Code of Conduct
+
+By contributing, you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security disclosures
+
+Never report a vulnerability in a public issue or discussion. Use [GitHub Security Advisories](https://github.com/InspectorHub/OpenInspection/security/advisories) — see [`SECURITY.md`](SECURITY.md) if present.
+
+## License
+
+Source code is licensed under [GNU Affero General Public License v3.0](LICENSE).

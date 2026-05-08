@@ -14,6 +14,10 @@ export interface BrandingConfig {
     billingUrl: string;
     gaMeasurementId?: string | null | undefined;
     reportTheme?: 'modern' | 'classic' | 'minimal' | undefined;
+    /** Sprint 1 CC-2 — true when the worker runs as the public sandbox demo
+     *  (env.SANDBOX_MODE === 'true'). Plumbed through branding so every page
+     *  template that already accepts branding gets it for free. */
+    sandboxMode?: boolean | undefined;
 }
 
 import { ScopedDB } from '../lib/db/scoped';

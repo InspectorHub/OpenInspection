@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / installation help
+    url: https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a
+    about: Use Q&A Discussions for questions, configuration help, or anything that has a right answer but is not a bug.
+  - name: Feature ideation
+    url: https://github.com/InspectorHub/OpenInspection/discussions/categories/ideas
+    about: Pitch and discuss feature ideas in Discussions before opening a tracker issue.
+  - name: Security vulnerability
+    url: https://github.com/InspectorHub/OpenInspection/security/advisories/new
+    about: Report security issues privately via GitHub Security Advisories — never via public issues.
+  - name: Managed hosting (InspectorHub)
+    url: https://inspectorhub.io
+    about: For SaaS / billing / account questions, contact the InspectorHub team.

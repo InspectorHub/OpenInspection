@@ -12,7 +12,8 @@ import { logger } from '../logger';
  */
 export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const tenantId = c.get('tenantId');
-    
+    const sandboxMode = c.env.SANDBOX_MODE === 'true';
+
     // Default system branding (fallback)
     const defaultBranding: BrandingConfig = {
         siteName: c.env.APP_NAME || 'OpenInspection',
@@ -20,7 +21,8 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         logoUrl: null,
         supportEmail: c.env.SENDER_EMAIL || 'support@openinspection.org',
         billingUrl: '/settings',
-        gaMeasurementId: c.env.GA_MEASUREMENT_ID || null
+        gaMeasurementId: c.env.GA_MEASUREMENT_ID || null,
+        sandboxMode,
     };
 
     if (!tenantId) {
@@ -30,10 +32,13 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
 
     const cacheKey = `branding:${tenantId}`;
     const cached = await c.env.TENANT_CACHE?.get(cacheKey);
-    
+
     if (cached) {
         try {
-            c.set('branding', JSON.parse(cached));
+            const parsed = JSON.parse(cached) as BrandingConfig;
+            // sandboxMode is env-driven, never cached — always recompute.
+            parsed.sandboxMode = sandboxMode;
+            c.set('branding', parsed);
             return await next();
         } catch (e) {
             logger.error('[branding] Cache parse failed', {}, e instanceof Error ? e : undefined);
@@ -62,14 +67,25 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             supportEmail: config.supportEmail || defaultBranding.supportEmail,
             billingUrl: config.billingUrl || defaultBranding.billingUrl,
             gaMeasurementId: config.gaMeasurementId || defaultBranding.gaMeasurementId,
-            reportTheme: (config.reportTheme || 'modern') as 'modern' | 'classic' | 'minimal'
+            reportTheme: (config.reportTheme || 'modern') as 'modern' | 'classic' | 'minimal',
+            sandboxMode,
         } : defaultBranding;
-        
+
         c.set('branding', branding);
-        
+
         if (config && c.env.TENANT_CACHE) {
             try {
-                c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(branding), { expirationTtl: 3600 }));
+                // Strip sandboxMode before caching (env-driven, recomputed per request).
+                const cacheable: Omit<BrandingConfig, 'sandboxMode'> = {
+                    siteName:     branding.siteName,
+                    primaryColor: branding.primaryColor,
+                    logoUrl:      branding.logoUrl,
+                    supportEmail: branding.supportEmail,
+                    billingUrl:   branding.billingUrl,
+                };
+                if (branding.gaMeasurementId !== undefined) cacheable.gaMeasurementId = branding.gaMeasurementId;
+                if (branding.reportTheme !== undefined)     cacheable.reportTheme     = branding.reportTheme;
+                c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(cacheable), { expirationTtl: 3600 }));
             } catch {
                 // executionCtx unavailable in test environments
             }

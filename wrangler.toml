@@ -18,6 +18,24 @@ APP_MODE = "standalone"
 # Default: Cloudflare's official always-pass test key (safe to use until you go live)
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
+# ── Sandbox mode (Sprint 1 CC-2) ───────────────────────────────────────────
+# Set to "true" only on the public demo deployment (sandbox.inspectorhub.io).
+# Enables a top banner on every authenticated page warning visitors that the
+# data resets nightly. Production self-hosters MUST leave this unset/empty.
+SANDBOX_MODE = ""
+
+# ── Sandbox environment override ───────────────────────────────────────────
+# Deploy with `wrangler deploy --env sandbox` to flip SANDBOX_MODE on without
+# touching the production worker. Used by the openinspection-sandbox Worker
+# bound to sandbox.inspectorhub.io.
+[env.sandbox]
+name = "openinspection-sandbox"
+[env.sandbox.vars]
+ENVIRONMENT = "sandbox"
+APP_MODE = "standalone"
+SANDBOX_MODE = "true"
+TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+
 # ── Secrets — set via: wrangler secret put SECRET_NAME ──────────────────────
 # Run `npm run setup:cloudflare` to be prompted for each one interactively.
 #
