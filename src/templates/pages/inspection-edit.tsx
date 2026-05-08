@@ -208,7 +208,11 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                     onboarding overlay (T6 / step 0) highlights so the user
                     knows which buttons the tour is talking about. */}
                 {/* Spec 5G mobile field-flow (Round 12) — 44px+ tap target on
-                    mobile per Apple HIG; desktop keeps compact 28px height. */}
+                    mobile per Apple HIG; desktop keeps compact 28px height.
+                    R7-16 — show the full rating label on tablet+ (≥640px) so
+                    new inspectors can read "Satisfactory" instead of decoding
+                    "Sat". Mobile keeps the abbreviation to fit 5 buttons in
+                    one row. aria-label still provides the full name to AT. */}
                 <div data-rating-row class="flex flex-wrap gap-1.5 mb-3">
                   <template x-for="level in ratingLevels" x-bind:key="level.id">
                     <button
@@ -218,8 +222,10 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       class="px-4 py-2.5 min-h-[44px] lg:min-h-0 lg:px-3 lg:py-1.5 text-sm lg:text-xs font-semibold rounded-lg border transition-all"
                       x-bind:class="getItemRating(item.id) === level.id ? 'text-white border-transparent' : 'text-gray-400 hover:text-gray-600'"
                       x-bind:style="getItemRating(item.id) === level.id ? 'background:' + level.color + ';border-color:transparent' : 'border-color: #e2e8f0'"
-                      x-text="level.abbreviation"
-                    ></button>
+                    >
+                      <span class="hidden sm:inline" x-text="level.label"></span>
+                      <span class="sm:hidden" x-text="level.abbreviation"></span>
+                    </button>
                   </template>
                 </div>
 
@@ -770,7 +776,15 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <span class="font-semibold" style="color: var(--ih-primary, #6366f1)" x-text="'Selected ' + selectedBatchCount + '/' + currentSectionItems.length"></span>
               <button x-on:click="batchSelectAll()" class="px-3 py-1 rounded-lg text-xs font-semibold" style="background: white; color: var(--ih-primary, #6366f1)">Select All</button>
               <template x-for="level in ratingLevels" x-bind:key="level.id">
-                <button x-on:click="batchSetRating(level.id)" class="px-3 py-1 rounded-lg text-xs font-semibold" style="background: white; color: #475569" x-text="'Set ' + level.abbreviation"></button>
+                <button
+                    x-on:click="batchSetRating(level.id)"
+                    x-bind:aria-label="'Set ' + level.label"
+                    class="px-3 py-1 rounded-lg text-xs font-semibold"
+                    style="background: white; color: #475569"
+                >
+                  <span class="hidden sm:inline" x-text="'Set ' + level.label"></span>
+                  <span class="sm:hidden" x-text="'Set ' + level.abbreviation"></span>
+                </button>
               </template>
               <button x-on:click="batchMode = false; batchSelected = {}" class="ml-auto px-3 py-1 rounded-lg text-xs font-semibold" style="color: #64748b">Exit</button>
             </div>
@@ -948,7 +962,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       x-bind:style="'background:' + getRatingColor(getItemRating(item.id)) + '20; color:' + getRatingColor(getItemRating(item.id))"
                     ></span>
                   </div>
-                  {/* Rating Buttons */}
+                  {/* Rating Buttons (R7-16 — full label on ≥640px, abbreviation
+                      on mobile; aria-label preserves the full name for AT). */}
                   <div class="flex flex-wrap gap-1.5 mb-3" x-on:click="$event.stopPropagation()">
                     <template x-for="level in ratingLevels" x-bind:key="level.id">
                       <button
@@ -958,8 +973,10 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                         class="px-2.5 py-1 text-[10px] font-semibold rounded-lg border transition-all"
                         x-bind:class="getItemRating(item.id) === level.id ? 'text-white border-transparent' : 'text-gray-400 hover:text-gray-600'"
                         x-bind:style="getItemRating(item.id) === level.id ? 'background:' + level.color + ';border-color:transparent' : 'border-color: #e2e8f0'"
-                        x-text="level.abbreviation"
-                      ></button>
+                      >
+                        <span class="hidden sm:inline" x-text="level.label"></span>
+                        <span class="sm:hidden" x-text="level.abbreviation"></span>
+                      </button>
                     </template>
                   </div>
                   {/* Round 39 — formerly the whole row had stopPropagation,

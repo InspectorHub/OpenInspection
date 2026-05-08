@@ -71,6 +71,11 @@ export default defineConfig({
             dependencies: ['api'],
         },
         {
+            // R7-06 — public booking page native date input.
+            name: 'booking-date-input',
+            testMatch: 'booking-date-input.spec.ts',
+        },
+        {
             name: 'cloud',
             testMatch: 'cloud-e2e.spec.ts',
             use: {
