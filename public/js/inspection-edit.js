@@ -308,9 +308,13 @@ function inspectionEditor(inspectionId) {
         }
         var key = e.key.toLowerCase();
         var idx = -1;
+        // Sprint 1 A-8: extend 1-3 → 1-5 so rating levels 4 (Not Inspected)
+        // and 5 (Not Present) are reachable from the keyboard.
         if (key === '1') idx = 0;
         else if (key === '2') idx = 1;
         else if (key === '3') idx = 2;
+        else if (key === '4') idx = 3;
+        else if (key === '5') idx = 4;
         else if (key === '0') idx = -2; // clear
         else if (key === 'n') idx = -3; // N/A — rating with abbreviation 'NA' or 'N/A'
         else return;

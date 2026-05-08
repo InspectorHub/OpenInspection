@@ -661,7 +661,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 {/* Spec 5G M1 — keyboard hints inline next to section title (Mockup 01) */}
                 <span class="hidden lg:flex items-center gap-1.5 text-[10px] text-slate-400 ml-2" title="Keyboard shortcuts (press ? for full HUD)">
                   <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">↑↓</kbd> nav
-                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">1-3</kbd> rate
+                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">1-5</kbd> rate
                   <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">/</kbd> lib
                   <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">⏎</kbd> next
                 </span>
@@ -1225,7 +1225,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             <footer class="px-4 py-2 border-t text-[10px] text-slate-400" style="border-color: rgba(226,232,240,0.5);">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <kbd class="px-1 bg-slate-100 border rounded font-mono">↑↓</kbd> nav
-                <kbd class="px-1 bg-slate-100 border rounded font-mono">1-3</kbd> rate
+                <kbd class="px-1 bg-slate-100 border rounded font-mono">1-5</kbd> rate
                 <kbd class="px-1 bg-slate-100 border rounded font-mono">/</kbd> lib
                 <kbd class="px-1 bg-slate-100 border rounded font-mono">?</kbd> all
               </div>
@@ -1539,6 +1539,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <p class="text-xs uppercase tracking-wide font-semibold mb-3" style="color: #94a3b8">Keyboard Shortcuts</p>
               <ul class="space-y-2 text-sm" style="color: #0f172a">
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">1 / 2 / 3</span><span>Set rating Satisfactory / Monitor / Defect</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">4 / 5</span><span>Not Inspected / Not Present</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">0</span><span>Clear rating · <span class="font-mono">N</span> = N/A</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">↑ / ↓</span><span>Move active item · Enter = next · Shift+Enter = prev</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">G + 0–9</span><span>Jump to section by index</span></li>
