@@ -26,6 +26,7 @@ import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
+import { TemplateMigrationService } from '../../services/template-migration.service';
 import { ImportHistoryService } from '../../services/import-history.service';
 
 import { StandaloneProvider } from '../integration/standalone';
@@ -158,6 +159,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportPdf':
                     target.reportPdf = new ReportPdfService(c.env.DB, c.env.BROWSER, c.env.REPORTS);
+                    break;
+                case 'templateMigration':
+                    target.templateMigration = new TemplateMigrationService(c.env.DB, c.get('tenantId'));
                     break;
                 case 'importHistory':
                     target.importHistory = new ImportHistoryService(c.env.DB, c.get('tenantId'));

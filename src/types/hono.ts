@@ -95,6 +95,7 @@ import { TemplateSeedService } from '../services/template-seed.service';
 import { ReportPdfService } from '../services/report-pdf.service';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
+import { TemplateMigrationService } from '../services/template-migration.service';
 import { ImportHistoryService } from '../services/import-history.service';
 import { AuthVariables } from './auth';
 
@@ -129,6 +130,7 @@ export interface AppServices {
     reportPdf: ReportPdfService;
     signingKey: SigningKeyService;
     auditLog: AuditLogService;
+    templateMigration: TemplateMigrationService;
     importHistory: ImportHistoryService;
 }
 
