@@ -71,6 +71,12 @@ export default defineConfig({
             dependencies: ['api'],
         },
         {
+            // Sprint 2 regression — Track A fixes (A1-A4). Source-level +
+            // route-level guards so the regressions can't reappear.
+            name: 'sprint2-regression',
+            testMatch: 'sprint2-regression.spec.ts',
+        },
+        {
             name: 'cloud',
             testMatch: 'cloud-e2e.spec.ts',
             use: {
