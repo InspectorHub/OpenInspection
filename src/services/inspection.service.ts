@@ -1008,6 +1008,178 @@ export class InspectionService {
     }
 
     /**
+     * Round-2 F1 — list every party associated with an inspection so the
+     * Publish modal can render per-recipient Email + Text checkboxes.
+     *
+     * Returned shape (`InspectionRecipient[]`):
+     *   - role: 'client' | 'agent_buyer' | 'agent_listing'
+     *   - contactId: contact row id (null for the inline client — clients are
+     *     stored as columns on `inspections`, not in `contacts`)
+     *   - name, email, phone
+     *
+     * Recipients without any contact info (no email AND no phone) are dropped
+     * because there is no way to deliver to them. Tenant-scoped via the
+     * compound `where(eq(id), eq(tenantId))` guard on the inspection lookup
+     * AND the contact lookup.
+     */
+    async getRecipientList(inspectionId: string, tenantId: string): Promise<Array<{
+        contactId: string | null;
+        name:      string;
+        role:      'client' | 'agent_buyer' | 'agent_listing';
+        email:     string | null;
+        phone:     string | null;
+    }>> {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        const recipients: Array<{
+            contactId: string | null;
+            name:      string;
+            role:      'client' | 'agent_buyer' | 'agent_listing';
+            email:     string | null;
+            phone:     string | null;
+        }> = [];
+
+        // Client — stored inline on inspections (not contacts table). Only
+        // include when there is at least a name AND at least one channel.
+        if ((inspection.clientName ?? '').trim() && (inspection.clientEmail || inspection.clientPhone)) {
+            recipients.push({
+                contactId: null,
+                name:      inspection.clientName as string,
+                role:      'client',
+                email:     (inspection.clientEmail as string | null) ?? null,
+                phone:     (inspection.clientPhone as string | null) ?? null,
+            });
+        }
+
+        // Agents — buyer's agent (referredByAgentId) + listing agent (sellingAgentId).
+        const agentIds = [inspection.referredByAgentId, inspection.sellingAgentId]
+            .filter((x): x is string => typeof x === 'string' && x.length > 0);
+        if (agentIds.length > 0) {
+            const agentRows = await db.select().from(contacts)
+                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, agentIds)));
+            const byId = new Map<string, typeof agentRows[number]>();
+            for (const row of agentRows) byId.set(row.id as string, row);
+
+            const buyerId   = inspection.referredByAgentId as string | null;
+            const listingId = inspection.sellingAgentId   as string | null;
+
+            for (const [id, role] of [
+                [buyerId,   'agent_buyer'  as const],
+                [listingId, 'agent_listing' as const],
+            ] as Array<[string | null, 'agent_buyer' | 'agent_listing']>) {
+                if (!id) continue;
+                const row = byId.get(id);
+                if (!row) continue;
+                const email = (row.email as string | null) ?? null;
+                const phone = (row.phone as string | null) ?? null;
+                if (!email && !phone) continue; // no delivery channel
+                recipients.push({
+                    contactId: row.id as string,
+                    name:      row.name as string,
+                    role,
+                    email,
+                    phone,
+                });
+            }
+        }
+
+        return recipients;
+    }
+
+    /**
+     * Round-2 F3 — People card payload (Spectora §E.2 / §4.1).
+     *
+     * Groups every party connected to an inspection by role so the inspection
+     * Settings page can render a contact card with role chips:
+     *
+     *   - Inspector  → users row referenced by inspectorId
+     *   - Client     → inline columns on inspections (clientName/email/phone)
+     *   - Buyer's Agent  → contacts row pointed at by referredByAgentId
+     *   - Listing Agent  → contacts row pointed at by sellingAgentId
+     *
+     * Schema currently allows ONE buyer agent + ONE listing agent per
+     * inspection. The result returns arrays for forward-compat (so the UI
+     * can render "Buyer's Agent · 2" if multi-agent ever ships) without a
+     * follow-up service refactor.
+     */
+    async getPeopleCard(inspectionId: string, tenantId: string): Promise<{
+        inspector:     { id: string; name: string | null; email: string; phone: string | null } | null;
+        client:        { name: string; email: string | null; phone: string | null } | null;
+        buyerAgents:   Array<{ id: string; name: string; email: string | null; phone: string | null; agency: string | null }>;
+        listingAgents: Array<{ id: string; name: string; email: string | null; phone: string | null; agency: string | null }>;
+    }> {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        // Inspector — users table (tenant-scoped).
+        let inspector: { id: string; name: string | null; email: string; phone: string | null } | null = null;
+        if (inspection.inspectorId) {
+            const u = await db.select().from(users)
+                .where(and(eq(users.id, inspection.inspectorId as string), eq(users.tenantId, tenantId)))
+                .get();
+            if (u) {
+                inspector = {
+                    id:    u.id as string,
+                    name:  (u.name  as string | null) ?? null,
+                    email: u.email as string,
+                    phone: (u.phone as string | null) ?? null,
+                };
+            }
+        }
+
+        // Client — inline on inspections. Only return when there's at least
+        // a name (otherwise nothing meaningful to render in the card).
+        const clientName = (inspection.clientName as string | null) ?? null;
+        const client = clientName && clientName.trim().length > 0
+            ? {
+                name:  clientName,
+                email: (inspection.clientEmail as string | null) ?? null,
+                phone: (inspection.clientPhone as string | null) ?? null,
+            }
+            : null;
+
+        // Agents — fetch both in one query.
+        const agentIds = [inspection.referredByAgentId, inspection.sellingAgentId]
+            .filter((x): x is string => typeof x === 'string' && x.length > 0);
+        const agentRowsById = new Map<string, typeof contacts.$inferSelect>();
+        if (agentIds.length > 0) {
+            const rows = await db.select().from(contacts)
+                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, agentIds)));
+            for (const row of rows) agentRowsById.set(row.id as string, row);
+        }
+        const toAgent = (id: string | null) => {
+            if (!id) return null;
+            const row = agentRowsById.get(id);
+            if (!row) return null;
+            return {
+                id:     row.id as string,
+                name:   row.name as string,
+                email:  (row.email  as string | null) ?? null,
+                phone:  (row.phone  as string | null) ?? null,
+                agency: (row.agency as string | null) ?? null,
+            };
+        };
+        const buyerAgent   = toAgent(inspection.referredByAgentId as string | null);
+        const listingAgent = toAgent(inspection.sellingAgentId   as string | null);
+
+        return {
+            inspector,
+            client,
+            buyerAgents:   buyerAgent   ? [buyerAgent]   : [],
+            listingAgents: listingAgent ? [listingAgent] : [],
+        };
+    }
+
+    /**
      * Publishes an inspection report (transitions to delivered status).
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
@@ -1016,6 +1188,10 @@ export class InspectionService {
         notifyAgent: boolean;
         requireSignature: boolean;
         requirePayment: boolean;
+        // Round-2 F1 — optional per-recipient delivery list. Older callers
+        // (legacy publish modal, AI agent flows) keep working without it.
+        recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
+        sendAgreementCopy?: boolean;
     }) {
         const db = this.getDrizzle();
 
@@ -1343,7 +1519,7 @@ export class InspectionService {
         const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
             defectStats:    { safety: number; recommendation: number; maintenance: number };
             agentName?:     string;
-            statusFlags:    { reportPublished: boolean; agreementSigned: boolean; paid: boolean; flagged: boolean; canceled: boolean };
+            statusFlags:    { reportPublished: boolean; reportReady: boolean; agreementSigned: boolean; paid: boolean; sent: boolean; flagged: boolean; canceled: boolean };
             requestId?:     string;
             siblingCount?:  number;
         }> =>
@@ -1354,14 +1530,22 @@ export class InspectionService {
                 const agentName = (sellingId && agentNameMap.get(sellingId)) || (referredById && agentNameMap.get(referredById)) || undefined;
                 const reqId = (r as { requestId?: unknown }).requestId as string | null | undefined;
                 const siblingCount = reqId ? (requestSiblingCounts.get(reqId) ?? 1) : 1;
+                // Round-2 F2 — split "report ready" (built/completed) from "sent"
+                // (delivered = publish workflow completed). Older clients still
+                // see `reportPublished` (alias of reportReady) for backward-
+                // compat; new dashboard JSX reads `sent` for the ✈️ icon.
+                const reportReady = r.status === 'completed' || r.status === 'delivered';
+                const sent        = r.status === 'delivered';
                 return {
                     ...r,
                     defectStats: statsMap.get(id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
                     ...(agentName ? { agentName } : {}),
                     statusFlags: {
-                        reportPublished: r.status === 'completed' || r.status === 'delivered',
+                        reportPublished: reportReady,
+                        reportReady,
                         agreementSigned: signedSet.has(id),
                         paid:            paidIdSet.has(id),
+                        sent,
                         flagged:         overdueSet.has(id),
                         canceled:        r.status === 'cancelled',
                     },

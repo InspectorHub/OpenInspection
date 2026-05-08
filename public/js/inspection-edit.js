@@ -112,7 +112,14 @@ function inspectionEditor(inspectionId) {
       notifyAgent: true,
       requireSignature: false,
       requirePayment: false,
+      // Round-2 F1 — radio: 'report' (default) or 'agreement'.
+      payload: 'report',
     },
+
+    // Round-2 F1 — multi-recipient Publish modal state.
+    showLegacyPublishOptions: false,
+    loadingRecipients: false,
+    recipients: [],
 
     async init() {
       // Tell global KeyboardHUD (keyboard-hud.tsx) not to fire on ? — this
@@ -1823,13 +1830,71 @@ function inspectionEditor(inspectionId) {
       window.open('/api/inspections/' + this.inspectionId + '/report', '_blank');
     },
 
+    // Round-2 F1 — Fetch the recipient list for the multi-recipient publish
+    // modal. Each row gets a fresh { channels: { email: false, text: false } }
+    // so checkbox state starts unchecked. Sets `loadingRecipients` for the
+    // body's loading sentinel.
+    async loadRecipients() {
+      this.loadingRecipients = true;
+      try {
+        const res = await authFetch('/api/inspections/' + this.inspectionId + '/recipients');
+        if (res.ok) {
+          const json = await res.json();
+          const list = (json && json.data) || [];
+          this.recipients = list.map(function (r) {
+            return {
+              contactId: r.contactId,
+              name:      r.name,
+              role:      r.role,
+              email:     r.email,
+              phone:     r.phone,
+              channels:  { email: !!r.email, text: false },
+            };
+          });
+        } else {
+          this.recipients = [];
+        }
+      } catch (e) {
+        this.recipients = [];
+      } finally {
+        this.loadingRecipients = false;
+      }
+    },
+
+    // Round-2 F1 — count of {recipient × channel} checkboxes that are on.
+    // Used by Send All disabled binding.
+    selectedRecipientCount() {
+      let n = 0;
+      for (const r of this.recipients) {
+        if (r.channels && r.channels.email) n++;
+        if (r.channels && r.channels.text)  n++;
+      }
+      return n;
+    },
+
     async publish() {
       this.publishing = true;
       try {
+        // Round-2 F1 — collapse the per-recipient channel selections into the
+        // payload shape PublishInspectionSchema expects.
+        const recipientPayload = (this.recipients || [])
+          .map(function (r) {
+            const ch = [];
+            if (r.channels && r.channels.email) ch.push('email');
+            if (r.channels && r.channels.text)  ch.push('text');
+            return { contactId: r.contactId, channels: ch };
+          })
+          .filter(function (r) { return r.channels.length > 0; });
+
+        const body = Object.assign({}, this.publishOptions, {
+          recipients:        recipientPayload,
+          sendAgreementCopy: this.publishOptions.payload === 'agreement',
+        });
+
         var res = await authFetch('/api/inspections/' + this.inspectionId + '/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.publishOptions),
+          body: JSON.stringify(body),
         });
         if (res.ok) {
           var json = await res.json();
