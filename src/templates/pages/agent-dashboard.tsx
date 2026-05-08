@@ -76,7 +76,7 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                             orphan). Shows top 10 agents by referral count.
                             Renders even when this user has no referrals — useful
                             social context. */}
-                        <div class="mt-6 glass-panel rounded-2xl p-6">
+                        <div class="mt-6 glass-panel rounded-md p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-sm font-bold text-slate-900">Office Leaderboard</h3>
                                 <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Top 10 by referrals</span>

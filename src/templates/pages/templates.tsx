@@ -73,7 +73,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                         <div class="space-y-2">
                             <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Template Name</label>
                             <input type="text" id="tplName" placeholder="e.g., Luxury Residential Standard"
-                                class="premium-input w-full px-3 py-2.5 rounded-2xl border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
+                                class="premium-input w-full px-3 py-2.5 rounded-md border-2 border-slate-100 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-semibold" />
                         </div>
                         <p class="text-sm text-slate-400 font-medium leading-relaxed">
                             After creating the template, you will be taken to the visual editor where you can add sections and inspection items.

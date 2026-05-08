@@ -80,7 +80,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 </div>
 
                 {/* Earnings Panel — only visible when there's revenue activity */}
-                <div x-data="dashboardEarnings()" x-init="loadEarnings()" x-show="earnings.paid > 0 || earnings.pending > 0" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" style="display: none;">
+                <div x-data="dashboardEarnings()" x-init="loadEarnings()" x-show="earnings.paid > 0 || earnings.pending > 0" class="bg-white rounded-md shadow-sm border border-slate-100 p-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" style="display: none;">
                     <div>
                         <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paid this period</div>
                         <div class="mt-1 text-xl font-bold text-emerald-600" x-text="formatCurrency(earnings.paid)"></div>
@@ -113,7 +113,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
 
                     {/* Section: Needs Attention */}
-                    <section id="bucket-needsAttention" x-show="!loading && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-needsAttention" x-show="!loading && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.needsAttention = !sections.needsAttention"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -172,7 +172,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Today */}
-                    <section id="bucket-today" x-show="!loading && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-today" x-show="!loading && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.today = !sections.today"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -231,7 +231,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Today's events (Spec 4D.T10) */}
-                    <section x-show="!loading && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section x-show="!loading && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.todayEvents = !sections.todayEvents"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -254,7 +254,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: This Week */}
-                    <section id="bucket-thisWeek" x-show="!loading && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-thisWeek" x-show="!loading && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.thisWeek = !sections.thisWeek"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -313,7 +313,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Later */}
-                    <section x-show="!loading && (buckets.later.length > 0 || buckets.laterTotal > 0)" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section x-show="!loading && (buckets.later.length > 0 || buckets.laterTotal > 0)" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.later = !sections.later"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -377,7 +377,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Recent Reports */}
-                    <section id="bucket-recentReports" x-show="!loading && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-recentReports" x-show="!loading && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.recentReports = !sections.recentReports"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -436,7 +436,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Cancelled */}
-                    <section x-show="!loading && buckets.cancelled.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section x-show="!loading && buckets.cancelled.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.cancelled = !sections.cancelled"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -540,11 +540,11 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2 md:col-span-2 relative">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Property Address</label>
                                     <input type="text" id="propAddress" placeholder="Start typing — autocomplete via Google" autocomplete="off" data-places-autocomplete
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                     {/* Spec 5D — Google Places autocomplete dropdown.
                                         Hidden until at least 2 chars typed. Falls back to
                                         plain text input when GOOGLE_PLACES_API_KEY absent. */}
-                                    <div id="propAddressDropdown" class="hidden absolute left-0 right-0 top-full z-50 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-72 overflow-y-auto"></div>
+                                    <div id="propAddressDropdown" class="hidden absolute left-0 right-0 top-full z-50 mt-1 bg-white border border-slate-200 rounded-md shadow-2xl max-h-72 overflow-y-auto"></div>
                                     <input type="hidden" id="propPlaceId" />
                                     <input type="hidden" id="propAddrStreet" />
                                     <input type="hidden" id="propAddrCity" />
@@ -556,7 +556,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Template</label>
-                                    <select id="templateId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="templateId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Select a template...</option>
                                     </select>
                                     <p id="noTemplateHint" class="hidden text-xs text-amber-600 font-semibold mt-1 ml-1">
@@ -566,7 +566,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Inspection Date &amp; Time</label>
                                     <input type="text" id="inspectionDate" data-flatpickr data-min-date="today" autocomplete="off" placeholder="Pick date and time"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div x-data="contactSelector" class="relative mb-3">
                                     {/* R7-08 fix: clarify that this autocompletes existing contacts
@@ -598,27 +598,27 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Name</label>
                                     <input type="text" id="clientName" placeholder="e.g., John Doe"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Email</label>
                                     <input type="email" id="clientEmail" placeholder="e.g., john@example.com"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Phone</label>
                                     <input type="tel" id="clientPhone" placeholder="e.g., (555) 123-4567"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Assign Inspector</label>
-                                    <select id="inspectorId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="inspectorId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Self-assignment</option>
                                     </select>
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Listing Agent</label>
-                                    <select id="agentId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="agentId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
                                 </div>
@@ -627,7 +627,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     inspections.sellingAgentId. Both selects share populateAgents(). */}
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Buyer's Agent</label>
-                                    <select id="buyerAgentId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="buyerAgentId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
                                 </div>
@@ -651,7 +651,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <div id="serviceCountLabel" class="text-xs text-slate-500"></div>
                                         </div>
                                         <div class="text-right">
-                                            <div id="serviceTotalAmount" class="text-lg font-black">$0.00</div>
+                                            <div id="serviceTotalAmount" class="text-lg font-bold">$0.00</div>
                                             <div id="serviceDiscountLine" style="display:none" class="text-xs text-green-400"></div>
                                         </div>
                                     </div>

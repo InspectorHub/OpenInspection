@@ -146,7 +146,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                         <div class="space-y-2">
                             <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
                             <link rel="stylesheet" href="/vendor/quill/quill.snow.css" />
-                            <div class="rounded-2xl border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
+                            <div class="rounded-md border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
                                 <div id="agreementEditor" style="min-height: 280px; font-size: 15px;"></div>
                             </div>
                             <input type="hidden" id="agreementContent" />

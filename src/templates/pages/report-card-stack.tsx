@@ -88,7 +88,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
         {/* Agreement Gate Overlay (Spectora-style) */}
         <template x-if="agreementGate && !agreementLoading">
           <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
-            <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="bg-slate-900 border border-slate-700 rounded-md max-w-2xl w-full p-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div class="text-center">
                 <div class="w-14 h-14 bg-indigo-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
                   <svg class="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

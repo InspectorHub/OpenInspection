@@ -64,7 +64,7 @@ function renderServicesSection() {
                 <div class="text-sm font-bold text-slate-900">${svc.name}</div>
                 ${svc.durationMinutes ? `<div class="text-xs text-slate-400">&#x23F1; ${svc.durationMinutes} min</div>` : ''}
             </div>
-            <div class="text-sm font-black text-slate-900">${formatCents(svc.price)}</div>
+            <div class="text-sm font-bold text-slate-900">${formatCents(svc.price)}</div>
         </div>
     `).join('');
     updateTotalBar();

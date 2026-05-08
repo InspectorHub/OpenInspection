@@ -12,7 +12,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
 
                 <div class="sm:mx-auto sm:w-full sm:max-w-md animate-fade-in">
                     <div class="flex justify-center mb-8">
-                        <div class="w-16 h-16 bg-emerald-600 rounded-lg flex items-center justify-center shadow-2xl shadow-emerald-200 ring-8 ring-white">
+                        <div class="w-16 h-16 bg-emerald-600 rounded-lg flex items-center justify-center shadow-2xl shadow-md ring-8 ring-white">
                              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                         </div>
                     </div>
@@ -26,7 +26,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <div>
                                 <label for="companyName" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Business Name</label>
                                 <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
+                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="companyName" name="companyName" type="text" required placeholder="Acme Inspections"
                                         class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>
@@ -35,7 +35,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <div>
                                 <label for="email" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Admin Email</label>
                                 <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
+                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="email" name="email" type="email" autocomplete="email" required placeholder="admin@company.com"
                                         class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>
@@ -44,7 +44,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <div>
                                 <label for="password" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Password</label>
                                 <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
+                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="password" name="password" type="password" required placeholder="••••••••"
                                         class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>
@@ -54,7 +54,7 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <div>
                                 <label for="verificationCode" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Verification Code</label>
                                 <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
+                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
                                     <input id="verificationCode" name="verificationCode" type="text" required placeholder="000000"
                                         class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 </div>

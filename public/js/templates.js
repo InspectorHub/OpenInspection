@@ -94,11 +94,11 @@ function renderTemplates() {
           <tr>
             <td colspan="4" class="py-32 text-center">
               <div class="flex flex-col items-center gap-6">
-                <div class="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center">
+                <div class="w-20 h-20 rounded-lg bg-indigo-50 flex items-center justify-center">
                   <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>
                 <div>
-                  <p class="text-lg font-black text-slate-900 tracking-tight">No templates yet</p>
+                  <p class="text-lg font-bold text-slate-900 tracking-tight">No templates yet</p>
                   <p class="text-sm text-slate-400 font-medium mt-1">Create a checklist template for your inspections.</p>
                 </div>
                 <button onclick="showCreateModal()" class="px-6 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-slate-900 transition-all active:scale-95">New Template</button>
@@ -119,23 +119,23 @@ function renderTemplates() {
                 <div>
                   <div class="flex items-center gap-2">
                     <a href="/templates/${t.id}/edit" class="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors">${t.name}</a>
-                    ${t.source === 'marketplace' ? '<span class="text-[9px] font-black uppercase tracking-widest text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">Marketplace</span>' : ''}
+                    ${t.source === 'marketplace' ? '<span class="text-[9px] font-bold uppercase tracking-widest text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">Marketplace</span>' : ''}
                   </div>
                   <p class="text-[10px] text-slate-400 font-medium" title="${t.id}">${itemCount} items · v${t.version}.0${t.source === 'marketplace' ? ' · Imported from Marketplace' : ''}</p>
                 </div>
               </div>
             </td>
             <td class="px-6 py-6">
-              <span class="inline-flex items-center rounded-lg border border-indigo-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-indigo-50/50 text-indigo-600">v${t.version}.0</span>
+              <span class="inline-flex items-center rounded-lg border border-indigo-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50/50 text-indigo-600">v${t.version}.0</span>
             </td>
             <td class="px-6 py-6 text-sm text-slate-500 font-bold">${itemCount} items</td>
             <td class="py-6 pl-3 pr-10 text-right">
               <div class="inline-flex items-center gap-4">
-                <a href="/templates/${t.id}/edit" class="inline-flex items-center gap-1 text-indigo-600 font-black text-[10px] uppercase tracking-widest hover:text-indigo-700 transition-all" title="Open in template editor">
+                <a href="/templates/${t.id}/edit" class="inline-flex items-center gap-1 text-indigo-600 font-bold text-[10px] uppercase tracking-widest hover:text-indigo-700 transition-all" title="Open in template editor">
                   Edit
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                 </a>
-                <button onclick="deleteTemplate('${t.id}')" class="inline-flex items-center gap-1 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:text-red-500 transition-all active:scale-95" title="Delete this template (cannot be undone)">
+                <button onclick="deleteTemplate('${t.id}')" class="inline-flex items-center gap-1 text-slate-300 font-bold text-[10px] uppercase tracking-widest hover:text-red-500 transition-all active:scale-95" title="Delete this template (cannot be undone)">
                   Remove
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 </button>

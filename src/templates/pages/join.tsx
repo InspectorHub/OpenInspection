@@ -9,7 +9,7 @@ export const JoinPage = ({ token, branding }: { token?: string, branding?: Brand
                 <div class="w-full max-w-md relative z-10 animate-slide-in">
                     <div class="glass-panel p-6 rounded-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.12)]">
                         <div class="text-center mb-6">
-                            <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl shadow-md mb-6 group hover:rotate-6 transition-transform">
+                            <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-md shadow-md mb-6 group hover:rotate-6 transition-transform">
                                 <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                             </div>
                             <h1 class="text-2xl font-bold tracking-tight text-slate-900 mb-2">Join Team</h1>

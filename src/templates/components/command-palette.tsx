@@ -43,7 +43,7 @@ export function CommandPalette(): JSX.Element {
                 x-transition:leave-end="opacity-0"
             />
             <div
-                class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[70vh]"
+                class="relative w-full max-w-2xl bg-white rounded-md shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[70vh]"
                 x-transition:enter="transition ease-out duration-150"
                 x-transition:enter-start="opacity-0 scale-[0.98] translate-y-1"
                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"

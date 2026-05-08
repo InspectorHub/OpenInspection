@@ -123,7 +123,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
                     {...{ 'x-on:click': 'if ($event.target === $el) close()' }}
                 >
-                    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                    <div class="bg-white rounded-md shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                         <header class="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
                             <h2 class="text-lg font-bold text-slate-900">Import contacts from CSV</h2>
                             <button x-on:click="close()" class="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
@@ -174,7 +174,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                         {/* Step 3: Done */}
                         <div x-show="step === 'done'" class="p-6 text-center">
-                            <div class="text-5xl mb-3">✓</div>
+                            <div class="text-3xl mb-3">✓</div>
                             <p class="text-lg font-bold text-emerald-700" x-text={"`Imported ${finalResult?.imported || 0} contacts`"}></p>
                             <button x-on:click="close()" class="mt-4 px-5 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold uppercase tracking-widest">Done</button>
                         </div>

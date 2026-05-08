@@ -51,7 +51,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                 </select>
             </div>
 
-            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 rounded-2xl">
+            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 rounded-md">
                 <p class="text-slate-500 font-semibold">No recommendations yet.</p>
                 <p class="text-slate-400 text-sm mt-2">Click "Seed defaults" above to load 80 starter entries, or add your own.</p>
             </div>

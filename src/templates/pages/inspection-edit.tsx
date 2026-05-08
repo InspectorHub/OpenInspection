@@ -144,7 +144,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             <template x-for="item in currentSectionItems" x-bind:key="item.id">
               <div
                 x-bind:data-item-id="item.id"
-                class="rounded-2xl p-4 transition-all cursor-pointer"
+                class="rounded-md p-4 transition-all cursor-pointer"
                 style="background: rgba(255,255,255,0.85); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); border-left: 3px solid transparent; touch-action: manipulation;"
                 x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-left-color: ' + getRatingColor(getItemRating(item.id))"
                 x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
@@ -357,7 +357,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </div>
 
           {/* Spec 4D mobile — Inspection Events compact list */}
-          <section x-data={`inspectionEventsSection('${inspectionId}')`} x-init="load()" class="mx-4 mb-24 mt-3 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+          <section x-data={`inspectionEventsSection('${inspectionId}')`} x-init="load()" class="mx-4 mb-24 mt-3 rounded-md bg-white p-4 ring-1 ring-slate-200">
             <header class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-slate-900">Events</h2>
@@ -756,7 +756,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             </div>
 
             {/* Inspection Events (Spec 4D.T9) */}
-            <section x-data={`inspectionEventsSection('${inspectionId}')`} x-init="load()" class="mx-6 mt-3 rounded-2xl bg-white p-5 ring-1 ring-slate-200">
+            <section x-data={`inspectionEventsSection('${inspectionId}')`} x-init="load()" class="mx-6 mt-3 rounded-md bg-white p-5 ring-1 ring-slate-200">
                 <header class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <h2 class="text-base font-bold text-slate-900">Events</h2>
@@ -840,7 +840,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <template x-for="item in currentSectionItems" x-bind:key="item.id">
                 <div
                   x-bind:data-item-id="item.id"
-                  class="rounded-2xl p-4 transition-all cursor-pointer group"
+                  class="rounded-md p-4 transition-all cursor-pointer group"
                   style="background: rgba(255,255,255,0.85); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7);"
                   x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-top: 4px solid ' + getRatingColor(getItemRating(item.id))"
                   x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
@@ -1418,7 +1418,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 </div>
                 <div class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                     <template x-for="m in messages" x-bind:key="m.id">
-                        <div x-bind:class="m.fromRole === 'inspector' ? 'ml-12' : 'mr-12'" class="rounded-2xl p-3" x-bind:style="m.fromRole === 'inspector' ? 'background:#eef2ff;' : 'background:#f1f5f9;'">
+                        <div x-bind:class="m.fromRole === 'inspector' ? 'ml-12' : 'mr-12'" class="rounded-md p-3" x-bind:style="m.fromRole === 'inspector' ? 'background:#eef2ff;' : 'background:#f1f5f9;'">
                             <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
                                 <span x-text="(m.fromName || m.fromRole) + ' · ' + new Date(m.createdAt).toLocaleString()"></span>
                             </div>
@@ -1469,7 +1469,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           {...{ 'x-on:click.self': 'showCheatsheet = false', 'x-on:keydown.escape.window': 'showCheatsheet = false' }}
           style="background: rgba(0,0,0,0.5)"
         >
-          <div class="w-full max-w-md rounded-2xl p-6 max-h-[85vh] overflow-y-auto" style="background: #ffffff; box-shadow: 0 16px 48px rgba(0,0,0,0.25)">
+          <div class="w-full max-w-md rounded-md p-6 max-h-[85vh] overflow-y-auto" style="background: #ffffff; box-shadow: 0 16px 48px rgba(0,0,0,0.25)">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-bold" style="color: #0f172a">Gestures &amp; Shortcuts</h3>
               <button x-on:click="showCheatsheet = false" class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center" aria-label="Close">
@@ -1509,7 +1509,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </div>
         </div>
       </div>
-      <div id="commentPicker" class="hidden fixed z-[200] bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 w-72 max-h-64 overflow-y-auto"></div>
+      <div id="commentPicker" class="hidden fixed z-[200] bg-white rounded-md shadow-2xl border border-slate-100 p-3 w-72 max-h-64 overflow-y-auto"></div>
       <script src="/js/auth.js"></script>
       <script src="/js/modal-dialog.js"></script>
       <script src="/js/comments-library.js"></script>

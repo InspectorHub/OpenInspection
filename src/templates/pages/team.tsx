@@ -65,7 +65,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                     <div class="glass-panel rounded-xl overflow-hidden shadow-xl shadow-slate-100/50 border-dashed border-2 border-slate-200 bg-slate-50/10">
                         <div class="px-10 py-8 border-b border-slate-100/50 bg-white/30 flex items-center justify-between">
                             <div class="flex items-center gap-4">
-                                <h2 class="text-xl font-black text-slate-400 tracking-tight">Pending Invitations</h2>
+                                <h2 class="text-xl font-bold text-slate-400 tracking-tight">Pending Invitations</h2>
                                 <div class="px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">Incoming</div>
                             </div>
                         </div>
@@ -129,7 +129,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                 <option value="office_staff">Office Staff</option>
                             </select>
                         </div>
-                        <div id="inviteResult" class="hidden text-sm font-bold text-red-600 px-3 py-2 bg-red-50 rounded-2xl border border-red-100"></div>
+                        <div id="inviteResult" class="hidden text-sm font-bold text-red-600 px-3 py-2 bg-red-50 rounded-md border border-red-100"></div>
                     </form>
                 </Modal>
 

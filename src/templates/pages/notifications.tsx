@@ -61,7 +61,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                 </div>
 
                 <div x-show="nextCursor" class="text-center">
-                    <button x-on:click="loadMore()" class="px-3 py-2 rounded-2xl ring-2 ring-slate-200 text-slate-600 text-xs font-bold uppercase tracking-[0.2em] hover:bg-slate-50 transition-all">Load more</button>
+                    <button x-on:click="loadMore()" class="px-3 py-2 rounded-md ring-2 ring-slate-200 text-slate-600 text-xs font-bold uppercase tracking-[0.2em] hover:bg-slate-50 transition-all">Load more</button>
                 </div>
             </div>
 

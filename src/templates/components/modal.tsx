@@ -3,7 +3,7 @@
  *
  * One canonical shape for every page-level modal in apps/core. Matches the
  * Round 38 / 39 design language: backdrop bg-black/40, white card with
- * rounded-2xl, h-10 button row, normal-case copy.
+ * rounded-md, h-10 button row, normal-case copy.
  *
  * Two driver modes:
  *   - Alpine: pass `name="showXxxModal"`. The component wires x-show + click-
@@ -117,7 +117,7 @@ export const Modal = ({
             {...alpineAttrs}
         >
             <div
-                class={`bg-white rounded-2xl shadow-xl w-full ${SIZE_CLASS[size]} p-6 max-h-[90vh] overflow-y-auto`}
+                class={`bg-white rounded-md shadow-xl w-full ${SIZE_CLASS[size]} p-6 max-h-[90vh] overflow-y-auto`}
                 {...(name ? { 'x-on:click.stop': '' } : { onclick: 'event.stopPropagation()' })}
             >
                 {!hideHeader && (
