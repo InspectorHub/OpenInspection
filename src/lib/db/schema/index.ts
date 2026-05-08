@@ -1,5 +1,6 @@
 export * from './tenant';
 export {
+    ratingSystems,
     templates,
     inspections,
     inspectionResults,

@@ -1,5 +1,23 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { tenants, users } from './tenant';
+
+// Sprint 2 S2-1 — tenant-scoped rating systems library. The level list
+// itself is stored as JSON because it is never queried independently and
+// the row count per system is tiny (≤ 10).
+export const ratingSystems = sqliteTable('rating_systems', {
+    id:          text('id').primaryKey(),
+    tenantId:    text('tenant_id').notNull().references(() => tenants.id),
+    name:        text('name').notNull(),
+    slug:        text('slug').notNull(),
+    description: text('description'),
+    levels:      text('levels', { mode: 'json' }).notNull(),
+    isDefault:   integer('is_default', { mode: 'boolean' }).notNull().default(false),
+    isSeed:      integer('is_seed',    { mode: 'boolean' }).notNull().default(false),
+    createdAt:   integer('created_at').notNull(),
+    updatedAt:   integer('updated_at').notNull(),
+}, (t) => ({
+    tenantSlugUnique: uniqueIndex('idx_rating_systems_tenant_slug').on(t.tenantId, t.slug),
+}));
 
 export const templates = sqliteTable('templates', {
     id: text('id').primaryKey(),
@@ -8,6 +26,8 @@ export const templates = sqliteTable('templates', {
     version: integer('version').notNull().default(1),
     schema: text('schema', { mode: 'json' }).notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    // Sprint 2 S2-1 — selects the active rating system. Null = use tenant default.
+    ratingSystemId: text('rating_system_id'),
 });
 
 export const inspections = sqliteTable('inspections', {
@@ -89,6 +109,11 @@ export const inspectionResults = sqliteTable('inspection_results', {
     inspectionId: text('inspection_id').notNull().references(() => inspections.id),
     data: text('data', { mode: 'json' }).notNull(),
     lastSyncedAt: integer('last_synced_at', { mode: 'timestamp' }).notNull(),
+    // Sprint 2 S2-1 — denormalized rating system reference and a frozen
+    // snapshot of the levels array at inspection creation. Editing the
+    // source rating system afterwards never mutates an existing inspection.
+    ratingSystemId:       text('rating_system_id'),
+    ratingSystemSnapshot: text('rating_system_snapshot', { mode: 'json' }),
 });
 
 export const availability = sqliteTable('availability', {

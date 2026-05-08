@@ -31,7 +31,7 @@ import { AgentDashboardPage } from './templates/pages/agent-dashboard';
 import { TemplatesPage } from './templates/pages/templates';
 import { TemplateEditorPage } from './templates/pages/template-editor';
 import { MarketplacePage } from './templates/pages/marketplace';
-import { RatingSystemsStubPage } from './templates/pages/rating-systems-stub';
+import { RatingSystemsPage } from './templates/pages/rating-systems';
 import { TeamPage } from './templates/pages/team';
 import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
@@ -89,6 +89,7 @@ import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
+import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 
 const app = new OpenAPIHono<HonoConfig>();
@@ -333,6 +334,7 @@ app.route('/api/calendar', calendarRoutes);
 app.route('/api/team', teamRoutes);
 app.route('/api/contacts', contactRoutes);
 app.route('/api/recommendations', recommendationsRoutes);
+app.route('/api/rating-systems', ratingSystemsRoutes);
 app.route('/api', eventsRoutes);
 app.route('/api/invoices', invoiceRoutes);
 app.route('/api/services', servicesRoutes);
@@ -924,9 +926,8 @@ app.get('/templates/:id/edit', htmlAuthGuard(['owner', 'admin']), (c) => {
     return c.html(TemplateEditorPage({ templateId: id, branding: c.get('branding') }));
 });
 app.get('/marketplace', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MarketplacePage({ branding: c.get('branding') })));
-// Sprint 1 Sub-spec B Task 2 Step 5 — Library / Rating Systems stub (real
-// implementation lands in Sprint 2 — TREC, ITB, custom rating systems).
-app.get('/library/rating-systems', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(RatingSystemsStubPage({ branding: c.get('branding') })));
+// Sprint 2 S2-1 — Library / Rating Systems CRUD page replaces the Sprint 1 stub.
+app.get('/library/rating-systems', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(RatingSystemsPage({ branding: c.get('branding') })));
 // Settings hub (group cards)
 app.get('/settings', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsPage({ branding: c.get('branding') })));
 

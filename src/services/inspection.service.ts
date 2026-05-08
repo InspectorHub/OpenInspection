@@ -18,6 +18,41 @@ function fireAutomation(db: D1Database, tenantId: string, inspectionId: string, 
         .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
 }
 
+/**
+ * Sprint 2 S2-1 — Translate a rating_systems.levels[] payload into the
+ * legacy `RatingLevel` shape consumed by computeReportStats / getRatingColor.
+ *
+ *   `bucket: 'satisfactory'` → severity: 'good'  / isDefect: false
+ *   `bucket: 'monitor'`      → severity: 'marginal' / isDefect: false
+ *   `bucket: 'defect'`       → severity: 'significant' / isDefect: true
+ *   `bucket: 'na'`           → severity: 'minor' / isDefect: false
+ */
+function mapRatingSystemLevels(levels: Array<Record<string, unknown>>): RatingLevel[] {
+    const sevByBucket: Record<string, RatingLevel['severity']> = {
+        satisfactory: 'good',
+        monitor:      'marginal',
+        defect:       'significant',
+        na:           'minor',
+    };
+    return levels
+        .slice()
+        .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
+        .map((lvl) => {
+            const bucket = String(lvl.bucket ?? 'na');
+            const severity = sevByBucket[bucket] ?? 'minor';
+            const id = String(lvl.id ?? lvl.label ?? lvl.abbr ?? crypto.randomUUID());
+            return {
+                id,
+                label:        String(lvl.label ?? lvl.abbr ?? id),
+                abbreviation: String(lvl.abbr ?? lvl.label ?? id),
+                color:        String(lvl.color ?? '#9ca3af'),
+                severity,
+                isDefect:     bucket === 'defect',
+                ...(typeof lvl.description === 'string' ? { description: lvl.description } : {}),
+            };
+        });
+}
+
 type Inspection = z.infer<typeof InspectionSchema>;
 type InspectionListParams = z.infer<typeof InspectionListQuerySchema>;
 type CreateInspectionData = z.infer<typeof CreateInspectionSchema>;
@@ -193,6 +228,11 @@ export class InspectionService {
             if (tpl) {
                 templateSnapshot = tpl.schema;
                 templateSnapshotVersion = tpl.version;
+                // Sprint 2 S2-1 — the template's rating system is captured at
+                // first results-write time (see updateResults below) rather
+                // than at inspection creation. Until the inspector touches an
+                // item the inspection_results row doesn't exist yet, so there
+                // is nowhere to attach the snapshot here.
             }
         }
 
@@ -326,12 +366,39 @@ export class InspectionService {
             const mergedData = { ...(existing.data as Record<string, unknown>), ...data };
             await db.update(inspectionResults).set({ data: mergedData, lastSyncedAt: new Date() }).where(eq(inspectionResults.id, existing.id));
         } else {
+            // Sprint 2 S2-1 — when seeding an inspection_results row for the
+            // first time, also freeze the active rating system onto the row
+            // so future edits to the source system never mutate this report.
+            let ratingSystemId: string | null = null;
+            let ratingSystemSnapshot: unknown = null;
+            if (inspection.templateId) {
+                const tpl = await db.select().from(templates)
+                    .where(and(eq(templates.id, inspection.templateId), eq(templates.tenantId, tenantId)))
+                    .get();
+                const tplRatingSystemId = tpl
+                    ? ((tpl as unknown as { ratingSystemId?: string | null }).ratingSystemId ?? null)
+                    : null;
+                if (tplRatingSystemId) {
+                    const { ratingSystems } = await import('../lib/db/schema');
+                    const sysRow = await db.select().from(ratingSystems)
+                        .where(and(eq(ratingSystems.id, tplRatingSystemId), eq(ratingSystems.tenantId, tenantId)))
+                        .get();
+                    if (sysRow) {
+                        ratingSystemId = sysRow.id as string;
+                        const rawLevels = sysRow.levels as unknown;
+                        const lvls = typeof rawLevels === 'string' ? JSON.parse(rawLevels) : rawLevels;
+                        ratingSystemSnapshot = { id: sysRow.id, slug: sysRow.slug, name: sysRow.name, levels: lvls };
+                    }
+                }
+            }
             const insertValues = {
                 id: crypto.randomUUID(),
                 inspectionId: id,
                 tenantId,
                 data,
-                lastSyncedAt: new Date()
+                lastSyncedAt: new Date(),
+                ratingSystemId,
+                ratingSystemSnapshot: ratingSystemSnapshot as never,
             };
             await db.insert(inspectionResults).values(insertValues);
         }
@@ -463,7 +530,36 @@ export class InspectionService {
             ? { sections: [{ id: 'general', title: 'General', items: rawSchema }] }
             : (rawSchema as SchemaData).sections ? rawSchema as SchemaData : { sections: [] };
 
-        const levels: RatingLevel[] = schemaData.ratingSystem?.levels ?? [];
+        // Sprint 2 S2-1 — multi-rating system resolution. Order of precedence:
+        //   1. inspection_results.rating_system_snapshot (frozen at creation)
+        //   2. template.rating_system_id → live rating_systems row
+        //   3. legacy template.schema.ratingSystem.levels (pre-Sprint-2 templates)
+        // The fallback default 4-tier list lives at the bottom of this method.
+        let levels: RatingLevel[] = [];
+        const snapshotRaw = (resultsRow as unknown as { ratingSystemSnapshot?: unknown })?.ratingSystemSnapshot;
+        if (snapshotRaw) {
+            const snap = typeof snapshotRaw === 'string' ? JSON.parse(snapshotRaw) : snapshotRaw;
+            if (snap && Array.isArray((snap as { levels?: unknown }).levels)) {
+                levels = mapRatingSystemLevels((snap as { levels: Array<Record<string, unknown>> }).levels);
+            }
+        }
+        if (levels.length === 0 && template && (template as unknown as { ratingSystemId?: string | null }).ratingSystemId) {
+            const ratingSystemId = (template as unknown as { ratingSystemId: string | null }).ratingSystemId as string | null;
+            if (ratingSystemId) {
+                const { ratingSystems } = await import('../lib/db/schema');
+                const sysRow = await db.select().from(ratingSystems)
+                    .where(and(eq(ratingSystems.id, ratingSystemId), eq(ratingSystems.tenantId, tenantId)))
+                    .get();
+                if (sysRow) {
+                    const rawLevels = sysRow.levels as unknown;
+                    const lvlArr = typeof rawLevels === 'string' ? JSON.parse(rawLevels) : rawLevels;
+                    if (Array.isArray(lvlArr)) levels = mapRatingSystemLevels(lvlArr);
+                }
+            }
+        }
+        if (levels.length === 0) {
+            levels = schemaData.ratingSystem?.levels ?? [];
+        }
         const resultData: Record<string, ResultEntry> = resultsRow?.data
             ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, ResultEntry>
             : {};

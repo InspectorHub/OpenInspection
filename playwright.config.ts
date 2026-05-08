@@ -49,6 +49,13 @@ export default defineConfig({
             dependencies: ['api'],
         },
         {
+            // Sprint 2 S2-1 — rating systems CRUD. Depends on `api` so the
+            // admin user exists; runs against the same dev worker.
+            name: 'rating-system-crud',
+            testMatch: 'rating-system-crud.spec.ts',
+            dependencies: ['api'],
+        },
+        {
             name: 'cloud',
             testMatch: 'cloud-e2e.spec.ts',
             use: {
