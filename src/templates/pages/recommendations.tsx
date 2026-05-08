@@ -12,13 +12,24 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight">Recommendations Library</h1>
                     <p class="text-sm text-slate-500 mt-1">Pre-written repair recommendations with estimate ranges. Inspectors attach these to inspection items by clicking chips.</p>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex gap-3 print:hidden">
                     <button x-show="items.length === 0" x-on:click="seedDefaults()" {...{ 'x-bind:disabled': 'loading' }} class="px-5 py-2 rounded-xl bg-indigo-100 text-indigo-700 text-xs font-bold uppercase tracking-widest hover:bg-indigo-200 disabled:opacity-50">Seed defaults (80)</button>
+                    {/* Sub-spec D Task 6 — Print as PDF. Uses window.print() + the
+                        @media print rules in input.css to render a clean table. */}
+                    <button
+                        type="button"
+                        onclick="window.print()"
+                        aria-label="Print recommendations as PDF"
+                        class="h-8 px-4 rounded-md bg-white border border-slate-200 text-slate-700 text-[13px] font-bold inline-flex items-center gap-1.5 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        Print as PDF
+                    </button>
                     <button x-on:click="openCreate()" class="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black">+ Add recommendation</button>
                 </div>
             </header>
 
-            <div class="flex gap-3 flex-wrap">
+            <div class="flex gap-3 flex-wrap print:hidden">
                 <select x-model="categoryFilter" x-on:change="reload()" class="px-3 py-2 rounded-lg border border-slate-200 text-sm">
                     <option value="">All categories</option>
                     <template x-for="cat in distinctCategories" {...{ 'x-bind:key': 'cat' }}>
@@ -38,7 +49,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                 <p class="text-slate-400 text-sm mt-2">Click "Seed defaults" above to load 80 starter entries, or add your own.</p>
             </div>
 
-            <div x-show="items.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div x-show="items.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3 print:hidden">
                 <template x-for="rec in items" {...{ 'x-bind:key': 'rec.id' }}>
                     <div class="p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition">
                         <div class="flex items-start justify-between gap-3">
@@ -58,6 +69,36 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                         </div>
                     </div>
                 </template>
+            </div>
+
+            {/* Sub-spec D Task 6 — Print-only table view. Hidden on screen,
+                rendered as a clean tabular list when the user hits Print
+                (CSS rules in input.css @media print scope). Uses Alpine
+                template loop so it always reflects the current filtered
+                result set. */}
+            <div x-show="items.length > 0" class="hidden print:block">
+                <table class="recommendations-print-table">
+                    <thead>
+                        <tr>
+                            <th>Priority</th>
+                            <th>Category</th>
+                            <th>Item</th>
+                            <th>Estimate</th>
+                            <th>Recommended action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="rec in items" {...{ 'x-bind:key': 'rec.id' }}>
+                            <tr>
+                                <td x-bind:class="rec.severity === 'defect' ? 'priority-safety' : rec.severity === 'monitor' ? 'priority-rec' : 'priority-maint'" x-text="rec.severity"></td>
+                                <td x-text="rec.category || '—'"></td>
+                                <td x-text="rec.name"></td>
+                                <td x-text="estimateLabel(rec)"></td>
+                                <td x-text="rec.defaultRepairSummary"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
 
             {/* Create / Edit modal */}

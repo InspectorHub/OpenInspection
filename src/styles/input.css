@@ -412,6 +412,20 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
         display: none !important;
     }
 
+    /* Sprint 1 Sub-spec D Task 6 — hide app shell when printing any
+       MainLayout page. The viewer report page already lives in BareLayout
+       and uses .print:hidden on its own header, but recommendations + other
+       library pages share MainLayout — drop nav, sidebar, mobile header,
+       trailing toast strip so the print preview shows page content only. */
+    .lg\:flex.flex-col.sticky.top-0.h-screen,
+    [aria-label="Open menu"],
+    .lg\:hidden.sticky.top-0,
+    #statusToast,
+    .floating-print-btn { display: none !important; }
+    /* Force the printable region to consume the full page width. */
+    main.md\:flex-1 { width: 100% !important; flex: 1 1 100% !important; }
+    main.md\:flex-1 > div { padding: 0 !important; max-width: none !important; }
+
     /* Sprint 1 Sub-spec D Task 6 — Recommendations print table layout.
        Cards on screen, table on print. Hides the app shell. */
     .recommendations-print-table {
