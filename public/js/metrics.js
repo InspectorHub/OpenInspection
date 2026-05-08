@@ -5,6 +5,16 @@ document.addEventListener('alpine:init', () => {
         loading: true,
         charts: {},
 
+        // Sub-spec B Task 3 — readable period label for PageHeader meta
+        periodLabel(p) {
+            switch (p) {
+                case '3m':  return 'last 3 months';
+                case '6m':  return 'last 6 months';
+                case '12m': return 'last 12 months';
+                default:    return p;
+            }
+        },
+
         async init() {
             await this.load();
         },

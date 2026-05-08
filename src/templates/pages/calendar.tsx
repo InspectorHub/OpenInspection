@@ -1,16 +1,19 @@
 import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const CalendarPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Calendar`} branding={branding}>
             <div class="space-y-6 animate-fade-in">
-                {/* Header */}
-                <div>
-                    <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-bold text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Calendar</span>
-                    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Calendar</h1>
-                    <p class="text-lg text-slate-500 font-semibold mt-2">View scheduled inspections by month, week, or day.</p>
+                <div x-data="calendarMeta">
+                    <PageHeader
+                        eyebrow="CALENDAR"
+                        eyebrowColor="indigo"
+                        title="Calendar"
+                        meta={<span x-text="metaText"></span>}
+                    />
                 </div>
                 {/* FullCalendar mount point */}
                 <div class="glass-panel rounded-lg overflow-hidden shadow-md p-4">

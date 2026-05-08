@@ -5,6 +5,14 @@ function notificationsApp() {
         filter: 'all',
         loading: false,
 
+        // Sub-spec B Task 3 — counters surfaced into PageHeader meta
+        get unreadCount() {
+            return this.items.filter(i => !i.readAt).length;
+        },
+        get urgentCount() {
+            return this.items.filter(i => !i.readAt && i.priority === 'urgent').length;
+        },
+
         async load(reset = true) {
             this.loading = true;
             if (reset) { this.items = []; this.nextCursor = null; }

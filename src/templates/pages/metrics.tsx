@@ -1,5 +1,6 @@
 import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 interface MetricsPageProps {
     appName?: string | undefined;
@@ -9,19 +10,26 @@ interface MetricsPageProps {
 export function MetricsPage({ appName, branding }: MetricsPageProps) {
     return (
         <MainLayout title={`Metrics — ${appName || 'OpenInspection'}`} branding={branding}>
-            <div x-data="metrics">
-                <div class="flex items-center justify-between mb-6">
-                    <h1 class="text-xl font-bold text-slate-900">Metrics</h1>
-                    <div class="flex gap-1 bg-slate-100 rounded-lg p-1">
-                        {(['3m', '6m', '12m'] as const).map(p => (
-                            <button
-                                x-on:click={`period='${p}'; load()`}
-                                x-bind:class={`period==='${p}' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'`}
-                                class="px-3 py-1 rounded text-xs font-bold transition-all"
-                            >{p}</button>
-                        ))}
-                    </div>
-                </div>
+            <div x-data="metrics" class="space-y-6">
+                <PageHeader
+                    eyebrow="METRICS"
+                    eyebrowColor="slate"
+                    title="Metrics"
+                    meta={
+                        <span x-text="data ? `${periodLabel(period)} · ${data.totalInspections} inspections · ${fmt(data.totalRevenue)}` : 'Loading…'"></span>
+                    }
+                    actions={
+                        <div class="flex gap-1 bg-slate-100 rounded-md p-1">
+                            {(['3m', '6m', '12m'] as const).map(p => (
+                                <button
+                                    x-on:click={`period='${p}'; load()`}
+                                    x-bind:class={`period==='${p}' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'`}
+                                    class="h-6 px-3 rounded text-[12px] font-bold transition-all"
+                                >{p}</button>
+                            ))}
+                        </div>
+                    }
+                />
 
                 <div x-show="loading" class="text-sm text-slate-400 text-center py-10">Loading...</div>
 

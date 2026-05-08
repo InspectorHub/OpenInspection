@@ -7,6 +7,37 @@ let _reports = [];
 let _activeStatus = 'all';
 let _searchDebounce = null;
 
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function reportsMeta() {
+    return {
+        delivered: 0,
+        awaiting:  0,
+        unpaid:    0,
+        get metaText() {
+            const total = this.delivered + this.awaiting + this.unpaid;
+            if (total === 0) return 'No reports yet';
+            const parts = [];
+            if (this.delivered > 0) parts.push(this.delivered + ' delivered');
+            if (this.awaiting > 0)  parts.push(this.awaiting + ' awaiting review');
+            if (this.unpaid > 0)    parts.push(this.unpaid + ' unpaid');
+            return parts.join(' · ');
+        },
+        async init() {
+            try {
+                const r = await authFetch('/api/inspections?status=completed&limit=200');
+                if (!r.ok) return;
+                const j = await r.json();
+                const list = j.data?.inspections || [];
+                this.delivered = list.filter(i => i.status === 'delivered' || i.status === 'signed').length;
+                this.awaiting  = list.filter(i => i.status === 'completed').length;
+                this.unpaid    = list.filter(i => i.paymentStatus && i.paymentStatus !== 'paid').length;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('reportsMeta', reportsMeta));
+window.reportsMeta = reportsMeta;
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.report-tab').forEach(btn => {
         btn.addEventListener('click', () => {

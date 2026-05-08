@@ -1,3 +1,29 @@
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function teamMeta() {
+    return {
+        members:        0,
+        pendingInvites: 0,
+        get metaText() {
+            if (this.members === 0 && this.pendingInvites === 0) return 'No team members yet';
+            const parts = [];
+            if (this.members > 0)        parts.push(this.members + ' member' + (this.members === 1 ? '' : 's'));
+            if (this.pendingInvites > 0) parts.push(this.pendingInvites + ' invite' + (this.pendingInvites === 1 ? '' : 's') + ' pending');
+            return parts.join(' · ');
+        },
+        async init() {
+            try {
+                const r = await authFetch('/api/team/members');
+                if (!r.ok) return;
+                const j = await r.json();
+                this.members        = (j.data?.members || []).length;
+                this.pendingInvites = (j.data?.invites || []).filter(i => i.status === 'pending').length;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('teamMeta', teamMeta));
+window.teamMeta = teamMeta;
+
 (function() {
     const membersList = document.getElementById('membersList');
     const invitesList = document.getElementById('invitesList');
