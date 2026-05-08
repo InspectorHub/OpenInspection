@@ -60,9 +60,14 @@ function inspectionEditor(inspectionId) {
     commentLibraryFilter: 'all', // 'all' | 'satisfactory' | 'monitor' | 'defect' | 'my-snippets'
     commentLibrarySearch: '',
     commentLibrarySelectedIdx: 0,
-    // GS prefix — set true after pressing G; next digit jumps to that section
+    // GS prefix — set true after pressing G; next digit jumps to that section,
+    // or pressing S opens a fuzzy section picker (Sprint 1 A-9).
     gPrefix: false,
     gPrefixTimer: null,
+    // Sprint 1 A-9: section picker popover state
+    sectionPickerOpen: false,
+    sectionPickerQuery: '',
+    sectionPickerIdx: 0,
     batchMode: false,
     batchSelected: {},
     showMenu: false,
@@ -240,7 +245,8 @@ function inspectionEditor(inspectionId) {
           this.showCommentLibrary = false;
           return;
         }
-        // GS prefix — G then 0-9 jumps to that section
+        // GS prefix — G then 0-9 jumps to that section by index, or G then S
+        // opens the fuzzy section picker (Sprint 1 A-9).
         if (this.gPrefix && /^[0-9]$/.test(e.key)) {
           e.preventDefault();
           this.gPrefix = false;
@@ -248,10 +254,17 @@ function inspectionEditor(inspectionId) {
           this.gotoSection(parseInt(e.key, 10));
           return;
         }
+        if (this.gPrefix && (e.key === 's' || e.key === 'S')) {
+          e.preventDefault();
+          this.gPrefix = false;
+          clearTimeout(this.gPrefixTimer);
+          this.openSectionPicker();
+          return;
+        }
         if (e.key === 'g' || e.key === 'G') {
           e.preventDefault();
           this.gPrefix = true;
-          if (typeof showToast === 'function') showToast('Press 0–9 to jump to section');
+          if (typeof showToast === 'function') showToast('G then S = picker · G then 0–9 = jump');
           clearTimeout(this.gPrefixTimer);
           this.gPrefixTimer = setTimeout(() => { this.gPrefix = false; }, 1500);
           return;
@@ -1107,6 +1120,64 @@ function inspectionEditor(inspectionId) {
       if (typeof showToast === 'function') showToast('Section: ' + (sec.title || sec.name || ('#' + idx)));
     },
 
+    // Sprint 1 A-9: Fuzzy section picker. Opens via G then S leader-keys.
+    openSectionPicker() {
+      this.sectionPickerOpen = true;
+      this.sectionPickerQuery = '';
+      this.sectionPickerIdx = 0;
+      var self = this;
+      setTimeout(function () {
+        var input = document.getElementById('section-picker-input');
+        if (input) input.focus();
+      }, 50);
+    },
+
+    closeSectionPicker() {
+      this.sectionPickerOpen = false;
+      this.sectionPickerQuery = '';
+      this.sectionPickerIdx = 0;
+    },
+
+    get filteredSectionsForPicker() {
+      var q = (this.sectionPickerQuery || '').toLowerCase().trim();
+      var src = (this.sections || []).map(function (s, idx) {
+        return { idx: idx, title: s.title || s.name || ('#' + idx) };
+      });
+      if (!q) return src;
+      return src.filter(function (s) { return s.title.toLowerCase().indexOf(q) !== -1; });
+    },
+
+    pickSection(idx) {
+      this.gotoSection(idx);
+      this.closeSectionPicker();
+    },
+
+    // Called from x-on:keydown on the picker input
+    onSectionPickerKeydown(e) {
+      var list = this.filteredSectionsForPicker;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.sectionPickerIdx = Math.min(this.sectionPickerIdx + 1, list.length - 1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.sectionPickerIdx = Math.max(this.sectionPickerIdx - 1, 0);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var sel = list[this.sectionPickerIdx];
+        if (sel) this.pickSection(sel.idx);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeSectionPicker();
+        return;
+      }
+    },
+
     openCommentLibrary(initialFilter) {
       if (!this.activeItem) {
         if (typeof showToast === 'function') showToast('Select an item first');
@@ -1149,18 +1220,69 @@ function inspectionEditor(inspectionId) {
         if (typeof showToast === 'function') showToast('Select an item first');
         return;
       }
-      var notes = (this.results[this.activeItemId]?.notes || '').trim();
+      // Sprint 1 A-9: prefer the active selection in a textarea, otherwise
+      // fall back to the full notes for the active item. Lets ⌘D harvest
+      // a sub-string of the inspector's draft into a reusable snippet.
+      var selectedText = '';
+      var ae = document.activeElement;
+      if (ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT') && typeof ae.selectionStart === 'number') {
+        var ss = ae.selectionStart;
+        var se = ae.selectionEnd;
+        if (ss !== se) selectedText = (ae.value || '').substring(ss, se).trim();
+      }
+      var notes = selectedText || (this.results[this.activeItemId]?.notes || '').trim();
       if (!notes) {
         if (typeof showToast === 'function') showToast('No notes to save');
         return;
       }
       var bucket = this._bucketForRatingId(this.results[this.activeItemId]?.rating);
+      var section = (this.currentSection && this.currentSection.title) || '';
+      var self = this;
+
+      var commit = function (title) {
+        var body = {
+          text:         notes,
+          ratingBucket: bucket === 'all' ? null : bucket,
+          section:      section || null,
+          category:     title || null,
+        };
+        // Try server-side persistence first so the snippet shows up on the
+        // /comments page and across devices. Fall back to localStorage on
+        // failure (offline / 401).
+        authFetch('/api/admin/comments', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        }).then(function (res) {
+          if (res && res.ok) {
+            self.loadUserSnippets();
+            if (typeof showToast === 'function') showToast('Saved to snippets');
+          } else {
+            self._saveSnippetLocal(notes, bucket);
+          }
+        }).catch(function () {
+          self._saveSnippetLocal(notes, bucket);
+        });
+      };
+
+      if (window.OIPrompt) {
+        window.OIPrompt.open({
+          title:       'Save as snippet',
+          placeholder: 'Optional title (or leave blank)',
+          scope:       'snippet-save',
+          onApply: function (title) { commit((title || '').trim()); },
+        });
+      } else {
+        commit('');
+      }
+    },
+
+    _saveSnippetLocal(notes, bucket) {
       var existing = [];
       try {
         var raw = localStorage.getItem('oi:snippets');
         if (raw) existing = JSON.parse(raw);
       } catch (_) {}
-      // Dedupe
       for (var j = 0; j < existing.length; j++) {
         if (existing[j].text === notes) {
           if (typeof showToast === 'function') showToast('Snippet already saved');
@@ -1169,7 +1291,7 @@ function inspectionEditor(inspectionId) {
       }
       existing.unshift({ rating: bucket, text: notes, source: 'user' });
       localStorage.setItem('oi:snippets', JSON.stringify(existing));
-      if (typeof showToast === 'function') showToast('Saved as snippet');
+      if (typeof showToast === 'function') showToast('Saved locally');
     },
 
     get _commentLibraryPool() {

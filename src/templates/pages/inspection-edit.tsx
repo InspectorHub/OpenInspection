@@ -1558,6 +1558,69 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
         </div>
       </div>
       <div id="commentPicker" class="hidden fixed z-[200] bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 w-72 max-h-64 overflow-y-auto"></div>
+
+      {/* Sprint 1 A-9: section picker popover (G then S leader-keys) */}
+      <div
+        x-show="sectionPickerOpen"
+        style="display:none"
+        {...{
+          'x-cloak': '',
+          'x-on:keydown.escape.window': 'if (sectionPickerOpen) closeSectionPicker()',
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Section picker"
+        aria-keyshortcuts="g s"
+        class="fixed inset-0 z-[55] flex items-start justify-center pt-[12vh] px-4"
+      >
+        <div
+          class="absolute inset-0 bg-slate-900/30"
+          style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+          x-on:click="closeSectionPicker()"
+          x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        ></div>
+        <div
+          class="relative w-80 rounded-lg bg-white border border-slate-200"
+          style="box-shadow: 0 12px 32px rgba(15,23,42,0.12);"
+          x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2 scale-[0.97]" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+          x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0 scale-100" x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]"
+        >
+          <div class="px-4 py-3 border-b border-slate-100">
+            <input
+              id="section-picker-input"
+              type="text"
+              x-model="sectionPickerQuery"
+              x-on:input="sectionPickerIdx = 0"
+              x-on:keydown="onSectionPickerKeydown($event)"
+              placeholder="Jump to section…"
+              class="w-full h-8 px-3 rounded-md border border-slate-200 outline-none text-[13px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-colors"
+              aria-label="Section search"
+            />
+          </div>
+          <div class="max-h-72 overflow-y-auto py-1" role="listbox">
+            <template x-for="(s, i) in filteredSectionsForPicker" x-bind:key="s.idx">
+              <button
+                type="button"
+                x-on:click="pickSection(s.idx)"
+                x-bind:aria-selected="sectionPickerIdx === i"
+                x-bind:class="sectionPickerIdx === i ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'"
+                class="block w-full text-left px-3 py-2 text-[13px] font-medium transition-colors focus:outline-none"
+                role="option"
+              >
+                <span x-text="s.title"></span>
+              </button>
+            </template>
+            <p x-show="filteredSectionsForPicker.length === 0" class="px-3 py-3 text-[12px] italic text-slate-400">No sections match.</p>
+          </div>
+          <div class="px-4 py-2 border-t border-slate-100 bg-slate-50/50 rounded-b-lg text-[11px] text-slate-400 font-medium flex items-center gap-2">
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">↑↓</kbd> navigate
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">↵</kbd> jump
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">Esc</kbd> close
+          </div>
+        </div>
+      </div>
+
       <script src="/js/auth.js"></script>
       <script src="/js/modal-dialog.js"></script>
       <script src="/js/comments-library.js"></script>
