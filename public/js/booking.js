@@ -1,8 +1,9 @@
 // Sprint 1 Sub-spec C — public booking page Alpine handler.
 //
 // Owns:
-//   * date input formatting/validation (C-1) — keeps placeholder "MM / DD / YYYY"
-//     stable across locales, validates the parsed Date is real and in the future
+//   * date input validation (R7-06) — uses native <input type="date">; values
+//     arrive as ISO "YYYY-MM-DD" strings regardless of OS locale, so we just
+//     verify the date is real and not in the past
 //   * 4-option time window radio cards (C-6) — morning / afternoon / all-day /
 //     custom, with inline time picker for custom
 //   * form submit flow with Turnstile token + AddressAutocomplete hidden fields
@@ -14,7 +15,7 @@
 document.addEventListener('alpine:init', () => {
     // ─── Sprint 1 page-level data ────────────────────────────────────────────
     Alpine.data('bookingPage', () => ({
-        dateMasked: '',          // "MM / DD / YYYY" string the user types
+        inspectionDate: '',       // ISO "YYYY-MM-DD" from native date input
         dateError:  '',
         selectedWindow: '',
         customTime:  '',
@@ -51,31 +52,20 @@ document.addEventListener('alpine:init', () => {
                 .reduce((sum, s) => sum + (s.price || 0), 0);
         },
 
-        formatDate(e) {
-            // Strip non-digits, cap at MMDDYYYY, then re-insert slashes with spaces.
-            const v = (e.target.value || '').replace(/\D/g, '').slice(0, 8);
-            let out = v;
-            if (v.length > 4)      out = v.slice(0, 2) + ' / ' + v.slice(2, 4) + ' / ' + v.slice(4);
-            else if (v.length > 2) out = v.slice(0, 2) + ' / ' + v.slice(2);
-            this.dateMasked = out;
-            // Clear the error eagerly while the user is fixing the field.
-            if (this.dateError) this.dateError = '';
-        },
-
         validateDate() {
             this.dateError = '';
-            if (!this.dateMasked) return;
-            const m = this.dateMasked.match(/^(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})$/);
-            if (!m) { this.dateError = 'Please enter the date as MM / DD / YYYY'; return; }
-            const month = parseInt(m[1], 10);
-            const day   = parseInt(m[2], 10);
-            const year  = parseInt(m[3], 10);
+            if (!this.inspectionDate) return;
+            const m = this.inspectionDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!m) { this.dateError = 'Please pick a valid date'; return; }
+            const year  = parseInt(m[1], 10);
+            const month = parseInt(m[2], 10);
+            const day   = parseInt(m[3], 10);
             const dt = new Date(year, month - 1, day);
             if (isNaN(dt.getTime()) ||
                 dt.getFullYear() !== year ||
                 dt.getMonth() !== month - 1 ||
                 dt.getDate() !== day) {
-                this.dateError = 'Please enter a valid date';
+                this.dateError = 'Please pick a valid date';
                 return;
             }
             const today = new Date();
@@ -86,9 +76,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         toIsoDate() {
-            const m = (this.dateMasked || '').match(/^(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})$/);
-            if (!m) return null;
-            return `${m[3]}-${m[1]}-${m[2]}`;
+            // Native <input type="date"> already gives us "YYYY-MM-DD".
+            const m = (this.inspectionDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            return m ? this.inspectionDate : null;
         },
 
         async submitBooking() {
@@ -96,7 +86,7 @@ document.addEventListener('alpine:init', () => {
             this.validateDate();
             if (this.dateError) return;
             const isoDate = this.toIsoDate();
-            if (!isoDate) { this.dateError = 'Please enter the date as MM / DD / YYYY'; return; }
+            if (!isoDate) { this.dateError = 'Please pick a valid date'; return; }
             if (!this.selectedWindow) {
                 this.message = 'Please pick a time window';
                 this.messageOk = false;
@@ -143,7 +133,7 @@ document.addEventListener('alpine:init', () => {
                         : 'Inspection requested — check your email for confirmation.';
                     this.messageOk = true;
                     form.reset();
-                    this.dateMasked = '';
+                    this.inspectionDate = '';
                     this.selectedWindow = '';
                     this.customTime = '';
                     this.selectedServiceIds = [];

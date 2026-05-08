@@ -159,26 +159,27 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                     <p class="text-[13px] text-slate-500">Pick a date and time window that works.</p>
                                 </div>
 
-                                {/* Date — text input + JS mask, locale-stable English placeholder. */}
+                                {/* Date — native date input (R7-06). type="date" triggers
+                                    the native iOS spinner picker on mobile Safari and the
+                                    native picker on Chrome/Edge/Firefox; values are always
+                                    serialized as "YYYY-MM-DD" regardless of OS locale. */}
                                 <label class="block">
                                     <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Inspection date</span>
                                     <input
-                                        type="text"
-                                        name="dateMasked"
-                                        x-model="dateMasked"
+                                        type="date"
+                                        name="inspectionDate"
+                                        x-model="inspectionDate"
                                         {...{
-                                            'x-on:input':  'formatDate($event)',
+                                            'x-on:change': 'validateDate()',
                                             'x-on:blur':   'validateDate()',
                                         }}
-                                        placeholder="MM / DD / YYYY"
+                                        placeholder="YYYY-MM-DD"
                                         autocomplete="off"
-                                        inputmode="numeric"
                                         required
-                                        pattern="\\d{2}\\s*/\\s*\\d{2}\\s*/\\s*\\d{4}"
                                         class="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[14px] font-medium tabular-nums transition-colors"
                                         aria-describedby="date-hint date-error"
                                     />
-                                    <p id="date-hint" class="mt-1 text-[11px] text-slate-400">Format: MM / DD / YYYY</p>
+                                    <p id="date-hint" class="mt-1 text-[11px] text-slate-400">Pick a date that is not in the past.</p>
                                     <p
                                         id="date-error"
                                         x-show="dateError"
