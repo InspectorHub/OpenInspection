@@ -194,11 +194,13 @@
 
         ta.addEventListener('input', () => {
             if (!state.isOpen) {
-                if (ta.value[ta.selectionStart - 1] === '/' && isLineStart({ value: ta.value, selectionStart: ta.selectionStart - 0 }) /* still pre-slash */ ) {
-                    // Slash was just inserted at line start.
-                    const slashIdx = ta.selectionStart - 1;
-                    // line-start check using the slash position as the anchor
-                    if (slashIdx === 0 || ta.value[slashIdx - 1] === '\n') {
+                // Just-inserted "/"? selectionStart points right after it.
+                const slashIdx = ta.selectionStart - 1;
+                if (slashIdx >= 0 && ta.value[slashIdx] === '/') {
+                    // Line-start = slash is the very first char OR the char
+                    // immediately before it is a newline.
+                    const atLineStart = slashIdx === 0 || ta.value[slashIdx - 1] === '\n';
+                    if (atLineStart) {
                         state.slashPos = slashIdx;
                         state.filter = '';
                         scheduleOpen();
