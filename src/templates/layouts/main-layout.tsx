@@ -267,13 +267,14 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                             <button
                                 type="button"
                                 id="oi-cmdk-trigger"
+                                x-data="{ isMac: navigator.platform?.startsWith('Mac') }"
                                 x-on:click="window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))"
                                 class="w-full flex items-center gap-3 px-5 py-3 mb-2 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-all border border-slate-200/60 group"
                                 aria-label="Open command palette"
                             >
                                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M16.5 10.5a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
                                 <span class="text-sm font-medium">Search…</span>
-                                <kbd class="ml-auto px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono text-slate-500 group-hover:border-slate-300">⌘K</kbd>
+                                <kbd class="ml-auto px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono text-slate-500 group-hover:border-slate-300" x-text="isMac ? '⌘K' : 'Ctrl /'">⌘K</kbd>
                             </button>
                             <a href="/dashboard" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-all font-semibold group relative">
                                 <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path></svg>
