@@ -26,6 +26,7 @@ const COLUMNS: ShortcutColumn[] = [
             { key: '⇧⏎',   label: 'Previous item' },
             { key: 'GS',   label: 'Jump to section' },
             { key: '⌘K',   label: 'Command palette' },
+            { key: '⌃/',   label: 'Command palette (Win)' },
         ],
     },
     {
