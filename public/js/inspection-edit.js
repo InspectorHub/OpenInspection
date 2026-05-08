@@ -95,6 +95,11 @@ function inspectionEditor(inspectionId) {
     aiSuggestions: [],
     aiTargetField: null,
     showAiPopover: false,
+    // Competitor parity App.E.3 (Spectora) — top-right "Search entire report…"
+    // input. Empty string = match all (no filter applied). The search helpers
+    // below scan section.title, item.label, and free-text fields in
+    // results[item.id] (notes / canned / custom comments).
+    searchQuery: '',
     // Spec 2026-05-07 — user snippets fetched from /api/admin/comments
     // (the same data source as the /comments page). Lets MY SNIPPETS show
     // bucket-classified user comments, so /comments + Library drawer agree.
@@ -601,6 +606,126 @@ function inspectionEditor(inspectionId) {
 
     getItemNotes(itemId) {
       return this.results[itemId]?.notes || '';
+    },
+
+    // ===== Editor full-text search (App.E.3) =================================
+    // Mirror of src/lib/editor-search.ts logic, kept inline here because
+    // public/js/* is plain JS loaded by the browser (no bundler step). The
+    // server-side TS file is the source of truth and carries the unit
+    // tests; if you change matching behavior here, change it there too.
+
+    _searchNeedle() {
+      var q = this.searchQuery;
+      if (!q) return '';
+      return String(q).trim().toLowerCase();
+    },
+
+    _searchContains(haystack, needle) {
+      if (!haystack) return false;
+      return String(haystack).toLowerCase().indexOf(needle) !== -1;
+    },
+
+    _searchResultMatches(itemId, needle) {
+      var r = this.results[itemId];
+      if (!r) return false;
+      if (this._searchContains(r.notes, needle)) return true;
+      if (this._searchContains(r.recommendation, needle)) return true;
+      var canned = r.cannedComments;
+      if (canned) {
+        var tabs = ['information', 'limitations', 'defects'];
+        for (var t = 0; t < tabs.length; t++) {
+          var list = canned[tabs[t]];
+          if (!list) continue;
+          for (var i = 0; i < list.length; i++) {
+            var entry = list[i] || {};
+            if (this._searchContains(entry.title, needle)) return true;
+            if (this._searchContains(entry.comment, needle)) return true;
+            if (this._searchContains(entry.effectiveComment, needle)) return true;
+          }
+        }
+      }
+      var custom = r.customComments;
+      if (custom) {
+        var ctabs = ['information', 'limitations', 'defects'];
+        for (var ct = 0; ct < ctabs.length; ct++) {
+          var clist = custom[ctabs[ct]];
+          if (!clist) continue;
+          for (var ci = 0; ci < clist.length; ci++) {
+            var centry = clist[ci] || {};
+            if (this._searchContains(centry.title, needle)) return true;
+            if (this._searchContains(centry.comment, needle)) return true;
+            if (this._searchContains(centry.location, needle)) return true;
+          }
+        }
+      }
+      return false;
+    },
+
+    /** True if the section's title matches OR any of its items matches. */
+    sectionMatchesSearch(section) {
+      var needle = this._searchNeedle();
+      if (!needle) return true;
+      if (!section) return false;
+      if (this._searchContains(section.title, needle)) return true;
+      var items = section.items || [];
+      for (var i = 0; i < items.length; i++) {
+        if (this.itemMatchesSearch(section, items[i])) return true;
+      }
+      return false;
+    },
+
+    /** True if section.title matches (whole section kept) OR
+     *  item.label / its result row matches the query. */
+    itemMatchesSearch(section, item) {
+      var needle = this._searchNeedle();
+      if (!needle) return true;
+      if (!item) return false;
+      if (section && this._searchContains(section.title, needle)) return true;
+      if (this._searchContains(item.label, needle)) return true;
+      return this._searchResultMatches(item.id, needle);
+    },
+
+    /** True when the user has typed something — used to swap "no results"
+     *  empty-state messages and to show the clear (×) button. */
+    get hasSearchQuery() {
+      return this._searchNeedle() !== '';
+    },
+
+    /** Total number of items matching the current query across all sections.
+     *  Drives the live "N matches" hint next to the search input. */
+    get searchMatchCount() {
+      var needle = this._searchNeedle();
+      if (!needle) return 0;
+      var count = 0;
+      for (var s = 0; s < this.sections.length; s++) {
+        var sec = this.sections[s];
+        var items = sec.items || [];
+        if (this._searchContains(sec.title, needle)) {
+          count += items.length;
+          continue;
+        }
+        for (var i = 0; i < items.length; i++) {
+          if (this.itemMatchesSearch(sec, items[i])) count++;
+        }
+      }
+      return count;
+    },
+
+    clearSearch() {
+      this.searchQuery = '';
+    },
+
+    /** Wrap matched substrings inside `text` with <mark>. Result is
+     *  HTML-escaped so it's safe to bind via x-html on a known item label
+     *  / section title (no other HTML in those fields). */
+    highlightSearchMatch(text) {
+      var src = text == null ? '' : String(text);
+      var safe = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      var needle = this._searchNeedle();
+      if (!needle) return safe;
+      var escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var re = new RegExp(escaped, 'gi');
+      return safe.replace(re, function (m) { return '<mark>' + m + '</mark>'; });
     },
 
     getPhotoCount(itemId) {

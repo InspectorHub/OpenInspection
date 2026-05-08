@@ -167,6 +167,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <template x-for="(sec, idx) in sections" x-bind:key="sec.id">
                 <button
                   x-on:click="selectSection(idx)"
+                  x-show="sectionMatchesSearch(sec)"
                   class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap"
                   x-bind:class="currentSectionIdx === idx ? 'text-white' : 'bg-white/60 text-gray-600'"
                   x-bind:style="currentSectionIdx === idx ? 'background: var(--ih-primary, #6366f1)' : ''"
@@ -231,6 +232,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             <template x-for="item in currentSectionItems" x-bind:key="item.id">
               <div
                 x-bind:data-item-id="item.id"
+                x-show="itemMatchesSearch(currentSection, item)"
                 class="rounded-md p-4 transition-all cursor-pointer"
                 style="background: rgba(255,255,255,0.85); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); border-left: 3px solid transparent; touch-action: manipulation;"
                 x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-left-color: ' + getRatingColor(getItemRating(item.id))"
@@ -242,7 +244,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               >
                 <div class="flex items-start justify-between mb-3">
                   <div>
-                    <h3 class="font-bold text-sm" style="color: #0f172a" x-text="item.label"></h3>
+                    <h3 class="font-bold text-sm" style="color: #0f172a" x-html="highlightSearchMatch(item.label)"></h3>
                     <span class="text-[10px] font-mono" style="color: #cbd5e1" x-text="item.number"></span>
                   </div>
                   <span class="w-3 h-3 rounded-full" x-bind:style="'background:' + getRatingColor(getItemRating(item.id))"></span>
@@ -462,6 +464,17 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 </div>
               </div>
             </template>
+            {/* Competitor parity App.E.3 — no-results state when search filters
+                out every item in the current section. */}
+            <div
+              x-show="hasSearchQuery && searchMatchCount === 0"
+              style="display:none"
+              data-testid="editor-search-empty"
+              class="mt-4 rounded-md bg-white border border-dashed border-slate-200 p-6 text-center"
+            >
+              <p class="text-sm text-slate-500">No matches for &ldquo;<span class="font-semibold text-slate-700" x-text="searchQuery"></span>&rdquo;.</p>
+              <button x-on:click="clearSearch()" class="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear search</button>
+            </div>
           </div>
 
           {/* Spec 4D mobile — Inspection Events compact list */}
@@ -726,6 +739,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <template x-for="(sec, idx) in sections" x-bind:key="sec.id">
                 <button
                   x-on:click="selectSection(idx)"
+                  x-show="sectionMatchesSearch(sec)"
                   class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
                   x-bind:style="currentSectionIdx === idx ? 'background: #eef2ff; color: var(--ih-primary, #6366f1)' : 'color: #64748b'"
                 >
@@ -800,6 +814,45 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 >Batch</button>
               </div>
               <div class="flex items-center gap-2">
+                {/* Competitor parity App.E.3 (Spectora) — full-text search box.
+                    Filters every visible section + item live as the user
+                    types. Empty query restores the normal section/item tree. */}
+                <div class="relative" data-testid="editor-search">
+                  <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.5 5.5a7.5 7.5 0 0011.15 11.15z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="search"
+                    x-model="searchQuery"
+                    placeholder="Search entire report…"
+                    aria-label="Search the entire report"
+                    data-testid="editor-search-input"
+                    class="w-56 pl-8 pr-7 py-1.5 text-xs rounded-lg border bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-all"
+                    style="border-color: #e2e8f0"
+                  />
+                  <button
+                    type="button"
+                    x-show="hasSearchQuery"
+                    style="display:none"
+                    x-on:click="clearSearch()"
+                    aria-label="Clear search"
+                    data-testid="editor-search-clear"
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center"
+                  >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <span
+                  x-show="hasSearchQuery"
+                  style="display:none"
+                  data-testid="editor-search-count"
+                  class="text-[11px] font-mono text-slate-500"
+                  x-text="searchMatchCount + ' match' + (searchMatchCount === 1 ? '' : 'es')"
+                ></span>
                 <button x-on:click="previewReport()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl" style="color: #64748b">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   Preview
@@ -985,6 +1038,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <template x-for="item in currentSectionItems" x-bind:key="item.id">
                 <div
                   x-bind:data-item-id="item.id"
+                  x-show="itemMatchesSearch(currentSection, item)"
                   class="rounded-md p-4 transition-all cursor-pointer group"
                   style="background: rgba(255,255,255,0.85); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7);"
                   x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-top: 4px solid ' + getRatingColor(getItemRating(item.id))"
@@ -996,7 +1050,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                   </div>
                   <div class="flex items-start justify-between mb-3">
                     <div>
-                      <h3 class="font-bold text-sm group-hover:text-indigo-600 transition-colors" style="color: #0f172a" x-text="item.label"></h3>
+                      <h3 class="font-bold text-sm group-hover:text-indigo-600 transition-colors" style="color: #0f172a" x-html="highlightSearchMatch(item.label)"></h3>
                       <span class="text-[10px] font-mono" style="color: #cbd5e1" x-text="item.number"></span>
                     </div>
                     <span
@@ -1352,6 +1406,16 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                   </div>
                 </div>
               </template>
+              {/* Competitor parity App.E.3 — desktop no-results state. */}
+              <div
+                x-show="hasSearchQuery && searchMatchCount === 0"
+                style="display:none"
+                data-testid="editor-search-empty-desktop"
+                class="col-span-2 xl:col-span-3 rounded-md bg-white border border-dashed border-slate-200 p-8 text-center"
+              >
+                <p class="text-sm text-slate-500">No matches for &ldquo;<span class="font-semibold text-slate-700" x-text="searchQuery"></span>&rdquo;.</p>
+                <button x-on:click="clearSearch()" class="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear search</button>
+              </div>
             </div>
           </main>
 
