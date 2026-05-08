@@ -395,6 +395,62 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
         height: 100% !important;
         object-fit: cover !important;
     }
+
+    /* Sprint 1 Sub-spec D Task 2 — tab-aware print filtering. The viewer's
+       Alpine controller writes `currentTab` to html[data-viewer-tab], and
+       these rules collapse non-matching items so window.print() exports the
+       requested view. `data-defects` / `data-defect-safety` are emitted on
+       each `.report-item` by report.template.tsx. */
+    html[data-viewer-tab="summary"] .report-item[data-defects="0"]                   { display: none !important; }
+    html[data-viewer-tab="safety"]  .report-item:not([data-defect-safety="1"])       { display: none !important; }
+    /* Drop sections whose items were all hidden. Uses :has() — supported in
+       modern Chromium / WebKit / Firefox 121+. */
+    html[data-viewer-tab="summary"] section.report-section:has(> :scope .report-item):not(:has(.report-item:not([data-defects="0"]))) {
+        display: none !important;
+    }
+    html[data-viewer-tab="safety"]  section.report-section:has(> :scope .report-item):not(:has(.report-item[data-defect-safety="1"])) {
+        display: none !important;
+    }
+
+    /* Sprint 1 Sub-spec D Task 6 — hide app shell when printing any
+       MainLayout page. The viewer report page already lives in BareLayout
+       and uses .print:hidden on its own header, but recommendations + other
+       library pages share MainLayout — drop nav, sidebar, mobile header,
+       trailing toast strip so the print preview shows page content only. */
+    .lg\:flex.flex-col.sticky.top-0.h-screen,
+    [aria-label="Open menu"],
+    .lg\:hidden.sticky.top-0,
+    #statusToast,
+    .floating-print-btn { display: none !important; }
+    /* Force the printable region to consume the full page width. */
+    main.md\:flex-1 { width: 100% !important; flex: 1 1 100% !important; }
+    main.md\:flex-1 > div { padding: 0 !important; max-width: none !important; }
+
+    /* Sprint 1 Sub-spec D Task 6 — Recommendations print table layout.
+       Cards on screen, table on print. Hides the app shell. */
+    .recommendations-print-table {
+        display: table !important;
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11pt;
+    }
+    .recommendations-print-table th,
+    .recommendations-print-table td {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 8px 12px;
+        text-align: left;
+        vertical-align: top;
+    }
+    .recommendations-print-table th {
+        font-size: 9pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+    }
+    .recommendations-print-table .priority-safety { color: #b91c1c; font-weight: 700; }
+    .recommendations-print-table .priority-rec    { color: #b45309; }
+    .recommendations-print-table .priority-maint  { color: #1e40af; }
 }
 
 /* ============================================================

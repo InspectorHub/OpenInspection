@@ -1,5 +1,7 @@
 import { BareLayout } from '../layouts/main-layout';
 import { AtmosphericBg } from '../components/atmospheric-bg';
+import { AgentDashboardHero } from '../components/agent-dashboard-hero';
+import { ReportStatusPill } from '../components/report-status-pill';
 import { BrandingConfig } from '../../types/auth';
 import { PageHeader } from '../components/page-header';
 
@@ -31,9 +33,23 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                     </div>
                 </nav>
 
-                {/* Main Content */}
-                <main class="py-10 animate-slide-in relative z-10">
-                    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                {/* Main Content — combines Sub-spec B PageHeader with Sub-spec D
+                    hero strip + share-with-buyer + status pill via the
+                    `agentDashboardState` Alpine factory. */}
+                <main
+                    class="py-10 animate-slide-in relative z-10"
+                    x-data="agentDashboardState"
+                    x-init="init && init()"
+                >
+                    <div class="mx-auto max-w-7xl px-6 lg:px-8 space-y-6">
+                        {/* Sub-spec D Task 7 — Hero strip. Address + share-with-buyer
+                            CTA. Pulls live data from Alpine `hero` once the referral
+                            list loads (see public/js/agent-dashboard.js). */}
+                        <AgentDashboardHero alpine />
+
+                        {/* PageHeader (Sub-spec B B-2) sits below the hero. Status
+                            pill (Sub-spec D D-7) folded into the actions slot so it
+                            still surfaces lifecycle state next to the title. */}
                         <div x-data="agentMeta" class="mb-10">
                             <PageHeader
                                 eyebrow="AGENT VIEW"
@@ -41,6 +57,11 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                                 title="Referral Dashboard"
                                 meta={
                                     <span x-text="`${total || 0} referral${total === 1 ? '' : 's'}${pending ? ' · ' + pending + ' pending' : ''}`"></span>
+                                }
+                                actions={
+                                    <span x-show="hero.status" class="align-middle">
+                                        <ReportStatusPill status="published" />
+                                    </span>
                                 }
                             />
                         </div>

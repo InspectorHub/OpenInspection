@@ -1,14 +1,28 @@
 import { BareLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
+import { ReportSidebar, type ReportSidebarSection } from '../components/report-sidebar';
+import { ReportTabBar } from '../components/report-tab-bar';
+import { ShareDropdown } from '../components/share-dropdown';
+import { PdfDropdown } from '../components/pdf-dropdown';
+import { ReportStatusPill } from '../components/report-status-pill';
 
-interface InspectionRecord { id: string; propertyAddress: string; clientName?: string | null; clientEmail?: string | null; date: string; price: number; paymentStatus: string; signed?: boolean; }
+interface InspectionRecord { id: string; propertyAddress: string; clientName?: string | null; clientEmail?: string | null; date: string; price: number; paymentStatus: string; signed?: boolean; status?: string | null; }
 interface TemplateRecord { schema: string | Record<string, unknown>; }
 interface SchemaItemRaw { id: string; label?: string; name?: string; }
 interface SchemaSectionRaw { title?: string; name?: string; items: SchemaItemRaw[]; }
 interface SchemaItem { id: string; label: string; }
-interface SchemaSection { title: string; items: SchemaItem[]; }
+interface SchemaSection { id: string; title: string; items: SchemaItem[]; }
 interface ResultItem { rating?: string; status?: string; notes?: string; photos?: { key: string }[]; }
 interface RatingLevel { id: string; label: string; abbreviation?: string; color: string; severity: string; isDefect: boolean; }
+
+/**
+ * Sprint 1 Sub-spec D — derive a stable, slug-like id from a section title so
+ * the sidebar nav anchors and the section <section id> stay in sync.
+ */
+function slugifySectionId(title: string, index: number): string {
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return slug || `section-${index}`;
+}
 
 export function renderProfessionalReport(data: {
     inspection: InspectionRecord,
@@ -26,13 +40,17 @@ export function renderProfessionalReport(data: {
     const rawSchema = typeof template.schema === 'string' ? JSON.parse(template.schema) as { sections: SchemaSectionRaw[]; ratingSystem?: { levels: RatingLevel[] } } : template.schema as { sections: SchemaSectionRaw[]; ratingSystem?: { levels: RatingLevel[] } };
     // Normalize field names: DB may have "name" but templates use "title"/"label"
     const schema: { sections: SchemaSection[] } = {
-        sections: (rawSchema.sections || []).map((sec: SchemaSectionRaw) => ({
-            title: sec.title || sec.name || 'Untitled',
-            items: (sec.items || []).map((item: SchemaItemRaw) => ({
-                id: item.id,
-                label: item.label || item.name || 'Untitled',
-            })),
-        })),
+        sections: (rawSchema.sections || []).map((sec: SchemaSectionRaw, idx: number) => {
+            const title = sec.title || sec.name || 'Untitled';
+            return {
+                id: slugifySectionId(title, idx),
+                title,
+                items: (sec.items || []).map((item: SchemaItemRaw) => ({
+                    id: item.id,
+                    label: item.label || item.name || 'Untitled',
+                })),
+            };
+        }),
     };
     const ratingLevels: RatingLevel[] = rawSchema.ratingSystem?.levels || [
         { id: 'Satisfactory', label: 'Satisfactory', color: '#22c55e', severity: 'good', isDefect: false },
@@ -66,17 +84,50 @@ export function renderProfessionalReport(data: {
         total: 0
     };
 
+    // Sub-spec D — per-section defect counts power the sidebar badges.
+    // The current rendering pipeline only carries a single severity bucket
+    // per item (good/marginal/defect); we surface defects as the
+    // `recommendation` category, marginal/monitor as `maintenance`, and
+    // leave `safety` at zero because per-item safety classification lives
+    // on the v2 defect tabs which aren't part of this template render path.
+    const sectionDefects = new Map<string, { safety: number; recommendation: number; maintenance: number }>();
+
     schema.sections.forEach((s: SchemaSection) => {
+        const counts = { safety: 0, recommendation: 0, maintenance: 0 };
         s.items.forEach((i: SchemaItem) => {
             const res = resultData[i.id];
             const ratingId = res?.rating || res?.status;
             const bucket = resolveSeverity(ratingId);
             if (bucket === 'good') stats.satisfactory++;
-            if (bucket === 'marginal') stats.monitor++;
-            if (bucket === 'defect') stats.defect++;
+            if (bucket === 'marginal') { stats.monitor++; counts.maintenance++; }
+            if (bucket === 'defect')   { stats.defect++;  counts.recommendation++; }
             stats.total++;
         });
+        sectionDefects.set(s.id, counts);
     });
+
+    // Sidebar payload (Sub-spec D Task 1) — compact section list with
+    // pre-computed defect badges.
+    const sidebarSections: ReportSidebarSection[] = schema.sections.map((s) => ({
+        id: s.id,
+        title: s.title,
+        defects: sectionDefects.get(s.id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
+    }));
+
+    // Aggregate defect counts feed the tab bar pill (Sub-spec D Task 2).
+    const aggregateDefects = sidebarSections.reduce(
+        (acc, s) => ({
+            safety:         acc.safety         + s.defects.safety,
+            recommendation: acc.recommendation + s.defects.recommendation,
+            maintenance:    acc.maintenance    + s.defects.maintenance,
+        }),
+        { safety: 0, recommendation: 0, maintenance: 0 },
+    );
+
+    // Resolve viewer role from auth state. Inspector role unlocks edit/publish
+    // actions in the sidebar; agent / client view is read-only.
+    const viewerRole: 'inspector' | 'agent' | 'client' = isAuthenticated ? 'inspector' : 'client';
+    const reportStatus = (inspection.status as string | undefined) || 'draft';
 
     return BareLayout({
         title: `Inspection Report - ${inspection.propertyAddress}`,
@@ -91,9 +142,45 @@ export function renderProfessionalReport(data: {
         ),
         children: (
 <div
-    x-data={`reportGatekeeper('${inspection.id}')`}
-    class="min-h-screen bg-slate-50/50 antialiased py-6 px-6 relative"
+    x-data={`reportViewer(${JSON.stringify({
+        inspection: { id: inspection.id, propertyAddress: inspection.propertyAddress },
+        sections: sidebarSections.map(s => ({ id: s.id, title: s.title })),
+        role: viewerRole,
+        tab: 'full',
+    })})`}
+    x-init="init()"
+    class="min-h-screen bg-slate-50/50 antialiased relative"
 >
+    {/* Sub-spec D Task 5 — left sidebar, hidden in print. */}
+    <ReportSidebar
+        sections={sidebarSections}
+        role={viewerRole}
+        inspectionId={inspection.id}
+        siteName={siteName}
+        {...(logoUrl ? { brandLogo: logoUrl } : {})}
+    />
+
+    {/* Sub-spec D Task 5 — top action bar + tab bar (Share / PDF / status pill).
+        Sticky at top in screen view; entirely removed for print via print:hidden. */}
+    <header class="lg:ml-60 bg-white border-b border-slate-200 sticky top-0 z-20 print:hidden">
+        <div class="px-6 py-3 flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Inspection Report</p>
+                <h1 class="text-[18px] font-semibold tracking-tight text-slate-900 truncate">{inspection.propertyAddress}</h1>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <ReportStatusPill status={reportStatus} />
+                <ShareDropdown />
+                <PdfDropdown />
+            </div>
+        </div>
+        <ReportTabBar defectCounts={aggregateDefects} />
+    </header>
+
+    <div
+        x-data={`reportGatekeeper('${inspection.id}')`}
+        class="lg:ml-60 px-6 py-6 print:ml-0 print:px-0 print:py-0"
+    >
     {/* Spec 5F R2 Step 6 — atmospheric blobs removed (audit P1-4). */}
 
     <div
@@ -222,8 +309,15 @@ export function renderProfessionalReport(data: {
                     to a 2-col grid with hairline borders; defect items break
                     back to full-row red bg; photos shrink to 4-col mini grid
                     capped at 8 per item. */}
-                {schema.sections.map((section: SchemaSection) => (
-                    <section class="page-break report-pdf-section" key={section.title}>
+                {schema.sections.map((section: SchemaSection) => {
+                    const sectionCounts = sectionDefects.get(section.id) ?? { safety: 0, recommendation: 0, maintenance: 0 };
+                    return (
+                    <section
+                        class="page-break report-pdf-section report-section"
+                        id={`section-${section.id}`}
+                        key={section.id}
+                        data-defect-safety={sectionCounts.safety > 0 ? '1' : '0'}
+                    >
                         <div class="flex items-center gap-4 mb-16">
                             <h2 class="text-3xl font-bold tracking-tight text-slate-900 shrink-0">{section.title}</h2>
                             <div class="flex-grow h-0.5 bg-gradient-to-r from-slate-100 to-transparent"></div>
@@ -241,8 +335,31 @@ export function renderProfessionalReport(data: {
                                 const photos = res.photos || [];
                                 const photoCap = 8;
 
+                                // Sub-spec D Task 5 — collapse empty items: no rating + only the
+                                // "No notes recorded." placeholder + no photos. These are dead
+                                // weight in the report and clutter the Summary view.
+                                const hasRating = !!itemRatingId;
+                                const hasNotes  = !!(res.notes && res.notes !== 'No notes recorded.');
+                                const hasPhotos = photos.length > 0;
+                                if (!hasRating && !hasNotes && !hasPhotos) return null;
+
+                                // Defect category mapping (Sub-spec D Task 2 / 5):
+                                // bucket=defect   -> recommendation (per render-path heuristic)
+                                // bucket=marginal -> maintenance
+                                // bucket=good/null -> none
+                                const itemDefectCount = bucket === 'defect' ? 1 : bucket === 'marginal' ? 1 : 0;
+                                // Per-render-path: safety category isn't classified at item level
+                                // here (only the v2 defect-tabs path has that data). Mirror the
+                                // section-level zero so the print filter behaves consistently.
+                                const itemSafetyFlag  = '0';
+
                                 return (
-                                    <div class={`flex flex-col lg:flex-row gap-16 avoid-break group ${itemClass}`} key={item.id}>
+                                    <div
+                                        class={`flex flex-col lg:flex-row gap-16 avoid-break group report-item ${itemClass}`}
+                                        key={item.id}
+                                        data-defects={String(itemDefectCount)}
+                                        data-defect-safety={itemSafetyFlag}
+                                    >
                                         <div class="flex-grow">
                                             <div class="flex justify-between items-start gap-4 mb-6">
                                                 <h3 class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
@@ -273,7 +390,8 @@ export function renderProfessionalReport(data: {
                             })}
                         </div>
                     </section>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Document Finalization Tier */}
@@ -462,6 +580,10 @@ export function renderProfessionalReport(data: {
             }));
         });
     ` }} />
+    </div>
+
+    {/* Sub-spec D Task 1 — Alpine controller for the new sidebar / tabs / dropdowns. */}
+    <script src="/js/report-viewer.js"></script>
 </div>
         ),
     });

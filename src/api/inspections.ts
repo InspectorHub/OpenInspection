@@ -26,7 +26,7 @@ import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/t
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { AggregatedRecommendationsResponseSchema } from '../lib/validations/recommendation.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, agreementRequests, users } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, agreementRequests, users, contacts } from '../lib/db/schema';
 import { eq, inArray, and } from 'drizzle-orm';
 
 const inspectionsRoutes = new OpenAPIHono<HonoConfig>();
@@ -1459,6 +1459,65 @@ inspectionsRoutes.openapi(createRoute({
     const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
     const baseUrl = getBaseUrl(c);
     return c.json({ success: true, data: { token, url: `${baseUrl}/report/${id}?view=agent&token=${token}` } });
+});
+
+// ── Sprint 1 Sub-spec D Task 3 (D-3) — POST /api/inspections/:id/share-agent ────
+// Generates a fresh 30-day agent view token and emails the link to the inspection's
+// referring agent. Returns 400 if no agent is linked or the agent has no email on
+// file. Used by the report viewer's Share dropdown ("Share with your agent").
+inspectionsRoutes.openapi(createRoute({
+    method: 'post', path: '/{id}/share-agent',
+    tags: ['Inspections'],
+    summary: 'Email the report share link to the linked agent',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ sentTo: z.string() })) } },
+            description: 'Share link emailed to agent',
+        },
+    },
+}), async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const db = drizzle(c.env.DB);
+
+    const inspectionRow = await db.select({
+        id: inspectionTable.id,
+        propertyAddress: inspectionTable.propertyAddress,
+        referredByAgentId: inspectionTable.referredByAgentId,
+    }).from(inspectionTable)
+        .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)))
+        .get();
+    if (!inspectionRow) throw Errors.NotFound('Inspection not found');
+    if (!inspectionRow.referredByAgentId) {
+        throw Errors.BadRequest('No agent linked to this inspection');
+    }
+
+    const agentRow = await db.select({ email: contacts.email })
+        .from(contacts)
+        .where(and(eq(contacts.id, inspectionRow.referredByAgentId), eq(contacts.tenantId, tenantId)))
+        .get();
+    if (!agentRow || !agentRow.email) {
+        throw Errors.BadRequest('Agent has no email on file');
+    }
+
+    const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
+    const baseUrl = getBaseUrl(c);
+    const url = `${baseUrl}/report/${id}?view=agent&token=${token}`;
+
+    try {
+        await c.var.services.email.sendAgentShareLink(agentRow.email, inspectionRow.propertyAddress, url);
+    } catch (err) {
+        logger.error('[share-agent] email delivery failed', { inspectionId: id }, err instanceof Error ? err : undefined);
+        throw Errors.Internal('Failed to send share link');
+    }
+
+    auditFromContext(c, 'inspection.share_agent', 'inspection', {
+        entityId: id,
+        metadata: { agentEmail: agentRow.email },
+    });
+    return c.json({ success: true, data: { sentTo: agentRow.email } });
 });
 
 // ── Phase T (T12): Photo annotation save ────────────────────────────────────────

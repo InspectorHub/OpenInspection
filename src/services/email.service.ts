@@ -96,6 +96,28 @@ export class EmailService {
     }
 
     /**
+     * Sub-spec D — Sends a shareable agent view link for an inspection
+     * report. Used by `POST /api/inspections/:id/share-agent` so the
+     * inspector can hand the agent a 30-day signed URL straight from the
+     * report viewer.
+     */
+    async sendAgentShareLink(to: string, address: string, reportUrl: string) {
+        await this.sendEmail(
+            [to],
+            `Inspection report shared: ${address}`,
+            `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+               <h1 style="color: #4f46e5;">Inspection Report Shared</h1>
+               <p>The inspector has shared the inspection report for <strong>${address}</strong> with you.</p>
+               <div style="margin: 32px 0;">
+                 <a href="${reportUrl}" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Report</a>
+               </div>
+               <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link: ${reportUrl}</p>
+               <p style="font-size: 12px; color: #999;">This link expires in 30 days.</p>
+             </div>`
+        );
+    }
+
+    /**
      * Sends an inspection report delivery email.
      */
     async sendReportReady(to: string, address: string, reportUrl: string) {

@@ -16,7 +16,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                     <span x-text="`${items?.length || 0} repair item${(items?.length || 0) === 1 ? '' : 's'}${(distinctCategories?.length || 0) ? ' across ' + distinctCategories.length + ' categor' + (distinctCategories.length === 1 ? 'y' : 'ies') : ''}`"></span>
                 }
                 actions={
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 print:hidden">
                         <button
                             x-show="items.length === 0"
                             x-on:click="seedDefaults()"
@@ -24,6 +24,17 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                             class="h-8 px-3 rounded-md bg-indigo-100 text-indigo-700 text-[13px] font-bold hover:bg-indigo-200 disabled:opacity-50 transition-all"
                         >
                             Seed defaults (80)
+                        </button>
+                        {/* Sub-spec D Task 6 — Print as PDF. Uses window.print() +
+                            @media print rules in input.css to render a clean table. */}
+                        <button
+                            type="button"
+                            onclick="window.print()"
+                            aria-label="Print recommendations as PDF"
+                            class="h-8 px-4 rounded-md bg-white border border-slate-200 text-slate-700 text-[13px] font-bold inline-flex items-center gap-1.5 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            Print as PDF
                         </button>
                         <button
                             x-on:click="openCreate()"
@@ -36,7 +47,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                 }
             />
 
-            <div class="flex gap-3 flex-wrap">
+            <div class="flex gap-3 flex-wrap print:hidden">
                 <select x-model="categoryFilter" x-on:change="reload()" class="px-3 py-2 rounded-lg border border-slate-200 text-sm">
                     <option value="">All categories</option>
                     <template x-for="cat in distinctCategories" {...{ 'x-bind:key': 'cat' }}>
@@ -56,7 +67,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                 <p class="text-slate-400 text-sm mt-2">Click "Seed defaults" above to load 80 starter entries, or add your own.</p>
             </div>
 
-            <div x-show="items.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div x-show="items.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3 print:hidden">
                 <template x-for="rec in items" {...{ 'x-bind:key': 'rec.id' }}>
                     <div class="p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition">
                         <div class="flex items-start justify-between gap-3">
@@ -76,6 +87,36 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                         </div>
                     </div>
                 </template>
+            </div>
+
+            {/* Sub-spec D Task 6 — Print-only table view. Hidden on screen,
+                rendered as a clean tabular list when the user hits Print
+                (CSS rules in input.css @media print scope). Uses Alpine
+                template loop so it always reflects the current filtered
+                result set. */}
+            <div x-show="items.length > 0" class="hidden print:block">
+                <table class="recommendations-print-table">
+                    <thead>
+                        <tr>
+                            <th>Priority</th>
+                            <th>Category</th>
+                            <th>Item</th>
+                            <th>Estimate</th>
+                            <th>Recommended action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="rec in items" {...{ 'x-bind:key': 'rec.id' }}>
+                            <tr>
+                                <td x-bind:class="rec.severity === 'defect' ? 'priority-safety' : rec.severity === 'monitor' ? 'priority-rec' : 'priority-maint'" x-text="rec.severity"></td>
+                                <td x-text="rec.category || '—'"></td>
+                                <td x-text="rec.name"></td>
+                                <td x-text="estimateLabel(rec)"></td>
+                                <td x-text="rec.defaultRepairSummary"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
 
             {/* Create / Edit modal */}
