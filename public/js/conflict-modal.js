@@ -47,16 +47,17 @@ function conflictModalFactory() {
                     initial:     (cf.ours || '') + '\n\n--- Theirs ---\n' + (cf.theirs || ''),
                     scope:       'conflict-merge',
                     onApply: function (edited) {
-                        self._applyChoice(cf, edited);
+                        self._applyChoice(cf, edited, 'edit_merged');
                     },
                 });
                 return;
             }
             const chosen = (choice === 'theirs') ? cf.theirs : cf.ours;
-            await this._applyChoice(cf, chosen);
+            const resolution = (choice === 'theirs') ? 'accept_theirs' : 'keep_mine';
+            await this._applyChoice(cf, chosen, resolution);
         },
 
-        async _applyChoice(cf, chosen) {
+        async _applyChoice(cf, chosen, resolution) {
             const r = await db.results.get(cf.inspectionId);
             if (r?.data?.[cf.itemId]) {
                 r.data[cf.itemId][cf.field] = chosen;
@@ -71,7 +72,33 @@ function conflictModalFactory() {
                 });
             }
             await db.conflicts.delete(cf.id);
+            // Sprint 1 A-11: record the resolution so it shows up in the
+            // /api/admin/audit-logs feed. Fire-and-forget — never block UX.
+            this._recordAuditLog(cf, resolution, chosen);
             await drainQueue();
+        },
+
+        _recordAuditLog(cf, resolution, mergedValue) {
+            const fetcher = (typeof window.authFetch === 'function') ? window.authFetch : fetch;
+            try {
+                fetcher('/api/admin/audit-logs', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        action:       'inspection.sync_conflict_resolved',
+                        resourceType: 'inspection',
+                        resourceId:   cf.inspectionId,
+                        detail: {
+                            itemId:      cf.itemId,
+                            field:       cf.field,
+                            resolution:  resolution,
+                            ourValue:    cf.ours,
+                            theirValue:  cf.theirs,
+                            mergedValue: resolution === 'edit_merged' ? mergedValue : null,
+                        },
+                    }),
+                }).catch(() => { /* silent — audit is best-effort */ });
+            } catch (_) { /* ignore */ }
         },
     };
 }

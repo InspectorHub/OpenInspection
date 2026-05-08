@@ -443,7 +443,7 @@ adminRoutes.openapi(getAuditLogsRoute, async (c) => {
         action,
         entityType
     } as Parameters<typeof adminService.getAuditLogs>[1]);
-    
+
     // Map Date to string for schema compatibility
     const formattedResult = {
         ...result,
@@ -452,10 +452,57 @@ adminRoutes.openapi(getAuditLogsRoute, async (c) => {
             createdAt: safeISODate(log.createdAt)
         }))
     };
-    
+
     auditFromContext(c, 'audit.view', 'audit_log');
 
     return c.json({ success: true, data: formattedResult }, 200);
+});
+
+/**
+ * POST /api/admin/audit-logs
+ *
+ * Sprint 1 Sub-spec A Task 12 (A-11): client-callable endpoint so the
+ * conflict-modal can record \`inspection.sync_conflict_resolved\` audit
+ * entries. The action enum is constrained to the small set inspectors
+ * can legitimately log; all other audit actions are server-side only.
+ */
+const InspectorAuditActionSchema = z.enum(['inspection.sync_conflict_resolved']);
+
+const postAuditLogRoute = createRoute({
+    method: 'post',
+    path: '/audit-logs',
+    tags: ['Admin'],
+    summary: 'Record an inspector-driven audit event',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        action:       InspectorAuditActionSchema,
+                        resourceType: z.string().min(1).max(64),
+                        resourceId:   z.string().min(1).max(128),
+                        detail:       z.record(z.string(), z.unknown()).optional(),
+                    }),
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SuccessResponseSchema } },
+            description: 'Recorded',
+        },
+    },
+});
+
+adminRoutes.openapi(postAuditLogRoute, async (c) => {
+    const { action, resourceType, resourceId, detail } = c.req.valid('json');
+    auditFromContext(c, action, resourceType, {
+        entityId: resourceId,
+        ...(detail ? { metadata: detail } : {}),
+    });
+    return c.json({ success: true }, 200);
 });
 
 /**

@@ -16,6 +16,7 @@ export type AuditAction =
     | 'inspection.bulk_status'
     | 'inspection.template_upgraded'
     | 'inspection.results_merged'
+    | 'inspection.sync_conflict_resolved'
     | 'persistence.granted'
     | 'persistence.denied'
     | 'template.create'
