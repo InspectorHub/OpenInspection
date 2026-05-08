@@ -197,7 +197,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                       x-bind:id="'notes-mob-' + item.id"
                       x-model="results[item.id].notes"
                       x-on:input="debounceSave()"
-                      placeholder="Add notes..."
+                      data-slash-trigger="true"
+                      placeholder="Add notes — type / for snippets"
                       class="w-full p-3 text-sm rounded-xl border resize-none"
                       style="background: #f1f5f9; border-color: #e2e8f0; color: #0f172a"
                       rows={3}
@@ -906,7 +907,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                         x-bind:id="'notes-dsk-' + item.id"
                         x-model="results[item.id].notes"
                         x-on:input="debounceSave()"
-                        placeholder="Add notes..."
+                        data-slash-trigger="true"
+                        placeholder="Add notes — type / for snippets"
                         class="w-full p-3 text-sm rounded-xl border resize-none"
                         style="background: #f1f5f9; border-color: #e2e8f0; color: #0f172a"
                         rows={3}
