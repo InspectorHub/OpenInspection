@@ -52,6 +52,7 @@ export const SETTINGS_GROUPS: readonly GroupConfig[] = [
             { slug: 'branding', label: 'Branding', href: '/settings/workspace/branding', description: 'Site name, color, logo' },
             { slug: 'theme', label: 'Report Theme', href: '/settings/workspace/theme', description: 'Modern / classic / minimal' },
             { slug: 'reports', label: 'Reports', href: '/settings/workspace/reports', description: 'Estimate display, defect badges' },
+            { slug: 'referral', label: 'Referral Sources', href: '/settings/workspace/referral', description: 'Custom referral labels' },
             { slug: 'telemetry', label: 'Telemetry', href: '/settings/workspace/telemetry', description: 'Google Analytics' },
         ],
     },

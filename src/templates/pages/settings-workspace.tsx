@@ -1,4 +1,5 @@
 import { SettingsLayout } from '../components/settings-layout';
+import { SEED_REFERRAL_SOURCES } from '../../lib/referral-sources';
 import type { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig | undefined; }
@@ -10,7 +11,13 @@ interface ReportsProps extends Props {
     enableRepairList?: boolean;
 }
 
-type WorkspaceSubPage = 'branding' | 'theme' | 'reports' | 'telemetry';
+// Round-2 backlog G3 — extra prop only used by the new Referral sub-page
+// so the textarea hydrates with the workspace's saved custom labels.
+interface ReferralProps extends Props {
+    customReferralSources?: string[];
+}
+
+type WorkspaceSubPage = 'branding' | 'theme' | 'reports' | 'referral' | 'telemetry';
 
 /* ─────────────────────────────  Branding  ───────────────────────────── */
 
@@ -266,11 +273,106 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
     );
 };
 
+/* ─────────────────────────────  Referral Sources (G3)  ───────────────────────────── */
+
+/**
+ * Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10) — custom referral
+ * sources. Tenants can append to the seven seeded values
+ * (Realtor / Past Client / Google Search / Facebook / Yelp / Walk-in /
+ * Other) by entering one label per line. We keep the form deliberately
+ * MVP — no drag-reorder, no per-row delete — so a single textarea + Save
+ * round-trips to `tenant_configs.custom_referral_sources` (JSON).
+ */
+export const SettingsWorkspaceReferralPage = ({ branding, customReferralSources }: ReferralProps): JSX.Element => {
+    const initial = (customReferralSources ?? []).join('\n');
+    return (
+        <SettingsLayout
+            branding={branding}
+            title="Settings | Referral Sources"
+            group="workspace"
+            subPage="referral"
+            pageTitle="Referral Sources"
+            pageSubtitle="Extend the built-in referral source list shown on every inspection. One label per line."
+        >
+            <section
+                class="bg-white rounded-lg border border-surface-200 p-6 space-y-5"
+                x-data={`{
+                    raw: ${JSON.stringify(initial)},
+                    saving: false,
+                    parse() {
+                        return this.raw.split('\\n').map(s => s.trim()).filter(Boolean);
+                    },
+                    async save() {
+                        this.saving = true;
+                        try {
+                            const r = await authFetch('/api/admin/branding', {
+                                method: 'POST',
+                                headers: { 'content-type': 'application/json' },
+                                body: JSON.stringify({ customReferralSources: this.parse() })
+                            });
+                            if (!r.ok) {
+                                if (typeof showToast === 'function') showToast('Failed to save', true);
+                            } else {
+                                if (typeof showToast === 'function') showToast('Saved');
+                            }
+                        } catch (e) {
+                            if (typeof showToast === 'function') showToast('Failed to save', true);
+                        }
+                        finally { this.saving = false; }
+                    }
+                }`}
+            >
+                <div class="space-y-3">
+                    <div class="text-xs font-bold uppercase tracking-[0.2em] text-ink-700">Built-in sources</div>
+                    <ul class="flex flex-wrap gap-2">
+                        {SEED_REFERRAL_SOURCES.map(s => (
+                            <li class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-surface-100 text-ink-700">{s}</li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div class="space-y-2">
+                    <label for="customReferralSources" class="block text-xs font-bold text-ink-700 uppercase tracking-[0.2em]">Custom labels</label>
+                    <textarea
+                        id="customReferralSources"
+                        data-testid="settings-referral-textarea"
+                        x-model="raw"
+                        rows={8}
+                        placeholder="Magazine ad
+Trade show
+Referral partner"
+                        class="w-full px-3 py-2 rounded-md border border-surface-200 focus:border-blueprint-500 focus:ring-1 focus:ring-blueprint-500 outline-none transition-all font-medium text-sm placeholder:text-ink-300"
+                    ></textarea>
+                    <p class="text-[11px] text-ink-500">One label per line. Maximum 32 entries; duplicates are ignored.</p>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-surface-200">
+                    <span x-show="saving" class="text-xs text-ink-500">Saving…</span>
+                    <button
+                        x-on:click="save()"
+                        x-bind:disabled="saving"
+                        data-testid="settings-referral-save"
+                        class="px-4 py-2 bg-blueprint-500 text-white rounded-md font-bold text-sm hover:bg-blueprint-700 active:scale-[.98] transition-all disabled:bg-surface-200"
+                    >
+                        Save
+                    </button>
+                </div>
+            </section>
+
+            <script src="/js/auth.js"></script>
+            <script src="/js/toast.js"></script>
+        </SettingsLayout>
+    );
+};
+
 /**
  * Dispatcher used by the route handler — picks the right component based on the
  * `subPage` URL segment. Keeps `index.ts` route registrations short.
  */
-export const SettingsWorkspacePage = ({ branding, subPage, showEstimates, enableRepairList }: ReportsProps & { subPage: WorkspaceSubPage }): JSX.Element => {
+export const SettingsWorkspacePage = (
+    { branding, subPage, showEstimates, enableRepairList, customReferralSources }:
+    ReportsProps & ReferralProps & { subPage: WorkspaceSubPage }
+): JSX.Element => {
     if (subPage === 'theme') return SettingsWorkspaceThemePage({ branding });
     if (subPage === 'telemetry') return SettingsWorkspaceTelemetryPage({ branding });
     if (subPage === 'reports') {
@@ -278,6 +380,11 @@ export const SettingsWorkspacePage = ({ branding, subPage, showEstimates, enable
         if (typeof showEstimates    === 'boolean') props.showEstimates    = showEstimates;
         if (typeof enableRepairList === 'boolean') props.enableRepairList = enableRepairList;
         return SettingsWorkspaceReportsPage(props);
+    }
+    if (subPage === 'referral') {
+        const props: ReferralProps = { branding };
+        if (Array.isArray(customReferralSources)) props.customReferralSources = customReferralSources;
+        return SettingsWorkspaceReferralPage(props);
     }
     return SettingsWorkspaceBrandingPage({ branding });
 };

@@ -932,6 +932,9 @@ app.get('/report/:id', async (c) => {
             viewerRole: role,
             // Track E1 — show "View repair list" link only when opted in.
             enableRepairList,
+            // Round-2 backlog G1 — Property Facts banner above the report
+            // header. Auto-hidden when every field is empty.
+            propertyFacts: data.propertyFacts,
         }));
     } catch {
         return c.text('Report not found', 404);
@@ -982,6 +985,26 @@ app.get('/settings/workspace/reports', htmlAuthGuard(['owner', 'admin']), async 
     const showEstimates    = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
     const enableRepairList = Boolean((cfg as { enableRepairList?: boolean | number }).enableRepairList);
     return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates, enableRepairList }));
+});
+// Round-2 backlog G3 — Custom referral sources sub-page. Reads
+// tenant_configs.custom_referral_sources via the BrandingService so the
+// textarea hydrates with the saved values on first paint.
+app.get('/settings/workspace/referral', htmlAuthGuard(['owner', 'admin']), async (c) => {
+    const tenantId = c.get('tenantId');
+    let customReferralSources: string[] | undefined;
+    try {
+        const cfg = await drizzle(c.env.DB).select({ customReferralSources: schema.tenantConfigs.customReferralSources })
+            .from(schema.tenantConfigs)
+            .where(eq(schema.tenantConfigs.tenantId, tenantId))
+            .get();
+        const raw = cfg?.customReferralSources;
+        if (Array.isArray(raw)) customReferralSources = raw as string[];
+    } catch { /* default empty */ }
+    return c.html(SettingsWorkspacePage({
+        branding: c.get('branding'),
+        subPage: 'referral',
+        ...(customReferralSources ? { customReferralSources } : {}),
+    }));
 });
 app.get('/settings/workspace/telemetry', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'telemetry' })));
 
@@ -1108,15 +1131,22 @@ async function loadInspectionShellData(c: Context<HonoConfig>, inspectionId: str
         // Track E1 — per-tenant Repair List toggle drives the 6th sub-nav
         // tab. Failure to read defaults to false so the existing 5-tab nav
         // stays the baseline.
+        // Round-2 backlog G3 — `customReferralSources` extends the seven
+        // seed referral labels on the inspection settings dropdown.
         let enableRepairList = false;
+        let customReferralSources: string[] | undefined;
         try {
-            const cfgRow = await drizzle(c.env.DB).select({ enableRepairList: schema.tenantConfigs.enableRepairList })
-                .from(schema.tenantConfigs)
-                .where(eq(schema.tenantConfigs.tenantId, tenantId))
-                .get();
+            const cfgRow = await drizzle(c.env.DB).select({
+                enableRepairList:      schema.tenantConfigs.enableRepairList,
+                customReferralSources: schema.tenantConfigs.customReferralSources,
+            }).from(schema.tenantConfigs)
+              .where(eq(schema.tenantConfigs.tenantId, tenantId))
+              .get();
             enableRepairList = !!cfgRow?.enableRepairList;
+            const raw = cfgRow?.customReferralSources;
+            if (Array.isArray(raw)) customReferralSources = raw as string[];
         } catch { /* default off */ }
-        return { propertyAddress, requestId, siblings, enableRepairList };
+        return { propertyAddress, requestId, siblings, enableRepairList, customReferralSources };
     } catch {
         return null;
     }
@@ -1200,6 +1230,7 @@ app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector
         enableRepairList: !!shell?.enableRepairList,
         ...(shell?.requestId ? { requestId: shell.requestId } : {}),
         ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
+        ...(shell?.customReferralSources ? { customReferralSources: shell.customReferralSources } : {}),
     }));
 });
 
