@@ -21,7 +21,7 @@ export function CommandPalette(): JSX.Element {
         <div
             x-data="commandPalette"
             {...{
-                'x-on:keydown.window': "if ($event.key === 'k' && ($event.metaKey || $event.ctrlKey)) { open = !open; if (open) { $nextTick(() => $refs.queryInput?.focus()); } $event.preventDefault(); }",
+                'x-on:keydown.window': "const k = $event.key; const meta = $event.metaKey || $event.ctrlKey; const isTyping = window.OIHotkeys?.isTyping?.(); if (meta && k === 'k') { open = !open; if (open) { $nextTick(() => $refs.queryInput?.focus()); } $event.preventDefault(); } else if (meta && k === '/' && !isTyping) { open = !open; if (open) { $nextTick(() => $refs.queryInput?.focus()); } $event.preventDefault(); }",
                 'x-on:keydown.escape.window': 'if (open) { open = false; $event.stopPropagation(); }',
                 'x-cloak': '',
             }}

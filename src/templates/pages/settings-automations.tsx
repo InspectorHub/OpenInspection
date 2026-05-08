@@ -47,7 +47,7 @@ export function SettingsAutomationsPage({ branding }: SettingsAutomationsPagePro
                 </div>
 
                 {/* handoff-decisions §1 — Attention Rules */}
-                <section class="space-y-4 pt-2 border-t border-surface-200" x-data="attentionRules">
+                <section id="attention-rules" class="space-y-4 pt-2 border-t border-surface-200 scroll-mt-24" x-data="attentionRules">
                     <div class="space-y-1 mt-4">
                         <h2 class="text-sm font-bold text-ink-700 uppercase tracking-[0.2em]">Attention Rules</h2>
                         <p class="text-xs text-ink-500">

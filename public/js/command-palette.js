@@ -57,6 +57,7 @@
         { label: 'Settings · Embed Widget',        href: '/settings/catalog/widget' },
         { label: 'Settings · Email',               href: '/settings/communication/email' },
         { label: 'Settings · Automations',         href: '/settings/communication/automations' },
+        { label: 'Settings · Attention Rules',     href: '/settings/communication/automations#attention-rules' },
         { label: 'Settings · Apple Calendar',      href: '/settings/communication/calendar' },
         { label: 'Settings · Integrations',        href: '/settings/communication/integrations' },
         { label: 'Settings · Change Password',     href: '/settings/account/password' },
