@@ -32,6 +32,8 @@ import {
     AttentionThresholdsSchema,
     AttentionThresholdsResponseSchema,
     ATTENTION_THRESHOLDS_DEFAULTS,
+    DashboardColumnPrefsSchema,
+    DashboardColumnPrefsResponseSchema,
 } from '../lib/validations/admin.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
@@ -1476,6 +1478,58 @@ adminRoutes.openapi(updateAttentionThresholdsRoute, async (c) => {
     }
     auditFromContext(c, 'config.attention_thresholds.update', 'tenant_config', { metadata: { ...body } });
     return c.json({ success: true as const, data: { thresholds: body } }, 200);
+});
+
+// --- Dashboard Column Prefs (Round-2 backlog #2 — Spectora §5.1 / §E.7) ---
+//
+// Per-tenant default for the inspection dashboard column visibility set.
+// Stored as a JSON array of column ids on `tenant_configs.dashboard_column_prefs`.
+// New users on a brand-new device pick this up via GET; user-level overrides
+// then live in localStorage on the client. Both endpoints require an
+// authenticated owner / admin. All other roles read the same value through
+// the dashboard render path — no separate read role gate needed.
+
+const getDashboardColumnsRoute = createRoute({
+    method: 'get',
+    path: '/dashboard-columns',
+    tags: ['Admin'],
+    summary: 'Get tenant default dashboard column prefs',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    responses: {
+        200: {
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
+            description: 'Success',
+        },
+    },
+});
+
+adminRoutes.openapi(getDashboardColumnsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const columns = await c.var.services.dashboardPrefs.getColumnPrefs(tenantId);
+    return c.json({ success: true as const, data: { columns } }, 200);
+});
+
+const updateDashboardColumnsRoute = createRoute({
+    method: 'patch',
+    path: '/dashboard-columns',
+    tags: ['Admin'],
+    summary: 'Update tenant default dashboard column prefs',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema } } } },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
+            description: 'Success',
+        },
+    },
+});
+
+adminRoutes.openapi(updateDashboardColumnsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const columns = await c.var.services.dashboardPrefs.setColumnPrefs(tenantId, body.columns);
+    auditFromContext(c, 'config.dashboard_columns.update', 'tenant_config', { metadata: { columns } });
+    return c.json({ success: true as const, data: { columns } }, 200);
 });
 
 export default adminRoutes;

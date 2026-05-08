@@ -271,3 +271,19 @@ export const ATTENTION_THRESHOLDS_DEFAULTS = {
     invoice_overdue_h:    72,
     report_unpublished_h: 72,
 } as const;
+
+// Round-2 backlog #2 (Spectora §5.1 / §E.7) — per-tenant default for the
+// inspection dashboard column visibility set. The actual id whitelist lives
+// in src/lib/dashboard-columns.ts; we constrain length here so a malicious
+// payload can't blow up the JSON envelope, but accept any string id and
+// drop unknown ones server-side via `normalizeDashboardColumns`.
+export const DashboardColumnPrefsSchema = z.object({
+    columns: z.array(z.string().min(1).max(64)).max(64)
+        .openapi({ example: ['propertyAddress', 'clientName', 'date', 'price'] }),
+}).openapi('DashboardColumnPrefs');
+
+export const DashboardColumnPrefsResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({ columns: z.array(z.string()) }),
+}).openapi('DashboardColumnPrefsResponse');
+

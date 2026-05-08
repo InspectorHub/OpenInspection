@@ -1606,6 +1606,27 @@ export class InspectionService {
             if (r.inspectionId) paidIdSet.add(r.inspectionId as string);
         }
 
+        // Round-2 backlog #2 — Inspector name lookup so the "Inspector" column
+        // (Customize Columns) can render the assigned inspector without a
+        // second round-trip. Self-assigned (inspectorId NULL) renders blank.
+        const inspectorIdSet = new Set<string>();
+        for (const i of all) {
+            if (i.inspectorId) inspectorIdSet.add(i.inspectorId as string);
+        }
+        const inspectorNameMap = new Map<string, string>();
+        if (inspectorIdSet.size > 0) {
+            const insRows = await db
+                .select({ id: users.id, name: users.name, email: users.email })
+                .from(users)
+                .where(and(eq(users.tenantId, tenantId), inArray(users.id, Array.from(inspectorIdSet))));
+            for (const r of insRows) {
+                const nice = (r.name as string | null)
+                    || ((r.email as string | null)?.split('@')[0] ?? '')
+                    || '';
+                if (nice) inspectorNameMap.set(r.id as string, nice);
+            }
+        }
+
         // Sprint 2 S2-2 — count sibling inspections per request_id so list rows
         // can show a "(2 inspections)" hint when the inspection belongs to a
         // multi-service booking. Built once for the entire bucket sweep.
@@ -1615,9 +1636,10 @@ export class InspectionService {
             if (rid) requestSiblingCounts.set(rid, (requestSiblingCounts.get(rid) ?? 0) + 1);
         }
 
-        const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
+        const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; inspectorId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
             defectStats:    { safety: number; recommendation: number; maintenance: number };
             agentName?:     string;
+            inspectorName?: string;
             statusFlags:    { reportPublished: boolean; reportReady: boolean; agreementSigned: boolean; paid: boolean; sent: boolean; flagged: boolean; canceled: boolean };
             requestId?:     string;
             siblingCount?:  number;
@@ -1629,6 +1651,8 @@ export class InspectionService {
                 const agentName = (sellingId && agentNameMap.get(sellingId)) || (referredById && agentNameMap.get(referredById)) || undefined;
                 const reqId = (r as { requestId?: unknown }).requestId as string | null | undefined;
                 const siblingCount = reqId ? (requestSiblingCounts.get(reqId) ?? 1) : 1;
+                const inspectorId = r.inspectorId as string | null;
+                const inspectorName = inspectorId ? inspectorNameMap.get(inspectorId) : undefined;
                 // Round-2 F2 — split "report ready" (built/completed) from "sent"
                 // (delivered = publish workflow completed). Older clients still
                 // see `reportPublished` (alias of reportReady) for backward-
@@ -1639,6 +1663,7 @@ export class InspectionService {
                     ...r,
                     defectStats: statsMap.get(id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
                     ...(agentName ? { agentName } : {}),
+                    ...(inspectorName ? { inspectorName } : {}),
                     statusFlags: {
                         reportPublished: reportReady,
                         reportReady,

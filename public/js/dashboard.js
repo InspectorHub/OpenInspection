@@ -888,8 +888,160 @@ function dashboardFactory() {
         setFilter(filter) {
             this.activeFilter = filter || 'all';
         },
+
+        // Round-2 backlog #2 — Customize Columns. Reads the shared Alpine
+        // store written by the dashboardColumns factory (see below). Returns
+        // true when the column id is in the visible set or when the store
+        // hasn't loaded yet (fail-open so an empty store never hides every
+        // column on first paint).
+        isVisible(id) {
+            const store = window.Alpine && window.Alpine.store && window.Alpine.store('dashboardColumns');
+            if (!store || !Array.isArray(store.ids) || store.ids.length === 0) return true;
+            return store.ids.indexOf(id) !== -1;
+        },
     };
 }
+
+// ─── Round-2 backlog #2 — Customize Columns ─────────────────────────────────
+// Master registry must mirror src/lib/dashboard-columns.ts. Keep ids in sync
+// — dropping an id here only hides the modal checkbox; the row template still
+// reads `isVisible(id)` against the live store.
+const DASHBOARD_COLUMN_REGISTRY = [
+    { id: 'propertyAddress', label: 'Property Address', defaultOn: true,  alwaysOn: true  },
+    { id: 'clientName',      label: 'Client Name',      defaultOn: true                    },
+    { id: 'date',            label: 'Inspection Date',  defaultOn: true                    },
+    { id: 'inspector',       label: 'Inspector',        defaultOn: false                   },
+    { id: 'statusIcons',     label: 'Status Icons',     defaultOn: true                    },
+    { id: 'defectChips',     label: 'Defect Counts',    defaultOn: true                    },
+    { id: 'agent',           label: 'Agent',            defaultOn: true                    },
+    { id: 'price',           label: 'Price',            defaultOn: true                    },
+    { id: 'closingDate',     label: 'Closing Date',     defaultOn: false                   },
+    { id: 'orderId',         label: 'Order ID',         defaultOn: false                   },
+    { id: 'referralSource',  label: 'Referral Source',  defaultOn: false                   },
+    { id: 'propertyFacts',   label: 'Property Facts',   defaultOn: false                   },
+];
+const DASHBOARD_COLUMN_IDS = new Set(DASHBOARD_COLUMN_REGISTRY.map(c => c.id));
+const DEFAULT_DASHBOARD_COLUMNS = DASHBOARD_COLUMN_REGISTRY.filter(c => c.defaultOn).map(c => c.id);
+const ALWAYS_ON_DASHBOARD_COLUMNS = DASHBOARD_COLUMN_REGISTRY.filter(c => c.alwaysOn).map(c => c.id);
+const DASHBOARD_COLUMNS_LS_KEY = 'oi.dashboard.columns';
+
+// Sanitises any candidate column id list (localStorage / API / user toggle)
+// into a clean ordered set. Drops unknown ids, dedupes, re-injects every
+// always-on id, and preserves the registry's column order.
+function normalizeDashboardColumns(input) {
+    const wanted = new Set();
+    if (Array.isArray(input)) {
+        for (let i = 0; i < input.length; i++) {
+            const id = input[i];
+            if (typeof id === 'string' && DASHBOARD_COLUMN_IDS.has(id)) wanted.add(id);
+        }
+    }
+    for (let i = 0; i < ALWAYS_ON_DASHBOARD_COLUMNS.length; i++) wanted.add(ALWAYS_ON_DASHBOARD_COLUMNS[i]);
+    return DASHBOARD_COLUMN_REGISTRY.filter(c => wanted.has(c.id)).map(c => c.id);
+}
+
+function readColumnsFromLocalStorage() {
+    try {
+        const raw = window.localStorage.getItem(DASHBOARD_COLUMNS_LS_KEY);
+        if (!raw) return null;
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : null;
+    } catch { return null; }
+}
+
+function writeColumnsToLocalStorage(ids) {
+    try { window.localStorage.setItem(DASHBOARD_COLUMNS_LS_KEY, JSON.stringify(ids)); } catch {}
+}
+
+// Boot the shared store EARLY so the first dashboard render has a populated
+// `ids` array. Alpine.store is reactive — mutations propagate to every
+// `isVisible(id)` consumer.
+document.addEventListener('alpine:init', () => {
+    if (!window.Alpine || !window.Alpine.store) return;
+    if (window.Alpine.store('dashboardColumns')) return; // idempotent
+    const cached = readColumnsFromLocalStorage();
+    window.Alpine.store('dashboardColumns', {
+        ids: normalizeDashboardColumns(cached || DEFAULT_DASHBOARD_COLUMNS),
+        loaded: cached !== null,
+    });
+});
+
+// Modal factory — drives the Customize Columns modal. Reads/writes the
+// shared store so toggles take effect instantly.
+function dashboardColumns() {
+    return {
+        columns: DASHBOARD_COLUMN_REGISTRY,
+        saving: false,
+        error: '',
+        async initColumns() {
+            // Hydrate the store from the tenant default the FIRST time we
+            // see this device (no localStorage entry). Failures (e.g. 401
+            // before sign-in completes) silently keep the registry default.
+            const store = window.Alpine.store('dashboardColumns');
+            if (!store) return;
+            if (store.loaded) return; // localStorage already wins
+            try {
+                const r = await authFetch('/api/admin/dashboard-columns');
+                if (!r.ok) return;
+                const j = await r.json();
+                const ids = j?.data?.columns;
+                if (Array.isArray(ids) && ids.length) {
+                    store.ids = normalizeDashboardColumns(ids);
+                }
+            } catch {}
+        },
+        isVisible(id) {
+            const store = window.Alpine.store('dashboardColumns');
+            return !!store && Array.isArray(store.ids) && store.ids.indexOf(id) !== -1;
+        },
+        toggle(id) {
+            // Always-on columns can't be toggled off.
+            if (ALWAYS_ON_DASHBOARD_COLUMNS.indexOf(id) !== -1) return;
+            const store = window.Alpine.store('dashboardColumns');
+            if (!store) return;
+            const idx = store.ids.indexOf(id);
+            if (idx === -1) store.ids = normalizeDashboardColumns(store.ids.concat(id));
+            else store.ids = normalizeDashboardColumns(store.ids.filter(x => x !== id));
+        },
+        resetColumns() {
+            const store = window.Alpine.store('dashboardColumns');
+            if (!store) return;
+            store.ids = normalizeDashboardColumns(DEFAULT_DASHBOARD_COLUMNS);
+        },
+        async saveColumns() {
+            const store = window.Alpine.store('dashboardColumns');
+            if (!store) return;
+            this.saving = true;
+            this.error = '';
+            const ids = normalizeDashboardColumns(store.ids);
+            // Always persist the local override immediately so a failed
+            // tenant-default save doesn't lose the inspector's pick.
+            writeColumnsToLocalStorage(ids);
+            try {
+                const r = await authFetch('/api/admin/dashboard-columns', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ columns: ids }),
+                });
+                if (r.status === 403) {
+                    // Inspector role — local save still wins. Soft-success.
+                } else if (!r.ok) {
+                    const j = await r.json().catch(() => ({}));
+                    this.error = j?.error?.message || 'Could not save team default — your local pick is still applied.';
+                }
+            } catch (e) {
+                this.error = 'Network error — your local pick is still applied.';
+            } finally {
+                this.saving = false;
+                if (!this.error) {
+                    document.getElementById('customizeColumnsModal')?.classList.add('hidden');
+                }
+            }
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('dashboardColumns', dashboardColumns));
+window.dashboardColumns = dashboardColumns;
 
 function registerB4Component(name, factory) {
     document.addEventListener('alpine:init', () => window.Alpine.data(name, factory));
