@@ -198,7 +198,7 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                                     <a href="/recommendations" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Repair Items</a>
                                     <a href="/agreements" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Agreements</a>
                                     <a href="/marketplace" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Marketplace</a>
-                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-400 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems <span class="ml-1 text-[10px] uppercase tracking-widest">soon</span></a>
+                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems</a>
                                 </div>
                             </details>
                             <a href="/contacts" class="flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-all font-semibold">
@@ -307,7 +307,7 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                                     <a href="/recommendations" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Repair Items</a>
                                     <a href="/agreements" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Agreements</a>
                                     <a href="/marketplace" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Marketplace</a>
-                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-400 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems <span class="ml-1 text-[10px] uppercase tracking-widest">soon</span></a>
+                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems</a>
                                 </div>
                             </details>
                             <a href="/contacts" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-all font-semibold group">
