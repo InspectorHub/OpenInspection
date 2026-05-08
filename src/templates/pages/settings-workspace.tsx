@@ -3,7 +3,11 @@ import type { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig | undefined; }
 
-type WorkspaceSubPage = 'branding' | 'theme' | 'telemetry';
+// Sprint 2 S2-4 — extra prop only used by the new Reports sub-page so the
+// toggle reflects persisted state on first paint.
+interface ReportsProps extends Props { showEstimates?: boolean }
+
+type WorkspaceSubPage = 'branding' | 'theme' | 'reports' | 'telemetry';
 
 /* ─────────────────────────────  Branding  ───────────────────────────── */
 
@@ -161,12 +165,90 @@ export const SettingsWorkspaceTelemetryPage = ({ branding }: Props): JSX.Element
     );
 };
 
+/* ─────────────────────────────  Reports (S2-4)  ───────────────────────────── */
+
+/**
+ * Sprint 2 S2-4 — toggle for "Show repair estimate ranges in published
+ * reports". When on, the public report card stack renders the
+ * `Estimated cost: $X – $Y` badge underneath the recommendation pill on
+ * each defect item. Defaults to off so existing tenants don't suddenly
+ * start showing dollar figures.
+ */
+export const SettingsWorkspaceReportsPage = ({ branding, showEstimates }: ReportsProps): JSX.Element => {
+    const initial = showEstimates ? 'true' : 'false';
+    return (
+        <SettingsLayout
+            branding={branding}
+            title="Settings | Reports"
+            group="workspace"
+            subPage="reports"
+            pageTitle="Reports"
+            pageSubtitle="Control how published reports surface optional defect annotations such as repair estimate ranges."
+        >
+            <section
+                class="bg-white rounded-lg border border-surface-200 p-6 space-y-5"
+                x-data={`{
+                    showEstimates: ${initial},
+                    saving: false,
+                    async save() {
+                        this.saving = true;
+                        try {
+                            const r = await authFetch('/api/admin/branding', {
+                                method: 'POST',
+                                headers: { 'content-type': 'application/json' },
+                                body: JSON.stringify({ showEstimates: this.showEstimates })
+                            });
+                            if (!r.ok) {
+                                if (typeof showToast === 'function') showToast('Failed to save', true);
+                            } else {
+                                if (typeof showToast === 'function') showToast('Saved');
+                            }
+                        } catch (e) {
+                            if (typeof showToast === 'function') showToast('Failed to save', true);
+                        }
+                        finally { this.saving = false; }
+                    }
+                }`}
+            >
+                <label class="flex items-start justify-between gap-6 cursor-pointer">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-ink-900">Show repair estimate ranges</div>
+                        <div class="text-xs text-ink-500 mt-1 leading-relaxed">
+                            When enabled, defect cards in the published report include the
+                            inspector's estimated repair cost range (e.g.{' '}
+                            <span class="font-mono text-ink-700">$500 – $1,500</span>).
+                            Inspectors enter these numbers per defect on the inspection edit page.
+                        </div>
+                    </div>
+                    <input
+                        type="checkbox"
+                        data-testid="settings-show-estimates-toggle"
+                        x-model="showEstimates"
+                        x-on:change="save()"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        style="background-position: left center; background-repeat: no-repeat;"
+                    />
+                </label>
+                <p class="text-xs text-ink-400" x-show="saving">Saving…</p>
+            </section>
+
+            <script src="/js/auth.js"></script>
+            <script src="/js/toast.js"></script>
+        </SettingsLayout>
+    );
+};
+
 /**
  * Dispatcher used by the route handler — picks the right component based on the
  * `subPage` URL segment. Keeps `index.ts` route registrations short.
  */
-export const SettingsWorkspacePage = ({ branding, subPage }: Props & { subPage: WorkspaceSubPage }): JSX.Element => {
+export const SettingsWorkspacePage = ({ branding, subPage, showEstimates }: ReportsProps & { subPage: WorkspaceSubPage }): JSX.Element => {
     if (subPage === 'theme') return SettingsWorkspaceThemePage({ branding });
     if (subPage === 'telemetry') return SettingsWorkspaceTelemetryPage({ branding });
+    if (subPage === 'reports') {
+        const props: ReportsProps = { branding };
+        if (typeof showEstimates === 'boolean') props.showEstimates = showEstimates;
+        return SettingsWorkspaceReportsPage(props);
+    }
     return SettingsWorkspaceBrandingPage({ branding });
 };

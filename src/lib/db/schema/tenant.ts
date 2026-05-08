@@ -64,6 +64,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
         .$type<{ agreement_unsigned_h: number; invoice_overdue_h: number; report_unpublished_h: number }>()
         .notNull()
         .default(sql`'{"agreement_unsigned_h":72,"invoice_overdue_h":72,"report_unpublished_h":72}'`),
+    // Sprint 2 S2-4 — when true, published reports render the per-defect
+    // "Estimated cost: $X – $Y" badge.
+    showEstimates: integer('show_estimates', { mode: 'boolean' }).notNull().default(false),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

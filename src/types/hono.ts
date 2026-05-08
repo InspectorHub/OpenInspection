@@ -98,6 +98,7 @@ import { AuditLogService } from '../services/audit-log.service';
 import { TemplateMigrationService } from '../services/template-migration.service';
 import { ImportHistoryService } from '../services/import-history.service';
 import { InspectionRequestService } from '../services/inspection-request.service';
+import { RatingSystemService } from '../services/rating-system.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -134,6 +135,7 @@ export interface AppServices {
     templateMigration: TemplateMigrationService;
     importHistory: ImportHistoryService;
     inspectionRequest: InspectionRequestService;
+    ratingSystem: RatingSystemService;
 }
 
 /**

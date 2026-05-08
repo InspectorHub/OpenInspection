@@ -701,6 +701,12 @@ function inspectionEditor(inspectionId) {
           category: (s && s.category) || c.category || null,
           location: (s && typeof s.location === 'string' && s.location.length > 0) ? s.location : (c.location || ''),
           photos: (s && Array.isArray(s.photos)) ? s.photos : [],
+          // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation slug
+          // and repair estimate range (cents). Null when blank so the editor
+          // and report renderer can detect "no value" without ambiguity.
+          recommendationId: (s && typeof s.recommendationId === 'string' && s.recommendationId.length > 0) ? s.recommendationId : null,
+          estimateLow:      (s && typeof s.estimateLow  === 'number' && Number.isFinite(s.estimateLow))  ? s.estimateLow  : null,
+          estimateHigh:     (s && typeof s.estimateHigh === 'number' && Number.isFinite(s.estimateHigh)) ? s.estimateHigh : null,
         };
       });
     },
@@ -945,6 +951,29 @@ function inspectionEditor(inspectionId) {
 
     setDefectCategory(itemId, cannedId, category) {
       this._upsertStateEntry(itemId, 'defects', cannedId, { category: category });
+      this.debounceSave();
+    },
+
+    // Sprint 2 S2-3 — write the contractor recommendation slug onto a
+    // defect state row. Empty string clears the selection (stored as null
+    // so the report renderer can branch on `!= null`).
+    setDefectRecommendation(itemId, cannedId, slug) {
+      var value = (typeof slug === 'string' && slug.length > 0) ? slug : null;
+      this._upsertStateEntry(itemId, 'defects', cannedId, { recommendationId: value });
+      this.debounceSave();
+    },
+
+    // Sprint 2 S2-4 — write the low / high estimate (USD) onto a defect
+    // state row. The UI lets inspectors enter dollars; we persist cents to
+    // match the canonical money representation used elsewhere (Stripe etc).
+    // Blank string => null (cleared). Non-numeric input falls back to null
+    // so we never persist NaN.
+    setDefectEstimate(itemId, cannedId, side, dollars) {
+      var raw = (typeof dollars === 'string') ? dollars.trim() : dollars;
+      var num = (raw === '' || raw == null) ? null : Number(raw);
+      var cents = (num != null && Number.isFinite(num) && num >= 0) ? Math.round(num * 100) : null;
+      var patch = (side === 'high') ? { estimateHigh: cents } : { estimateLow: cents };
+      this._upsertStateEntry(itemId, 'defects', cannedId, patch);
       this.debounceSave();
     },
 

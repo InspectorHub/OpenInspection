@@ -31,7 +31,7 @@ import { AgentDashboardPage } from './templates/pages/agent-dashboard';
 import { TemplatesPage } from './templates/pages/templates';
 import { TemplateEditorPage } from './templates/pages/template-editor';
 import { MarketplacePage } from './templates/pages/marketplace';
-import { RatingSystemsStubPage } from './templates/pages/rating-systems-stub';
+import { RatingSystemsPage } from './templates/pages/rating-systems';
 import { TeamPage } from './templates/pages/team';
 import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
@@ -94,6 +94,7 @@ import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
+import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionRequestsRoutes from './api/inspection-requests';
 
@@ -340,6 +341,7 @@ app.route('/api/calendar', calendarRoutes);
 app.route('/api/team', teamRoutes);
 app.route('/api/contacts', contactRoutes);
 app.route('/api/recommendations', recommendationsRoutes);
+app.route('/api/rating-systems', ratingSystemsRoutes);
 app.route('/api', eventsRoutes);
 app.route('/api/invoices', invoiceRoutes);
 app.route('/api/services', servicesRoutes);
@@ -909,6 +911,8 @@ app.get('/report/:id', async (c) => {
             ratingLevels: data.ratingLevels as import('./lib/report-utils').RatingLevel[],
             branding: c.get('branding'),
             summaryMode,
+            // Sprint 2 S2-4 — gate "Estimated cost: $X – $Y" badges per tenant.
+            showEstimates: data.showEstimates,
         }));
     } catch {
         return c.text('Report not found', 404);
@@ -934,9 +938,8 @@ app.get('/templates/:id/edit', htmlAuthGuard(['owner', 'admin']), (c) => {
     return c.html(TemplateEditorPage({ templateId: id, branding: c.get('branding') }));
 });
 app.get('/marketplace', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MarketplacePage({ branding: c.get('branding') })));
-// Sprint 1 Sub-spec B Task 2 Step 5 — Library / Rating Systems stub (real
-// implementation lands in Sprint 2 — TREC, ITB, custom rating systems).
-app.get('/library/rating-systems', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(RatingSystemsStubPage({ branding: c.get('branding') })));
+// Sprint 2 S2-1 — Library / Rating Systems CRUD page replaces the Sprint 1 stub.
+app.get('/library/rating-systems', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(RatingSystemsPage({ branding: c.get('branding') })));
 // Settings hub (group cards)
 app.get('/settings', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsPage({ branding: c.get('branding') })));
 
@@ -947,6 +950,19 @@ app.get('/settings/profile', htmlAuthGuard(['owner', 'admin']), (c) => c.html(Se
 app.get('/settings/workspace', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/workspace/branding'));
 app.get('/settings/workspace/branding', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'branding' })));
 app.get('/settings/workspace/theme', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'theme' })));
+// Sprint 2 S2-4 — Reports sub-page hosts the "Show estimate ranges" toggle.
+// We resolve the persisted value via the BrandingService so the checkbox
+// reflects state on first paint without a flash.
+app.get('/settings/workspace/reports', htmlAuthGuard(['owner', 'admin']), async (c) => {
+    const tenantId = c.get('tenantId');
+    const cfg = await c.var.services.branding.getBranding(tenantId, {
+        siteName: c.env.APP_NAME || 'OpenInspection',
+        primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
+        supportEmail: c.env.SENDER_EMAIL || 'support@example.com',
+    });
+    const showEstimates = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
+    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates }));
+});
 app.get('/settings/workspace/telemetry', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'telemetry' })));
 
 // Catalog group

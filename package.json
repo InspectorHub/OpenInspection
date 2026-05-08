@@ -37,6 +37,8 @@
     "seed:comments:remote": "node scripts/seed-comments.js",
     "seed:recommendations": "node scripts/seed-recommendations.js --local",
     "seed:recommendations:remote": "node scripts/seed-recommendations.js",
+    "seed:rating-systems": "node scripts/seed-rating-systems.js --local",
+    "seed:rating-systems:remote": "node scripts/seed-rating-systems.js",
     "seed:marketplace": "node scripts/seed-marketplace.js --local",
     "seed:marketplace:remote": "node scripts/seed-marketplace.js",
     "seed:sandbox": "node scripts/sandbox-seed.js --local",

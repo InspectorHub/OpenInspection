@@ -50,17 +50,25 @@ export default defineConfig({
         },
         {
             // Sprint 2 Track 2 (S2-2) — multi-inspection per request smoke.
-            // Auth-free; verifies the public booking surface + by-inspection
-            // endpoint mounts. Full admin flow runs in the Chrome MCP GIF.
             name: 'multi-inspection',
             testMatch: 'multi-inspection-request.spec.ts',
         },
         {
             // Sprint 2 Track 2 (S2-5) — inspection sub-routes router smoke.
-            // Confirms the 5 sub-routes are mounted, /edit redirects, and
-            // /photos is responsive across 5 viewports.
             name: 'subroutes',
             testMatch: 'inspection-subroutes.spec.ts',
+        },
+        {
+            // Sprint 2 S2-1 — rating systems CRUD.
+            name: 'rating-system-crud',
+            testMatch: 'rating-system-crud.spec.ts',
+            dependencies: ['api'],
+        },
+        {
+            // Sprint 2 S2-4 — repair estimate range toggle + sanitizer.
+            name: 'estimate-range',
+            testMatch: 'estimate-range.spec.ts',
+            dependencies: ['api'],
         },
         {
             name: 'cloud',
