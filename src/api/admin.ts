@@ -1080,6 +1080,8 @@ adminRoutes.openapi(createCommentRoute, async (c) => {
         category: category ?? null,
         ratingBucket: ratingBucket ?? null,
         section: section ?? null,
+        // S2-7 — libraryId tracks marketplace provenance; null for tenant-authored.
+        libraryId: null as string | null,
         createdAt: new Date(),
     };
     await db.insert(comments).values(row);

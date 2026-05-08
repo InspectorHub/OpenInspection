@@ -1,9 +1,40 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
-import { marketplaceTemplates, tenantMarketplaceImports, marketplaceLibraries, tenantLibraryImports } from '../lib/db/schema/marketplace';
-import { templates } from '../lib/db/schema';
+import {
+    marketplaceTemplates,
+    tenantMarketplaceImports,
+    marketplaceLibraries,
+    tenantLibraryImports,
+    tenantMarketplaceImportHistory,
+} from '../lib/db/schema/marketplace';
+import { templates, comments } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { logger } from '../lib/logger';
 import { TemplateService } from './template.service';
+
+/**
+ * Sprint 2 S2-7 — Library update mode. Append (default, legacy behavior) keeps
+ * old rows alongside new. Replace deletes the prior import's rows first then
+ * inserts the new pack.
+ */
+export type LibraryUpdateMode = 'append' | 'replace';
+
+export interface UpdateLibraryImportOptions {
+    mode?: LibraryUpdateMode;
+    /** Acknowledged by caller that user-modified rows will be lost. */
+    confirmLossOfEdits?: boolean;
+    /** User id for the history row (S2-8). Defaults to 'system'. */
+    userId?: string;
+}
+
+export interface UpdateLibraryImportResult {
+    rowsAdded: number;
+    rowsDeleted: number;
+    fromSemver: string;
+    toSemver: string;
+    libraryName: string;
+    mode: LibraryUpdateMode;
+}
 
 export class MarketplaceService {
   private db: ReturnType<typeof drizzle>;
@@ -47,7 +78,42 @@ export class MarketplaceService {
     }));
   }
 
-  async importTemplate(marketplaceId: string): Promise<string> {
+  /**
+   * Sprint 2 S2-8 — write one row to tenant_marketplace_import_history.
+   * Never throws; swallows + logs so audit failure cannot break imports.
+   */
+  private async writeHistory(input: {
+    templateId?: string | null;
+    libraryId?: string | null;
+    action: 'install' | 'update' | 'replace' | 'migrate';
+    sourceVersion?: string | null;
+    targetVersion?: string | null;
+    rowsAffected: number;
+    metadata?: Record<string, unknown>;
+    userId: string;
+  }): Promise<void> {
+    try {
+      await this.db.insert(tenantMarketplaceImportHistory).values({
+        id:            crypto.randomUUID(),
+        tenantId:      this.tenantId,
+        templateId:    input.templateId ?? null,
+        libraryId:     input.libraryId ?? null,
+        action:        input.action,
+        sourceVersion: input.sourceVersion ?? null,
+        targetVersion: input.targetVersion ?? null,
+        rowsAffected:  input.rowsAffected,
+        metadata:      input.metadata ? JSON.stringify(input.metadata) : null,
+        createdAt:     Date.now(),
+        createdBy:     input.userId,
+      }).run();
+    } catch (err) {
+      logger.error('[marketplace] history insert failed', {
+        tenantId: this.tenantId, action: input.action,
+      }, err instanceof Error ? err : undefined);
+    }
+  }
+
+  async importTemplate(marketplaceId: string, userId: string = 'system'): Promise<string> {
     const [mkt] = await this.db
       .select()
       .from(marketplaceTemplates)
@@ -112,6 +178,17 @@ export class MarketplaceService {
       .set({ downloadCount: sql`${marketplaceTemplates.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceTemplates.id, marketplaceId));
 
+    // Sprint 2 S2-8 — record the install in import history.
+    await this.writeHistory({
+      templateId:    newTemplateId,
+      action:        'install',
+      sourceVersion: null,
+      targetVersion: mkt.semver,
+      rowsAffected:  1,
+      metadata:      { marketplaceTemplateId: marketplaceId, name: mkt.name },
+      userId,
+    });
+
     return newTemplateId;
   }
 
@@ -126,7 +203,7 @@ export class MarketplaceService {
    * Throws Errors.BadRequest if no import row exists or the marketplace
    * version has not advanced past the imported semver.
    */
-  async updateTemplateImport(marketplaceId: string): Promise<{
+  async updateTemplateImport(marketplaceId: string, userId: string = 'system'): Promise<{
     newLocalId: string;
     newName: string;
     fromSemver: string;
@@ -201,6 +278,22 @@ export class MarketplaceService {
       .set({ downloadCount: sql`${marketplaceTemplates.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceTemplates.id, marketplaceId));
 
+    // Sprint 2 S2-8 — record the template update event.
+    await this.writeHistory({
+      templateId:    newTemplateId,
+      action:        'update',
+      sourceVersion: fromSemver,
+      targetVersion: mkt.semver,
+      rowsAffected:  1,
+      metadata: {
+        marketplaceTemplateId: marketplaceId,
+        oldLocalId,
+        newLocalId: newTemplateId,
+        newName,
+      },
+      userId,
+    });
+
     return {
       newLocalId: newTemplateId,
       newName,
@@ -235,7 +328,7 @@ export class MarketplaceService {
     }));
   }
 
-  async importLibrary(libraryId: string): Promise<{ rowCount: number; localFirstId: string }> {
+  async importLibrary(libraryId: string, userId: string = 'system'): Promise<{ rowCount: number; localFirstId: string }> {
     const [lib] = await this.db
       .select()
       .from(marketplaceLibraries)
@@ -273,12 +366,12 @@ export class MarketplaceService {
       // Use raw SQL with placeholder list — single statement per chunk
       // is dramatically faster than 248 individual inserts. D1 caps SQL
       // statement size and bound-parameter count, so chunk to 25 rows
-      // (25 × 5 = 125 placeholders, well under D1 limits).
+      // (25 × 6 = 150 placeholders, well under D1 limits).
       const CHUNK = 25;
       const nowSec = Math.floor(Date.now() / 1000);
       for (let i = 0; i < entries.length; i += CHUNK) {
         const batch = entries.slice(i, i + CHUNK);
-        const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(', ');
+        const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
         const params: (string | number | null)[] = [];
         for (let j = 0; j < batch.length; j++) {
           const c = batch[j];
@@ -288,10 +381,11 @@ export class MarketplaceService {
             this.tenantId,
             c.text,
             c.section ?? null,
+            libraryId,             // S2-7 — provenance for replace mode
             nowSec,
           );
         }
-        const stmt = `INSERT INTO comments (id, tenant_id, text, category, created_at) VALUES ${placeholders}`;
+        const stmt = `INSERT INTO comments (id, tenant_id, text, category, library_id, created_at) VALUES ${placeholders}`;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (this.rawDb as any).prepare(stmt).bind(...params).run();
         rowCount += batch.length;
@@ -314,6 +408,17 @@ export class MarketplaceService {
       .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceLibraries.id, libraryId));
 
+    // Sprint 2 S2-8 — record the library install.
+    await this.writeHistory({
+      libraryId,
+      action:        'install',
+      sourceVersion: null,
+      targetVersion: lib.semver,
+      rowsAffected:  rowCount,
+      metadata:      { libraryName: lib.name, kind: lib.kind },
+      userId,
+    });
+
     return { rowCount, localFirstId: firstId };
   }
 
@@ -327,12 +432,26 @@ export class MarketplaceService {
    *
    * Throws Errors.BadRequest if no prior import or no version bump.
    */
-  async updateLibraryImport(libraryId: string): Promise<{
-    rowsAdded: number;
-    fromSemver: string;
-    toSemver: string;
-    libraryName: string;
-  }> {
+  /**
+   * Sprint 2 S2-7 — Library update with explicit Append vs Replace mode.
+   *
+   * - 'append' (default, legacy behavior): adds the new pack's rows alongside
+   *   the prior import's rows. Risks duplication when the marketplace bumps a
+   *   library 248 → 248+248 entries.
+   * - 'replace': deletes every comment with the matching `library_id` for this
+   *   tenant, then inserts the new pack. Tenant-authored comments
+   *   (library_id IS NULL) are NEVER touched.
+   *
+   * Throws Errors.BadRequest if no prior import exists or the marketplace
+   * version has not advanced past the imported semver.
+   */
+  async updateLibraryImport(
+    libraryId: string,
+    options: UpdateLibraryImportOptions = {},
+  ): Promise<UpdateLibraryImportResult> {
+    const mode: LibraryUpdateMode = options.mode ?? 'append';
+    const userId = options.userId ?? 'system';
+
     const [lib] = await this.db
       .select()
       .from(marketplaceLibraries)
@@ -357,49 +476,71 @@ export class MarketplaceService {
       throw Errors.BadRequest('No update available — already on the latest version');
     }
 
-    const fromSemver = existing.importedSemver;
-    const now = new Date().toISOString();
-    let rowsAdded = 0;
-
-    if (lib.kind === 'comments') {
-      let schema: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
-      if (typeof lib.schema === 'string') {
-        try { schema = JSON.parse(lib.schema); } catch { schema = {}; }
-      } else if (lib.schema && typeof lib.schema === 'object') {
-        schema = lib.schema as typeof schema;
-      }
-      const entries = Array.isArray(schema.comments) ? schema.comments : [];
-      const CHUNK = 25;
-      const nowSec = Math.floor(Date.now() / 1000);
-      for (let i = 0; i < entries.length; i += CHUNK) {
-        const batch = entries.slice(i, i + CHUNK);
-        const placeholders = batch.map(() => '(?, ?, ?, ?, ?)').join(', ');
-        const params: (string | number | null)[] = [];
-        for (let j = 0; j < batch.length; j++) {
-          const c = batch[j];
-          params.push(
-            crypto.randomUUID(),
-            this.tenantId,
-            c.text,
-            c.section ?? null,
-            nowSec,
-          );
-        }
-        const stmt = `INSERT INTO comments (id, tenant_id, text, category, created_at) VALUES ${placeholders}`;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (this.rawDb as any).prepare(stmt).bind(...params).run();
-        rowsAdded += batch.length;
-      }
-    } else {
+    if (lib.kind !== 'comments') {
       throw new Error(`Library kind '${lib.kind}' not yet supported for update`);
     }
 
+    const fromSemver = existing.importedSemver;
+    const now = new Date().toISOString();
+    let rowsAdded = 0;
+    let rowsDeleted = 0;
+
+    // S2-7 — Replace mode: clear prior-import rows for this tenant first.
+    if (mode === 'replace') {
+      const deleted = await this.db.delete(comments)
+        .where(and(
+          eq(comments.tenantId, this.tenantId),
+          eq(comments.libraryId, libraryId),
+        ))
+        .run();
+      // Drizzle returns a meta object on D1; better-sqlite3 returns
+      // { changes: number }. We tolerate both via duck-typing.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const changes = (deleted as any)?.meta?.changes ?? (deleted as any)?.changes ?? 0;
+      rowsDeleted = typeof changes === 'number' ? changes : 0;
+    }
+
+    // Parse the new pack's entries.
+    let parsed: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
+    if (typeof lib.schema === 'string') {
+      try { parsed = JSON.parse(lib.schema); } catch { parsed = {}; }
+    } else if (lib.schema && typeof lib.schema === 'object') {
+      parsed = lib.schema as typeof parsed;
+    }
+    const entries = Array.isArray(parsed.comments) ? parsed.comments : [];
+
+    const CHUNK = 25;
+    const nowSec = Math.floor(Date.now() / 1000);
+    for (let i = 0; i < entries.length; i += CHUNK) {
+      const batch = entries.slice(i, i + CHUNK);
+      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+      const params: (string | number | null)[] = [];
+      for (let j = 0; j < batch.length; j++) {
+        const c = batch[j];
+        params.push(
+          crypto.randomUUID(),
+          this.tenantId,
+          c.text,
+          c.section ?? null,
+          libraryId,             // S2-7 provenance
+          nowSec,
+        );
+      }
+      const stmt = `INSERT INTO comments (id, tenant_id, text, category, library_id, created_at) VALUES ${placeholders}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.rawDb as any).prepare(stmt).bind(...params).run();
+      rowsAdded += batch.length;
+    }
+
+    // Update the marker. Replace mode resets rowCount to the new size; append
+    // mode accumulates as before.
+    const newRowCount = mode === 'replace' ? rowsAdded : (existing.rowCount + rowsAdded);
     await this.db
       .update(tenantLibraryImports)
       .set({
         importedSemver: lib.semver,
         importedAt:     now,
-        rowCount:       existing.rowCount + rowsAdded,
+        rowCount:       newRowCount,
       })
       .where(eq(tenantLibraryImports.id, existing.id));
 
@@ -408,11 +549,31 @@ export class MarketplaceService {
       .set({ downloadCount: sql`${marketplaceLibraries.downloadCount} + 1`, updatedAt: now })
       .where(eq(marketplaceLibraries.id, libraryId));
 
+    // Sprint 2 S2-8 — write history. action='replace' surfaces the destructive
+    // event distinctly from a plain 'update' (append).
+    await this.writeHistory({
+      libraryId,
+      action:        mode === 'replace' ? 'replace' : 'update',
+      sourceVersion: fromSemver,
+      targetVersion: lib.semver,
+      rowsAffected:  rowsAdded,
+      metadata: {
+        libraryName: lib.name,
+        kind:        lib.kind,
+        rowsAdded,
+        rowsDeleted,
+        confirmLossOfEdits: !!options.confirmLossOfEdits,
+      },
+      userId,
+    });
+
     return {
       rowsAdded,
+      rowsDeleted,
       fromSemver,
-      toSemver: lib.semver,
+      toSemver:    lib.semver,
       libraryName: lib.name,
+      mode,
     };
   }
 }

@@ -48,3 +48,23 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
   importedAt:     text('imported_at').notNull(),
   rowCount:       integer('row_count').notNull().default(0),
 });
+
+// Sprint 2 Track 3 (S2-8) — per-import history. One row per
+// install/update/replace/migrate event, indexed for fast tenant scoping
+// and per-resource (template / library) lookups.
+export const tenantMarketplaceImportHistory = sqliteTable('tenant_marketplace_import_history', {
+  id:            text('id').primaryKey(),
+  tenantId:      text('tenant_id').notNull(),
+  libraryId:     text('library_id'),
+  templateId:    text('template_id'),
+  // 'install' | 'update' | 'replace' | 'migrate'
+  action:        text('action').notNull(),
+  sourceVersion: text('source_version'),
+  targetVersion: text('target_version'),
+  rowsAffected:  integer('rows_affected').notNull().default(0),
+  // JSON-encoded action-specific context (deleted ids, migration counts, …).
+  // Stored as TEXT so we can keep parity with raw SQL inserts in tests.
+  metadata:      text('metadata'),
+  createdAt:     integer('created_at').notNull(),
+  createdBy:     text('created_by').notNull(),
+});

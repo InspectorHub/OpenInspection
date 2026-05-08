@@ -81,6 +81,7 @@ import servicesRoutes from './api/services';
 import automationsRoutes from './api/automations';
 import metricsRoutes from './api/metrics';
 import marketplaceRoutes from './api/marketplace';
+import templateMigrationRoutes from './api/template-migrations';
 import dataRoutes from './api/data';
 import icsRoutes from './api/ics';
 import userRoutes from './api/users';
@@ -339,6 +340,9 @@ app.route('/api/services', servicesRoutes);
 app.route('/api/automations', automationsRoutes);
 app.route('/api/metrics', metricsRoutes);
 app.route('/api/templates/marketplace', marketplaceRoutes);
+// Sprint 2 S2-6 — migrate inspections from one template to another.
+// Mounted at /api/templates so the path is /api/templates/:oldId/migrate-to/:newId.
+app.route('/api/templates', templateMigrationRoutes);
 app.route('/api/data', dataRoutes);
 app.route('/api/integration', integrationRoutes);
 app.route('/api/ics', icsRoutes);

@@ -223,6 +223,14 @@ document.addEventListener('alpine:init', function () {
             dismissed: false,
             dismissedIds: loadDismissed(),
 
+            // Sprint 2 S2-6 — migrate confirmation modal state
+            migrateModalOpen: false,
+            migrateGroup:     null,
+            migrateOldId:     '',
+            migrateNewId:     '',
+            migratePreview:   null,
+            migrateLoading:   false,
+
             async load() {
                 try {
                     var res = await authFetch('/api/inspections/templates/duplicates');
@@ -248,11 +256,106 @@ document.addEventListener('alpine:init', function () {
                 window.location.href = '/templates/compare?ids=' + encodeURIComponent(ids);
             },
 
-            useNewOnly(g) {
-                if (typeof showToast === 'function') {
-                    showToast('Migration ships in next release (Sprint 2 S2-6).', false);
-                } else {
-                    window.alert('Migration ships in next release.');
+            // Sprint 2 S2-6 — invokes /api/templates/:oldId/migrate-to/:newId.
+            // Two-phase flow: dry-run preview first → confirm modal with diff →
+            // real migration with deleteOldTemplate=true.
+            async useNewOnly(g) {
+                if (!g || !g.copies || g.copies.length < 2) return;
+                const sorted = g.copies.slice().sort(function (a, b) {
+                    return String(a.version).localeCompare(String(b.version));
+                });
+                const oldest = sorted[0];
+                const newest = sorted[sorted.length - 1];
+                if (!oldest || !newest || oldest.id === newest.id) return;
+
+                this.migrateLoading = true;
+                try {
+                    const previewRes = await authFetch(
+                        '/api/templates/' + oldest.id + '/migrate-to/' + newest.id,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ strategy: 'preserve_unknown', dryRun: true }),
+                        }
+                    );
+                    if (!previewRes.ok) {
+                        const errBody = await previewRes.json().catch(function () { return {}; });
+                        const msg = (errBody && errBody.error && errBody.error.message) || 'Migration preview failed';
+                        if (typeof showToast === 'function') showToast(msg, true);
+                        return;
+                    }
+                    const previewJson = await previewRes.json();
+                    const preview = (previewJson && previewJson.data && previewJson.data.preview) || {
+                        affected: 0, breakingItems: [], compatibleItems: [],
+                    };
+
+                    this.migrateGroup = g;
+                    this.migrateOldId = oldest.id;
+                    this.migrateNewId = newest.id;
+                    this.migratePreview = preview;
+                    this.migrateModalOpen = true;
+                } catch (e) {
+                    console.error('[useNewOnly] preview failed', e);
+                    if (typeof showToast === 'function') showToast('Network error', true);
+                } finally {
+                    this.migrateLoading = false;
+                }
+            },
+
+            closeMigrateModal() {
+                this.migrateModalOpen = false;
+                this.migrateGroup = null;
+                this.migrateOldId = '';
+                this.migrateNewId = '';
+                this.migratePreview = null;
+            },
+
+            async confirmMigrate() {
+                if (!this.migrateOldId || !this.migrateNewId) return;
+                this.migrateLoading = true;
+                try {
+                    const res = await authFetch(
+                        '/api/templates/' + this.migrateOldId + '/migrate-to/' + this.migrateNewId,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                strategy: 'preserve_unknown',
+                                deleteOldTemplate: true,
+                            }),
+                        }
+                    );
+                    if (!res.ok) {
+                        const errBody = await res.json().catch(function () { return {}; });
+                        const msg = (errBody && errBody.error && errBody.error.message) || 'Migration failed';
+                        if (typeof showToast === 'function') showToast(msg, true);
+                        return;
+                    }
+                    const json = await res.json();
+                    const migrated = (json && json.data && json.data.migrated) || 0;
+                    const deletedOld = !!(json && json.data && json.data.oldTemplateDeleted);
+
+                    if (this.migrateGroup) {
+                        var mid = this.migrateGroup.marketplaceId;
+                        this.groups = this.groups.filter(function (x) { return x.marketplaceId !== mid; });
+                    }
+                    if (typeof showToast === 'function') {
+                        showToast(
+                            'Migrated ' + migrated + ' inspection' + (migrated === 1 ? '' : 's') +
+                            (deletedOld ? '; old template removed.' : '.'),
+                            false
+                        );
+                    }
+                    // Force a reload so the templates table reflects the deletion.
+                    if (typeof loadTemplates === 'function') {
+                        try { loadTemplates(); } catch (e) { /* ignore */ }
+                    }
+                    this.closeMigrateModal();
+                } catch (e) {
+                    console.error('[confirmMigrate] failed', e);
+                    if (typeof showToast === 'function') showToast('Network error', true);
+                } finally {
+                    this.migrateLoading = false;
                 }
             },
 

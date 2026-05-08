@@ -4,6 +4,13 @@ import { requireRole } from '../lib/middleware/rbac';
 import { HonoConfig } from '../types/hono';
 import { Errors, AppError } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
+import {
+    LibraryReplaceParamsSchema,
+    LibraryReplaceBodySchema,
+} from '../lib/validations/library-replace.schema';
+import {
+    ImportHistoryQuerySchema,
+} from '../lib/validations/import-history.schema';
 
 const marketplaceRoutes = new OpenAPIHono<HonoConfig>();
 
@@ -214,6 +221,114 @@ marketplaceRoutes.openapi(createRoute({
         if (err instanceof AppError) throw err;
         throw err;
     }
+});
+
+// Sprint 2 S2-7 — Library "replace" mode update. Deletes prior-import rows
+// before inserting the new pack. Owner/admin only; user must acknowledge the
+// edit-loss when prior rows have been modified.
+marketplaceRoutes.openapi(createRoute({
+    method: 'post', path: '/libraries/{libraryId}/imports/replace',
+    tags: ['Marketplace'],
+    summary: 'Replace tenant library import (deletes prior rows + inserts new pack)',
+    description:
+        'Owner/admin only. Deletes all comments rows whose library_id matches ' +
+        'the prior import for this tenant, then inserts the new pack. ' +
+        'Tenant-authored comments (library_id IS NULL) are never touched.',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: {
+        params: LibraryReplaceParamsSchema,
+        body: {
+            content: {
+                'application/json': {
+                    schema: LibraryReplaceBodySchema,
+                },
+            },
+            required: false,
+        },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.boolean(),
+                data: z.object({
+                    rowsAdded:   z.number().int(),
+                    rowsDeleted: z.number().int(),
+                    fromSemver:  z.string(),
+                    toSemver:    z.string(),
+                    libraryName: z.string(),
+                    mode:        z.literal('replace'),
+                }),
+            }) } },
+            description: 'Replaced',
+        },
+        400: { description: 'No update available or library not imported' },
+        404: { description: 'Library not found' },
+    },
+}), async (c) => {
+    const { libraryId } = c.req.valid('param');
+    let body: { confirmLossOfEdits?: boolean } | undefined;
+    try { body = c.req.valid('json'); } catch { body = undefined; }
+
+    const userId = (c.get('user')?.sub as string) || 'system';
+    try {
+        const result = await c.var.services.marketplace.updateLibraryImport(libraryId, {
+            mode: 'replace',
+            confirmLossOfEdits: body?.confirmLossOfEdits ?? false,
+            userId,
+        });
+
+        auditFromContext(c, 'library.marketplace.updated', 'library', {
+            entityId: libraryId,
+            metadata: {
+                mode:        'replace',
+                fromSemver:  result.fromSemver,
+                toSemver:    result.toSemver,
+                rowsAdded:   result.rowsAdded,
+                rowsDeleted: result.rowsDeleted,
+            },
+        });
+
+        return c.json({ success: true, data: result }, 200);
+    } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw err;
+    }
+});
+
+// Sprint 2 S2-8 — Per-import history list. Tenant-scoped, optional template
+// or library filter. Used by the version-history drawer on /templates and /comments.
+marketplaceRoutes.openapi(createRoute({
+    method: 'get', path: '/imports/history',
+    tags: ['Marketplace'],
+    summary: 'List per-import history events',
+    description:
+        'Returns install / update / replace / migrate events for the tenant. ' +
+        'Filter by templateId or libraryId; paginated.',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { query: ImportHistoryQuerySchema },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.boolean(),
+                data: z.object({
+                    items:    z.array(z.unknown()),
+                    page:     z.number().int(),
+                    pageSize: z.number().int(),
+                    hasMore:  z.boolean(),
+                }),
+            }) } },
+            description: 'OK',
+        },
+    },
+}), async (c) => {
+    const q = c.req.valid('query');
+    const result = await c.var.services.importHistory.list({
+        ...(q.templateId !== undefined ? { templateId: q.templateId } : {}),
+        ...(q.libraryId  !== undefined ? { libraryId:  q.libraryId  } : {}),
+        ...(q.page       !== undefined ? { page:       q.page       } : {}),
+        ...(q.pageSize   !== undefined ? { pageSize:   q.pageSize   } : {}),
+    });
+    return c.json({ success: true, data: result }, 200);
 });
 
 export default marketplaceRoutes;

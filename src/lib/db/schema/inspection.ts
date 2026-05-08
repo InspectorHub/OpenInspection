@@ -124,6 +124,11 @@ export const comments = sqliteTable('comments', {
     // Section label (Roof, Electrical, ...) — same shape as canned-comments.js
     // entries. Free-text so tenants can grow their own taxonomy.
     section: text('section'),
+    // Sprint 2 S2-7 — provenance for marketplace-imported comments.
+    // Set when MarketplaceService.importLibrary inserts rows; null for
+    // tenant-authored comments. Used by replace-mode update to delete only
+    // prior-import rows, never touching the tenant's own comments.
+    libraryId: text('library_id'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

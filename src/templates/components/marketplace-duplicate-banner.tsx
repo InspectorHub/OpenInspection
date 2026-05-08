@@ -1,14 +1,13 @@
 /**
- * Sprint 1 B-8 — Marketplace duplicate banner.
+ * Sprint 1 B-8 / Sprint 2 S2-6 — Marketplace duplicate banner.
  *
  * Sits on top of /templates. When the tenant has imported the same
  * marketplace template more than once (typical after an "update" that landed
  * via the keep-old + new-copy strategy), this banner explains the situation
  * and offers Compare versions / Use new only / Keep both actions.
  *
- * Sprint 1 ships banner UI + Keep both (localStorage dismissal) + Compare
- * Versions navigation. "Use new only" toasts "coming next release" until
- * Sprint 2 S2-6 ships the inspection migrate-to-template endpoint.
+ * Sprint 2 S2-6 wires the "Use new only" button to a real migration endpoint
+ * via a confirmation modal — replaces the old "coming next release" toast.
  */
 export const MarketplaceDuplicateBanner = (): JSX.Element => (
     <div
@@ -54,7 +53,8 @@ export const MarketplaceDuplicateBanner = (): JSX.Element => (
                         <button
                             type="button"
                             x-on:click="useNewOnly(g)"
-                            class="h-7 px-3 rounded-md bg-amber-600 text-white text-[12px] font-bold hover:bg-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                            x-bind:disabled="migrateLoading"
+                            class="h-7 px-3 rounded-md bg-amber-600 text-white text-[12px] font-bold hover:bg-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/30 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             Use new only
                         </button>
@@ -69,5 +69,75 @@ export const MarketplaceDuplicateBanner = (): JSX.Element => (
                 </div>
             </div>
         </template>
+
+        {/* Sprint 2 S2-6 — Migrate confirm modal. Lives inside the same x-data
+            scope so it can share the migrate* state without prop-drilling.
+            Uses style="display:none" + x-show to avoid the x-cloak nested-element
+            sticky-display gotcha (see main-layout.tsx). */}
+        <div
+            x-show="migrateModalOpen"
+            {...{ 'x-on:keydown.escape.window': 'closeMigrateModal()' }}
+            style="display:none"
+            class="fixed inset-0 z-50 flex items-center justify-center"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="migrate-modal-title"
+        >
+            <div class="absolute inset-0 bg-slate-900/40" x-on:click="closeMigrateModal()"></div>
+            <div
+                class="relative w-full max-w-md mx-4 bg-white rounded-xl shadow-xl border border-slate-200"
+                x-transition:enter="ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+            >
+                <div class="px-5 py-4 border-b border-slate-100">
+                    <h3 id="migrate-modal-title" class="text-[15px] font-semibold text-slate-900">
+                        Migrate inspections?
+                    </h3>
+                </div>
+                <div class="px-5 py-4 space-y-3 text-sm text-slate-700">
+                    <p>
+                        <strong x-text="migrateGroup?.copies?.[0]?.name || 'this template'"></strong>
+                        will move
+                        <span class="font-mono text-xs" x-text="(migratePreview?.affected ?? 0) + ' inspection' + ((migratePreview?.affected ?? 0) === 1 ? '' : 's')"></span>
+                        from the old version to the new version.
+                    </p>
+                    <template x-if="migratePreview && migratePreview.breakingItems && migratePreview.breakingItems.length > 0">
+                        <p class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900">
+                            <span class="font-bold" x-text="migratePreview.breakingItems.length"></span>
+                            inspection(s) reference items that no longer exist in the new template.
+                            Their data will be parked under <span class="font-mono">_legacy</span> so nothing is lost — review later in inspection-edit.
+                        </p>
+                    </template>
+                    <template x-if="migratePreview && (!migratePreview.breakingItems || migratePreview.breakingItems.length === 0) && (migratePreview.affected ?? 0) > 0">
+                        <p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                            All affected inspections map cleanly to the new template — no data parked under <span class="font-mono">_legacy</span>.
+                        </p>
+                    </template>
+                    <p class="text-[12px] text-slate-500">
+                        The old template will be deleted after a successful migration so the duplicate banner clears.
+                    </p>
+                </div>
+                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button
+                        type="button"
+                        x-on:click="closeMigrateModal()"
+                        x-bind:disabled="migrateLoading"
+                        class="h-8 px-4 rounded-md border border-slate-200 bg-white text-slate-600 text-[13px] font-semibold hover:bg-slate-50 transition-colors disabled:opacity-60"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        x-on:click="confirmMigrate()"
+                        x-bind:disabled="migrateLoading"
+                        class="h-8 px-4 rounded-md bg-amber-600 text-white text-[13px] font-bold hover:bg-amber-700 transition-colors disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                        <span x-show="!migrateLoading">Migrate &amp; remove old</span>
+                        <span x-show="migrateLoading" style="display:none">Migrating…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 );
