@@ -697,11 +697,10 @@ function inspectionEditor(inspectionId) {
       this.debounceSave();
     },
 
-    // Spec 5B P2B — AI rewrite of a canned comment row. Asks the inspector
-    // for a one-line instruction ("shorten", "add NW corner detail"…), POSTs
-    // /api/ai/comment/edit, and replaces the row's text with the rewritten
-    // version on success. Errors surface as toasts; the original text is
-    // preserved on any failure path.
+    // Spec 5B P2B — AI rewrite of a canned comment row. Sprint 1 A-5: opens
+    // the global InlineTextPopover instead of window.prompt; on Apply, posts
+    // to /api/ai/comment/edit and replaces the row's text on success. Errors
+    // surface as toasts; the original text is preserved on any failure path.
     async rewriteCannedComment(itemId, tabName, cannedId, ev) {
       const item = this._findItemById(itemId);
       if (!item) return;
@@ -718,29 +717,48 @@ function inspectionEditor(inspectionId) {
       var entry = entries.find(function (e) { return e.cannedId === cannedId; });
       if (!entry) return;
       var originalComment = entry.effectiveComment || entry.comment || '';
+      var category = (tabName === 'defects' && entry.category) ? entry.category : null;
+      var location = (tabName === 'defects' && entry.location) ? entry.location : null;
+      var self = this;
 
-      var instruction = (window.prompt(
-        'Rewrite instruction\n\n(e.g. "shorten", "make professional", "add specific NW corner detail")',
-        ''
-      ) || '').trim();
-      if (!instruction) return;
+      if (!window.OIPrompt) {
+        if (typeof showToast === 'function') showToast('Popover unavailable. Reload the page.', true);
+        return;
+      }
+      window.OIPrompt.open({
+        title:       'Rewrite instruction',
+        placeholder: 'e.g. shorten, make professional, add NW corner detail',
+        scope:       'ai-rewrite',
+        onApply: function (instruction) {
+          self._performAiRewrite(itemId, tabName, cannedId, ev, {
+            item:            item,
+            sectionTitle:    sectionTitle,
+            originalComment: originalComment,
+            category:        category,
+            location:        location,
+            instruction:     instruction,
+          });
+        },
+      });
+    },
 
-      var btn = ev?.currentTarget || ev?.target;
+    async _performAiRewrite(itemId, tabName, cannedId, ev, ctx) {
+      var btn = ev && (ev.currentTarget || ev.target);
       var origText = btn ? btn.textContent : null;
       if (btn) { btn.textContent = '...'; btn.disabled = true; }
       var toast = function (m, err) { if (typeof showToast === 'function') showToast(m, err); };
 
       try {
         var body = {
-          itemLabel:       item.label,
-          sectionTitle:    sectionTitle,
+          itemLabel:       ctx.item.label,
+          sectionTitle:    ctx.sectionTitle,
           tab:             tabName,
-          originalComment: originalComment,
-          instruction:     instruction,
+          originalComment: ctx.originalComment,
+          instruction:     ctx.instruction,
         };
         if (tabName === 'defects') {
-          if (entry.category) body.category = entry.category;
-          if (entry.location) body.location = entry.location;
+          if (ctx.category) body.category = ctx.category;
+          if (ctx.location) body.location = ctx.location;
         }
         var res = await authFetch('/api/ai/comment/edit', {
           method:  'POST',

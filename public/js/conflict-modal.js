@@ -36,14 +36,27 @@ function conflictModalFactory() {
         async resolve(choice) {
             const cf = this.current;
             if (!cf) return;
-            let chosen = cf.ours;
-            if (choice === 'theirs') chosen = cf.theirs;
-            else if (choice === 'edit') {
-                const edited = window.prompt('Edit the merged notes:', cf.ours + '\n\n--- Theirs ---\n' + cf.theirs);
-                if (edited == null) return;
-                chosen = edited;
+            // Sprint 1 A-5: 'edit' opens InlineTextPopover (async); other
+            // choices resolve immediately via _applyChoice.
+            if (choice === 'edit') {
+                const self = this;
+                if (!window.OIPrompt) return;
+                window.OIPrompt.open({
+                    title:       'Edit merged notes',
+                    placeholder: 'Adjust the merged notes',
+                    initial:     (cf.ours || '') + '\n\n--- Theirs ---\n' + (cf.theirs || ''),
+                    scope:       'conflict-merge',
+                    onApply: function (edited) {
+                        self._applyChoice(cf, edited);
+                    },
+                });
+                return;
             }
+            const chosen = (choice === 'theirs') ? cf.theirs : cf.ours;
+            await this._applyChoice(cf, chosen);
+        },
 
+        async _applyChoice(cf, chosen) {
             const r = await db.results.get(cf.inspectionId);
             if (r?.data?.[cf.itemId]) {
                 r.data[cf.itemId][cf.field] = chosen;
