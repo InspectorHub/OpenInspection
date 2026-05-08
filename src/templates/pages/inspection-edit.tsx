@@ -192,6 +192,12 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
                 {/* Expanded Detail */}
                 <div x-show="expanded[item.id]" x-collapse="" class="mt-3 pt-3" style="border-top: 1px solid rgba(226,232,240,0.6)">
+                  {/* Sprint 1 A-10: simple-notes fallback hint when item has no tabs */}
+                  <div x-show="!item.tabs || (!item.tabs.information && !item.tabs.limitations && !item.tabs.defects)" class="mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-500">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Simple notes mode.</span>
+                    <a href="/templates" class="text-indigo-600 hover:underline">Upgrade to tabs →</a>
+                  </div>
                   <div class="relative">
                     <textarea
                       x-bind:id="'notes-mob-' + item.id"
@@ -911,6 +917,12 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
                   {/* Expanded Detail (desktop) */}
                   <div x-show="expanded[item.id] && !batchMode" x-collapse="" class="mt-3 pt-3" style="border-top: 1px solid rgba(226,232,240,0.6)" x-on:click="$event.stopPropagation()">
+                    {/* Sprint 1 A-10: simple-notes fallback hint when item has no tabs */}
+                    <div x-show="!item.tabs || (!item.tabs.information && !item.tabs.limitations && !item.tabs.defects)" class="mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-500">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                      <span>Simple notes mode.</span>
+                      <a href="/templates" class="text-indigo-600 hover:underline">Upgrade to tabs →</a>
+                    </div>
                     <div class="relative">
                       <textarea
                         x-bind:id="'notes-dsk-' + item.id"
