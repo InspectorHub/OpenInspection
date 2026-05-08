@@ -1431,6 +1431,45 @@ function inspectionEditor(inspectionId) {
       }
     },
 
+    // Sprint 1 A-7: upload a photo bound to a specific custom defect row.
+    // Uses the same /api/inspections/:id/upload endpoint with targetType=defect
+    // + customId form fields (added in src/api/inspections.ts). The R2 key
+    // returns; we attach it to the matching custom defect entry's photos[].
+    async uploadDefectPhoto(itemId, customId, event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+      var formData = new FormData();
+      formData.append('file', file);
+      formData.append('itemId', itemId);
+      formData.append('targetType', 'defect');
+      formData.append('customId', customId);
+      try {
+        var res = await authFetch('/api/inspections/' + this.inspectionId + '/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) {
+          if (typeof showToast === 'function') showToast('Photo upload failed.', true);
+          return;
+        }
+        var json = await res.json();
+        this._ensureCustomState(itemId);
+        var st = this.results[itemId];
+        var arr = (st.customComments && st.customComments.defects) || [];
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].id === customId) {
+            if (!arr[i].photos) arr[i].photos = [];
+            arr[i].photos.push({ key: json.data.key });
+            break;
+          }
+        }
+        this.debounceSave();
+      } catch (e) {
+        console.error('Defect photo upload failed:', e);
+        if (typeof showToast === 'function') showToast('Photo upload network error.', true);
+      }
+    },
+
     previewReport() {
       window.open('/api/inspections/' + this.inspectionId + '/report', '_blank');
     },

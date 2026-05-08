@@ -756,6 +756,12 @@ inspectionsRoutes.openapi(cloneInspectionRoute, async (c) => {
 
 /**
  * Photo Upload
+ *
+ * Sprint 1 A-7: accepts optional `targetType` ('item' | 'defect') and
+ * `customId` so a photo can be bound to a specific custom defect row
+ * instead of the item as a whole. R2 upload + storage logic is unchanged;
+ * the response echoes the target so the client can attach the key to the
+ * right custom row.
  */
 const uploadPhotoRoute = createRoute({
     method: 'post',
@@ -770,6 +776,8 @@ const uploadPhotoRoute = createRoute({
                     schema: z.object({
                         file: z.unknown().openapi({ type: 'string', format: 'binary' }),
                         itemId: z.string(),
+                        targetType: z.enum(['item', 'defect']).optional(),
+                        customId: z.string().optional(),
                     }),
                 },
             },
@@ -780,7 +788,13 @@ const uploadPhotoRoute = createRoute({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ key: z.string(), success: z.boolean() })),
+                    schema: createApiResponseSchema(z.object({
+                        key: z.string(),
+                        success: z.boolean(),
+                        targetType: z.enum(['item', 'defect']).optional(),
+                        itemId: z.string().optional(),
+                        customId: z.string().nullable().optional(),
+                    })),
                 },
             },
             description: 'Success',
@@ -793,12 +807,17 @@ inspectionsRoutes.openapi(uploadPhotoRoute, async (c) => {
     const formData = await c.req.parseBody();
     const file = formData['file'] as File;
     const itemId = formData['itemId'] as string;
-    
+    const targetTypeRaw = formData['targetType'];
+    const customIdRaw = formData['customId'];
+    const targetType = (targetTypeRaw === 'defect' ? 'defect' : 'item') as 'item' | 'defect';
+    const customId = typeof customIdRaw === 'string' && customIdRaw.length > 0 ? customIdRaw : null;
+
     if (!file || !itemId) throw Errors.BadRequest('File and Item ID are required');
+    if (targetType === 'defect' && !customId) throw Errors.BadRequest('customId is required when targetType=defect');
 
     const service = c.var.services.inspection;
     const key = await service.uploadPhoto(id, c.get('tenantId'), itemId, file);
-    return c.json({ success: true, data: { key, success: true } }, 200);
+    return c.json({ success: true, data: { key, success: true, targetType, itemId, customId } }, 200);
 });
 
 /**

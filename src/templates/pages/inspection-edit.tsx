@@ -1064,27 +1064,54 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                                   style="border-color: #e2e8f0; color: #1e293b"
                                   placeholder="Comment text..."></textarea>
                                 <template x-if="(activeItemId === item.id ? activeItemTab : 'information') === 'defects'">
-                                  <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Location</label>
-                                      <input type="text"
-                                        x-bind:value="custom.location || ''"
-                                        x-on:input="setCustomCommentLocation(item.id, custom.id, $event.target.value)"
-                                        placeholder="Northwest corner"
-                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
-                                        style="border-color: #e2e8f0" />
+                                  <div class="space-y-2">
+                                    <div class="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Location</label>
+                                        <input type="text"
+                                          x-bind:value="custom.location || ''"
+                                          x-on:input="setCustomCommentLocation(item.id, custom.id, $event.target.value)"
+                                          placeholder="Northwest corner"
+                                          class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                          style="border-color: #e2e8f0" />
+                                      </div>
+                                      <div>
+                                        <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Category</label>
+                                        <select
+                                          x-bind:value="custom.category || 'maintenance'"
+                                          x-on:change="setCustomCommentCategory(item.id, custom.id, $event.target.value)"
+                                          class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                          style="border-color: #e2e8f0">
+                                          <option value="maintenance">Maintenance</option>
+                                          <option value="recommendation">Recommendation</option>
+                                          <option value="safety">Safety</option>
+                                        </select>
+                                      </div>
                                     </div>
+                                    {/* Sprint 1 A-7: photos bound to this specific custom defect */}
                                     <div>
-                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Category</label>
-                                      <select
-                                        x-bind:value="custom.category || 'maintenance'"
-                                        x-on:change="setCustomCommentCategory(item.id, custom.id, $event.target.value)"
-                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
-                                        style="border-color: #e2e8f0">
-                                        <option value="maintenance">Maintenance</option>
-                                        <option value="recommendation">Recommendation</option>
-                                        <option value="safety">Safety</option>
-                                      </select>
+                                      <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-[9px] font-bold uppercase text-slate-400">Photos</label>
+                                        <input type="file"
+                                          accept="image/*"
+                                          capture="environment"
+                                          class="hidden"
+                                          x-bind:id={"'custom-photo-' + custom.id"}
+                                          x-on:change="uploadDefectPhoto(item.id, custom.id, $event); $event.target.value = ''"
+                                        />
+                                        <button type="button"
+                                          x-on:click="document.getElementById('custom-photo-' + custom.id).click()"
+                                          class="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-600 hover:bg-slate-100 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
+                                          aria-label="Add photo to this defect"
+                                          title="Add photo">{'📷'}</button>
+                                      </div>
+                                      <div x-show="custom.photos && custom.photos.length > 0" class="flex gap-1.5 flex-wrap">
+                                        <template x-for="(p, pi) in (custom.photos || [])" x-bind:key="pi">
+                                          <img x-bind:src={"'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(p.key)"}
+                                            class="w-12 h-12 object-cover rounded-md border border-slate-200 hover:border-indigo-400 hover:-translate-y-0.5 transition-all"
+                                            x-bind:alt={"'Defect photo ' + (pi + 1)"} />
+                                        </template>
+                                      </div>
                                     </div>
                                   </div>
                                 </template>
