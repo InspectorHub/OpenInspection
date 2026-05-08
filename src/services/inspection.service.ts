@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, type RatingLevel } from '../lib/report-utils';
@@ -833,7 +833,9 @@ export class InspectionService {
             .where(eq(tenantConfigs.tenantId, tenantId))
             .limit(1);
         const thresholds = cfg[0]?.thresholds ?? null;
-        const reportUnpublishedH = thresholds?.report_unpublished_h ?? 24;
+        const reportUnpublishedH  = thresholds?.report_unpublished_h ?? 24;
+        const agreementUnsignedH  = thresholds?.agreement_unsigned_h ?? 72;
+        const invoiceOverdueH     = thresholds?.invoice_overdue_h    ?? 72;
 
         const now           = Date.now();
         // Use UTC boundaries to match the `date` column which stores "YYYY-MM-DD" (UTC midnight when parsed).
@@ -842,7 +844,28 @@ export class InspectionService {
         const in48h         = new Date(now + 48 * 3600 * 1000);
         const in7days       = new Date(now + 7 * 86400 * 1000);
         const minus30days   = new Date(now - 30 * 86400 * 1000);
-        const reportStaleAt  = new Date(now - reportUnpublishedH * 3600 * 1000);
+        const reportStaleAt    = new Date(now - reportUnpublishedH * 3600 * 1000);
+        const agreementStaleAt = new Date(now - agreementUnsignedH * 3600 * 1000);
+        const invoiceStaleAt   = new Date(now - invoiceOverdueH    * 3600 * 1000);
+
+        // handoff §1 — extra signals for needsAttention bucket.
+        // 1) Inspections with NO signed agreement record older than threshold.
+        const signedRows = await db.select({ inspectionId: inspectionAgreements.inspectionId })
+            .from(inspectionAgreements)
+            .where(eq(inspectionAgreements.tenantId, tenantId));
+        const signedSet = new Set(signedRows.map(r => r.inspectionId as string));
+        // 2) Unpaid invoices with dueDate past invoice-overdue threshold.
+        const overdueInvoices = await db.select({ inspectionId: invoices.inspectionId, dueDate: invoices.dueDate })
+            .from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NULL`));
+        const overdueSet = new Set(
+            overdueInvoices
+                .filter(r => {
+                    if (!r.dueDate || !r.inspectionId) return false;
+                    return new Date(r.dueDate as string) <= invoiceStaleAt;
+                })
+                .map(r => r.inspectionId as string)
+        );
 
         // Parse the text `date` column ("YYYY-MM-DD") to a Date at midnight UTC.
         const insDate = (i: typeof inspections.$inferSelect) =>
@@ -853,12 +876,17 @@ export class InspectionService {
             return d !== null && d >= startOfToday && d <= endOfToday;
         };
 
-        // Needs attention: scheduled within 48h OR in_progress past the
-        // configured `report_unpublished_h` threshold (handoff-decisions §1).
+        // Needs attention (handoff §1):
+        //  - scheduled within 48h, OR
+        //  - in_progress past the report-unpublished threshold, OR
+        //  - active inspection with no signed agreement past the agreement threshold, OR
+        //  - active inspection with an overdue invoice past the invoice threshold.
         const needsAttention = all.filter(i => {
             const d = insDate(i);
             if (i.status === 'scheduled' && d && d <= in48h) return true;
             if (i.status === 'in_progress' && d && d <= reportStaleAt) return true;
+            if (i.status !== 'cancelled' && new Date(i.createdAt) <= agreementStaleAt && !signedSet.has(i.id as string)) return true;
+            if (i.status !== 'cancelled' && overdueSet.has(i.id as string)) return true;
             return false;
         });
 

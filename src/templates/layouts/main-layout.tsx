@@ -31,6 +31,9 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
             {/* hotkeys.js exposes window.OIHotkeys (isTyping/shouldIgnoreSingleChar).
                 Loaded synchronously so global keydown handlers see it on first paint. */}
             <script src="/js/hotkeys.js"></script>
+            {/* handoff §7 — unsaved-changes guard. Pages opt in by calling
+                window.OIDirty.set(true|false). beforeunload + a-click intercept. */}
+            <script src="/js/unsaved-guard.js"></script>
             <script defer src="/vendor/alpine-collapse.min.js"></script>
             <script defer src="/vendor/alpine.min.js"></script>
             {/* These two register Alpine.data factories. Loaded SYNC (no defer)

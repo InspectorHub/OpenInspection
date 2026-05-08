@@ -1229,6 +1229,9 @@ function inspectionEditor(inspectionId) {
     debounceSave() {
       clearTimeout(this.saveTimer);
       this.saveState = 'saving';
+      // handoff §7 — mark dirty so the unsaved-guard guards browser close
+      // and in-app nav until saveResults flips it back.
+      window.OIDirty?.set?.(true);
       this.saveTimer = setTimeout(() => this.saveResults(), 1000);
     },
 
@@ -1241,6 +1244,7 @@ function inspectionEditor(inspectionId) {
           body: JSON.stringify({ data: this.results }),
         });
         this.saveState = res.ok ? 'saved' : 'error';
+        if (res.ok) window.OIDirty?.set?.(false);
       } catch (e) {
         console.error('Failed to save results:', e);
         this.saveState = 'error';
