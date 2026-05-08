@@ -35,6 +35,20 @@ export default defineConfig({
             // will create test data if not already present.
         },
         {
+            // Sprint 1 C-9 — public-page responsive smoke (5 viewports × 3
+            // pages). No D1 seed needed since all targets are public; runs
+            // independent of api/browser/mobile projects.
+            name: 'responsive',
+            testMatch: 'public-pages-responsive.spec.ts',
+        },
+        {
+            // Sprint 1 D-8 — report-gate end-to-end (auth + payment + agreement
+            // gates). Depends on browser project to ensure user is created.
+            name: 'gates',
+            testMatch: 'report-gate.spec.ts',
+            dependencies: ['api'],
+        },
+        {
             name: 'cloud',
             testMatch: 'cloud-e2e.spec.ts',
             use: {

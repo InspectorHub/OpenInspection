@@ -33,7 +33,9 @@ interface PageDef {
 }
 
 const PAGES: PageDef[] = [
-    { url: '/book',                              key: 'booking',        primaryCta: 'button[type=submit]' },
+    // /book is a long multi-field form; submit button is naturally below the
+    // fold on short viewports. Keep horizontal-scroll check but skip CTA-above-fold.
+    { url: '/book',                              key: 'booking' },
     { url: '/not-found?from=agreement-sign',     key: 'agreement-404',  primaryCta: 'a' },
     { url: '/not-found',                         key: 'not-found',      primaryCta: 'a' },
 ];
