@@ -50,6 +50,50 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
     ),
     children: (
       <>
+      {/* Sprint 2 S2-5 — Inspection sub-route nav. Renders the 5-tab bar
+          (Report / Photos / Summary / Signatures / Settings) at the top of
+          the editor so users can switch between sub-routes without leaving
+          the page. Kept outside the inspectionEditor x-data scope so it
+          stays interactive even if the editor's Alpine init fails. */}
+      <nav
+        role="tablist"
+        aria-label="Inspection sections"
+        class="sticky top-0 z-[60] bg-white border-b border-slate-200 print:hidden"
+      >
+        <div class="max-w-full mx-auto px-4 flex items-center gap-1 overflow-x-auto hide-scrollbar">
+          <a
+            href={`/inspections/${inspectionId}/report`}
+            role="tab"
+            aria-current="page"
+            aria-selected="true"
+            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-indigo-500 text-slate-900 whitespace-nowrap"
+          >Report</a>
+          <a
+            href={`/inspections/${inspectionId}/photos`}
+            role="tab"
+            aria-selected="false"
+            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 whitespace-nowrap transition-colors"
+          >Photos</a>
+          <a
+            href={`/inspections/${inspectionId}/summary`}
+            role="tab"
+            aria-selected="false"
+            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 whitespace-nowrap transition-colors"
+          >Summary</a>
+          <a
+            href={`/inspections/${inspectionId}/signatures`}
+            role="tab"
+            aria-selected="false"
+            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 whitespace-nowrap transition-colors"
+          >Signatures</a>
+          <a
+            href={`/inspections/${inspectionId}/settings`}
+            role="tab"
+            aria-selected="false"
+            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 whitespace-nowrap transition-colors"
+          >Settings</a>
+        </div>
+      </nav>
       <div
         x-data={`inspectionEditor('${inspectionId}')`}
         class="min-h-screen"

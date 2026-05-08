@@ -27,9 +27,10 @@ export const InspectionPhotosPage = ({
     requestId,
     siblings,
 }: InspectionPhotosPageProps): JSX.Element => {
+    const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout
-            title="Photos"
+            title={`${siteName} | Photos`}
             {...(branding ? { branding } : {})}
             extraHead={(
                 <style dangerouslySetInnerHTML={{ __html: `

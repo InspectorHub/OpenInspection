@@ -25,9 +25,10 @@ export const InspectionSummaryPage = ({
     requestId,
     siblings,
 }: InspectionSummaryPageProps): JSX.Element => {
+    const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout
-            title="Summary"
+            title={`${siteName} | Summary`}
             {...(branding ? { branding } : {})}
         >
             <InspectionShell

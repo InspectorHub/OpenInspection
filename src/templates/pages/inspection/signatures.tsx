@@ -26,9 +26,10 @@ export const InspectionSignaturesPage = ({
     requestId,
     siblings,
 }: InspectionSignaturesPageProps): JSX.Element => {
+    const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout
-            title="Signatures"
+            title={`${siteName} | Signatures`}
             {...(branding ? { branding } : {})}
         >
             <InspectionShell

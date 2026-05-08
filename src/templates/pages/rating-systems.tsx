@@ -156,6 +156,9 @@ export const RatingSystemsPage = ({ branding }: Props): JSX.Element => {
                     </p>
                 </Modal>
             </div>
+            {/* auth.js MUST load before rating-systems.js — the latter calls
+                window.authFetch from auth.js. Order matches dashboard/templates. */}
+            <script src="/js/auth.js"></script>
             <script src="/js/rating-systems.js"></script>
         </MainLayout>
     );
