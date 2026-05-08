@@ -74,6 +74,13 @@ export const inspections = sqliteTable('inspections', {
     foundationType:      text('foundation_type'),
     bedrooms:            integer('bedrooms'),
     bathrooms:           real('bathrooms'),
+    // Round-2 backlog G1 (Spectora §E.2) — free-text lot size so inspectors
+    // can enter "0.25 acres", "10,000 sqft", etc. without a parser.
+    lotSize:             text('lot_size'),
+    // Round-2 backlog G1 — JSON envelope for future property facts that
+    // don't warrant their own column. Reads/writes go through
+    // updatePropertyFacts() which merges with the dedicated columns.
+    propertyFacts:       text('property_facts', { mode: 'json' }).$type<Record<string, unknown>>(),
     unit:                text('unit'),
     county:              text('county'),
     sellingAgentId:      text('selling_agent_id'),

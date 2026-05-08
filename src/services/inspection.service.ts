@@ -107,6 +107,18 @@ type Inspection = z.infer<typeof InspectionSchema>;
 type InspectionListParams = z.infer<typeof InspectionListQuerySchema>;
 type CreateInspectionData = z.infer<typeof CreateInspectionSchema>;
 
+/** Round-2 backlog G1 — Property Facts strip payload. Mirrors the canonical
+ *  Zod shape declared in inspection.schema.ts (PropertyFactsSchema). */
+type PropertyFactFoundation = 'basement' | 'slab' | 'crawlspace' | 'other';
+export interface PropertyFacts {
+    yearBuilt:      number | null;
+    sqft:           number | null;
+    foundationType: PropertyFactFoundation | null;
+    lotSize:        string | null;
+    bedrooms:       number | null;
+    bathrooms:      number | null;
+}
+
 /**
  * Service to handle all inspection-related business logic.
  */
@@ -396,6 +408,79 @@ export class InspectionService {
             ...clone,
             createdAt: safeISODate(clone.createdAt)
         };
+    }
+
+    /**
+     * Round-2 backlog G1 (Spectora §E.2) — return the Property Facts strip
+     * payload for a single inspection. Each field is null when the inspector
+     * hasn't filled it in yet so the UI can show its "—" placeholder.
+     */
+    async getPropertyFacts(id: string, tenantId: string): Promise<PropertyFacts> {
+        const db = this.getDrizzle();
+        const row = await db.select({
+            yearBuilt:      inspections.yearBuilt,
+            sqft:           inspections.sqft,
+            foundationType: inspections.foundationType,
+            lotSize:        inspections.lotSize,
+            bedrooms:       inspections.bedrooms,
+            bathrooms:      inspections.bathrooms,
+        }).from(inspections)
+          .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+          .get();
+        if (!row) throw Errors.NotFound('Inspection not found');
+        // Foundation column is free-text in SQLite; coerce to the canonical
+        // four-value enum so the API response schema validates. Anything
+        // unexpected falls back to 'other'.
+        const allowedFoundations: ReadonlyArray<PropertyFactFoundation> =
+            ['basement', 'slab', 'crawlspace', 'other'] as const;
+        const ft = row.foundationType ?? null;
+        const foundationType: PropertyFactFoundation | null = ft === null
+            ? null
+            : (allowedFoundations.includes(ft as PropertyFactFoundation) ? (ft as PropertyFactFoundation) : 'other');
+        return {
+            yearBuilt:      row.yearBuilt      ?? null,
+            sqft:           row.sqft           ?? null,
+            foundationType,
+            lotSize:        row.lotSize        ?? null,
+            bedrooms:       row.bedrooms       ?? null,
+            bathrooms:      row.bathrooms      ?? null,
+        };
+    }
+
+    /**
+     * Round-2 backlog G1 — patch the six Property Facts columns in a single
+     * write. Undefined keys are skipped (so the caller can save one field at
+     * a time without clobbering the others). Null values clear the field.
+     * Returns the resulting facts row so the UI doesn't need a re-fetch.
+     */
+    async updatePropertyFacts(id: string, tenantId: string, facts: {
+        yearBuilt?:      number | null | undefined;
+        sqft?:           number | null | undefined;
+        foundationType?: PropertyFactFoundation | null | undefined;
+        lotSize?:        string | null | undefined;
+        bedrooms?:       number | null | undefined;
+        bathrooms?:      number | null | undefined;
+    }): Promise<PropertyFacts> {
+        const db = this.getDrizzle();
+        const existing = await db.select({ id: inspections.id }).from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!existing) throw Errors.NotFound('Inspection not found');
+
+        const update: Partial<typeof inspections.$inferInsert> = {};
+        if (facts.yearBuilt      !== undefined) update.yearBuilt      = facts.yearBuilt;
+        if (facts.sqft           !== undefined) update.sqft           = facts.sqft;
+        if (facts.foundationType !== undefined) update.foundationType = facts.foundationType;
+        if (facts.lotSize        !== undefined) update.lotSize        = facts.lotSize;
+        if (facts.bedrooms       !== undefined) update.bedrooms       = facts.bedrooms;
+        if (facts.bathrooms      !== undefined) update.bathrooms      = facts.bathrooms;
+
+        if (Object.keys(update).length > 0) {
+            await db.update(inspections).set(update)
+                .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+        }
+
+        return this.getPropertyFacts(id, tenantId);
     }
 
     /**
@@ -805,6 +890,19 @@ export class InspectionService {
             // defaults the column to 0 anyway, so this is just paranoia).
         }
 
+        // Round-2 backlog G1 (Spectora §E.2) — Property Facts banner rendered
+        // at the top of the published report. Surface the six dedicated
+        // columns; the report layer decides whether to render the strip
+        // when at least one field is populated.
+        const propertyFacts = {
+            yearBuilt:      (inspection as { yearBuilt?: number | null }).yearBuilt           ?? null,
+            sqft:           (inspection as { sqft?: number | null }).sqft                     ?? null,
+            foundationType: (inspection as { foundationType?: string | null }).foundationType ?? null,
+            lotSize:        (inspection as { lotSize?: string | null }).lotSize               ?? null,
+            bedrooms:       (inspection as { bedrooms?: number | null }).bedrooms             ?? null,
+            bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
+        };
+
         return {
             inspection: { ...inspection, inspectorName },
             theme: 'modern' as const,
@@ -817,6 +915,7 @@ export class InspectionService {
                 { id: 'Not Inspected', label: 'Not Inspected', abbreviation: 'NI', color: '#3b82f6', severity: 'minor', isDefect: false },
             ],
             showEstimates,
+            propertyFacts,
         };
     }
 

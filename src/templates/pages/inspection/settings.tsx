@@ -14,6 +14,8 @@
 import { MainLayout } from '../../layouts/main-layout';
 import { InspectionShell } from '../../components/inspection-shell';
 import { PeopleCard } from '../../components/people-card';
+import { PropertyFactsCard } from '../../components/property-facts-card';
+import { SEED_REFERRAL_SOURCES, resolveReferralSources } from '../../../lib/referral-sources';
 import type { BrandingConfig } from '../../../types/auth';
 
 export interface InspectionSettingsPageProps {
@@ -23,6 +25,9 @@ export interface InspectionSettingsPageProps {
     requestId?:       string | undefined;
     siblings?:        Array<{ id: string; templateName: string; status: string }> | undefined;
     enableRepairList?: boolean;
+    // Round-2 backlog G3 — tenant-defined referral sources are appended to
+    // the seven seeds. Server resolves the merged list before render.
+    customReferralSources?: string[] | undefined;
 }
 
 export const InspectionSettingsPage = ({
@@ -32,7 +37,12 @@ export const InspectionSettingsPage = ({
     requestId,
     siblings,
     enableRepairList,
+    customReferralSources,
 }: InspectionSettingsPageProps): JSX.Element => {
+    const referralSources = resolveReferralSources(customReferralSources);
+    // Backstop in case the resolver shape changes — the seven seeds always
+    // need to be available.
+    const sources = referralSources.length > 0 ? referralSources : [...SEED_REFERRAL_SOURCES];
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout
@@ -80,6 +90,64 @@ export const InspectionSettingsPage = ({
                                     </select>
                                 </label>
                             </div>
+                            {/* Round-2 backlog G2 (Spectora §7.10) — Closing
+                                Date single picker. Used for follow-up CRM
+                                signals; never gates the report. */}
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <label class="block">
+                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Closing Date</span>
+                                    <input
+                                        type="date"
+                                        data-testid="inspection-closing-date"
+                                        x-model="form.closingDate"
+                                        class="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 text-[14px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                    />
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        {/* Round-2 backlog G1 (Spectora §E.2) — Property
+                            Facts strip. Six inline-editable fields. Saves
+                            via /api/inspections/:id/property-facts on
+                            change rather than waiting for the form submit. */}
+                        <PropertyFactsCard />
+
+                        {/* Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10)
+                            — Order ID + Referral Source. Both optional.
+                            Order ID is free-text up to 64 chars (ISN-style
+                            identifier). Referral Source is the merged
+                            seed + tenant custom list. */}
+                        <fieldset class="space-y-4">
+                            <legend class="text-[16px] font-semibold tracking-tight text-slate-900">Order &amp; referral</legend>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <label class="block">
+                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Order ID</span>
+                                    <input
+                                        type="text"
+                                        maxLength={64}
+                                        placeholder="—"
+                                        data-testid="inspection-order-id"
+                                        x-model="form.orderId"
+                                        class="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 text-[14px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none placeholder:text-slate-300"
+                                    />
+                                </label>
+                                <label class="block">
+                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Referral Source</span>
+                                    <select
+                                        data-testid="inspection-referral-source"
+                                        x-model="form.referralSource"
+                                        class="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 text-[14px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                    >
+                                        <option value="">— Select source —</option>
+                                        {sources.map(s => (
+                                            <option value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </div>
+                            <p class="text-[12px] text-slate-500">
+                                Add custom referral sources at <a href="/settings/workspace/referral" class="text-indigo-600 hover:underline">Settings → Workspace → Referral Sources</a>.
+                            </p>
                         </fieldset>
 
                         <fieldset class="space-y-4">

@@ -1,6 +1,7 @@
 // src/templates/pages/report-card-stack.tsx
 import { BareLayout } from '../layouts/main-layout';
 import { StatsCards } from '../components/stats-cards';
+import { PropertyFactsBanner, type PropertyFactsBannerProps } from '../components/property-facts-card';
 import type { RatingLevel } from '../../lib/report-utils';
 import type { BrandingConfig } from '../../types/auth';
 import {
@@ -61,6 +62,9 @@ interface ReportPageProps {
   // Track E1 (ITB §11) — when true, surface a "View repair list" link in
   // the report header so realtors can jump to the contractor punch-list.
   enableRepairList?: boolean;
+  // Round-2 backlog G1 (Spectora §E.2) — Property Facts banner payload.
+  // Renders nothing when every field is null/empty.
+  propertyFacts?: PropertyFactsBannerProps['facts'] | undefined;
 }
 
 const SECTION_ICONS: Record<string, string> = {
@@ -224,6 +228,11 @@ export function ReportCardStackPage(props: ReportPageProps) {
           <h1 class="text-2xl sm:text-3xl font-bold theme-font-display leading-tight mb-2">{address}</h1>
           <p class="theme-text-secondary text-sm">{date} · Inspector: {inspectorName || 'N/A'}</p>
         </div>
+
+        {/* Round-2 backlog G1 (Spectora §E.2) — Property Facts banner.
+            Renders nothing when no facts are populated, so legacy reports
+            with bare metadata stay visually unchanged. */}
+        {props.propertyFacts && <PropertyFactsBanner facts={props.propertyFacts} />}
 
         {/* Stats */}
         <div class="max-w-4xl mx-auto px-4 sm:px-6 mb-6">

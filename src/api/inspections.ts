@@ -23,6 +23,8 @@ import {
     ReportDataResponseSchema,
     CancelInspectionSchema,
     DashboardResponseSchema,
+    PropertyFactsSchema,
+    PropertyFactsResponseSchema,
 } from '../lib/validations/inspection.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -578,6 +580,71 @@ inspectionsRoutes.openapi(updateInspectionRoute, async (c) => {
         });
     }
     return c.json({ success: true, data: { success: true } }, 200);
+});
+
+/**
+ * Round-2 backlog G1 (Spectora §E.2) — GET /api/inspections/:id/property-facts
+ * Returns the six Property Facts columns for the strip + report banner.
+ */
+const getPropertyFactsRoute = createRoute({
+    method: 'get',
+    path: '/{id}/property-facts',
+    tags: ['Inspections'],
+    summary: 'Get property facts',
+    description: 'Returns the Property Facts strip payload (year built, sqft, foundation, lot, beds, baths).',
+    request: {
+        params: z.object({ id: z.string().uuid() }),
+    },
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: PropertyFactsResponseSchema } },
+            description: 'Success',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(getPropertyFactsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const facts = await c.var.services.inspection.getPropertyFacts(id, tenantId);
+    return c.json({ success: true, data: facts }, 200);
+});
+
+/**
+ * Round-2 backlog G1 (Spectora §E.2) — PATCH /api/inspections/:id/property-facts
+ * Inline-edit handler for the Property Facts card. Accepts a partial payload
+ * so a single-field save round-trips without touching the other columns.
+ */
+const updatePropertyFactsRoute = createRoute({
+    method: 'patch',
+    path: '/{id}/property-facts',
+    tags: ['Inspections'],
+    summary: 'Update property facts',
+    description: 'Patches the Property Facts strip. Omitted keys are unchanged; null clears a field.',
+    request: {
+        params: z.object({ id: z.string().uuid() }),
+        body: { content: { 'application/json': { schema: PropertyFactsSchema } } },
+    },
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: PropertyFactsResponseSchema } },
+            description: 'Success',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(updatePropertyFactsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const facts = await c.var.services.inspection.updatePropertyFacts(id, tenantId, body);
+    auditFromContext(c, 'inspection.property_facts.update', 'inspection', {
+        entityId: id,
+        metadata: { fields: Object.keys(body) },
+    });
+    return c.json({ success: true, data: facts }, 200);
 });
 
 /**
