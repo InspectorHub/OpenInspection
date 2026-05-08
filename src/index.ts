@@ -913,6 +913,9 @@ app.get('/report/:id', async (c) => {
             summaryMode,
             // Sprint 2 S2-4 — gate "Estimated cost: $X – $Y" badges per tenant.
             showEstimates: data.showEstimates,
+            // Competitor parity App.F.4 — drives the EDIT SECTION hover button.
+            // Public viewers (no JWT) get `null` and never see the affordance.
+            viewerRole: role,
         }));
     } catch {
         return c.text('Report not found', 404);
