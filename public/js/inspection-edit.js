@@ -1154,15 +1154,54 @@ function inspectionEditor(inspectionId) {
     // Spec 5G M1 — right-pane inline quick comments. Auto-filters by
     // the active item's current rating so inspectors get the right pool
     // without opening the full library drawer.
+    //
+    // Sprint 1 A-2: ITEM-aware ranking. After bucket-filtering, score each
+    // entry against the active item's label so the most relevant items
+    // (e.g. "Gutters & Downspouts" comments when that item is active)
+    // outrank generic section comments. Mirrors the server-side helper
+    // rankCannedCommentsForItem in inspection.service.ts.
     get quickCommentsForActive() {
       var pool = this._commentLibraryPool;
       var bucket = 'all';
+      var activeItem = null;
+      var section = '';
       if (this.activeItemId) {
         var r = this.results[this.activeItemId]?.rating;
         bucket = this._bucketForRatingId(r);
+        activeItem = this._findItemById(this.activeItemId);
+        section = (this.currentSection && this.currentSection.title) || '';
       }
-      if (bucket === 'all') return pool.slice(0, 6);
-      return pool.filter(function (c) { return c.rating === 'all' || c.rating === bucket; }).slice(0, 6);
+      var filtered = (bucket === 'all')
+        ? pool
+        : pool.filter(function (c) { return c.rating === 'all' || c.rating === bucket; });
+      if (!activeItem) return filtered.slice(0, 6);
+
+      var itemLabel = (activeItem.label || activeItem.name || '').toLowerCase().trim();
+      var itemTokens = itemLabel.split(/[^a-z0-9]+/i).filter(function (t) { return t.length >= 3; });
+      var lcSection = section.toLowerCase();
+
+      function score(c) {
+        var s = 0;
+        var lcCategory = (c.category || '').toLowerCase();
+        var lcText = (c.text || '').toLowerCase();
+        var lcSec = (c.section || '').toLowerCase();
+        if (lcCategory && lcCategory === itemLabel) s += 100;
+        else if (lcCategory && (lcCategory.indexOf(itemLabel) !== -1 || (itemLabel && itemLabel.indexOf(lcCategory) !== -1))) s += 60;
+        if (itemTokens.length > 0) {
+          var hits = 0;
+          for (var i = 0; i < itemTokens.length; i++) {
+            if (lcText.indexOf(itemTokens[i]) !== -1 || lcCategory.indexOf(itemTokens[i]) !== -1) hits++;
+          }
+          if (hits === itemTokens.length) s += 40;
+          else if (hits > 0) s += Math.round(20 * (hits / itemTokens.length));
+        }
+        if (lcSec && lcSec === lcSection) s += 10;
+        return s;
+      }
+
+      var scored = filtered.map(function (c, idx) { return { c: c, s: score(c), idx: idx }; });
+      scored.sort(function (a, b) { return (b.s - a.s) || (a.idx - b.idx); });
+      return scored.map(function (x) { return x.c; }).slice(0, 6);
     },
 
     get commentLibraryCount() {

@@ -966,3 +966,73 @@ export class InspectionService {
         return { inspectionId, tenantId };
     }
 }
+
+// -----------------------------------------------------------------------
+// Sprint 1 Sub-spec A Task 5 — ITEM-aware Quick Comments ranking helper.
+//
+// Scores a list of canned comments against the active item label so that
+// the QUICK COMMENTS panel surfaces the most relevant entries first.
+// Pure function (no DB) — exported for unit-test isolation; the API caller
+// is expected to fetch the section's comments first, then rank in memory.
+// -----------------------------------------------------------------------
+
+export type CannedRatingBucket = 'satisfactory' | 'monitor' | 'defect' | null;
+
+export interface CannedCommentLike {
+    id:            string;
+    text:          string;
+    section?:      string | null;
+    category?:     string | null;
+    ratingBucket?: CannedRatingBucket;
+}
+
+export interface RankCommentsOpts {
+    section:    string;
+    itemLabel:  string;
+    rating?:    'satisfactory' | 'monitor' | 'defect';
+    limit?:     number;
+}
+
+function tokenize(input: string): string[] {
+    return (input || '')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/i)
+        .filter(t => t.length >= 3);
+}
+
+function scoreCanned(c: CannedCommentLike, opts: RankCommentsOpts): number {
+    const lcItem = (opts.itemLabel || '').toLowerCase().trim();
+    const itemTokens = tokenize(opts.itemLabel);
+    const lcCategory = (c.category || '').toLowerCase();
+    const lcText = (c.text || '').toLowerCase();
+    const lcSection = (c.section || '').toLowerCase();
+
+    let s = 0;
+    // Strongest signal: category exactly matches the item label.
+    if (lcCategory && lcCategory === lcItem) s += 100;
+    // Substring overlap (either direction) — handles "Gutters" vs "Gutters & Downspouts".
+    else if (lcCategory && (lcCategory.includes(lcItem) || lcItem.includes(lcCategory))) s += 60;
+    // Comment text contains all item tokens (length >= 3 each).
+    if (itemTokens.length > 0) {
+        const hits = itemTokens.filter(t => lcText.includes(t) || lcCategory.includes(t)).length;
+        if (hits === itemTokens.length) s += 40;
+        else if (hits > 0) s += 20 * (hits / itemTokens.length);
+    }
+    // Section match.
+    if (lcSection && lcSection === opts.section.toLowerCase()) s += 10;
+    // Rating-bucket boost when caller knows the active item's rating.
+    if (opts.rating && c.ratingBucket === opts.rating) s += 5;
+    return s;
+}
+
+export function rankCannedCommentsForItem<T extends CannedCommentLike>(
+    comments: T[],
+    opts: RankCommentsOpts,
+): T[] {
+    if (!Array.isArray(comments) || comments.length === 0) return [];
+    const scored = comments.map((c, idx) => ({ c, s: scoreCanned(c, opts), idx }));
+    // Stable sort: higher score first, then preserve original order for ties.
+    scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
+    const out = scored.map(x => x.c);
+    return typeof opts.limit === 'number' ? out.slice(0, opts.limit) : out;
+}
