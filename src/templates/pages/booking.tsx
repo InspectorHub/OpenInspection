@@ -107,6 +107,51 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                 </div>
                             </section>
 
+                            {/* ── Services (Sprint 2 S2-2) ───────────────────── */}
+                            <section class="space-y-5" x-show="hasServices" style="display:none">
+                                <div class="space-y-1">
+                                    <h2 class="text-[18px] font-semibold tracking-tight text-slate-900">Services</h2>
+                                    <p class="text-[13px] text-slate-500">Choose one or more inspections for this visit.</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <template x-for="svc in availableServices" {...{ 'x-bind:key': 'svc.id' }}>
+                                        <label class="block cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                x-model="selectedServiceIds"
+                                                {...{ 'x-bind:value': 'svc.id' }}
+                                                class="sr-only peer"
+                                            />
+                                            <div class="px-4 py-3 rounded-md border border-slate-200 bg-white peer-checked:border-indigo-500 peer-checked:bg-indigo-50 peer-checked:ring-2 peer-checked:ring-indigo-500/10 transition-all flex items-center justify-between gap-3">
+                                                <div class="min-w-0">
+                                                    <div class="text-[13px] font-bold text-slate-900 truncate" x-text="svc.name"></div>
+                                                    <div class="text-[11px] text-slate-500 mt-0.5" x-text="(svc.durationMinutes ? svc.durationMinutes + ' min · ' : '') + '$' + (svc.price / 100).toFixed(2)"></div>
+                                                </div>
+                                                <svg
+                                                    class="w-4 h-4 text-indigo-500 flex-shrink-0"
+                                                    {...{ 'x-bind:class': "selectedServiceIds.includes(svc.id) ? '' : 'opacity-0'" }}
+                                                    fill="currentColor"
+                                                    viewBox="0 0 20 20"
+                                                >
+                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                                </svg>
+                                            </div>
+                                        </label>
+                                    </template>
+                                </div>
+                                <div
+                                    x-show="selectedServiceIds.length > 0"
+                                    style="display:none"
+                                    class="px-4 py-2 rounded-md bg-slate-50 flex items-center justify-between"
+                                >
+                                    <span class="text-[12px] font-bold text-slate-700">
+                                        <span x-text="selectedServiceIds.length"></span>
+                                        <span x-text="selectedServiceIds.length === 1 ? 'inspection' : 'inspections'"></span>
+                                    </span>
+                                    <span class="text-[15px] font-bold text-slate-900 tabular-nums" x-text="'$' + (totalPriceCents / 100).toFixed(2)"></span>
+                                </div>
+                            </section>
+
                             {/* ── Schedule ─────────────────────────────────── */}
                             <section class="space-y-5">
                                 <div class="space-y-1">

@@ -17,6 +17,14 @@ export const PublicBookingSchema = z.object({
     customTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().openapi({ example: '13:30' }),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }),
+    // Sprint 2 S2-2 — Multi-inspection per request. Customer can pick multiple
+    // services in a single visit. When omitted (legacy single-service flow),
+    // the server still creates a one-inspection request to keep the data model
+    // uniform. `serviceIds` are tenant Service entries; their templateId is
+    // resolved server-side.
+    services: z.array(z.object({
+        serviceId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    })).min(1).max(10).optional().openapi({ description: 'Optional list of services to book in one visit (1-10)' }),
 }).refine(
     (data) => data.timeSlot !== 'custom' || !!data.customTime,
     { message: 'customTime is required when timeSlot is custom', path: ['customTime'] },
@@ -63,7 +71,11 @@ export const AvailabilityResponseSchema = createApiResponseSchema(z.object({
 
 export const BookingResponseSchema = createApiResponseSchema(z.object({
     success: z.boolean().openapi({ example: true }),
+    // Single-service legacy callers still get the first inspection's id here.
     inspectionId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+    // Sprint 2 S2-2 — request grouping is always present, even for single-service bookings.
+    requestId: z.string().optional().openapi({ example: 'req-abc12345' }),
+    inspectionIds: z.array(z.string().uuid()).optional().openapi({ description: 'All inspection ids in the request' }),
 })).openapi('BookingResponse');
 
 export const AvailabilityListResponseSchema = createApiResponseSchema(z.object({

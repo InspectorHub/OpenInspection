@@ -62,6 +62,35 @@ export const inspections = sqliteTable('inspections', {
     templateSnapshot:    text('template_snapshot', { mode: 'json' }),
     templateSnapshotVersion: integer('template_snapshot_version').default(1),
     reportThemeOverride: text('report_theme_override', { enum: ['modern', 'classic', 'minimal'] }),
+    // Sprint 2 S2-2 — Multi-inspection per request. NULL on legacy rows pre-backfill;
+    // application requires a non-null value on all newly created inspections.
+    requestId:           text('request_id'),
+});
+
+// Sprint 2 S2-2 — A single customer booking can spawn multiple inspections
+// (e.g. Residential + Radon + Termite at the same address). All inspections
+// in a request share the schedule + property metadata.
+export const inspectionRequests = sqliteTable('inspection_requests', {
+    id:               text('id').primaryKey(),
+    tenantId:         text('tenant_id').notNull().references(() => tenants.id),
+    clientName:       text('client_name').notNull(),
+    clientEmail:      text('client_email'),
+    clientPhone:      text('client_phone'),
+    propertyAddress:  text('property_address').notNull(),
+    propertyCity:     text('property_city'),
+    propertyState:    text('property_state'),
+    propertyZip:      text('property_zip'),
+    scheduledAt:      text('scheduled_at').notNull(),
+    status:           text('status', {
+        enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'],
+    }).notNull().default('pending'),
+    notes:            text('notes'),
+    totalAmount:      integer('total_amount').notNull().default(0),
+    paymentStatus:    text('payment_status', {
+        enum: ['unpaid', 'partial', 'paid'],
+    }).notNull().default('unpaid'),
+    createdAt:        integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt:        integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const agreements = sqliteTable('agreements', {

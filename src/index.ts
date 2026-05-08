@@ -46,6 +46,10 @@ import { InvoicesPage } from './templates/pages/invoices';
 import { SetupPage } from './templates/pages/setup';
 import { ReportCardStackPage } from './templates/pages/report-card-stack';
 import { InspectionEditPage } from './templates/pages/inspection-edit';
+import { InspectionPhotosPage } from './templates/pages/inspection/photos';
+import { InspectionSummaryPage } from './templates/pages/inspection/summary';
+import { InspectionSignaturesPage } from './templates/pages/inspection/signatures';
+import { InspectionSettingsPage } from './templates/pages/inspection/settings';
 import { SettingsAutomationsPage } from './templates/pages/settings-automations';
 import { SettingsWidgetPage } from './templates/pages/settings-widget';
 import { SettingsServicesPage } from './templates/pages/settings-services';
@@ -91,6 +95,7 @@ import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
 import eventsRoutes from './api/events';
+import inspectionRequestsRoutes from './api/inspection-requests';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -321,6 +326,7 @@ app.route('/api/auth', coreAuthRoutes);
 app.route('/', coreAuthRoutes);
 app.route('/api/inspections', inspectionsRoutes);
 app.route('/api/inspections', inspectionSyncRoutes);
+app.route('/api/inspection-requests', inspectionRequestsRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/public', bookingsRoutes);
 app.route('/api/public/widget', widgetRoutes);
@@ -1018,11 +1024,119 @@ app.get('/inspections/:id/form', htmlAuthGuard(['owner', 'admin', 'inspector']),
     return c.html(FormRendererPage({ inspectionId: id, branding }));
 });
 
-// Inspection Edit Page - Inspector + Admin/Owner
+// Inspection sub-routes (Sprint 2 S2-5).
+//
+// `/edit` is preserved as a 302 redirect to `/report` for backward
+// compatibility with bookmarks and existing JS that still constructs the
+// legacy URL. The canonical surface is the 5-tab sub-route family:
+//   /inspections/:id/report     — primary editor (existing inspection-edit)
+//   /inspections/:id/photos     — read-only gallery
+//   /inspections/:id/summary    — read-only defects preview
+//   /inspections/:id/signatures — agreement envelopes + audit chain timeline
+//   /inspections/:id/settings   — schedule / inspector / template / gates
+//
+// All five share <InspectionShell> for sub-nav + breadcrumb. The Report tab
+// keeps the existing BareLayout-based editor untouched so the Alpine sticky
+// header and full-canvas drawing surface continue to work.
+async function loadInspectionShellData(c: Context<HonoConfig>, inspectionId: string) {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) return null;
+    try {
+        const insp = await c.var.services.inspection.getInspection(inspectionId, tenantId);
+        const propertyAddress = insp.inspection.propertyAddress || 'Inspection';
+        const parent = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId);
+        let siblings: Array<{ id: string; templateName: string; status: string }> | undefined;
+        let requestId: string | undefined;
+        if (parent && parent.inspections.length > 1) {
+            requestId = parent.id;
+            // Look up template names for siblings (best-effort — falls back to id).
+            const tplIds = Array.from(new Set(parent.inspections.map(i => i.templateId).filter((x): x is string => !!x)));
+            const tplNameById = new Map<string, string>();
+            if (tplIds.length > 0) {
+                const db = drizzle(c.env.DB);
+                const rows = await db.select({ id: schema.templates.id, name: schema.templates.name })
+                    .from(schema.templates)
+                    .where(and(eq(schema.templates.tenantId, tenantId), tplIds.length === 1
+                        ? eq(schema.templates.id, tplIds[0]!)
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        : (await import('drizzle-orm')).inArray(schema.templates.id, tplIds as any)))
+                    .all();
+                rows.forEach(r => tplNameById.set(r.id, r.name));
+            }
+            siblings = parent.inspections.map(i => ({
+                id: i.id,
+                templateName: (i.templateId && tplNameById.get(i.templateId)) || 'Inspection',
+                status: i.status,
+            }));
+        }
+        return { propertyAddress, requestId, siblings };
+    } catch {
+        return null;
+    }
+}
+
 app.get('/inspections/:id/edit', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
     const id = c.req.param('id');
     if (!id) return c.redirect('/dashboard');
+    return c.redirect(`/inspections/${id}/report`, 302);
+});
+
+app.get('/inspections/:id/report', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
     return c.html(InspectionEditPage({ inspectionId: id, branding: c.get('branding') }));
+});
+
+app.get('/inspections/:id/photos', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
+    const shell = await loadInspectionShellData(c, id);
+    return c.html(InspectionPhotosPage({
+        inspectionId: id,
+        propertyAddress: shell?.propertyAddress ?? 'Inspection',
+        branding: c.get('branding'),
+        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
+        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
+    }));
+});
+
+app.get('/inspections/:id/summary', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
+    const shell = await loadInspectionShellData(c, id);
+    return c.html(InspectionSummaryPage({
+        inspectionId: id,
+        propertyAddress: shell?.propertyAddress ?? 'Inspection',
+        branding: c.get('branding'),
+        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
+        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
+    }));
+});
+
+app.get('/inspections/:id/signatures', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
+    const shell = await loadInspectionShellData(c, id);
+    return c.html(InspectionSignaturesPage({
+        inspectionId: id,
+        propertyAddress: shell?.propertyAddress ?? 'Inspection',
+        branding: c.get('branding'),
+        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
+        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
+    }));
+});
+
+app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
+    const shell = await loadInspectionShellData(c, id);
+    return c.html(InspectionSettingsPage({
+        inspectionId: id,
+        propertyAddress: shell?.propertyAddress ?? 'Inspection',
+        branding: c.get('branding'),
+        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
+        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
+    }));
 });
 
 app.get('/', (c) => c.redirect('/dashboard'));

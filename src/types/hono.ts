@@ -97,6 +97,7 @@ import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { TemplateMigrationService } from '../services/template-migration.service';
 import { ImportHistoryService } from '../services/import-history.service';
+import { InspectionRequestService } from '../services/inspection-request.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -132,6 +133,7 @@ export interface AppServices {
     auditLog: AuditLogService;
     templateMigration: TemplateMigrationService;
     importHistory: ImportHistoryService;
+    inspectionRequest: InspectionRequestService;
 }
 
 /**

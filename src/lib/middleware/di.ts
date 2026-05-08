@@ -28,6 +28,7 @@ import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
 import { TemplateMigrationService } from '../../services/template-migration.service';
 import { ImportHistoryService } from '../../services/import-history.service';
+import { InspectionRequestService } from '../../services/inspection-request.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -165,6 +166,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'importHistory':
                     target.importHistory = new ImportHistoryService(c.env.DB, c.get('tenantId'));
+                    break;
+                case 'inspectionRequest':
+                    target.inspectionRequest = new InspectionRequestService(c.env.DB);
                     break;
             }
             return target[prop];
