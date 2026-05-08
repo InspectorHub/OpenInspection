@@ -793,6 +793,95 @@ function inspectionEditor(inspectionId) {
       }
     },
 
+    // Sprint 1 Sub-spec A Task 7 (A-6): AI rewrite for custom comments —
+    // mirrors rewriteCannedComment but reads / writes the customComments
+    // store via _patchCustom instead of upsertStateEntry.
+    async rewriteCustomComment(itemId, tabName, customId, ev) {
+      var item = this._findItemById(itemId);
+      if (!item) return;
+      var sectionTitle = (function (self) {
+        for (var s = 0; s < self.sections.length; s++) {
+          var items = self.sections[s].items || [];
+          for (var i = 0; i < items.length; i++) if (items[i].id === itemId) return self.sections[s].title || '';
+        }
+        return '';
+      })(this);
+
+      var entries = this.getCustomEntries(itemId, tabName);
+      var entry = entries.find(function (e) { return e.id === customId; });
+      if (!entry) return;
+      var originalComment = entry.comment || '';
+      var category = (tabName === 'defects' && entry.category) ? entry.category : null;
+      var location = (tabName === 'defects' && entry.location) ? entry.location : null;
+      var self = this;
+
+      if (!window.OIPrompt) {
+        if (typeof showToast === 'function') showToast('Popover unavailable. Reload the page.', true);
+        return;
+      }
+      window.OIPrompt.open({
+        title:       'Rewrite custom comment',
+        placeholder: 'e.g. shorten, sound less alarming, more specific',
+        scope:       'ai-rewrite',
+        onApply: function (instruction) {
+          self._performCustomRewrite(itemId, tabName, customId, ev, {
+            item:            item,
+            sectionTitle:    sectionTitle,
+            originalComment: originalComment,
+            category:        category,
+            location:        location,
+            instruction:     instruction,
+          });
+        },
+      });
+    },
+
+    async _performCustomRewrite(itemId, tabName, customId, ev, ctx) {
+      var btn = ev && (ev.currentTarget || ev.target);
+      var origText = btn ? btn.textContent : null;
+      if (btn) { btn.textContent = '...'; btn.disabled = true; }
+      var toast = function (m, err) { if (typeof showToast === 'function') showToast(m, err); };
+
+      try {
+        var body = {
+          itemLabel:       ctx.item.label,
+          sectionTitle:    ctx.sectionTitle,
+          tab:             tabName,
+          originalComment: ctx.originalComment,
+          instruction:     ctx.instruction,
+        };
+        if (tabName === 'defects') {
+          if (ctx.category) body.category = ctx.category;
+          if (ctx.location) body.location = ctx.location;
+        }
+        var res = await authFetch('/api/ai/comment/edit', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+        var json = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          if (json && json.error && json.error.code === 'ai_not_configured') {
+            toast('AI is not configured. Opening Settings → Advanced → AI…', true);
+            setTimeout(function () { window.location.href = '/settings/advanced/ai'; }, 1200);
+            return;
+          }
+          var msg = (json && json.error && json.error.message) || ('AI rewrite failed (' + res.status + ').');
+          toast(msg, true);
+          return;
+        }
+        var rewritten = json && json.data && json.data.rewritten;
+        if (!rewritten) { toast('AI returned no text. Try again.', true); return; }
+        this._patchCustom(itemId, tabName, customId, { comment: rewritten });
+        this.debounceSave();
+      } catch (e) {
+        console.error('[AI] rewriteCustomComment error', e);
+        toast('AI rewrite network error.', true);
+      } finally {
+        if (btn && origText !== null) { btn.textContent = origText; btn.disabled = false; }
+      }
+    },
+
     setDefectLocation(itemId, cannedId, location) {
       this._upsertStateEntry(itemId, 'defects', cannedId, { location: location });
       this.debounceSave();

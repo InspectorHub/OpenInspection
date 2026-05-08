@@ -321,10 +321,19 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                                 </div>
                               </template>
                             </div>
-                            <button type="button"
-                              x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
-                              class="text-rose-500 px-1 text-xs font-bold"
-                              title="Delete">×</button>
+                            <div class="flex flex-col items-center gap-0.5">
+                              {/* Sprint 1 A-6: AI rewrite button on custom rows (mobile) */}
+                              <button type="button"
+                                x-on:click="rewriteCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event)"
+                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 hover:bg-amber-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-xs"
+                                aria-label="Rewrite with AI"
+                                title="Rewrite with AI">{'✨'}</button>
+                              <button type="button"
+                                x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
+                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-rose-500 hover:bg-rose-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/30 text-xs font-bold"
+                                aria-label="Delete custom comment"
+                                title="Delete">×</button>
+                            </div>
                           </div>
                         </div>
                       </template>
@@ -1080,10 +1089,19 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                                   </div>
                                 </template>
                               </div>
-                              <button type="button"
-                                x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
-                                class="text-rose-500 hover:bg-rose-50 rounded p-1 text-xs font-bold"
-                                title="Delete custom comment">×</button>
+                              <div class="flex flex-col items-center gap-0.5">
+                                {/* Sprint 1 A-6: AI rewrite button on custom rows */}
+                                <button type="button"
+                                  x-on:click="rewriteCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event)"
+                                  class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 hover:bg-amber-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                  aria-label="Rewrite with AI"
+                                  title="Rewrite with AI">{'✨'}</button>
+                                <button type="button"
+                                  x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
+                                  class="inline-flex items-center justify-center w-7 h-7 rounded-md text-rose-500 hover:bg-rose-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/30 text-xs font-bold"
+                                  aria-label="Delete custom comment"
+                                  title="Delete custom comment">×</button>
+                              </div>
                             </div>
                           </div>
                         </template>
