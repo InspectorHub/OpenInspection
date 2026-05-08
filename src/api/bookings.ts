@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import { users, inspections } from '../lib/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
+import { users, inspections, services as servicesTable } from '../lib/db/schema';
 import { createCalendarEvent } from './calendar';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
@@ -43,6 +43,71 @@ bookingsRoutes.openapi(listInspectorsRoute, async (c) => {
     const service = c.var.services.booking;
     const inspectors = await service.listInspectors(tenantId);
     return c.json({ success: true, data: { inspectors } }, 200);
+});
+
+/**
+ * GET /api/public/services — Sprint 2 S2-2.
+ * Lists active services so the public booking page can render the multi-
+ * service selector. Only id / name / price / duration / templateId are
+ * exposed; internal notes are not surfaced.
+ */
+const listPublicServicesRoute = createRoute({
+    method: 'get',
+    path: '/services',
+    tags: ['Public'],
+    summary: 'List active services for public booking',
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.boolean(),
+                        data: z.object({
+                            services: z.array(z.object({
+                                id:              z.string(),
+                                name:            z.string(),
+                                description:     z.string().nullable(),
+                                price:           z.number(),
+                                durationMinutes: z.number().nullable(),
+                            })),
+                        }),
+                    }),
+                },
+            },
+            description: 'List of active services',
+        },
+    },
+});
+
+bookingsRoutes.openapi(listPublicServicesRoute, async (c) => {
+    const tenantId = c.get('tenantId') || c.get('requestedSubdomain');
+    if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
+    const db = drizzle(c.env.DB);
+    const rows = await db.select({
+        id:              servicesTable.id,
+        name:            servicesTable.name,
+        description:     servicesTable.description,
+        price:           servicesTable.price,
+        durationMinutes: servicesTable.durationMinutes,
+        active:          servicesTable.active,
+        templateId:      servicesTable.templateId,
+    }).from(servicesTable)
+        .where(eq(servicesTable.tenantId, tenantId))
+        .all();
+    // Only expose services that are active AND have a template wired up.
+    const visible = rows.filter(r => r.active && r.templateId);
+    return c.json({
+        success: true,
+        data: {
+            services: visible.map(r => ({
+                id:              r.id,
+                name:            r.name,
+                description:     r.description ?? null,
+                price:           r.price,
+                durationMinutes: r.durationMinutes ?? null,
+            })),
+        },
+    }, 200);
 });
 
 /**
@@ -173,20 +238,78 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
         throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
     }
 
-    const inspectionId = crypto.randomUUID();
-    await db.insert(inspections).values({
-        id: inspectionId,
-        tenantId,
-        inspectorId,
-        propertyAddress: body.address,
-        clientName: body.clientName,
-        clientEmail: body.clientEmail,
-        date: body.date,
-        status: 'draft',
-        paymentStatus: 'unpaid',
-        price: 0,
-        createdAt: new Date()
-    });
+    // Sprint 2 S2-2 — When the customer selects multiple services, we route
+    // through InspectionRequestService so the resulting inspections are
+    // grouped under a parent request. The legacy single-service flow still
+    // creates a one-inspection request implicitly so dashboards can group
+    // every booking the same way.
+    const startIso = `${body.date}T${requestedTime}:00Z`;
+    const inspectionRequestService = c.var.services.inspectionRequest;
+    let createdRequestId: string;
+    let primaryInspectionId: string;
+    let allInspectionIds: string[] = [];
+
+    if (body.services && body.services.length > 0) {
+        const serviceIds = body.services.map(s => s.serviceId);
+        const svcRows = await db.select().from(servicesTable)
+            .where(and(eq(servicesTable.tenantId, tenantId), inArray(servicesTable.id, serviceIds)))
+            .all();
+        if (svcRows.length !== serviceIds.length) {
+            throw Errors.BadRequest('One or more services were not found.');
+        }
+        const subs = svcRows.map(s => {
+            const sub: { templateId: string; price: number } = {
+                templateId: s.templateId ?? '',
+                price:      s.price ?? 0,
+            };
+            if (!sub.templateId) throw Errors.BadRequest(`Service '${s.name}' has no template configured.`);
+            return sub;
+        });
+        const created = await inspectionRequestService.create(tenantId, {
+            clientName:      body.clientName,
+            clientEmail:     body.clientEmail,
+            propertyAddress: body.address,
+            scheduledAt:     startIso,
+            inspectorId,
+        }, subs);
+        createdRequestId = created.id;
+        allInspectionIds = created.inspections.map(i => i.id);
+        primaryInspectionId = allInspectionIds[0] ?? '';
+    } else {
+        primaryInspectionId = crypto.randomUUID();
+        createdRequestId = `req-${primaryInspectionId}`;
+        const now = new Date();
+        // Insert one-inspection request first so the FK is satisfied.
+        await db.insert((await import('../lib/db/schema')).inspectionRequests).values({
+            id:              createdRequestId,
+            tenantId,
+            clientName:      body.clientName,
+            clientEmail:     body.clientEmail,
+            propertyAddress: body.address,
+            scheduledAt:     startIso,
+            status:          'pending',
+            totalAmount:     0,
+            paymentStatus:   'unpaid',
+            createdAt:       now,
+            updatedAt:       now,
+        });
+        await db.insert(inspections).values({
+            id: primaryInspectionId,
+            tenantId,
+            inspectorId,
+            propertyAddress: body.address,
+            clientName: body.clientName,
+            clientEmail: body.clientEmail,
+            date: body.date,
+            status: 'draft',
+            paymentStatus: 'unpaid',
+            price: 0,
+            requestId: createdRequestId,
+            createdAt: now
+        });
+        allInspectionIds = [primaryInspectionId];
+    }
+    const inspectionId = primaryInspectionId;
 
     // Sprint 1 C-6 — map window option to a human-readable label for the
     // calendar event + confirmation email.
@@ -266,7 +389,12 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
 
     return c.json({
         success: true,
-        data: { success: true, inspectionId }
+        data: {
+            success: true,
+            inspectionId,
+            requestId: createdRequestId,
+            inspectionIds: allInspectionIds,
+        }
     }, 200);
 });
 

@@ -27,6 +27,29 @@ document.addEventListener('alpine:init', () => {
             { id: 'all-day',   label: 'All day',   detail: '8:00 AM – 5:00 PM' },
             { id: 'custom',    label: 'Custom',    detail: 'Pick exact time' },
         ],
+        // Sprint 2 S2-2 — multi-inspection per request. The available services
+        // section only shows up if the tenant has any active templated services.
+        availableServices:    [],
+        selectedServiceIds:   [],
+
+        async init() {
+            try {
+                const res = await fetch('/api/public/services');
+                if (res.ok) {
+                    const j = await res.json();
+                    this.availableServices = (j.data && j.data.services) || [];
+                }
+            } catch (_e) {
+                // Services list is optional — booking works without it.
+            }
+        },
+
+        get hasServices() { return this.availableServices.length > 0; },
+        get totalPriceCents() {
+            return this.availableServices
+                .filter(s => this.selectedServiceIds.includes(s.id))
+                .reduce((sum, s) => sum + (s.price || 0), 0);
+        },
 
         formatDate(e) {
             // Strip non-digits, cap at MMDDYYYY, then re-insert slashes with spaces.
@@ -98,6 +121,13 @@ document.addEventListener('alpine:init', () => {
                     turnstileToken: turnstileToken || undefined,
                 };
                 if (this.selectedWindow === 'custom') payload.customTime = this.customTime;
+                // Sprint 2 S2-2 — when the customer picked one or more services,
+                // include them so the server creates a parent request + N
+                // sub-inspections. When empty, the legacy single-service flow
+                // still creates a one-inspection request implicitly.
+                if (this.selectedServiceIds.length > 0) {
+                    payload.services = this.selectedServiceIds.map(id => ({ serviceId: id }));
+                }
 
                 const res = await fetch('/api/public/book', {
                     method: 'POST',
@@ -105,12 +135,18 @@ document.addEventListener('alpine:init', () => {
                     body: JSON.stringify(payload),
                 });
                 if (res.ok) {
-                    this.message   = 'Inspection requested — check your email for confirmation.';
+                    const j = await res.json().catch(() => ({}));
+                    const ids = (j.data && j.data.inspectionIds) || [];
+                    const count = ids.length || 1;
+                    this.message   = count > 1
+                        ? count + ' inspections requested — check your email for confirmation.'
+                        : 'Inspection requested — check your email for confirmation.';
                     this.messageOk = true;
                     form.reset();
                     this.dateMasked = '';
                     this.selectedWindow = '';
                     this.customTime = '';
+                    this.selectedServiceIds = [];
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
                     const j = await res.json().catch(() => ({}));
