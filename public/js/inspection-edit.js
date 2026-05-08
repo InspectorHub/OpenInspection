@@ -528,12 +528,37 @@ function inspectionEditor(inspectionId) {
       return total > 0 ? Math.round((rated / total) * 100) : 0;
     },
 
+    // Live-computed report summary used by the Publish modal "Report Summary"
+    // chip and any UI that wants up-to-date counts. Original implementation
+    // cached the server-side stats from inspection load and never recomputed
+    // when the user clicked rating buttons — so the modal showed "0 monitors"
+    // even when 2 items were rated MON. This getter recounts on every access
+    // by walking the live `results` object against the active rating levels.
+    // Kept `_reportStats` as a fallback when sections / ratingLevels haven't
+    // arrived yet (initial paint).
     get reportStats() {
-      return this._reportStats;
-    },
-
-    set reportStats(val) {
-      this._reportStats = val;
+      if (!Array.isArray(this.sections) || this.sections.length === 0) {
+        return this._reportStats;
+      }
+      var total        = 0;
+      var rated        = 0;
+      var satisfactory = 0;
+      var monitor      = 0;
+      var defect       = 0;
+      for (var s = 0; s < this.sections.length; s++) {
+        var items = this.sections[s].items || [];
+        total += items.length;
+        for (var i = 0; i < items.length; i++) {
+          var ratingId = this.results[items[i].id]?.rating;
+          if (!ratingId) continue;
+          rated++;
+          var bucket = this._bucketForRatingId(ratingId);
+          if (bucket === 'satisfactory')   satisfactory++;
+          else if (bucket === 'monitor')   monitor++;
+          else if (bucket === 'defect')    defect++;
+        }
+      }
+      return { total: total, rated: rated, satisfactory: satisfactory, monitor: monitor, defect: defect };
     },
 
     get selectedBatchCount() {
