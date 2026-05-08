@@ -7,6 +7,9 @@ import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
 interface InspectionEditProps {
   inspectionId: string;
   branding?: BrandingConfig | undefined;
+  // Track E1 — when true, the editor's sub-nav exposes the "Repair List"
+  // 6th tab. Default off so existing tenants keep the 5-tab layout.
+  enableRepairList?: boolean;
 }
 
 /**
@@ -27,7 +30,7 @@ function buildRecoGroups(): Array<{ group: string; items: Array<{ id: string; la
     return Array.from(groups.entries()).map(([group, items]) => ({ group, items }));
 }
 
-export function InspectionEditPage({ inspectionId, branding }: InspectionEditProps) {
+export function InspectionEditPage({ inspectionId, branding, enableRepairList = false }: InspectionEditProps) {
   const siteName = branding?.siteName || 'OpenInspection';
   const recoGroups = buildRecoGroups();
 
@@ -80,6 +83,16 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             aria-selected="false"
             class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 whitespace-nowrap transition-colors"
           >Summary</a>
+          {/* Track E1 (ITB §11) — opt-in 6th tab. */}
+          {enableRepairList && (
+            <a
+              href={`/inspections/${inspectionId}/repair-list`}
+              role="tab"
+              aria-selected="false"
+              data-testid="inspection-edit-repair-list-tab"
+              class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 whitespace-nowrap transition-colors"
+            >Repair List</a>
+          )}
           <a
             href={`/inspections/${inspectionId}/signatures`}
             role="tab"

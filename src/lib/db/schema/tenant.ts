@@ -67,6 +67,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Sprint 2 S2-4 — when true, published reports render the per-defect
     // "Estimated cost: $X – $Y" badge.
     showEstimates: integer('show_estimates', { mode: 'boolean' }).notNull().default(false),
+    // Track E1 (ITB §11, UC-ITB-07) — when true, the published report sub-nav
+    // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want
+    // a separate punch-list view rather than the full narrative report.
+    enableRepairList: integer('enable_repair_list', { mode: 'boolean' }).notNull().default(false),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

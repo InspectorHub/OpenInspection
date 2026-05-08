@@ -50,6 +50,7 @@ import { InspectionPhotosPage } from './templates/pages/inspection/photos';
 import { InspectionSummaryPage } from './templates/pages/inspection/summary';
 import { InspectionSignaturesPage } from './templates/pages/inspection/signatures';
 import { InspectionSettingsPage } from './templates/pages/inspection/settings';
+import { RepairListPage } from './templates/pages/inspection/repair-list';
 import { SettingsAutomationsPage } from './templates/pages/settings-automations';
 import { SettingsWidgetPage } from './templates/pages/settings-widget';
 import { SettingsServicesPage } from './templates/pages/settings-services';
@@ -895,6 +896,19 @@ app.get('/report/:id', async (c) => {
 
         const data = await service.getReportData(id, tenantId as string);
 
+        // Track E1 — surface the per-tenant Repair List toggle so the report
+        // viewer can render the "View repair list" top-right link only when
+        // the workspace has opted in. Failure to read the column is treated
+        // as opt-out (e.g. legacy tenants pre-migration 0044).
+        let enableRepairList = false;
+        try {
+            const cfgRow = await drizzle(c.env.DB).select({ enableRepairList: schema.tenantConfigs.enableRepairList })
+                .from(schema.tenantConfigs)
+                .where(eq(schema.tenantConfigs.tenantId, tenantId as string))
+                .get();
+            enableRepairList = !!cfgRow?.enableRepairList;
+        } catch { /* default off */ }
+
         const rawDate = data.inspection.date || '';
         const formattedDate = rawDate ? new Date(rawDate).toLocaleDateString('en-US', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -913,6 +927,8 @@ app.get('/report/:id', async (c) => {
             summaryMode,
             // Sprint 2 S2-4 — gate "Estimated cost: $X – $Y" badges per tenant.
             showEstimates: data.showEstimates,
+            // Track E1 — show "View repair list" link only when opted in.
+            enableRepairList,
         }));
     } catch {
         return c.text('Report not found', 404);
@@ -960,8 +976,9 @@ app.get('/settings/workspace/reports', htmlAuthGuard(['owner', 'admin']), async 
         primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
         supportEmail: c.env.SENDER_EMAIL || 'support@example.com',
     });
-    const showEstimates = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
-    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates }));
+    const showEstimates    = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
+    const enableRepairList = Boolean((cfg as { enableRepairList?: boolean | number }).enableRepairList);
+    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates, enableRepairList }));
 });
 app.get('/settings/workspace/telemetry', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'telemetry' })));
 
@@ -1085,7 +1102,18 @@ async function loadInspectionShellData(c: Context<HonoConfig>, inspectionId: str
                 status: i.status,
             }));
         }
-        return { propertyAddress, requestId, siblings };
+        // Track E1 — per-tenant Repair List toggle drives the 6th sub-nav
+        // tab. Failure to read defaults to false so the existing 5-tab nav
+        // stays the baseline.
+        let enableRepairList = false;
+        try {
+            const cfgRow = await drizzle(c.env.DB).select({ enableRepairList: schema.tenantConfigs.enableRepairList })
+                .from(schema.tenantConfigs)
+                .where(eq(schema.tenantConfigs.tenantId, tenantId))
+                .get();
+            enableRepairList = !!cfgRow?.enableRepairList;
+        } catch { /* default off */ }
+        return { propertyAddress, requestId, siblings, enableRepairList };
     } catch {
         return null;
     }
@@ -1097,10 +1125,23 @@ app.get('/inspections/:id/edit', htmlAuthGuard(['owner', 'admin', 'inspector']),
     return c.redirect(`/inspections/${id}/report`, 302);
 });
 
-app.get('/inspections/:id/report', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
+app.get('/inspections/:id/report', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
     const id = c.req.param('id');
     if (!id) return c.redirect('/dashboard');
-    return c.html(InspectionEditPage({ inspectionId: id, branding: c.get('branding') }));
+    // Track E1 — surface the per-tenant Repair List toggle so the editor's
+    // sub-nav optionally renders the 6th tab.
+    const tenantId = c.get('tenantId');
+    let enableRepairList = false;
+    if (tenantId) {
+        try {
+            const cfgRow = await drizzle(c.env.DB).select({ enableRepairList: schema.tenantConfigs.enableRepairList })
+                .from(schema.tenantConfigs)
+                .where(eq(schema.tenantConfigs.tenantId, tenantId))
+                .get();
+            enableRepairList = !!cfgRow?.enableRepairList;
+        } catch { /* default off */ }
+    }
+    return c.html(InspectionEditPage({ inspectionId: id, branding: c.get('branding'), enableRepairList }));
 });
 
 app.get('/inspections/:id/photos', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
@@ -1111,6 +1152,7 @@ app.get('/inspections/:id/photos', htmlAuthGuard(['owner', 'admin', 'inspector']
         inspectionId: id,
         propertyAddress: shell?.propertyAddress ?? 'Inspection',
         branding: c.get('branding'),
+        enableRepairList: !!shell?.enableRepairList,
         ...(shell?.requestId ? { requestId: shell.requestId } : {}),
         ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
     }));
@@ -1124,6 +1166,7 @@ app.get('/inspections/:id/summary', htmlAuthGuard(['owner', 'admin', 'inspector'
         inspectionId: id,
         propertyAddress: shell?.propertyAddress ?? 'Inspection',
         branding: c.get('branding'),
+        enableRepairList: !!shell?.enableRepairList,
         ...(shell?.requestId ? { requestId: shell.requestId } : {}),
         ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
     }));
@@ -1137,6 +1180,7 @@ app.get('/inspections/:id/signatures', htmlAuthGuard(['owner', 'admin', 'inspect
         inspectionId: id,
         propertyAddress: shell?.propertyAddress ?? 'Inspection',
         branding: c.get('branding'),
+        enableRepairList: !!shell?.enableRepairList,
         ...(shell?.requestId ? { requestId: shell.requestId } : {}),
         ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
     }));
@@ -1150,9 +1194,49 @@ app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector
         inspectionId: id,
         propertyAddress: shell?.propertyAddress ?? 'Inspection',
         branding: c.get('branding'),
+        enableRepairList: !!shell?.enableRepairList,
         ...(shell?.requestId ? { requestId: shell.requestId } : {}),
         ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
     }));
+});
+
+// Track E1 (ITB §11, UC-ITB-07) — Repair List sub-route. Server-renders
+// the punch-list of every flagged defect across the inspection. Available
+// only when the tenant has opted in via Settings → Workspace → Reports;
+// otherwise the route 404s so it cannot be deep-linked accidentally.
+app.get('/inspections/:id/repair-list', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
+    const tenantId = c.get('tenantId');
+    if (!tenantId) return c.redirect('/dashboard');
+
+    const shell = await loadInspectionShellData(c, id);
+
+    // Gate on the tenant toggle so an admin can't deep-link past the opt-in.
+    if (!shell?.enableRepairList) {
+        return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+    }
+    try {
+        const data = await c.var.services.inspection.getRepairList(id, tenantId);
+        const rawDate = data.inspection.date || '';
+        const formattedDate = rawDate ? new Date(rawDate).toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        }) : null;
+        return c.html(RepairListPage({
+            inspectionId:    id,
+            propertyAddress: shell?.propertyAddress ?? data.inspection.propertyAddress ?? 'Inspection',
+            inspectionDate:  formattedDate,
+            inspectorName:   data.inspection.inspectorName,
+            defects:         data.defects,
+            totals:          data.totals,
+            showEstimates:   data.showEstimates,
+            branding:        c.get('branding'),
+            ...(shell?.requestId ? { requestId: shell.requestId } : {}),
+            ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
+        }));
+    } catch {
+        return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+    }
 });
 
 app.get('/', (c) => c.redirect('/dashboard'));

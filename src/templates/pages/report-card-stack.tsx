@@ -49,6 +49,9 @@ interface ReportPageProps {
   // $X – $Y" badge underneath the recommendation pill. Tenant-controlled
   // via Settings → Workspace → Reports.
   showEstimates?: boolean;
+  // Track E1 (ITB §11) — when true, surface a "View repair list" link in
+  // the report header so realtors can jump to the contractor punch-list.
+  enableRepairList?: boolean;
 }
 
 const SECTION_ICONS: Record<string, string> = {
@@ -67,6 +70,7 @@ function getSectionIcon(title: string): string {
 export function ReportCardStackPage(props: ReportPageProps) {
   const { inspectionId, address, date, inspectorName, theme, stats, branding, summaryMode } = props;
   const showEstimates = props.showEstimates ?? false;
+  const enableRepairList = props.enableRepairList ?? false;
   // Server-side defect filter for ?summary=1 (PDF Summary mode).
   // Keeps only sections with at least one defect, and within each kept
   // section, only items whose severityBucket maps to defect.
@@ -187,6 +191,17 @@ export function ReportCardStackPage(props: ReportPageProps) {
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                 PDF
               </button>
+              {/* Track E1 (ITB §11) — opt-in jump link to the aggregated repair list. */}
+              {enableRepairList && (
+                <a
+                  href={`/inspections/${inspectionId}/repair-list`}
+                  data-testid="report-repair-list-link"
+                  class="no-print px-4 py-2 text-sm font-medium rounded-lg theme-border border theme-text-secondary flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                  View Repair List
+                </a>
+              )}
               <button x-on:click="showRepairPanel = !showRepairPanel" class="px-4 py-2 text-sm font-semibold rounded-lg text-white flex items-center gap-2 theme-accent">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Repair Request
