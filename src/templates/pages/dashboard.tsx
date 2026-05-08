@@ -40,15 +40,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                 {/* Statistics Grid — R7-04 fix: each card is now a button
                     that opens the matching bucket section + scrolls into
                     view. anchor maps to a section in the inspections list
-                    rendered below. */}
-                {/* R45 fix — labels, count semantics, and click targets now
-                    align. Each card's number, name, and the bucket it scrolls
-                    to all reference the same dataset. Was previously a 3-way
-                    mismatch (Active = today+thisWeek+later but click jumps to
-                    just `today`; Ready for Review = recentReports but click
-                    jumps to needsAttention; Completed double-counted recent
-                    reports as both 'review' and 'completed'). */}
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    rendered below.
+                    Sub-spec B Task 5 (B-4) — each card now also renders portfolio
+                    defectStats chips beneath the count when the bucket has any
+                    open defects. The Alpine binding is local: `dashboardCards`
+                    factory pulls defectAggregate from /api/inspections/dashboard. */}
+                <div x-data="dashboardCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
                         { label: 'Upcoming',        id: 'statUpcoming',   target: 'later',          icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'indigo' },
                         { label: 'In Progress',     id: 'statInProgress', target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
@@ -59,18 +56,25 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             key={stat.id}
                             type="button"
                             x-on:click={`sections['${stat.target}']=true; $nextTick(()=>{ const el=document.getElementById('bucket-${stat.target}'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); })`}
-                            class="glass-card group p-4 rounded-lg animate-fade-in text-left hover:scale-[1.02] transition-transform cursor-pointer"
+                            class="group p-4 rounded-lg bg-white border border-slate-200 animate-fade-in text-left hover:shadow-md hover:border-slate-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                             style={`animation-delay: ${0.1 + i * 0.05}s`}
                             title={`Jump to ${stat.label}`}
                         >
-                            <div class="flex items-center justify-between mb-6">
-                                <div class={`w-12 h-12 rounded-lg bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-${stat.color}-600 group-hover:text-white transition-all duration-300 shadow-sm`}>
-                                   <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
+                            <div class="flex items-center justify-between mb-4">
+                                <div class={`w-10 h-10 rounded-md bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-105 transition-all duration-200`}>
+                                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
                                 </div>
                                 <span class="sr-only">Live</span>
                             </div>
-                            <h3 class="text-2xl font-bold text-slate-900 tracking-tight mb-1" id={stat.id}>0</h3>
-                            <p class="text-sm font-bold text-slate-500 uppercase tracking-tight">{stat.label}</p>
+                            <h3 class="text-2xl font-bold text-slate-900 tracking-tight tabular-nums mb-1" id={stat.id}>0</h3>
+                            <p class="text-[12px] font-bold text-slate-500 uppercase tracking-[0.15em]">{stat.label}</p>
+                            {/* Portfolio defect chips — only when bucket has at least one defect.
+                                ih-pill canonical class lives in input.css. */}
+                            <div class="mt-3 flex items-center gap-1 flex-wrap" x-show={`agg('${stat.target}').safety + agg('${stat.target}').recommendation + agg('${stat.target}').maintenance > 0`}>
+                                <span x-show={`agg('${stat.target}').safety > 0`} class="ih-pill ih-pill--defect" title="Safety defects" x-text={`'\u{1F534} ' + agg('${stat.target}').safety`}></span>
+                                <span x-show={`agg('${stat.target}').recommendation > 0`} class="ih-pill ih-pill--monitor" title="Recommendations" x-text={`'\u{1F7E1} ' + agg('${stat.target}').recommendation`}></span>
+                                <span x-show={`agg('${stat.target}').maintenance > 0`} class="ih-pill ih-pill--info" title="Maintenance items" x-text={`'\u{1F535} ' + agg('${stat.target}').maintenance`}></span>
+                            </div>
                         </button>
                     ))}
                 </div>

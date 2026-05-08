@@ -210,6 +210,13 @@ export const InspectionListItemSchema = z.object({
     createdAt:    z.string().nullable().optional(),
 }).passthrough().openapi('InspectionListItem');
 
+// Sub-spec B Task 5 (B-4) — portfolio defectStats aggregated per top card.
+const DefectAggregateBucketSchema = z.object({
+    safety:         z.number(),
+    recommendation: z.number(),
+    maintenance:    z.number(),
+});
+
 export const DashboardResponseSchema = z.object({
     needsAttention: z.array(InspectionListItemSchema),
     today:          z.array(InspectionListItemSchema),
@@ -218,4 +225,10 @@ export const DashboardResponseSchema = z.object({
     laterTotal:     z.number(),
     recentReports:  z.array(InspectionListItemSchema),
     cancelled:      z.array(InspectionListItemSchema),
+    defectAggregate: z.object({
+        later:          DefectAggregateBucketSchema,
+        thisWeek:       DefectAggregateBucketSchema,
+        needsAttention: DefectAggregateBucketSchema,
+        recentReports:  DefectAggregateBucketSchema,
+    }).optional(),
 }).openapi('DashboardResponse');

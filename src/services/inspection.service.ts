@@ -924,6 +924,30 @@ export class InspectionService {
         const decorate = <T extends { id: unknown }>(rows: T[]): Array<T & { defectStats: { safety: number; recommendation: number; maintenance: number } }> =>
             rows.map(r => ({ ...r, defectStats: statsMap.get(r.id as string) ?? { safety: 0, recommendation: 0, maintenance: 0 } }));
 
+        // Sub-spec B Task 5 (B-4) — portfolio defect aggregation per top card.
+        // Sums per-bucket safety / recommendation / maintenance counts so the
+        // top 4 dashboard cards can render colored chips alongside the count.
+        const aggregate = (rows: Array<{ id: unknown }>): { safety: number; recommendation: number; maintenance: number } =>
+            rows.reduce((acc, r) => {
+                const s = statsMap.get(r.id as string) ?? { safety: 0, recommendation: 0, maintenance: 0 };
+                acc.safety         += s.safety;
+                acc.recommendation += s.recommendation;
+                acc.maintenance    += s.maintenance;
+                return acc;
+            }, { safety: 0, recommendation: 0, maintenance: 0 });
+
+        const defectAggregate = {
+            // Maps to the 4 top cards on /dashboard.
+            //   later          → "Upcoming"
+            //   thisWeek       → "In Progress"
+            //   needsAttention → "Needs Attention"
+            //   recentReports  → "Recent Reports"
+            later:          aggregate(later),
+            thisWeek:       aggregate(thisWeek),
+            needsAttention: aggregate(needsAttention),
+            recentReports:  aggregate(recentReports),
+        };
+
         return {
             needsAttention: decorate(needsAttention),
             today:          decorate(today),
@@ -932,6 +956,7 @@ export class InspectionService {
             laterTotal,
             recentReports:  decorate(recentReports),
             cancelled:      decorate(cancelled),
+            defectAggregate,
         };
     }
 

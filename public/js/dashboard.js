@@ -228,6 +228,40 @@ function relativeTime(d) {
 document.addEventListener('alpine:init', () => window.Alpine.data('dashboardMeta', dashboardMeta));
 window.dashboardMeta = dashboardMeta;
 
+// ─── Sub-spec B Task 5 (B-4) — defectAggregate for top 4 cards ──────────────
+// Pulls aggregate from /api/inspections/dashboard once on init and exposes
+// agg(bucket) helper that the dashboard cards use to render colored chips.
+const ZERO_AGG = { safety: 0, recommendation: 0, maintenance: 0 };
+function dashboardCards() {
+    return {
+        defectAggregate: {
+            later:          ZERO_AGG,
+            thisWeek:       ZERO_AGG,
+            needsAttention: ZERO_AGG,
+            recentReports:  ZERO_AGG,
+        },
+        agg(target) {
+            return this.defectAggregate?.[target] || ZERO_AGG;
+        },
+        async init() {
+            await this.reload();
+            window.addEventListener('inspection-updated', () => this.reload());
+        },
+        async reload() {
+            try {
+                const r = await fetch('/api/inspections/dashboard', { credentials: 'include' });
+                if (!r.ok) return;
+                const j = await r.json();
+                if (j.data?.defectAggregate) {
+                    this.defectAggregate = j.data.defectAggregate;
+                }
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('dashboardCards', dashboardCards));
+window.dashboardCards = dashboardCards;
+
 // ─── Prerequisites (templates, inspectors, agents for create modal) ─────────
 
 async function fetchPrerequisites() {

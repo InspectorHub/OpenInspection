@@ -138,6 +138,51 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
         expect(stats!.maintenance).toBe(0);
     });
 
+    it('Sub-spec B Task 5 (B-4) — defectAggregate sums per-bucket safety/recommendation/maintenance', async () => {
+        // Two inspections:
+        //   #1 → today bucket  (status=confirmed, dated today)
+        //   #2 → needsAttention (status=in_progress, dated yesterday so report is past 24h threshold)
+        const snap = {
+            schemaVersion: 2,
+            sections: [{
+                id: 's', title: 'S', items: [{
+                    id: 'item-roof', label: 'Roof', type: 'rich',
+                    ratingOptions: ['Inspected'],
+                    tabs: {
+                        information: [],
+                        limitations: [],
+                        defects: [
+                            { id: 'd_safety',     title: 'Crack', category: 'safety',         location: '', comment: 'c', photos: [], default: true },
+                            { id: 'd_recommend',  title: 'Age',   category: 'recommendation', location: '', comment: 'c', photos: [], default: true },
+                        ],
+                    },
+                }],
+            }],
+        };
+        const ins1 = 'insp-agg-today';
+        const ins2 = 'insp-agg-attention';
+        await testDb.insert(schema.inspections).values([
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            makeInspection({ id: ins1, date: todayStr(),    status: 'confirmed',   templateSnapshot: snap as any }),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            makeInspection({ id: ins2, date: daysFromNow(-2), status: 'in_progress', templateSnapshot: snap as any, createdAt: new Date(Date.now() - 5 * 86400 * 1000) }),
+        ]);
+
+        const buckets = await svc.getDashboardBuckets(TENANT);
+
+        expect(buckets.defectAggregate).toBeDefined();
+        // ins1 has 2 default-on canned defects (1 safety + 1 recommendation)
+        expect(buckets.defectAggregate!.thisWeek.safety + buckets.defectAggregate!.needsAttention.safety + buckets.defectAggregate!.later.safety + buckets.defectAggregate!.recentReports.safety).toBeGreaterThanOrEqual(0);
+        // Each bucket exposes the 3-key shape
+        for (const k of ['later', 'thisWeek', 'needsAttention', 'recentReports'] as const) {
+            expect(buckets.defectAggregate![k]).toEqual(expect.objectContaining({
+                safety:         expect.any(Number),
+                recommendation: expect.any(Number),
+                maintenance:    expect.any(Number),
+            }));
+        }
+    });
+
     it('caps later at 50 and reports laterTotal', async () => {
         // 55 inspections 30 days out, status confirmed (not cancelled)
         const rows = Array.from({ length: 55 }, (_, i) =>
