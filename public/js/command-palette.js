@@ -99,7 +99,8 @@
         return parts.join(', ') || (insp.id ? `Inspection #${String(insp.id).slice(0, 6)}` : 'Inspection');
     }
 
-    document.addEventListener('alpine:init', () => {
+    function register() {
+        if (!window.Alpine) return;
         Alpine.data('commandPalette', () => ({
             open: false,
             loading: false,
@@ -309,5 +310,10 @@
                 }
             },
         }));
-    });
+    }
+
+    // The script may load before or after Alpine starts (defer ordering),
+    // so cover both paths.
+    if (window.Alpine) register();
+    else document.addEventListener('alpine:init', register);
 })();

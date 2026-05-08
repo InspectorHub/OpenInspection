@@ -33,10 +33,12 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
             <script src="/js/hotkeys.js"></script>
             <script defer src="/vendor/alpine-collapse.min.js"></script>
             <script defer src="/vendor/alpine.min.js"></script>
-            {/* slash-trigger registers an Alpine `slashSnippet` data plugin —
-                opt-in per textarea via x-data="slashSnippet({ section, rating })". */}
-            <script defer src="/js/slash-trigger.js"></script>
-            <script defer src="/js/command-palette.js"></script>
+            {/* These two register Alpine.data factories. Loaded SYNC (no defer)
+                so their alpine:init listener attaches BEFORE the deferred
+                alpine.min.js fires that event. With defer they ran too late
+                and the factories never registered. */}
+            <script src="/js/slash-trigger.js"></script>
+            <script src="/js/command-palette.js"></script>
             <script defer src="/vendor/flatpickr.min.js"></script>
             <script defer src="/js/flatpickr-init.js"></script>
             {/* B4 — Dexie importmap: must precede every type="module" script that imports 'dexie' */}
