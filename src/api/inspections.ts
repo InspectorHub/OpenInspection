@@ -25,6 +25,10 @@ import {
     DashboardResponseSchema,
     PropertyFactsSchema,
     PropertyFactsResponseSchema,
+    MediaCenterResponseSchema,
+    MediaPoolUploadResponseSchema,
+    MediaAttachRequestSchema,
+    MediaAttachResponseSchema,
 } from '../lib/validations/inspection.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -930,6 +934,131 @@ inspectionsRoutes.openapi(uploadPhotoRoute, async (c) => {
     const service = c.var.services.inspection;
     const key = await service.uploadPhoto(id, c.get('tenantId'), itemId, file);
     return c.json({ success: true, data: { key, success: true, targetType, itemId, customId } }, 200);
+});
+
+/* ── Round-2 backlog #9 (Spectora §E.3) — Media Center ─────────────────────
+ *
+ * Three endpoints powering the editor's centralized photo library drawer:
+ *   GET  /api/inspections/:id/media          — aggregate {attached, pool}
+ *   POST /api/inspections/:id/media/upload   — bulk upload to loose pool
+ *   POST /api/inspections/:id/media/attach   — attach pool photo to an item
+ *   DELETE /api/inspections/:id/media/pool/:poolId — discard pool photo
+ */
+const mediaCenterRoute = createRoute({
+    method: 'get',
+    path:   '/{id}/media',
+    tags:   ['Inspections'],
+    summary: 'Media Center — all attached + pool photos',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(MediaCenterResponseSchema) } },
+            description: 'Aggregated photos',
+        },
+    },
+});
+inspectionsRoutes.openapi(mediaCenterRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const data = await c.var.services.inspection.getMediaCenter(id, c.get('tenantId'));
+    return c.json({ success: true, data }, 200);
+});
+
+const mediaUploadRoute = createRoute({
+    method: 'post',
+    path:   '/{id}/media/upload',
+    tags:   ['Inspections'],
+    summary: 'Upload a photo to the inspection media pool (loose, unattached)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string().uuid() }),
+        body: {
+            content: {
+                'multipart/form-data': {
+                    schema: z.object({
+                        file:    z.unknown().openapi({ type: 'string', format: 'binary' }),
+                        // Optional EXIF take-time as epoch milliseconds — the
+                        // client-side photo picker extracts this when the
+                        // browser exposes File.lastModified or an EXIF parser
+                        // is available.
+                        takenAt: z.coerce.number().int().nonnegative().optional(),
+                    }),
+                },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(MediaPoolUploadResponseSchema) } },
+            description: 'Pool photo created',
+        },
+    },
+});
+inspectionsRoutes.openapi(mediaUploadRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const formData = await c.req.parseBody();
+    const file = formData['file'] as File;
+    const takenAtRaw = formData['takenAt'];
+    if (!file) throw Errors.BadRequest('File is required');
+
+    let takenAt: number | null = null;
+    if (typeof takenAtRaw === 'string' && takenAtRaw.length > 0) {
+        const n = Number(takenAtRaw);
+        if (Number.isFinite(n) && n > 0) takenAt = Math.round(n);
+    }
+
+    const result = await c.var.services.inspection.uploadPoolPhoto(id, c.get('tenantId'), file, { takenAt });
+    return c.json({ success: true, data: result }, 200);
+});
+
+const mediaAttachRoute = createRoute({
+    method: 'post',
+    path:   '/{id}/media/attach',
+    tags:   ['Inspections'],
+    summary: 'Attach a pool photo to an inspection item',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string().uuid() }),
+        body: { content: { 'application/json': { schema: MediaAttachRequestSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(MediaAttachResponseSchema) } },
+            description: 'Photo attached',
+        },
+    },
+});
+inspectionsRoutes.openapi(mediaAttachRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { poolId, itemId } = c.req.valid('json');
+    const result = await c.var.services.inspection.attachPoolPhoto(id, c.get('tenantId'), poolId, itemId);
+    auditFromContext(c, 'inspection.media.attach', 'inspection', {
+        entityId: id,
+        metadata: { poolId, itemId },
+    });
+    return c.json({ success: true, data: result }, 200);
+});
+
+const mediaPoolDeleteRoute = createRoute({
+    method: 'delete',
+    path:   '/{id}/media/pool/{poolId}',
+    tags:   ['Inspections'],
+    summary: 'Delete a pool photo (cancel an upload)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string().uuid(), poolId: z.string().min(1) }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SuccessResponseSchema } },
+            description: 'Pool photo deleted',
+        },
+    },
+});
+inspectionsRoutes.openapi(mediaPoolDeleteRoute, async (c) => {
+    const { id, poolId } = c.req.valid('param');
+    await c.var.services.inspection.deletePoolPhoto(id, c.get('tenantId'), poolId);
+    return c.json({ success: true as const }, 200);
 });
 
 /**
