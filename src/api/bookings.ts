@@ -156,8 +156,18 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
 
     // Spec 3C — enforce inspector availability + availability_overrides + existing-bookings collision check.
     // Reuses BookingService.getAvailableSlots (returns [{time:'HH:MM', available:bool}, ...]).
+    //
+    // Sprint 1 C-6 — translate the 4 customer-facing window options into the
+    // existing internal time-slot model. all-day reuses the morning slot
+    // (08:00); custom maps to the user-provided customTime (HH:mm).
+    let requestedTime: string;
+    switch (body.timeSlot) {
+        case 'morning':   requestedTime = '08:00'; break;
+        case 'afternoon': requestedTime = '13:00'; break;
+        case 'all-day':   requestedTime = '08:00'; break;
+        case 'custom':    requestedTime = body.customTime ?? '08:00'; break;
+    }
     const slots = await service.getAvailableSlots(tenantId, inspectorId, body.date);
-    const requestedTime = body.timeSlot === 'morning' ? '08:00' : '13:00';
     const targetSlot = slots.find(s => s.time === requestedTime);
     if (!targetSlot || !targetSlot.available) {
         throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
@@ -178,11 +188,20 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
         createdAt: new Date()
     });
 
+    // Sprint 1 C-6 — map window option to a human-readable label for the
+    // calendar event + confirmation email.
+    const windowLabel: Record<typeof body.timeSlot, string> = {
+        'morning':   'Morning (8:00 AM – 12:00 PM)',
+        'afternoon': 'Afternoon (12:00 PM – 4:00 PM)',
+        'all-day':   'All day (8:00 AM – 5:00 PM)',
+        'custom':    body.customTime ? `${body.customTime}` : 'Custom time',
+    };
+
     // Async tasks
     c.executionCtx.waitUntil((async () => {
         const inspector = await db.select().from(users).where(eq(users.id, inspectorId!)).get();
         if (inspector?.googleRefreshToken && inspector?.googleCalendarId) {
-            const startDateTime = `${body.date}T${body.timeSlot === 'morning' ? '08:00:00' : '13:00:00'}Z`;
+            const startDateTime = `${body.date}T${requestedTime}:00Z`;
             await createCalendarEvent(
                 c.env.GOOGLE_CLIENT_ID,
                 c.env.GOOGLE_CLIENT_SECRET,
@@ -200,7 +219,7 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
             body.clientName,
             body.address,
             body.date,
-            body.timeSlot === 'morning' ? 'Morning (08:00 - 12:00)' : 'Afternoon (13:00 - 17:00)'
+            windowLabel[body.timeSlot]
         ).catch(e => logger.error('Booking confirmation email failed', {}, e instanceof Error ? e : undefined));
     })());
 
@@ -454,6 +473,111 @@ bookingsRoutes.openapi(declineAgreementRoute, async (c) => {
     }
 
     return c.json({ success: true as const }, 200);
+});
+
+/**
+ * Sprint 1 C-5 — Public address autocomplete proxy for the unauthenticated
+ * /book page. The internal `/api/places/autocomplete` endpoint is JWT-gated,
+ * so we expose a thin public forwarder here with three guarantees:
+ *
+ *   1. Token never leaves the worker (kept off the wire entirely).
+ *   2. If no token is configured, returns `{ data: [], reason: 'NO_API_KEY' }`
+ *      and the client falls back silently to plain-text input.
+ *   3. Rate-limited via the shared booking rate limiter to deter scraping.
+ *
+ * This implementation uses Google Places (existing `GOOGLE_PLACES_API_KEY`
+ * binding) — same upstream that powers the dashboard's authenticated
+ * autocomplete. The plan language uses "Mapbox" as a placeholder for any
+ * geocoder; we align with the existing infrastructure.
+ */
+const publicGeocodeRoute = createRoute({
+    method: 'get',
+    path: '/geocode',
+    tags: ['Public'],
+    summary: 'Address autocomplete proxy (public, rate-limited)',
+    request: {
+        query: z.object({
+            q: z.string().min(1).max(200).openapi({ example: '1005 S Gay' }),
+        }),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        data: z.array(z.object({
+                            label:   z.string(),
+                            line1:   z.string(),
+                            city:    z.string().nullable(),
+                            state:   z.string().nullable(),
+                            zip:     z.string().nullable(),
+                            placeId: z.string(),
+                        })),
+                        reason: z.enum(['NO_API_KEY', 'UPSTREAM_ERROR']).optional(),
+                    }),
+                },
+            },
+            description: 'Autocomplete suggestions or fallback reason',
+        },
+    },
+});
+
+bookingsRoutes.openapi(publicGeocodeRoute, async (c) => {
+    await checkRateLimit(c, 'book');
+    const { q } = c.req.valid('query');
+    if (q.length < 3) {
+        return c.json({ data: [] }, 200);
+    }
+    const apiKey = c.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) {
+        return c.json({ data: [], reason: 'NO_API_KEY' as const }, 200);
+    }
+
+    try {
+        const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
+        url.searchParams.set('input', q);
+        url.searchParams.set('types', 'address');
+        url.searchParams.set('components', 'country:us');
+        url.searchParams.set('key', apiKey);
+        const res = await fetch(url.toString());
+        if (!res.ok) {
+            logger.warn('[public.geocode] upstream error', { status: res.status });
+            return c.json({ data: [], reason: 'UPSTREAM_ERROR' as const }, 200);
+        }
+        const j = await res.json() as {
+            status: string;
+            predictions?: Array<{
+                place_id: string;
+                description: string;
+                terms?: Array<{ value: string }>;
+                structured_formatting?: { main_text?: string; secondary_text?: string };
+            }>;
+        };
+        if (j.status !== 'OK' && j.status !== 'ZERO_RESULTS') {
+            logger.warn('[public.geocode] upstream status', { status: j.status });
+            return c.json({ data: [], reason: 'UPSTREAM_ERROR' as const }, 200);
+        }
+        // Best-effort split of secondary_text into city / state / zip — Google
+        // Places returns "City, ST 12345" for US addresses. We do a lenient
+        // regex split; clients should treat these as hints, not authoritative.
+        const data = (j.predictions ?? []).slice(0, 5).map(p => {
+            const main = p.structured_formatting?.main_text || p.description;
+            const secondary = p.structured_formatting?.secondary_text || '';
+            const m = secondary.match(/^([^,]+),\s*([A-Z]{2})\s*(\d{5})?/);
+            return {
+                label:   p.description,
+                line1:   main,
+                city:    m?.[1] ?? null,
+                state:   m?.[2] ?? null,
+                zip:     m?.[3] ?? null,
+                placeId: p.place_id,
+            };
+        });
+        return c.json({ data }, 200);
+    } catch (e) {
+        logger.error('[public.geocode] exception', {}, e instanceof Error ? e : undefined);
+        return c.json({ data: [], reason: 'UPSTREAM_ERROR' as const }, 200);
+    }
 });
 
 export default bookingsRoutes;
