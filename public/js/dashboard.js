@@ -603,6 +603,75 @@ window.cloneInspection = cloneInspection;
 window.deleteInspection = deleteInspection;
 window.submitInspection = submitInspection;
 
+// ─── Time-based filter helpers (Competitor parity Feature C1) ───────────────
+// Pure JS port of src/lib/inspection-filter.ts — kept in sync by the unit
+// tests in tests/unit/inspection-filter.spec.ts. Both modules share the same
+// filter ids and date semantics so the dashboard tab strip behaves identically
+// to any future server-side filter.
+const INSPECTION_FILTERS = [
+    { id: 'all',         label: 'All' },
+    { id: 'past',        label: 'Past' },
+    { id: 'yesterday',   label: 'Yesterday' },
+    { id: 'today',       label: 'Today' },
+    { id: 'tomorrow',    label: 'Tomorrow' },
+    { id: 'this_week',   label: 'This Week' },
+    { id: 'future',      label: 'Future' },
+    { id: 'unconfirmed', label: 'Unconfirmed' },
+    { id: 'in_progress', label: 'In Progress' },
+];
+
+function _startOfDay(d) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+}
+
+function _addDays(d, days) {
+    const x = new Date(d);
+    x.setDate(x.getDate() + days);
+    return x;
+}
+
+function _startOfWeek(d) {
+    const x = _startOfDay(d);
+    x.setDate(x.getDate() - x.getDay());
+    return x;
+}
+
+function _parseInspectionDate(raw) {
+    if (!raw) return null;
+    if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function matchesInspectionFilter(insp, filter, now) {
+    if (filter === 'all') return true;
+    const status = ((insp && insp.status) || '').toLowerCase();
+    if (filter === 'unconfirmed') return status === 'scheduled' || status === 'draft';
+    if (filter === 'in_progress') return status === 'in_progress';
+    const date = _parseInspectionDate(insp && insp.date != null ? insp.date : null);
+    if (!date) return false;
+    const today     = _startOfDay(now || new Date());
+    const yesterday = _addDays(today, -1);
+    const tomorrow  = _addDays(today, 1);
+    const weekStart = _startOfWeek(today);
+    const weekEnd   = _addDays(weekStart, 7);
+    const dayStart  = _startOfDay(date);
+    switch (filter) {
+        case 'past':       return dayStart.getTime() < today.getTime();
+        case 'yesterday':  return dayStart.getTime() === yesterday.getTime();
+        case 'today':      return dayStart.getTime() === today.getTime();
+        case 'tomorrow':   return dayStart.getTime() === tomorrow.getTime();
+        case 'this_week':  return dayStart.getTime() >= weekStart.getTime() && dayStart.getTime() < weekEnd.getTime();
+        case 'future':     return dayStart.getTime() >= weekEnd.getTime();
+    }
+    return false;
+}
+
+window.INSPECTION_FILTERS         = INSPECTION_FILTERS;
+window.matchesInspectionFilter    = matchesInspectionFilter;
+
 // ─── Alpine dashboard factory ───────────────────────────────────────────────
 
 function dashboardFactory() {
@@ -626,6 +695,11 @@ function dashboardFactory() {
             recentReports: false,
             cancelled: false,
         },
+        // Competitor parity C1 — time-based filter tabs.
+        // 'all' shows the existing grouped buckets; any other filter id
+        // collapses to a single flat list filtered in-memory.
+        activeFilter: 'all',
+        filterOptions: INSPECTION_FILTERS,
         // Spec 4D.T10 — Today's events bucket
         todayEvents: [],
         eventTypes: [],
@@ -750,6 +824,69 @@ function dashboardFactory() {
                 b.recentReports.length +
                 b.cancelled.length
             ) === 0;
+        },
+
+        // Competitor parity C1 — flat dedup'd union of every bucket. Used
+        // exclusively when activeFilter !== 'all' so the inspector sees one
+        // clean list instead of 5 collapsing sections.
+        get _allInspections() {
+            const b = this.buckets;
+            const seen = new Set();
+            const out  = [];
+            const push = (rows) => {
+                for (let i = 0; i < (rows || []).length; i++) {
+                    const r = rows[i];
+                    const id = r && r.id;
+                    if (!id || seen.has(id)) continue;
+                    seen.add(id);
+                    out.push(r);
+                }
+            };
+            push(b.needsAttention);
+            push(b.today);
+            push(b.thisWeek);
+            push(b.later);
+            push(b.recentReports);
+            push(b.cancelled);
+            return out;
+        },
+
+        // Inspections matching the currently active non-'all' filter, sorted
+        // by inspection date ascending (closest first). Stable enough that
+        // re-renders don't shuffle rows when the same data reloads.
+        get filteredInspections() {
+            if (this.activeFilter === 'all') return [];
+            const now = new Date();
+            const list = this._allInspections.filter(i => matchesInspectionFilter(i, this.activeFilter, now));
+            list.sort((a, b) => {
+                const da = a && a.date ? new Date(a.date).getTime() : 0;
+                const db = b && b.date ? new Date(b.date).getTime() : 0;
+                return da - db;
+            });
+            return list;
+        },
+
+        // Counts for the tab strip pills, e.g. "TODAY (3)". Computed once
+        // per Alpine reactive cycle.
+        get filterCounts() {
+            const counts = { all: 0, past: 0, yesterday: 0, today: 0, tomorrow: 0,
+                             this_week: 0, future: 0, unconfirmed: 0, in_progress: 0 };
+            const now = new Date();
+            const list = this._allInspections;
+            counts.all = list.length;
+            for (let i = 0; i < list.length; i++) {
+                const insp = list[i];
+                for (let j = 0; j < INSPECTION_FILTERS.length; j++) {
+                    const f = INSPECTION_FILTERS[j].id;
+                    if (f === 'all') continue;
+                    if (matchesInspectionFilter(insp, f, now)) counts[f]++;
+                }
+            }
+            return counts;
+        },
+
+        setFilter(filter) {
+            this.activeFilter = filter || 'all';
         },
     };
 }

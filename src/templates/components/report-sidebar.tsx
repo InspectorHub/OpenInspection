@@ -55,7 +55,9 @@ export const ReportSidebar = ({ sections, role, inspectionId, brandLogo, siteNam
 
         {/* Sections nav */}
         <nav class="flex-1 overflow-y-auto py-2" aria-label="Report sections">
-            {sections.map((s) => (
+            {sections.map((s) => {
+                const total = s.defects.safety + s.defects.recommendation + s.defects.maintenance;
+                return (
                 <a
                     href={`#section-${s.id}`}
                     key={s.id}
@@ -66,8 +68,26 @@ export const ReportSidebar = ({ sections, role, inspectionId, brandLogo, siteNam
                         <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-60 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={s.icon}></path></svg>
                     )}
                     <span class="flex-1 truncate">{s.title}</span>
-                    {/* Defect count badges — only render non-zero */}
-                    <span class="flex items-center gap-0.5 text-[10px] font-bold tabular-nums">
+                    {/*
+                      Competitor parity C2 — single red total-defects badge
+                      per Spectora App.F.2 ("count of defects in that section").
+                      Sums safety + recommendation + maintenance. Only renders
+                      when total > 0. The per-category breakdown below stays
+                      as the secondary signal so inspectors don't lose the
+                      severity split.
+                    */}
+                    {total > 0 && (
+                        <span
+                            data-test="section-defect-total"
+                            class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold tabular-nums"
+                            title={`${total} issue${total === 1 ? '' : 's'} in this section`}
+                            aria-label={`${total} issues`}
+                        >{total}</span>
+                    )}
+                    {/* Per-category breakdown — only render non-zero. Wrapped
+                        in `hidden lg:flex` so on smaller side-rail widths the
+                        single combined badge above stands alone. */}
+                    <span class="hidden xl:flex items-center gap-0.5 text-[10px] font-bold tabular-nums">
                         {s.defects.safety > 0 && (
                             <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white" title="Safety hazards">{s.defects.safety}</span>
                         )}
@@ -79,7 +99,8 @@ export const ReportSidebar = ({ sections, role, inspectionId, brandLogo, siteNam
                         )}
                     </span>
                 </a>
-            ))}
+                );
+            })}
         </nav>
 
         {/* Footer status */}

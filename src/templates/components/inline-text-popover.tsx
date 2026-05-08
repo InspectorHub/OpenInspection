@@ -57,6 +57,22 @@ export const InlineTextPopover = (): JSX.Element => (
                 <h3 id="oi-prompt-title" class="text-[15px] font-semibold text-slate-900 tracking-tight" x-text="title"></h3>
             </div>
             <div class="p-5 space-y-3">
+                {/*
+                  Competitor parity C3 — quick-pick instruction templates.
+                  Render as outlined pills above the textarea so the
+                  inspector can click "shorten" / "less alarming" without
+                  typing. Empty templates array hides the row entirely.
+                */}
+                <div x-show="templates.length > 0" class="flex flex-wrap items-center gap-1.5" data-test="oi-prompt-templates">
+                    <template x-for="t in templates" {...{ 'x-bind:key': 't' }}>
+                        <button
+                            type="button"
+                            x-on:click="pickTemplate(t)"
+                            class="inline-flex items-center h-6 px-2.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold hover:bg-indigo-100 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            x-text="t"
+                        ></button>
+                    </template>
+                </div>
                 <textarea
                     x-ref="ta"
                     x-model="value"

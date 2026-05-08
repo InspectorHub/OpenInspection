@@ -779,6 +779,14 @@ function inspectionEditor(inspectionId) {
       var entry = entries.find(function (e) { return e.cannedId === cannedId; });
       if (!entry) return;
       var originalComment = entry.effectiveComment || entry.comment || '';
+      // Competitor parity C3 — never call the rewriter on empty text. The
+      // spec is explicit: "DO NOT generate from scratch — only rewrite
+      // existing text." Server-side Zod also enforces min:1 but we'd rather
+      // catch this with a friendly toast than a 400.
+      if (!originalComment.trim()) {
+        if (typeof showToast === 'function') showToast('Add a comment first, then rewrite with AI.', false);
+        return;
+      }
       var category = (tabName === 'defects' && entry.category) ? entry.category : null;
       var location = (tabName === 'defects' && entry.location) ? entry.location : null;
       var self = this;
@@ -791,6 +799,14 @@ function inspectionEditor(inspectionId) {
         title:       'Rewrite instruction',
         placeholder: 'e.g. shorten, make professional, add NW corner detail',
         scope:       'ai-rewrite',
+        // Competitor parity C3 — quick-pick instruction templates.
+        templates: [
+          'shorten',
+          'more specific',
+          'less alarming',
+          'more professional',
+          'add specific location detail',
+        ],
         onApply: function (instruction) {
           self._performAiRewrite(itemId, tabName, cannedId, ev, {
             item:            item,
@@ -873,6 +889,12 @@ function inspectionEditor(inspectionId) {
       var entry = entries.find(function (e) { return e.id === customId; });
       if (!entry) return;
       var originalComment = entry.comment || '';
+      // Competitor parity C3 — only rewrite, never generate. See the matching
+      // guard in rewriteCannedComment above.
+      if (!originalComment.trim()) {
+        if (typeof showToast === 'function') showToast('Add a comment first, then rewrite with AI.', false);
+        return;
+      }
       var category = (tabName === 'defects' && entry.category) ? entry.category : null;
       var location = (tabName === 'defects' && entry.location) ? entry.location : null;
       var self = this;
@@ -885,6 +907,14 @@ function inspectionEditor(inspectionId) {
         title:       'Rewrite custom comment',
         placeholder: 'e.g. shorten, sound less alarming, more specific',
         scope:       'ai-rewrite',
+        // Competitor parity C3 — quick-pick instruction templates.
+        templates: [
+          'shorten',
+          'more specific',
+          'less alarming',
+          'more professional',
+          'add specific location detail',
+        ],
         onApply: function (instruction) {
           self._performCustomRewrite(itemId, tabName, customId, ev, {
             item:            item,
