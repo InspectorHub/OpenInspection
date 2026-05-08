@@ -77,10 +77,42 @@ export const UpdateInspectionSchema = z.object({
     foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional(),
     bedrooms:       z.number().int().min(0).nullable().optional().openapi({ example: 3 }),
     bathrooms:      z.number().min(0).max(20).nullable().optional().openapi({ example: 2.5 }),
+    // Round-2 backlog G1 — free-text lot size ("0.25 acres", "10,000 sqft").
+    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }),
     unit:           z.string().max(50).nullable().optional(),
     county:         z.string().max(100).nullable().optional(),
+    // Round-2 backlog G2 (Spectora §7.10) — when does the buyer close on
+    // the property. Used for follow-up CRM signals. ISO YYYY-MM-DD.
+    closingDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD)').nullable().optional().openapi({ example: '2026-07-15' }),
+    // Round-2 backlog G3 (Spectora §4.1) — free-text Order ID for ISN-style
+    // integrations. Surfaced in PMS exports.
+    orderId:        z.string().max(64).nullable().optional().openapi({ example: 'ORD-2026-0142' }),
+    // Round-2 backlog G3 — referral source label. Free-text so the seed
+    // list ("Realtor", "Past Client", ...) plus tenant custom values both
+    // round-trip without a separate enum.
+    referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }),
     reportThemeOverride: z.enum(['modern', 'classic', 'minimal']).nullable().optional().openapi({ example: 'classic' }),
 }).openapi('UpdateInspection');
+
+/**
+ * Round-2 backlog G1 (Spectora §E.2) — Property Facts strip payload.
+ * Six structured fields. All optional so inspectors can fill them in over
+ * time. `null` clears a field; omitted = leave existing value untouched.
+ *
+ * `yearBuilt`, `sqft`, `bedrooms`, `bathrooms` and `foundationType` map to
+ * dedicated columns on `inspections`. `lotSize` maps to the new `lot_size`
+ * column added in migration 0045.
+ */
+export const PropertyFactsSchema = z.object({
+    yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }),
+    sqft:           z.number().int().min(0).max(1_000_000).nullable().optional().openapi({ example: 1800 }),
+    foundationType: z.enum(['basement', 'slab', 'crawlspace', 'other']).nullable().optional().openapi({ example: 'basement' }),
+    lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }),
+    bedrooms:       z.number().int().min(0).max(50).nullable().optional().openapi({ example: 3 }),
+    bathrooms:      z.number().min(0).max(50).nullable().optional().openapi({ example: 2.5 }),
+}).openapi('PropertyFacts');
+
+export const PropertyFactsResponseSchema = createApiResponseSchema(PropertyFactsSchema).openapi('PropertyFactsResponse');
 
 export const CancellationReasonSchema = z.enum([
     'client_cancelled',

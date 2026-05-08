@@ -15,6 +15,11 @@ export const UpdateBrandingSchema = z.object({
     showEstimates: z.boolean().optional().openapi({ example: true }),
     // Track E1 (ITB §11) — gate the "Repair List" tab on the published report.
     enableRepairList: z.boolean().optional().openapi({ example: true }),
+    // Round-2 backlog G3 (Spectora §4.1) — extra referral-source labels the
+    // tenant wants on the inspection settings dropdown. The seed list of
+    // seven values (Realtor / Past Client / …) is hardcoded; this array
+    // appends to it. Trimmed entries; max 32 to keep the dropdown usable.
+    customReferralSources: z.array(z.string().min(1).max(50)).max(32).optional().openapi({ example: ['Magazine ad', 'Trade show'] }),
 }).openapi('UpdateBranding');
 
 /**
