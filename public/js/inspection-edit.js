@@ -767,6 +767,12 @@ function inspectionEditor(inspectionId) {
         });
         var json = await res.json().catch(function () { return {}; });
         if (!res.ok) {
+          // Sprint 1 A-4: route to Settings on missing AI key.
+          if (json && json.error && json.error.code === 'ai_not_configured') {
+            toast('AI is not configured. Opening Settings → Advanced → AI…', true);
+            setTimeout(function () { window.location.href = '/settings/advanced/ai'; }, 1200);
+            return;
+          }
           var msg = (json && json.error && json.error.message) || ('AI rewrite failed (' + res.status + ').');
           toast(msg, true);
           return;
@@ -1378,6 +1384,18 @@ function inspectionEditor(inspectionId) {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
+          // Sprint 1 A-4: distinguish missing-key from other failures so the
+          // inspector gets a clear path to AI settings instead of a generic
+          // toast. Native confirm() is forbidden by the design system; we
+          // surface a primary toast then redirect after a short delay so
+          // the user sees what's happening.
+          if (json?.error?.code === 'ai_not_configured') {
+            toast('AI is not configured. Opening Settings → Advanced → AI…', true);
+            setTimeout(function () {
+              window.location.href = '/settings/advanced/ai';
+            }, 1200);
+            return;
+          }
           const msg = json?.error?.message || `AI Suggest failed (${res.status}).`;
           toast(msg, true);
           return;

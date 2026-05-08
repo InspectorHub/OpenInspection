@@ -64,7 +64,14 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     }
                     break;
                 case 'ai':
-                    target.ai = new AIService(c.env.DB, c.env.GEMINI_API_KEY || dbSecrets.geminiApiKey || '');
+                    target.ai = new AIService(
+                        c.env.DB,
+                        c.env.GEMINI_API_KEY || dbSecrets.geminiApiKey || '',
+                        // Sprint 1 A-4: pass APP_MODE so the service can return
+                        // dev-mock suggestions in standalone (local) deployments
+                        // when no API key is set, instead of throwing 503.
+                        c.env.APP_MODE,
+                    );
                     break;
                 case 'auth':
                     target.auth = new AuthService(c.env.DB, c.env.TENANT_CACHE);
