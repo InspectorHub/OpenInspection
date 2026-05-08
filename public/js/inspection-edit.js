@@ -60,9 +60,14 @@ function inspectionEditor(inspectionId) {
     commentLibraryFilter: 'all', // 'all' | 'satisfactory' | 'monitor' | 'defect' | 'my-snippets'
     commentLibrarySearch: '',
     commentLibrarySelectedIdx: 0,
-    // GS prefix — set true after pressing G; next digit jumps to that section
+    // GS prefix — set true after pressing G; next digit jumps to that section,
+    // or pressing S opens a fuzzy section picker (Sprint 1 A-9).
     gPrefix: false,
     gPrefixTimer: null,
+    // Sprint 1 A-9: section picker popover state
+    sectionPickerOpen: false,
+    sectionPickerQuery: '',
+    sectionPickerIdx: 0,
     batchMode: false,
     batchSelected: {},
     showMenu: false,
@@ -240,7 +245,8 @@ function inspectionEditor(inspectionId) {
           this.showCommentLibrary = false;
           return;
         }
-        // GS prefix — G then 0-9 jumps to that section
+        // GS prefix — G then 0-9 jumps to that section by index, or G then S
+        // opens the fuzzy section picker (Sprint 1 A-9).
         if (this.gPrefix && /^[0-9]$/.test(e.key)) {
           e.preventDefault();
           this.gPrefix = false;
@@ -248,10 +254,17 @@ function inspectionEditor(inspectionId) {
           this.gotoSection(parseInt(e.key, 10));
           return;
         }
+        if (this.gPrefix && (e.key === 's' || e.key === 'S')) {
+          e.preventDefault();
+          this.gPrefix = false;
+          clearTimeout(this.gPrefixTimer);
+          this.openSectionPicker();
+          return;
+        }
         if (e.key === 'g' || e.key === 'G') {
           e.preventDefault();
           this.gPrefix = true;
-          if (typeof showToast === 'function') showToast('Press 0–9 to jump to section');
+          if (typeof showToast === 'function') showToast('G then S = picker · G then 0–9 = jump');
           clearTimeout(this.gPrefixTimer);
           this.gPrefixTimer = setTimeout(() => { this.gPrefix = false; }, 1500);
           return;
@@ -308,9 +321,13 @@ function inspectionEditor(inspectionId) {
         }
         var key = e.key.toLowerCase();
         var idx = -1;
+        // Sprint 1 A-8: extend 1-3 → 1-5 so rating levels 4 (Not Inspected)
+        // and 5 (Not Present) are reachable from the keyboard.
         if (key === '1') idx = 0;
         else if (key === '2') idx = 1;
         else if (key === '3') idx = 2;
+        else if (key === '4') idx = 3;
+        else if (key === '5') idx = 4;
         else if (key === '0') idx = -2; // clear
         else if (key === 'n') idx = -3; // N/A — rating with abbreviation 'NA' or 'N/A'
         else return;
@@ -697,11 +714,10 @@ function inspectionEditor(inspectionId) {
       this.debounceSave();
     },
 
-    // Spec 5B P2B — AI rewrite of a canned comment row. Asks the inspector
-    // for a one-line instruction ("shorten", "add NW corner detail"…), POSTs
-    // /api/ai/comment/edit, and replaces the row's text with the rewritten
-    // version on success. Errors surface as toasts; the original text is
-    // preserved on any failure path.
+    // Spec 5B P2B — AI rewrite of a canned comment row. Sprint 1 A-5: opens
+    // the global InlineTextPopover instead of window.prompt; on Apply, posts
+    // to /api/ai/comment/edit and replaces the row's text on success. Errors
+    // surface as toasts; the original text is preserved on any failure path.
     async rewriteCannedComment(itemId, tabName, cannedId, ev) {
       const item = this._findItemById(itemId);
       if (!item) return;
@@ -718,29 +734,48 @@ function inspectionEditor(inspectionId) {
       var entry = entries.find(function (e) { return e.cannedId === cannedId; });
       if (!entry) return;
       var originalComment = entry.effectiveComment || entry.comment || '';
+      var category = (tabName === 'defects' && entry.category) ? entry.category : null;
+      var location = (tabName === 'defects' && entry.location) ? entry.location : null;
+      var self = this;
 
-      var instruction = (window.prompt(
-        'Rewrite instruction\n\n(e.g. "shorten", "make professional", "add specific NW corner detail")',
-        ''
-      ) || '').trim();
-      if (!instruction) return;
+      if (!window.OIPrompt) {
+        if (typeof showToast === 'function') showToast('Popover unavailable. Reload the page.', true);
+        return;
+      }
+      window.OIPrompt.open({
+        title:       'Rewrite instruction',
+        placeholder: 'e.g. shorten, make professional, add NW corner detail',
+        scope:       'ai-rewrite',
+        onApply: function (instruction) {
+          self._performAiRewrite(itemId, tabName, cannedId, ev, {
+            item:            item,
+            sectionTitle:    sectionTitle,
+            originalComment: originalComment,
+            category:        category,
+            location:        location,
+            instruction:     instruction,
+          });
+        },
+      });
+    },
 
-      var btn = ev?.currentTarget || ev?.target;
+    async _performAiRewrite(itemId, tabName, cannedId, ev, ctx) {
+      var btn = ev && (ev.currentTarget || ev.target);
       var origText = btn ? btn.textContent : null;
       if (btn) { btn.textContent = '...'; btn.disabled = true; }
       var toast = function (m, err) { if (typeof showToast === 'function') showToast(m, err); };
 
       try {
         var body = {
-          itemLabel:       item.label,
-          sectionTitle:    sectionTitle,
+          itemLabel:       ctx.item.label,
+          sectionTitle:    ctx.sectionTitle,
           tab:             tabName,
-          originalComment: originalComment,
-          instruction:     instruction,
+          originalComment: ctx.originalComment,
+          instruction:     ctx.instruction,
         };
         if (tabName === 'defects') {
-          if (entry.category) body.category = entry.category;
-          if (entry.location) body.location = entry.location;
+          if (ctx.category) body.category = ctx.category;
+          if (ctx.location) body.location = ctx.location;
         }
         var res = await authFetch('/api/ai/comment/edit', {
           method:  'POST',
@@ -749,6 +784,12 @@ function inspectionEditor(inspectionId) {
         });
         var json = await res.json().catch(function () { return {}; });
         if (!res.ok) {
+          // Sprint 1 A-4: route to Settings on missing AI key.
+          if (json && json.error && json.error.code === 'ai_not_configured') {
+            toast('AI is not configured. Opening Settings → Advanced → AI…', true);
+            setTimeout(function () { window.location.href = '/settings/advanced/ai'; }, 1200);
+            return;
+          }
           var msg = (json && json.error && json.error.message) || ('AI rewrite failed (' + res.status + ').');
           toast(msg, true);
           return;
@@ -763,6 +804,95 @@ function inspectionEditor(inspectionId) {
         this.debounceSave();
       } catch (e) {
         console.error('[AI] rewriteCannedComment error', e);
+        toast('AI rewrite network error.', true);
+      } finally {
+        if (btn && origText !== null) { btn.textContent = origText; btn.disabled = false; }
+      }
+    },
+
+    // Sprint 1 Sub-spec A Task 7 (A-6): AI rewrite for custom comments —
+    // mirrors rewriteCannedComment but reads / writes the customComments
+    // store via _patchCustom instead of upsertStateEntry.
+    async rewriteCustomComment(itemId, tabName, customId, ev) {
+      var item = this._findItemById(itemId);
+      if (!item) return;
+      var sectionTitle = (function (self) {
+        for (var s = 0; s < self.sections.length; s++) {
+          var items = self.sections[s].items || [];
+          for (var i = 0; i < items.length; i++) if (items[i].id === itemId) return self.sections[s].title || '';
+        }
+        return '';
+      })(this);
+
+      var entries = this.getCustomEntries(itemId, tabName);
+      var entry = entries.find(function (e) { return e.id === customId; });
+      if (!entry) return;
+      var originalComment = entry.comment || '';
+      var category = (tabName === 'defects' && entry.category) ? entry.category : null;
+      var location = (tabName === 'defects' && entry.location) ? entry.location : null;
+      var self = this;
+
+      if (!window.OIPrompt) {
+        if (typeof showToast === 'function') showToast('Popover unavailable. Reload the page.', true);
+        return;
+      }
+      window.OIPrompt.open({
+        title:       'Rewrite custom comment',
+        placeholder: 'e.g. shorten, sound less alarming, more specific',
+        scope:       'ai-rewrite',
+        onApply: function (instruction) {
+          self._performCustomRewrite(itemId, tabName, customId, ev, {
+            item:            item,
+            sectionTitle:    sectionTitle,
+            originalComment: originalComment,
+            category:        category,
+            location:        location,
+            instruction:     instruction,
+          });
+        },
+      });
+    },
+
+    async _performCustomRewrite(itemId, tabName, customId, ev, ctx) {
+      var btn = ev && (ev.currentTarget || ev.target);
+      var origText = btn ? btn.textContent : null;
+      if (btn) { btn.textContent = '...'; btn.disabled = true; }
+      var toast = function (m, err) { if (typeof showToast === 'function') showToast(m, err); };
+
+      try {
+        var body = {
+          itemLabel:       ctx.item.label,
+          sectionTitle:    ctx.sectionTitle,
+          tab:             tabName,
+          originalComment: ctx.originalComment,
+          instruction:     ctx.instruction,
+        };
+        if (tabName === 'defects') {
+          if (ctx.category) body.category = ctx.category;
+          if (ctx.location) body.location = ctx.location;
+        }
+        var res = await authFetch('/api/ai/comment/edit', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+        var json = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          if (json && json.error && json.error.code === 'ai_not_configured') {
+            toast('AI is not configured. Opening Settings → Advanced → AI…', true);
+            setTimeout(function () { window.location.href = '/settings/advanced/ai'; }, 1200);
+            return;
+          }
+          var msg = (json && json.error && json.error.message) || ('AI rewrite failed (' + res.status + ').');
+          toast(msg, true);
+          return;
+        }
+        var rewritten = json && json.data && json.data.rewritten;
+        if (!rewritten) { toast('AI returned no text. Try again.', true); return; }
+        this._patchCustom(itemId, tabName, customId, { comment: rewritten });
+        this.debounceSave();
+      } catch (e) {
+        console.error('[AI] rewriteCustomComment error', e);
         toast('AI rewrite network error.', true);
       } finally {
         if (btn && origText !== null) { btn.textContent = origText; btn.disabled = false; }
@@ -990,6 +1120,64 @@ function inspectionEditor(inspectionId) {
       if (typeof showToast === 'function') showToast('Section: ' + (sec.title || sec.name || ('#' + idx)));
     },
 
+    // Sprint 1 A-9: Fuzzy section picker. Opens via G then S leader-keys.
+    openSectionPicker() {
+      this.sectionPickerOpen = true;
+      this.sectionPickerQuery = '';
+      this.sectionPickerIdx = 0;
+      var self = this;
+      setTimeout(function () {
+        var input = document.getElementById('section-picker-input');
+        if (input) input.focus();
+      }, 50);
+    },
+
+    closeSectionPicker() {
+      this.sectionPickerOpen = false;
+      this.sectionPickerQuery = '';
+      this.sectionPickerIdx = 0;
+    },
+
+    get filteredSectionsForPicker() {
+      var q = (this.sectionPickerQuery || '').toLowerCase().trim();
+      var src = (this.sections || []).map(function (s, idx) {
+        return { idx: idx, title: s.title || s.name || ('#' + idx) };
+      });
+      if (!q) return src;
+      return src.filter(function (s) { return s.title.toLowerCase().indexOf(q) !== -1; });
+    },
+
+    pickSection(idx) {
+      this.gotoSection(idx);
+      this.closeSectionPicker();
+    },
+
+    // Called from x-on:keydown on the picker input
+    onSectionPickerKeydown(e) {
+      var list = this.filteredSectionsForPicker;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.sectionPickerIdx = Math.min(this.sectionPickerIdx + 1, list.length - 1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.sectionPickerIdx = Math.max(this.sectionPickerIdx - 1, 0);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var sel = list[this.sectionPickerIdx];
+        if (sel) this.pickSection(sel.idx);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeSectionPicker();
+        return;
+      }
+    },
+
     openCommentLibrary(initialFilter) {
       if (!this.activeItem) {
         if (typeof showToast === 'function') showToast('Select an item first');
@@ -1032,18 +1220,69 @@ function inspectionEditor(inspectionId) {
         if (typeof showToast === 'function') showToast('Select an item first');
         return;
       }
-      var notes = (this.results[this.activeItemId]?.notes || '').trim();
+      // Sprint 1 A-9: prefer the active selection in a textarea, otherwise
+      // fall back to the full notes for the active item. Lets ⌘D harvest
+      // a sub-string of the inspector's draft into a reusable snippet.
+      var selectedText = '';
+      var ae = document.activeElement;
+      if (ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT') && typeof ae.selectionStart === 'number') {
+        var ss = ae.selectionStart;
+        var se = ae.selectionEnd;
+        if (ss !== se) selectedText = (ae.value || '').substring(ss, se).trim();
+      }
+      var notes = selectedText || (this.results[this.activeItemId]?.notes || '').trim();
       if (!notes) {
         if (typeof showToast === 'function') showToast('No notes to save');
         return;
       }
       var bucket = this._bucketForRatingId(this.results[this.activeItemId]?.rating);
+      var section = (this.currentSection && this.currentSection.title) || '';
+      var self = this;
+
+      var commit = function (title) {
+        var body = {
+          text:         notes,
+          ratingBucket: bucket === 'all' ? null : bucket,
+          section:      section || null,
+          category:     title || null,
+        };
+        // Try server-side persistence first so the snippet shows up on the
+        // /comments page and across devices. Fall back to localStorage on
+        // failure (offline / 401).
+        authFetch('/api/admin/comments', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        }).then(function (res) {
+          if (res && res.ok) {
+            self.loadUserSnippets();
+            if (typeof showToast === 'function') showToast('Saved to snippets');
+          } else {
+            self._saveSnippetLocal(notes, bucket);
+          }
+        }).catch(function () {
+          self._saveSnippetLocal(notes, bucket);
+        });
+      };
+
+      if (window.OIPrompt) {
+        window.OIPrompt.open({
+          title:       'Save as snippet',
+          placeholder: 'Optional title (or leave blank)',
+          scope:       'snippet-save',
+          onApply: function (title) { commit((title || '').trim()); },
+        });
+      } else {
+        commit('');
+      }
+    },
+
+    _saveSnippetLocal(notes, bucket) {
       var existing = [];
       try {
         var raw = localStorage.getItem('oi:snippets');
         if (raw) existing = JSON.parse(raw);
       } catch (_) {}
-      // Dedupe
       for (var j = 0; j < existing.length; j++) {
         if (existing[j].text === notes) {
           if (typeof showToast === 'function') showToast('Snippet already saved');
@@ -1052,7 +1291,7 @@ function inspectionEditor(inspectionId) {
       }
       existing.unshift({ rating: bucket, text: notes, source: 'user' });
       localStorage.setItem('oi:snippets', JSON.stringify(existing));
-      if (typeof showToast === 'function') showToast('Saved as snippet');
+      if (typeof showToast === 'function') showToast('Saved locally');
     },
 
     get _commentLibraryPool() {
@@ -1136,15 +1375,54 @@ function inspectionEditor(inspectionId) {
     // Spec 5G M1 — right-pane inline quick comments. Auto-filters by
     // the active item's current rating so inspectors get the right pool
     // without opening the full library drawer.
+    //
+    // Sprint 1 A-2: ITEM-aware ranking. After bucket-filtering, score each
+    // entry against the active item's label so the most relevant items
+    // (e.g. "Gutters & Downspouts" comments when that item is active)
+    // outrank generic section comments. Mirrors the server-side helper
+    // rankCannedCommentsForItem in inspection.service.ts.
     get quickCommentsForActive() {
       var pool = this._commentLibraryPool;
       var bucket = 'all';
+      var activeItem = null;
+      var section = '';
       if (this.activeItemId) {
         var r = this.results[this.activeItemId]?.rating;
         bucket = this._bucketForRatingId(r);
+        activeItem = this._findItemById(this.activeItemId);
+        section = (this.currentSection && this.currentSection.title) || '';
       }
-      if (bucket === 'all') return pool.slice(0, 6);
-      return pool.filter(function (c) { return c.rating === 'all' || c.rating === bucket; }).slice(0, 6);
+      var filtered = (bucket === 'all')
+        ? pool
+        : pool.filter(function (c) { return c.rating === 'all' || c.rating === bucket; });
+      if (!activeItem) return filtered.slice(0, 6);
+
+      var itemLabel = (activeItem.label || activeItem.name || '').toLowerCase().trim();
+      var itemTokens = itemLabel.split(/[^a-z0-9]+/i).filter(function (t) { return t.length >= 3; });
+      var lcSection = section.toLowerCase();
+
+      function score(c) {
+        var s = 0;
+        var lcCategory = (c.category || '').toLowerCase();
+        var lcText = (c.text || '').toLowerCase();
+        var lcSec = (c.section || '').toLowerCase();
+        if (lcCategory && lcCategory === itemLabel) s += 100;
+        else if (lcCategory && (lcCategory.indexOf(itemLabel) !== -1 || (itemLabel && itemLabel.indexOf(lcCategory) !== -1))) s += 60;
+        if (itemTokens.length > 0) {
+          var hits = 0;
+          for (var i = 0; i < itemTokens.length; i++) {
+            if (lcText.indexOf(itemTokens[i]) !== -1 || lcCategory.indexOf(itemTokens[i]) !== -1) hits++;
+          }
+          if (hits === itemTokens.length) s += 40;
+          else if (hits > 0) s += Math.round(20 * (hits / itemTokens.length));
+        }
+        if (lcSec && lcSec === lcSection) s += 10;
+        return s;
+      }
+
+      var scored = filtered.map(function (c, idx) { return { c: c, s: score(c), idx: idx }; });
+      scored.sort(function (a, b) { return (b.s - a.s) || (a.idx - b.idx); });
+      return scored.map(function (x) { return x.c; }).slice(0, 6);
     },
 
     get commentLibraryCount() {
@@ -1279,6 +1557,45 @@ function inspectionEditor(inspectionId) {
       }
     },
 
+    // Sprint 1 A-7: upload a photo bound to a specific custom defect row.
+    // Uses the same /api/inspections/:id/upload endpoint with targetType=defect
+    // + customId form fields (added in src/api/inspections.ts). The R2 key
+    // returns; we attach it to the matching custom defect entry's photos[].
+    async uploadDefectPhoto(itemId, customId, event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+      var formData = new FormData();
+      formData.append('file', file);
+      formData.append('itemId', itemId);
+      formData.append('targetType', 'defect');
+      formData.append('customId', customId);
+      try {
+        var res = await authFetch('/api/inspections/' + this.inspectionId + '/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) {
+          if (typeof showToast === 'function') showToast('Photo upload failed.', true);
+          return;
+        }
+        var json = await res.json();
+        this._ensureCustomState(itemId);
+        var st = this.results[itemId];
+        var arr = (st.customComments && st.customComments.defects) || [];
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].id === customId) {
+            if (!arr[i].photos) arr[i].photos = [];
+            arr[i].photos.push({ key: json.data.key });
+            break;
+          }
+        }
+        this.debounceSave();
+      } catch (e) {
+        console.error('Defect photo upload failed:', e);
+        if (typeof showToast === 'function') showToast('Photo upload network error.', true);
+      }
+    },
+
     previewReport() {
       window.open('/api/inspections/' + this.inspectionId + '/report', '_blank');
     },
@@ -1321,6 +1638,18 @@ function inspectionEditor(inspectionId) {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
+          // Sprint 1 A-4: distinguish missing-key from other failures so the
+          // inspector gets a clear path to AI settings instead of a generic
+          // toast. Native confirm() is forbidden by the design system; we
+          // surface a primary toast then redirect after a short delay so
+          // the user sees what's happening.
+          if (json?.error?.code === 'ai_not_configured') {
+            toast('AI is not configured. Opening Settings → Advanced → AI…', true);
+            setTimeout(function () {
+              window.location.href = '/settings/advanced/ai';
+            }, 1200);
+            return;
+          }
           const msg = json?.error?.message || `AI Suggest failed (${res.status}).`;
           toast(msg, true);
           return;

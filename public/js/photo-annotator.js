@@ -107,14 +107,25 @@ function photoAnnotator() {
                 } else if (this.currentTool === 'pen') {
                     shape = new Konva.Line({ points: [pos.x, pos.y], stroke: this.color, strokeWidth: parseFloat(this.lineWidth), lineCap: 'round', lineJoin: 'round', tension: 0.4 });
                 } else if (this.currentTool === 'text') {
-                    const text = window.prompt('Text:');
-                    if (!text) { drawing = false; return; }
-                    shape = new Konva.Text({ x: pos.x, y: pos.y, text, fill: this.color, fontSize: 18 * (parseFloat(this.lineWidth) / 4), draggable: true });
-                    this.layer.add(shape);
-                    this.layer.draw();
-                    this.snapshot();
+                    // Sprint 1 A-5: replace blocking window.prompt with async OIPrompt.
                     drawing = false;
                     shape = null;
+                    const self = this;
+                    const stagedPos = { x: pos.x, y: pos.y };
+                    if (window.OIPrompt) {
+                        window.OIPrompt.open({
+                            title:       'Annotation text',
+                            placeholder: 'Type to label this region',
+                            scope:       'photo-annotation',
+                            onApply: function (text) {
+                                if (!text) return;
+                                const t = new Konva.Text({ x: stagedPos.x, y: stagedPos.y, text, fill: self.color, fontSize: 18 * (parseFloat(self.lineWidth) / 4), draggable: true });
+                                self.layer.add(t);
+                                self.layer.draw();
+                                self.snapshot();
+                            },
+                        });
+                    }
                     return;
                 }
                 if (shape) this.layer.add(shape);

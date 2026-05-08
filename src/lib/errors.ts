@@ -13,7 +13,11 @@ export enum ErrorCode {
     CONFLICT = 'conflict',
     RATE_LIMITED = 'rate_limited',
     INTERNAL_ERROR = 'internal_error',
-    SERVICE_UNAVAILABLE = 'service_unavailable'
+    SERVICE_UNAVAILABLE = 'service_unavailable',
+    // Sprint 1 Sub-spec A Task 6 — distinct code for missing AI key so the
+    // client can surface a clear "open AI settings" path instead of a
+    // generic 503.
+    AI_NOT_CONFIGURED = 'ai_not_configured',
 }
 
 /**
@@ -45,4 +49,6 @@ export const Errors = {
     RateLimited: (msg: string = 'Too many attempts. Please try again later.') => new AppError(429, ErrorCode.RATE_LIMITED, msg),
     Internal: (msg: string = 'Internal server error') => new AppError(500, ErrorCode.INTERNAL_ERROR, msg),
     ServiceUnavailable: (msg: string, details?: unknown) => new AppError(503, ErrorCode.SERVICE_UNAVAILABLE, msg, details),
+    AINotConfigured: (msg: string = 'AI is not configured. Set GEMINI_API_KEY in Settings.') =>
+        new AppError(503, ErrorCode.AI_NOT_CONFIGURED, msg),
 };

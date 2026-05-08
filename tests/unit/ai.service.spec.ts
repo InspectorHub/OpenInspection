@@ -28,12 +28,23 @@ describe('Spec 5B P2B — AIService.rewriteComment', () => {
         } as Response);
     }
 
-    it('throws ServiceUnavailable when GEMINI_API_KEY is not configured', async () => {
-        const svc = new AIService({} as D1Database, '');
+    it('throws AINotConfigured when GEMINI_API_KEY is not configured (saas mode)', async () => {
+        // Sprint 1 A-4: explicit appMode='saas' so the dev-mock path is skipped.
+        const svc = new AIService({} as D1Database, '', 'saas');
         await expect(svc.rewriteComment({
             itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
             originalComment: 'foo', instruction: 'shorten',
-        })).rejects.toThrow(/AI Rewrite is not available/i);
+        })).rejects.toThrow(/AI is not configured/i);
+    });
+
+    it('returns dev-mock rewrite in standalone mode without API key', async () => {
+        const svc = new AIService({} as D1Database, '', 'standalone');
+        const out = await svc.rewriteComment({
+            itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
+            originalComment: 'Old text', instruction: 'shorten',
+        });
+        expect(out).toMatch(/^\[DEV\] /);
+        expect(out).toContain('Old text');
     });
 
     it('returns the rewritten text with surrounding quotes stripped', async () => {

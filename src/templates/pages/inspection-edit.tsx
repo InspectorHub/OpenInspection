@@ -192,6 +192,12 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
                 {/* Expanded Detail */}
                 <div x-show="expanded[item.id]" x-collapse="" class="mt-3 pt-3" style="border-top: 1px solid rgba(226,232,240,0.6)">
+                  {/* Sprint 1 A-10: simple-notes fallback hint when item has no tabs */}
+                  <div x-show="!item.tabs || (!item.tabs.information && !item.tabs.limitations && !item.tabs.defects)" class="mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-500">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Simple notes mode.</span>
+                    <a href="/templates" class="text-indigo-600 hover:underline">Upgrade to tabs →</a>
+                  </div>
                   <div class="relative">
                     <textarea
                       x-bind:id="'notes-mob-' + item.id"
@@ -321,10 +327,19 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                                 </div>
                               </template>
                             </div>
-                            <button type="button"
-                              x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
-                              class="text-rose-500 px-1 text-xs font-bold"
-                              title="Delete">×</button>
+                            <div class="flex flex-col items-center gap-0.5">
+                              {/* Sprint 1 A-6: AI rewrite button on custom rows (mobile) */}
+                              <button type="button"
+                                x-on:click="rewriteCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event)"
+                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 hover:bg-amber-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-xs"
+                                aria-label="Rewrite with AI"
+                                title="Rewrite with AI">{'✨'}</button>
+                              <button type="button"
+                                x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
+                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-rose-500 hover:bg-rose-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/30 text-xs font-bold"
+                                aria-label="Delete custom comment"
+                                title="Delete">×</button>
+                            </div>
                           </div>
                         </div>
                       </template>
@@ -652,7 +667,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                 {/* Spec 5G M1 — keyboard hints inline next to section title (Mockup 01) */}
                 <span class="hidden lg:flex items-center gap-1.5 text-[10px] text-slate-400 ml-2" title="Keyboard shortcuts (press ? for full HUD)">
                   <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">↑↓</kbd> nav
-                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">1-3</kbd> rate
+                  <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">1-5</kbd> rate
                   <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">/</kbd> lib
                   <kbd class="px-1.5 py-0.5 bg-white/80 border border-slate-200 rounded font-mono">⏎</kbd> next
                 </span>
@@ -902,6 +917,12 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
                   {/* Expanded Detail (desktop) */}
                   <div x-show="expanded[item.id] && !batchMode" x-collapse="" class="mt-3 pt-3" style="border-top: 1px solid rgba(226,232,240,0.6)" x-on:click="$event.stopPropagation()">
+                    {/* Sprint 1 A-10: simple-notes fallback hint when item has no tabs */}
+                    <div x-show="!item.tabs || (!item.tabs.information && !item.tabs.limitations && !item.tabs.defects)" class="mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-500">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                      <span>Simple notes mode.</span>
+                      <a href="/templates" class="text-indigo-600 hover:underline">Upgrade to tabs →</a>
+                    </div>
                     <div class="relative">
                       <textarea
                         x-bind:id="'notes-dsk-' + item.id"
@@ -1055,35 +1076,71 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
                                   style="border-color: #e2e8f0; color: #1e293b"
                                   placeholder="Comment text..."></textarea>
                                 <template x-if="(activeItemId === item.id ? activeItemTab : 'information') === 'defects'">
-                                  <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Location</label>
-                                      <input type="text"
-                                        x-bind:value="custom.location || ''"
-                                        x-on:input="setCustomCommentLocation(item.id, custom.id, $event.target.value)"
-                                        placeholder="Northwest corner"
-                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
-                                        style="border-color: #e2e8f0" />
+                                  <div class="space-y-2">
+                                    <div class="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Location</label>
+                                        <input type="text"
+                                          x-bind:value="custom.location || ''"
+                                          x-on:input="setCustomCommentLocation(item.id, custom.id, $event.target.value)"
+                                          placeholder="Northwest corner"
+                                          class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                          style="border-color: #e2e8f0" />
+                                      </div>
+                                      <div>
+                                        <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Category</label>
+                                        <select
+                                          x-bind:value="custom.category || 'maintenance'"
+                                          x-on:change="setCustomCommentCategory(item.id, custom.id, $event.target.value)"
+                                          class="w-full px-2 py-1 text-[11px] rounded border bg-white"
+                                          style="border-color: #e2e8f0">
+                                          <option value="maintenance">Maintenance</option>
+                                          <option value="recommendation">Recommendation</option>
+                                          <option value="safety">Safety</option>
+                                        </select>
+                                      </div>
                                     </div>
+                                    {/* Sprint 1 A-7: photos bound to this specific custom defect */}
                                     <div>
-                                      <label class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Category</label>
-                                      <select
-                                        x-bind:value="custom.category || 'maintenance'"
-                                        x-on:change="setCustomCommentCategory(item.id, custom.id, $event.target.value)"
-                                        class="w-full px-2 py-1 text-[11px] rounded border bg-white"
-                                        style="border-color: #e2e8f0">
-                                        <option value="maintenance">Maintenance</option>
-                                        <option value="recommendation">Recommendation</option>
-                                        <option value="safety">Safety</option>
-                                      </select>
+                                      <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-[9px] font-bold uppercase text-slate-400">Photos</label>
+                                        <input type="file"
+                                          accept="image/*"
+                                          capture="environment"
+                                          class="hidden"
+                                          x-bind:id={"'custom-photo-' + custom.id"}
+                                          x-on:change="uploadDefectPhoto(item.id, custom.id, $event); $event.target.value = ''"
+                                        />
+                                        <button type="button"
+                                          x-on:click="document.getElementById('custom-photo-' + custom.id).click()"
+                                          class="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-600 hover:bg-slate-100 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs"
+                                          aria-label="Add photo to this defect"
+                                          title="Add photo">{'📷'}</button>
+                                      </div>
+                                      <div x-show="custom.photos && custom.photos.length > 0" class="flex gap-1.5 flex-wrap">
+                                        <template x-for="(p, pi) in (custom.photos || [])" x-bind:key="pi">
+                                          <img x-bind:src={"'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(p.key)"}
+                                            class="w-12 h-12 object-cover rounded-md border border-slate-200 hover:border-indigo-400 hover:-translate-y-0.5 transition-all"
+                                            x-bind:alt={"'Defect photo ' + (pi + 1)"} />
+                                        </template>
+                                      </div>
                                     </div>
                                   </div>
                                 </template>
                               </div>
-                              <button type="button"
-                                x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
-                                class="text-rose-500 hover:bg-rose-50 rounded p-1 text-xs font-bold"
-                                title="Delete custom comment">×</button>
+                              <div class="flex flex-col items-center gap-0.5">
+                                {/* Sprint 1 A-6: AI rewrite button on custom rows */}
+                                <button type="button"
+                                  x-on:click="rewriteCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id, $event)"
+                                  class="inline-flex items-center justify-center w-7 h-7 rounded-md text-amber-600 hover:bg-amber-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                  aria-label="Rewrite with AI"
+                                  title="Rewrite with AI">{'✨'}</button>
+                                <button type="button"
+                                  x-on:click="removeCustomComment(item.id, (activeItemId === item.id ? activeItemTab : 'information'), custom.id)"
+                                  class="inline-flex items-center justify-center w-7 h-7 rounded-md text-rose-500 hover:bg-rose-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/30 text-xs font-bold"
+                                  aria-label="Delete custom comment"
+                                  title="Delete custom comment">×</button>
+                              </div>
                             </div>
                           </div>
                         </template>
@@ -1117,8 +1174,10 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </main>
 
           {/* Spec 5G M1 — Right pane: active item photos + quick comments.
-              Hidden in focus mode (⌘2) and on screens narrower than xl. */}
-          <aside x-show="viewMode !== 'focus' && activeItem" class="hidden lg:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(226,232,240,0.6);">
+              Hidden in focus mode (⌘2), on screens narrower than xl, and
+              while the Comment Library drawer is open (Sprint 1 A-1: avoids
+              the slash-trigger popover overlapping ACTIVE ITEM at 1024-1280px). */}
+          <aside x-show="viewMode !== 'focus' && activeItem && !showCommentLibrary" class="hidden lg:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(226,232,240,0.6);">
             <header class="px-4 py-3 border-b" style="border-color: rgba(226,232,240,0.5);">
               <h3 class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Active Item</h3>
               <p class="text-sm font-bold text-slate-900 mt-0.5 leading-tight" x-text="activeItem?.label || activeItem?.name || ''"></p>
@@ -1178,7 +1237,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             <footer class="px-4 py-2 border-t text-[10px] text-slate-400" style="border-color: rgba(226,232,240,0.5);">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <kbd class="px-1 bg-slate-100 border rounded font-mono">↑↓</kbd> nav
-                <kbd class="px-1 bg-slate-100 border rounded font-mono">1-3</kbd> rate
+                <kbd class="px-1 bg-slate-100 border rounded font-mono">1-5</kbd> rate
                 <kbd class="px-1 bg-slate-100 border rounded font-mono">/</kbd> lib
                 <kbd class="px-1 bg-slate-100 border rounded font-mono">?</kbd> all
               </div>
@@ -1492,6 +1551,7 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
               <p class="text-xs uppercase tracking-wide font-semibold mb-3" style="color: #94a3b8">Keyboard Shortcuts</p>
               <ul class="space-y-2 text-sm" style="color: #0f172a">
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">1 / 2 / 3</span><span>Set rating Satisfactory / Monitor / Defect</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">4 / 5</span><span>Not Inspected / Not Present</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">0</span><span>Clear rating · <span class="font-mono">N</span> = N/A</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">↑ / ↓</span><span>Move active item · Enter = next · Shift+Enter = prev</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">G + 0–9</span><span>Jump to section by index</span></li>
@@ -1509,7 +1569,72 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </div>
         </div>
       </div>
+      {/* commentPicker uses canonical rounded-md (B-7 codemod sweep) */}
       <div id="commentPicker" class="hidden fixed z-[200] bg-white rounded-md shadow-2xl border border-slate-100 p-3 w-72 max-h-64 overflow-y-auto"></div>
+
+      {/* Sprint 1 A-9: section picker popover (G then S leader-keys) */}
+      <div
+        x-show="sectionPickerOpen"
+        style="display:none"
+        {...{
+          'x-cloak': '',
+          'x-on:keydown.escape.window': 'if (sectionPickerOpen) closeSectionPicker()',
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Section picker"
+        aria-keyshortcuts="g s"
+        class="fixed inset-0 z-[55] flex items-start justify-center pt-[12vh] px-4"
+      >
+        <div
+          class="absolute inset-0 bg-slate-900/30"
+          style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+          x-on:click="closeSectionPicker()"
+          x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        ></div>
+        <div
+          class="relative w-80 rounded-lg bg-white border border-slate-200"
+          style="box-shadow: 0 12px 32px rgba(15,23,42,0.12);"
+          x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2 scale-[0.97]" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+          x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0 scale-100" x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]"
+        >
+          <div class="px-4 py-3 border-b border-slate-100">
+            <input
+              id="section-picker-input"
+              type="text"
+              x-model="sectionPickerQuery"
+              x-on:input="sectionPickerIdx = 0"
+              x-on:keydown="onSectionPickerKeydown($event)"
+              placeholder="Jump to section…"
+              class="w-full h-8 px-3 rounded-md border border-slate-200 outline-none text-[13px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-colors"
+              aria-label="Section search"
+            />
+          </div>
+          <div class="max-h-72 overflow-y-auto py-1" role="listbox">
+            <template x-for="(s, i) in filteredSectionsForPicker" x-bind:key="s.idx">
+              <button
+                type="button"
+                x-on:click="pickSection(s.idx)"
+                x-bind:aria-selected="sectionPickerIdx === i"
+                x-bind:class="sectionPickerIdx === i ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'"
+                class="block w-full text-left px-3 py-2 text-[13px] font-medium transition-colors focus:outline-none"
+                role="option"
+              >
+                <span x-text="s.title"></span>
+              </button>
+            </template>
+            <p x-show="filteredSectionsForPicker.length === 0" class="px-3 py-3 text-[12px] italic text-slate-400">No sections match.</p>
+          </div>
+          <div class="px-4 py-2 border-t border-slate-100 bg-slate-50/50 rounded-b-lg text-[11px] text-slate-400 font-medium flex items-center gap-2">
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">↑↓</kbd> navigate
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">↵</kbd> jump
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">Esc</kbd> close
+          </div>
+        </div>
+      </div>
+
+
       <script src="/js/auth.js"></script>
       <script src="/js/modal-dialog.js"></script>
       <script src="/js/comments-library.js"></script>

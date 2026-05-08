@@ -6,9 +6,27 @@ import { Errors } from '../lib/errors';
 
 /**
  * Service to handle AI-powered features using Google Gemini.
+ *
+ * Sprint 1 A-4: when running in `standalone` mode without a Gemini API key,
+ * `suggestComment` returns dev-mock suggestions so local development can
+ * exercise the UI flow end-to-end. Production deploys (`saas` mode or
+ * unspecified) throw `Errors.AINotConfigured` (503) so the client can
+ * route the inspector to AI settings instead of showing a silent failure.
  */
 export class AIService {
-    constructor(private db: D1Database, private apiKey: string) {}
+    constructor(
+        private db: D1Database,
+        private apiKey: string,
+        private appMode?: 'standalone' | 'saas',
+    ) {}
+
+    private isDevMode(): boolean {
+        return this.appMode === 'standalone';
+    }
+
+    private hasApiKey(): boolean {
+        return Boolean(this.apiKey) && !this.apiKey.includes('your_api_key');
+    }
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -114,9 +132,13 @@ Summary:`;
         category?:       'safety' | 'recommendation' | 'maintenance';
         location?:       string;
     }): Promise<string> {
-        if (!this.apiKey || this.apiKey.includes('your_api_key')) {
-            throw Errors.ServiceUnavailable(
-                'AI Rewrite is not available: GEMINI_API_KEY is not configured. Add the key in Settings → API Keys.'
+        if (!this.hasApiKey()) {
+            // Sprint 1 A-4: dev-mock instead of throwing in standalone mode.
+            if (this.isDevMode()) {
+                return `[DEV] ${input.originalComment} (rewritten: ${input.instruction})`.trim();
+            }
+            throw Errors.AINotConfigured(
+                'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
             );
         }
 
@@ -160,9 +182,19 @@ Return only the rewritten comment text — no preamble, no quotes, no markdown.`
         yearBuilt?:       number | null;
         sqft?:            number | null;
     }): Promise<string[]> {
-        if (!this.apiKey || this.apiKey.includes('your_api_key')) {
-            throw Errors.ServiceUnavailable(
-                'AI Suggest is not available: GEMINI_API_KEY is not configured. Add the key in Settings → API Keys.'
+        if (!this.hasApiKey()) {
+            // Sprint 1 A-4: dev-mode mock so local development can exercise
+            // the full Suggest flow without burning Gemini quota.
+            if (this.isDevMode()) {
+                const item = params.itemName || 'Item';
+                return [
+                    `[DEV] ${item} appears serviceable with no defects observed at the time of inspection.`,
+                    `[DEV] ${item} requires routine maintenance attention; recommend periodic inspection.`,
+                    `[DEV] ${item} shows signs of wear; monitor over the next inspection cycle.`,
+                ];
+            }
+            throw Errors.AINotConfigured(
+                'AI is not configured. Set GEMINI_API_KEY in Settings → Advanced → AI.'
             );
         }
 
