@@ -59,6 +59,7 @@ import { SettingsWorkspacePage } from './templates/pages/settings-workspace';
 import { SettingsCommunicationPage } from './templates/pages/settings-communication';
 import { SettingsAccountPage } from './templates/pages/settings-account';
 import { SettingsAdvancedPage } from './templates/pages/settings-advanced';
+import { NotFoundPage } from './templates/pages/not-found';
 
 
 import coreAuthRoutes from './api/auth';
@@ -496,8 +497,19 @@ app.get('/agreements/sign/:token', async (c) => {
             vars,
         }));
     } catch {
-        return c.text('Agreement not found or link has expired.', 404);
+        // Sprint 1 C-2 — styled 404 instead of monospace text.
+        return c.redirect('/not-found?from=agreement-sign', 302);
     }
+});
+
+// Sprint 1 C-2 — public, branded not-found page. Used by:
+//   * direct visit to /agreements/sign without a valid token
+//   * report-share token miss
+//   * Hono catch-all (app.notFound)
+// `from` query selects context-specific copy (agreement-sign / report-share).
+app.get('/not-found', (c) => {
+    const from = c.req.query('from');
+    return c.html(NotFoundPage({ branding: c.get('branding'), ...(from ? { from } : {}) }), 404);
 });
 
 // Spec 5H P1 — Internal render route consumed by SignCompletionWorkflow.
@@ -905,6 +917,17 @@ app.get('/inspections/:id/edit', htmlAuthGuard(['owner', 'admin', 'inspector']),
 });
 
 app.get('/', (c) => c.redirect('/dashboard'));
+
+// Sprint 1 C-2 — global catch-all 404. API requests under /api/* fall back
+// to the JSON error middleware (handled by app.onError when a route throws);
+// HTML requests get the styled NotFoundPage.
+app.notFound((c) => {
+    const url = new URL(c.req.url);
+    if (url.pathname.startsWith('/api/')) {
+        return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404);
+    }
+    return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+});
 
 export default app;
 export { scheduled } from './scheduled';
