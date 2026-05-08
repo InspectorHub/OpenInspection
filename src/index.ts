@@ -31,6 +31,7 @@ import { AgentDashboardPage } from './templates/pages/agent-dashboard';
 import { TemplatesPage } from './templates/pages/templates';
 import { TemplateEditorPage } from './templates/pages/template-editor';
 import { MarketplacePage } from './templates/pages/marketplace';
+import { RatingSystemsStubPage } from './templates/pages/rating-systems-stub';
 import { TeamPage } from './templates/pages/team';
 import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
@@ -813,6 +814,9 @@ app.get('/templates/:id/edit', htmlAuthGuard(['owner', 'admin']), (c) => {
     return c.html(TemplateEditorPage({ templateId: id, branding: c.get('branding') }));
 });
 app.get('/marketplace', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MarketplacePage({ branding: c.get('branding') })));
+// Sprint 1 Sub-spec B Task 2 Step 5 — Library / Rating Systems stub (real
+// implementation lands in Sprint 2 — TREC, ITB, custom rating systems).
+app.get('/library/rating-systems', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(RatingSystemsStubPage({ branding: c.get('branding') })));
 // Settings hub (group cards)
 app.get('/settings', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsPage({ branding: c.get('branding') })));
 
@@ -871,7 +875,10 @@ app.get('/settings/automations', htmlAuthGuard(['owner', 'admin']), (c) => c.red
 app.get('/settings/security', htmlAuthGuard(), (c) => c.redirect('/settings/account/security'));
 app.get('/settings/data', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/advanced/data'));
 app.get('/metrics', htmlAuthGuard(['owner', 'admin']), (c) => c.html(MetricsPage({ branding: c.get('branding') })));
-app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.html(TeamPage({ branding: c.get('branding') })));
+// Sprint 1 Sub-spec B Task 2 — Team relocates under Settings.
+// Old /team URL kept as a 301 redirect so deep links from other tabs still work.
+app.get('/settings/team', htmlAuthGuard(['owner', 'admin']), (c) => c.html(TeamPage({ branding: c.get('branding') })));
+app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/team', 301));
 app.get('/agreements', htmlAuthGuard(['owner', 'admin', 'agent']), (c) => c.html(AgreementsPage({ branding: c.get('branding') })));
 app.get('/contacts', htmlAuthGuard(['owner', 'admin']), (c) => c.html(ContactsPage({ branding: c.get('branding') })));
 app.get('/recommendations', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
