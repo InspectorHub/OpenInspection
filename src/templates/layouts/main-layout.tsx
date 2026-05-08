@@ -3,6 +3,7 @@ import { NetworkPill } from '../components/network-pill';
 import { ConflictModal } from '../components/conflict-modal';
 import { KeyboardHUD } from '../components/keyboard-hud';
 import { CommandPalette } from '../components/command-palette';
+import { InlineTextPopover } from '../components/inline-text-popover';
 
 function sanitizePrimaryColor(branding?: BrandingConfig): string {
     const raw = branding?.primaryColor || '#6366f1';
@@ -42,6 +43,7 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
                 and the factories never registered. */}
             <script src="/js/slash-trigger.js"></script>
             <script src="/js/command-palette.js"></script>
+            <script src="/js/inline-text-popover.js"></script>
             <script defer src="/vendor/flatpickr.min.js"></script>
             <script defer src="/js/flatpickr-init.js"></script>
             {/* B4 — Dexie importmap: must precede every type="module" script that imports 'dexie' */}
@@ -105,6 +107,7 @@ export const BareLayout = (props: { title: string, children: unknown, branding?:
                 <ConflictModal />
                 <KeyboardHUD />
                 <CommandPalette />
+                <InlineTextPopover />
             </body>
         </html>
     );
@@ -457,6 +460,7 @@ navigator.serviceWorker?.addEventListener('message', function(e) {
                 <ConflictModal />
                 <KeyboardHUD />
                 <CommandPalette />
+                <InlineTextPopover />
             </body>
         </html>
     );
