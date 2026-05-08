@@ -125,10 +125,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.needsAttention" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.needsAttention" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -136,6 +141,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -162,10 +184,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.today" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.today" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -173,6 +200,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -222,10 +266,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.thisWeek" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.thisWeek" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -233,6 +282,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -259,10 +325,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.later" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.later" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -270,6 +341,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -301,10 +389,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.recentReports" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.recentReports" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -312,6 +405,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -338,10 +448,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.cancelled" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.cancelled" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -349,6 +464,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
