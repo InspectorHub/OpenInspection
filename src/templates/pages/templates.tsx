@@ -2,6 +2,7 @@ import { MainLayout } from '../layouts/main-layout';
 import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 import { PageHeader } from '../components/page-header';
+import { MarketplaceDuplicateBanner } from '../components/marketplace-duplicate-banner';
 
 export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
@@ -27,6 +28,10 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                         }
                     />
                 </div>
+
+                {/* Marketplace duplicate banner — shows when same marketplace template
+                    has been imported more than once (Sprint 1 B-8). */}
+                <MarketplaceDuplicateBanner />
 
                 {/* Templates List */}
                 <div class="glass-panel rounded-xl overflow-hidden shadow-md/5">

@@ -200,3 +200,72 @@ async function submitTemplate() {
         btn.textContent = 'Create Template';
     }
 }
+
+// Sprint 1 B-8 — Marketplace duplicate banner Alpine handler.
+// Detects tenants with > 1 local copy of the same marketplace template and
+// surfaces compare/use-new/keep-both actions on /templates.
+document.addEventListener('alpine:init', function () {
+    var DISMISS_KEY = 'oi.marketplace.dismissedDuplicates';
+
+    function loadDismissed() {
+        try {
+            var raw = localStorage.getItem(DISMISS_KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) { return []; }
+    }
+    function saveDismissed(list) {
+        try { localStorage.setItem(DISMISS_KEY, JSON.stringify(list)); } catch (e) { /* silent */ }
+    }
+
+    window.Alpine.data('duplicateBanner', function () {
+        return {
+            groups:    [],
+            dismissed: false,
+            dismissedIds: loadDismissed(),
+
+            async load() {
+                try {
+                    var res = await authFetch('/api/inspections/templates/duplicates');
+                    if (!res.ok) return;
+                    var json = await res.json();
+                    var all = (json && json.data) || [];
+                    var self = this;
+                    this.groups = all.filter(function (g) { return self.dismissedIds.indexOf(g.marketplaceId) === -1; });
+                } catch (e) { /* silent */ }
+            },
+
+            oldestVersion(g) {
+                if (!g || !g.copies || g.copies.length === 0) return '';
+                var sorted = g.copies.slice().sort(function (a, b) {
+                    return String(a.version).localeCompare(String(b.version));
+                });
+                return sorted[0].version;
+            },
+
+            compareVersions(g) {
+                if (!g || !g.copies || g.copies.length < 2) return;
+                var ids = g.copies.map(function (c) { return c.id; }).join(',');
+                window.location.href = '/templates/compare?ids=' + encodeURIComponent(ids);
+            },
+
+            useNewOnly(g) {
+                if (typeof showToast === 'function') {
+                    showToast('Migration ships in next release (Sprint 2 S2-6).', false);
+                } else {
+                    window.alert('Migration ships in next release.');
+                }
+            },
+
+            keepBoth(g) {
+                if (!g || !g.marketplaceId) return;
+                this.dismissedIds.push(g.marketplaceId);
+                saveDismissed(this.dismissedIds);
+                this.groups = this.groups.filter(function (x) { return x.marketplaceId !== g.marketplaceId; });
+                if (typeof showToast === 'function') {
+                    showToast('Banner dismissed. Manage copies anytime in this list.', false);
+                }
+            },
+        };
+    });
+});
+
