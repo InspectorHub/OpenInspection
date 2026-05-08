@@ -24,11 +24,11 @@ function inspectionOnboarding() {
         // visible rating-button group and removes it on advance/dismiss.
         _updateAnchorHighlight() {
             document.querySelectorAll('.onboarding-anchor').forEach(el =>
-                el.classList.remove('onboarding-anchor', 'animate-pulse', 'ring-4', 'ring-indigo-400', 'ring-offset-4', 'rounded-2xl'));
+                el.classList.remove('onboarding-anchor', 'animate-pulse', 'ring-4', 'ring-indigo-400', 'ring-offset-4', 'rounded-md'));
             if (this.active && this.stepIdx === 0) {
                 const target = document.querySelector('[data-rating-row]');
                 if (target) {
-                    target.classList.add('onboarding-anchor', 'animate-pulse', 'ring-4', 'ring-indigo-400', 'ring-offset-4', 'rounded-2xl');
+                    target.classList.add('onboarding-anchor', 'animate-pulse', 'ring-4', 'ring-indigo-400', 'ring-offset-4', 'rounded-md');
                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }

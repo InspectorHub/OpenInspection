@@ -21,7 +21,7 @@ export function MessagesPublicPage({ token, branding }: MessagesPublicProps) {
                     </p>
                     <div class="space-y-3 max-h-[60vh] overflow-y-auto mb-4">
                         <template x-for="m in messages" x-bind:key="m.id">
-                            <div x-bind:class="m.fromRole === 'client' ? 'ml-12' : 'mr-12'" class="rounded-2xl p-3" x-bind:style="m.fromRole === 'client' ? 'background:#eef4ff;' : 'background:#f3f1ed;'">
+                            <div x-bind:class="m.fromRole === 'client' ? 'ml-12' : 'mr-12'" class="rounded-md p-3" x-bind:style="m.fromRole === 'client' ? 'background:#eef4ff;' : 'background:#f3f1ed;'">
                                 <div class="text-xs text-slate-500 mb-1" x-text="(m.fromName || m.fromRole) + ' · ' + new Date(m.createdAt).toLocaleString()"></div>
                                 <p class="text-sm whitespace-pre-wrap text-slate-900" x-text="m.body"></p>
                                 <div x-show="m.attachments && m.attachments.length" class="mt-2 flex flex-wrap gap-2">
@@ -34,7 +34,7 @@ export function MessagesPublicPage({ token, branding }: MessagesPublicProps) {
                         </template>
                         <p x-show="messages.length === 0" class="text-center text-sm text-slate-400 py-8">No messages yet — send the first one below.</p>
                     </div>
-                    <div class="border-t border-slate-200 pt-3 bg-white p-4 rounded-2xl">
+                    <div class="border-t border-slate-200 pt-3 bg-white p-4 rounded-md">
                         <textarea x-model="composeBody" rows={3} placeholder="Type your message..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm resize-none"></textarea>
                         <div class="mt-2 flex flex-wrap gap-2">
                             <template x-for="(a, i) in pendingAttachments" x-bind:key="a.id">

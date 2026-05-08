@@ -13,7 +13,7 @@ export const ConflictModal = () => (
         <div class="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <header class="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
                 <div>
-                    <h2 class="text-xl font-black text-slate-900">Sync Conflict</h2>
+                    <h2 class="text-xl font-bold text-slate-900">Sync Conflict</h2>
                     <p class="text-sm text-slate-500" x-text="`${current?.itemId} · ${current?.field}`"></p>
                 </div>
                 <span x-text="`${index + 1} of ${conflicts.length}`" class="text-xs font-bold text-slate-400"></span>

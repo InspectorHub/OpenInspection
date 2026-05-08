@@ -77,10 +77,10 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                 <div class="max-w-2xl mx-auto">
                     {/* Header */}
                     <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-md flex items-center justify-center shadow-lg shadow-md">
                             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         </div>
-                        <span class="text-xl font-black text-slate-900">{siteName}</span>
+                        <span class="text-xl font-bold text-slate-900">{siteName}</span>
                     </div>
 
                     <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -107,7 +107,7 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                                 <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
-                                <h2 class="text-xl font-black text-slate-900 mb-2">Already Signed</h2>
+                                <h2 class="text-xl font-bold text-slate-900 mb-2">Already Signed</h2>
                                 <p class="text-slate-500 font-semibold mb-6">This agreement has been signed. Thank you!</p>
                                 {/* Spec 5H D-patch — Download as PDF (browser print → save as PDF) */}
                                 <button onclick="window.print()"
@@ -121,7 +121,7 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                             <>
                                 <div class="px-10 py-8" id="signSection">
                                     <p class="text-sm font-bold text-slate-500 mb-4">Draw your signature below:</p>
-                                    <div class="border-2 border-slate-200 rounded-2xl overflow-hidden bg-slate-50 mb-6" style="touch-action: none;">
+                                    <div class="border-2 border-slate-200 rounded-md overflow-hidden bg-slate-50 mb-6" style="touch-action: none;">
                                         <canvas id="sigCanvas" width="580" height="180" class="w-full cursor-crosshair block"></canvas>
                                     </div>
                                     <div class="flex gap-3">
@@ -141,7 +141,7 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                                     <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
                                         <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                     </div>
-                                    <p class="text-lg font-black text-slate-900">Signed successfully!</p>
+                                    <p class="text-lg font-bold text-slate-900">Signed successfully!</p>
                                     <p class="text-slate-500 font-semibold text-sm mt-1">Thank you for signing this agreement.</p>
                                 </div>
                             </>

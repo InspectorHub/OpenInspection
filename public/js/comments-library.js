@@ -19,7 +19,7 @@ function openCommentPicker(btn) {
             picker.innerHTML = '<p class="text-sm text-slate-400 text-center py-2">No saved comments. Add them in Templates → Comments.</p>';
         } else {
             picker.innerHTML = _allComments.map(function (c) {
-                var label = (c.category ? '<span class="text-[10px] text-indigo-400 font-black uppercase mr-1">' + _escapeHtml(c.category) + '</span>' : '') + _escapeHtml(c.text);
+                var label = (c.category ? '<span class="text-[10px] text-indigo-400 font-bold uppercase mr-1">' + _escapeHtml(c.category) + '</span>' : '') + _escapeHtml(c.text);
                 return '<button class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 rounded-lg transition font-semibold" data-comment-id="' + _escapeHtml(c.id) + '">' + label + '</button>';
             }).join('');
         }

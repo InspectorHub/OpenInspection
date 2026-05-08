@@ -1,6 +1,26 @@
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function agentMeta() {
+    return {
+        total:   0,
+        pending: 0,
+        async init() {
+            try {
+                const r = await authFetch('/api/agent/my-reports');
+                if (!r.ok) return;
+                const j = await r.json();
+                const list = j.data?.reports || j.data || [];
+                this.total = list.length;
+                this.pending = list.filter(x => x.status === 'draft' || x.status === 'in_progress').length;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('agentMeta', agentMeta));
+window.agentMeta = agentMeta;
+
 const statusColors = {
     draft: 'bg-amber-100/50 text-amber-700 border-amber-200',
     completed: 'bg-emerald-100/50 text-emerald-700 border-emerald-200',

@@ -1,5 +1,6 @@
 import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 interface Props { branding?: BrandingConfig; }
 
@@ -7,15 +8,23 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Notifications`} {...(branding ? { branding } : {})}>
-            <div class="space-y-4 animate-fade-in" x-data="notificationsApp()" x-init="load()">
-                <div class="flex items-end justify-between flex-wrap gap-4">
-                    <div>
-                        <span class="px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-[0.2em]">Inbox</span>
-                        <h1 class="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Notifications</h1>
-                        <p class="mt-2 text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Activity from your workspace — bookings, reports, agreements, messages.</p>
-                    </div>
-                    <button x-on:click="markAllRead()" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-all">Mark all read</button>
-                </div>
+            <div class="space-y-6 animate-fade-in" x-data="notificationsApp()" x-init="load()">
+                <PageHeader
+                    eyebrow="NOTIFICATIONS"
+                    eyebrowColor="slate"
+                    title="Notifications"
+                    meta={
+                        <span x-text="`${unreadCount || 0} unread${urgentCount ? ' · ' + urgentCount + ' urgent' : ''}`"></span>
+                    }
+                    actions={
+                        <button
+                            x-on:click="markAllRead()"
+                            class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                        >
+                            Mark all read
+                        </button>
+                    }
+                />
 
                 <div class="flex gap-2">
                     <button x-on:click="setFilter('all')" x-bind:class="filter==='all' ? 'bg-indigo-600 text-white' : 'ring-2 ring-slate-200 text-slate-600'" class="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">All</button>
@@ -52,7 +61,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                 </div>
 
                 <div x-show="nextCursor" class="text-center">
-                    <button x-on:click="loadMore()" class="px-3 py-2 rounded-2xl ring-2 ring-slate-200 text-slate-600 text-xs font-bold uppercase tracking-[0.2em] hover:bg-slate-50 transition-all">Load more</button>
+                    <button x-on:click="loadMore()" class="px-3 py-2 rounded-md ring-2 ring-slate-200 text-slate-600 text-xs font-bold uppercase tracking-[0.2em] hover:bg-slate-50 transition-all">Load more</button>
                 </div>
             </div>
 

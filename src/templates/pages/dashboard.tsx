@@ -2,6 +2,7 @@ import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
 import { CancelModal } from '../components/cancel-modal';
 import { Modal } from '../components/modal';
+import { PageHeader } from '../components/page-header';
 
 export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
@@ -10,38 +11,41 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
         <MainLayout title={`${siteName} | Dashboard`} branding={branding}>
             <div class="space-y-6 animate-fade-in">
 
-                {/* Header Section */}
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
-                        </div>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Inspections</h1>
-                        <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage your inspections.</p>
-                    </div>
-
-                    <div class="flex items-center gap-4">
-                        <button type="button" onclick="showCreateModal()" class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-1.5 text-sm rounded-md bg-indigo-600 text-white font-bold shadow-md hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
-                            <svg class="w-5 h-5 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                            </svg>
-                            New Inspection
-                        </button>
-                    </div>
+                {/* Sprint 1 Sub-spec B Task 3 — canonical PageHeader.
+                    Meta is wired to dashboardMeta Alpine data (see dashboard.js)
+                    so counts update live as buckets load. */}
+                <div x-data="dashboardMeta">
+                    <PageHeader
+                        eyebrow="DASHBOARD"
+                        eyebrowColor="indigo"
+                        title="Inspections"
+                        meta={
+                            <span x-text="metaText"></span>
+                        }
+                        actions={
+                            <button
+                                type="button"
+                                onclick="showCreateModal()"
+                                class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                New Inspection
+                            </button>
+                        }
+                    />
                 </div>
 
                 {/* Statistics Grid — R7-04 fix: each card is now a button
                     that opens the matching bucket section + scrolls into
                     view. anchor maps to a section in the inspections list
-                    rendered below. */}
-                {/* R45 fix — labels, count semantics, and click targets now
-                    align. Each card's number, name, and the bucket it scrolls
-                    to all reference the same dataset. Was previously a 3-way
-                    mismatch (Active = today+thisWeek+later but click jumps to
-                    just `today`; Ready for Review = recentReports but click
-                    jumps to needsAttention; Completed double-counted recent
-                    reports as both 'review' and 'completed'). */}
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    rendered below.
+                    Sub-spec B Task 5 (B-4) — each card now also renders portfolio
+                    defectStats chips beneath the count when the bucket has any
+                    open defects. The Alpine binding is local: `dashboardCards`
+                    factory pulls defectAggregate from /api/inspections/dashboard. */}
+                <div x-data="dashboardCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
                         { label: 'Upcoming',        id: 'statUpcoming',   target: 'later',          icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'indigo' },
                         { label: 'In Progress',     id: 'statInProgress', target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
@@ -52,24 +56,31 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             key={stat.id}
                             type="button"
                             x-on:click={`sections['${stat.target}']=true; $nextTick(()=>{ const el=document.getElementById('bucket-${stat.target}'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); })`}
-                            class="glass-card group p-4 rounded-lg animate-fade-in text-left hover:scale-[1.02] transition-transform cursor-pointer"
+                            class="group p-4 rounded-lg bg-white border border-slate-200 animate-fade-in text-left hover:shadow-md hover:border-slate-300 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                             style={`animation-delay: ${0.1 + i * 0.05}s`}
                             title={`Jump to ${stat.label}`}
                         >
-                            <div class="flex items-center justify-between mb-6">
-                                <div class={`w-12 h-12 rounded-lg bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-110 group-hover:bg-${stat.color}-600 group-hover:text-white transition-all duration-300 shadow-sm`}>
-                                   <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
+                            <div class="flex items-center justify-between mb-4">
+                                <div class={`w-10 h-10 rounded-md bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-105 transition-all duration-200`}>
+                                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
                                 </div>
                                 <span class="sr-only">Live</span>
                             </div>
-                            <h3 class="text-2xl font-bold text-slate-900 tracking-tight mb-1" id={stat.id}>0</h3>
-                            <p class="text-sm font-bold text-slate-500 uppercase tracking-tight">{stat.label}</p>
+                            <h3 class="text-2xl font-bold text-slate-900 tracking-tight tabular-nums mb-1" id={stat.id}>0</h3>
+                            <p class="text-[12px] font-bold text-slate-500 uppercase tracking-[0.15em]">{stat.label}</p>
+                            {/* Portfolio defect chips — only when bucket has at least one defect.
+                                ih-pill canonical class lives in input.css. */}
+                            <div class="mt-3 flex items-center gap-1 flex-wrap" x-show={`agg('${stat.target}').safety + agg('${stat.target}').recommendation + agg('${stat.target}').maintenance > 0`}>
+                                <span x-show={`agg('${stat.target}').safety > 0`} class="ih-pill ih-pill--defect" title="Safety defects" x-text={`'\u{1F534} ' + agg('${stat.target}').safety`}></span>
+                                <span x-show={`agg('${stat.target}').recommendation > 0`} class="ih-pill ih-pill--monitor" title="Recommendations" x-text={`'\u{1F7E1} ' + agg('${stat.target}').recommendation`}></span>
+                                <span x-show={`agg('${stat.target}').maintenance > 0`} class="ih-pill ih-pill--info" title="Maintenance items" x-text={`'\u{1F535} ' + agg('${stat.target}').maintenance`}></span>
+                            </div>
                         </button>
                     ))}
                 </div>
 
                 {/* Earnings Panel — only visible when there's revenue activity */}
-                <div x-data="dashboardEarnings()" x-init="loadEarnings()" x-show="earnings.paid > 0 || earnings.pending > 0" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" style="display: none;">
+                <div x-data="dashboardEarnings()" x-init="loadEarnings()" x-show="earnings.paid > 0 || earnings.pending > 0" class="bg-white rounded-md shadow-sm border border-slate-100 p-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" style="display: none;">
                     <div>
                         <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paid this period</div>
                         <div class="mt-1 text-xl font-bold text-emerald-600" x-text="formatCurrency(earnings.paid)"></div>
@@ -102,7 +113,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </div>
 
                     {/* Section: Needs Attention */}
-                    <section id="bucket-needsAttention" x-show="!loading && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-needsAttention" x-show="!loading && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.needsAttention = !sections.needsAttention"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -114,10 +125,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.needsAttention" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.needsAttention" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -125,6 +141,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -139,7 +172,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Today */}
-                    <section id="bucket-today" x-show="!loading && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-today" x-show="!loading && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.today = !sections.today"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -151,10 +184,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.today" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.today" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -162,6 +200,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -176,7 +231,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Today's events (Spec 4D.T10) */}
-                    <section x-show="!loading && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section x-show="!loading && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.todayEvents = !sections.todayEvents"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -199,7 +254,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: This Week */}
-                    <section id="bucket-thisWeek" x-show="!loading && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-thisWeek" x-show="!loading && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.thisWeek = !sections.thisWeek"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -211,10 +266,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.thisWeek" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.thisWeek" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -222,6 +282,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -236,7 +313,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Later */}
-                    <section x-show="!loading && (buckets.later.length > 0 || buckets.laterTotal > 0)" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section x-show="!loading && (buckets.later.length > 0 || buckets.laterTotal > 0)" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.later = !sections.later"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -248,10 +325,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.later" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.later" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -259,6 +341,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -278,7 +377,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Recent Reports */}
-                    <section id="bucket-recentReports" x-show="!loading && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl scroll-mt-20">
+                    <section id="bucket-recentReports" x-show="!loading && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.recentReports = !sections.recentReports"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -290,10 +389,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.recentReports" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.recentReports" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -301,6 +405,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -315,7 +436,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Cancelled */}
-                    <section x-show="!loading && buckets.cancelled.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-2xl">
+                    <section x-show="!loading && buckets.cancelled.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.cancelled = !sections.cancelled"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -327,10 +448,15 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.cancelled" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.cancelled" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between" data-test="inspection-row">
+                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
                                     <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-xs text-slate-500" x-text="(i.clientName || '—') + ' · ' + (i.date ? new Date(i.date).toLocaleString() : 'no date')"></p>
+                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
+                                        <p class="text-[12px] text-slate-500 mt-0.5">
+                                            <span x-text="i.clientName || '—'"></span>
+                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            <span> · </span>
+                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
+                                        </p>
                                         {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
                                         <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
                                             <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
@@ -338,6 +464,23 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
                                         </div>
                                     </a>
+                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
+                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
+                                    {/* Status icons — slate-300 default, semantic color when active */}
+                                    <div class="flex items-center gap-1 text-slate-300">
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.reportPublished ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'" x-bind:aria-label="i.statusFlags?.reportPublished ? 'Report published' : 'Report not yet published'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.agreementSigned ? 'text-emerald-500' : ''" x-bind:title="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'" x-bind:aria-label="i.statusFlags?.agreementSigned ? 'Agreement signed' : 'Agreement not yet signed'">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="w-5 h-5 inline-flex items-center justify-center" x-bind:class="i.statusFlags?.paid ? 'text-emerald-500' : (i.price > 0 ? 'text-amber-500' : '')" x-bind:title="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')" x-bind:aria-label="i.statusFlags?.paid ? 'Paid' : (i.price > 0 ? 'Payment pending' : 'No payment required')">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm12 4a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2h10zm-7 5a2 2 0 100-4 2 2 0 000 4z"/></svg>
+                                        </span>
+                                        <span x-show="i.statusFlags?.flagged" class="w-5 h-5 inline-flex items-center justify-center text-rose-500" title="Flagged: invoice overdue or other attention needed" aria-label="Flagged">
+                                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                    </div>
                                     <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
                                         <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
                                         <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
@@ -397,11 +540,11 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2 md:col-span-2 relative">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Property Address</label>
                                     <input type="text" id="propAddress" placeholder="Start typing — autocomplete via Google" autocomplete="off" data-places-autocomplete
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                     {/* Spec 5D — Google Places autocomplete dropdown.
                                         Hidden until at least 2 chars typed. Falls back to
                                         plain text input when GOOGLE_PLACES_API_KEY absent. */}
-                                    <div id="propAddressDropdown" class="hidden absolute left-0 right-0 top-full z-50 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-72 overflow-y-auto"></div>
+                                    <div id="propAddressDropdown" class="hidden absolute left-0 right-0 top-full z-50 mt-1 bg-white border border-slate-200 rounded-md shadow-2xl max-h-72 overflow-y-auto"></div>
                                     <input type="hidden" id="propPlaceId" />
                                     <input type="hidden" id="propAddrStreet" />
                                     <input type="hidden" id="propAddrCity" />
@@ -413,7 +556,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Template</label>
-                                    <select id="templateId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="templateId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Select a template...</option>
                                     </select>
                                     <p id="noTemplateHint" class="hidden text-xs text-amber-600 font-semibold mt-1 ml-1">
@@ -423,7 +566,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Inspection Date &amp; Time</label>
                                     <input type="text" id="inspectionDate" data-flatpickr data-min-date="today" autocomplete="off" placeholder="Pick date and time"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div x-data="contactSelector" class="relative mb-3">
                                     {/* R7-08 fix: clarify that this autocompletes existing contacts
@@ -455,27 +598,27 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Name</label>
                                     <input type="text" id="clientName" placeholder="e.g., John Doe"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Email</label>
                                     <input type="email" id="clientEmail" placeholder="e.g., john@example.com"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Client Phone</label>
                                     <input type="tel" id="clientPhone" placeholder="e.g., (555) 123-4567"
-                                        class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
+                                        class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm" />
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Assign Inspector</label>
-                                    <select id="inspectorId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="inspectorId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">Self-assignment</option>
                                     </select>
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Listing Agent</label>
-                                    <select id="agentId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="agentId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
                                 </div>
@@ -484,7 +627,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                     inspections.sellingAgentId. Both selects share populateAgents(). */}
                                 <div class="space-y-2">
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Buyer's Agent</label>
-                                    <select id="buyerAgentId" class="premium-input w-full px-3 py-2 rounded-2xl border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
+                                    <select id="buyerAgentId" class="premium-input w-full px-3 py-2 rounded-md border-2 border-slate-50 focus:border-emerald-600 outline-none transition-all font-bold text-sm bg-white">
                                         <option value="">None</option>
                                     </select>
                                 </div>
@@ -508,7 +651,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                             <div id="serviceCountLabel" class="text-xs text-slate-500"></div>
                                         </div>
                                         <div class="text-right">
-                                            <div id="serviceTotalAmount" class="text-lg font-black">$0.00</div>
+                                            <div id="serviceTotalAmount" class="text-lg font-bold">$0.00</div>
                                             <div id="serviceDiscountLine" style="display:none" class="text-xs text-green-400"></div>
                                         </div>
                                     </div>

@@ -1,6 +1,7 @@
 import { MainLayout } from '../layouts/main-layout';
 import { Modal } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
@@ -8,29 +9,31 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
     return (
         <MainLayout title={`${siteName} | Team`} branding={branding}>
             <div class="space-y-6 animate-fade-in">
-    
-                {/* Header */}
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Administration</span>
-                        </div>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl text-gradient">Workspace Team</h1>
-                        <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage members, inspectors, and organizational permissions.</p>
-                    </div>
-                    
-                    <div class="flex flex-col items-end gap-4">
-                        <button type="button" id="openInviteModalBtn"
-                            class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-1.5 text-sm rounded-md bg-indigo-600 text-white font-bold shadow-md hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-                            Invite Member
-                        </button>
-                        <div id="quotaBadge" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100 shadow-sm transition-all group hover:bg-white hover:border-indigo-100">
-                             <div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Seats: </span>
-                             <span class="text-xs font-bold text-slate-900 leading-none">Loading...</span>
-                        </div>
-                    </div>
+                <div x-data="teamMeta">
+                    <PageHeader
+                        eyebrow="SETTINGS · TEAM"
+                        eyebrowColor="slate"
+                        title="Workspace Team"
+                        breadcrumb={[{ label: 'Settings', href: '/settings' }, { label: 'Team' }]}
+                        meta={<span x-text="metaText"></span>}
+                        actions={
+                            <div class="flex items-center gap-2">
+                                <div id="quotaBadge" class="hidden sm:flex items-center gap-2 px-3 h-8 rounded-md bg-slate-50 border border-slate-200">
+                                    <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
+                                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none">Seats:</span>
+                                    <span class="text-[12px] font-bold text-slate-900 leading-none">Loading...</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    id="openInviteModalBtn"
+                                    class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                                    Invite Member
+                                </button>
+                            </div>
+                        }
+                    />
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
@@ -62,7 +65,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                     <div class="glass-panel rounded-xl overflow-hidden shadow-xl shadow-slate-100/50 border-dashed border-2 border-slate-200 bg-slate-50/10">
                         <div class="px-10 py-8 border-b border-slate-100/50 bg-white/30 flex items-center justify-between">
                             <div class="flex items-center gap-4">
-                                <h2 class="text-xl font-black text-slate-400 tracking-tight">Pending Invitations</h2>
+                                <h2 class="text-xl font-bold text-slate-400 tracking-tight">Pending Invitations</h2>
                                 <div class="px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">Incoming</div>
                             </div>
                         </div>
@@ -126,7 +129,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                 <option value="office_staff">Office Staff</option>
                             </select>
                         </div>
-                        <div id="inviteResult" class="hidden text-sm font-bold text-red-600 px-3 py-2 bg-red-50 rounded-2xl border border-red-100"></div>
+                        <div id="inviteResult" class="hidden text-sm font-bold text-red-600 px-3 py-2 bg-red-50 rounded-md border border-red-100"></div>
                     </form>
                 </Modal>
 

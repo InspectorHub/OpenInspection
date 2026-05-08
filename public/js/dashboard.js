@@ -64,7 +64,7 @@ function renderServicesSection() {
                 <div class="text-sm font-bold text-slate-900">${svc.name}</div>
                 ${svc.durationMinutes ? `<div class="text-xs text-slate-400">&#x23F1; ${svc.durationMinutes} min</div>` : ''}
             </div>
-            <div class="text-sm font-black text-slate-900">${formatCents(svc.price)}</div>
+            <div class="text-sm font-bold text-slate-900">${formatCents(svc.price)}</div>
         </div>
     `).join('');
     updateTotalBar();
@@ -172,6 +172,95 @@ function dashboardEarnings() {
     };
 }
 window.dashboardEarnings = dashboardEarnings;
+
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+// Drives the meta string under the dashboard H1. Polls the same endpoint as
+// the bucket grid so numbers stay in sync. Renders the canonical
+// "{total} inspections · {inProgress} in progress · last sync {syncedAt}".
+function dashboardMeta() {
+    return {
+        total:      0,
+        inProgress: 0,
+        syncedAt:   '',
+        get metaText() {
+            const parts = [];
+            if (this.total > 0) parts.push(this.total + ' inspection' + (this.total === 1 ? '' : 's'));
+            if (this.inProgress > 0) parts.push(this.inProgress + ' in progress');
+            if (this.syncedAt) parts.push('last sync ' + this.syncedAt);
+            return parts.length ? parts.join(' · ') : 'No inspections yet';
+        },
+        async init() {
+            await this.reload();
+            window.addEventListener('inspection-updated', () => this.reload());
+        },
+        async reload() {
+            try {
+                const r = await fetch('/api/inspections/dashboard', { credentials: 'include' });
+                if (!r.ok) return;
+                const j = await r.json();
+                const d = j.data || {};
+                const all = [
+                    ...(d.needsAttention || []),
+                    ...(d.today || []),
+                    ...(d.thisWeek || []),
+                    ...(d.later || []),
+                    ...(d.recentReports || []),
+                ];
+                this.total = (d.laterTotal && d.laterTotal > (d.later || []).length)
+                    ? all.length - (d.later || []).length + d.laterTotal
+                    : all.length;
+                this.inProgress = all.filter(i => i.status === 'in_progress').length;
+                this.syncedAt = relativeTime(new Date());
+            } catch {}
+        },
+    };
+}
+function relativeTime(d) {
+    const now = new Date();
+    const diffSec = Math.round((now - d) / 1000);
+    if (diffSec < 60) return 'just now';
+    const diffMin = Math.round(diffSec / 60);
+    if (diffMin < 60) return diffMin + 'm ago';
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return diffHr + 'h ago';
+    return d.toLocaleDateString();
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('dashboardMeta', dashboardMeta));
+window.dashboardMeta = dashboardMeta;
+
+// ─── Sub-spec B Task 5 (B-4) — defectAggregate for top 4 cards ──────────────
+// Pulls aggregate from /api/inspections/dashboard once on init and exposes
+// agg(bucket) helper that the dashboard cards use to render colored chips.
+const ZERO_AGG = { safety: 0, recommendation: 0, maintenance: 0 };
+function dashboardCards() {
+    return {
+        defectAggregate: {
+            later:          ZERO_AGG,
+            thisWeek:       ZERO_AGG,
+            needsAttention: ZERO_AGG,
+            recentReports:  ZERO_AGG,
+        },
+        agg(target) {
+            return this.defectAggregate?.[target] || ZERO_AGG;
+        },
+        async init() {
+            await this.reload();
+            window.addEventListener('inspection-updated', () => this.reload());
+        },
+        async reload() {
+            try {
+                const r = await fetch('/api/inspections/dashboard', { credentials: 'include' });
+                if (!r.ok) return;
+                const j = await r.json();
+                if (j.data?.defectAggregate) {
+                    this.defectAggregate = j.data.defectAggregate;
+                }
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('dashboardCards', dashboardCards));
+window.dashboardCards = dashboardCards;
 
 // ─── Prerequisites (templates, inspectors, agents for create modal) ─────────
 

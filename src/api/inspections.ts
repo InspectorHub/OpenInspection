@@ -144,6 +144,49 @@ inspectionsRoutes.openapi(listTemplatesRoute, async (c) => {
 });
 
 /**
+ * GET /api/inspections/templates/duplicates
+ *
+ * Sprint 1 B-8 — returns marketplace import groups that have more than one
+ * local copy in this tenant. The Marketplace duplicate banner consumes this
+ * to suggest compare/use-new/keep-both actions on /templates.
+ */
+const listTemplateDuplicatesRoute = createRoute({
+    method: 'get',
+    path: '/templates/duplicates',
+    tags: ['Templates'],
+    summary: 'List duplicate marketplace imports',
+    description: 'Returns one entry per marketplace template ID that has more than one local copy.',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.boolean().openapi({ example: true }),
+                        data: z.array(z.object({
+                            marketplaceId: z.string(),
+                            copies: z.array(z.object({
+                                id:        z.string(),
+                                name:      z.string(),
+                                version:   z.string(),
+                                createdAt: z.string(),
+                            })),
+                        })),
+                    }),
+                },
+            },
+            description: 'Duplicate import groups',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(listTemplateDuplicatesRoute, async (c) => {
+    const service = c.var.services.template;
+    const dups = await service.findDuplicates(c.get('tenantId'));
+    return c.json({ success: true, data: dups }, 200);
+});
+
+/**
  * GET /api/inspections/templates/:id
  */
 const getTemplateRoute = createRoute({

@@ -1,3 +1,32 @@
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function calendarMeta() {
+    return {
+        weekCount: 0,
+        nextOpen:  '',
+        get metaText() {
+            const parts = [];
+            if (this.weekCount > 0) parts.push(this.weekCount + ' this week');
+            else parts.push('No inspections scheduled this week');
+            if (this.nextOpen) parts.push('next open ' + this.nextOpen);
+            return parts.join(' · ');
+        },
+        async init() {
+            try {
+                const now = new Date();
+                const start = now.toISOString().slice(0, 10);
+                const end = new Date(now.getTime() + 7 * 86400 * 1000).toISOString().slice(0, 10);
+                const r = await authFetch('/api/inspections?from=' + start + '&to=' + end + '&limit=200');
+                if (!r.ok) return;
+                const j = await r.json();
+                const list = j.data?.inspections || [];
+                this.weekCount = list.length;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('calendarMeta', calendarMeta));
+window.calendarMeta = calendarMeta;
+
 document.addEventListener('DOMContentLoaded', function() {
     var calendarEl = document.getElementById('calendar');
     if (!calendarEl) return;

@@ -1,26 +1,31 @@
 import { MainLayout } from '../layouts/main-layout';
 import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
 
     return (
         <MainLayout title={`${siteName} | Agreements`} branding={branding}>
-            <div class="animate-slide-in flex flex-col" style="min-height: calc(100vh - 5rem);">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
-                    <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
-                            <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
-                            Legal Compliance
-                        </div>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4">Agreements</h1>
-                        <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage liability waivers and professional service agreements for your clients.</p>
-                    </div>
-                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-1.5 text-sm rounded-md shadow-md/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        New Agreement
-                    </button>
+            <div class="animate-slide-in flex flex-col space-y-6" style="min-height: calc(100vh - 5rem);">
+                <div x-data="agreementsMeta">
+                    <PageHeader
+                        eyebrow="LIBRARY · AGREEMENTS"
+                        eyebrowColor="slate"
+                        title="Agreements"
+                        meta={<span x-text="metaText"></span>}
+                        actions={
+                            <button
+                                type="button"
+                                onclick="showCreateModal()"
+                                class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                New Agreement
+                            </button>
+                        }
+                    />
                 </div>
 
                 {/* Tabs: Templates / Signing Requests (Spec 5H P2) */}
@@ -141,7 +146,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                         <div class="space-y-2">
                             <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Legal Content (Rich Text)</label>
                             <link rel="stylesheet" href="/vendor/quill/quill.snow.css" />
-                            <div class="rounded-2xl border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
+                            <div class="rounded-md border-2 border-slate-100 focus-within:border-indigo-600 focus-within:ring-4 focus-within:ring-indigo-50 transition-all overflow-hidden bg-white">
                                 <div id="agreementEditor" style="min-height: 280px; font-size: 15px;"></div>
                             </div>
                             <input type="hidden" id="agreementContent" />

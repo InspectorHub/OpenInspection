@@ -1,27 +1,28 @@
 import { MainLayout } from '../layouts/main-layout';
 import { Modal } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Marketplace`} branding={branding}>
-            <div class="space-y-4 animate-fade-in" x-data="marketplace()">
-                {/* Header */}
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div class="space-y-6 animate-fade-in" x-data="marketplace()">
+                <PageHeader
+                    eyebrow="LIBRARY · MARKETPLACE"
+                    eyebrowColor="slate"
+                    title="Marketplace"
+                    meta={
+                        <span x-text="`${templates?.length || 0} templates · ${libraries?.length || 0} libraries · ${(libraries?.filter(l => l.featured).length || 0) + (templates?.filter(t => t.featured).length || 0)} featured`"></span>
+                    }
+                />
+                {/* R7-25: Spell out the import / update relationship so
+                    inspectors aren't unsure whether importing creates a
+                    copy they own or links to a remote template. */}
+                <div class="inline-flex items-start gap-2 px-4 py-2 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-slate-600 max-w-2xl">
+                    <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div>
-                        <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-bold text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Template Marketplace</span>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Marketplace</h1>
-                        <p class="text-lg text-slate-500 font-semibold mt-2">Browse and import community inspection templates.</p>
-                        {/* R7-25: Spell out the import / update relationship so
-                            inspectors aren't unsure whether importing creates a
-                            copy they own or links to a remote template. */}
-                        <div class="mt-3 inline-flex items-start gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 max-w-2xl">
-                            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            <div>
-                                <strong>Import = your own copy.</strong> When the publisher updates the template, you'll see "Update available" and can pull the new version (or keep your customizations).
-                            </div>
-                        </div>
+                        <strong>Import = your own copy.</strong> When the publisher updates the template, you'll see "Update available" and can pull the new version (or keep your customizations).
                     </div>
                 </div>
 
@@ -55,7 +56,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                     <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Comment & Snippet Libraries</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <template x-for="l in libraries" {...{ 'x-bind:key': 'l.id' }}>
-                            <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 hover:shadow-lg transition" x-bind:class="l.featured ? 'ring-2 ring-amber-400/60' : ''">
+                            <div class="glass-panel rounded-md p-6 flex flex-col gap-4 hover:shadow-lg transition" x-bind:class="l.featured ? 'ring-2 ring-amber-400/60' : ''">
                                 <div class="flex items-start justify-between">
                                     <div>
                                         <div class="flex items-center gap-2">
@@ -99,11 +100,11 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                 {/* Grid */}
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <template x-for="t in templates" {...{ 'x-bind:key': 't.id' }}>
-                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 hover:shadow-lg transition" x-bind:class="t.featured ? 'ring-2 ring-amber-400/60' : ''">
+                        <div class="glass-panel rounded-md p-6 flex flex-col gap-4 hover:shadow-lg transition" x-bind:class="t.featured ? 'ring-2 ring-amber-400/60' : ''">
                             <div class="flex items-start justify-between">
                                 <div>
                                     <div class="flex items-center gap-2">
-                                        <h3 class="font-black text-slate-900 text-lg" x-text="t.name"></h3>
+                                        <h3 class="font-bold text-slate-900 text-lg" x-text="t.name"></h3>
                                         <span x-show="t.featured" class="text-[10px] font-bold uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">★ Featured</span>
                                     </div>
                                     <div class="flex items-center gap-2 mt-1">
@@ -273,7 +274,7 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                 {/* Toast — Bug #7 (4-30 review) fix: pre-Alpine render leaks the
                     static "View" anchor text. Default style=display:none keeps toast
                     hidden until Alpine flips x-show on a real toast event. */}
-                <div x-show="toast" style="display:none" x-transition class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 z-50">
+                <div x-show="toast" style="display:none" x-transition class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-md shadow-xl flex items-center gap-3 z-50">
                     <span x-text="toast"></span>
                     <a x-show="toastLink" style="display:none" x-bind:href="toastLink" class="text-violet-400 font-bold text-sm underline">View</a>
                 </div>

@@ -1,23 +1,27 @@
 import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Reports`} branding={branding}>
             <div class="space-y-6 animate-fade-in">
-                <div class="flex flex-col gap-3">
-                    <span class="self-start px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-[0.2em]">Reports</span>
-                    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                        <div>
-                            <h1 class="text-3xl font-bold tracking-tight text-slate-900">Reports</h1>
-                            <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Published and ready-to-deliver inspection reports.</p>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <input id="reportsSearch" type="search" placeholder="Search address, client..."
-                                   class="w-64 px-5 py-3 rounded-2xl border-0 ring-2 ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none transition-all font-semibold text-sm placeholder:text-slate-300 bg-white" />
-                        </div>
-                    </div>
+                <div x-data="reportsMeta">
+                    <PageHeader
+                        eyebrow="REPORTS"
+                        eyebrowColor="emerald"
+                        title="Reports"
+                        meta={<span x-text="metaText"></span>}
+                        actions={
+                            <input
+                                id="reportsSearch"
+                                type="search"
+                                placeholder="Search address, client..."
+                                class="h-8 w-64 px-3 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all text-[13px] font-medium placeholder:text-slate-400 bg-white"
+                            />
+                        }
+                    />
                 </div>
 
                 <div class="flex items-center gap-2 flex-wrap">

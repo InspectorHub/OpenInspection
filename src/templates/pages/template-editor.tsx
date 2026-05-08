@@ -143,7 +143,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                                 </button>
                                                 <div x-show="showIconPicker" x-cloak {...{'@click.outside': 'showIconPicker = false'}}
                                                     x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                                                    class="absolute top-6 left-0 z-50 bg-white rounded-2xl shadow-2xl border border-surface-200 p-3 w-[280px]">
+                                                    class="absolute top-6 left-0 z-50 bg-white rounded-md shadow-2xl border border-surface-200 p-3 w-[280px]">
                                                     <div class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400 mb-2 px-1">Section Icon</div>
                                                     <div class="icon-picker-grid">
                                                         <template x-for="ic in sectionIconKeys" x-bind:key="ic">
@@ -179,7 +179,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
 
                                 <div id="itemsList" class="px-8 py-6 space-y-3">
                                     <template x-for="(item, ii) in selectedSection.items" x-bind:key="item.id">
-                                        <div x-bind:data-id="item.id" class="section-accent rounded-2xl bg-white shadow-sm hover:shadow-md transition-all animate-slide-up"
+                                        <div x-bind:data-id="item.id" class="section-accent rounded-md bg-white shadow-sm hover:shadow-md transition-all animate-slide-up"
                                             x-bind:style="'--section-color:' + sectionColor(selectedSection)"
                                             {...{'@click': 'selectItem(item.id)'}}>
                                             <div class="px-5 py-4 flex items-center gap-4 cursor-pointer"
@@ -231,7 +231,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                     </template>
 
                                     <div x-show="!selectedSection.items.length" class="text-center py-12 animate-fade-in">
-                                        <div class="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mx-auto mb-4">
+                                        <div class="w-16 h-16 rounded-md bg-surface-100 flex items-center justify-center mx-auto mb-4">
                                             <svg class="w-8 h-8 text-ink-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                         </div>
                                         <p class="text-ink-400 font-500">No items yet</p>

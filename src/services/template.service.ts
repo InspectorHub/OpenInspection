@@ -81,6 +81,73 @@ export class TemplateService {
     }
 
     /**
+     * Sub-spec B Task 9 (B-8) — find marketplace imports that have more than
+     * one local copy in this tenant. Returns one entry per marketplace
+     * template ID, each containing every local copy with id, name, version,
+     * createdAt. The marketplace banner uses this to suggest
+     * compare/use-new/keep-both actions.
+     */
+    async findDuplicates(tenantId: string): Promise<Array<{
+        marketplaceId: string;
+        copies: Array<{ id: string; name: string; version: string; createdAt: string }>;
+    }>> {
+        const db = this.getDrizzle();
+        const { tenantMarketplaceImports } = await import('../lib/db/schema/marketplace');
+
+        // Pull all marketplace imports for this tenant joined with the local
+        // template's name + createdAt. We do this in two scans (imports
+        // table + templates table) and bucket in-process — D1 doesn't support
+        // CTEs reliably and the row count is small.
+        const imports = await db.select({
+            marketplaceId:   tenantMarketplaceImports.marketplaceTemplateId,
+            localId:         tenantMarketplaceImports.localTemplateId,
+            importedSemver:  tenantMarketplaceImports.importedSemver,
+            importedAt:      tenantMarketplaceImports.importedAt,
+        })
+            .from(tenantMarketplaceImports)
+            .where(eq(tenantMarketplaceImports.tenantId, tenantId))
+            .all();
+
+        if (imports.length === 0) return [];
+
+        // Group by marketplaceId.
+        const groups = new Map<string, Array<{ localId: string; importedSemver: string; importedAt: string }>>();
+        for (const imp of imports) {
+            const key = imp.marketplaceId as string;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push({
+                localId:        imp.localId as string,
+                importedSemver: imp.importedSemver as string,
+                importedAt:     imp.importedAt as string,
+            });
+        }
+
+        // Only groups with > 1 copy are duplicates.
+        const dupGroups = Array.from(groups.entries()).filter(([, copies]) => copies.length > 1);
+        if (dupGroups.length === 0) return [];
+
+        // Look up local template names in one query.
+        const allLocalIds = dupGroups.flatMap(([, copies]) => copies.map(c => c.localId));
+        const { inArray } = await import('drizzle-orm');
+        const localRows = await db.select({ id: templates.id, name: templates.name })
+            .from(templates)
+            .where(and(eq(templates.tenantId, tenantId), inArray(templates.id, allLocalIds)))
+            .all();
+        const nameMap = new Map<string, string>();
+        for (const r of localRows) nameMap.set(r.id as string, (r.name as string) || '(unnamed)');
+
+        return dupGroups.map(([marketplaceId, copies]) => ({
+            marketplaceId,
+            copies: copies.map(c => ({
+                id:        c.localId,
+                name:      nameMap.get(c.localId) || '(unnamed)',
+                version:   c.importedSemver,
+                createdAt: c.importedAt,
+            })),
+        }));
+    }
+
+    /**
      * Fetches a single template by ID.
      */
     async getTemplate(id: string, tenantId: string) {

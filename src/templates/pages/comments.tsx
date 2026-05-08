@@ -1,19 +1,30 @@
 import { MainLayout } from '../layouts/main-layout';
 import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 interface Props { branding?: BrandingConfig; }
 
 export const CommentsPage = ({ branding }: Props): JSX.Element => (
     <MainLayout title="Comments Library" branding={branding}>
-        <div x-data="commentsAdmin" x-init="init()" class="space-y-4">
-            <header class="flex items-start justify-between flex-wrap gap-4">
-                <div>
-                    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Comments Library</h1>
-                    <p class="text-sm text-slate-500 mt-1">Pre-written comment snippets. Inspectors attach these to inspection items during field work.</p>
-                </div>
-                <button x-on:click="openCreate()" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-bold uppercase tracking-wide hover:bg-indigo-700">+ Add comment</button>
-            </header>
+        <div x-data="commentsAdmin" x-init="init()" class="space-y-6">
+            <PageHeader
+                eyebrow="LIBRARY · COMMENTS"
+                eyebrowColor="slate"
+                title="Comments Library"
+                meta={
+                    <span x-text="`${items?.length || 0} in library${(distinctCategories?.length || 0) ? ' · ' + (distinctCategories.length) + ' categor' + (distinctCategories.length === 1 ? 'y' : 'ies') : ''}`"></span>
+                }
+                actions={
+                    <button
+                        x-on:click="openCreate()"
+                        class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Add comment
+                    </button>
+                }
+            />
 
             {/*
               Spec 2026-05-07 — rating-bucket tabs mirror the inspection-edit
@@ -47,7 +58,7 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                 </select>
             </div>
 
-            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 rounded-2xl">
+            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 rounded-md">
                 <p class="text-slate-500 font-semibold">No comments yet.</p>
                 <p class="text-slate-400 text-sm mt-2">Click "+ Add comment" above to create your first comment snippet.</p>
             </div>

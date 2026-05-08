@@ -1,5 +1,37 @@
 var allInvoices = [];
 
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function invoicesMeta() {
+    return {
+        paid:    0,
+        pending: 0,
+        overdue: 0,
+        get metaText() {
+            const total = this.paid + this.pending + this.overdue;
+            if (total === 0) return 'No invoices yet';
+            const parts = [];
+            if (this.paid > 0)    parts.push(this.paid + ' paid');
+            if (this.pending > 0) parts.push(this.pending + ' pending');
+            if (this.overdue > 0) parts.push(this.overdue + ' overdue');
+            return parts.join(' · ');
+        },
+        async init() {
+            try {
+                const r = await authFetch('/api/invoices');
+                if (!r.ok) return;
+                const j = await r.json();
+                const list = j.data?.invoices || [];
+                const now = Date.now();
+                this.paid    = list.filter(i => i.status === 'paid').length;
+                this.pending = list.filter(i => i.status !== 'paid' && (!i.dueDate || new Date(i.dueDate).getTime() >= now)).length;
+                this.overdue = list.filter(i => i.status !== 'paid' && i.dueDate && new Date(i.dueDate).getTime() < now).length;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('invoicesMeta', invoicesMeta));
+window.invoicesMeta = invoicesMeta;
+
 document.addEventListener('DOMContentLoaded', loadInvoices);
 
 async function loadInvoices() {

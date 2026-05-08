@@ -1,22 +1,29 @@
 import { MainLayout } from '../layouts/main-layout';
 import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Invoices`} branding={branding}>
             <div class="space-y-6 animate-fade-in">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                    <div>
-                        <span class="inline-flex items-center rounded-lg bg-violet-600/10 px-3 py-1 text-[10px] font-bold text-violet-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-violet-600/20 mb-4">Invoices</span>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Invoices</h1>
-                        <p class="text-lg text-slate-500 font-semibold mt-2">Track and manage client invoices.</p>
-                    </div>
-                    <button onclick="showCreateModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        New Invoice
-                    </button>
+                <div x-data="invoicesMeta">
+                    <PageHeader
+                        eyebrow="INVOICES"
+                        eyebrowColor="emerald"
+                        title="Invoices"
+                        meta={<span x-text="metaText"></span>}
+                        actions={
+                            <button
+                                onclick="showCreateModal()"
+                                class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                New Invoice
+                            </button>
+                        }
+                    />
                 </div>
 
                 {/* Stats */}

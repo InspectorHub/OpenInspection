@@ -921,8 +921,80 @@ export class InspectionService {
         ].map(i => i.id as string);
         const uniqueIds = Array.from(new Set(allBucketIds));
         const statsMap = await this.getDefectStatsBatch(tenantId, uniqueIds);
-        const decorate = <T extends { id: unknown }>(rows: T[]): Array<T & { defectStats: { safety: number; recommendation: number; maintenance: number } }> =>
-            rows.map(r => ({ ...r, defectStats: statsMap.get(r.id as string) ?? { safety: 0, recommendation: 0, maintenance: 0 } }));
+
+        // Sub-spec B Task 7 (B-6) — list row metadata: agent name lookup +
+        // status flags + invoice paid lookup. We surface:
+        //   agentName  → from contacts (sellingAgentId or referredByAgentId)
+        //   statusFlags = { reportPublished, agreementSigned, paid, flagged, canceled }
+        const agentIdSet = new Set<string>();
+        for (const i of all) {
+            if (i.sellingAgentId)    agentIdSet.add(i.sellingAgentId as string);
+            if (i.referredByAgentId) agentIdSet.add(i.referredByAgentId as string);
+        }
+        const agentNameMap = new Map<string, string>();
+        if (agentIdSet.size > 0) {
+            const agentRows = await db.select({ id: contacts.id, name: contacts.name })
+                .from(contacts)
+                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, Array.from(agentIdSet))));
+            for (const r of agentRows) agentNameMap.set(r.id as string, r.name as string);
+        }
+        // Paid invoice lookup — any inspection with at least one paid invoice
+        // counts as paid in the row indicator.
+        const paidIdSet = new Set<string>();
+        const paidRows = await db.select({ inspectionId: invoices.inspectionId })
+            .from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NOT NULL`));
+        for (const r of paidRows) {
+            if (r.inspectionId) paidIdSet.add(r.inspectionId as string);
+        }
+
+        const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; price?: unknown }>(rows: T[]): Array<T & {
+            defectStats:  { safety: number; recommendation: number; maintenance: number };
+            agentName?:   string;
+            statusFlags:  { reportPublished: boolean; agreementSigned: boolean; paid: boolean; flagged: boolean; canceled: boolean };
+        }> =>
+            rows.map(r => {
+                const id = r.id as string;
+                const sellingId    = r.sellingAgentId as string | null;
+                const referredById = r.referredByAgentId as string | null;
+                const agentName = (sellingId && agentNameMap.get(sellingId)) || (referredById && agentNameMap.get(referredById)) || undefined;
+                return {
+                    ...r,
+                    defectStats: statsMap.get(id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
+                    ...(agentName ? { agentName } : {}),
+                    statusFlags: {
+                        reportPublished: r.status === 'completed' || r.status === 'delivered',
+                        agreementSigned: signedSet.has(id),
+                        paid:            paidIdSet.has(id),
+                        flagged:         overdueSet.has(id),
+                        canceled:        r.status === 'cancelled',
+                    },
+                };
+            });
+
+        // Sub-spec B Task 5 (B-4) — portfolio defect aggregation per top card.
+        // Sums per-bucket safety / recommendation / maintenance counts so the
+        // top 4 dashboard cards can render colored chips alongside the count.
+        const aggregate = (rows: Array<{ id: unknown }>): { safety: number; recommendation: number; maintenance: number } =>
+            rows.reduce((acc, r) => {
+                const s = statsMap.get(r.id as string) ?? { safety: 0, recommendation: 0, maintenance: 0 };
+                acc.safety         += s.safety;
+                acc.recommendation += s.recommendation;
+                acc.maintenance    += s.maintenance;
+                return acc;
+            }, { safety: 0, recommendation: 0, maintenance: 0 });
+
+        const defectAggregate = {
+            // Maps to the 4 top cards on /dashboard.
+            //   later          → "Upcoming"
+            //   thisWeek       → "In Progress"
+            //   needsAttention → "Needs Attention"
+            //   recentReports  → "Recent Reports"
+            later:          aggregate(later),
+            thisWeek:       aggregate(thisWeek),
+            needsAttention: aggregate(needsAttention),
+            recentReports:  aggregate(recentReports),
+        };
 
         return {
             needsAttention: decorate(needsAttention),
@@ -932,6 +1004,7 @@ export class InspectionService {
             laterTotal,
             recentReports:  decorate(recentReports),
             cancelled:      decorate(cancelled),
+            defectAggregate,
         };
     }
 

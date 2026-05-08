@@ -34,7 +34,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                     </span>
                                 </div>
                                 <button x-on:click="syncData" 
-                                    class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white shadow-md/20 hover:bg-slate-50 transition-all active:scale-95 group"
+                                    class="w-12 h-12 flex items-center justify-center rounded-md bg-white shadow-md/20 hover:bg-slate-50 transition-all active:scale-95 group"
                                     x-bind:disabled="syncing" 
                                     x-bind:class="{ 'opacity-50': syncing }">
                                     <svg class="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" x-bind:class="{ 'animate-spin': syncing }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -67,7 +67,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 
                                 <button x-on:click="toggleSection(section.id)" class="w-full px-10 py-8 flex justify-between items-center bg-white/40 hover:bg-white/60 transition-all group">
                                     <div class="flex items-center gap-4">
-                                        <div class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-6">
+                                        <div class="w-10 h-10 rounded-md flex items-center justify-center transition-all bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-6">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                                         </div>
                                         <h2 class="text-xl font-bold tracking-tight text-slate-900" x-text="section.title"></h2>
@@ -86,7 +86,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                             <div class="pt-10 first:pt-0">
                                                 <div class="flex justify-between items-start mb-6">
                                                     <div class="max-w-xl">
-                                                        <h3 class="text-lg font-black tracking-tight text-slate-900" x-text="item.label"></h3>
+                                                        <h3 class="text-lg font-bold tracking-tight text-slate-900" x-text="item.label"></h3>
                                                         <p class="mt-2 text-sm text-slate-400 font-medium leading-relaxed" x-text="item.description" x-show="item.description"></p>
                                                     </div>
                                                 </div>
@@ -100,7 +100,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                             {...{ 'x-bind:title': "{ Satisfactory: 'Satisfactory — observed in serviceable condition; no defect noted', Monitor: 'Monitor — minor wear or future-attention item; not currently a defect', Defect: 'Defect — material deficiency requiring repair or further evaluation' }[status]" }}
                                                             class="py-4 px-3 rounded-[1.25rem] text-[10px] font-bold uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-2 active:scale-95 shadow-sm"
                                                             x-bind:class="{
-                                                              'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-emerald-100': results[item.id]?.status === 'Satisfactory' && status === 'Satisfactory',
+                                                              'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-md': results[item.id]?.status === 'Satisfactory' && status === 'Satisfactory',
                                                               'bg-amber-50 border-amber-500 text-amber-700 shadow-amber-100': results[item.id]?.status === 'Monitor' && status === 'Monitor',
                                                               'bg-rose-50 border-rose-500 text-rose-700 shadow-rose-100': results[item.id]?.status === 'Defect' && status === 'Defect',
                                                               'bg-slate-50 border-transparent text-slate-400 grayscale opacity-40 scale-[0.98]': results[item.id]?.status && results[item.id]?.status !== status,
@@ -133,7 +133,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                     {/* AI Synthesis Intelligence */}
                                                     <button
                                                         x-on:click="assistComment(item.id, item.label)"
-                                                        class="absolute bottom-4 right-4 py-2 px-4 bg-white shadow-md text-indigo-600 rounded-2xl opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all border border-indigo-100 hover:bg-indigo-50 active:scale-95 flex items-center gap-2 ring-4 ring-white"
+                                                        class="absolute bottom-4 right-4 py-2 px-4 bg-white shadow-md text-indigo-600 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all border border-indigo-100 hover:bg-indigo-50 active:scale-95 flex items-center gap-2 ring-4 ring-white"
                                                         title="AI Professionalize"
                                                     >
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
@@ -194,7 +194,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                                 {/* Destructive Action Overlay */}
                                                                 <button
                                                                     x-on:click="removePhoto(item.id, index)"
-                                                                    class="absolute top-2 right-2 p-2 bg-rose-500 text-white rounded-2xl opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all z-20 shadow-xl"
+                                                                    class="absolute top-2 right-2 p-2 bg-rose-500 text-white rounded-md opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all z-20 shadow-xl"
                                                                 >
                                                                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                                                 </button>
@@ -212,7 +212,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                                                         </div>
                                                                     </template>
                                                                     <template x-if="photo.pending">
-                                                                        <span class="text-[8px] font-black uppercase tracking-widest px-4 text-center">Awaiting Transmission</span>
+                                                                        <span class="text-[8px] font-bold uppercase tracking-widest px-4 text-center">Awaiting Transmission</span>
                                                                     </template>
                                                                 </button>
                                                             </div>
@@ -243,8 +243,8 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                         </div>
 
                         <div x-show="isDelivered || inspection?.status === 'completed'" class="animate-slide-in">
-                            <div class="glass-panel p-6 rounded-xl text-center mb-8 border-emerald-100 shadow-2xl shadow-emerald-100/20 bg-emerald-50/10">
-                                <div class="w-20 h-20 bg-emerald-500 rounded-lg flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-emerald-200 group hover:rotate-6 transition-transform">
+                            <div class="glass-panel p-6 rounded-xl text-center mb-8 border-emerald-100 shadow-2xl shadow-md/20 bg-emerald-50/10">
+                                <div class="w-20 h-20 bg-emerald-500 rounded-lg flex items-center justify-center mx-auto mb-6 text-white shadow-2xl shadow-md group hover:rotate-6 transition-transform">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
                                 <h3 class="text-xl font-bold tracking-tight text-slate-900 mb-3">Inspection Complete</h3>
@@ -294,7 +294,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                     >
                         {/* Canvas Simulation Tier */}
                         <div class="bg-slate-100 flex items-center justify-center relative shadow-inner rounded-xl overflow-hidden">
-                            <div class="relative bg-white shadow-2xl rounded-2xl overflow-hidden ring-8 ring-white">
+                            <div class="relative bg-white shadow-2xl rounded-md overflow-hidden ring-8 ring-white">
                                 <canvas
                                     x-ref="annotationCanvas"
                                     x-on:mousedown="handleCanvasStart"
@@ -314,7 +314,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <button
                                     type="button"
                                     x-on:click="drawingMode = 'circle'"
-                                    class="flex items-center gap-3 px-4 py-2 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
+                                    class="flex items-center gap-3 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
                                     x-bind:class="drawingMode === 'circle' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
                                 >
                                     <div class="w-3 h-3 rounded-full border-2 border-current"></div>
@@ -323,7 +323,7 @@ export const FormRendererPage = (props: { inspectionId: string, branding?: Brand
                                 <button
                                     type="button"
                                     x-on:click="drawingMode = 'arrow'"
-                                    class="flex items-center gap-3 px-4 py-2 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
+                                    class="flex items-center gap-3 px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
                                     x-bind:class="drawingMode === 'arrow' ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'"
                                 >
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
