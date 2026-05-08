@@ -56,6 +56,13 @@ export default defineConfig({
             dependencies: ['api'],
         },
         {
+            // Sprint 2 S2-4 — repair estimate range toggle + sanitizer.
+            // Depends on `api` so an admin user + autotest inspection exist.
+            name: 'estimate-range',
+            testMatch: 'estimate-range.spec.ts',
+            dependencies: ['api'],
+        },
+        {
             name: 'cloud',
             testMatch: 'cloud-e2e.spec.ts',
             use: {

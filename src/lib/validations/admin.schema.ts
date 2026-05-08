@@ -11,6 +11,8 @@ export const UpdateBrandingSchema = z.object({
     billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }),
     gaMeasurementId: z.string().regex(/^G-[A-Z0-9]+$/, 'Invalid GA Measurement ID').or(z.literal('')).optional().openapi({ example: 'G-12345678' }),
     reportTheme: z.enum(['modern', 'classic', 'minimal']).optional().openapi({ example: 'modern' }),
+    // Sprint 2 S2-4 — gate the per-defect "Estimated cost: $X – $Y" badge.
+    showEstimates: z.boolean().optional().openapi({ example: true }),
 }).openapi('UpdateBranding');
 
 /**

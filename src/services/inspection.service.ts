@@ -11,6 +11,56 @@ import { ScopedDB } from '../lib/db/scoped';
 import { safeISODate, safeTimestamp } from '../lib/date';
 import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
+import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../lib/recommendation-categories';
+
+/** Slug → label map for resolving aggregated recommendation badges in
+ *  getReportData. Built once at module load. */
+const RECOMMENDATION_CATEGORY_LABELS = new Map<string, string>(
+    RECOMMENDATION_CATEGORIES.map(c => [c.id, c.label]),
+);
+
+/**
+ * Sprint 2 S2-3 / S2-4 — sanitize the new per-defect fields on every
+ * inspection-results write. Mutates the supplied `data` record in place.
+ *
+ *   - `recommendationId` must be one of {@link RECOMMENDATION_CATEGORY_IDS};
+ *     unknown slugs are dropped (set to null) so an outdated client doesn't
+ *     poison the JSON payload.
+ *   - `estimateLow` / `estimateHigh` must be non-negative finite integers
+ *     (cents). Anything else collapses to null.
+ *
+ * The sanitizer is intentionally lossy + per-row: a single malformed defect
+ * does not reject the whole patch. Mirrors the canned-comment + photo merge
+ * strategy used elsewhere in updateResults().
+ */
+function sanitizeDefectStates(data: Record<string, unknown>): void {
+    const validSlugs = new Set<string>(RECOMMENDATION_CATEGORY_IDS);
+    for (const key of Object.keys(data)) {
+        const entry = data[key] as { tabs?: { defects?: unknown } } | null | undefined;
+        if (!entry || typeof entry !== 'object') continue;
+        const defects = entry.tabs?.defects;
+        if (!Array.isArray(defects)) continue;
+        for (const d of defects as Array<Record<string, unknown>>) {
+            if (!d || typeof d !== 'object') continue;
+            // recommendationId — string slug or null
+            if ('recommendationId' in d) {
+                const v = d.recommendationId;
+                d.recommendationId = (typeof v === 'string' && validSlugs.has(v)) ? v : null;
+            }
+            // estimateLow / estimateHigh — non-negative integers (cents) or null
+            for (const side of ['estimateLow', 'estimateHigh'] as const) {
+                if (side in d) {
+                    const v = d[side];
+                    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+                        d[side] = Math.round(v);
+                    } else {
+                        d[side] = null;
+                    }
+                }
+            }
+        }
+    }
+}
 
 function fireAutomation(db: D1Database, tenantId: string, inspectionId: string, event: string): void {
     new AutomationService(db)
@@ -360,6 +410,13 @@ export class InspectionService {
             throw Errors.NotFound('Inspection not found or access denied');
         }
 
+        // Sprint 2 S2-3 / S2-4 — validate the per-defect recommendation slug
+        // and estimate range fields before persisting. Unknown slugs are
+        // dropped (silently — the legacy fields stay intact); negative or
+        // non-finite cents collapse to null. This guards the JSON payload
+        // without rejecting the entire write on a single bad row.
+        sanitizeDefectStates(data);
+
         const existing = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
 
         if (existing) {
@@ -506,7 +563,9 @@ export class InspectionService {
         interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[] }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
         interface PhotoEntry        { key: string; annotatedKey?: string; annotationsJson?: string }
-        interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[] }
+        // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
+        // estimate range (cents). All optional so legacy defects render.
+        interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null }
         interface CannedState       { cannedId: string; included: boolean; comment?: string | null }
         interface ResultEntry {
             rating?:         string;
@@ -634,8 +693,55 @@ export class InspectionService {
                                 url: `/api/inspections/${inspectionId}/photos/${encodeURIComponent(displayKey)}`,
                             };
                         }),
+                        // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +
+                        // repair estimate range. Null when the inspector left them blank.
+                        recommendationId: st?.recommendationId ?? null,
+                        estimateLow:      typeof st?.estimateLow  === 'number' ? st.estimateLow  : null,
+                        estimateHigh:     typeof st?.estimateHigh === 'number' ? st.estimateHigh : null,
                     };
                 });
+
+                // Sprint 2 S2-3 / S2-4 — when the inspector left the legacy
+                // top-level recommendation / estimate empty but tagged the
+                // included canned defects with per-defect values, surface
+                // those at the item level so the report card stack can
+                // render the badge without extending its data contract.
+                //   - estimateMin = min(defects[].estimateLow)
+                //   - estimateMax = max(defects[].estimateHigh)
+                //   - recommendation = the most-recent included defect's
+                //     human-readable label (joined with " · " when several)
+                let itemEstimateMin: number | null = res.estimateMin ?? null;
+                let itemEstimateMax: number | null = res.estimateMax ?? null;
+                let itemRecommendation: string | null = res.recommendation ?? null;
+                const includedDefects = defects.filter(d => d.included);
+                if (itemEstimateMin == null) {
+                    const lows = includedDefects
+                        .map(d => d.estimateLow)
+                        .filter((n): n is number => typeof n === 'number');
+                    if (lows.length > 0) itemEstimateMin = Math.round(Math.min(...lows) / 100);
+                }
+                if (itemEstimateMax == null) {
+                    const highs = includedDefects
+                        .map(d => d.estimateHigh)
+                        .filter((n): n is number => typeof n === 'number');
+                    if (highs.length > 0) itemEstimateMax = Math.round(Math.max(...highs) / 100);
+                }
+                if (itemRecommendation == null) {
+                    const slugs = Array.from(new Set(
+                        includedDefects
+                            .map(d => d.recommendationId)
+                            .filter((s): s is string => typeof s === 'string' && s.length > 0)
+                    ));
+                    if (slugs.length > 0) {
+                        // Resolve labels from the catalog, joined with bullet.
+                        // Lazy require so the import isn't pulled into every
+                        // service consumer that doesn't render a report.
+                        const cats = (RECOMMENDATION_CATEGORY_LABELS as Map<string, string>);
+                        itemRecommendation = slugs
+                            .map(s => cats.get(s) ?? s)
+                            .join(' · ');
+                    }
+                }
 
                 return {
                     id: item.id,
@@ -653,9 +759,9 @@ export class InspectionService {
                     severityBucket: bucket,
                     notes: res.notes ?? null,
                     photos,
-                    recommendation: res.recommendation ?? null,
-                    estimateMin: res.estimateMin ?? null,
-                    estimateMax: res.estimateMax ?? null,
+                    recommendation: itemRecommendation,
+                    estimateMin: itemEstimateMin,
+                    estimateMax: itemEstimateMax,
                     // Spec 5B v2 resolved tab payload — report PDFs render
                     // only entries where `included === true`.
                     resolvedTabs: {
@@ -674,6 +780,20 @@ export class InspectionService {
             inspectorName = inspector?.name || (inspector?.email?.split('@')[0] ?? null);
         }
 
+        // Sprint 2 S2-4 — per-tenant flag controls whether the published
+        // report renders "Estimated cost: $X – $Y" badges on defect cards.
+        let showEstimates = false;
+        try {
+            const cfg = await db.select({ showEstimates: tenantConfigs.showEstimates })
+                .from(tenantConfigs)
+                .where(eq(tenantConfigs.tenantId, tenantId))
+                .get();
+            if (cfg) showEstimates = Boolean(cfg.showEstimates);
+        } catch {
+            // tenant_configs row missing — assume disabled (the migration
+            // defaults the column to 0 anyway, so this is just paranoia).
+        }
+
         return {
             inspection: { ...inspection, inspectorName },
             theme: 'modern' as const,
@@ -685,6 +805,7 @@ export class InspectionService {
                 { id: 'Defect', label: 'Defect', abbreviation: 'DEF', color: '#f43f5e', severity: 'significant', isDefect: true },
                 { id: 'Not Inspected', label: 'Not Inspected', abbreviation: 'NI', color: '#3b82f6', severity: 'minor', isDefect: false },
             ],
+            showEstimates,
         };
     }
 

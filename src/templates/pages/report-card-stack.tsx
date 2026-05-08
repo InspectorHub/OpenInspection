@@ -41,6 +41,10 @@ interface ReportPageProps {
   // the PDF renderer (?summary=1) so the captured PDF doesn't depend on
   // Alpine hydration state.
   summaryMode?: boolean;
+  // Sprint 2 S2-4 — when true, render the per-defect "Estimated cost:
+  // $X – $Y" badge underneath the recommendation pill. Tenant-controlled
+  // via Settings → Workspace → Reports.
+  showEstimates?: boolean;
 }
 
 const SECTION_ICONS: Record<string, string> = {
@@ -58,6 +62,7 @@ function getSectionIcon(title: string): string {
 
 export function ReportCardStackPage(props: ReportPageProps) {
   const { inspectionId, address, date, inspectorName, theme, stats, branding, summaryMode } = props;
+  const showEstimates = props.showEstimates ?? false;
   // Server-side defect filter for ?summary=1 (PDF Summary mode).
   // Keeps only sections with at least one defect, and within each kept
   // section, only items whose severityBucket maps to defect.
@@ -240,13 +245,17 @@ export function ReportCardStackPage(props: ReportPageProps) {
                       </div>
                       {item.notes && <p class="text-sm theme-text-secondary mt-2 leading-relaxed">{item.notes}</p>}
                       {item.recommendation && (
-                        <div class="mt-2 flex items-center gap-2">
+                        <div class="mt-2 flex items-center gap-2 flex-wrap">
                           <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 uppercase">
                             Recommend: {item.recommendation}
                           </span>
-                          {(item.estimateMin || item.estimateMax) && (
-                            <span class="text-xs theme-text-muted">
-                              ${item.estimateMin?.toLocaleString() ?? '?'} - ${item.estimateMax?.toLocaleString() ?? '?'}
+                          {/* Sprint 2 S2-4 — estimate badge is tenant-gated. */}
+                          {showEstimates && (item.estimateMin != null || item.estimateMax != null) && (
+                            <span
+                              data-testid="report-estimate-badge"
+                              class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 tabular-nums"
+                            >
+                              Estimated cost: ${item.estimateMin?.toLocaleString() ?? '?'} – ${item.estimateMax?.toLocaleString() ?? '?'}
                             </span>
                           )}
                         </div>
@@ -317,7 +326,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
                   <span class="font-medium text-sm" x-text="item.label"></span>
                   <span class="text-xs theme-text-muted ml-2" x-show="item.recommendation" x-text="'-- ' + item.recommendation"></span>
                 </div>
-                <span class="text-xs font-mono theme-text-muted" x-show="item.estimateMin || item.estimateMax"
+                <span class="text-xs font-mono theme-text-muted" x-show={`${showEstimates ? 'true' : 'false'} && (item.estimateMin || item.estimateMax)`}
                   x-text="'$' + (item.estimateMin || '?') + ' - $' + (item.estimateMax || '?')"></span>
               </div>
             </template>

@@ -901,6 +901,8 @@ app.get('/report/:id', async (c) => {
             ratingLevels: data.ratingLevels as import('./lib/report-utils').RatingLevel[],
             branding: c.get('branding'),
             summaryMode,
+            // Sprint 2 S2-4 — gate "Estimated cost: $X – $Y" badges per tenant.
+            showEstimates: data.showEstimates,
         }));
     } catch {
         return c.text('Report not found', 404);
@@ -938,6 +940,19 @@ app.get('/settings/profile', htmlAuthGuard(['owner', 'admin']), (c) => c.html(Se
 app.get('/settings/workspace', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/workspace/branding'));
 app.get('/settings/workspace/branding', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'branding' })));
 app.get('/settings/workspace/theme', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'theme' })));
+// Sprint 2 S2-4 — Reports sub-page hosts the "Show estimate ranges" toggle.
+// We resolve the persisted value via the BrandingService so the checkbox
+// reflects state on first paint without a flash.
+app.get('/settings/workspace/reports', htmlAuthGuard(['owner', 'admin']), async (c) => {
+    const tenantId = c.get('tenantId');
+    const cfg = await c.var.services.branding.getBranding(tenantId, {
+        siteName: c.env.APP_NAME || 'OpenInspection',
+        primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
+        supportEmail: c.env.SENDER_EMAIL || 'support@example.com',
+    });
+    const showEstimates = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
+    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates }));
+});
 app.get('/settings/workspace/telemetry', htmlAuthGuard(['owner', 'admin']), (c) => c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'telemetry' })));
 
 // Catalog group
