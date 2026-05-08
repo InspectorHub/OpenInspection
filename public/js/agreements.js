@@ -1,6 +1,33 @@
 let allAgreements = [];
 let quillEditor = null;
 
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function agreementsMeta() {
+    return {
+        signed:  0,
+        pending: 0,
+        get metaText() {
+            if (this.signed === 0 && this.pending === 0) return 'No agreements yet';
+            const parts = [];
+            if (this.signed > 0)  parts.push(this.signed + ' signed');
+            if (this.pending > 0) parts.push(this.pending + ' awaiting signature');
+            return parts.join(' · ');
+        },
+        async init() {
+            try {
+                const r = await authFetch('/api/admin/agreements/requests');
+                if (!r.ok) return;
+                const j = await r.json();
+                const reqs = j.data?.requests || [];
+                this.signed  = reqs.filter(r => r.status === 'signed').length;
+                this.pending = reqs.filter(r => r.status !== 'signed' && r.status !== 'expired').length;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('agreementsMeta', agreementsMeta));
+window.agreementsMeta = agreementsMeta;
+
 function getAgreementContent() {
     if (quillEditor) {
         if (!quillEditor.getText().trim()) return '';

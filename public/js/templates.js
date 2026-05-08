@@ -22,6 +22,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadTemplates();
 });
 
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function templatesMeta() {
+    return {
+        total:    0,
+        imported: 0,
+        updates:  0,
+        get metaText() {
+            if (this.total === 0) return 'No templates yet';
+            const parts = [this.total + ' template' + (this.total === 1 ? '' : 's')];
+            if (this.imported > 0) parts.push(this.imported + ' imported from Marketplace');
+            if (this.updates > 0)  parts.push(this.updates + ' with updates available');
+            return parts.join(' · ');
+        },
+        async init() {
+            try {
+                const r = await authFetch('/api/inspections/templates');
+                if (!r.ok) return;
+                const j = await r.json();
+                const list = j.data?.templates || j.data || [];
+                this.total    = list.length;
+                this.imported = list.filter(t => t.marketplaceTemplateId).length;
+                this.updates  = list.filter(t => t.upstreamUpdateAvailable).length;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('templatesMeta', templatesMeta));
+window.templatesMeta = templatesMeta;
+
 async function loadTemplates() {
     try {
         const res = await authFetch('/api/inspections/templates');

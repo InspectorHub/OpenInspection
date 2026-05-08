@@ -2,6 +2,7 @@ import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
 import { CancelModal } from '../components/cancel-modal';
 import { Modal } from '../components/modal';
+import { PageHeader } from '../components/page-header';
 
 export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
@@ -10,24 +11,30 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
         <MainLayout title={`${siteName} | Dashboard`} branding={branding}>
             <div class="space-y-6 animate-fade-in">
 
-                {/* Header Section */}
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <span class="inline-flex items-center rounded-lg bg-indigo-600/10 px-3 py-1 text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-indigo-600/20">Dashboard</span>
-                        </div>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Inspections</h1>
-                        <p class="text-lg text-slate-500 max-w-2xl font-semibold leading-relaxed">Manage your inspections.</p>
-                    </div>
-
-                    <div class="flex items-center gap-4">
-                        <button type="button" onclick="showCreateModal()" class="premium-button group relative flex items-center justify-center gap-3 overflow-hidden px-4 py-1.5 text-sm rounded-md bg-indigo-600 text-white font-bold shadow-md hover:bg-slate-900 hover:shadow-indigo-200 active:scale-95 transition-all">
-                            <svg class="w-5 h-5 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                            </svg>
-                            New Inspection
-                        </button>
-                    </div>
+                {/* Sprint 1 Sub-spec B Task 3 — canonical PageHeader.
+                    Meta is wired to dashboardMeta Alpine data (see dashboard.js)
+                    so counts update live as buckets load. */}
+                <div x-data="dashboardMeta">
+                    <PageHeader
+                        eyebrow="DASHBOARD"
+                        eyebrowColor="indigo"
+                        title="Inspections"
+                        meta={
+                            <span x-text="metaText"></span>
+                        }
+                        actions={
+                            <button
+                                type="button"
+                                onclick="showCreateModal()"
+                                class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                New Inspection
+                            </button>
+                        }
+                    />
                 </div>
 
                 {/* Statistics Grid — R7-04 fix: each card is now a button

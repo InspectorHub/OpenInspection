@@ -1,6 +1,39 @@
 var allContacts = [];
 var currentTypeFilter = '';
 
+// ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+function contactsMeta() {
+    return {
+        clients:  0,
+        agents:   0,
+        agencies: 0,
+        get metaText() {
+            const total = this.clients + this.agents;
+            if (total === 0) return 'No contacts yet';
+            const parts = [];
+            if (this.clients > 0)  parts.push(this.clients + ' client'  + (this.clients === 1 ? '' : 's'));
+            if (this.agents > 0)   parts.push(this.agents + ' agent'   + (this.agents === 1 ? '' : 's'));
+            if (this.agencies > 0) parts.push(this.agencies + ' agenc' + (this.agencies === 1 ? 'y' : 'ies'));
+            return parts.join(' · ');
+        },
+        async init() {
+            try {
+                const r = await authFetch('/api/contacts?limit=500');
+                if (!r.ok) return;
+                const j = await r.json();
+                const list = j.data?.contacts || [];
+                this.clients = list.filter(c => c.type === 'client').length;
+                this.agents  = list.filter(c => c.type === 'agent').length;
+                const agencySet = new Set();
+                list.forEach(c => { if (c.agency && c.agency.trim()) agencySet.add(c.agency.trim().toLowerCase()); });
+                this.agencies = agencySet.size;
+            } catch {}
+        },
+    };
+}
+document.addEventListener('alpine:init', () => window.Alpine.data('contactsMeta', contactsMeta));
+window.contactsMeta = contactsMeta;
+
 document.addEventListener('DOMContentLoaded', loadContacts);
 
 async function loadContacts() {

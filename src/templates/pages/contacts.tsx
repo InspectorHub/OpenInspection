@@ -1,36 +1,43 @@
 import { MainLayout } from '../layouts/main-layout';
 import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Contacts`} branding={branding}>
             <div class="space-y-6 animate-fade-in">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                    <div>
-                        <span class="inline-flex items-center rounded-lg bg-emerald-600/10 px-3 py-1 text-[10px] font-bold text-emerald-600 uppercase tracking-[0.2em] ring-1 ring-inset ring-emerald-600/20 mb-4">Contacts</span>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Contacts</h1>
-                        <p class="text-lg text-slate-500 font-semibold mt-2">Manage agents and clients.</p>
-                    </div>
-                    <div class="flex gap-3">
-                        <select id="filterType" onchange="filterContacts()" class="px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm bg-white">
-                            <option value="">All Types</option>
-                            <option value="agent">Agents</option>
-                            <option value="client">Clients</option>
-                        </select>
-                        <button
-                            type="button"
-                            x-on:click="$dispatch('open-csv-modal')"
-                            class="px-4 py-2 rounded-lg ring-2 ring-slate-300 text-slate-700 text-xs font-bold uppercase tracking-widest hover:bg-slate-50"
-                        >
-                            Import CSV
-                        </button>
-                        <button onclick="showCreateModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md font-bold text-sm hover:bg-indigo-700 active:scale-[.98] transition-all">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                            Add Contact
-                        </button>
-                    </div>
+                <div x-data="contactsMeta">
+                    <PageHeader
+                        eyebrow="CONTACTS"
+                        eyebrowColor="slate"
+                        title="Contacts"
+                        meta={<span x-text="metaText"></span>}
+                        actions={
+                            <div class="flex items-center gap-2">
+                                <select id="filterType" onchange="filterContacts()" class="h-8 px-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-[13px] bg-white">
+                                    <option value="">All Types</option>
+                                    <option value="agent">Agents</option>
+                                    <option value="client">Clients</option>
+                                </select>
+                                <button
+                                    type="button"
+                                    x-on:click="$dispatch('open-csv-modal')"
+                                    class="h-8 px-3 rounded-md ring-1 ring-slate-300 text-slate-700 text-[13px] font-bold hover:bg-slate-50 transition-all"
+                                >
+                                    Import CSV
+                                </button>
+                                <button
+                                    onclick="showCreateModal()"
+                                    class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                    Add Contact
+                                </button>
+                            </div>
+                        }
+                    />
                 </div>
 
                 <div class="glass-panel rounded-xl overflow-hidden shadow-md">

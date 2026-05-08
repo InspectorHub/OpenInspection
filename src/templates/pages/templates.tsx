@@ -1,26 +1,31 @@
 import { MainLayout } from '../layouts/main-layout';
 import { Modal, ModalFooter } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
+import { PageHeader } from '../components/page-header';
 
 export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
 
     return (
         <MainLayout title={`${siteName} | Templates`} branding={branding}>
-            <div class="animate-slide-in space-y-12">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
-                            <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
-                            Templates
-                        </div>
-                        <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4">Templates</h1>
-                        <p class="text-lg text-slate-500 font-semibold max-w-2xl leading-relaxed">Manage your inspection checklists.</p>
-                    </div>
-                    <button type="button" onclick="showCreateModal()" class="premium-button flex items-center justify-center gap-2 px-4 py-1.5 text-sm rounded-md shadow-md/20 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all font-bold">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        New Template
-                    </button>
+            <div class="animate-slide-in space-y-6">
+                <div x-data="templatesMeta">
+                    <PageHeader
+                        eyebrow="LIBRARY · TEMPLATES"
+                        eyebrowColor="slate"
+                        title="Inspection Templates"
+                        meta={<span x-text="metaText"></span>}
+                        actions={
+                            <button
+                                type="button"
+                                onclick="showCreateModal()"
+                                class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                New Template
+                            </button>
+                        }
+                    />
                 </div>
 
                 {/* Templates List */}
