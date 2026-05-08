@@ -1343,7 +1343,7 @@ export class InspectionService {
         const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
             defectStats:    { safety: number; recommendation: number; maintenance: number };
             agentName?:     string;
-            statusFlags:    { reportPublished: boolean; agreementSigned: boolean; paid: boolean; flagged: boolean; canceled: boolean };
+            statusFlags:    { reportPublished: boolean; reportReady: boolean; agreementSigned: boolean; paid: boolean; sent: boolean; flagged: boolean; canceled: boolean };
             requestId?:     string;
             siblingCount?:  number;
         }> =>
@@ -1354,14 +1354,22 @@ export class InspectionService {
                 const agentName = (sellingId && agentNameMap.get(sellingId)) || (referredById && agentNameMap.get(referredById)) || undefined;
                 const reqId = (r as { requestId?: unknown }).requestId as string | null | undefined;
                 const siblingCount = reqId ? (requestSiblingCounts.get(reqId) ?? 1) : 1;
+                // Round-2 F2 — split "report ready" (built/completed) from "sent"
+                // (delivered = publish workflow completed). Older clients still
+                // see `reportPublished` (alias of reportReady) for backward-
+                // compat; new dashboard JSX reads `sent` for the ✈️ icon.
+                const reportReady = r.status === 'completed' || r.status === 'delivered';
+                const sent        = r.status === 'delivered';
                 return {
                     ...r,
                     defectStats: statsMap.get(id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
                     ...(agentName ? { agentName } : {}),
                     statusFlags: {
-                        reportPublished: r.status === 'completed' || r.status === 'delivered',
+                        reportPublished: reportReady,
+                        reportReady,
                         agreementSigned: signedSet.has(id),
                         paid:            paidIdSet.has(id),
+                        sent,
                         flagged:         overdueSet.has(id),
                         canceled:        r.status === 'cancelled',
                     },
