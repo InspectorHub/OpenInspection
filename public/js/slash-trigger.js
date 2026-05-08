@@ -4,9 +4,15 @@
 // character) and a comment-library picker opens 150ms later. ESC, backspace,
 // or blur cancels. Pure character-position check — no soft-line-start.
 //
-// Wire it on a textarea by adding the Alpine x-data binding:
-//   <textarea x-data="slashSnippet({ section: 'roof', rating: 'defect' })" ...>
-// `section` and `rating` filter the snippet library; both are optional.
+// Wire it on a textarea by adding the data attribute:
+//   <textarea data-slash-trigger="true"
+//             data-slash-section="Roof"        (optional)
+//             data-slash-rating="defect" ...>  (optional)
+//
+// Vanilla DOM (no Alpine.data) so it composes cleanly with parent x-data
+// scopes — the existing form-renderer textarea wraps in `x-data="form"`
+// and uses `x-model="results[item.id].notes"`; we just attach listeners
+// to the same element without owning its data.
 //
 // Requires window.OIHotkeys (loaded by hotkeys.js, before Alpine).
 
@@ -38,166 +44,232 @@
         }
     }
 
-    function init() {
-        if (!window.Alpine) return;
+    // Per-textarea state. Stored on the element so a re-attach is a no-op.
+    function attach(ta) {
+        if (ta.__slashAttached) return;
+        ta.__slashAttached = true;
 
-        // Re-export the helper so other code (tests, other Alpine plugins) can use it.
-        window.OISlashTrigger = { isLineStart };
+        // Read config lazily — Alpine x-bind:data-* may not have set the
+        // attribute when attach() runs (MutationObserver can fire before
+        // Alpine flushes its bindings).
+        const readConfig = () => ({
+            section: ta.dataset.slashSection || undefined,
+            rating: ta.dataset.slashRating || undefined,
+        });
 
-        Alpine.data('slashSnippet', (config = {}) => ({
-            open: false,
-            loading: false,
-            items: [],
+        const state = {
+            slashPos: -1,
+            filter: '',
+            debounceTimer: null,
+            allItems: [],
+            visibleItems: [],
             highlighted: 0,
-            // Position the picker absolutely below the textarea — caller wraps
-            // the <textarea> in a `position: relative` parent so x-show works.
-            anchorTop: 0,
-            anchorLeft: 0,
-            // Internals
-            _slashPos: -1,
-            _debounceTimer: null,
-            _filter: '',
+            picker: null,
+            isOpen: false,
+        };
+        ta.__slashState = state;
 
-            init() {
-                this.$el.addEventListener('keydown', (e) => this.onKeydown(e));
-                this.$el.addEventListener('input', () => this.onInput());
-                this.$el.addEventListener('blur', () => {
-                    // Slight delay so click on a picker item still registers.
-                    setTimeout(() => { this.close(); }, 100);
+        function ensurePicker() {
+            if (state.picker) return state.picker;
+            const parent = ta.parentElement;
+            if (!parent) return null;
+            // Caller is expected to provide a `position: relative` parent
+            // (form-renderer's `<div class="relative group mb-8">` qualifies).
+            const p = document.createElement('div');
+            p.className = 'oi-slash-picker absolute z-50 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden hidden';
+            p.style.minWidth = '320px';
+            p.style.maxWidth = '480px';
+            p.setAttribute('role', 'listbox');
+            const header = document.createElement('div');
+            header.className = 'px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-slate-50 border-b border-slate-100';
+            header.textContent = 'Comment library · / to search';
+            p.appendChild(header);
+            const ul = document.createElement('ul');
+            ul.className = 'max-h-72 overflow-y-auto';
+            p.appendChild(ul);
+            const footer = document.createElement('div');
+            footer.className = 'px-4 py-2 text-[10px] text-slate-400 bg-slate-50 border-t border-slate-100 flex justify-between';
+            footer.innerHTML = '<span><kbd class="px-1 py-0.5 bg-white border rounded text-[10px] font-mono">↑↓</kbd> nav · <kbd class="px-1 py-0.5 bg-white border rounded text-[10px] font-mono">⏎</kbd> insert · <kbd class="px-1 py-0.5 bg-white border rounded text-[10px] font-mono">Esc</kbd> close</span>';
+            p.appendChild(footer);
+            parent.appendChild(p);
+            state.picker = p;
+            return p;
+        }
+
+        function position() {
+            const p = state.picker;
+            if (!p) return;
+            const r = ta.getBoundingClientRect();
+            const parent = ta.parentElement;
+            const pr = parent ? parent.getBoundingClientRect() : { top: 0, left: 0 };
+            p.style.top = `${r.bottom - pr.top + 4}px`;
+            p.style.left = `${r.left - pr.left}px`;
+        }
+
+        function render() {
+            const p = ensurePicker();
+            if (!p) return;
+            const ul = p.querySelector('ul');
+            ul.innerHTML = '';
+            state.visibleItems.forEach((item, idx) => {
+                const li = document.createElement('li');
+                li.className = 'px-4 py-2 cursor-pointer text-sm transition-colors ' + (idx === state.highlighted ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50');
+                li.setAttribute('role', 'option');
+                li.setAttribute('data-idx', String(idx));
+                // Truncate long snippets visually
+                li.textContent = (item.text || item.title || '(snippet)').slice(0, 200);
+                li.addEventListener('mousedown', (e) => {
+                    // Use mousedown so click happens before blur close.
+                    e.preventDefault();
+                    state.highlighted = idx;
+                    insert();
                 });
-            },
+                li.addEventListener('mouseenter', () => {
+                    state.highlighted = idx;
+                    render();
+                });
+                ul.appendChild(li);
+            });
+            position();
+        }
 
-            onInput() {
-                const ta = this.$el;
-                if (!this.open) {
-                    if (ta.value[ta.selectionStart - 1] === '/' && this._wasLineStart(ta)) {
-                        this._slashPos = ta.selectionStart - 1;
-                        this._filter = '';
-                        this._scheduleOpen();
+        function applyFilter() {
+            const f = state.filter.trim().toLowerCase();
+            state.visibleItems = !f ? state.allItems
+                : state.allItems.filter((c) => (c.text || c.title || '').toLowerCase().includes(f));
+            if (state.visibleItems.length === 0) {
+                close();
+                return;
+            }
+            state.highlighted = 0;
+            render();
+        }
+
+        function open() {
+            if (state.isOpen) return;
+            state.isOpen = true;
+            const p = ensurePicker();
+            if (!p) return;
+            p.classList.remove('hidden');
+            position();
+        }
+
+        function close() {
+            state.isOpen = false;
+            state.slashPos = -1;
+            state.filter = '';
+            state.allItems = [];
+            state.visibleItems = [];
+            if (state.debounceTimer) {
+                clearTimeout(state.debounceTimer);
+                state.debounceTimer = null;
+            }
+            if (state.picker) state.picker.classList.add('hidden');
+        }
+
+        function scheduleOpen() {
+            if (state.debounceTimer) clearTimeout(state.debounceTimer);
+            state.debounceTimer = setTimeout(async () => {
+                if (state.slashPos < 0 || ta.value[state.slashPos] !== '/') return;
+                open();
+                state.allItems = await fetchSnippets(readConfig());
+                applyFilter();
+            }, DEBOUNCE_MS);
+        }
+
+        function insert() {
+            const item = state.visibleItems[state.highlighted];
+            if (!item) return;
+            const before = ta.value.slice(0, state.slashPos);
+            const after = ta.value.slice(ta.selectionStart);
+            const text = item.text || item.title || '';
+            ta.value = before + text + after;
+            const newCursor = before.length + text.length;
+            ta.selectionStart = ta.selectionEnd = newCursor;
+            // Bubble for x-model + per-textarea input handlers.
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+            ta.focus();
+            close();
+        }
+
+        ta.addEventListener('input', () => {
+            if (!state.isOpen) {
+                if (ta.value[ta.selectionStart - 1] === '/' && isLineStart({ value: ta.value, selectionStart: ta.selectionStart - 0 }) /* still pre-slash */ ) {
+                    // Slash was just inserted at line start.
+                    const slashIdx = ta.selectionStart - 1;
+                    // line-start check using the slash position as the anchor
+                    if (slashIdx === 0 || ta.value[slashIdx - 1] === '\n') {
+                        state.slashPos = slashIdx;
+                        state.filter = '';
+                        scheduleOpen();
                     }
-                    return;
                 }
-                // Track typing after the slash.
-                const after = ta.value.slice(this._slashPos + 1, ta.selectionStart);
-                if (after.includes('\n') || ta.selectionStart <= this._slashPos) {
-                    this.close();
-                    return;
-                }
-                this._filter = after;
-                this.applyFilter();
-            },
+                return;
+            }
+            const after = ta.value.slice(state.slashPos + 1, ta.selectionStart);
+            if (after.includes('\n') || ta.selectionStart <= state.slashPos) {
+                close();
+                return;
+            }
+            state.filter = after;
+            applyFilter();
+        });
 
-            _wasLineStart(ta) {
-                // The `/` is already inserted at selectionStart - 1. Line-start
-                // = there is either no char before it, or the prior char is a newline.
-                const slash = ta.selectionStart - 1;
-                if (slash === 0) return true;
-                return ta.value[slash - 1] === '\n';
-            },
-
-            _scheduleOpen() {
-                if (this._debounceTimer) clearTimeout(this._debounceTimer);
-                this._debounceTimer = setTimeout(async () => {
-                    // Bail if the user already typed past the slash with a
-                    // character that disqualifies a trigger (e.g. another '/').
-                    const ta = this.$el;
-                    if (this._slashPos < 0) return;
-                    if (ta.value[this._slashPos] !== '/') return;
-                    this.open = true;
-                    this.loading = true;
-                    this._positionPicker();
-                    const items = await fetchSnippets(config);
-                    this.items = items;
-                    this.loading = false;
-                    this.applyFilter();
-                }, DEBOUNCE_MS);
-            },
-
-            _positionPicker() {
-                // Anchor below the textarea; cheap and predictable.
-                const r = this.$el.getBoundingClientRect();
-                const parent = this.$el.parentElement;
-                const pr = parent ? parent.getBoundingClientRect() : { top: 0, left: 0 };
-                this.anchorTop = r.bottom - pr.top + 4;
-                this.anchorLeft = r.left - pr.left;
-            },
-
-            applyFilter() {
-                const f = this._filter.trim().toLowerCase();
-                const all = this._allItems || (this._allItems = this.items);
-                if (!f) {
-                    this.items = all;
-                } else {
-                    this.items = all.filter((c) =>
-                        (c.text || c.title || '').toLowerCase().includes(f)
-                    );
-                }
-                if (this.items.length === 0) this.close();
-                else this.highlighted = 0;
-            },
-
-            onKeydown(e) {
-                if (!this.open) return;
-                if (e.key === 'Escape') {
-                    this.close();
+        ta.addEventListener('keydown', (e) => {
+            if (!state.isOpen) return;
+            if (e.key === 'Escape') {
+                close();
+                e.preventDefault();
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                state.highlighted = Math.min(state.highlighted + 1, state.visibleItems.length - 1);
+                render();
+                e.preventDefault();
+            } else if (e.key === 'ArrowUp') {
+                state.highlighted = Math.max(state.highlighted - 1, 0);
+                render();
+                e.preventDefault();
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (state.visibleItems.length > 0) {
+                    insert();
                     e.preventDefault();
-                    return;
                 }
-                if (e.key === 'Backspace') {
-                    const ta = this.$el;
-                    if (ta.selectionStart - 1 <= this._slashPos) {
-                        this.close();
-                    }
-                    return;
-                }
-                if (e.key === 'ArrowDown') {
-                    this.highlighted = Math.min(this.highlighted + 1, this.items.length - 1);
-                    e.preventDefault();
-                } else if (e.key === 'ArrowUp') {
-                    this.highlighted = Math.max(this.highlighted - 1, 0);
-                    e.preventDefault();
-                } else if (e.key === 'Enter') {
-                    const item = this.items[this.highlighted];
-                    if (item) {
-                        this.insert(item);
-                        e.preventDefault();
-                    }
-                } else if (e.key === 'Tab') {
-                    const item = this.items[this.highlighted];
-                    if (item) {
-                        this.insert(item);
-                        e.preventDefault();
-                    }
-                }
-            },
+            }
+        });
 
-            insert(item) {
-                const ta = this.$el;
-                const before = ta.value.slice(0, this._slashPos);
-                const after = ta.value.slice(ta.selectionStart);
-                const text = item.text || item.title || '';
-                ta.value = before + text + after;
-                const newCursor = before.length + text.length;
-                ta.selectionStart = ta.selectionEnd = newCursor;
-                ta.dispatchEvent(new Event('input', { bubbles: true }));
-                ta.focus();
-                this.close();
-            },
-
-            close() {
-                this.open = false;
-                this.items = [];
-                this._allItems = null;
-                this._slashPos = -1;
-                this._filter = '';
-                if (this._debounceTimer) {
-                    clearTimeout(this._debounceTimer);
-                    this._debounceTimer = null;
-                }
-            },
-        }));
+        ta.addEventListener('blur', () => {
+            // Delay so a mousedown on a picker item still registers.
+            setTimeout(() => { close(); }, 120);
+        });
     }
 
-    if (window.Alpine) init();
-    else document.addEventListener('alpine:init', init);
+    function scan(root = document) {
+        root.querySelectorAll('textarea[data-slash-trigger]').forEach(attach);
+    }
+
+    // Initial scan + observe future inserts (form-renderer adds textareas
+    // dynamically as Alpine renders inspection items).
+    function start() {
+        scan();
+        const obs = new MutationObserver((records) => {
+            for (const rec of records) {
+                rec.addedNodes.forEach((node) => {
+                    if (node.nodeType !== 1) return;
+                    if (node.matches?.('textarea[data-slash-trigger]')) attach(node);
+                    scan(node);
+                });
+            }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+    }
+
+    // Re-export the helper so other code (tests, other plugins) can use it.
+    window.OISlashTrigger = { isLineStart, attach };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
 })();
