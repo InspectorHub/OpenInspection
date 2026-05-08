@@ -2,6 +2,7 @@ import { BrandingConfig } from '../../types/auth';
 import { NetworkPill } from '../components/network-pill';
 import { ConflictModal } from '../components/conflict-modal';
 import { KeyboardHUD } from '../components/keyboard-hud';
+import { CommandPalette } from '../components/command-palette';
 
 function sanitizePrimaryColor(branding?: BrandingConfig): string {
     const raw = branding?.primaryColor || '#6366f1';
@@ -27,8 +28,15 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
             <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
             <link rel="stylesheet" href="/fonts.css" />
             <link rel="stylesheet" href="/vendor/flatpickr.min.css" />
+            {/* hotkeys.js exposes window.OIHotkeys (isTyping/shouldIgnoreSingleChar).
+                Loaded synchronously so global keydown handlers see it on first paint. */}
+            <script src="/js/hotkeys.js"></script>
             <script defer src="/vendor/alpine-collapse.min.js"></script>
             <script defer src="/vendor/alpine.min.js"></script>
+            {/* slash-trigger registers an Alpine `slashSnippet` data plugin —
+                opt-in per textarea via x-data="slashSnippet({ section, rating })". */}
+            <script defer src="/js/slash-trigger.js"></script>
+            <script defer src="/js/command-palette.js"></script>
             <script defer src="/vendor/flatpickr.min.js"></script>
             <script defer src="/js/flatpickr-init.js"></script>
             {/* B4 — Dexie importmap: must precede every type="module" script that imports 'dexie' */}
@@ -91,6 +99,7 @@ export const BareLayout = (props: { title: string, children: unknown, branding?:
                 <NetworkPill />
                 <ConflictModal />
                 <KeyboardHUD />
+                <CommandPalette />
             </body>
         </html>
     );
@@ -196,13 +205,34 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                                 <span>Metrics</span>
                             </a>
+
+                            {/* handoff-decisions §5 — Settings group fully expanded as
+                                a flat sub-list. Section header has no chevron. */}
+                            <div class="pt-4 mt-4 border-t border-slate-100">
+                                <a href="/settings" class="block px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-indigo-600">Settings</a>
+                                <div class="space-y-0">
+                                    <a href="/settings/profile" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Profile</a>
+                                    <a href="/settings/workspace/branding" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Branding</a>
+                                    <a href="/settings/workspace/theme" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Report Theme</a>
+                                    <a href="/settings/workspace/telemetry" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Telemetry</a>
+                                    <a href="/settings/catalog/services" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Services &amp; Pricing</a>
+                                    <a href="/settings/catalog/event-types" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Event Types</a>
+                                    <a href="/settings/catalog/widget" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Embed Widget</a>
+                                    <a href="/settings/communication/email" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Email</a>
+                                    <a href="/settings/communication/automations" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Automations</a>
+                                    <a href="/settings/communication/calendar" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Apple Calendar</a>
+                                    <a href="/settings/communication/integrations" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Integrations</a>
+                                    <a href="/settings/account/password" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Change Password</a>
+                                    <a href="/settings/account/security" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Two-factor (2FA)</a>
+                                    <a href="/settings/account/bot-protection" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Bot Protection</a>
+                                    <a href="/settings/advanced/payments" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Payments</a>
+                                    <a href="/settings/advanced/ai" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">AI</a>
+                                    <a href="/settings/advanced/data" class="flex items-center h-7 pl-[30px] pr-4 rounded-lg text-[13px] text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors font-medium">Data Import / Export</a>
+                                </div>
+                            </div>
                         </nav>
                         {/* Bottom section */}
                         <div class="p-4 border-t border-slate-100 bg-slate-50/50 space-y-1">
-                            <a href="/settings" class="flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm transition-all font-semibold">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                <span>Settings</span>
-                            </a>
                             <button id="mobileLogoutBtn" class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-red-600 hover:bg-red-50 transition-all font-semibold">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                 <span>Sign Out</span>
@@ -310,12 +340,24 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                 <script dangerouslySetInnerHTML={{ __html: `
                     (function() {
                         var p = location.pathname;
+                        var firstActive = null;
                         document.querySelectorAll('aside a[href], nav a[href]').forEach(function(a) {
                             if (a.getAttribute('href') === p || (a.getAttribute('href') === '/dashboard' && p === '/')) {
                                 a.classList.add('bg-indigo-50', 'text-indigo-600');
                                 a.classList.remove('text-slate-600');
+                                if (!firstActive) firstActive = a;
                             }
                         });
+                        // handoff-decisions §6 — bring the active sub-item into view
+                        // inside the sidebar's overflow-y:auto scroll region.
+                        if (firstActive && typeof firstActive.scrollIntoView === 'function') {
+                            try {
+                                firstActive.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                            } catch (e) {
+                                // 'instant' lands on older browsers; fall back to non-smooth.
+                                firstActive.scrollIntoView({ block: 'nearest' });
+                            }
+                        }
                     })();
                 ` }} />
                 {/* B4 module loads moved into SharedHead so BareLayout pages
@@ -394,6 +436,7 @@ navigator.serviceWorker?.addEventListener('message', function(e) {
                 <NetworkPill />
                 <ConflictModal />
                 <KeyboardHUD />
+                <CommandPalette />
             </body>
         </html>
     );

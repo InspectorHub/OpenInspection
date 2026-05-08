@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
@@ -57,6 +58,12 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     icsToken: text('ics_token'),
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
     reportTheme: text('report_theme', { enum: ['modern', 'classic', 'minimal'] }).notNull().default('modern'),
+    // handoff-decisions §1 — per-team attention thresholds in hours.
+    // Default 72h applies uniformly to the three categories.
+    attentionThresholds: text('attention_thresholds', { mode: 'json' })
+        .$type<{ agreement_unsigned_h: number; invoice_overdue_h: number; report_unpublished_h: number }>()
+        .notNull()
+        .default(sql`'{"agreement_unsigned_h":72,"invoice_overdue_h":72,"report_unpublished_h":72}'`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

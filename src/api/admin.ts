@@ -29,6 +29,9 @@ import {
     UpdateCommentSchema,
     ListCommentsQuerySchema,
     StripeConnectAccountSchema,
+    AttentionThresholdsSchema,
+    AttentionThresholdsResponseSchema,
+    ATTENTION_THRESHOLDS_DEFAULTS,
 } from '../lib/validations/admin.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
@@ -1353,6 +1356,77 @@ adminRoutes.openapi({
     const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
     logger.info('Backfill complete', { tenantCount: results.length, totalSeeded, totalSkipped });
     return c.json({ success: true as const, data: { success: true } }, 200);
+});
+
+// --- Attention Thresholds (handoff-decisions §1) ---
+//
+// Configurable per-team thresholds (in hours) applied to the dashboard
+// "Needs Attention" bucket. Stored as JSON on `tenant_configs.attention_thresholds`.
+
+const getAttentionThresholdsRoute = createRoute({
+    method: 'get',
+    path: '/attention-thresholds',
+    tags: ['Admin'],
+    summary: 'Get attention thresholds',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    responses: {
+        200: {
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
+            description: 'Success',
+        },
+    },
+});
+
+adminRoutes.openapi(getAttentionThresholdsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+    const row = await db.select({ thresholds: tenantConfigs.attentionThresholds })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .limit(1);
+    const thresholds = row[0]?.thresholds ?? ATTENTION_THRESHOLDS_DEFAULTS;
+    return c.json({ success: true as const, data: { thresholds } }, 200);
+});
+
+const updateAttentionThresholdsRoute = createRoute({
+    method: 'patch',
+    path: '/attention-thresholds',
+    tags: ['Admin'],
+    summary: 'Update attention thresholds',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema } } } },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
+            description: 'Success',
+        },
+    },
+});
+
+adminRoutes.openapi(updateAttentionThresholdsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const db = drizzle(c.env.DB);
+
+    const existing = await db.select({ tenantId: tenantConfigs.tenantId })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .limit(1);
+
+    if (existing.length === 0) {
+        await db.insert(tenantConfigs).values({
+            tenantId,
+            reportTheme: 'modern',
+            attentionThresholds: body,
+            updatedAt: new Date(),
+        });
+    } else {
+        await db.update(tenantConfigs)
+            .set({ attentionThresholds: body, updatedAt: new Date() })
+            .where(eq(tenantConfigs.tenantId, tenantId));
+    }
+    auditFromContext(c, 'config.attention_thresholds.update', 'tenant_config', { metadata: { ...body } });
+    return c.json({ success: true as const, data: { thresholds: body } }, 200);
 });
 
 export default adminRoutes;

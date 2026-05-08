@@ -15,7 +15,7 @@ export function SettingsAutomationsPage({ branding }: SettingsAutomationsPagePro
             pageTitle="Email Automations"
             pageSubtitle="Emails sent automatically when inspection events occur."
         >
-            <div x-data="automations" class="max-w-3xl space-y-6">
+            <div x-data="automations" class="max-w-3xl space-y-8">
                 <div x-show="loading" class="text-sm text-ink-500 py-8 text-center">Loading...</div>
                 <div x-show="!!error" x-text="error" class="text-sm text-rose-600 py-4" />
 
@@ -46,6 +46,60 @@ export function SettingsAutomationsPage({ branding }: SettingsAutomationsPagePro
                     </template>
                 </div>
 
+                {/* handoff-decisions §1 — Attention Rules */}
+                <section class="space-y-4 pt-2 border-t border-surface-200" x-data="attentionRules">
+                    <div class="space-y-1 mt-4">
+                        <h2 class="text-sm font-bold text-ink-700 uppercase tracking-[0.2em]">Attention Rules</h2>
+                        <p class="text-xs text-ink-500">
+                            How long an item can stay in a stuck state before it shows up in the dashboard's
+                            <em>Needs Attention</em> bucket. Default is 72 hours.
+                        </p>
+                    </div>
+
+                    <div x-show="loading" class="text-xs text-ink-500">Loading…</div>
+                    <div x-show="!!saveError" x-text="saveError" class="text-xs text-rose-600" />
+
+                    <div x-show="!loading" class="bg-white border border-surface-200 rounded-md divide-y divide-surface-200">
+                        <template x-for="row in rows" {...{ 'x-bind:key': 'row.key' }}>
+                            <label class="flex items-center gap-4 px-4 py-3">
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-semibold text-ink-900" x-text="row.label" />
+                                    <div class="text-[11px] text-ink-500 mt-0.5" x-text="row.help" />
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="720"
+                                        step="1"
+                                        x-bind:value="values[row.key]"
+                                        x-on:input="onInput(row.key, $event.target.value)"
+                                        class="w-20 px-3 py-1.5 border border-surface-300 rounded text-sm font-mono text-ink-900 text-right focus:outline-none focus:border-blueprint-500"
+                                    />
+                                    <span class="text-xs text-ink-500 font-medium">hours</span>
+                                </div>
+                            </label>
+                        </template>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button
+                            type="button"
+                            x-on:click="save()"
+                            x-bind:disabled="saving || !dirty"
+                            x-bind:class="saving || !dirty ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blueprint-600'"
+                            class="px-4 py-2 bg-blueprint-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors"
+                            x-text="saving ? 'Saving…' : 'Save'"
+                        />
+                        <button
+                            type="button"
+                            x-on:click="resetDefaults()"
+                            class="px-4 py-2 border border-surface-300 text-ink-700 text-xs font-bold uppercase tracking-widest rounded hover:bg-surface-100 transition-colors"
+                        >Reset to default</button>
+                        <span x-show="saved" class="text-xs text-emerald-600 font-semibold">Saved</span>
+                    </div>
+                </section>
+
                 <section class="space-y-3 pt-2 border-t border-surface-200">
                     <h2 class="text-sm font-bold text-ink-700 uppercase tracking-[0.2em] mt-4">Recent Activity</h2>
                     <div x-show="logsLoading" class="text-xs text-ink-500">Loading activity…</div>
@@ -65,6 +119,7 @@ export function SettingsAutomationsPage({ branding }: SettingsAutomationsPagePro
 
                 <script src="/js/auth.js" />
                 <script src="/js/automations.js" />
+                <script src="/js/attention-rules.js" />
             </div>
         </SettingsLayout>
     );

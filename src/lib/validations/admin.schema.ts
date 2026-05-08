@@ -244,3 +244,21 @@ export const ListCommentsQuerySchema = z.object({
     section: z.string().max(64).optional().openapi({ example: 'Roof' }),
     search: z.string().max(200).optional(),
 }).openapi('ListCommentsQuery');
+
+// handoff-decisions §1 — attention thresholds (in hours, 1..720 = 30 days max)
+export const AttentionThresholdsSchema = z.object({
+    agreement_unsigned_h: z.number().int().min(1).max(720),
+    invoice_overdue_h:    z.number().int().min(1).max(720),
+    report_unpublished_h: z.number().int().min(1).max(720),
+}).openapi('AttentionThresholds');
+
+export const AttentionThresholdsResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({ thresholds: AttentionThresholdsSchema }),
+}).openapi('AttentionThresholdsResponse');
+
+export const ATTENTION_THRESHOLDS_DEFAULTS = {
+    agreement_unsigned_h: 72,
+    invoice_overdue_h:    72,
+    report_unpublished_h: 72,
+} as const;

@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, type RatingLevel } from '../lib/report-utils';
@@ -825,6 +825,16 @@ export class InspectionService {
         const all = await db.select().from(inspections)
             .where(eq(inspections.tenantId, tenantId));
 
+        // handoff-decisions §1 — pull the configurable report-unpublished
+        // threshold. Falls back to 24h when the row is missing (legacy tenants
+        // pre-migration 0040). 72h is the new default applied at insert time.
+        const cfg = await db.select({ thresholds: tenantConfigs.attentionThresholds })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .limit(1);
+        const thresholds = cfg[0]?.thresholds ?? null;
+        const reportUnpublishedH = thresholds?.report_unpublished_h ?? 24;
+
         const now           = Date.now();
         // Use UTC boundaries to match the `date` column which stores "YYYY-MM-DD" (UTC midnight when parsed).
         const startOfToday  = new Date(); startOfToday.setUTCHours(0, 0, 0, 0);
@@ -832,7 +842,7 @@ export class InspectionService {
         const in48h         = new Date(now + 48 * 3600 * 1000);
         const in7days       = new Date(now + 7 * 86400 * 1000);
         const minus30days   = new Date(now - 30 * 86400 * 1000);
-        const minus24h      = new Date(now - 24 * 3600 * 1000);
+        const reportStaleAt  = new Date(now - reportUnpublishedH * 3600 * 1000);
 
         // Parse the text `date` column ("YYYY-MM-DD") to a Date at midnight UTC.
         const insDate = (i: typeof inspections.$inferSelect) =>
@@ -843,11 +853,12 @@ export class InspectionService {
             return d !== null && d >= startOfToday && d <= endOfToday;
         };
 
-        // Needs attention: scheduled within 48h OR in_progress >24h after inspection date.
+        // Needs attention: scheduled within 48h OR in_progress past the
+        // configured `report_unpublished_h` threshold (handoff-decisions §1).
         const needsAttention = all.filter(i => {
             const d = insDate(i);
             if (i.status === 'scheduled' && d && d <= in48h) return true;
-            if (i.status === 'in_progress' && d && d <= minus24h) return true;
+            if (i.status === 'in_progress' && d && d <= reportStaleAt) return true;
             return false;
         });
 
