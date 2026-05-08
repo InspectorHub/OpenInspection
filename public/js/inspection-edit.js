@@ -88,6 +88,9 @@ function inspectionEditor(inspectionId) {
     quickRatingItemId: null, // when long-press fires, target item id
     showQuickRating: false,  // bottom-sheet visibility
     showCheatsheet: false,   // ? HUD visibility (mobile menu button + desktop ?)
+    slashPickerOpen: false,  // slash-trigger inline popover state — used to
+                             // hide the right ACTIVE ITEM pane while open
+                             // (avoids duplicate canned-comment list).
     _reportStats: { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
     aiSuggestions: [],
     aiTargetField: null,
@@ -107,6 +110,17 @@ function inspectionEditor(inspectionId) {
     },
 
     async init() {
+      // Tell global KeyboardHUD (keyboard-hud.tsx) not to fire on ? — this
+      // page has its own richer cheatsheet covering both desktop hotkeys and
+      // mobile gestures. Without this flag both HUDs would open at once.
+      window.__oiLocalCheatsheet = true;
+
+      // Slash-trigger inline popover sync — hide ACTIVE ITEM right pane while
+      // the picker is open so the same canned comments are not rendered twice.
+      window.addEventListener('oi:slash-picker', (e) => {
+        this.slashPickerOpen = !!(e && e.detail && e.detail.open);
+      });
+
       window.addEventListener('resize', () => {
         this.isDesktop = window.innerWidth >= 1024;
       });

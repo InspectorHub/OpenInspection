@@ -152,6 +152,11 @@
             if (!p) return;
             p.classList.remove('hidden');
             position();
+            // Notify the page (e.g. inspection-edit) so it can hide the
+            // ACTIVE ITEM right pane to avoid showing the same canned
+            // comments twice. inspection-edit listens via window event +
+            // sets `slashPickerOpen` on the editor data.
+            window.dispatchEvent(new CustomEvent('oi:slash-picker', { detail: { open: true } }));
         }
 
         function close() {
@@ -165,6 +170,7 @@
                 state.debounceTimer = null;
             }
             if (state.picker) state.picker.classList.add('hidden');
+            window.dispatchEvent(new CustomEvent('oi:slash-picker', { detail: { open: false } }));
         }
 
         function scheduleOpen() {

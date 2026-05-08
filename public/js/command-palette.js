@@ -37,11 +37,11 @@
         { label: 'Marketplace',    href: '/marketplace' },
         { label: 'Agreements',     href: '/agreements' },
         { label: 'Comments',       href: '/comments' },
-        { label: 'Recommendations',href: '/recommendations' },
+        { label: 'Repair Items',   href: '/recommendations', aliases: ['recommendations'] },
         { label: 'Contacts',       href: '/contacts',        hint: 'G then C' },
         { label: 'Calendar',       href: '/calendar' },
         { label: 'Invoices',       href: '/invoices' },
-        { label: 'Team',           href: '/team' },
+        { label: 'Rating Systems', href: '/library/rating-systems', aliases: ['ratings'] },
         { label: 'Metrics',        href: '/metrics' },
         { label: 'Notifications',  href: '/notifications' },
     ];

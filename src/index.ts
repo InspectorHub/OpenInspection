@@ -513,6 +513,12 @@ app.get('/not-found', (c) => {
     return c.html(NotFoundPage({ branding: c.get('branding'), ...(from ? { from } : {}) }), 404);
 });
 
+// Sprint 1 C-2 — friendly redirects for token-less agreement / report links.
+// Inspectors and customers occasionally type or share the bare path; without
+// these handlers the request would fall through to the generic Hono 404.
+app.get('/agreement-sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
+app.get('/agreements/sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
+
 // Spec 5H P1 — Internal render route consumed by SignCompletionWorkflow.
 // Auth model: token IS the secret (256-bit hex from createSigningRequest).
 // Originally M2M-authed via Bearer JWT_SECRET, but CF Browser Rendering

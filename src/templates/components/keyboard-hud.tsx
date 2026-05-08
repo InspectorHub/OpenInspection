@@ -69,7 +69,7 @@ export function KeyboardHUD(): JSX.Element {
         <div
             x-data="{ open: false }"
             {...{
-                'x-on:keydown.window': "if (($event.key === '?' || ($event.shiftKey && $event.key === '/')) && !window.OIHotkeys?.isTyping?.()) { open = !open; $event.preventDefault(); }",
+                'x-on:keydown.window': "if (($event.key === '?' || ($event.shiftKey && $event.key === '/')) && !window.OIHotkeys?.isTyping?.() && !window.__oiLocalCheatsheet) { open = !open; $event.preventDefault(); }",
                 'x-on:keydown.escape.window': 'open = false',
                 'x-transition.opacity': '',
                 'x-cloak': '',
