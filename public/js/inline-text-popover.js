@@ -42,6 +42,10 @@
                 value:       '',
                 scope:       'default',
                 history:     [],
+                // Competitor parity C3 — quick-pick instruction templates.
+                // Render as small chips above the textarea; clicking a chip
+                // populates the textarea with the chip text.
+                templates:   [],
                 _onApply:    null,
 
                 show: function (opts) {
@@ -51,6 +55,7 @@
                     this.value       = opts.initial || '';
                     this.scope       = opts.scope || 'default';
                     this.history     = loadHistory(this.scope);
+                    this.templates   = Array.isArray(opts.templates) ? opts.templates.slice(0, 6) : [];
                     this._onApply    = opts.onApply || null;
                     this.open        = true;
                     var self = this;
@@ -62,6 +67,16 @@
                             try { self.$refs.ta.setSelectionRange(len, len); } catch (e) { /* ignore */ }
                         }
                     }, 50);
+                },
+
+                pickTemplate: function (text) {
+                    this.value = text || '';
+                    var self = this;
+                    if (self.$refs && self.$refs.ta) {
+                        self.$refs.ta.focus();
+                        var len = (self.value || '').length;
+                        try { self.$refs.ta.setSelectionRange(len, len); } catch (e) { /* ignore */ }
+                    }
                 },
 
                 apply: function () {
@@ -76,9 +91,10 @@
                 },
 
                 close: function () {
-                    this.open     = false;
-                    this.value    = '';
-                    this._onApply = null;
+                    this.open      = false;
+                    this.value     = '';
+                    this.templates = [];
+                    this._onApply  = null;
                 },
             };
         });
