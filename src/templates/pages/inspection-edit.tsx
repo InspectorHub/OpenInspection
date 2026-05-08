@@ -1117,8 +1117,10 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
           </main>
 
           {/* Spec 5G M1 — Right pane: active item photos + quick comments.
-              Hidden in focus mode (⌘2) and on screens narrower than xl. */}
-          <aside x-show="viewMode !== 'focus' && activeItem" class="hidden lg:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(226,232,240,0.6);">
+              Hidden in focus mode (⌘2), on screens narrower than xl, and
+              while the Comment Library drawer is open (Sprint 1 A-1: avoids
+              the slash-trigger popover overlapping ACTIVE ITEM at 1024-1280px). */}
+          <aside x-show="viewMode !== 'focus' && activeItem && !showCommentLibrary" class="hidden lg:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(226,232,240,0.6);">
             <header class="px-4 py-3 border-b" style="border-color: rgba(226,232,240,0.5);">
               <h3 class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Active Item</h3>
               <p class="text-sm font-bold text-slate-900 mt-0.5 leading-tight" x-text="activeItem?.label || activeItem?.name || ''"></p>
