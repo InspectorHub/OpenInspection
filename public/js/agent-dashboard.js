@@ -1,6 +1,46 @@
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
+// Sub-spec D Task 7 — Alpine factory for the hero strip + share-with-buyer
+// CTA. State is mutated by loadReports() once the referral list is fetched
+// so the hero reflects the most recent referral.
+document.addEventListener('alpine:init', function () {
+    if (!window.Alpine || typeof window.Alpine.data !== 'function') return;
+    window.Alpine.data('agentDashboardState', function () {
+        return {
+            hero: {
+                inspectionId:    '',
+                propertyAddress: '',
+                subline:         '',
+                inspectorName:   '',
+                status:          '',
+            },
+            init() {
+                window.__oiAgentHero = this.hero;
+            },
+            shareToBuyer() {
+                if (!this.hero.inspectionId) {
+                    if (typeof window.showToast === 'function') window.showToast('No referral selected to share', false);
+                    return;
+                }
+                const fetchFn = typeof window.authFetch === 'function' ? window.authFetch : window.fetch.bind(window);
+                fetchFn('/api/inspections/' + this.hero.inspectionId + '/agent-token', { method: 'POST' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) {
+                        const url = j && j.data && j.data.url;
+                        if (!url) throw new Error(j && j.error && j.error.message);
+                        if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function () {});
+                        if (typeof window.showToast === 'function') window.showToast('Buyer share link copied to clipboard');
+                    })
+                    .catch(function (err) {
+                        console.warn('[agent-dashboard] shareToBuyer failed', err);
+                        if (typeof window.showToast === 'function') window.showToast('Could not generate share link', false);
+                    });
+            },
+        };
+    });
+});
+
 const statusColors = {
     draft: 'bg-amber-100/50 text-amber-700 border-amber-200',
     completed: 'bg-emerald-100/50 text-emerald-700 border-emerald-200',
@@ -23,6 +63,19 @@ async function loadReports() {
         const reports = (response.data && response.data.reports) || response.reports || [];
         const statTotal = document.getElementById('statTotal');
         if (statTotal) statTotal.textContent = reports.length.toString();
+
+        // Sub-spec D Task 7 — push the most recent referral into the hero
+        // strip so the address + share CTA refer to a real inspection.
+        const hero = window.__oiAgentHero;
+        if (hero && reports.length > 0) {
+            const top = reports[0];
+            hero.inspectionId    = top.id || '';
+            hero.propertyAddress = top.propertyAddress || '';
+            const date = top.date ? new Date(top.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+            hero.subline         = date + (top.clientName ? (date ? ' · for ' : 'for ') + top.clientName : '');
+            hero.inspectorName   = top.inspectorName || '';
+            hero.status          = top.status || 'published';
+        }
 
         if (reports.length === 0) {
             reportsList.innerHTML =

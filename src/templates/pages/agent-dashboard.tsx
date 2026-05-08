@@ -1,5 +1,7 @@
 import { BareLayout } from '../layouts/main-layout';
 import { AtmosphericBg } from '../components/atmospheric-bg';
+import { AgentDashboardHero } from '../components/agent-dashboard-hero';
+import { ReportStatusPill } from '../components/report-status-pill';
 import { BrandingConfig } from '../../types/auth';
 
 export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
@@ -31,18 +33,35 @@ export const AgentDashboardPage = ({ branding }: { branding?: BrandingConfig | u
                 </nav>
 
                 {/* Main Content */}
-                <main class="py-10 animate-slide-in relative z-10">
-                    <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-16">
+                <main
+                    class="py-10 animate-slide-in relative z-10"
+                    x-data="agentDashboardState"
+                    x-init="init && init()"
+                >
+                    <div class="mx-auto max-w-7xl px-6 lg:px-8 space-y-6">
+                        {/* Sub-spec D Task 7 — Hero strip. Address + share-with-buyer
+                            CTA. Pulls live data from Alpine `hero` once the referral
+                            list loads (see public/js/agent-dashboard.js). */}
+                        <AgentDashboardHero alpine />
+
+                        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
                             <div>
                                 <div class="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 ring-1 ring-indigo-100">
                                     <span class="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></span>
                                     Agent Portal
                                 </div>
-                                <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4">Referral Dashboard</h1>
+                                <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-4 inline-flex items-center gap-3">
+                                    Referral Dashboard
+                                    {/* Sub-spec D Task 4 (D-7) — top-of-page status pill so the
+                                        agent can spot the latest inspection's lifecycle state at a
+                                        glance. Hidden until the dashboard loads referrals. */}
+                                    <span x-show="hero.status" class="align-middle">
+                                        <ReportStatusPill status="published" />
+                                    </span>
+                                </h1>
                                 <p class="text-xl text-slate-400 font-medium max-w-2xl leading-relaxed">Track shared inspections and follow up on client reports in real-time.</p>
                             </div>
-                            
+
                             <div class="glass-panel p-6 rounded-lg min-w-[240px]">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Total Referrals</p>
                                 <h2 id="statTotal" class="text-2xl font-bold text-slate-900 tabular-nums">0</h2>
