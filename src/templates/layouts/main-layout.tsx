@@ -101,7 +101,11 @@ export const BareLayout = (props: { title: string, children: unknown, branding?:
             />
             <body class="bg-[#fdfdfd] text-slate-900 antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900">
                 {children}
-                <NetworkPill />
+                {/* Sprint 1 C-3 — NetworkPill is an inspector-only tool;
+                    BareLayout serves public-facing pages so the pill renders
+                    nothing. Kept in the tree so the layout call signature
+                    stays uniform. */}
+                <NetworkPill isPublic={true} />
                 <ConflictModal />
                 <KeyboardHUD />
                 <CommandPalette />

@@ -2,8 +2,19 @@
  * B4 — Top-right floating network state pill.
  * Layout has no top header so this is fixed-position. Z-order below the
  * sync progress bar (which is fixed top:0).
+ *
+ * Sprint 1 C-3 — When `isPublic` is true (i.e. unauth-aware public
+ * pages such as /book, /agreements/sign, /r/* report viewer) the pill
+ * is hidden entirely. Customers do not need to see "Online" / sync
+ * state — that is an internal inspector tool.
  */
-export const NetworkPill = () => (
+interface NetworkPillProps {
+    isPublic?: boolean;
+}
+
+export const NetworkPill = ({ isPublic = false }: NetworkPillProps = {}): JSX.Element => {
+    if (isPublic) return <></>;
+    return (
     <div
         x-data="networkPill"
         x-cloak
@@ -69,4 +80,5 @@ export const NetworkPill = () => (
             </button>
         </div>
     </div>
-);
+    );
+};
