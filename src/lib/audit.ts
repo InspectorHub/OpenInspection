@@ -18,6 +18,7 @@ export type AuditAction =
     | 'inspection.results_merged'
     | 'inspection.sync_conflict_resolved'
     | 'inspection.share_agent'
+    | 'inspection.property_facts.update'
     | 'persistence.granted'
     | 'persistence.denied'
     | 'template.create'
