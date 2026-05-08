@@ -17,7 +17,7 @@ metricsRoutes.openapi(createRoute({
 }), async (c) => {
     const tenantId = c.get('tenantId');
     const { period } = c.req.valid('query');
-    const db = drizzle(c.env.DB as any);
+    const db = drizzle(c.env.DB);
 
     const months = period === '3m' ? 3 : period === '6m' ? 6 : 12;
     const fromDate = new Date();

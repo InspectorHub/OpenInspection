@@ -587,7 +587,7 @@ app.get('/m2m/cert-render/:token', async (c) => {
 
         const timelineEvents = auditRows.map((r) => {
             let payload: Record<string, unknown> = {};
-            try { payload = JSON.parse(r.payloadJson); } catch (_) { /* ignore */ }
+            try { payload = JSON.parse(r.payloadJson); } catch { /* ignore */ }
             return {
                 event: r.event,
                 timestampUtc: new Date(r.createdAt).toISOString(),
@@ -610,7 +610,7 @@ app.get('/m2m/cert-render/:token', async (c) => {
                 if (r.event === 'workflow.complete' && typeof p.signedPdfHash === 'string') {
                     documentHash = (p.signedPdfHash as string).replace(/^sha256:/, '');
                 }
-            } catch (_) { /* ignore parse errors */ }
+            } catch { /* ignore parse errors */ }
         }
 
         // Tenant signing key fingerprint (any audit row's key_fingerprint works since rotation is rare)
@@ -645,7 +645,7 @@ app.get('/m2m/cert-render/:token', async (c) => {
 
 // Spec 5H P2 — Public verifier (no-auth, court-friendly).
 // HTML page at /verify/{envelopeId} + JSON API at /api/public/verify/*
-async function loadVerifyData(c: any, envelopeId: string) {
+async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string) {
     const db = drizzle(c.env.DB, { schema });
     const reqRow = await db.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, envelopeId)).get();
     if (!reqRow) return null;
@@ -675,7 +675,7 @@ app.get('/verify/:envelopeId', async (c) => {
     }
     const events = data.auditRows.map((r) => {
         let payload: Record<string, unknown> = {};
-        try { payload = JSON.parse(r.payloadJson); } catch (_) { /* ignore */ }
+        try { payload = JSON.parse(r.payloadJson); } catch { /* ignore */ }
         return {
             event: r.event, createdAtUtc: new Date(r.createdAt).toISOString(),
             valid: data.verify.valid, payload, hash: r.hash,

@@ -626,7 +626,7 @@ inspectionsRoutes.openapi(aggregateRecommendationsRoute, async (c) => {
     const { id } = c.req.valid('param');
     const tenantId = c.get('tenantId') as string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = drizzle(c.env.DB as any);
+    const db = drizzle(c.env.DB);
     const row = await db.select().from(inspectionResults)
         .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
     const data = (row?.data as Record<string, { recommendations?: Array<Record<string, unknown>> }>) ?? {};
@@ -841,7 +841,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
 
     let inspectorName: string | null = null;
     if (inspection.inspectorId) {
-        const dbForName = drizzle(c.env.DB as any);
+        const dbForName = drizzle(c.env.DB);
         const inspectorRow = await dbForName.select({ name: users.name })
             .from(users)
             .where(and(eq(users.id, inspection.inspectorId), eq(users.tenantId, c.get('tenantId'))))
@@ -862,7 +862,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
     }
 
     if (inspection.agreementRequired === true) {
-        const db2 = drizzle(c.env.DB as any);
+        const db2 = drizzle(c.env.DB);
         const signed = await db2.select({ id: agreementRequests.id })
             .from(agreementRequests)
             .where(and(

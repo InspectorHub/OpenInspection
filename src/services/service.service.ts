@@ -13,7 +13,7 @@ type CreateDiscountData = z.infer<typeof CreateDiscountCodeSchema>;
 export class ServiceService {
     constructor(private db: D1Database) {}
 
-    private getDrizzle() { return drizzle(this.db as any); }
+    private getDrizzle() { return drizzle(this.db); }
 
     async listServices(tenantId: string) {
         const db = this.getDrizzle();

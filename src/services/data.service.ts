@@ -30,7 +30,7 @@ function parseCSV(text: string): string[][] {
 
 export class DataService {
     constructor(private db: D1Database) {}
-    private getDrizzle() { return drizzle(this.db as any); }
+    private getDrizzle() { return drizzle(this.db); }
 
     // ── Export ─────────────────────────────────────────────────────────────────
 

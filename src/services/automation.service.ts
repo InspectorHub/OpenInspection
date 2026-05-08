@@ -23,7 +23,7 @@ interface TriggerContext {
 export class AutomationService {
     constructor(private db: D1Database, private notification?: NotificationService, private agreementService?: AgreementService) {}
 
-    private getDrizzle() { return drizzle(this.db as any); }
+    private getDrizzle() { return drizzle(this.db); }
 
     async ensureSeeds(tenantId: string): Promise<void> {
         const db = this.getDrizzle();
@@ -67,7 +67,11 @@ export class AutomationService {
         const id = nanoid();
         await db.insert(automations).values({
             id, tenantId, ...data,
+            // Casts narrow the public string param to the schema's enum literal
+            // union; runtime values are validated by the API zod schema.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             trigger:   data.trigger as any,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             recipient: data.recipient as any,
             active: true, isDefault: false, createdAt: new Date(),
         });
@@ -82,6 +86,8 @@ export class AutomationService {
         const existing = await db.select().from(automations)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId))).limit(1);
         if (!existing[0]) throw Errors.NotFound('Automation not found');
+        // Same enum-narrowing as create() — public Partial<{string}> → table's enum literals.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await db.update(automations).set(data as any)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId)));
         return (await db.select().from(automations).where(eq(automations.id, id)))[0];
@@ -103,6 +109,7 @@ export class AutomationService {
         const rules = await db.select().from(automations)
             .where(and(
                 eq(automations.tenantId, ctx.tenantId),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 eq(automations.trigger, ctx.triggerEvent as any),
                 eq(automations.active, true),
             ));

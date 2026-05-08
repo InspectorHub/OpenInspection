@@ -6,12 +6,12 @@ import { Errors } from '../lib/errors';
 import { TemplateService } from './template.service';
 
 export class MarketplaceService {
-  private db: ReturnType<typeof drizzle<any>>;
+  private db: ReturnType<typeof drizzle>;
   private rawDb: D1Database;
   private tenantId: string;
 
   constructor(db: D1Database, tenantId: string) {
-    this.db = drizzle(db as any);
+    this.db = drizzle(db);
     this.rawDb = db;
     this.tenantId = tenantId;
   }

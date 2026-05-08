@@ -878,7 +878,7 @@ adminRoutes.openapi(getSigningRequestDetailRoute, async (c) => {
             agreement: agreement ? { id: agreement.id, name: agreement.name } : null,
             auditEvents: auditRows.map((r) => {
                 let payload: Record<string, unknown> = {};
-                try { payload = JSON.parse(r.payloadJson); } catch (_) { /* ignore */ }
+                try { payload = JSON.parse(r.payloadJson); } catch { /* ignore */ }
                 return {
                     id: r.id,
                     event: r.event,

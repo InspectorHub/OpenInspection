@@ -52,10 +52,11 @@ export class InspectionService {
             )!);
         }
 
-        if ((params as any).tab && (params as any).tab !== 'all') {
+        const tabParam = (params as { tab?: string }).tab;
+        if (tabParam && tabParam !== 'all') {
             const todayStr = new Date().toISOString().slice(0, 10);
             const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-            switch ((params as any).tab) {
+            switch (tabParam) {
                 case 'today':
                     conditions.push(sql`date(${inspections.date}) = ${todayStr}`);
                     break;
@@ -70,11 +71,11 @@ export class InspectionService {
                     )!);
                     break;
                 case 'unconfirmed':
-                    conditions.push(eq(inspections.status, 'scheduled' as any));
+                    conditions.push(eq(inspections.status, 'scheduled'));
                     conditions.push(sql`${inspections.createdAt} < ${cutoff}`);
                     break;
                 case 'in_progress':
-                    conditions.push(eq(inspections.status, 'in_progress' as any));
+                    conditions.push(eq(inspections.status, 'in_progress'));
                     break;
             }
         }
@@ -667,7 +668,7 @@ export class InspectionService {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
         if (inspection.status === 'cancelled') throw Errors.BadRequest('Cannot confirm a cancelled inspection');
         await db.update(inspections).set({
-            status:      'confirmed' as any,
+            status:      'confirmed',
             confirmedAt: new Date().toISOString(),
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         fireAutomation(this.db, tenantId, id, 'inspection.confirmed');
@@ -676,7 +677,7 @@ export class InspectionService {
     async cancelInspection(tenantId: string, id: string, reason: string, notes?: string): Promise<void> {
         const { db } = await this.fetchForStatusChange(tenantId, id);
         await db.update(inspections).set({
-            status:       'cancelled' as any,
+            status:       'cancelled',
             cancelReason: reason,
             cancelNotes:  notes ?? null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
@@ -687,7 +688,7 @@ export class InspectionService {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
         if (inspection.status !== 'cancelled') throw Errors.BadRequest('Inspection is not cancelled');
         await db.update(inspections).set({
-            status:       'scheduled' as any,
+            status:       'scheduled',
             cancelReason: null,
             cancelNotes:  null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
