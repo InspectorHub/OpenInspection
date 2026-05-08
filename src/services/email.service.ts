@@ -1,5 +1,6 @@
 import { AppError, ErrorCode } from '../lib/errors';
 import { logger } from '../lib/logger';
+import { buildIcs, type IcsEvent } from '../lib/ics';
 
 /**
  * Service to handle transactional email delivery using Resend.
@@ -10,14 +11,16 @@ export class EmailService {
 
     /**
      * Sends a transactional email. Optionally includes binary attachments
-     * (e.g. PDF reports). Resend's API expects each attachment as
-     * { filename, content } where `content` is base64.
+     * (e.g. PDF reports) or text attachments (e.g. ICS calendar invites).
+     * Resend's API expects each attachment as { filename, content }
+     * where `content` is base64. The `contentType` field is optional —
+     * Resend will infer from the filename extension when absent.
      */
     async sendEmail(
         to: string[],
         subject: string,
         html: string,
-        attachments?: Array<{ filename: string; content: ArrayBuffer }>,
+        attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
     ) {
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
             logger.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);
@@ -32,10 +35,17 @@ export class EmailService {
         };
 
         if (attachments && attachments.length > 0) {
-            payload.attachments = attachments.map(a => ({
-                filename: a.filename,
-                content: arrayBufferToBase64(a.content),
-            }));
+            payload.attachments = attachments.map(a => {
+                const base64 = typeof a.content === 'string'
+                    ? btoa(unescape(encodeURIComponent(a.content)))
+                    : arrayBufferToBase64(a.content);
+                const out: Record<string, string> = {
+                    filename: a.filename,
+                    content: base64,
+                };
+                if (a.contentType) out.content_type = a.contentType;
+                return out;
+            });
         }
 
         try {
@@ -210,9 +220,38 @@ export class EmailService {
     }
 
     /**
-     * Sends a booking confirmation email.
+     * Sprint 1 C-10 — build a Resend-shaped attachment for an ICS calendar
+     * invite. Caller passes the IcsEvent fields (uid, summary, etc.) and
+     * gets back an attachment payload ready to drop into `sendEmail`.
      */
-    async sendBookingConfirmation(to: string, clientName: string, address: string, date: string, time: string) {
+    icsAttachment(event: IcsEvent): { filename: string; content: string; contentType: string } {
+        return {
+            filename:    'inspection.ics',
+            content:     buildIcs(event),
+            contentType: 'text/calendar; charset=utf-8; method=REQUEST',
+        };
+    }
+
+    /**
+     * Sends a booking confirmation email.
+     *
+     * Sprint 1 C-10 — accepts an optional `icsEvent`; when provided,
+     * attaches a `.ics` calendar invite that imports cleanly into Apple
+     * Calendar / Google Calendar. The body intentionally calls out the
+     * attachment so the customer knows to open it.
+     */
+    async sendBookingConfirmation(
+        to: string,
+        clientName: string,
+        address: string,
+        date: string,
+        time: string,
+        icsEvent?: IcsEvent,
+    ) {
+        const attachments = icsEvent ? [this.icsAttachment(icsEvent)] : undefined;
+        const calendarHint = icsEvent
+            ? '<p style="margin: 5px 0; color:#64748b; font-size:13px;">A calendar invite (<strong>inspection.ics</strong>) is attached — open it to add this inspection to your calendar.</p>'
+            : '';
         await this.sendEmail(
             [to],
             `Inspection Scheduled: ${address}`,
@@ -225,11 +264,13 @@ export class EmailService {
                     <p style="margin: 5px 0;"><strong>Date:</strong> ${date}</p>
                     <p style="margin: 5px 0;"><strong>Time:</strong> ${time}</p>
                 </div>
+                ${calendarHint}
                 <p>Our inspector will arrive during the scheduled window. If you need to reschedule, please contact us.</p>
                 <p style="color: #64748b; font-size: 14px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
                     Thank you,<br>${this.appName} Team
                 </p>
-            </div>`
+            </div>`,
+            attachments,
         );
     }
 }

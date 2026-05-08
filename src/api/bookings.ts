@@ -214,12 +214,35 @@ bookingsRoutes.openapi(createBookingRoute, async (c) => {
         }
 
         const emailService = c.var.services.email;
+
+        // Sprint 1 C-10 — build the ICS event so the confirmation email
+        // carries a calendar invite the customer can import into Apple
+        // Calendar / Google Calendar. Duration defaults to 3 hours, with
+        // 4 hours for morning/afternoon windows and 9 hours for all-day.
+        const startMs = new Date(`${body.date}T${requestedTime}:00Z`).getTime();
+        const durationHours = body.timeSlot === 'all-day' ? 9
+            : body.timeSlot === 'morning' || body.timeSlot === 'afternoon' ? 4
+            : 3;
+        const endMs = startMs + durationHours * 60 * 60 * 1000;
+        const inspectorName = inspector?.name || inspector?.email || (c.env.APP_NAME || 'Your inspector');
+        const inspectorEmail = inspector?.email || c.env.SENDER_EMAIL || `noreply@${c.env.APP_NAME?.toLowerCase().replace(/\s/g, '') || 'inspector'}.com`;
+
         await emailService.sendBookingConfirmation(
             body.clientEmail,
             body.clientName,
             body.address,
             body.date,
-            windowLabel[body.timeSlot]
+            windowLabel[body.timeSlot],
+            {
+                uid:            `inspection-${inspectionId}`,
+                summary:        `Home Inspection at ${body.address}`,
+                description:    `Inspector: ${inspectorName}\nWindow: ${windowLabel[body.timeSlot]}\n\nWe will send your detailed report within 24 hours of completion.`,
+                location:       body.address,
+                start:          new Date(startMs),
+                end:            new Date(endMs),
+                organizerEmail: inspectorEmail,
+                organizerName:  inspectorName,
+            },
         ).catch(e => logger.error('Booking confirmation email failed', {}, e instanceof Error ? e : undefined));
     })());
 
