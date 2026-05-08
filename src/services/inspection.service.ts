@@ -1008,6 +1008,90 @@ export class InspectionService {
     }
 
     /**
+     * Round-2 F1 — list every party associated with an inspection so the
+     * Publish modal can render per-recipient Email + Text checkboxes.
+     *
+     * Returned shape (`InspectionRecipient[]`):
+     *   - role: 'client' | 'agent_buyer' | 'agent_listing'
+     *   - contactId: contact row id (null for the inline client — clients are
+     *     stored as columns on `inspections`, not in `contacts`)
+     *   - name, email, phone
+     *
+     * Recipients without any contact info (no email AND no phone) are dropped
+     * because there is no way to deliver to them. Tenant-scoped via the
+     * compound `where(eq(id), eq(tenantId))` guard on the inspection lookup
+     * AND the contact lookup.
+     */
+    async getRecipientList(inspectionId: string, tenantId: string): Promise<Array<{
+        contactId: string | null;
+        name:      string;
+        role:      'client' | 'agent_buyer' | 'agent_listing';
+        email:     string | null;
+        phone:     string | null;
+    }>> {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        const recipients: Array<{
+            contactId: string | null;
+            name:      string;
+            role:      'client' | 'agent_buyer' | 'agent_listing';
+            email:     string | null;
+            phone:     string | null;
+        }> = [];
+
+        // Client — stored inline on inspections (not contacts table). Only
+        // include when there is at least a name AND at least one channel.
+        if ((inspection.clientName ?? '').trim() && (inspection.clientEmail || inspection.clientPhone)) {
+            recipients.push({
+                contactId: null,
+                name:      inspection.clientName as string,
+                role:      'client',
+                email:     (inspection.clientEmail as string | null) ?? null,
+                phone:     (inspection.clientPhone as string | null) ?? null,
+            });
+        }
+
+        // Agents — buyer's agent (referredByAgentId) + listing agent (sellingAgentId).
+        const agentIds = [inspection.referredByAgentId, inspection.sellingAgentId]
+            .filter((x): x is string => typeof x === 'string' && x.length > 0);
+        if (agentIds.length > 0) {
+            const agentRows = await db.select().from(contacts)
+                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, agentIds)));
+            const byId = new Map<string, typeof agentRows[number]>();
+            for (const row of agentRows) byId.set(row.id as string, row);
+
+            const buyerId   = inspection.referredByAgentId as string | null;
+            const listingId = inspection.sellingAgentId   as string | null;
+
+            for (const [id, role] of [
+                [buyerId,   'agent_buyer'  as const],
+                [listingId, 'agent_listing' as const],
+            ] as Array<[string | null, 'agent_buyer' | 'agent_listing']>) {
+                if (!id) continue;
+                const row = byId.get(id);
+                if (!row) continue;
+                const email = (row.email as string | null) ?? null;
+                const phone = (row.phone as string | null) ?? null;
+                if (!email && !phone) continue; // no delivery channel
+                recipients.push({
+                    contactId: row.id as string,
+                    name:      row.name as string,
+                    role,
+                    email,
+                    phone,
+                });
+            }
+        }
+
+        return recipients;
+    }
+
+    /**
      * Publishes an inspection report (transitions to delivered status).
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
@@ -1016,6 +1100,10 @@ export class InspectionService {
         notifyAgent: boolean;
         requireSignature: boolean;
         requirePayment: boolean;
+        // Round-2 F1 — optional per-recipient delivery list. Older callers
+        // (legacy publish modal, AI agent flows) keep working without it.
+        recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
+        sendAgreementCopy?: boolean;
     }) {
         const db = this.getDrizzle();
 

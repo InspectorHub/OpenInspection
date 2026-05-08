@@ -142,13 +142,42 @@ export const InspectionStatsResponseSchema = createApiResponseSchema(InspectionS
 
 // --- Report Data ---
 
+// Round-2 F1 — per-recipient delivery selection. Each recipient row chooses
+// zero-or-more channels. Empty `channels` means "skip this recipient".
+export const PublishRecipientSchema = z.object({
+  contactId: z.string().nullable(),
+  channels:  z.array(z.enum(['email', 'text'])).default([]),
+}).openapi('PublishRecipient');
+
 export const PublishInspectionSchema = z.object({
   theme: z.enum(['modern', 'classic', 'minimal']).default('modern'),
   notifyClient: z.boolean().default(true),
   notifyAgent: z.boolean().default(true),
   requireSignature: z.boolean().default(false),
   requirePayment: z.boolean().default(false),
+  // Round-2 F1 — multi-recipient publish modal payload. Optional because
+  // legacy clients still post the flat shape above. When present, the
+  // server uses this list to drive per-recipient delivery (email + text)
+  // instead of the broad notifyClient/notifyAgent flags.
+  recipients: z.array(PublishRecipientSchema).optional(),
+  // Whether the modal sent a copy of the agreement alongside the report.
+  // Stored only for audit/notification fan-out — does not change how the
+  // report itself is built.
+  sendAgreementCopy: z.boolean().default(false),
 }).openapi('PublishInspection');
+
+// Round-2 F1 — recipient list returned by GET /api/inspections/:id/recipients.
+export const InspectionRecipientSchema = z.object({
+  contactId: z.string().nullable(),
+  name:      z.string(),
+  role:      z.enum(['client', 'agent_buyer', 'agent_listing']),
+  email:     z.string().nullable(),
+  phone:     z.string().nullable(),
+}).openapi('InspectionRecipient');
+
+export const InspectionRecipientsResponseSchema = createApiResponseSchema(
+  z.array(InspectionRecipientSchema)
+).openapi('InspectionRecipientsResponse');
 
 export const ReportItemSchema = z.object({
   id: z.string(),

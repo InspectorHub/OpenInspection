@@ -18,6 +18,7 @@ import {
     InspectionListResponseSchema,
     InspectionCountsSchema,
     PublishInspectionSchema,
+    InspectionRecipientsResponseSchema,
     ReportDataResponseSchema,
     CancelInspectionSchema,
     DashboardResponseSchema,
@@ -1343,6 +1344,33 @@ inspectionsRoutes.openapi(createRoute({
     const { id } = c.req.valid('param');
     await c.var.services.inspection.uncancelInspection(tenantId, id);
     return c.json({ success: true });
+});
+
+/**
+ * Round-2 F1 — GET /api/inspections/:id/recipients
+ * Returns the multi-party list (client + buyer agent + listing agent) that
+ * the Publish modal renders per-recipient Email/Text checkboxes against.
+ */
+const recipientsRoute = createRoute({
+    method:  'get',
+    path:    '/{id}/recipients',
+    tags:    ['Inspections'],
+    summary: 'List the recipients eligible for the Publish modal',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: InspectionRecipientsResponseSchema } },
+            description: 'Recipient list',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(recipientsRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id }   = c.req.valid('param');
+    const list     = await c.var.services.inspection.getRecipientList(id, tenantId);
+    return c.json({ success: true, data: list }, 200);
 });
 
 /**

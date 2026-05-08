@@ -1,6 +1,7 @@
 // src/templates/pages/inspection-edit.tsx
 import { BareLayout } from '../layouts/main-layout';
 import { Modal, ModalFooter } from '../components/modal';
+import { PublishModal } from '../components/publish-modal';
 import type { BrandingConfig } from '../../types/auth';
 import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
 
@@ -1504,66 +1505,40 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
           </aside>
         </div>
 
-        {/* ===== Publish Modal — 3 distinct buttons (Cancel, Send PDF [tertiary
-             emerald], Confirm Publish), so footer is inlined rather than using
-             ModalFooter. All three share the canonical h-10/rounded-xl shape. */}
+        {/* Round-2 F1 — Multi-recipient Publish modal (Spectora §G.3).
+             Lists every party (client, buyer's agent, listing agent) with
+             per-recipient Email + Text checkboxes, plus a radio that switches
+             between sending the report or the agreement. Footer:
+                [Cancel]   [Send All]
+             Send All disabled when nothing is checked. Empty-state shown
+             when the inspection has no contacts. */}
+        <PublishModal />
         <Modal
-            name="showPublishModal"
-            title="Publish Report"
+            name="showLegacyPublishOptions"
+            title="Publish options"
             size="md"
             footer={
                 <>
                     <button
                         type="button"
-                        x-on:click="showPublishModal = false"
+                        x-on:click="showLegacyPublishOptions = false"
                         class="flex-1 h-10 px-4 text-sm font-semibold rounded-xl border bg-white hover:bg-slate-50 transition-all"
                         style="border-color: #e2e8f0; color: #475569"
                     >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        {...{ 'x-on:click': 'sendReportPdf()' }}
-                        {...{ 'x-bind:disabled': 'sendingPdf' }}
-                        class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 transition-all"
-                    >
-                        <span x-show="!sendingPdf">Send PDF</span>
-                        <span x-show="sendingPdf">Sending…</span>
-                    </button>
-                    <button
-                        type="button"
-                        x-on:click="publish()"
-                        x-bind:disabled="publishing"
-                        class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all"
-                    >
-                        <span x-text="publishing ? 'Publishing…' : 'Confirm Publish'"></span>
+                        Done
                     </button>
                 </>
             }
         >
-            <div class="space-y-4">
-                <div class="p-3 rounded-xl" style="background: #f1f5f9">
-                    <div class="text-xs font-mono" style="color: #94a3b8">Report Summary</div>
-                    <div class="text-sm mt-1" style="color: #1e293b" x-text="reportStats.total + ' items  |  ' + reportStats.defect + ' defects  |  ' + reportStats.monitor + ' monitors'"></div>
-                </div>
-                <div class="space-y-3">
-                    <label class="flex items-center justify-between">
-                        <span class="text-sm" style="color: #475569">Email client</span>
-                        <input type="checkbox" x-model="publishOptions.notifyClient" class="rounded" checked />
-                    </label>
-                    <label class="flex items-center justify-between">
-                        <span class="text-sm" style="color: #475569">Email agent</span>
-                        <input type="checkbox" x-model="publishOptions.notifyAgent" class="rounded" checked />
-                    </label>
-                    <label class="flex items-center justify-between">
-                        <span class="text-sm" style="color: #475569">Require signature</span>
-                        <input type="checkbox" x-model="publishOptions.requireSignature" class="rounded" />
-                    </label>
-                    <label class="flex items-center justify-between">
-                        <span class="text-sm" style="color: #475569">Require payment</span>
-                        <input type="checkbox" x-model="publishOptions.requirePayment" class="rounded" />
-                    </label>
-                </div>
+            <div class="space-y-3">
+                <label class="flex items-center justify-between">
+                    <span class="text-sm" style="color: #475569">Require signature</span>
+                    <input type="checkbox" x-model="publishOptions.requireSignature" class="rounded" />
+                </label>
+                <label class="flex items-center justify-between">
+                    <span class="text-sm" style="color: #475569">Require payment</span>
+                    <input type="checkbox" x-model="publishOptions.requirePayment" class="rounded" />
+                </label>
                 <div>
                     <div class="text-xs font-semibold mb-2" style="color: #94a3b8">THEME</div>
                     <div class="flex gap-2">
