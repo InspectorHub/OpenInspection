@@ -239,7 +239,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                     </div>
                                 </div>
 
-                                <div x-show="selectedSection" class="px-8 pb-6">
+                                <div x-show="selectedSection" class="px-8 pb-6 space-y-3">
                                     <details class="group">
                                         <summary class="text-[11px] font-700 uppercase tracking-[0.1em] text-ink-400 cursor-pointer hover:text-ink-600 transition-colors select-none flex items-center gap-2">
                                             <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M9 5l7 7-7 7"/></svg>
@@ -249,6 +249,14 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                             class="mt-3 w-full text-sm bg-amber-50/50 border border-amber-200/50 rounded-xl px-4 py-3 resize-none font-body text-ink-600 placeholder:text-ink-300"
                                             placeholder="Optional legal disclaimer text shown at bottom of this section..."></textarea>
                                     </details>
+                                    {/* Track E2 (Spectora App.A) — force a fresh PDF page before this section. */}
+                                    <label class="flex items-center gap-3 cursor-pointer group select-none">
+                                        <input type="checkbox" x-model="selectedSection.alwaysPageBreak"
+                                            class="w-4 h-4 rounded border-surface-200 text-blueprint-600 focus:ring-blueprint-500" />
+                                        <span class="text-[11px] font-700 uppercase tracking-[0.1em] text-ink-500 group-hover:text-ink-700 transition-colors">
+                                            Always start on a new page (PDF)
+                                        </span>
+                                    </label>
                                 </div>
                             </div>
                         </template>

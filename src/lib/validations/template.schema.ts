@@ -59,6 +59,16 @@ const TemplateSectionSchema = z.object({
     title: z.string().min(1),
     icon:  z.string().optional(),
     items: z.array(TemplateItemSchema),
+    // Track E2 (Spectora App.A) — per-section legal disclaimer rendered at
+    // the bottom of the section in the published report. Null/empty when
+    // unset. Free-form text (≤ 4 KB) so tenants can paste boilerplate.
+    disclaimerText: z.string().max(4000).nullable().optional(),
+    // Track E2 — when true, the published report forces a page break BEFORE
+    // this section in PDF output. Used for cover-letter style sections that
+    // must start on a fresh sheet. Defaults to false (the existing CSS
+    // already breaks per-section by default — this flag is an explicit
+    // marker so future "no-break" overrides have a clean signal to honor).
+    alwaysPageBreak: z.boolean().optional(),
 }).strict();
 
 const RatingLevelSchema = z.object({

@@ -333,6 +333,13 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
     /* Each section starts on a new page in PDF output. */
     .report-section { page-break-before: always; break-before: page; }
     .report-section:first-of-type { page-break-before: auto; break-before: auto; }
+    /* Track E2 (Spectora App.A) — sections marked alwaysPageBreak override
+       the first-of-type carve-out so they always force a fresh sheet, even
+       when authored as the first section. */
+    .report-section[data-page-break="always"] {
+        page-break-before: always !important;
+        break-before: page !important;
+    }
 
     img { max-height: 250px; object-fit: contain; }
     .grid { display: flex !important; flex-wrap: wrap; gap: 1rem; }

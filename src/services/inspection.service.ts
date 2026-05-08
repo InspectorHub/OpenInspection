@@ -560,7 +560,11 @@ export class InspectionService {
         interface CannedDefect      { id: string; title: string; category: 'maintenance' | 'recommendation' | 'safety'; location: string; comment: string; photos: string[]; default: boolean }
         interface ItemTabs          { information: CannedInfoComment[]; limitations: CannedInfoComment[]; defects: CannedDefect[] }
         interface SchemaItem        { id: string; label: string; icon?: string; type?: string; ratingOptions?: string[]; tabs?: ItemTabs; number?: string }
-        interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[] }
+        // Track E2 (Spectora App.A) — per-section disclaimer + force-page-break
+        // are stored on the schema's section node so the editor can author
+        // them and the published report can honor them. Both are optional —
+        // legacy templates without these fields render unchanged.
+        interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
         interface PhotoEntry        { key: string; annotatedKey?: string; annotationsJson?: string }
         // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
@@ -652,6 +656,13 @@ export class InspectionService {
             title: sec.title || (sec as unknown as Record<string, string>).name || 'Untitled',
             icon: sec.icon ?? null,
             defectCount: stats.sectionDefects[sec.id] ?? 0,
+            // Track E2 — surface per-section flags so the report viewer can
+            // render the disclaimer + apply the page-break attribute. Null
+            // when unset so the renderer can short-circuit cleanly.
+            disclaimerText:  (typeof sec.disclaimerText === 'string' && sec.disclaimerText.trim().length > 0)
+                ? sec.disclaimerText.trim()
+                : null,
+            alwaysPageBreak: sec.alwaysPageBreak === true,
             items: sec.items.map((item: SchemaItem) => {
                 const res = resultData[item.id] || {};
                 const ratingId = res.rating ?? null;

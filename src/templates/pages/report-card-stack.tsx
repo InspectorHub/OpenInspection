@@ -24,6 +24,10 @@ interface ReportSection {
   icon?: string | null;
   defectCount: number;
   items: ReportItem[];
+  // Track E2 (Spectora App.A) — per-section legal disclaimer + force page
+  // break. Both are optional; legacy templates render unchanged.
+  disclaimerText?: string | null;
+  alwaysPageBreak?: boolean;
 }
 
 interface ReportPageProps {
@@ -216,7 +220,11 @@ export function ReportCardStackPage(props: ReportPageProps) {
         {/* Sections */}
         <div class="max-w-4xl mx-auto px-4 sm:px-6" {...{'x-bind:class': "showRepairPanel ? 'pb-[65vh]' : 'pb-32'"}}>
           {sections.map((section) => (
-            <div class="mb-6 report-section" x-show={`filter === 'all' || filter === 'summary' || sectionHasDefects('${section.id}')`}>
+            <div
+              class="mb-6 report-section"
+              {...(section.alwaysPageBreak ? { 'data-page-break': 'always' } : {})}
+              x-show={`filter === 'all' || filter === 'summary' || sectionHasDefects('${section.id}')`}
+            >
               <div class="flex items-center gap-3 mb-4">
                 <span class="text-2xl">{getSectionIcon(section.title)}</span>
                 <h2 class="text-2xl font-bold theme-font-display italic">{section.title}</h2>
@@ -294,6 +302,20 @@ export function ReportCardStackPage(props: ReportPageProps) {
                   </span>
                 </div>
               </div>
+
+              {/* Track E2 (Spectora App.A) — per-section disclaimer rendered
+                  beneath the items list. Hidden in summary filter to keep the
+                  preview pane clean. */}
+              {section.disclaimerText && (
+                <div
+                  data-testid="section-disclaimer"
+                  class="mt-4 px-4 py-3 rounded-md border theme-border bg-amber-50/40 text-[12px] leading-relaxed text-slate-700"
+                  x-show="filter !== 'summary'"
+                >
+                  <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700 mb-1">Disclaimer</div>
+                  <p class="whitespace-pre-line">{section.disclaimerText}</p>
+                </div>
+              )}
             </div>
           ))}
         </div>
