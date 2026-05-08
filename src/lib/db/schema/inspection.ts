@@ -139,6 +139,25 @@ export const inspectionAgreements = sqliteTable('inspection_agreements', {
     userAgent: text('user_agent'),
 });
 
+// Round-2 backlog #9 (Spectora §E.3) — Media Center pool. Photos uploaded
+// ahead of item placement live here until the inspector drags one onto an
+// item textarea, at which point InspectionService.attachPoolPhoto moves it
+// into inspection_results.data[itemId].photos[] and deletes the pool row.
+export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
+    id:            text('id').primaryKey(),
+    inspectionId:  text('inspection_id').notNull(),
+    tenantId:      text('tenant_id').notNull(),
+    r2Key:         text('r2_key').notNull(),
+    url:           text('url').notNull(),
+    uploadedAt:    integer('uploaded_at').notNull(),
+    // JSON envelope: { takenAt?: number, gps?: {lat,lng}, cameraModel?: string }
+    exifData:      text('exif_data', { mode: 'json' }).$type<{
+        takenAt?:     number;
+        gps?:         { lat: number; lng: number };
+        cameraModel?: string;
+    }>(),
+});
+
 export const inspectionResults = sqliteTable('inspection_results', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),

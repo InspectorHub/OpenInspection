@@ -320,3 +320,53 @@ export const DashboardResponseSchema = z.object({
         recentReports:  DefectAggregateBucketSchema,
     }).optional(),
 }).openapi('DashboardResponse');
+
+/**
+ * Round-2 backlog #9 (Spectora §E.3) — Media Center.
+ *
+ * Two-list payload: photos already attached to an item plus the loose pool
+ * of bulk-uploaded shots awaiting placement. The drawer renders both groups
+ * with the same card UI, but only attached photos carry an itemId/section.
+ */
+export const MediaCenterAttachedPhotoSchema = z.object({
+    key:           z.string(),
+    url:           z.string(),
+    itemId:        z.string(),
+    itemLabel:     z.string(),
+    sectionId:     z.string(),
+    sectionTitle:  z.string(),
+    photoIndex:    z.number().int().nonnegative(),
+    annotated:     z.boolean(),
+}).openapi('MediaCenterAttachedPhoto');
+
+export const MediaCenterPoolPhotoSchema = z.object({
+    id:            z.string(),
+    key:           z.string(),
+    url:           z.string(),
+    uploadedAt:    z.number().int(),
+    takenAt:       z.number().int().nullable(),
+}).openapi('MediaCenterPoolPhoto');
+
+export const MediaCenterResponseSchema = z.object({
+    attached:  z.array(MediaCenterAttachedPhotoSchema),
+    pool:      z.array(MediaCenterPoolPhotoSchema),
+}).openapi('MediaCenterResponse');
+
+export const MediaPoolUploadResponseSchema = z.object({
+    id:          z.string(),
+    key:         z.string(),
+    url:         z.string(),
+    uploadedAt:  z.number().int(),
+    takenAt:     z.number().int().nullable(),
+}).openapi('MediaPoolUploadResponse');
+
+export const MediaAttachRequestSchema = z.object({
+    poolId: z.string().min(1),
+    itemId: z.string().min(1),
+}).openapi('MediaAttachRequest');
+
+export const MediaAttachResponseSchema = z.object({
+    key:        z.string(),
+    itemId:     z.string(),
+    photoIndex: z.number().int().nonnegative(),
+}).openapi('MediaAttachResponse');

@@ -19,6 +19,7 @@ export type AuditAction =
     | 'inspection.sync_conflict_resolved'
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
+    | 'inspection.media.attach'
     | 'persistence.granted'
     | 'persistence.denied'
     | 'template.create'

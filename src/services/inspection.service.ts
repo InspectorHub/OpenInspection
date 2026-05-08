@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, type RatingLevel } from '../lib/report-utils';
@@ -563,6 +563,292 @@ export class InspectionService {
             httpMetadata: { contentType: file.type }
         });
         return key;
+    }
+
+    /**
+     * Round-2 backlog #9 (Spectora §E.3) — Media Center.
+     *
+     * Aggregates every photo associated with an inspection in two groups:
+     *   - `attached` — photos already pinned to a specific item, sourced
+     *     from inspection_results.data[itemId].photos[]. Includes the item
+     *     label and section title so the drawer card can show provenance.
+     *   - `pool`     — loose photos uploaded to the inspection_media_pool
+     *     table that have not yet been dragged onto an item.
+     *
+     * Sections/items come from the inspection's template snapshot when
+     * available (so a mid-inspection template edit doesn't break labels);
+     * otherwise we fall back to the live template row.
+     */
+    async getMediaCenter(
+        inspectionId: string,
+        tenantId: string,
+    ): Promise<{
+        attached: Array<{
+            key: string;
+            url: string;
+            itemId: string;
+            itemLabel: string;
+            sectionId: string;
+            sectionTitle: string;
+            photoIndex: number;
+            annotated: boolean;
+        }>;
+        pool: Array<{
+            id: string;
+            key: string;
+            url: string;
+            uploadedAt: number;
+            takenAt: number | null;
+        }>;
+    }> {
+        const db = this.getDrizzle();
+
+        const insp = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!insp) throw Errors.NotFound('Inspection not found');
+
+        // Resolve section/item label map from the snapshot (preferred) or
+        // the live template row. Falls back to using the item id as label
+        // when neither resolves — the drawer is still usable, just less
+        // descriptive.
+        interface SchemaItemLite { id: string; label?: string; title?: string }
+        interface SchemaSectionLite { id: string; title?: string; name?: string; items?: SchemaItemLite[] }
+        let sections: SchemaSectionLite[] = [];
+        const snap = insp.templateSnapshot as { sections?: SchemaSectionLite[] } | null;
+        if (snap && Array.isArray(snap.sections)) {
+            sections = snap.sections;
+        } else if (insp.templateId) {
+            const tpl = await db.select().from(templates)
+                .where(and(eq(templates.id, insp.templateId), eq(templates.tenantId, tenantId)))
+                .get();
+            const live = tpl?.schema as { sections?: SchemaSectionLite[] } | null;
+            if (live && Array.isArray(live.sections)) sections = live.sections;
+        }
+
+        const itemMeta = new Map<string, { itemLabel: string; sectionId: string; sectionTitle: string }>();
+        for (const sec of sections) {
+            const sectionTitle = sec.title || sec.name || 'Section';
+            for (const item of (sec.items ?? [])) {
+                itemMeta.set(item.id, {
+                    itemLabel: item.label || item.title || item.id,
+                    sectionId: sec.id,
+                    sectionTitle,
+                });
+            }
+        }
+
+        // Pull results — photos live under data[itemId].photos[]. Mirrors
+        // the same shape used by getReportData().
+        interface PhotoEntry { key: string; annotatedKey?: string; annotationsJson?: string }
+        interface ResultEntry { photos?: PhotoEntry[] }
+        const resultsRow = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        const resultData: Record<string, ResultEntry> = resultsRow?.data
+            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, ResultEntry>
+            : {};
+
+        const attached: Array<{
+            key: string;
+            url: string;
+            itemId: string;
+            itemLabel: string;
+            sectionId: string;
+            sectionTitle: string;
+            photoIndex: number;
+            annotated: boolean;
+        }> = [];
+        for (const [itemId, entry] of Object.entries(resultData)) {
+            const photos = Array.isArray(entry?.photos) ? entry.photos : [];
+            const meta = itemMeta.get(itemId) ?? {
+                itemLabel:    itemId,
+                sectionId:    'unknown',
+                sectionTitle: 'Unsectioned',
+            };
+            photos.forEach((p, idx) => {
+                if (!p || typeof p.key !== 'string') return;
+                const displayKey = p.annotatedKey || p.key;
+                attached.push({
+                    key:          displayKey,
+                    url:          `/api/inspections/${inspectionId}/photos/${encodeURIComponent(displayKey)}`,
+                    itemId,
+                    itemLabel:    meta.itemLabel,
+                    sectionId:    meta.sectionId,
+                    sectionTitle: meta.sectionTitle,
+                    photoIndex:   idx,
+                    annotated:    !!p.annotatedKey,
+                });
+            });
+        }
+
+        // Pool — loose uploads, ordered newest first.
+        const poolRows = await db.select().from(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.inspectionId, inspectionId),
+                eq(inspectionMediaPool.tenantId, tenantId),
+            ))
+            .orderBy(sql`${inspectionMediaPool.uploadedAt} desc`)
+            .all();
+
+        const pool = poolRows.map(r => ({
+            id:          r.id,
+            key:         r.r2Key,
+            url:         r.url,
+            uploadedAt:  r.uploadedAt,
+            takenAt:     (r.exifData as { takenAt?: number } | null)?.takenAt ?? null,
+        }));
+
+        return { attached, pool };
+    }
+
+    /**
+     * Round-2 backlog #9 — bulk upload to the loose pool. The photo is not
+     * tied to any item until the inspector drags its card onto an item
+     * textarea; see {@link attachPoolPhoto}.
+     */
+    async uploadPoolPhoto(
+        inspectionId: string,
+        tenantId: string,
+        file: File,
+        opts?: { takenAt?: number | null | undefined },
+    ): Promise<{
+        id: string;
+        key: string;
+        url: string;
+        uploadedAt: number;
+        takenAt: number | null;
+    }> {
+        if (!this.r2) throw Errors.BadRequest('Storage not available');
+        await this.getInspection(inspectionId, tenantId); // ownership check
+
+        const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+        if (file.size > MAX_PHOTO_BYTES) {
+            throw Errors.BadRequest(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${file.size})`);
+        }
+
+        const id = crypto.randomUUID();
+        const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const key = `${tenantId}/${inspectionId}/_pool_${id}_${safeName}`;
+        await this.r2.put(key, await file.arrayBuffer(), {
+            httpMetadata: { contentType: file.type || 'image/jpeg' },
+        });
+
+        const uploadedAt = Date.now();
+        const takenAt = (opts?.takenAt && Number.isFinite(opts.takenAt) && opts.takenAt > 0) ? opts.takenAt : null;
+        const url = `/api/inspections/${inspectionId}/photos/${encodeURIComponent(key)}`;
+        const exifData = takenAt !== null ? { takenAt } : null;
+
+        const db = this.getDrizzle();
+        await db.insert(inspectionMediaPool).values({
+            id,
+            inspectionId,
+            tenantId,
+            r2Key: key,
+            url,
+            uploadedAt,
+            exifData,
+        });
+
+        return { id, key, url, uploadedAt, takenAt };
+    }
+
+    /**
+     * Round-2 backlog #9 — atomically attach a pool photo to an item.
+     * Moves the photo entry into inspection_results.data[itemId].photos[]
+     * and deletes the pool row. The R2 object is preserved (only the
+     * pointer moves) so an in-flight drag can be replayed safely.
+     */
+    async attachPoolPhoto(
+        inspectionId: string,
+        tenantId: string,
+        poolId: string,
+        itemId: string,
+    ): Promise<{ key: string; itemId: string; photoIndex: number }> {
+        if (!itemId) throw Errors.BadRequest('itemId is required');
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+
+        const poolRow = await db.select().from(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.id, poolId),
+                eq(inspectionMediaPool.inspectionId, inspectionId),
+                eq(inspectionMediaPool.tenantId, tenantId),
+            ))
+            .get();
+        if (!poolRow) throw Errors.NotFound('Pool photo not found');
+
+        // Locate or create the inspection_results row, then append the
+        // photo to data[itemId].photos[].
+        interface ResultEntry { photos?: Array<{ key: string }> }
+        const existing = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+
+        const data: Record<string, ResultEntry> = existing?.data
+            ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) as Record<string, ResultEntry>
+            : {};
+        const entry = data[itemId] ?? {};
+        const photos = Array.isArray(entry.photos) ? entry.photos.slice() : [];
+        photos.push({ key: poolRow.r2Key });
+        data[itemId] = { ...entry, photos };
+        const photoIndex = photos.length - 1;
+
+        if (existing) {
+            await db.update(inspectionResults)
+                .set({ data: data as unknown as object, lastSyncedAt: new Date() })
+                .where(eq(inspectionResults.id, existing.id));
+        } else {
+            await db.insert(inspectionResults).values({
+                id:           crypto.randomUUID(),
+                tenantId,
+                inspectionId,
+                data:         data as unknown as object,
+                lastSyncedAt: new Date(),
+            });
+        }
+
+        await db.delete(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.id, poolId),
+                eq(inspectionMediaPool.tenantId, tenantId),
+            ));
+
+        return { key: poolRow.r2Key, itemId, photoIndex };
+    }
+
+    /**
+     * Round-2 backlog #9 — delete a loose pool photo (drag cancel / cleanup).
+     * Hard-deletes both the DB row and the R2 object.
+     */
+    async deletePoolPhoto(
+        inspectionId: string,
+        tenantId: string,
+        poolId: string,
+    ): Promise<void> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+
+        const row = await db.select().from(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.id, poolId),
+                eq(inspectionMediaPool.inspectionId, inspectionId),
+                eq(inspectionMediaPool.tenantId, tenantId),
+            ))
+            .get();
+        if (!row) throw Errors.NotFound('Pool photo not found');
+
+        await db.delete(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.id, poolId),
+                eq(inspectionMediaPool.tenantId, tenantId),
+            ));
+
+        if (this.r2) {
+            await this.r2.delete(row.r2Key).catch(err => {
+                logger.warn('[media-pool] R2 delete failed', { key: row.r2Key, error: String(err) });
+            });
+        }
     }
 
     /**
