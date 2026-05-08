@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         For free-form ideation or a vote-based discussion, please open a thread in
-        [Ideas Discussions](https://github.com/important-new/OpenInspection/discussions/categories/ideas) instead — issues are best for *concrete* asks the maintainers can scope.
+        [Ideas Discussions](https://github.com/InspectorHub/OpenInspection/discussions/categories/ideas) instead — issues are best for *concrete* asks the maintainers can scope.
   - type: textarea
     id: problem
     attributes:
@@ -55,5 +55,5 @@ body:
     attributes:
       label: Code of conduct
       options:
-        - label: I have read and agree to the [Code of Conduct](https://github.com/important-new/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md).
+        - label: I have read and agree to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md).
           required: true

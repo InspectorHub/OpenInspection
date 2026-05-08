@@ -8,9 +8,9 @@ body:
       value: |
         Thanks for taking the time to file a bug.
         Before continuing, please:
-        - Search [existing issues](https://github.com/important-new/OpenInspection/issues?q=is%3Aissue) for duplicates.
-        - For *questions* (vs. bugs), use [Q&A Discussions](https://github.com/important-new/OpenInspection/discussions/categories/q-a) instead.
-        - For *security vulnerabilities*, follow [SECURITY.md](https://github.com/important-new/OpenInspection/blob/main/apps/core/SECURITY.md) — do **not** open a public issue.
+        - Search [existing issues](https://github.com/InspectorHub/OpenInspection/issues?q=is%3Aissue) for duplicates.
+        - For *questions* (vs. bugs), use [Q&A Discussions](https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a) instead.
+        - For *security vulnerabilities*, follow [SECURITY.md](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/SECURITY.md) — do **not** open a public issue.
   - type: input
     id: version
     attributes:
@@ -74,5 +74,5 @@ body:
     attributes:
       label: Code of conduct
       options:
-        - label: I have read and agree to the [Code of Conduct](https://github.com/important-new/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md).
+        - label: I have read and agree to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md).
           required: true

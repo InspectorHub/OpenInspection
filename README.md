@@ -2,9 +2,9 @@
 
 > The first open-source SaaS-grade home inspection app. Self-host on Cloudflare for ~$0/month.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/important-new/OpenInspection)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/InspectorHub/OpenInspection)
 [![Try the sandbox](https://img.shields.io/badge/sandbox-live-emerald)](https://sandbox.inspectorhub.io)
-[![GitHub Discussions](https://img.shields.io/github/discussions/important-new/OpenInspection)](https://github.com/important-new/OpenInspection/discussions)
+[![GitHub Discussions](https://img.shields.io/github/discussions/InspectorHub/OpenInspection)](https://github.com/InspectorHub/OpenInspection/discussions)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
 
 🧪 **Live demo**: [sandbox.inspectorhub.io](https://sandbox.inspectorhub.io) — login `demo@inspectorhub.io` / `demo1234`. Data resets daily.
@@ -65,7 +65,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 
 ### CLI-First
 ```bash
-git clone https://github.com/important-new/OpenInspection
+git clone https://github.com/InspectorHub/OpenInspection
 cd OpenInspection
 npm install
 npm run setup:cloudflare    # provisions D1 / R2 / KV automatically
@@ -74,7 +74,7 @@ npm run dev                 # http://localhost:8788
 
 ### Local development
 ```bash
-git clone https://github.com/important-new/OpenInspection
+git clone https://github.com/InspectorHub/OpenInspection
 cd OpenInspection
 npm install
 npm run setup:cloudflare -- --local    # provisions a local-only sandbox
@@ -102,10 +102,10 @@ Detailed setup: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`doc
 
 ## Community
 
-- 💬 [Q&A](https://github.com/important-new/OpenInspection/discussions/categories/q-a)
-- 📣 [Roadmap & releases](https://github.com/important-new/OpenInspection/discussions/categories/announcements)
-- 💡 [Ideas & feature requests](https://github.com/important-new/OpenInspection/discussions/categories/ideas)
-- 🐛 [Issue tracker](https://github.com/important-new/OpenInspection/issues)
+- 💬 [Q&A](https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a)
+- 📣 [Roadmap & releases](https://github.com/InspectorHub/OpenInspection/discussions/categories/announcements)
+- 💡 [Ideas & feature requests](https://github.com/InspectorHub/OpenInspection/discussions/categories/ideas)
+- 🐛 [Issue tracker](https://github.com/InspectorHub/OpenInspection/issues)
 
 ## Prefer a managed setup?
 

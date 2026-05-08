@@ -4,16 +4,16 @@ Thanks for considering a contribution. OpenInspection is an open-source home ins
 
 ## Quick links
 
-- 🐛 [Report a bug](https://github.com/important-new/OpenInspection/issues/new?template=bug_report.yml)
-- 💡 [Suggest a feature](https://github.com/important-new/OpenInspection/issues/new?template=feature_request.yml)
-- 💬 [Ask a question](https://github.com/important-new/OpenInspection/discussions/categories/q-a)
-- 📣 [Roadmap & releases](https://github.com/important-new/OpenInspection/discussions/categories/announcements)
+- 🐛 [Report a bug](https://github.com/InspectorHub/OpenInspection/issues/new?template=bug_report.yml)
+- 💡 [Suggest a feature](https://github.com/InspectorHub/OpenInspection/issues/new?template=feature_request.yml)
+- 💬 [Ask a question](https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a)
+- 📣 [Roadmap & releases](https://github.com/InspectorHub/OpenInspection/discussions/categories/announcements)
 - 🧪 [Try the sandbox](https://sandbox.inspectorhub.io)
 
 ## Development setup
 
 ```bash
-git clone https://github.com/important-new/OpenInspection.git
+git clone https://github.com/InspectorHub/OpenInspection.git
 cd OpenInspection
 npm install
 npm run setup:cloudflare    # provisions D1 / R2 / KV (or use --local)
@@ -83,7 +83,7 @@ By contributing, you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Security disclosures
 
-Never report a vulnerability in a public issue or discussion. Use [GitHub Security Advisories](https://github.com/important-new/OpenInspection/security/advisories) — see [`SECURITY.md`](SECURITY.md) if present.
+Never report a vulnerability in a public issue or discussion. Use [GitHub Security Advisories](https://github.com/InspectorHub/OpenInspection/security/advisories) — see [`SECURITY.md`](SECURITY.md) if present.
 
 ## License
 
