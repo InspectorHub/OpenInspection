@@ -90,6 +90,7 @@ import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
 import eventsRoutes from './api/events';
+import inspectionRequestsRoutes from './api/inspection-requests';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -320,6 +321,7 @@ app.route('/api/auth', coreAuthRoutes);
 app.route('/', coreAuthRoutes);
 app.route('/api/inspections', inspectionsRoutes);
 app.route('/api/inspections', inspectionSyncRoutes);
+app.route('/api/inspection-requests', inspectionRequestsRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/public', bookingsRoutes);
 app.route('/api/public/widget', widgetRoutes);

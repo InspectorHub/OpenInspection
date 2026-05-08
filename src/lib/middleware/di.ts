@@ -26,6 +26,7 @@ import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
+import { InspectionRequestService } from '../../services/inspection-request.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -157,6 +158,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportPdf':
                     target.reportPdf = new ReportPdfService(c.env.DB, c.env.BROWSER, c.env.REPORTS);
+                    break;
+                case 'inspectionRequest':
+                    target.inspectionRequest = new InspectionRequestService(c.env.DB);
                     break;
             }
             return target[prop];

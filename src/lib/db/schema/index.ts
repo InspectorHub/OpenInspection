@@ -16,6 +16,7 @@ export {
     automationLogs,
     eventTypes,
     inspectionEvents,
+    inspectionRequests,
 } from './inspection';
 export { contacts } from './contact';
 export { recommendations } from './recommendation';
