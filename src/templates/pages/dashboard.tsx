@@ -3,7 +3,8 @@ import { BrandingConfig } from '../../types/auth';
 import { CancelModal } from '../components/cancel-modal';
 import { Modal } from '../components/modal';
 import { PageHeader } from '../components/page-header';
-import { RowStatusIcons } from '../components/row-status-icons';
+import { CustomizeColumnsModal } from '../components/customize-columns-modal';
+import { InspectionRow } from '../components/inspection-row';
 
 export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
@@ -24,16 +25,37 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                             <span x-text="metaText"></span>
                         }
                         actions={
-                            <button
-                                type="button"
-                                onclick="showCreateModal()"
-                                class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                </svg>
-                                New Inspection
-                            </button>
+                            <>
+                                {/* Round-2 backlog #2 — Customize Columns toolbar button.
+                                    Opens the modal whose Alpine state is on the modal root.
+                                    Sits to the LEFT of New Inspection so the primary CTA
+                                    keeps its position; styled as a low-emphasis icon button. */}
+                                <button
+                                    type="button"
+                                    onclick="document.getElementById('customizeColumnsModal')?.classList.remove('hidden')"
+                                    class="h-8 px-3 rounded-md border bg-white text-slate-600 font-bold text-[13px] hover:bg-slate-50 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                    style="border-color: #e2e8f0"
+                                    aria-label="Customize columns"
+                                    title="Customize columns"
+                                    data-test="customize-columns-btn"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    Columns
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick="showCreateModal()"
+                                    class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    New Inspection
+                                </button>
+                            </>
                         }
                     />
                 </div>
@@ -201,39 +223,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.needsAttention" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.needsAttention" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
-                                    <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-[12px] text-slate-500 mt-0.5">
-                                            <span x-text="i.clientName || '—'"></span>
-                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
-                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
-                                            <template x-if="i.siblingCount && i.siblingCount > 1">
-                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
-                                            </template>
-                                            <span> · </span>
-                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
-                                        </p>
-                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
-                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
-                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
-                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
-                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
-                                        </div>
-                                    </a>
-                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
-                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
-                                    {/* Round-2 F2 — status icons (📄 ready · 📋 signed · ✈️ sent · 🚩 flag) */}
-                                    <RowStatusIcons />
-                                    <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
-                                        <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
-                                        <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
-                                            <template x-for="a in validActions()" {...{ 'x-bind:key': 'a' }}>
-                                                <button type="button" x-on:click="run(a)" class="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50" x-text="actionLabel(a)"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
+                                <InspectionRow />
                             </template>
                         </div>
                     </section>
@@ -251,39 +241,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.today" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.today" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
-                                    <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-[12px] text-slate-500 mt-0.5">
-                                            <span x-text="i.clientName || '—'"></span>
-                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
-                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
-                                            <template x-if="i.siblingCount && i.siblingCount > 1">
-                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
-                                            </template>
-                                            <span> · </span>
-                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
-                                        </p>
-                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
-                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
-                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
-                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
-                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
-                                        </div>
-                                    </a>
-                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
-                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
-                                    {/* Round-2 F2 — status icons (📄 ready · 📋 signed · ✈️ sent · 🚩 flag) */}
-                                    <RowStatusIcons />
-                                    <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
-                                        <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
-                                        <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
-                                            <template x-for="a in validActions()" {...{ 'x-bind:key': 'a' }}>
-                                                <button type="button" x-on:click="run(a)" class="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50" x-text="actionLabel(a)"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
+                                <InspectionRow />
                             </template>
                         </div>
                     </section>
@@ -324,39 +282,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.thisWeek" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.thisWeek" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
-                                    <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-[12px] text-slate-500 mt-0.5">
-                                            <span x-text="i.clientName || '—'"></span>
-                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
-                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
-                                            <template x-if="i.siblingCount && i.siblingCount > 1">
-                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
-                                            </template>
-                                            <span> · </span>
-                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
-                                        </p>
-                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
-                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
-                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
-                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
-                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
-                                        </div>
-                                    </a>
-                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
-                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
-                                    {/* Round-2 F2 — status icons (📄 ready · 📋 signed · ✈️ sent · 🚩 flag) */}
-                                    <RowStatusIcons />
-                                    <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
-                                        <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
-                                        <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
-                                            <template x-for="a in validActions()" {...{ 'x-bind:key': 'a' }}>
-                                                <button type="button" x-on:click="run(a)" class="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50" x-text="actionLabel(a)"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
+                                <InspectionRow />
                             </template>
                         </div>
                     </section>
@@ -374,39 +300,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.later" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.later" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
-                                    <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-[12px] text-slate-500 mt-0.5">
-                                            <span x-text="i.clientName || '—'"></span>
-                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
-                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
-                                            <template x-if="i.siblingCount && i.siblingCount > 1">
-                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
-                                            </template>
-                                            <span> · </span>
-                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
-                                        </p>
-                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
-                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
-                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
-                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
-                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
-                                        </div>
-                                    </a>
-                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
-                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
-                                    {/* Round-2 F2 — status icons (📄 ready · 📋 signed · ✈️ sent · 🚩 flag) */}
-                                    <RowStatusIcons />
-                                    <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
-                                        <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
-                                        <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
-                                            <template x-for="a in validActions()" {...{ 'x-bind:key': 'a' }}>
-                                                <button type="button" x-on:click="run(a)" class="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50" x-text="actionLabel(a)"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
+                                <InspectionRow />
                             </template>
                             <div x-show="buckets.laterTotal > buckets.later.length" class="px-5 py-3 border-t border-slate-100">
                                 <button type="button" x-on:click="loadAllLater()"
@@ -429,39 +323,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.recentReports" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.recentReports" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
-                                    <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-[12px] text-slate-500 mt-0.5">
-                                            <span x-text="i.clientName || '—'"></span>
-                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
-                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
-                                            <template x-if="i.siblingCount && i.siblingCount > 1">
-                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
-                                            </template>
-                                            <span> · </span>
-                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
-                                        </p>
-                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
-                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
-                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
-                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
-                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
-                                        </div>
-                                    </a>
-                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
-                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
-                                    {/* Round-2 F2 — status icons (📄 ready · 📋 signed · ✈️ sent · 🚩 flag) */}
-                                    <RowStatusIcons />
-                                    <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
-                                        <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
-                                        <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
-                                            <template x-for="a in validActions()" {...{ 'x-bind:key': 'a' }}>
-                                                <button type="button" x-on:click="run(a)" class="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50" x-text="actionLabel(a)"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
+                                <InspectionRow />
                             </template>
                         </div>
                     </section>
@@ -479,39 +341,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                         </button>
                         <div x-show="sections.cancelled" {...{ 'x-collapse': true }}>
                             <template x-for="i in buckets.cancelled" {...{ 'x-bind:key': 'i.id' }}>
-                                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-3" data-test="inspection-row">
-                                    <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
-                                        <p class="font-bold text-slate-900 truncate text-[14px]" x-text="i.propertyAddress || i.address || '(no address)'"></p>
-                                        <p class="text-[12px] text-slate-500 mt-0.5">
-                                            <span x-text="i.clientName || '—'"></span>
-                                            <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
-                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
-                                            <template x-if="i.siblingCount && i.siblingCount > 1">
-                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
-                                            </template>
-                                            <span> · </span>
-                                            <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
-                                        </p>
-                                        {/* Spec 5B P2B — defect chips per inspection. Hidden when all zero. */}
-                                        <div class="mt-1 flex items-center gap-1.5" x-show="i.defectStats && (i.defectStats.safety + i.defectStats.recommendation + i.defectStats.maintenance) > 0">
-                                            <span x-show="i.defectStats?.safety > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-50 text-rose-700" x-text="'🔴 ' + i.defectStats.safety + ' safety'"></span>
-                                            <span x-show="i.defectStats?.recommendation > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700" x-text="'🟡 ' + i.defectStats.recommendation + ' rec'"></span>
-                                            <span x-show="i.defectStats?.maintenance > 0" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-50 text-sky-700" x-text="'🔵 ' + i.defectStats.maintenance + ' maint'"></span>
-                                        </div>
-                                    </a>
-                                    {/* Sub-spec B Task 7 (B-6) — price (right-aligned, monospace) */}
-                                    <div x-show="i.price > 0" class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums" x-text="'$' + ((i.price || 0) / 100).toFixed(0)"></div>
-                                    {/* Round-2 F2 — status icons (📄 ready · 📋 signed · ✈️ sent · 🚩 flag) */}
-                                    <RowStatusIcons />
-                                    <div x-data="actionMenu({ id: i.id, status: i.status })" class="relative ml-3">
-                                        <button type="button" x-on:click="open = !open" class="text-slate-400 hover:text-slate-700 px-2 text-lg font-bold">•••</button>
-                                        <div x-show="open" {...{ 'x-cloak': true, 'x-on:click.outside': 'open = false' }} class="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[140px]">
-                                            <template x-for="a in validActions()" {...{ 'x-bind:key': 'a' }}>
-                                                <button type="button" x-on:click="run(a)" class="block w-full text-left px-4 py-2 text-sm hover:bg-slate-50" x-text="actionLabel(a)"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
+                                <InspectionRow />
                             </template>
                         </div>
                     </section>
@@ -526,6 +356,12 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
 
                     <CancelModal />
                 </div>
+
+                {/* Round-2 backlog #2 — Customize Columns modal (sibling of the
+                    dashboard() Alpine root so the modal opens above the list
+                    but the dashboard() factory's `isVisible(id)` reactive
+                    helper is shared via `window.__dashboardColumns`). */}
+                <CustomizeColumnsModal />
 
                 {/* Create Inspection Modal — R7-11 fix: add overflow-x-hidden so
                     in-modal vertical scroll doesn't spill into page-level

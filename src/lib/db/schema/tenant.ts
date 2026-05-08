@@ -75,6 +75,11 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // referral sources that extend the seven seeds (Realtor / Past Client /
     // Google Search / Facebook / Yelp / Walk-in / Other). NULL = no extras.
     customReferralSources: text('custom_referral_sources', { mode: 'json' }).$type<string[]>(),
+    // Round-2 backlog #2 (Spectora §5.1 / §E.7) — per-tenant default for the
+    // inspection dashboard column visibility set. JSON array of column ids
+    // (see src/lib/dashboard-columns.ts for the registry). NULL means
+    // "use the registry default-on set".
+    dashboardColumnPrefs: text('dashboard_column_prefs', { mode: 'json' }).$type<string[]>(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

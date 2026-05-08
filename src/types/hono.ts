@@ -99,6 +99,7 @@ import { TemplateMigrationService } from '../services/template-migration.service
 import { ImportHistoryService } from '../services/import-history.service';
 import { InspectionRequestService } from '../services/inspection-request.service';
 import { RatingSystemService } from '../services/rating-system.service';
+import { DashboardPrefsService } from '../services/dashboard-prefs.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -136,6 +137,7 @@ export interface AppServices {
     importHistory: ImportHistoryService;
     inspectionRequest: InspectionRequestService;
     ratingSystem: RatingSystemService;
+    dashboardPrefs: DashboardPrefsService;
 }
 
 /**

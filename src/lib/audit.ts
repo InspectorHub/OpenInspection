@@ -51,7 +51,8 @@ export type AuditAction =
     | 'comment.updated'
     | 'config.integration.update'
     | 'config.secrets.update'
-    | 'config.attention_thresholds.update';
+    | 'config.attention_thresholds.update'
+    | 'config.dashboard_columns.update';
 
 export interface AuditParams {
     db: D1Database;

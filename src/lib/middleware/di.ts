@@ -30,6 +30,7 @@ import { TemplateMigrationService } from '../../services/template-migration.serv
 import { ImportHistoryService } from '../../services/import-history.service';
 import { InspectionRequestService } from '../../services/inspection-request.service';
 import { RatingSystemService } from '../../services/rating-system.service';
+import { DashboardPrefsService } from '../../services/dashboard-prefs.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -173,6 +174,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'ratingSystem':
                     target.ratingSystem = new RatingSystemService(c.env.DB);
+                    break;
+                case 'dashboardPrefs':
+                    target.dashboardPrefs = new DashboardPrefsService(c.env.DB);
                     break;
             }
             return target[prop];
