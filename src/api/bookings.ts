@@ -449,6 +449,51 @@ bookingsRoutes.openapi(signAgreementRoute, async (c) => {
         }).catch(() => {});
     }
 
+    // Sprint 1 C-8 — confirmation email to the signer (and CC the inspector
+    // so both parties have a record). Spec 5H envelope verifier URL is the
+    // tamper-evident receipt; we pass it as the email CTA.
+    if (request && signed.clientEmail) {
+        c.executionCtx.waitUntil((async () => {
+            try {
+                const baseUrl = (c.env.APP_BASE_URL || '').replace(/\/$/, '') || (() => {
+                    const host = c.req.header('host');
+                    return host ? `https://${host}` : '';
+                })();
+                const verifyUrl = baseUrl ? `${baseUrl}/verify/${signed.id}` : `/verify/${signed.id}`;
+                const confirmationId = signed.id.replace(/-/g, '').slice(0, 8).toUpperCase();
+                const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
+
+                // Look up inspector email so we can CC them.
+                let inspectorEmail: string | null = null;
+                let propertyAddress = 'your inspection';
+                if (signed.inspectionId) {
+                    const db = drizzle(c.env.DB);
+                    const insp = await db.select().from(inspections)
+                        .where(eq(inspections.id, signed.inspectionId)).get();
+                    if (insp?.propertyAddress) propertyAddress = insp.propertyAddress;
+                    if (insp?.inspectorId) {
+                        const insRow = await db.select().from(users)
+                            .where(eq(users.id, insp.inspectorId)).get();
+                        inspectorEmail = insRow?.email ?? null;
+                    }
+                }
+
+                await c.var.services.email.sendAgreementSignedConfirmation(
+                    signed.clientEmail,
+                    inspectorEmail ? [inspectorEmail] : [],
+                    signed.clientName || 'Client',
+                    propertyAddress,
+                    verifyUrl,
+                    confirmationId,
+                    new Date().toUTCString(),
+                    ip,
+                );
+            } catch (e) {
+                logger.error('agreement.signed confirmation email failed', {}, e instanceof Error ? e : undefined);
+            }
+        })());
+    }
+
     return c.json({ success: true as const }, 200);
 });
 
