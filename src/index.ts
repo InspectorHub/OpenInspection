@@ -60,6 +60,7 @@ import { SettingsWorkspacePage } from './templates/pages/settings-workspace';
 import { SettingsCommunicationPage } from './templates/pages/settings-communication';
 import { SettingsAccountPage } from './templates/pages/settings-account';
 import { SettingsAdvancedPage } from './templates/pages/settings-advanced';
+import { NotFoundPage } from './templates/pages/not-found';
 
 
 import coreAuthRoutes from './api/auth';
@@ -497,8 +498,19 @@ app.get('/agreements/sign/:token', async (c) => {
             vars,
         }));
     } catch {
-        return c.text('Agreement not found or link has expired.', 404);
+        // Sprint 1 C-2 — styled 404 instead of monospace text.
+        return c.redirect('/not-found?from=agreement-sign', 302);
     }
+});
+
+// Sprint 1 C-2 — public, branded not-found page. Used by:
+//   * direct visit to /agreements/sign without a valid token
+//   * report-share token miss
+//   * Hono catch-all (app.notFound)
+// `from` query selects context-specific copy (agreement-sign / report-share).
+app.get('/not-found', (c) => {
+    const from = c.req.query('from');
+    return c.html(NotFoundPage({ branding: c.get('branding'), ...(from ? { from } : {}) }), 404);
 });
 
 // Spec 5H P1 — Internal render route consumed by SignCompletionWorkflow.
@@ -759,7 +771,11 @@ app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
     return c.body(JSON.stringify(payload, null, 2));
 });
 
-// Public report page (no auth required)
+// Public report page (no auth required for the share link, but gated on
+// payment + agreement state per Spec 3A). Sprint 1 C-7 — the gate now
+// also fires on the public /report/:id route; previously only the
+// authenticated /api/inspections/:id/report enforced it, which left the
+// public link bypassable.
 app.get('/report/:id', async (c) => {
     const id = c.req.param('id') as string;
     const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
@@ -769,8 +785,96 @@ app.get('/report/:id', async (c) => {
     // renderer). ?print=1 already supported by main-layout (hides nav).
     const summaryMode = c.req.query('summary') === '1';
 
+    // Inspector / admin / owner bypass — they can preview a gated report
+    // from the dashboard without paying it themselves. We check the JWT
+    // cookie directly (htmlAuthGuard would force a /login redirect for
+    // unauthenticated customers, which we explicitly want to avoid here).
+    let role: string | null = null;
+    try {
+        const { getCookie } = await import('hono/cookie');
+        const { verify } = await import('hono/jwt');
+        const tok = getCookie(c, '__Host-inspector_token');
+        if (tok && c.env.JWT_SECRET) {
+            const payload = await verify(tok, c.env.JWT_SECRET, 'HS256');
+            role = (payload as { role?: string })?.role ?? null;
+        }
+    } catch { /* unauthenticated public view */ }
+    const isInspectorOrAdmin = role === 'owner' || role === 'admin' || role === 'inspector';
+
     try {
         const service = c.var.services.inspection;
+
+        // Sprint 1 C-7 — gate logic for public viewers only. We need the
+        // inspection row's flags before pulling the (potentially expensive)
+        // full report data. Loading just the row is cheap.
+        if (!isInspectorOrAdmin) {
+            const db = drizzle(c.env.DB);
+            const insp = await db.select({
+                id:                schema.inspections.id,
+                propertyAddress:   schema.inspections.propertyAddress,
+                date:              schema.inspections.date,
+                inspectorId:       schema.inspections.inspectorId,
+                paymentRequired:   schema.inspections.paymentRequired,
+                paymentStatus:     schema.inspections.paymentStatus,
+                agreementRequired: schema.inspections.agreementRequired,
+            }).from(schema.inspections)
+                .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId as string)))
+                .get();
+            if (!insp) return c.text('Report not found', 404);
+
+            const branding = c.get('branding');
+            const companyName = branding?.siteName || c.env.APP_NAME || 'OpenInspection';
+            const primaryColor = branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1';
+            const baseUrl = (c.env.APP_BASE_URL || '').replace(/\/$/, '') || (c.req.header('host') ? `https://${c.req.header('host')}` : '');
+
+            let inspectorName: string | null = null;
+            if (insp.inspectorId) {
+                const inspectorRow = await db.select({ name: users.name })
+                    .from(users)
+                    .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId as string)))
+                    .get();
+                inspectorName = inspectorRow?.name ?? null;
+            }
+
+            if (insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
+                const { ReportGatePage } = await import('./templates/pages/report-gate');
+                return c.html(ReportGatePage({
+                    reason:          'payment',
+                    companyName,
+                    primaryColor,
+                    actionUrl:       `${baseUrl}/invoices?inspection=${id}`,
+                    actionLabel:     'View invoice & pay',
+                    propertyAddress: insp.propertyAddress ?? null,
+                    inspectorName,
+                    scheduledDate:   insp.date ?? null,
+                }) as string);
+            }
+
+            if (insp.agreementRequired === true) {
+                const signed = await db.select({ id: schema.agreementRequests.id })
+                    .from(schema.agreementRequests)
+                    .where(and(
+                        eq(schema.agreementRequests.inspectionId, id),
+                        eq(schema.agreementRequests.tenantId, tenantId as string),
+                        eq(schema.agreementRequests.status, 'signed'),
+                    ))
+                    .limit(1);
+                if (signed.length === 0) {
+                    const { ReportGatePage } = await import('./templates/pages/report-gate');
+                    return c.html(ReportGatePage({
+                        reason:          'agreement',
+                        companyName,
+                        primaryColor,
+                        actionUrl:       `${baseUrl}/sign/${id}`,
+                        actionLabel:     'Sign agreement',
+                        propertyAddress: insp.propertyAddress ?? null,
+                        inspectorName,
+                        scheduledDate:   insp.date ?? null,
+                    }) as string);
+                }
+            }
+        }
+
         const data = await service.getReportData(id, tenantId as string);
 
         const rawDate = data.inspection.date || '';
@@ -912,6 +1016,17 @@ app.get('/inspections/:id/edit', htmlAuthGuard(['owner', 'admin', 'inspector']),
 });
 
 app.get('/', (c) => c.redirect('/dashboard'));
+
+// Sprint 1 C-2 — global catch-all 404. API requests under /api/* fall back
+// to the JSON error middleware (handled by app.onError when a route throws);
+// HTML requests get the styled NotFoundPage.
+app.notFound((c) => {
+    const url = new URL(c.req.url);
+    if (url.pathname.startsWith('/api/')) {
+        return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404);
+    }
+    return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+});
 
 export default app;
 export { scheduled } from './scheduled';

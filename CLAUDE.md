@@ -67,6 +67,7 @@ npm run deploy       # Deploy to Cloudflare Workers
 | `STRIPE_SECRET_KEY` | No | Stripe API key (for Connect payments) |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook HMAC verification |
 | `GA_MEASUREMENT_ID` | No | Google Analytics tracking ID |
+| `GOOGLE_PLACES_API_KEY` | No | Google Places API key powering address autocomplete on the dashboard new-inspection wizard and the public `/book` page (proxied via `/api/places/*` and `/api/public/geocode`). When unset, both endpoints return `{ data: [], reason: 'NO_API_KEY' }` and the address inputs degrade gracefully to plain text — the customer can still type a free-form address and submit. |
 
 ---
 

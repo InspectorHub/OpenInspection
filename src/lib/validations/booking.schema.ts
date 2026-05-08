@@ -3,16 +3,24 @@ import { createApiResponseSchema } from './shared.schema';
 
 /**
  * Validation schema for the public booking request.
+ *
+ * Sprint 1 C-6 — `timeSlot` extended from morning/afternoon to a 4-option
+ * window enum. `all-day` collapses to a morning slot internally; `custom`
+ * requires a paired `customTime` (HH:mm) — see bookings.ts for the mapping.
  */
 export const PublicBookingSchema = z.object({
     address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }),
     clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }),
     clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-15' }),
-    timeSlot: z.enum(['morning', 'afternoon']).openapi({ example: 'morning' }),
+    timeSlot: z.enum(['morning', 'afternoon', 'all-day', 'custom']).openapi({ example: 'morning' }),
+    customTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().openapi({ example: '13:30' }),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
     turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }),
-}).openapi('PublicBooking');
+}).refine(
+    (data) => data.timeSlot !== 'custom' || !!data.customTime,
+    { message: 'customTime is required when timeSlot is custom', path: ['customTime'] },
+).openapi('PublicBooking');
 
 /**
  * Validation schema for recurring weekly availability.
