@@ -131,6 +131,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         <p class="text-[12px] text-slate-500 mt-0.5">
                                             <span x-text="i.clientName || '—'"></span>
                                             <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
+                                            <template x-if="i.siblingCount && i.siblingCount > 1">
+                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
+                                            </template>
                                             <span> · </span>
                                             <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
                                         </p>
@@ -190,6 +194,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         <p class="text-[12px] text-slate-500 mt-0.5">
                                             <span x-text="i.clientName || '—'"></span>
                                             <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
+                                            <template x-if="i.siblingCount && i.siblingCount > 1">
+                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
+                                            </template>
                                             <span> · </span>
                                             <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
                                         </p>
@@ -272,6 +280,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         <p class="text-[12px] text-slate-500 mt-0.5">
                                             <span x-text="i.clientName || '—'"></span>
                                             <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
+                                            <template x-if="i.siblingCount && i.siblingCount > 1">
+                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
+                                            </template>
                                             <span> · </span>
                                             <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
                                         </p>
@@ -331,6 +343,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         <p class="text-[12px] text-slate-500 mt-0.5">
                                             <span x-text="i.clientName || '—'"></span>
                                             <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
+                                            <template x-if="i.siblingCount && i.siblingCount > 1">
+                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
+                                            </template>
                                             <span> · </span>
                                             <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
                                         </p>
@@ -395,6 +411,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         <p class="text-[12px] text-slate-500 mt-0.5">
                                             <span x-text="i.clientName || '—'"></span>
                                             <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
+                                            <template x-if="i.siblingCount && i.siblingCount > 1">
+                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
+                                            </template>
                                             <span> · </span>
                                             <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
                                         </p>
@@ -454,6 +474,10 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                         <p class="text-[12px] text-slate-500 mt-0.5">
                                             <span x-text="i.clientName || '—'"></span>
                                             <template x-if="i.agentName"><span> · <span class="text-slate-400">via</span> <span x-text="i.agentName"></span></span></template>
+                                            {/* Sprint 2 S2-2 — sibling-count badge for multi-inspection requests. */}
+                                            <template x-if="i.siblingCount && i.siblingCount > 1">
+                                                <span> · <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-inset ring-indigo-200" x-text="i.siblingCount + ' inspections'"></span></span>
+                                            </template>
                                             <span> · </span>
                                             <span x-text="i.date ? new Date(i.date).toLocaleString() : 'no date'"></span>
                                         </p>

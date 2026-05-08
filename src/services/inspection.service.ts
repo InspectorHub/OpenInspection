@@ -948,16 +948,29 @@ export class InspectionService {
             if (r.inspectionId) paidIdSet.add(r.inspectionId as string);
         }
 
-        const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; price?: unknown }>(rows: T[]): Array<T & {
-            defectStats:  { safety: number; recommendation: number; maintenance: number };
-            agentName?:   string;
-            statusFlags:  { reportPublished: boolean; agreementSigned: boolean; paid: boolean; flagged: boolean; canceled: boolean };
+        // Sprint 2 S2-2 — count sibling inspections per request_id so list rows
+        // can show a "(2 inspections)" hint when the inspection belongs to a
+        // multi-service booking. Built once for the entire bucket sweep.
+        const requestSiblingCounts = new Map<string, number>();
+        for (const i of all) {
+            const rid = (i as typeof inspections.$inferSelect).requestId;
+            if (rid) requestSiblingCounts.set(rid, (requestSiblingCounts.get(rid) ?? 0) + 1);
+        }
+
+        const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
+            defectStats:    { safety: number; recommendation: number; maintenance: number };
+            agentName?:     string;
+            statusFlags:    { reportPublished: boolean; agreementSigned: boolean; paid: boolean; flagged: boolean; canceled: boolean };
+            requestId?:     string;
+            siblingCount?:  number;
         }> =>
             rows.map(r => {
                 const id = r.id as string;
                 const sellingId    = r.sellingAgentId as string | null;
                 const referredById = r.referredByAgentId as string | null;
                 const agentName = (sellingId && agentNameMap.get(sellingId)) || (referredById && agentNameMap.get(referredById)) || undefined;
+                const reqId = (r as { requestId?: unknown }).requestId as string | null | undefined;
+                const siblingCount = reqId ? (requestSiblingCounts.get(reqId) ?? 1) : 1;
                 return {
                     ...r,
                     defectStats: statsMap.get(id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
@@ -969,6 +982,7 @@ export class InspectionService {
                         flagged:         overdueSet.has(id),
                         canceled:        r.status === 'cancelled',
                     },
+                    ...(reqId ? { requestId: reqId, siblingCount } : {}),
                 };
             });
 
