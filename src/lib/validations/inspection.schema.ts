@@ -179,6 +179,33 @@ export const InspectionRecipientsResponseSchema = createApiResponseSchema(
   z.array(InspectionRecipientSchema)
 ).openapi('InspectionRecipientsResponse');
 
+// Round-2 F3 — People card payload (Spectora §E.2).
+const PeopleAgentSchema = z.object({
+  id:     z.string(),
+  name:   z.string(),
+  email:  z.string().nullable(),
+  phone:  z.string().nullable(),
+  agency: z.string().nullable(),
+});
+
+export const InspectionPeopleSchema = z.object({
+  inspector: z.object({
+    id:    z.string(),
+    name:  z.string().nullable(),
+    email: z.string(),
+    phone: z.string().nullable(),
+  }).nullable(),
+  client: z.object({
+    name:  z.string(),
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+  }).nullable(),
+  buyerAgents:   z.array(PeopleAgentSchema),
+  listingAgents: z.array(PeopleAgentSchema),
+}).openapi('InspectionPeople');
+
+export const InspectionPeopleResponseSchema = createApiResponseSchema(InspectionPeopleSchema).openapi('InspectionPeopleResponse');
+
 export const ReportItemSchema = z.object({
   id: z.string(),
   label: z.string(),

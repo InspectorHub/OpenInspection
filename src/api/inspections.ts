@@ -19,6 +19,7 @@ import {
     InspectionCountsSchema,
     PublishInspectionSchema,
     InspectionRecipientsResponseSchema,
+    InspectionPeopleResponseSchema,
     ReportDataResponseSchema,
     CancelInspectionSchema,
     DashboardResponseSchema,
@@ -1371,6 +1372,32 @@ inspectionsRoutes.openapi(recipientsRoute, async (c) => {
     const { id }   = c.req.valid('param');
     const list     = await c.var.services.inspection.getRecipientList(id, tenantId);
     return c.json({ success: true, data: list }, 200);
+});
+
+/**
+ * Round-2 F3 — GET /api/inspections/:id/people
+ * People-card payload (inspector + client + buyer/listing agents).
+ */
+const peopleRoute = createRoute({
+    method:  'get',
+    path:    '/{id}/people',
+    tags:    ['Inspections'],
+    summary: 'People card payload (inspector, client, agents)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: InspectionPeopleResponseSchema } },
+            description: 'People card',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(peopleRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id }   = c.req.valid('param');
+    const card     = await c.var.services.inspection.getPeopleCard(id, tenantId);
+    return c.json({ success: true, data: card }, 200);
 });
 
 /**

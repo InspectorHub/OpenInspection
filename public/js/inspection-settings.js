@@ -23,6 +23,17 @@ document.addEventListener('alpine:init', () => {
             agreementRequired: false,
         },
 
+        // Round-2 F3 — People card payload. Loaded from
+        // /api/inspections/:id/people; rendered by the PeopleCard component.
+        peopleCard: null,
+        get peopleCardCount() {
+            if (!this.peopleCard) return 0;
+            return (this.peopleCard.inspector ? 1 : 0)
+                 + (this.peopleCard.client    ? 1 : 0)
+                 + (this.peopleCard.buyerAgents?.length   || 0)
+                 + (this.peopleCard.listingAgents?.length || 0);
+        },
+
         get ratingSystemLabel() {
             // T1 will set rating_system_id + ratingSystem fields on templates.
             // Until merge we return null and the badge stays hidden.
@@ -34,10 +45,12 @@ document.addEventListener('alpine:init', () => {
 
         async load() {
             try {
-                const [inspRes, tplRes, teamRes] = await Promise.all([
+                const [inspRes, tplRes, teamRes, peopleRes] = await Promise.all([
                     window.authFetch('/api/inspections/' + this.inspectionId),
                     window.authFetch('/api/templates'),
                     window.authFetch('/api/team/members'),
+                    // Round-2 F3 — People card payload.
+                    window.authFetch('/api/inspections/' + this.inspectionId + '/people'),
                 ]);
                 const inspJson = inspRes.ok ? await inspRes.json() : { data: {} };
                 const insp = (inspJson.data && (inspJson.data.inspection || inspJson.data)) || {};
@@ -57,6 +70,10 @@ document.addEventListener('alpine:init', () => {
                     const teamJson = await teamRes.json();
                     const members = (teamJson.data && (teamJson.data.members || teamJson.data)) || [];
                     this.inspectors = members.filter(m => m.role === 'inspector' || m.role === 'admin' || m.role === 'owner');
+                }
+                if (peopleRes && peopleRes.ok) {
+                    const peopleJson = await peopleRes.json();
+                    this.peopleCard = (peopleJson && peopleJson.data) || null;
                 }
             } catch (e) {
                 console.error('settings.load failed', e);

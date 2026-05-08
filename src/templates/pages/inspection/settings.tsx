@@ -13,6 +13,7 @@
 
 import { MainLayout } from '../../layouts/main-layout';
 import { InspectionShell } from '../../components/inspection-shell';
+import { PeopleCard } from '../../components/people-card';
 import type { BrandingConfig } from '../../../types/auth';
 
 export interface InspectionSettingsPageProps {
@@ -48,6 +49,11 @@ export const InspectionSettingsPage = ({
             >
                 <div x-data={`inspectionSettingsPage('${inspectionId}')`} x-init="load()" class="space-y-8 max-w-2xl">
                     <div x-show="loading" class="text-center py-12 text-slate-400 text-[13px]">Loading…</div>
+
+                    {/* Round-2 F3 — People card with role chips. Auto-loads
+                        from /api/inspections/:id/people via the settings
+                        Alpine factory; auto-hides when nothing returned. */}
+                    <PeopleCard />
 
                     <form x-show="!loading" style="display:none" {...{ 'x-on:submit.prevent': 'save()' }} class="space-y-6">
                         <fieldset class="space-y-4">

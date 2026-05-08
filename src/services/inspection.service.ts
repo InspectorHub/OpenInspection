@@ -1092,6 +1092,94 @@ export class InspectionService {
     }
 
     /**
+     * Round-2 F3 — People card payload (Spectora §E.2 / §4.1).
+     *
+     * Groups every party connected to an inspection by role so the inspection
+     * Settings page can render a contact card with role chips:
+     *
+     *   - Inspector  → users row referenced by inspectorId
+     *   - Client     → inline columns on inspections (clientName/email/phone)
+     *   - Buyer's Agent  → contacts row pointed at by referredByAgentId
+     *   - Listing Agent  → contacts row pointed at by sellingAgentId
+     *
+     * Schema currently allows ONE buyer agent + ONE listing agent per
+     * inspection. The result returns arrays for forward-compat (so the UI
+     * can render "Buyer's Agent · 2" if multi-agent ever ships) without a
+     * follow-up service refactor.
+     */
+    async getPeopleCard(inspectionId: string, tenantId: string): Promise<{
+        inspector:     { id: string; name: string | null; email: string; phone: string | null } | null;
+        client:        { name: string; email: string | null; phone: string | null } | null;
+        buyerAgents:   Array<{ id: string; name: string; email: string | null; phone: string | null; agency: string | null }>;
+        listingAgents: Array<{ id: string; name: string; email: string | null; phone: string | null; agency: string | null }>;
+    }> {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        // Inspector — users table (tenant-scoped).
+        let inspector: { id: string; name: string | null; email: string; phone: string | null } | null = null;
+        if (inspection.inspectorId) {
+            const u = await db.select().from(users)
+                .where(and(eq(users.id, inspection.inspectorId as string), eq(users.tenantId, tenantId)))
+                .get();
+            if (u) {
+                inspector = {
+                    id:    u.id as string,
+                    name:  (u.name  as string | null) ?? null,
+                    email: u.email as string,
+                    phone: (u.phone as string | null) ?? null,
+                };
+            }
+        }
+
+        // Client — inline on inspections. Only return when there's at least
+        // a name (otherwise nothing meaningful to render in the card).
+        const clientName = (inspection.clientName as string | null) ?? null;
+        const client = clientName && clientName.trim().length > 0
+            ? {
+                name:  clientName,
+                email: (inspection.clientEmail as string | null) ?? null,
+                phone: (inspection.clientPhone as string | null) ?? null,
+            }
+            : null;
+
+        // Agents — fetch both in one query.
+        const agentIds = [inspection.referredByAgentId, inspection.sellingAgentId]
+            .filter((x): x is string => typeof x === 'string' && x.length > 0);
+        const agentRowsById = new Map<string, typeof contacts.$inferSelect>();
+        if (agentIds.length > 0) {
+            const rows = await db.select().from(contacts)
+                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, agentIds)));
+            for (const row of rows) agentRowsById.set(row.id as string, row);
+        }
+        const toAgent = (id: string | null) => {
+            if (!id) return null;
+            const row = agentRowsById.get(id);
+            if (!row) return null;
+            return {
+                id:     row.id as string,
+                name:   row.name as string,
+                email:  (row.email  as string | null) ?? null,
+                phone:  (row.phone  as string | null) ?? null,
+                agency: (row.agency as string | null) ?? null,
+            };
+        };
+        const buyerAgent   = toAgent(inspection.referredByAgentId as string | null);
+        const listingAgent = toAgent(inspection.sellingAgentId   as string | null);
+
+        return {
+            inspector,
+            client,
+            buyerAgents:   buyerAgent   ? [buyerAgent]   : [],
+            listingAgents: listingAgent ? [listingAgent] : [],
+        };
+    }
+
+    /**
      * Publishes an inspection report (transitions to delivered status).
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
