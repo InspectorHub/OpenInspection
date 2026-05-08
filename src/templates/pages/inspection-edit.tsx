@@ -118,6 +118,29 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
             </div>
           </div>
 
+          {/* Sprint 2 S2-2 — mobile request switcher banner. */}
+          <div
+            x-data={`requestSwitcher('${inspectionId}')`}
+            x-init="load()"
+            x-show="hasSiblings"
+            style="display:none"
+            class="mx-4 mt-3 flex flex-wrap items-center gap-1.5 px-3 py-2 bg-indigo-50 rounded-md border border-indigo-200"
+          >
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white ring-1 ring-inset ring-indigo-200 text-[10px] font-bold text-indigo-700">
+              Part <span x-text="partIndex"></span> of <span x-text="partTotal"></span>
+            </span>
+            <span class="text-[10px] text-slate-500" x-text="'request ' + requestIdShort"></span>
+            <div class="flex flex-wrap gap-1 mt-1 w-full">
+              <template x-for="s in siblings" {...{ 'x-bind:key': 's.id' }}>
+                <a
+                  x-bind:href="'/inspections/' + s.id + '/report'"
+                  x-bind:class="isCurrent(s.id) ? 'px-2 py-0.5 rounded bg-white border border-indigo-300 text-indigo-700 text-[10px] font-bold' : 'px-2 py-0.5 rounded text-slate-600 text-[10px] font-medium hover:bg-white'"
+                  x-text="s.templateName"
+                ></a>
+              </template>
+            </div>
+          </div>
+
           {/* Round 32 — one-time gesture hint surfaces R23 swipe nav.
               Auto-dismisses on first successful swipe; tap × to dismiss
               manually. Persisted via localStorage `oi:swipeHint`. */}
@@ -659,6 +682,35 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
 
           {/* Center Content */}
           <main class="flex-1 min-w-0">
+            {/* Sprint 2 S2-2 — request switcher banner.
+                Renders only when the inspection belongs to a multi-service
+                booking (request.inspections.length > 1). The banner shows
+                "Part X of Y in request ABC123" plus chip links to siblings.
+                Hidden during initial fetch and for single-service inspections. */}
+            <div
+              x-data={`requestSwitcher('${inspectionId}')`}
+              x-init="load()"
+              x-show="hasSiblings"
+              style="display:none"
+              class="mx-6 mt-3 flex flex-wrap items-center gap-2 px-3 py-2 bg-indigo-50 rounded-md border border-indigo-200"
+              role="region"
+              aria-label="Inspection request siblings"
+            >
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white ring-1 ring-inset ring-indigo-200 text-[11px] font-bold text-indigo-700">
+                Part <span x-text="partIndex"></span> of <span x-text="partTotal"></span>
+              </span>
+              <span class="text-[11px] text-slate-500">
+                in request <span class="font-mono font-semibold text-slate-700" x-text="requestIdShort"></span>
+              </span>
+              <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 ml-2">Switch:</span>
+              <template x-for="s in siblings" {...{ 'x-bind:key': 's.id' }}>
+                <a
+                  x-bind:href="'/inspections/' + s.id + '/report'"
+                  x-bind:class="isCurrent(s.id) ? 'px-2.5 py-1 rounded-md bg-white border border-indigo-300 text-indigo-700 text-[11px] font-bold' : 'px-2.5 py-1 rounded-md text-slate-600 text-[11px] font-medium hover:bg-white hover:text-slate-900 transition-colors'"
+                  x-text="s.templateName"
+                ></a>
+              </template>
+            </div>
             {/* Toolbar */}
             <div class="sticky top-0 z-40 px-3 py-2 flex items-center justify-between" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(16px) saturate(1.5); border-bottom: 1px solid rgba(226,232,240,0.6);">
               <div class="flex items-center gap-3">
@@ -1643,6 +1695,8 @@ export function InspectionEditPage({ inspectionId, branding }: InspectionEditPro
       <script src="/js/canned-comments.js"></script>
       <script src="/js/inspection-edit.js"></script>
       <script src="/js/inspection-events.js"></script>
+      {/* Sprint 2 S2-2 — request switcher Alpine factory. */}
+      <script src="/js/request-switcher.js"></script>
       {/* Phase T (T14) — Konva-based photo annotator. konva.min.js (~150KB) is
           lazy-loaded by photo-annotator.js on the first `annotate` event so it
           doesn't block first paint of the inspection edit page. */}

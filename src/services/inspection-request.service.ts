@@ -121,7 +121,9 @@ export class InspectionRequestService {
 
     /**
      * Fetch a single parent request with its children (tenant-scoped).
-     * Returns null when not found.
+     * Returns null when not found. Resolves child template names so callers
+     * (e.g. the inspection-edit request switcher) can render readable chips
+     * without an extra round-trip.
      */
     async get(tenantId: string, id: string) {
         const db = this.getDrizzle();
@@ -144,7 +146,17 @@ export class InspectionRequestService {
             .where(and(eq(inspections.tenantId, tenantId), eq(inspections.requestId, id)))
             .all();
 
-        return this.shapeRequest(req, subs);
+        const tplIds = Array.from(new Set(subs.map(s => s.templateId).filter((x): x is string => !!x)));
+        const tplNameById = new Map<string, string>();
+        if (tplIds.length > 0) {
+            const tplRows = await db.select({ id: templates.id, name: templates.name })
+                .from(templates)
+                .where(and(eq(templates.tenantId, tenantId), inArray(templates.id, tplIds)))
+                .all();
+            for (const t of tplRows) tplNameById.set(t.id, t.name);
+        }
+
+        return this.shapeRequest(req, subs, tplNameById);
     }
 
     /**
@@ -318,7 +330,7 @@ export class InspectionRequestService {
         return detail;
     }
 
-    private shapeRequest(req: RequestRow, subs: SubInspectionRow[]) {
+    private shapeRequest(req: RequestRow, subs: SubInspectionRow[], tplNameById?: Map<string, string>) {
         return {
             id:               req.id,
             tenantId:         req.tenantId,
@@ -339,6 +351,7 @@ export class InspectionRequestService {
             inspections:      subs.map(s => ({
                 id:              s.id,
                 templateId:      s.templateId,
+                templateName:    (s.templateId && tplNameById?.get(s.templateId)) || null,
                 propertyAddress: s.propertyAddress,
                 clientName:      s.clientName,
                 status:          s.status,

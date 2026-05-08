@@ -57,6 +57,7 @@ export const InspectionRequestListQuerySchema = z.object({
 const SubInspectionResponseSchema = z.object({
     id:              z.string(),
     templateId:      z.string().nullable(),
+    templateName:    z.string().nullable().optional(),
     propertyAddress: z.string(),
     clientName:      z.string().nullable(),
     status:          z.string(),

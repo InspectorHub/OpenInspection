@@ -152,4 +152,15 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         expect(updated.clientName).toBe('New Name');
         expect(updated.status).toBe('in_progress');
     });
+
+    it('get() resolves template names so the request switcher can render readable chips', async () => {
+        const created = await svc.create(TENANT, {
+            clientName: 'A', propertyAddress: '1 St', scheduledAt: '2026-06-15T09:00:00Z',
+        }, [{ templateId: TPL1 }, { templateId: TPL2 }]);
+
+        const detail = await svc.get(TENANT, created.id);
+        expect(detail).not.toBeNull();
+        const names = detail!.inspections.map(i => i.templateName).sort();
+        expect(names).toEqual(['Radon', 'Residential']);
+    });
 });

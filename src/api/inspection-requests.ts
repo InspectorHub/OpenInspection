@@ -19,6 +19,7 @@ import {
     InspectionRequestListQuerySchema,
     InspectionRequestListResponseSchema,
     InspectionRequestDetailResponseSchema,
+    InspectionRequestResponseSchema,
 } from '../lib/validations/inspection-request.schema';
 
 const inspectionRequestsRoutes = new OpenAPIHono<HonoConfig>();
@@ -72,6 +73,40 @@ inspectionRequestsRoutes.openapi(detailRoute, async (c) => {
     const request = await c.var.services.inspectionRequest.get(tenantId, id);
     if (!request) throw Errors.NotFound('Inspection request not found');
     return c.json({ success: true, data: { request } }, 200);
+});
+
+// Sprint 2 S2-2 — resolve the parent request for an inspection.
+// Used by the inspection-edit "Part X of Y" badge + sibling switcher.
+// Returns 200 with `{ request: null }` when the inspection has no parent
+// (single-service legacy bookings) so the caller can branch without 404
+// noise in the console.
+const byInspectionRoute = createRoute({
+    method: 'get', path: '/by-inspection/{inspectionId}',
+    tags: ['Inspection Requests'],
+    summary: 'Get parent request by inspection id',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ inspectionId: z.string().min(1) }) },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(true),
+                        data: z.object({ request: InspectionRequestResponseSchema.nullable() }),
+                    }),
+                },
+            },
+            description: 'Parent request (or null when none)',
+        },
+    },
+    security: [{ bearerAuth: [] }],
+});
+
+inspectionRequestsRoutes.openapi(byInspectionRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { inspectionId } = c.req.valid('param');
+    const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId);
+    return c.json({ success: true as const, data: { request: request ?? null } }, 200);
 });
 
 const createReqRoute = createRoute({
