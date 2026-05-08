@@ -269,6 +269,18 @@
                     }));
                 }
 
+                // Sort groups by their best item score so the most relevant
+                // group surfaces first (e.g. "attention" → Settings before
+                // Comment snippets even though comment snippets were collected
+                // earlier). Empty query keeps original order.
+                if (q) {
+                    out.sort((a, b) => {
+                        const aBest = a.items[0]?._score ?? 0;
+                        const bBest = b.items[0]?._score ?? 0;
+                        return bBest - aBest;
+                    });
+                }
+
                 // Re-index all items into a flat highlight order.
                 let n = 0;
                 for (const g of out) {
