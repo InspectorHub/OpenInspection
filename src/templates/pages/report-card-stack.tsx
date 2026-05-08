@@ -29,6 +29,10 @@ interface ReportSection {
   icon?: string | null;
   defectCount: number;
   items: ReportItem[];
+  // Track E2 (Spectora App.A) — per-section legal disclaimer + force page
+  // break. Both are optional; legacy templates render unchanged.
+  disclaimerText?: string | null;
+  alwaysPageBreak?: boolean;
 }
 
 interface ReportPageProps {
@@ -54,6 +58,9 @@ interface ReportPageProps {
   // the published report. Drives the EDIT SECTION hover button: only
   // owner / admin / inspector see it; public clients (no token) do not.
   viewerRole?: string | null | undefined;
+  // Track E1 (ITB §11) — when true, surface a "View repair list" link in
+  // the report header so realtors can jump to the contractor punch-list.
+  enableRepairList?: boolean;
 }
 
 const SECTION_ICONS: Record<string, string> = {
@@ -76,6 +83,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
   // EDIT SECTION button on hover. Public clients never get a way back into
   // the editor from the published view.
   const showEditAffordance = canEditSection(props.viewerRole ?? null);
+  const enableRepairList = props.enableRepairList ?? false;
   // Server-side defect filter for ?summary=1 (PDF Summary mode).
   // Keeps only sections with at least one defect, and within each kept
   // section, only items whose severityBucket maps to defect.
@@ -196,6 +204,17 @@ export function ReportCardStackPage(props: ReportPageProps) {
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                 PDF
               </button>
+              {/* Track E1 (ITB §11) — opt-in jump link to the aggregated repair list. */}
+              {enableRepairList && (
+                <a
+                  href={`/inspections/${inspectionId}/repair-list`}
+                  data-testid="report-repair-list-link"
+                  class="no-print px-4 py-2 text-sm font-medium rounded-lg theme-border border theme-text-secondary flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                  View Repair List
+                </a>
+              )}
               <button x-on:click="showRepairPanel = !showRepairPanel" class="px-4 py-2 text-sm font-semibold rounded-lg text-white flex items-center gap-2 theme-accent">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Repair Request
@@ -233,6 +252,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
               id={`section-${section.id}`}
               data-testid="report-section"
               class="mb-6 report-section group/section relative"
+              {...(section.alwaysPageBreak ? { 'data-page-break': 'always' } : {})}
               x-show={`filter === 'all' || filter === 'summary' || sectionHasDefects('${section.id}')`}
             >
               <div class="flex items-center gap-3 mb-4">
@@ -343,6 +363,20 @@ export function ReportCardStackPage(props: ReportPageProps) {
                   </span>
                 </div>
               </div>
+
+              {/* Track E2 (Spectora App.A) — per-section disclaimer rendered
+                  beneath the items list. Hidden in summary filter to keep the
+                  preview pane clean. */}
+              {section.disclaimerText && (
+                <div
+                  data-testid="section-disclaimer"
+                  class="mt-4 px-4 py-3 rounded-md border theme-border bg-amber-50/40 text-[12px] leading-relaxed text-slate-700"
+                  x-show="filter !== 'summary'"
+                >
+                  <div class="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700 mb-1">Disclaimer</div>
+                  <p class="whitespace-pre-line">{section.disclaimerText}</p>
+                </div>
+              )}
             </div>
           ))}
         </div>

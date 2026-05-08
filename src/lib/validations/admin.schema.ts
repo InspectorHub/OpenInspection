@@ -13,6 +13,8 @@ export const UpdateBrandingSchema = z.object({
     reportTheme: z.enum(['modern', 'classic', 'minimal']).optional().openapi({ example: 'modern' }),
     // Sprint 2 S2-4 — gate the per-defect "Estimated cost: $X – $Y" badge.
     showEstimates: z.boolean().optional().openapi({ example: true }),
+    // Track E1 (ITB §11) — gate the "Repair List" tab on the published report.
+    enableRepairList: z.boolean().optional().openapi({ example: true }),
 }).openapi('UpdateBranding');
 
 /**

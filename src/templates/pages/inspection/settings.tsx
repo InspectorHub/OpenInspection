@@ -16,11 +16,12 @@ import { InspectionShell } from '../../components/inspection-shell';
 import type { BrandingConfig } from '../../../types/auth';
 
 export interface InspectionSettingsPageProps {
-    inspectionId:    string;
-    propertyAddress: string;
-    branding?:       BrandingConfig | undefined;
-    requestId?:      string | undefined;
-    siblings?:       Array<{ id: string; templateName: string; status: string }> | undefined;
+    inspectionId:     string;
+    propertyAddress:  string;
+    branding?:        BrandingConfig | undefined;
+    requestId?:       string | undefined;
+    siblings?:        Array<{ id: string; templateName: string; status: string }> | undefined;
+    enableRepairList?: boolean;
 }
 
 export const InspectionSettingsPage = ({
@@ -29,6 +30,7 @@ export const InspectionSettingsPage = ({
     branding,
     requestId,
     siblings,
+    enableRepairList,
 }: InspectionSettingsPageProps): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
@@ -40,6 +42,7 @@ export const InspectionSettingsPage = ({
                 inspectionId={inspectionId}
                 propertyAddress={propertyAddress}
                 current="settings"
+                enableRepairList={!!enableRepairList}
                 {...(requestId ? { requestId } : {})}
                 {...(siblings  ? { siblings  } : {})}
             >

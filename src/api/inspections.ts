@@ -1230,6 +1230,70 @@ inspectionsRoutes.openapi(getReportDataRoute, async (c) => {
 });
 
 /**
+ * GET /api/inspections/:id/repair-list
+ *
+ * Track E1 (ITB §11, UC-ITB-07) — flat punch-list of every defect-rated
+ * item across the inspection, suitable for handing to a contractor or
+ * realtor. Authenticated route; the public viewer page hits the same
+ * service via a server-side render at /inspections/:id/repair-list.
+ */
+const RepairListEntrySchema = z.object({
+    sectionId:           z.string(),
+    sectionTitle:        z.string(),
+    itemId:              z.string(),
+    itemLabel:           z.string(),
+    comment:             z.string(),
+    location:            z.string().nullable(),
+    category:            z.enum(['safety', 'recommendation', 'maintenance']),
+    recommendationId:    z.string().nullable(),
+    recommendationLabel: z.string().nullable(),
+    estimateLow:         z.number().nullable(),
+    estimateHigh:        z.number().nullable(),
+    photos:              z.array(z.object({ key: z.string(), url: z.string() })),
+    source:              z.enum(['canned', 'custom']),
+});
+const RepairListResponseSchema = z.object({
+    inspection: z.object({
+        id:              z.string(),
+        propertyAddress: z.string(),
+        date:            z.string().nullable(),
+        inspectorName:   z.string().nullable(),
+    }),
+    defects: z.array(RepairListEntrySchema),
+    totals: z.object({
+        count:           z.number(),
+        safety:          z.number(),
+        recommendation:  z.number(),
+        maintenance:     z.number(),
+        estimateLowSum:  z.number(),
+        estimateHighSum: z.number(),
+    }),
+    showEstimates: z.boolean(),
+});
+
+const getRepairListRoute = createRoute({
+    method: 'get',
+    path: '/{id}/repair-list',
+    tags: ['Inspections'],
+    summary: 'Get aggregated repair list (defects-only punch list)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(RepairListResponseSchema) } },
+            description: 'Repair list',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(getRepairListRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const data = await c.var.services.inspection.getRepairList(id, tenantId);
+    return c.json({ success: true, data }, 200);
+});
+
+/**
  * POST /api/inspections/:id/confirm
  */
 inspectionsRoutes.openapi(createRoute({

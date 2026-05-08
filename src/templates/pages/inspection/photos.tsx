@@ -13,11 +13,12 @@ import { InspectionShell } from '../../components/inspection-shell';
 import type { BrandingConfig } from '../../../types/auth';
 
 export interface InspectionPhotosPageProps {
-    inspectionId:    string;
-    propertyAddress: string;
-    branding?:       BrandingConfig | undefined;
-    requestId?:      string | undefined;
-    siblings?:       Array<{ id: string; templateName: string; status: string }> | undefined;
+    inspectionId:     string;
+    propertyAddress:  string;
+    branding?:        BrandingConfig | undefined;
+    requestId?:       string | undefined;
+    siblings?:        Array<{ id: string; templateName: string; status: string }> | undefined;
+    enableRepairList?: boolean;
 }
 
 export const InspectionPhotosPage = ({
@@ -26,6 +27,7 @@ export const InspectionPhotosPage = ({
     branding,
     requestId,
     siblings,
+    enableRepairList,
 }: InspectionPhotosPageProps): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     return (
@@ -43,6 +45,7 @@ export const InspectionPhotosPage = ({
                 inspectionId={inspectionId}
                 propertyAddress={propertyAddress}
                 current="photos"
+                enableRepairList={!!enableRepairList}
                 {...(requestId ? { requestId } : {})}
                 {...(siblings  ? { siblings  } : {})}
             >

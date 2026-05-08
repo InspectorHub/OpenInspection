@@ -16,7 +16,7 @@
 
 import { PageHeader } from './page-header';
 
-export type InspectionSubRoute = 'report' | 'photos' | 'summary' | 'signatures' | 'settings';
+export type InspectionSubRoute = 'report' | 'photos' | 'summary' | 'signatures' | 'settings' | 'repair-list';
 
 interface SubInspectionInfo {
     id:           string;
@@ -31,15 +31,18 @@ export interface InspectionShellProps {
     /** When set, the page header shows a "Part X of Y" badge with switcher. */
     requestId?:      string;
     siblings?:       SubInspectionInfo[];
+    /** Track E1 — when true, the sub-nav exposes a 6th "Repair List" tab. */
+    enableRepairList?: boolean;
     children:        unknown;
 }
 
 const TABS: Array<{ id: InspectionSubRoute; label: string }> = [
-    { id: 'report',     label: 'Report' },
-    { id: 'photos',     label: 'Photos' },
-    { id: 'summary',    label: 'Summary' },
-    { id: 'signatures', label: 'Signatures' },
-    { id: 'settings',   label: 'Settings' },
+    { id: 'report',      label: 'Report' },
+    { id: 'photos',      label: 'Photos' },
+    { id: 'summary',     label: 'Summary' },
+    { id: 'repair-list', label: 'Repair List' },
+    { id: 'signatures',  label: 'Signatures' },
+    { id: 'settings',    label: 'Settings' },
 ];
 
 export const InspectionShell = ({
@@ -48,8 +51,12 @@ export const InspectionShell = ({
     current,
     requestId,
     siblings,
+    enableRepairList = false,
     children,
 }: InspectionShellProps): JSX.Element => {
+    // Track E1 — Repair List tab is opt-in per tenant. Filter it out when
+    // disabled so the sub-nav stays at its 5-tab Sprint 2 baseline.
+    const visibleTabs = enableRepairList ? TABS : TABS.filter(t => t.id !== 'repair-list');
     const hasMultipleSiblings = !!siblings && siblings.length > 1;
     const partIndex = hasMultipleSiblings && siblings
         ? siblings.findIndex(s => s.id === inspectionId) + 1
@@ -114,7 +121,7 @@ export const InspectionShell = ({
                 class="border-b border-slate-200 sticky top-0 z-20 bg-[#f8fafc]"
             >
                 <div class="flex items-center gap-1 overflow-x-auto hide-scrollbar">
-                    {TABS.map((t) => {
+                    {visibleTabs.map((t) => {
                         const active = t.id === current;
                         return (
                             <a

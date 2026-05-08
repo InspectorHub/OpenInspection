@@ -560,7 +560,11 @@ export class InspectionService {
         interface CannedDefect      { id: string; title: string; category: 'maintenance' | 'recommendation' | 'safety'; location: string; comment: string; photos: string[]; default: boolean }
         interface ItemTabs          { information: CannedInfoComment[]; limitations: CannedInfoComment[]; defects: CannedDefect[] }
         interface SchemaItem        { id: string; label: string; icon?: string; type?: string; ratingOptions?: string[]; tabs?: ItemTabs; number?: string }
-        interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[] }
+        // Track E2 (Spectora App.A) — per-section disclaimer + force-page-break
+        // are stored on the schema's section node so the editor can author
+        // them and the published report can honor them. Both are optional —
+        // legacy templates without these fields render unchanged.
+        interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
         interface PhotoEntry        { key: string; annotatedKey?: string; annotationsJson?: string }
         // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
@@ -652,6 +656,13 @@ export class InspectionService {
             title: sec.title || (sec as unknown as Record<string, string>).name || 'Untitled',
             icon: sec.icon ?? null,
             defectCount: stats.sectionDefects[sec.id] ?? 0,
+            // Track E2 — surface per-section flags so the report viewer can
+            // render the disclaimer + apply the page-break attribute. Null
+            // when unset so the renderer can short-circuit cleanly.
+            disclaimerText:  (typeof sec.disclaimerText === 'string' && sec.disclaimerText.trim().length > 0)
+                ? sec.disclaimerText.trim()
+                : null,
+            alwaysPageBreak: sec.alwaysPageBreak === true,
             items: sec.items.map((item: SchemaItem) => {
                 const res = resultData[item.id] || {};
                 const ratingId = res.rating ?? null;
@@ -806,6 +817,161 @@ export class InspectionService {
                 { id: 'Not Inspected', label: 'Not Inspected', abbreviation: 'NI', color: '#3b82f6', severity: 'minor', isDefect: false },
             ],
             showEstimates,
+        };
+    }
+
+    /**
+     * Track E1 (ITB §11, UC-ITB-07) — Repair List aggregation.
+     *
+     * Walks every section of the published report (via getReportData so we
+     * stay aligned with the rating-system snapshot resolution + photo
+     * surfacing logic) and returns a flat list of defect-rated items only.
+     * Each row is a contractor punch-list entry: section breadcrumb + item
+     * label + the effective comment + contractor recommendation tag +
+     * estimate range + photo URLs.
+     *
+     * Custom (per-inspection) defects added by the inspector are also
+     * surfaced — they live under inspection_results.data[itemId].customComments
+     * and are not exposed by getReportData yet, so we pull them separately.
+     */
+    async getRepairList(inspectionId: string, tenantId: string) {
+        const report = await this.getReportData(inspectionId, tenantId);
+
+        // Pull custom defects directly from inspection_results since
+        // getReportData only resolves the template canned tabs.
+        interface CustomDefect {
+            id?:        string;
+            title?:     string;
+            comment?:   string;
+            included?:  boolean;
+            category?:  'safety' | 'recommendation' | 'maintenance';
+            location?:  string | null;
+            recommendationId?: string | null;
+            estimateLow?:      number | null;
+            estimateHigh?:     number | null;
+        }
+        const resultsRow = await this.getDrizzle()
+            .select({ data: inspectionResults.data })
+            .from(inspectionResults)
+            .where(and(
+                eq(inspectionResults.inspectionId, inspectionId),
+                eq(inspectionResults.tenantId, tenantId),
+            ))
+            .get();
+        const customByItem = new Map<string, CustomDefect[]>();
+        if (resultsRow?.data) {
+            const rawData = typeof resultsRow.data === 'string'
+                ? JSON.parse(resultsRow.data) as Record<string, unknown>
+                : resultsRow.data as Record<string, unknown>;
+            for (const itemId of Object.keys(rawData)) {
+                const entry = rawData[itemId] as { customComments?: { defects?: CustomDefect[] } } | null;
+                const customDefects = entry?.customComments?.defects ?? [];
+                if (customDefects.length > 0) customByItem.set(itemId, customDefects);
+            }
+        }
+
+        // Resolve recommendation slug → label once.
+        const labelBySlug = new Map<string, string>(
+            RECOMMENDATION_CATEGORIES.map(c => [c.id, c.label]),
+        );
+
+        interface RepairListEntry {
+            sectionId:           string;
+            sectionTitle:        string;
+            itemId:              string;
+            itemLabel:           string;
+            comment:             string;
+            location:            string | null;
+            category:            'safety' | 'recommendation' | 'maintenance';
+            recommendationId:    string | null;
+            recommendationLabel: string | null;
+            estimateLow:         number | null;
+            estimateHigh:        number | null;
+            photos:              Array<{ key: string; url: string }>;
+            // Source — distinguishes canned (template-driven) vs custom
+            // (per-inspection ad-hoc) defects so realtors can see the mix.
+            source:              'canned' | 'custom';
+        }
+        const entries: RepairListEntry[] = [];
+
+        for (const section of report.sections) {
+            for (const item of section.items) {
+                // Canned defects from the resolved tabs.
+                const cannedDefects = item.resolvedTabs?.defects ?? [];
+                for (const d of cannedDefects) {
+                    if (!d.included) continue;
+                    const cat = (d.effectiveCategory ?? 'maintenance') as RepairListEntry['category'];
+                    const slug = d.recommendationId ?? null;
+                    entries.push({
+                        sectionId:    section.id,
+                        sectionTitle: section.title,
+                        itemId:       item.id,
+                        itemLabel:    item.label,
+                        comment:      d.effectiveComment ?? '',
+                        location:     (typeof d.effectiveLocation === 'string' && d.effectiveLocation.length > 0)
+                            ? d.effectiveLocation
+                            : null,
+                        category:            cat,
+                        recommendationId:    slug,
+                        recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
+                        estimateLow:         d.estimateLow ?? null,
+                        estimateHigh:        d.estimateHigh ?? null,
+                        photos:              (d.defectPhotos ?? []).map(p => ({ key: p.key, url: p.url })),
+                        source:              'canned',
+                    });
+                }
+                // Custom defects (ad-hoc additions by the inspector).
+                const customs = customByItem.get(item.id) ?? [];
+                for (const c of customs) {
+                    if (c.included === false) continue;
+                    const cat = (c.category ?? 'maintenance') as RepairListEntry['category'];
+                    const slug = c.recommendationId ?? null;
+                    entries.push({
+                        sectionId:    section.id,
+                        sectionTitle: section.title,
+                        itemId:       item.id,
+                        itemLabel:    c.title || item.label,
+                        comment:      c.comment ?? '',
+                        location:     (typeof c.location === 'string' && c.location.length > 0)
+                            ? c.location
+                            : null,
+                        category:            cat,
+                        recommendationId:    slug,
+                        recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
+                        estimateLow:         c.estimateLow ?? null,
+                        estimateHigh:        c.estimateHigh ?? null,
+                        // Custom defect photos are not currently aggregated by
+                        // getReportData — the canned defect photo path stays
+                        // authoritative for now. A future iteration may pull
+                        // custom defect photos straight off the JSON payload.
+                        photos:              [],
+                        source:              'custom',
+                    });
+                }
+            }
+        }
+
+        const totals = entries.reduce(
+            (acc, e) => {
+                acc.count++;
+                acc[e.category]++;
+                if (typeof e.estimateLow  === 'number') acc.estimateLowSum  += e.estimateLow;
+                if (typeof e.estimateHigh === 'number') acc.estimateHighSum += e.estimateHigh;
+                return acc;
+            },
+            { count: 0, safety: 0, recommendation: 0, maintenance: 0, estimateLowSum: 0, estimateHighSum: 0 },
+        );
+
+        return {
+            inspection: {
+                id:              report.inspection.id as string,
+                propertyAddress: report.inspection.propertyAddress as string,
+                date:            report.inspection.date as string | null,
+                inspectorName:   report.inspection.inspectorName,
+            },
+            defects: entries,
+            totals,
+            showEstimates: report.showEstimates,
         };
     }
 

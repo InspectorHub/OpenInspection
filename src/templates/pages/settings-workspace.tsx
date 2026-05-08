@@ -3,9 +3,12 @@ import type { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig | undefined; }
 
-// Sprint 2 S2-4 — extra prop only used by the new Reports sub-page so the
-// toggle reflects persisted state on first paint.
-interface ReportsProps extends Props { showEstimates?: boolean }
+// Sprint 2 S2-4 + Track E1 — extra props only used by the new Reports
+// sub-page so the toggles reflect persisted state on first paint.
+interface ReportsProps extends Props {
+    showEstimates?:    boolean;
+    enableRepairList?: boolean;
+}
 
 type WorkspaceSubPage = 'branding' | 'theme' | 'reports' | 'telemetry';
 
@@ -174,8 +177,9 @@ export const SettingsWorkspaceTelemetryPage = ({ branding }: Props): JSX.Element
  * each defect item. Defaults to off so existing tenants don't suddenly
  * start showing dollar figures.
  */
-export const SettingsWorkspaceReportsPage = ({ branding, showEstimates }: ReportsProps): JSX.Element => {
-    const initial = showEstimates ? 'true' : 'false';
+export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRepairList }: ReportsProps): JSX.Element => {
+    const initialEstimates    = showEstimates ? 'true' : 'false';
+    const initialRepairList   = enableRepairList ? 'true' : 'false';
     return (
         <SettingsLayout
             branding={branding}
@@ -183,20 +187,21 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates }: Report
             group="workspace"
             subPage="reports"
             pageTitle="Reports"
-            pageSubtitle="Control how published reports surface optional defect annotations such as repair estimate ranges."
+            pageSubtitle="Control how published reports surface optional defect annotations such as repair estimate ranges and the contractor punch-list."
         >
             <section
-                class="bg-white rounded-lg border border-surface-200 p-6 space-y-5"
+                class="bg-white rounded-lg border border-surface-200 p-6 space-y-6"
                 x-data={`{
-                    showEstimates: ${initial},
+                    showEstimates: ${initialEstimates},
+                    enableRepairList: ${initialRepairList},
                     saving: false,
-                    async save() {
+                    async save(payload) {
                         this.saving = true;
                         try {
                             const r = await authFetch('/api/admin/branding', {
                                 method: 'POST',
                                 headers: { 'content-type': 'application/json' },
-                                body: JSON.stringify({ showEstimates: this.showEstimates })
+                                body: JSON.stringify(payload)
                             });
                             if (!r.ok) {
                                 if (typeof showToast === 'function') showToast('Failed to save', true);
@@ -224,7 +229,30 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates }: Report
                         type="checkbox"
                         data-testid="settings-show-estimates-toggle"
                         x-model="showEstimates"
-                        x-on:change="save()"
+                        x-on:change="save({ showEstimates: showEstimates })"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        style="background-position: left center; background-repeat: no-repeat;"
+                    />
+                </label>
+
+                {/* Track E1 (ITB §11) — Repair List toggle. */}
+                <div class="border-t border-surface-200" />
+                <label class="flex items-start justify-between gap-6 cursor-pointer">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-ink-900">Enable Repair List</div>
+                        <div class="text-xs text-ink-500 mt-1 leading-relaxed">
+                            Opt-in punch-list view that aggregates every flagged defect across
+                            the inspection into a clean, contractor-ready document. When on,
+                            the published report exposes a "View Repair List" link in the
+                            top-right and inspectors get a "Repair List" sub-tab in the
+                            inspection editor.
+                        </div>
+                    </div>
+                    <input
+                        type="checkbox"
+                        data-testid="settings-enable-repair-list-toggle"
+                        x-model="enableRepairList"
+                        x-on:change="save({ enableRepairList: enableRepairList })"
                         class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                     />
@@ -242,12 +270,13 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates }: Report
  * Dispatcher used by the route handler — picks the right component based on the
  * `subPage` URL segment. Keeps `index.ts` route registrations short.
  */
-export const SettingsWorkspacePage = ({ branding, subPage, showEstimates }: ReportsProps & { subPage: WorkspaceSubPage }): JSX.Element => {
+export const SettingsWorkspacePage = ({ branding, subPage, showEstimates, enableRepairList }: ReportsProps & { subPage: WorkspaceSubPage }): JSX.Element => {
     if (subPage === 'theme') return SettingsWorkspaceThemePage({ branding });
     if (subPage === 'telemetry') return SettingsWorkspaceTelemetryPage({ branding });
     if (subPage === 'reports') {
         const props: ReportsProps = { branding };
-        if (typeof showEstimates === 'boolean') props.showEstimates = showEstimates;
+        if (typeof showEstimates    === 'boolean') props.showEstimates    = showEstimates;
+        if (typeof enableRepairList === 'boolean') props.enableRepairList = enableRepairList;
         return SettingsWorkspaceReportsPage(props);
     }
     return SettingsWorkspaceBrandingPage({ branding });
