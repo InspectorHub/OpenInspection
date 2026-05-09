@@ -32,11 +32,44 @@ export const PropertyFactsCard = (): JSX.Element => (
         class="space-y-4"
         data-testid="property-facts-card"
     >
-        <legend class="text-[16px] font-semibold tracking-tight text-slate-900">Property facts</legend>
-        <p class="text-[12px] text-slate-500">
-            Surfaced as a banner on the published report. Leave blank for fields you didn't capture —
-            the report renders only the facts you fill in.
-        </p>
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+                <legend class="text-[16px] font-semibold tracking-tight text-slate-900">Property facts</legend>
+                <p class="text-[12px] text-slate-500">
+                    Surfaced as a banner on the published report. Leave blank for fields you didn't capture —
+                    the report renders only the facts you fill in.
+                </p>
+            </div>
+            {/* Sprint 3 S3-1 — Auto-fill button. Hits /property-facts/autofill
+                with the property address; server proxies Estated.io and
+                returns mapped facts. Manual entries are never overwritten. */}
+            <button
+                type="button"
+                data-testid="property-facts-autofill"
+                x-on:click="autofillFromAddress()"
+                {...{ 'x-bind:disabled': "autofillState === 'pending'" }}
+                class="h-8 px-3 rounded-md bg-indigo-50 text-indigo-700 text-[12px] font-bold ring-1 ring-inset ring-indigo-200 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-wait inline-flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                title="Auto-fill from public records (Estated.io)"
+            >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                <span x-show="autofillState !== 'pending'">Auto-fill from address</span>
+                <span x-show="autofillState === 'pending'" style="display:none">Fetching…</span>
+            </button>
+        </div>
+
+        <p
+            x-show="autofillMessage"
+            style="display:none"
+            x-text="autofillMessage"
+            x-bind:class="
+                autofillState === 'success' ? 'text-emerald-700 bg-emerald-50 ring-emerald-200' :
+                autofillState === 'no_key'  ? 'text-slate-700 bg-slate-50 ring-slate-200' :
+                autofillState === 'not_found' ? 'text-amber-700 bg-amber-50 ring-amber-200' :
+                'text-rose-700 bg-rose-50 ring-rose-200'
+            "
+            class="text-[12px] px-3 py-2 rounded-md ring-1 ring-inset"
+            data-testid="property-facts-autofill-message"
+        ></p>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Year Built */}

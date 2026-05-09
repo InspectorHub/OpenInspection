@@ -47,6 +47,12 @@ document.addEventListener('alpine:init', () => {
         },
         factsState: 'idle', // 'idle' | 'saving' | 'saved' | 'error'
         factsTimer: null,
+        // Sprint 3 S3-1 — Property auto-fill. `propertyAddress` is hydrated
+        // from the inspection on load() so the autofill button can pass it
+        // to the server-side proxy. `autofillState` drives the spinner.
+        propertyAddress: '',
+        autofillState: 'idle', // 'idle' | 'pending' | 'success' | 'no_key' | 'not_found' | 'error'
+        autofillMessage: '',
 
         // Round-2 F3 — People card payload. Loaded from
         // /api/inspections/:id/people; rendered by the PeopleCard component.
@@ -84,6 +90,7 @@ document.addEventListener('alpine:init', () => {
                 this.form.date = (insp.date || '').slice(0, 10);
                 this.form.inspectorId = insp.inspectorId || '';
                 this.form.templateId = insp.templateId || '';
+                this.propertyAddress = insp.propertyAddress || '';
                 this.form.price = Number(insp.price || 0);
                 this.form.paymentRequired = !!insp.paymentRequired;
                 this.form.agreementRequired = !!insp.agreementRequired;
@@ -168,6 +175,85 @@ document.addEventListener('alpine:init', () => {
             } catch (e) {
                 console.error('saveFact failed', e);
                 this.factsState = 'error';
+            }
+        },
+
+        // Sprint 3 S3-1 — Auto-fill from public records (Estated.io proxy).
+        // Calls /api/inspections/:id/property-facts/autofill with the saved
+        // property address. The server returns mapped facts or a
+        // graceful-degrade reason. Each non-empty incoming field is patched
+        // via the existing PATCH /property-facts handler — preserving any
+        // values the inspector has already typed (we never overwrite a
+        // non-empty manual entry).
+        async autofillFromAddress() {
+            if (!this.propertyAddress || this.propertyAddress.length < 5) {
+                this.autofillState = 'error';
+                this.autofillMessage = 'No address on file. Edit it first.';
+                return;
+            }
+            this.autofillState = 'pending';
+            this.autofillMessage = '';
+            try {
+                const res = await window.authFetch(
+                    '/api/inspections/' + this.inspectionId + '/property-facts/autofill',
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ addressString: this.propertyAddress }),
+                    },
+                );
+                const json = await res.json().catch(function () { return null; });
+                if (!res.ok) {
+                    this.autofillState = 'error';
+                    this.autofillMessage = (json && json.error && json.error.message) || ('HTTP ' + res.status);
+                    return;
+                }
+                const data = (json && json.data) || {};
+                if (!data.facts) {
+                    if (data.reason === 'NO_API_KEY') {
+                        this.autofillState = 'no_key';
+                        this.autofillMessage = 'Auto-fill is not configured on this server. Enter facts manually.';
+                    } else if (data.reason === 'NOT_FOUND') {
+                        this.autofillState = 'not_found';
+                        this.autofillMessage = "Couldn't find property in public records. Enter facts manually.";
+                    } else {
+                        this.autofillState = 'error';
+                        this.autofillMessage = "Provider couldn't supply data. Enter facts manually.";
+                    }
+                    return;
+                }
+                // Patch each non-empty field, preserving manual overrides.
+                const facts = data.facts || {};
+                let filled = 0;
+                if (this.facts.yearBuilt == null && typeof facts.yearBuilt === 'number') {
+                    await this.saveFact('yearBuilt', facts.yearBuilt); filled++;
+                }
+                if (this.facts.sqft == null && typeof facts.sqft === 'number') {
+                    await this.saveFact('sqft', facts.sqft); filled++;
+                }
+                if (!this.facts.foundationType && typeof facts.foundationType === 'string' && facts.foundationType) {
+                    await this.saveFact('foundationType', facts.foundationType); filled++;
+                }
+                if (!this.facts.lotSize && typeof facts.lotSize === 'string' && facts.lotSize) {
+                    await this.saveFact('lotSize', facts.lotSize); filled++;
+                }
+                if (this.facts.bedrooms == null && typeof facts.bedrooms === 'number') {
+                    await this.saveFact('bedrooms', facts.bedrooms); filled++;
+                }
+                if (this.facts.bathrooms == null && typeof facts.bathrooms === 'number') {
+                    await this.saveFact('bathrooms', facts.bathrooms); filled++;
+                }
+                this.autofillState = 'success';
+                this.autofillMessage = filled > 0
+                    ? ('Auto-filled ' + filled + ' field' + (filled === 1 ? '' : 's') + '.')
+                    : 'Property already fully filled — no fields updated.';
+                if (typeof window.showToast === 'function') {
+                    window.showToast(this.autofillMessage);
+                }
+            } catch (e) {
+                console.error('autofill failed', e);
+                this.autofillState = 'error';
+                this.autofillMessage = (e && e.message) || 'Auto-fill failed';
             }
         },
 
