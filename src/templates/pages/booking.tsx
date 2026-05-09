@@ -167,6 +167,7 @@ export const PublicBookingPage = ({ siteKey, branding, embed, style }: PublicBoo
                                     <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Inspection date</span>
                                     <input
                                         type="date"
+                                        lang="en"
                                         name="inspectionDate"
                                         x-model="inspectionDate"
                                         {...{

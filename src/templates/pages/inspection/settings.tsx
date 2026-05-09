@@ -71,8 +71,13 @@ export const InspectionSettingsPage = ({
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <label class="block">
                                     <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Date</span>
+                                    {/* Iter-2 bug #6 — explicit `lang="en"` stops Chrome on
+                                        zh-CN OS locales from rendering the native date
+                                        placeholder as 「年/月/日」. */}
                                     <input
                                         type="date"
+                                        lang="en"
+                                        placeholder="YYYY-MM-DD"
                                         x-model="form.date"
                                         class="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 text-[14px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                                     />
@@ -96,8 +101,13 @@ export const InspectionSettingsPage = ({
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <label class="block">
                                     <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Closing Date</span>
+                                    {/* Iter-2 bug #6 — same as the schedule date input above:
+                                        explicit `lang="en"` overrides the OS locale so users
+                                        on zh-CN do not see 「年/月/日」 as the placeholder. */}
                                     <input
                                         type="date"
+                                        lang="en"
+                                        placeholder="YYYY-MM-DD"
                                         data-testid="inspection-closing-date"
                                         x-model="form.closingDate"
                                         class="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 text-[14px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
