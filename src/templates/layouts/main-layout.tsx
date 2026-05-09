@@ -192,14 +192,21 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                                     <span class="flex-1">Library</span>
                                     <svg class="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                                 </summary>
+                                {/* Iter-2 bug #8 — canonical Library order: Inspection
+                                    Templates / Marketplace / Comments / Repair Items /
+                                    Tags / Agreements / Rating Systems. All seven entries
+                                    are required; the previous order shipped Marketplace
+                                    after Agreements which made customers think it was
+                                    missing when the menu was reading-cut on small
+                                    viewports. */}
                                 <div class="mt-1 ml-7 pl-3 border-l border-slate-100 space-y-0.5">
                                     <a href="/templates" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Inspection Templates</a>
+                                    <a href="/marketplace" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Marketplace</a>
                                     <a href="/comments" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Comments</a>
                                     <a href="/recommendations" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Repair Items</a>
-                                    <a href="/agreements" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Agreements</a>
-                                    <a href="/marketplace" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Marketplace</a>
-                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems</a>
                                     <a href="/library/tags" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Tags</a>
+                                    <a href="/agreements" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Agreements</a>
+                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems</a>
                                 </div>
                             </details>
                             <a href="/contacts" class="flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-all font-semibold">
@@ -302,14 +309,16 @@ export const MainLayout = (props: { title: string, children: unknown, branding?:
                                     <span class="flex-1">Library</span>
                                     <svg class="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                                 </summary>
+                                {/* Iter-2 bug #8 — canonical Library order, kept in
+                                    sync with the mobile drawer above. */}
                                 <div class="mt-1 ml-7 pl-3 border-l border-slate-100 space-y-0.5">
                                     <a href="/templates" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Inspection Templates</a>
+                                    <a href="/marketplace" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Marketplace</a>
                                     <a href="/comments" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Comments</a>
                                     <a href="/recommendations" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Repair Items</a>
-                                    <a href="/agreements" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Agreements</a>
-                                    <a href="/marketplace" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Marketplace</a>
-                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems</a>
                                     <a href="/library/tags" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Tags</a>
+                                    <a href="/agreements" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Agreements</a>
+                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors">Rating Systems</a>
                                 </div>
                             </details>
                             <a href="/contacts" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-all font-semibold group">
