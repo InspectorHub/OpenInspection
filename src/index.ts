@@ -51,6 +51,7 @@ import { InspectionSummaryPage } from './templates/pages/inspection/summary';
 import { InspectionSignaturesPage } from './templates/pages/inspection/signatures';
 import { InspectionSettingsPage } from './templates/pages/inspection/settings';
 import { RepairListPage } from './templates/pages/inspection/repair-list';
+import { CustomerRepairRequestPage } from './templates/pages/customer-repair-request';
 import { SettingsAutomationsPage } from './templates/pages/settings-automations';
 import { SettingsWidgetPage } from './templates/pages/settings-widget';
 import { SettingsServicesPage } from './templates/pages/settings-services';
@@ -98,6 +99,7 @@ import recommendationsRoutes from './api/recommendations';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionRequestsRoutes from './api/inspection-requests';
+import repairRequestRoutes from './api/repair-requests';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -185,7 +187,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
@@ -332,6 +334,11 @@ app.route('/api/inspection-requests', inspectionRequestsRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/public', bookingsRoutes);
 app.route('/api/public/widget', widgetRoutes);
+// Sprint 3 Track B (S3-2) — Customer-driven Repair Request export.
+// Public, token-gated like /report/:id; the email endpoint validates the
+// per-tenant enable_customer_repair_export flag + payment + agreement gates
+// before sending.
+app.route('/api/public', repairRequestRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/agent', agentRoutes);
 app.route('/api/places', placesRoutes);
@@ -900,13 +907,19 @@ app.get('/report/:id', async (c) => {
         // viewer can render the "View repair list" top-right link only when
         // the workspace has opted in. Failure to read the column is treated
         // as opt-out (e.g. legacy tenants pre-migration 0044).
+        // Sprint 3 S3-2 — same pattern for the customer repair-request export.
         let enableRepairList = false;
+        let enableCustomerRepairExport = false;
         try {
-            const cfgRow = await drizzle(c.env.DB).select({ enableRepairList: schema.tenantConfigs.enableRepairList })
+            const cfgRow = await drizzle(c.env.DB).select({
+                enableRepairList:           schema.tenantConfigs.enableRepairList,
+                enableCustomerRepairExport: schema.tenantConfigs.enableCustomerRepairExport,
+            })
                 .from(schema.tenantConfigs)
                 .where(eq(schema.tenantConfigs.tenantId, tenantId as string))
                 .get();
             enableRepairList = !!cfgRow?.enableRepairList;
+            enableCustomerRepairExport = !!cfgRow?.enableCustomerRepairExport;
         } catch { /* default off */ }
 
         const rawDate = data.inspection.date || '';
@@ -932,12 +945,180 @@ app.get('/report/:id', async (c) => {
             viewerRole: role,
             // Track E1 — show "View repair list" link only when opted in.
             enableRepairList,
+            // Sprint 3 S3-2 — show "Generate repair request" link only when
+            // the workspace has opted in to the customer-facing export.
+            enableCustomerRepairExport,
             // Round-2 backlog G1 — Property Facts banner above the report
             // header. Auto-hidden when every field is empty.
             propertyFacts: data.propertyFacts,
         }));
     } catch {
         return c.text('Report not found', 404);
+    }
+});
+
+// Sprint 3 Track B (S3-2) — Public Customer Repair Request export.
+//
+// Token-gated companion to the inspector-facing /inspections/:id/repair-list
+// (Track E1). Mirrors the same payment + agreement gates that protect the
+// report itself — the customer cannot bypass them by jumping straight to
+// the repair-request export. Tenant must opt in via the
+// enable_customer_repair_export tenant_configs flag.
+app.get('/r/:id/repair-request', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
+    if (!tenantId) return c.text('Not found', 404);
+
+    // Inspector / admin / owner bypass — same logic as /report/:id so a
+    // logged-in inspector can preview the export without the gate firing
+    // against them.
+    let role: string | null = null;
+    try {
+        const { getCookie } = await import('hono/cookie');
+        const { verify } = await import('hono/jwt');
+        const tok = getCookie(c, '__Host-inspector_token');
+        if (tok && c.env.JWT_SECRET) {
+            const payload = await verify(tok, c.env.JWT_SECRET, 'HS256');
+            role = (payload as { role?: string })?.role ?? null;
+        }
+    } catch { /* unauthenticated public view */ }
+    const isInspectorOrAdmin = role === 'owner' || role === 'admin' || role === 'inspector';
+
+    try {
+        // Per-tenant opt-in toggle. Failure to read = treat as off.
+        let enableCustomerRepairExport = false;
+        let enableRepairList = false;
+        try {
+            const cfgRow = await drizzle(c.env.DB).select({
+                enableCustomerRepairExport: schema.tenantConfigs.enableCustomerRepairExport,
+                enableRepairList:           schema.tenantConfigs.enableRepairList,
+            })
+                .from(schema.tenantConfigs)
+                .where(eq(schema.tenantConfigs.tenantId, tenantId as string))
+                .get();
+            enableCustomerRepairExport = !!cfgRow?.enableCustomerRepairExport;
+            enableRepairList = !!cfgRow?.enableRepairList;
+        } catch { /* default off */ }
+        if (!enableCustomerRepairExport) {
+            return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+        }
+        // Suppress unused-var lint — enableRepairList is read for symmetry
+        // with /report/:id but the customer view never surfaces the link.
+        void enableRepairList;
+
+        // Pre-fetch the inspection row so we can run the same payment +
+        // agreement gate as /report/:id before pulling the (more expensive)
+        // repair-list data set.
+        if (!isInspectorOrAdmin) {
+            const db = drizzle(c.env.DB);
+            const insp = await db.select({
+                id:                schema.inspections.id,
+                propertyAddress:   schema.inspections.propertyAddress,
+                date:              schema.inspections.date,
+                inspectorId:       schema.inspections.inspectorId,
+                paymentRequired:   schema.inspections.paymentRequired,
+                paymentStatus:     schema.inspections.paymentStatus,
+                agreementRequired: schema.inspections.agreementRequired,
+            }).from(schema.inspections)
+                .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId as string)))
+                .get();
+            if (!insp) return c.text('Report not found', 404);
+
+            const branding = c.get('branding');
+            const companyName = branding?.siteName || c.env.APP_NAME || 'OpenInspection';
+            const primaryColor = branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1';
+            const baseUrl = (c.env.APP_BASE_URL || '').replace(/\/$/, '') || (c.req.header('host') ? `https://${c.req.header('host')}` : '');
+
+            let inspectorName: string | null = null;
+            if (insp.inspectorId) {
+                const inspectorRow = await drizzle(c.env.DB).select({ name: users.name })
+                    .from(users)
+                    .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId as string)))
+                    .get();
+                inspectorName = inspectorRow?.name ?? null;
+            }
+
+            if (insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
+                const { ReportGatePage } = await import('./templates/pages/report-gate');
+                return c.html(ReportGatePage({
+                    reason:          'payment',
+                    companyName,
+                    primaryColor,
+                    actionUrl:       `${baseUrl}/invoices?inspection=${id}`,
+                    actionLabel:     'View invoice & pay',
+                    propertyAddress: insp.propertyAddress ?? null,
+                    inspectorName,
+                    scheduledDate:   insp.date ?? null,
+                }) as string);
+            }
+
+            if (insp.agreementRequired === true) {
+                const signed = await drizzle(c.env.DB).select({ id: schema.agreementRequests.id })
+                    .from(schema.agreementRequests)
+                    .where(and(
+                        eq(schema.agreementRequests.inspectionId, id),
+                        eq(schema.agreementRequests.tenantId, tenantId as string),
+                        eq(schema.agreementRequests.status, 'signed'),
+                    ))
+                    .limit(1);
+                if (signed.length === 0) {
+                    const { ReportGatePage } = await import('./templates/pages/report-gate');
+                    return c.html(ReportGatePage({
+                        reason:          'agreement',
+                        companyName,
+                        primaryColor,
+                        actionUrl:       `${baseUrl}/sign/${id}`,
+                        actionLabel:     'Sign agreement',
+                        propertyAddress: insp.propertyAddress ?? null,
+                        inspectorName,
+                        scheduledDate:   insp.date ?? null,
+                    }) as string);
+                }
+            }
+        }
+
+        // Pull the repair-list data set + the inspection's clientEmail for
+        // the email pre-fill input. clientEmail is a separate cheap select —
+        // getRepairList() doesn't surface it.
+        const data = await c.var.services.inspection.getRepairList(id, tenantId as string);
+        const clientRow = await drizzle(c.env.DB).select({ clientEmail: schema.inspections.clientEmail })
+            .from(schema.inspections)
+            .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId as string)))
+            .get();
+
+        const rawDate = data.inspection.date || '';
+        const formattedDate = rawDate ? new Date(rawDate).toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        }) : null;
+
+        // Strip recommendationId from the cards — the customer doesn't need
+        // the slug, only the human-readable label.
+        const defects = data.defects.map(d => ({
+            sectionId:           d.sectionId,
+            sectionTitle:        d.sectionTitle,
+            itemId:              d.itemId,
+            itemLabel:           d.itemLabel,
+            comment:             d.comment,
+            location:            d.location,
+            category:            d.category,
+            recommendationLabel: d.recommendationLabel,
+            estimateLow:         d.estimateLow,
+            estimateHigh:        d.estimateHigh,
+            photos:              d.photos,
+        }));
+
+        return c.html(CustomerRepairRequestPage({
+            inspectionId:    id,
+            propertyAddress: data.inspection.propertyAddress || 'Inspection',
+            inspectionDate:  formattedDate,
+            inspectorName:   data.inspection.inspectorName,
+            clientEmail:     clientRow?.clientEmail ?? null,
+            defects,
+            showEstimates:   data.showEstimates,
+            branding:        c.get('branding'),
+        }));
+    } catch {
+        return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
     }
 });
 
@@ -982,13 +1163,14 @@ app.get('/settings/workspace/reports', htmlAuthGuard(['owner', 'admin']), async 
         primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
         supportEmail: c.env.SENDER_EMAIL || 'support@example.com',
     });
-    const showEstimates          = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
-    const enableRepairList       = Boolean((cfg as { enableRepairList?: boolean | number }).enableRepairList);
+    const showEstimates              = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
+    const enableRepairList           = Boolean((cfg as { enableRepairList?: boolean | number }).enableRepairList);
+    const enableCustomerRepairExport = Boolean((cfg as { enableCustomerRepairExport?: boolean | number }).enableCustomerRepairExport);
     // Round-2 #10 — surface tenant-wide block-report policy so the toggles
     // hydrate with persisted state on first paint (no off-then-on flash).
-    const blockUnpaid            = Boolean((cfg as { blockUnpaid?: boolean | number }).blockUnpaid);
-    const blockUnsignedAgreement = Boolean((cfg as { blockUnsignedAgreement?: boolean | number }).blockUnsignedAgreement);
-    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates, enableRepairList, blockUnpaid, blockUnsignedAgreement }));
+    const blockUnpaid                = Boolean((cfg as { blockUnpaid?: boolean | number }).blockUnpaid);
+    const blockUnsignedAgreement     = Boolean((cfg as { blockUnsignedAgreement?: boolean | number }).blockUnsignedAgreement);
+    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates, enableRepairList, enableCustomerRepairExport, blockUnpaid, blockUnsignedAgreement }));
 });
 // Round-2 backlog G3 — Custom referral sources sub-page. Reads
 // tenant_configs.custom_referral_sources via the BrandingService so the

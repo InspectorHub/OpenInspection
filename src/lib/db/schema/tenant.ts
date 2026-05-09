@@ -71,6 +71,11 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want
     // a separate punch-list view rather than the full narrative report.
     enableRepairList: integer('enable_repair_list', { mode: 'boolean' }).notNull().default(false),
+    // Sprint 3 S3-2 — when true, the public report viewer surfaces a
+    // "Generate repair request" link that takes the customer to a print-
+    // friendly export they can hand off to a contractor (or email back to
+    // themselves). Defaults OFF so existing tenants opt in deliberately.
+    enableCustomerRepairExport: integer('enable_customer_repair_export', { mode: 'boolean' }).notNull().default(false),
     // Round-2 backlog #10 — when true, every NEW inspection inherits
     // paymentRequired = true at creation time. Per-inspection override
     // remains; Stripe webhook auto-flips paymentStatus to 'paid'.

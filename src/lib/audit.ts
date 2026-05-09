@@ -49,6 +49,7 @@ export type AuditAction =
     | 'data.import'
     | 'data.delete'
     | 'audit.view'
+    | 'repair_request.exported'
     | 'comment.updated'
     | 'config.integration.update'
     | 'config.secrets.update'
