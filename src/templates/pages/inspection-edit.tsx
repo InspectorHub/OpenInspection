@@ -867,6 +867,22 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   class="text-[11px] font-mono text-slate-500"
                   x-text="searchMatchCount + ' match' + (searchMatchCount === 1 ? '' : 'es')"
                 ></span>
+                {/* Sprint 3 S3-4 — Tablet 1024-1279: ACTIVE ITEM lives in a
+                    drawer (the persistent right pane only renders at xl ≥1280).
+                    Visible only at lg-not-xl (compound `hidden lg:inline-flex
+                    xl:hidden`) so mobile + desktop are unaffected. */}
+                <button
+                  type="button"
+                  x-show="activeItem"
+                  x-on:click="tabletInspectorOpen = !tabletInspectorOpen"
+                  data-testid="tablet-active-item-toggle"
+                  aria-label="Toggle active item inspector"
+                  class="hidden lg:inline-flex xl:hidden items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+                  style="color: #475569"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
+                  Inspector
+                </button>
                 <button x-on:click="previewReport()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl" style="color: #64748b">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   Preview
@@ -1434,10 +1450,12 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
           </main>
 
           {/* Spec 5G M1 — Right pane: active item photos + quick comments.
-              Hidden in focus mode (⌘2), on screens narrower than xl, and
-              while the Comment Library drawer is open (Sprint 1 A-1: avoids
-              the slash-trigger popover overlapping ACTIVE ITEM at 1024-1280px). */}
-          <aside x-show="viewMode !== 'focus' && activeItem && !showCommentLibrary && !slashPickerOpen" class="hidden lg:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(226,232,240,0.6);">
+              Hidden in focus mode (⌘2), on screens narrower than xl
+              (Sprint 3 S3-4: 1024-1279 tablet zone gets a slide-in drawer
+              instead — see tablet-active-item-drawer below), and while the
+              Comment Library drawer is open (Sprint 1 A-1: avoids the
+              slash-trigger popover overlapping ACTIVE ITEM). */}
+          <aside x-show="viewMode !== 'focus' && activeItem && !showCommentLibrary && !slashPickerOpen" class="hidden xl:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden" style="background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-color: rgba(226,232,240,0.6);">
             <header class="px-4 py-3 border-b" style="border-color: rgba(226,232,240,0.5);">
               <h3 class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Active Item</h3>
               <p class="text-sm font-bold text-slate-900 mt-0.5 leading-tight" x-text="activeItem?.label || activeItem?.name || ''"></p>
@@ -1503,6 +1521,106 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               </div>
             </footer>
           </aside>
+
+          {/* Sprint 3 S3-4 — Tablet 1024-1279 ACTIVE ITEM drawer.
+              Slides in from the right when the inspector taps the
+              "Inspector" button in the toolbar. Visible ONLY at
+              lg-not-xl (compound `hidden lg:flex xl:hidden` + x-show);
+              the persistent right pane handles ≥1280, mobile gets the
+              dedicated mobile layout.
+              The drawer mirrors the structure of the persistent pane:
+              Active Item header + Photos thumbnail grid + Quick Comments. */}
+          <aside
+            x-show="tabletInspectorOpen && activeItem"
+            data-testid="tablet-active-item-drawer"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="translate-x-full opacity-0"
+            x-transition:enter-end="translate-x-0 opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="translate-x-0 opacity-100"
+            x-transition:leave-end="translate-x-full opacity-0"
+            class="hidden lg:flex xl:hidden fixed inset-y-0 right-0 z-30 w-[320px] flex-col border-l shadow-xl overflow-y-auto"
+            style="background: rgba(255,255,255,0.96); backdrop-filter: blur(12px); border-color: rgba(226,232,240,0.6); display: none;"
+          >
+            <header class="px-4 py-3 border-b flex items-center justify-between" style="border-color: rgba(226,232,240,0.5);">
+              <div class="flex-1 min-w-0">
+                <h3 class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Active Item</h3>
+                <p class="text-sm font-bold text-slate-900 mt-0.5 leading-tight" x-text="activeItem?.label || activeItem?.name || ''"></p>
+                <p class="text-[10px] font-mono text-slate-400 mt-0.5" x-text="activeItem?.number || ''"></p>
+              </div>
+              <button
+                type="button"
+                x-on:click="tabletInspectorOpen = false"
+                aria-label="Close inspector drawer"
+                class="ml-2 w-8 h-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </header>
+
+            {/* Photos */}
+            <section class="px-4 py-3 border-b" style="border-color: rgba(226,232,240,0.5);">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+                  Photos &middot; <span x-text="(results[activeItemId]?.photos || []).length"></span>
+                </span>
+                <label class="text-[10px] text-indigo-500 hover:underline cursor-pointer">
+                  + Add
+                  <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }" />
+                </label>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5" x-show="(results[activeItemId]?.photos || []).length > 0">
+                <template x-for="(photo, pi) in (results[activeItemId]?.photos || []).slice(0, 8)" x-bind:key="pi">
+                  <div class="aspect-[4/3] rounded overflow-hidden bg-slate-100">
+                    <img x-bind:src="'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.annotatedKey || photo.key)" class="w-full h-full object-cover" alt="Photo" />
+                  </div>
+                </template>
+              </div>
+              <p x-show="(results[activeItemId]?.photos || []).length === 0" class="text-[11px] italic text-slate-400 py-2">
+                No photos. Press <kbd class="px-1 bg-slate-100 border rounded font-mono">P</kbd> to add.
+              </p>
+            </section>
+
+            {/* Quick comments */}
+            <section class="px-4 py-3 flex-1">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Quick Comments</span>
+                <button x-on:click="openCommentLibrary()" class="text-[10px] text-indigo-500 hover:underline">Browse all</button>
+              </div>
+              <div class="space-y-1">
+                <template x-for="(c, i) in quickCommentsForActive" x-bind:key="i">
+                  <button x-on:click="insertComment(c.text)" class="w-full text-left p-2 rounded text-[11px] text-slate-700 leading-snug border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all">
+                    <div class="flex items-start gap-1.5">
+                      <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0 mt-0.5"
+                        x-bind:style="c.rating === 'satisfactory' ? 'background:#10b981' : (c.rating === 'monitor' ? 'background:#f59e0b' : (c.rating === 'defect' ? 'background:#ef4444' : 'background:#64748b'))"
+                        x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
+                      <span x-text="c.text"></span>
+                    </div>
+                  </button>
+                </template>
+              </div>
+              <p class="text-[10px] text-slate-400 italic mt-3">
+                Press <kbd class="px-1 bg-slate-100 border rounded font-mono">/</kbd> for full library
+              </p>
+            </section>
+          </aside>
+
+          {/* Backdrop for the tablet drawer — clicking outside closes it. */}
+          <div
+            x-show="tabletInspectorOpen"
+            x-on:click="tabletInspectorOpen = false"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="hidden lg:block xl:hidden fixed inset-0 z-20 bg-slate-900/30"
+            style="display: none;"
+            aria-hidden="true"
+          ></div>
         </div>
 
         {/* Round-2 F1 — Multi-recipient Publish modal (Spectora §G.3).
