@@ -1765,11 +1765,21 @@ function inspectionEditor(inspectionId) {
     async uploadPhoto(itemId, event) {
       var file = event.target.files && event.target.files[0];
       if (!file) return;
+      await this._uploadBlobAsPhoto(itemId, file);
+    },
+
+    // S3-6 — shared upload path used by both <input type=file> and the
+    // burst camera modal. Accepts a Blob (or File) and resolves once the
+    // POST completes. On success, appends `{ key }` to results[itemId]
+    // .photos and triggers the debounced save. Errors are swallowed and
+    // logged — the surrounding caller surfaces a toast.
+    async _uploadBlobAsPhoto(itemId, blob) {
+      if (!blob || !itemId) return;
       var formData = new FormData();
-      // Server endpoint is POST /api/inspections/:id/upload with form field
-      // 'file' + 'itemId' (see src/api/inspections.ts:760). Earlier client
-      // versions used /photos + 'photo' which 404'd silently.
-      formData.append('file', file);
+      // Server endpoint is POST /api/inspections/:id/upload with form
+      // field 'file' + 'itemId' (see src/api/inspections.ts:760).
+      var fileName = (blob && blob.name) || ('photo-' + Date.now() + '.jpg');
+      formData.append('file', blob, fileName);
       formData.append('itemId', itemId);
       try {
         var res = await authFetch('/api/inspections/' + this.inspectionId + '/upload', {
@@ -1778,12 +1788,31 @@ function inspectionEditor(inspectionId) {
         });
         if (res.ok) {
           var json = await res.json();
+          if (!this.results[itemId]) this.results[itemId] = {};
           if (!this.results[itemId].photos) this.results[itemId].photos = [];
           this.results[itemId].photos.push({ key: json.data.key });
           this.debounceSave();
+        } else {
+          if (typeof showToast === 'function') showToast('Photo upload failed.', true);
         }
       } catch (e) {
         console.error('Photo upload failed:', e);
+        if (typeof showToast === 'function') showToast('Photo upload network error.', true);
+      }
+    },
+
+    // S3-6 — open the burst-camera modal for this item. Dispatches a
+    // window event the burstCamera factory listens for. If camera APIs
+    // are missing or denied, the modal itself falls back to the native
+    // <input capture> picker.
+    openBurstCamera(itemId) {
+      try {
+        window.dispatchEvent(new CustomEvent('burst-camera:open', { detail: { itemId: itemId } }));
+      } catch (e) {
+        // Older browsers without CustomEvent constructor — fall back to
+        // the file picker directly.
+        var input = document.getElementById('hotkey-photo-input');
+        if (input) input.click();
       }
     },
 
