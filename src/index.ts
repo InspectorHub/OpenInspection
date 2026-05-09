@@ -869,7 +869,16 @@ app.get('/report/:id', async (c) => {
                 inspectorName = inspectorRow?.name ?? null;
             }
 
-            if (insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
+            // iter-1 production bug #3 — the gate previously used
+            // `=== true` strict equality, but D1 sometimes surfaces the
+            // boolean column as the raw integer `1` depending on the
+            // codepath (mode:'boolean' is a Drizzle-side conversion that
+            // can be skipped when the row originated from a raw insert).
+            // The inspection-edit sidebar toggle uses truthy coercion, so
+            // the toggle could show ON while the gate skipped paywalling
+            // — exactly what the live deploy traversal exposed. Treat any
+            // truthy value as "gate enabled" so both surfaces agree.
+            if (insp.paymentRequired && insp.paymentStatus !== 'paid') {
                 const { ReportGatePage } = await import('./templates/pages/report-gate');
                 return c.html(ReportGatePage({
                     reason:          'payment',
@@ -883,7 +892,7 @@ app.get('/report/:id', async (c) => {
                 }) as string);
             }
 
-            if (insp.agreementRequired === true) {
+            if (insp.agreementRequired) {
                 const signed = await db.select({ id: schema.agreementRequests.id })
                     .from(schema.agreementRequests)
                     .where(and(
@@ -1045,7 +1054,10 @@ app.get('/r/:id/repair-request', async (c) => {
                 inspectorName = inspectorRow?.name ?? null;
             }
 
-            if (insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
+            // iter-1 bug #3 — same truthy coercion as the /report/:id gate
+            // (see comment at the first gate site). Keeps the repair-list
+            // page paywall in lockstep with the canonical report page.
+            if (insp.paymentRequired && insp.paymentStatus !== 'paid') {
                 const { ReportGatePage } = await import('./templates/pages/report-gate');
                 return c.html(ReportGatePage({
                     reason:          'payment',
@@ -1059,7 +1071,7 @@ app.get('/r/:id/repair-request', async (c) => {
                 }) as string);
             }
 
-            if (insp.agreementRequired === true) {
+            if (insp.agreementRequired) {
                 const signed = await drizzle(c.env.DB).select({ id: schema.agreementRequests.id })
                     .from(schema.agreementRequests)
                     .where(and(

@@ -468,7 +468,18 @@ function inspectionEditor(inspectionId) {
         if (inspRes.status === 401) { window.location.href = '/login'; return; }
 
         var inspJson = await inspRes.json();
-        this.inspection = inspJson.data?.inspection || {};
+        var rawInsp = inspJson.data?.inspection || {};
+        // iter-1 production bug #3 — D1 booleans can transit as 0/1 ints
+        // depending on the codepath (raw queries vs Drizzle mode:'boolean'
+        // conversion). The Report Access toggles in the sidebar do
+        // `inspection.paymentRequired ? on : off`, so a truthy `1` from a
+        // raw query would show ON even when the gate (which uses
+        // `=== true`) treats the same value as falsy and skips paywalling.
+        // Force every gate-related flag to a strict boolean here so the
+        // Alpine toggles and the server-side gate agree on the same shape.
+        rawInsp.paymentRequired   = rawInsp.paymentRequired   === true || rawInsp.paymentRequired   === 1;
+        rawInsp.agreementRequired = rawInsp.agreementRequired === true || rawInsp.agreementRequired === 1;
+        this.inspection = rawInsp;
 
         // Try to load report-data (sections + rating levels)
         var dataRes = await authFetch('/api/inspections/' + this.inspectionId + '/report-data');
