@@ -574,6 +574,18 @@ coreAuthRoutes.openapi(logoutRoute, async (c) => {
         sameSite: 'Strict',
     });
 
+    // iter-2 production bug #4 — clear the CSRF cookie alongside the auth
+    // cookie. Without this, `__Host-csrf_token` outlives the session and
+    // becomes a fixation vector: a subsequent login on the same browser
+    // inherits the same CSRF token, which an attacker who exfiltrated it
+    // pre-logout can replay against the new session. Same `__Host-` prefix
+    // rules apply (Secure + Path=/).
+    deleteCookie(c, '__Host-csrf_token', {
+        path: '/',
+        secure: true,
+        sameSite: 'Strict',
+    });
+
     return c.json({ success: true, data: { success: true } }, 200);
 });
 
