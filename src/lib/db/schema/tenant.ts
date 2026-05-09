@@ -71,6 +71,13 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want
     // a separate punch-list view rather than the full narrative report.
     enableRepairList: integer('enable_repair_list', { mode: 'boolean' }).notNull().default(false),
+    // Round-2 backlog #10 — when true, every NEW inspection inherits
+    // paymentRequired = true at creation time. Per-inspection override
+    // remains; Stripe webhook auto-flips paymentStatus to 'paid'.
+    blockUnpaid: integer('block_unpaid', { mode: 'boolean' }).notNull().default(false),
+    // Round-2 backlog #10 — when true, every NEW inspection inherits
+    // agreementRequired = true at creation time.
+    blockUnsignedAgreement: integer('block_unsigned_agreement', { mode: 'boolean' }).notNull().default(false),
     // Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10) — tenant-defined
     // referral sources that extend the seven seeds (Realtor / Past Client /
     // Google Search / Facebook / Yelp / Walk-in / Other). NULL = no extras.
