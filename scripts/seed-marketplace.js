@@ -38,7 +38,9 @@ try {
 const SEED_DIR = join(__dirname, '../src/data/seed-templates');
 
 // Spec 4F — `featured: 1` flags Spectora-parity defaults for marketplace top-sort + auto-seed on tenant init.
+// S3-5 — `internachi-13.json` is a standards-aligned 13-section template covering the InterNACHI Standards of Practice. Featured under category `standards_aligned`.
 const TEMPLATES = [
+  { file: 'internachi-13.json',     name: 'InterNACHI 13-Section Standard',          category: 'standards_aligned', featured: 1, changelog: 'S3-5: Standards-aligned 13-section template covering the InterNACHI Standards of Practice. Each section ships with a built-in legal disclaimer.' },
   { file: 'residential.json',       name: 'Standard Residential Inspection',         category: 'residential',       featured: 1, changelog: 'Initial release: standard US residential home inspection template.' },
   { file: 'pre-listing.json',       name: 'Pre-Listing Inspection',                  category: 'residential',       featured: 1, changelog: 'Spec 4F: seller-focused pre-listing inspection.' },
   { file: 'trec-rei-7-6.json',      name: 'TREC REI 7-6 Inspection Report',          category: 'trec',              featured: 0, changelog: 'Initial release: Texas Real Estate Commission REI 7-6 compliant template.' },

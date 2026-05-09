@@ -34,9 +34,13 @@ const ItemTabsSchema = z.object({
     defects:     z.array(CannedDefectSchema),
 }).strict();
 
+// S3-5 — tighten item label / section title to surface obviously-bogus
+// imports (e.g. someone pasting an entire paragraph as a "label"). The
+// limits comfortably accommodate every shipped seed template; current
+// longest label is 47 chars and longest section title is 34 chars.
 const RichItemSchema = z.object({
     id:            z.string().min(1),
-    label:         z.string().min(1),
+    label:         z.string().min(1).max(100),
     type:          z.literal('rich'),
     ratingOptions: z.array(z.string().min(1)).min(1),
     tabs:          ItemTabsSchema,
@@ -46,7 +50,7 @@ const RichItemSchema = z.object({
 
 const TextItemSchema = z.object({
     id:     z.string().min(1),
-    label:  z.string().min(1),
+    label:  z.string().min(1).max(100),
     type:   z.literal('text'),
     icon:   z.string().optional(),
     number: z.string().optional(),
@@ -56,7 +60,7 @@ const TemplateItemSchema = z.discriminatedUnion('type', [RichItemSchema, TextIte
 
 const TemplateSectionSchema = z.object({
     id:    z.string().min(1),
-    title: z.string().min(1),
+    title: z.string().min(1).max(50),
     icon:  z.string().optional(),
     items: z.array(TemplateItemSchema),
     // Track E2 (Spectora App.A) — per-section legal disclaimer rendered at
