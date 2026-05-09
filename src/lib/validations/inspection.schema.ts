@@ -36,7 +36,15 @@ export const InspectionListQuerySchema = z.object({
 export const CreateInspectionSchema = z.object({
     propertyAddress: z.string().min(5, 'Property address is too short').openapi({ example: '123 Main St, Anytown' }),
     clientName: z.string().min(1, 'Client name is required').default('Private Client').openapi({ example: 'John Doe' }),
-    clientEmail: z.string().email('Invalid email address').optional().nullable().openapi({ example: 'john@example.com' }),
+    // iter-1 production bug #1 — the dashboard's New Inspection modal posts
+    // `clientEmail: ""` when the inspector skips the field. The previous
+    // chain `.email().optional().nullable()` rejected the empty string with
+    // a raw Zod regex pattern. Accept "" as a sentinel for "missing" and
+    // normalise it to null so the service layer sees one canonical shape.
+    clientEmail: z.union([z.string().email('Invalid email address'), z.literal(''), z.null()])
+        .optional()
+        .transform((v) => (v === '' || v === undefined ? null : v))
+        .openapi({ example: 'john@example.com' }),
     clientPhone: z.string().max(30).optional().nullable().openapi({ example: '(555) 123-4567' }),
     templateId: z.string().uuid('Invalid template ID').openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }),

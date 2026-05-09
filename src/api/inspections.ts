@@ -1168,7 +1168,8 @@ inspectionsRoutes.get('/:id/report', async (c) => {
         inspectorName = inspectorRow?.name ?? null;
     }
 
-    if (inspection.paymentRequired === true && inspection.paymentStatus !== 'paid') {
+    // iter-1 bug #3 — truthy coercion (see /report/:id gate in index.ts).
+    if (inspection.paymentRequired && inspection.paymentStatus !== 'paid') {
         return c.html(ReportGatePage({
             reason: 'payment',
             companyName, primaryColor,
@@ -1180,7 +1181,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
         }) as string);
     }
 
-    if (inspection.agreementRequired === true) {
+    if (inspection.agreementRequired) {
         const db2 = drizzle(c.env.DB);
         const signed = await db2.select({ id: agreementRequests.id })
             .from(agreementRequests)

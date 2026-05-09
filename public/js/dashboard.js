@@ -487,7 +487,7 @@ async function cloneInspection(id) {
             window.dispatchEvent(new CustomEvent('inspection-updated'));
         } else {
             const err = await cloneRes.json().catch(function() { return {}; });
-            modalAlert('Failed to clone: ' + (err.error?.message || 'Unknown error'), 'Error');
+            modalAlert('Failed to clone: ' + window.extractErrorMessage(err, 'Unknown error'), 'Error');
         }
     } catch (e) {
         modalAlert('Network error: ' + e.message, 'Error');
@@ -503,7 +503,7 @@ async function deleteInspection(id) {
             window.dispatchEvent(new CustomEvent('inspection-updated'));
         } else {
             var err = await res.json().catch(function() { return {}; });
-            modalAlert('Failed to delete: ' + (err.error?.message || 'Unknown error'), 'Error');
+            modalAlert('Failed to delete: ' + window.extractErrorMessage(err, 'Unknown error'), 'Error');
         }
     } catch (e) {
         modalAlert('Network error: ' + e.message, 'Error');
@@ -583,8 +583,12 @@ async function submitInspection() {
            }
            window.dispatchEvent(new CustomEvent('inspection-updated'));
        } else {
-           const err = await res.json();
-           await modalAlert('Error: ' + (err.error?.message || err.error || 'Failed to create inspection'), 'Error');
+           // iter-1 bug #2 — use the shared helper so Zod validation issues
+           // surface the human `message` instead of the raw issue array
+           // (which previously leaked the email regex pattern to the toast).
+           const err = await res.json().catch(() => ({}));
+           const friendly = window.extractErrorMessage(err, 'Failed to create inspection');
+           await modalAlert('Error: ' + friendly, 'Error');
        }
    } catch (e) {
        console.error(e);
