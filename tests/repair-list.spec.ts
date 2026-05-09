@@ -21,9 +21,11 @@ test.describe('Track E1 — repair-list route', () => {
             maxRedirects: 0,
             failOnStatusCode: false,
         });
-        // Either a 302 to /login (unauth) or a 200/404 (auth + opt-in/out).
-        // A 500 or anything else means the route blew up.
-        expect([200, 301, 302, 303, 307, 308, 404]).toContain(res.status());
+        // Either a 302 to /login (unauth), a 200 (auth + opt-in), a 403
+        // (auth + opt-out, iter-2 Bug #13 friendly disabled-feature page) or
+        // a 404 (legacy / catch-all). A 500 or anything else means the route
+        // blew up.
+        expect([200, 301, 302, 303, 307, 308, 403, 404]).toContain(res.status());
         if ([301, 302, 303, 307, 308].includes(res.status())) {
             const location = res.headers()['location'] || '';
             expect(location).toMatch(/\/login/);

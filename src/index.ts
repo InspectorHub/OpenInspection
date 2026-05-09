@@ -53,6 +53,7 @@ import { InspectionSignaturesPage } from './templates/pages/inspection/signature
 import { InspectionSettingsPage } from './templates/pages/inspection/settings';
 import { RepairListPage } from './templates/pages/inspection/repair-list';
 import { CustomerRepairRequestPage } from './templates/pages/customer-repair-request';
+import { FeatureDisabledPage } from './templates/pages/feature-disabled';
 import { SettingsAutomationsPage } from './templates/pages/settings-automations';
 import { SettingsWidgetPage } from './templates/pages/settings-widget';
 import { SettingsServicesPage } from './templates/pages/settings-services';
@@ -1015,8 +1016,15 @@ app.get('/r/:id/repair-request', async (c) => {
             enableCustomerRepairExport = !!cfgRow?.enableCustomerRepairExport;
             enableRepairList = !!cfgRow?.enableRepairList;
         } catch { /* default off */ }
+        // Iter-2 Bug #14 — when the tenant has not enabled the customer
+        // repair-request export, render a friendly disabled-feature page that
+        // tells the customer to contact their inspector. Previously returned a
+        // generic 404 which made the link look broken from the customer's POV.
         if (!enableCustomerRepairExport) {
-            return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+            return c.html(
+                FeatureDisabledPage({ from: 'customer-repair-request', branding: c.get('branding') }),
+                403,
+            );
         }
         // Suppress unused-var lint — enableRepairList is read for symmetry
         // with /report/:id but the customer view never surfaces the link.
@@ -1455,8 +1463,14 @@ app.get('/inspections/:id/repair-list', htmlAuthGuard(['owner', 'admin', 'inspec
     const shell = await loadInspectionShellData(c, id);
 
     // Gate on the tenant toggle so an admin can't deep-link past the opt-in.
+    // Iter-2 Bug #13 — replaced the generic 404 with a friendly disabled-feature
+    // page so admins/inspectors are told WHY (toggle is off) and HOW to enable
+    // it (deep-link CTA to Settings → Workspace → Reports).
     if (!shell?.enableRepairList) {
-        return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+        return c.html(
+            FeatureDisabledPage({ from: 'repair-list', branding: c.get('branding') }),
+            403,
+        );
     }
     try {
         const data = await c.var.services.inspection.getRepairList(id, tenantId);

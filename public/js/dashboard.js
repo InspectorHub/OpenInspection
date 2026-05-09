@@ -7,7 +7,60 @@ let selectedServiceIds = [];
 let discountCode = '';
 let discountResult = null;
 
+// ─── iter-2 Bug #15 — friendly mapping for ?error= redirect codes ──────────
+// htmlAuthGuard redirects unauthorized role hits with ?error=unauthorized_role.
+// Map the code to a human message and surface it as a toast on first paint.
+// Unknown codes fall back to a generic message — never echo the raw code to
+// the user (UX + privacy).
+const DASHBOARD_ERROR_MESSAGES = {
+    unauthorized_role: 'Agent dashboard is for users with agent role only',
+};
+const GENERIC_DASHBOARD_ERROR = "Sorry, we couldn't open that page";
+
+function mapDashboardErrorMessage(code) {
+    if (!code) return null;
+    if (Object.prototype.hasOwnProperty.call(DASHBOARD_ERROR_MESSAGES, code)) {
+        return DASHBOARD_ERROR_MESSAGES[code];
+    }
+    return GENERIC_DASHBOARD_ERROR;
+}
+
+// Read ?error=, return the friendly message, and strip the param from the URL
+// (history.replaceState) so a refresh doesn't repeat the toast. Preserves any
+// other query params + the hash. Returns null when no error param is present.
+function consumeDashboardErrorParam(win) {
+    const w = win || window;
+    const search = w.location.search || '';
+    if (!search) return null;
+    const params = new URLSearchParams(search);
+    const code = params.get('error');
+    if (!code) return null;
+    params.delete('error');
+    const remaining = params.toString();
+    const cleanUrl = w.location.pathname + (remaining ? '?' + remaining : '') + (w.location.hash || '');
+    try { w.history.replaceState({}, '', cleanUrl); } catch (e) { /* old browser, ignore */ }
+    return mapDashboardErrorMessage(code);
+}
+
+// Expose for unit tests + future inline triggers.
+if (typeof window !== 'undefined') {
+    window.mapDashboardErrorMessage = mapDashboardErrorMessage;
+    window.consumeDashboardErrorParam = consumeDashboardErrorParam;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    // iter-2 Bug #15 — surface the htmlAuthGuard redirect's ?error= code as a
+    // toast before anything else, then strip the param from the URL.
+    try {
+        const errMsg = consumeDashboardErrorParam(window);
+        if (errMsg && typeof showToast === 'function') {
+            showToast(errMsg, true);
+        }
+    } catch (e) {
+        // Toast surfacing must never block dashboard boot.
+        console.warn('[Dashboard] error-toast bootstrap failed', e);
+    }
+
     // Fetch current user for avatar. If unauthenticated, htmlAuthGuard already redirected.
     try {
         const meRes = await authFetch('/api/auth/me');
