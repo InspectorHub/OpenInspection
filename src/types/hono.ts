@@ -68,6 +68,14 @@ export interface AppEnv {
     // never leaks to the client. Optional: when absent, dashboard.tsx falls
     // back to a free-text address input (no autocomplete dropdown).
     GOOGLE_PLACES_API_KEY?: string;
+
+    // Sprint 3 S3-1 — Estated.io public-records API. Server-side proxy holds
+    // the key so it never leaks to the client. Optional: when absent the
+    // /api/inspections/:id/property-facts/autofill endpoint returns
+    // `{ data: null, reason: 'NO_API_KEY' }` and the UI falls back to manual
+    // entry. Matches the existing GOOGLE_PLACES_API_KEY graceful-degrade
+    // pattern.
+    ESTATED_API_KEY?: string;
 }
 
 import { AdminService } from '../services/admin.service';
@@ -100,6 +108,8 @@ import { ImportHistoryService } from '../services/import-history.service';
 import { InspectionRequestService } from '../services/inspection-request.service';
 import { RatingSystemService } from '../services/rating-system.service';
 import { DashboardPrefsService } from '../services/dashboard-prefs.service';
+import { TagService } from '../services/tag.service';
+import { PropertyLookupService } from '../services/property-lookup.service';
 import { AuthVariables } from './auth';
 
 /**
@@ -138,6 +148,8 @@ export interface AppServices {
     inspectionRequest: InspectionRequestService;
     ratingSystem: RatingSystemService;
     dashboardPrefs: DashboardPrefsService;
+    tag: TagService;
+    propertyLookup: PropertyLookupService;
 }
 
 /**

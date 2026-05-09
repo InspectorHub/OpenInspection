@@ -53,7 +53,13 @@ export type AuditAction =
     | 'config.integration.update'
     | 'config.secrets.update'
     | 'config.attention_thresholds.update'
-    | 'config.dashboard_columns.update';
+    | 'config.dashboard_columns.update'
+    | 'tag.created'
+    | 'tag.updated'
+    | 'tag.deleted'
+    | 'tag.linked'
+    | 'tag.unlinked'
+    | 'inspection.property_facts.autofill';
 
 export interface AuditParams {
     db: D1Database;

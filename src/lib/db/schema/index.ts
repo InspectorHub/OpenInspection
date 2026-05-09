@@ -19,6 +19,8 @@ export {
     inspectionEvents,
     inspectionRequests,
     inspectionMediaPool,
+    tags,
+    inspectionItemTagLinks,
 } from './inspection';
 export { contacts } from './contact';
 export { recommendations } from './recommendation';

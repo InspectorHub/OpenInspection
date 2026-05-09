@@ -31,6 +31,8 @@ import { ImportHistoryService } from '../../services/import-history.service';
 import { InspectionRequestService } from '../../services/inspection-request.service';
 import { RatingSystemService } from '../../services/rating-system.service';
 import { DashboardPrefsService } from '../../services/dashboard-prefs.service';
+import { TagService } from '../../services/tag.service';
+import { PropertyLookupService } from '../../services/property-lookup.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -177,6 +179,14 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'dashboardPrefs':
                     target.dashboardPrefs = new DashboardPrefsService(c.env.DB);
+                    break;
+                case 'tag':
+                    target.tag = new TagService(c.env.DB);
+                    break;
+                case 'propertyLookup':
+                    target.propertyLookup = new PropertyLookupService({
+                        ESTATED_API_KEY: c.env.ESTATED_API_KEY,
+                    });
                     break;
             }
             return target[prop];

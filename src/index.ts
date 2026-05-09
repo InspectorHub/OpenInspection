@@ -98,6 +98,7 @@ import recommendationsRoutes from './api/recommendations';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionRequestsRoutes from './api/inspection-requests';
+import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 
 const app = new OpenAPIHono<HonoConfig>();
 
@@ -328,6 +329,11 @@ app.route('/api/auth', coreAuthRoutes);
 app.route('/', coreAuthRoutes);
 app.route('/api/inspections', inspectionsRoutes);
 app.route('/api/inspections', inspectionSyncRoutes);
+// Sprint 3 S3-3 — tag link/unlink endpoints share the /api/inspections root
+// so the URL carries inspection id + item id directly. Mounted before the
+// generic inspection routes finish registering so OpenAPI catches both.
+app.route('/api/inspections', inspectionTagRoutes);
+app.route('/api/tags', tagsRoutes);
 app.route('/api/inspection-requests', inspectionRequestsRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/public', bookingsRoutes);
