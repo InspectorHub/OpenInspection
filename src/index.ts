@@ -190,7 +190,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
@@ -547,6 +547,36 @@ app.get('/not-found', (c) => {
 app.get('/agreement-sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
 app.get('/agreements/sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
 
+// iter-2 production bug #9 — `/sign/:id` redirect target for the
+// ReportGatePage "Sign agreement" CTA. Sprint 1 D-7 minted the URL
+// `${baseUrl}/sign/${id}` with id = inspection id, but no route was
+// registered, so the customer who hit the gate landed on a 404.
+//
+// Resolves the inspection's most recent non-terminal agreement request
+// and 302s to the canonical token-gated page `/agreements/sign/:token`.
+// When no live request exists (every row is signed / declined / expired
+// / never created), redirects to the friendly not-found page so the
+// customer at least sees branded copy instead of the bare 404.
+//
+// Public — no JWT required. tenantId resolves from the subdomain via
+// tenantRouter middleware (`resolvedTenantId`), the same way the public
+// `/report/:id` viewer is scoped.
+app.get('/sign/:id', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
+    if (!tenantId) return c.redirect('/not-found?from=agreement-sign', 302);
+
+    try {
+        const pending = await c.var.services.agreement.findPendingByInspectionId(tenantId as string, id);
+        if (pending) {
+            return c.redirect(`/agreements/sign/${pending.token}`, 302);
+        }
+    } catch (e) {
+        logger.warn('sign-redirect: lookup failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });
+    }
+    return c.redirect('/not-found?from=agreement-sign', 302);
+});
+
 // Spec 5H P1 — Internal render route consumed by SignCompletionWorkflow.
 // Auth model: token IS the secret (256-bit hex from createSigningRequest).
 // Originally M2M-authed via Bearer JWT_SECRET, but CF Browser Rendering
@@ -885,7 +915,7 @@ app.get('/report/:id', async (c) => {
                     reason:          'payment',
                     companyName,
                     primaryColor,
-                    actionUrl:       `${baseUrl}/invoices?inspection=${id}`,
+                    actionUrl:       `${baseUrl}/r/${id}/invoice`,
                     actionLabel:     'View invoice & pay',
                     propertyAddress: insp.propertyAddress ?? null,
                     inspectorName,
@@ -971,6 +1001,84 @@ app.get('/report/:id', async (c) => {
         }));
     } catch {
         return c.text('Report not found', 404);
+    }
+});
+
+// iter-2 production bug #10 — public invoice payment page.
+//
+// Replaces `/invoices?inspection=<id>` as the report-gate "Pay invoice"
+// CTA target. The legacy `/invoices` route is JWT-protected (admin-only),
+// so an unauthenticated customer who clicked the gate CTA was redirected
+// to /login — a dead end for a buyer with no account.
+//
+// This route is public, scoped by inspection id; the inspection id itself
+// IS the secret (same pattern as `/r/:id/repair-request` and `/report/:id`).
+// We surface the invoice's line items, total, and either a hosted Stripe
+// Checkout link (when the workspace has Stripe Connect configured) or a
+// "Contact your inspector" fallback. No account required, no /login
+// detour.
+app.get('/r/:id/invoice', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
+    if (!tenantId) return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+
+    try {
+        const db = drizzle(c.env.DB);
+        const insp = await db.select({
+            id:              schema.inspections.id,
+            propertyAddress: schema.inspections.propertyAddress,
+            date:            schema.inspections.date,
+            inspectorId:     schema.inspections.inspectorId,
+        }).from(schema.inspections)
+            .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId as string)))
+            .get();
+        if (!insp) return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+
+        const branding = c.get('branding');
+        const companyName = branding?.siteName || c.env.APP_NAME || 'OpenInspection';
+        const primaryColor = branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1';
+
+        let inspectorName: string | null = null;
+        let inspectorEmail: string | null = null;
+        if (insp.inspectorId) {
+            const inspectorRow = await db.select({ name: users.name, email: users.email })
+                .from(users)
+                .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId as string)))
+                .get();
+            inspectorName = inspectorRow?.name ?? null;
+            inspectorEmail = inspectorRow?.email ?? null;
+        }
+
+        const invoice = await c.var.services.invoice.findByInspectionId(tenantId as string, id);
+
+        // No Stripe Connect integration in core today — payUrl stays null
+        // and the page renders the "Contact your inspector" fallback. When
+        // STRIPE_SECRET_KEY is wired up, mint a Checkout session here and
+        // pass its URL through. Tested by InvoicePublicPage's `payUrl=null`
+        // path which is the live behavior on every standalone deploy.
+        const payUrl: string | null = null;
+
+        const { InvoicePublicPage } = await import('./templates/pages/invoice-public');
+        return c.html(InvoicePublicPage({
+            companyName,
+            primaryColor,
+            propertyAddress: insp.propertyAddress ?? null,
+            inspectorName,
+            inspectorEmail,
+            scheduledDate: insp.date ?? null,
+            invoice: invoice ? {
+                id:          invoice.id,
+                amountCents: invoice.amountCents,
+                status:      invoice.status,
+                dueDate:     invoice.dueDate ?? null,
+                notes:       invoice.notes ?? null,
+                lineItems:   invoice.lineItems ?? [],
+            } : null,
+            payUrl,
+        }) as string);
+    } catch (e) {
+        logger.warn('public invoice page failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });
+        return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
     }
 });
 
@@ -1071,7 +1179,7 @@ app.get('/r/:id/repair-request', async (c) => {
                     reason:          'payment',
                     companyName,
                     primaryColor,
-                    actionUrl:       `${baseUrl}/invoices?inspection=${id}`,
+                    actionUrl:       `${baseUrl}/r/${id}/invoice`,
                     actionLabel:     'View invoice & pay',
                     propertyAddress: insp.propertyAddress ?? null,
                     inspectorName,
