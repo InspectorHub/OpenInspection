@@ -20,7 +20,10 @@ export const syncEngineState = (() => {
 })();
 
 const ENDPOINT = {
-    'results.merge':         (p) => ({ method: 'POST',   url: `/api/inspections/${p.inspectionId}/results/merge`, json: { baseSyncedAt: p.baseSyncedAt, base: p.base, ours: p.ours } }),
+    // Iter-2 bug #11 — forward the dirty-field map so the server can skip
+    // 3-way comparison on fields the local user has not edited. Keeping the
+    // field optional preserves backwards-compat with older clients.
+    'results.merge':         (p) => ({ method: 'POST',   url: `/api/inspections/${p.inspectionId}/results/merge`, json: { baseSyncedAt: p.baseSyncedAt, base: p.base, ours: p.ours, ...(p.dirtyFields ? { dirtyFields: p.dirtyFields } : {}) } }),
     'photo.upload':          (p) => ({ method: 'POST',   url: `/api/inspections/${p.inspectionId}/upload`, formData: makePhotoForm(p) }),
     'photo.delete':          (p) => ({ method: 'DELETE', url: `/api/inspections/${p.inspectionId}/items/${p.itemId}/photos/${p.photoIndex}` }),
     'signature.inspector':   (p) => ({ method: 'POST',   url: `/api/inspections/${p.inspectionId}/inspector-signature`, json: { signatureBase64: p.signatureBase64, signedAt: p.signedAt } }),

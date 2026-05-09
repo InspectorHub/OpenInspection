@@ -22,10 +22,27 @@ const ItemResultSchema = z.object({
 
 export const ResultsBlobSchema = z.record(z.string(), ItemResultSchema).openapi('ResultsBlob');
 
+/**
+ * Iter-2 bug #11 — dirty-field map narrows the conflict surface.
+ *
+ * Shape: `{ [itemId]: ['notes','status','photos','recommendations'] }`.
+ * Only listed (itemId, field) pairs contribute to a conflict — every
+ * other field silently takes theirs so server-only writes (e.g. an admin
+ * toggling `paymentRequired` from another tab, or a third-party adding
+ * an agreement signature) cannot pop a conflict modal at the inspector.
+ *
+ * Optional for backwards-compat: callers that omit the field fall back
+ * to the pre-bug-#11 "compare every field" behaviour so older clients
+ * that haven't shipped the new sync engine still merge correctly.
+ */
+const ItemDirtyFieldsSchema = z.array(z.enum(['status', 'notes', 'photos', 'recommendations']));
+export const DirtyFieldsMapSchema = z.record(z.string(), ItemDirtyFieldsSchema).openapi('DirtyFieldsMap');
+
 export const ResultsMergeRequestSchema = z.object({
     baseSyncedAt: z.number().int().nonnegative(),
     base:         ResultsBlobSchema, // client's last server-confirmed snapshot — needed because server doesn't keep history
     ours:         ResultsBlobSchema,
+    dirtyFields:  DirtyFieldsMapSchema.optional(),
 }).openapi('ResultsMergeRequest');
 
 export const MergeConflictSchema = z.object({

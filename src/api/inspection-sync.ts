@@ -5,7 +5,7 @@ import type { HonoConfig } from '../types/hono';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
-import { mergeResults, type ResultsBlob } from '../services/diff3.service';
+import { mergeResults, type ResultsBlob, type DirtyFieldsMap } from '../services/diff3.service';
 import {
     ResultsMergeRequestSchema,
     ResultsMergeResponseSchema,
@@ -55,7 +55,7 @@ syncRoutes.openapi(createRoute({
     },
 }), async (c) => {
     const { id } = c.req.valid('param');
-    const { base, ours } = c.req.valid('json');
+    const { base, ours, dirtyFields } = c.req.valid('json');
     const tenantId = c.get('tenantId') as string;
     const db = drizzle(c.env.DB);
 
@@ -71,7 +71,16 @@ syncRoutes.openapi(createRoute({
     // True 3-way merge: client supplies its last server-confirmed `base` snapshot
     // (server doesn't keep result history). diff3 uses base to distinguish the
     // client's edits from server-side third-party concurrent writes.
-    const { merged, conflicts } = mergeResults(base as ResultsBlob, ours as ResultsBlob, theirs);
+    //
+    // Iter-2 bug #11 — `dirtyFields` narrows the conflict surface so untouched
+    // local fields silently take theirs (no modal). When the client omits the
+    // field we fall through to the original "compare every field" behaviour.
+    const { merged, conflicts } = mergeResults(
+        base as ResultsBlob,
+        ours as ResultsBlob,
+        theirs,
+        dirtyFields as DirtyFieldsMap | undefined,
+    );
 
     if (conflicts.length > 0) {
         return c.json({

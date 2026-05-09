@@ -87,3 +87,83 @@ describe('mergeResults', () => {
         expect((out.merged.item1.recommendations || []).map(r => r.recommendationId)).toEqual(['r_A']);
     });
 });
+
+// ─── Iter-2 bug #11 — dirty-field map narrows the conflict surface ─────────
+describe('mergeResults dirtyFields (iter-2 bug #11)', () => {
+    it('takes theirs silently for fields the user did not edit, even when ours differs', () => {
+        // The local `ours.notes` happens to differ from base — say a stale
+        // snapshot — but the user did not edit `notes` on this item. Server
+        // has a real edit. Without dirty-tracking diff3 would surface a
+        // conflict; with it, theirs wins quietly.
+        const b: ResultsBlob = { item1: { status: 'satisfactory', notes: 'Original.', photos: [], updatedAt: 0 } };
+        const o: ResultsBlob = { item1: { status: 'satisfactory', notes: 'Stale local.', photos: [], updatedAt: 1 } };
+        const t: ResultsBlob = { item1: { status: 'satisfactory', notes: 'Server edit.', photos: [], updatedAt: 5 } };
+        const out = mergeResults(b, o, t, { item1: [] });
+        expect(out.conflicts).toHaveLength(0);
+        expect(out.merged.item1.notes).toBe('Server edit.');
+    });
+
+    it('still surfaces a conflict when the user did edit notes on this item', () => {
+        const b: ResultsBlob = { item1: { status: 'satisfactory', notes: 'Original.', photos: [], updatedAt: 0 } };
+        const o: ResultsBlob = { item1: { status: 'satisfactory', notes: 'Inspector.', photos: [], updatedAt: 1 } };
+        const t: ResultsBlob = { item1: { status: 'satisfactory', notes: 'Office.',    photos: [], updatedAt: 1 } };
+        const out = mergeResults(b, o, t, { item1: ['notes'] });
+        expect(out.conflicts).toHaveLength(1);
+        expect(out.conflicts[0]).toMatchObject({ itemId: 'item1', field: 'notes' });
+    });
+
+    it('non-dirty status takes theirs even when ours has higher updatedAt', () => {
+        // User did not change status. Server flipped it. Local updatedAt is
+        // newer (e.g. they edited notes elsewhere). Dirty map says only notes
+        // is dirty, so status must take theirs even though LWW would say ours.
+        const b: ResultsBlob = { item1: { status: 'satisfactory', notes: '', photos: [], updatedAt: 0 } };
+        const o: ResultsBlob = { item1: { status: 'satisfactory', notes: 'note', photos: [], updatedAt: 10 } };
+        const t: ResultsBlob = { item1: { status: 'defect',       notes: '',     photos: [], updatedAt: 5 } };
+        const out = mergeResults(b, o, t, { item1: ['notes'] });
+        expect(out.merged.item1.status).toBe('defect');
+    });
+
+    it('empty dirty list short-circuits to theirs but still unions photos', () => {
+        // Server-side write only — admin toggled something; the inspector
+        // didn't touch this item. But background photo uploads still
+        // happened (queued before the admin write). Photos must survive.
+        const b: ResultsBlob = { item1: { status: 'satisfactory', notes: 'orig', photos: [{ key: 'p1' }], updatedAt: 0 } };
+        const o: ResultsBlob = { item1: { status: 'satisfactory', notes: 'orig', photos: [{ key: 'p1' }, { key: 'p_new' }], updatedAt: 1 } };
+        const t: ResultsBlob = { item1: { status: 'defect',       notes: 'admin edit', photos: [{ key: 'p1' }], updatedAt: 5 } };
+        const out = mergeResults(b, o, t, { item1: [] });
+        expect(out.conflicts).toHaveLength(0);
+        expect(out.merged.item1.status).toBe('defect');
+        expect(out.merged.item1.notes).toBe('admin edit');
+        const keys = (out.merged.item1.photos || []).map(p => p.key).sort();
+        expect(keys).toEqual(['p1', 'p_new']);
+    });
+
+    it('per-item dirty mask: dirty on item1 does not affect item2', () => {
+        const b: ResultsBlob = {
+            item1: { status: 'satisfactory', notes: 'orig1', photos: [], updatedAt: 0 },
+            item2: { status: 'satisfactory', notes: 'orig2', photos: [], updatedAt: 0 },
+        };
+        const o: ResultsBlob = {
+            item1: { status: 'satisfactory', notes: 'mine',  photos: [], updatedAt: 1 },
+            item2: { status: 'satisfactory', notes: 'stale', photos: [], updatedAt: 1 },
+        };
+        const t: ResultsBlob = {
+            item1: { status: 'satisfactory', notes: 'theirs', photos: [], updatedAt: 1 },
+            item2: { status: 'satisfactory', notes: 'admin',  photos: [], updatedAt: 1 },
+        };
+        // Only item1.notes is dirty. item2 should silently take theirs.
+        const out = mergeResults(b, o, t, { item1: ['notes'], item2: [] });
+        expect(out.merged.item2.notes).toBe('admin');
+        // item1 has both sides editing notes — that's a real conflict.
+        expect(out.conflicts).toHaveLength(1);
+        expect(out.conflicts[0]?.itemId).toBe('item1');
+    });
+
+    it('omitting dirtyFields preserves pre-bug-#11 behaviour (back-compat)', () => {
+        const b: ResultsBlob = { item1: { status: 'satisfactory', notes: 'O', photos: [], updatedAt: 0 } };
+        const o: ResultsBlob = { item1: { status: 'satisfactory', notes: 'A', photos: [], updatedAt: 1 } };
+        const t: ResultsBlob = { item1: { status: 'satisfactory', notes: 'B', photos: [], updatedAt: 1 } };
+        const out = mergeResults(b, o, t);
+        expect(out.conflicts).toHaveLength(1);
+    });
+});
