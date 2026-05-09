@@ -1,12 +1,27 @@
 // ─── Sub-spec B Task 3 — PageHeader meta ────────────────────────────────────
+//
+// Iter-2 bug #5 — query param names previously read `from`/`to` which the
+// /api/inspections schema silently dropped, leaving the count uninformative.
+// The schema accepts `dateFrom`/`dateTo` so we send those instead and split
+// the subtitle into "X confirmed · N drafts hidden" so an inspector who
+// only sees gray DRAFT chips on the grid still understands the count.
 function calendarMeta() {
     return {
-        weekCount: 0,
-        nextOpen:  '',
+        weekCount:  0,
+        draftCount: 0,
+        nextOpen:   '',
         get metaText() {
             const parts = [];
-            if (this.weekCount > 0) parts.push(this.weekCount + ' this week');
-            else parts.push('No inspections scheduled this week');
+            const confirmed = this.weekCount - this.draftCount;
+            if (this.weekCount === 0) {
+                parts.push('No inspections scheduled this week');
+            } else if (this.draftCount > 0 && confirmed === 0) {
+                parts.push(this.draftCount + ' draft' + (this.draftCount === 1 ? '' : 's') + ' this week');
+            } else if (this.draftCount > 0) {
+                parts.push(confirmed + ' confirmed · ' + this.draftCount + ' draft' + (this.draftCount === 1 ? '' : 's'));
+            } else {
+                parts.push(this.weekCount + ' this week');
+            }
             if (this.nextOpen) parts.push('next open ' + this.nextOpen);
             return parts.join(' · ');
         },
@@ -15,11 +30,12 @@ function calendarMeta() {
                 const now = new Date();
                 const start = now.toISOString().slice(0, 10);
                 const end = new Date(now.getTime() + 7 * 86400 * 1000).toISOString().slice(0, 10);
-                const r = await authFetch('/api/inspections?from=' + start + '&to=' + end + '&limit=200');
+                const r = await authFetch('/api/inspections?dateFrom=' + start + '&dateTo=' + end + '&limit=200');
                 if (!r.ok) return;
                 const j = await r.json();
-                const list = j.data?.inspections || [];
-                this.weekCount = list.length;
+                const list = j.data || [];
+                this.weekCount  = list.length;
+                this.draftCount = list.filter(function(i) { return i && i.status === 'draft'; }).length;
             } catch {}
         },
     };
@@ -311,6 +327,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (info.event.extendedProps && info.event.extendedProps.source === 'google') {
                 info.el.style.cursor = 'default';
                 info.el.style.opacity = '0.7';
+            }
+            // Iter-2 bug #5 — drafts render with a dashed-style border + slightly
+            // muted opacity so they read as "tentative" against the brand-color
+            // confirmed events. Pure CSS, no extra DOM nodes.
+            if (info.event.extendedProps && info.event.extendedProps.isDraft) {
+                info.el.classList.add('fc-event-draft');
+                info.el.style.borderStyle = 'dashed';
+                info.el.style.borderWidth = '1.5px';
+                info.el.style.opacity = '0.85';
             }
         },
     });
