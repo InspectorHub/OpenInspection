@@ -312,7 +312,6 @@ export class InspectionService {
             .get();
         const defaultPaymentRequired   = tenantPolicy?.blockUnpaid ?? false;
         const defaultAgreementRequired = tenantPolicy?.blockUnsignedAgreement ?? false;
-        const overrides = data as { paymentRequired?: boolean; agreementRequired?: boolean };
 
         const newInspection = {
             id,
@@ -342,8 +341,8 @@ export class InspectionService {
             // Round-2 #10 — block-report gating defaults inherited from tenant
             // policy. The Sprint 1 D-7 ReportGatePage check at /report/:id
             // reads these per-inspection columns directly.
-            paymentRequired:   overrides.paymentRequired   ?? defaultPaymentRequired,
-            agreementRequired: overrides.agreementRequired ?? defaultAgreementRequired,
+            paymentRequired:   data.paymentRequired   ?? defaultPaymentRequired,
+            agreementRequired: data.agreementRequired ?? defaultAgreementRequired,
             createdAt
         };
 
