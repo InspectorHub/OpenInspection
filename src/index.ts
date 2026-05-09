@@ -189,7 +189,7 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 app.use('*', async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path);
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path);
 
     if (isAuthPublic || isPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
@@ -545,6 +545,36 @@ app.get('/not-found', (c) => {
 // these handlers the request would fall through to the generic Hono 404.
 app.get('/agreement-sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
 app.get('/agreements/sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
+
+// iter-2 production bug #9 — `/sign/:id` redirect target for the
+// ReportGatePage "Sign agreement" CTA. Sprint 1 D-7 minted the URL
+// `${baseUrl}/sign/${id}` with id = inspection id, but no route was
+// registered, so the customer who hit the gate landed on a 404.
+//
+// Resolves the inspection's most recent non-terminal agreement request
+// and 302s to the canonical token-gated page `/agreements/sign/:token`.
+// When no live request exists (every row is signed / declined / expired
+// / never created), redirects to the friendly not-found page so the
+// customer at least sees branded copy instead of the bare 404.
+//
+// Public — no JWT required. tenantId resolves from the subdomain via
+// tenantRouter middleware (`resolvedTenantId`), the same way the public
+// `/report/:id` viewer is scoped.
+app.get('/sign/:id', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
+    if (!tenantId) return c.redirect('/not-found?from=agreement-sign', 302);
+
+    try {
+        const pending = await c.var.services.agreement.findPendingByInspectionId(tenantId as string, id);
+        if (pending) {
+            return c.redirect(`/agreements/sign/${pending.token}`, 302);
+        }
+    } catch (e) {
+        logger.warn('sign-redirect: lookup failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });
+    }
+    return c.redirect('/not-found?from=agreement-sign', 302);
+});
 
 // Spec 5H P1 — Internal render route consumed by SignCompletionWorkflow.
 // Auth model: token IS the secret (256-bit hex from createSigningRequest).

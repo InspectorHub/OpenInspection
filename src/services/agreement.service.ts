@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { agreements, agreementRequests, inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
@@ -180,6 +180,39 @@ export class AgreementService {
      */
     async getRequestByToken(token: string) {
         return this.getDrizzle().select().from(agreementRequests).where(eq(agreementRequests.token, token)).get();
+    }
+
+    /**
+     * iter-2 production bug #9 — given an inspection id, return the most recent
+     * non-terminal (pending/sent/viewed) signing request for that inspection
+     * within the given tenant. Used by the public `/sign/:id` redirect route
+     * so a customer who hits the report-gate "Sign agreement" CTA lands on
+     * the live agreement page instead of a 404.
+     *
+     * Returns `null` when the inspection has no agreement request at all,
+     * or when all existing requests are in a terminal state (signed /
+     * declined / expired). Tenant-scoped — never crosses workspaces.
+     *
+     * NOTE: this is a read-only counterpart to `findOrCreate()`. Callers
+     * that want to mint a token when none exists should use the latter;
+     * the public `/sign/:id` redirect deliberately stays read-only so an
+     * unauthenticated customer cannot trigger row inserts.
+     */
+    async findPendingByInspectionId(tenantId: string, inspectionId: string): Promise<{ token: string; status: string } | null> {
+        const row = await this.getDrizzle().select({
+            token:  agreementRequests.token,
+            status: agreementRequests.status,
+        })
+            .from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.tenantId, tenantId),
+                eq(agreementRequests.inspectionId, inspectionId),
+                inArray(agreementRequests.status, ['pending', 'sent', 'viewed']),
+            ))
+            .orderBy(desc(agreementRequests.createdAt))
+            .limit(1)
+            .get();
+        return row ?? null;
     }
 
     /**
