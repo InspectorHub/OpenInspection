@@ -15,6 +15,15 @@ export const UpdateBrandingSchema = z.object({
     showEstimates: z.boolean().optional().openapi({ example: true }),
     // Track E1 (ITB §11) — gate the "Repair List" tab on the published report.
     enableRepairList: z.boolean().optional().openapi({ example: true }),
+    // Round-2 backlog #10 — tenant-wide default for the per-inspection
+    // paywall introduced in Sprint 1 D-7 (ReportGatePage). When true, every
+    // newly created inspection inherits paymentRequired=true. Per-inspection
+    // override remains the source of truth at gate time.
+    blockUnpaid: z.boolean().optional().openapi({ example: false }),
+    // Round-2 backlog #10 — tenant-wide default for the per-inspection
+    // agreement gate. When true, every newly created inspection inherits
+    // agreementRequired=true.
+    blockUnsignedAgreement: z.boolean().optional().openapi({ example: false }),
     // Round-2 backlog G3 (Spectora §4.1) — extra referral-source labels the
     // tenant wants on the inspection settings dropdown. The seed list of
     // seven values (Realtor / Past Client / …) is hardcoded; this array
