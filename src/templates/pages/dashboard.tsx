@@ -173,11 +173,39 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 ></span>
                             </button>
                         </template>
+
+                        {/* Sprint 3 S3-3 — Tag filter. Combines with the time
+                            filter (intersection) so an inspector can scope to
+                            "today + Critical" in two clicks. The dropdown
+                            populates on load via /api/tags. Shows a count
+                            badge when active. */}
+                        <div class="ml-2 flex items-center gap-2" data-test="inspection-tag-filter">
+                            <select
+                                x-model="activeTagFilter"
+                                x-on:change="onTagFilterChange()"
+                                aria-label="Filter by tag"
+                                class="h-7 px-2 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] outline-none focus:ring-2 focus:ring-indigo-500/30 bg-white text-slate-600 border-slate-200"
+                                data-testid="dashboard-tag-filter"
+                            >
+                                <option value="">Any tag</option>
+                                <template x-for="t in availableTags" {...{ 'x-bind:key': 't.id' }}>
+                                    <option {...{ 'x-bind:value': 't.id' }} x-text="t.name"></option>
+                                </template>
+                            </select>
+                            <button
+                                type="button"
+                                x-show="activeTagFilter"
+                                style="display:none"
+                                x-on:click="activeTagFilter = ''; onTagFilterChange()"
+                                class="text-[10px] font-bold uppercase tracking-[0.08em] text-indigo-600 hover:text-indigo-700"
+                            >Clear</button>
+                        </div>
                     </div>
 
-                    {/* C1 — Flat filtered list, shown only when activeFilter !== 'all'. */}
+                    {/* C1 — Flat filtered list, shown when activeFilter !== 'all'
+                        OR a tag filter is active (Sprint 3 S3-3). */}
                     <section
-                        x-show="!loading && activeFilter !== 'all'"
+                        x-show="!loading && (activeFilter !== 'all' || !!tagFilterIds)"
                         {...{ 'x-cloak': true }}
                         class="bg-white border border-slate-200 rounded-md scroll-mt-20"
                         data-test="inspection-filter-list"
@@ -211,7 +239,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Needs Attention */}
-                    <section id="bucket-needsAttention" x-show="!loading && activeFilter === 'all' && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
+                    <section id="bucket-needsAttention" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.needsAttention = !sections.needsAttention"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -229,7 +257,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Today */}
-                    <section id="bucket-today" x-show="!loading && activeFilter === 'all' && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
+                    <section id="bucket-today" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.today = !sections.today"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -247,7 +275,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Today's events (Spec 4D.T10) */}
-                    <section x-show="!loading && activeFilter === 'all' && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
+                    <section x-show="!loading && activeFilter === 'all' && !tagFilterIds && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.todayEvents = !sections.todayEvents"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -270,7 +298,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: This Week */}
-                    <section id="bucket-thisWeek" x-show="!loading && activeFilter === 'all' && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
+                    <section id="bucket-thisWeek" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.thisWeek = !sections.thisWeek"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -288,7 +316,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Later */}
-                    <section x-show="!loading && activeFilter === 'all' && (buckets.later.length > 0 || buckets.laterTotal > 0)" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
+                    <section x-show="!loading && activeFilter === 'all' && !tagFilterIds && (buckets.later.length > 0 || buckets.laterTotal > 0)" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.later = !sections.later"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -311,7 +339,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Recent Reports */}
-                    <section id="bucket-recentReports" x-show="!loading && activeFilter === 'all' && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
+                    <section id="bucket-recentReports" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.recentReports = !sections.recentReports"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">
@@ -329,7 +357,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     </section>
 
                     {/* Section: Cancelled */}
-                    <section x-show="!loading && activeFilter === 'all' && buckets.cancelled.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
+                    <section x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.cancelled.length > 0" {...{ 'x-cloak': true }} class="bg-white border border-slate-200 rounded-md">
                         <button type="button" x-on:click="sections.cancelled = !sections.cancelled"
                                 class="w-full flex items-center justify-between px-5 py-4 text-left">
                             <div class="flex items-center gap-3">

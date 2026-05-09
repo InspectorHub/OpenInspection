@@ -700,6 +700,14 @@ function dashboardFactory() {
         // collapses to a single flat list filtered in-memory.
         activeFilter: 'all',
         filterOptions: INSPECTION_FILTERS,
+        // Sprint 3 S3-3 — secondary tag filter. Combines with `activeFilter`
+        // (intersection) so the inspector can scope to "today + Critical".
+        // `tagFilterIds` is the resolved set of inspection ids that have at
+        // least one item linked to the active tag — populated lazily by
+        // onTagFilterChange().
+        activeTagFilter: '',
+        availableTags: [],
+        tagFilterIds: null, // null when no tag selected; Set<string> when active
         // Spec 4D.T10 — Today's events bucket
         todayEvents: [],
         eventTypes: [],
@@ -709,6 +717,42 @@ function dashboardFactory() {
         async init() {
             await this.reload();
             window.addEventListener('inspection-updated', () => this.reload());
+            // Sprint 3 S3-3 — populate the tag filter dropdown. Best-effort —
+            // a 4xx response (no permission) leaves the dropdown empty.
+            try {
+                const tagsRes = await fetch('/api/tags', { credentials: 'include' });
+                if (tagsRes.ok) {
+                    const json = await tagsRes.json().catch(function () { return null; });
+                    this.availableTags = (json && json.data) || [];
+                }
+            } catch (_) { /* silent */ }
+        },
+
+        async onTagFilterChange() {
+            const tagId = this.activeTagFilter || '';
+            if (!tagId) { this.tagFilterIds = null; return; }
+            try {
+                const res = await fetch('/api/tags/' + encodeURIComponent(tagId) + '/inspections', { credentials: 'include' });
+                if (!res.ok) { this.tagFilterIds = new Set(); return; }
+                const json = await res.json().catch(function () { return null; });
+                const ids = (json && json.data && json.data.inspectionIds) || [];
+                this.tagFilterIds = new Set(ids);
+                // If user is on the 'all' filter, switch to a flat list view so
+                // the tag-filtered set is actually visible.
+                if (this.activeFilter === 'all') this.activeFilter = 'today';
+            } catch (_) {
+                this.tagFilterIds = new Set();
+            }
+        },
+
+        /** True when the inspection passes BOTH the active time filter and
+         *  the tag filter (when set). Used by filteredInspections + counts. */
+        _passesAllActiveFilters(insp, timeFilter, now) {
+            if (!matchesInspectionFilter(insp, timeFilter, now)) return false;
+            if (this.tagFilterIds) {
+                if (!insp || !insp.id || !this.tagFilterIds.has(insp.id)) return false;
+            }
+            return true;
         },
 
         async reload() {
@@ -854,10 +898,13 @@ function dashboardFactory() {
         // Inspections matching the currently active non-'all' filter, sorted
         // by inspection date ascending (closest first). Stable enough that
         // re-renders don't shuffle rows when the same data reloads.
+        // Sprint 3 S3-3 — also intersects with the active tag filter when set.
+        // When only the tag filter is active (time = all), return the tag set.
         get filteredInspections() {
-            if (this.activeFilter === 'all') return [];
+            const tagActive = !!this.tagFilterIds;
+            if (this.activeFilter === 'all' && !tagActive) return [];
             const now = new Date();
-            const list = this._allInspections.filter(i => matchesInspectionFilter(i, this.activeFilter, now));
+            const list = this._allInspections.filter((i) => this._passesAllActiveFilters(i, this.activeFilter, now));
             list.sort((a, b) => {
                 const da = a && a.date ? new Date(a.date).getTime() : 0;
                 const db = b && b.date ? new Date(b.date).getTime() : 0;

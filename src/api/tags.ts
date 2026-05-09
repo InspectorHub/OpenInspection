@@ -83,6 +83,40 @@ tagsRoutes.openapi(createRoute({
     return c.json({ success: true as const, data: tag }, 200);
 });
 
+/* ── GET /api/tags/:id/inspections ─────────────────────────────────────
+ *  Sprint 3 S3-3 — list filter. Returns the distinct inspection ids in the
+ *  tenant that have at least one item linked to this tag. The dashboard
+ *  uses this to scope its flat list view to "by tag".
+ */
+tagsRoutes.openapi(createRoute({
+    method: 'get', path: '/{id}/inspections',
+    tags: ['Tags'],
+    summary: 'List inspections that have any item tagged with this tag',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: IdParamSchema },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(true),
+                        data:    z.object({ inspectionIds: z.array(z.string()) }),
+                    }),
+                },
+            },
+            description: 'Inspection ids',
+        },
+    },
+}), async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    // Tenant-scope guard via lookup — refuses cross-tenant ids.
+    const tag = await c.var.services.tag.get(id, tenantId);
+    if (!tag) throw Errors.NotFound('Tag not found');
+    const inspectionIds = await c.var.services.tag.listInspectionsByTag(tenantId, id);
+    return c.json({ success: true as const, data: { inspectionIds } }, 200);
+});
+
 /* ── DELETE /api/tags/:id ─────────────────────────────────────────────── */
 tagsRoutes.openapi(createRoute({
     method: 'delete', path: '/{id}',
