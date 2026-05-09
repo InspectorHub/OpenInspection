@@ -23,7 +23,10 @@ describe('R7-06 — /book inspection date input', () => {
         // The previous code used type="text" + a JS mask. The fix flips the
         // input to a native <input type="date"> which triggers the native
         // iOS spinner picker on mobile Safari.
-        expect(tsx).toMatch(/type="date"\s+name="inspectionDate"/);
+        // Iter-2 bug #6 added a `lang="en"` attribute between type and name
+        // to avoid OS-locale placeholder leaks on zh-CN; the regex permits
+        // any attributes between type="date" and name="inspectionDate".
+        expect(tsx).toMatch(/type="date"[\s\S]*?name="inspectionDate"/);
         // And no leftover "type=text" + "name=dateMasked" remnant.
         expect(tsx).not.toMatch(/type="text"\s+name="dateMasked"/);
     });

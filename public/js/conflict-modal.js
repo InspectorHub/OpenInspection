@@ -1,5 +1,6 @@
 import { db, openDb } from './db.js';
 import { drainQueue } from './sync-engine.js';
+import { resetLocalStore } from './reset-local-store.js';
 
 // See network-pill.js for the rationale behind alpine:init registration.
 function conflictModalFactory() {
@@ -7,6 +8,10 @@ function conflictModalFactory() {
         open: false,
         conflicts: [],
         index: 0,
+        // Iter-2 bug #12 — disables the reset button while the action is
+        // in flight so a double-click can't fire two parallel
+        // deleteDatabase() calls.
+        resetting: false,
         get current() { return this.conflicts[this.index]; },
 
         async init() {
@@ -76,6 +81,34 @@ function conflictModalFactory() {
             // /api/admin/audit-logs feed. Fire-and-forget — never block UX.
             this._recordAuditLog(cf, resolution, chosen);
             await drainQueue();
+        },
+
+        /**
+         * Iter-2 bug #12 — escape hatch. Wipes the local Dexie store
+         * (`oi_offline`) plus inspection-related localStorage and reloads.
+         * The native confirm() dialog gates the destructive action because
+         * it cannot be undone — the user will lose any locally-cached
+         * unsynced edits the modal can no longer adjudicate.
+         */
+        async resetLocal() {
+            if (this.resetting) return;
+            const ok = (typeof window !== 'undefined' && typeof window.confirm === 'function')
+                ? window.confirm('Reset local copy and reload?\n\nAny offline edits not yet synced will be discarded. The page will reload from the server.')
+                : true;
+            if (!ok) return;
+            this.resetting = true;
+            try {
+                await resetLocalStore();
+            } catch (err) {
+                console.error('[conflict-modal] resetLocalStore failed', err);
+            }
+            // Reload regardless of clear result — a partial wipe + reload is
+            // strictly better than leaving the user in a stuck modal.
+            if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+                window.location.reload();
+            } else {
+                this.resetting = false;
+            }
         },
 
         _recordAuditLog(cf, resolution, mergedValue) {
