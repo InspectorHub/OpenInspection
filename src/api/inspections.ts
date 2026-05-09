@@ -25,6 +25,8 @@ import {
     DashboardResponseSchema,
     PropertyFactsSchema,
     PropertyFactsResponseSchema,
+    PropertyFactsAutofillRequestSchema,
+    PropertyFactsAutofillResponseSchema,
     MediaCenterResponseSchema,
     MediaPoolUploadResponseSchema,
     MediaAttachRequestSchema,
@@ -649,6 +651,63 @@ inspectionsRoutes.openapi(updatePropertyFactsRoute, async (c) => {
         metadata: { fields: Object.keys(body) },
     });
     return c.json({ success: true, data: facts }, 200);
+});
+
+/**
+ * Sprint 3 S3-1 — POST /api/inspections/:id/property-facts/autofill
+ *
+ * Resolve property facts from an external public-records provider
+ * (Estated.io). Body: { addressString }. Response: { facts, source }.
+ * When no provider key is configured, returns
+ * `{ facts: null, source: 'manual_required', reason: 'NO_API_KEY' }`
+ * so the UI can show a polite "couldn't auto-fill" hint.
+ *
+ * Tenant ownership is verified via the inspection lookup. The endpoint
+ * does NOT persist the facts — the inline-save flow already in
+ * inspection-settings.js patches each field via the existing PATCH
+ * /property-facts endpoint, preserving the inspector's manual overrides.
+ */
+const autofillPropertyFactsRoute = createRoute({
+    method: 'post',
+    path: '/{id}/property-facts/autofill',
+    tags: ['Inspections'],
+    summary: 'Auto-fill property facts from public records (Estated.io)',
+    description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill.',
+    request: {
+        params: z.object({ id: z.string().uuid() }),
+        body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema } } },
+    },
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: PropertyFactsAutofillResponseSchema } },
+            description: 'Auto-fill result',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(autofillPropertyFactsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const { addressString } = c.req.valid('json');
+
+    // Tenant ownership guard — refuses cross-tenant lookups.
+    await c.var.services.inspection.getInspection(id, tenantId);
+
+    const result = await c.var.services.propertyLookup.lookup(addressString);
+    auditFromContext(c, 'inspection.property_facts.autofill', 'inspection', {
+        entityId: id,
+        metadata: { source: result.source ?? 'manual_required', reason: result.reason },
+    });
+
+    return c.json({
+        success: true as const,
+        data: {
+            facts:  result.data,
+            source: result.source ?? ('manual_required' as const),
+            ...(result.reason ? { reason: result.reason } : {}),
+        },
+    }, 200);
 });
 
 /**

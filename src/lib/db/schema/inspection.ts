@@ -139,6 +139,34 @@ export const inspectionAgreements = sqliteTable('inspection_agreements', {
     userAgent: text('user_agent'),
 });
 
+// Sprint 3 S3-3 — T-key Tag system. Tenant-scoped tag library + a
+// many-to-many link table connecting an inspection-item position to one or
+// more tags. Internal-only (never rendered on customer-facing report).
+//
+// Design notes:
+//   - `name` is unique per tenant.
+//   - `is_seed` marks the five default tags planted on first /tags visit.
+//   - The link table uses (inspection_id, item_id, tag_id) as a composite
+//     PK so re-linking the same tag is a no-op without DELETE-then-INSERT.
+export const tags = sqliteTable('tags', {
+    id:        text('id').primaryKey(),
+    tenantId:  text('tenant_id').notNull(),
+    name:      text('name').notNull(),
+    color:     text('color'),
+    isSeed:    integer('is_seed').notNull().default(0),
+    createdAt: integer('created_at').notNull(),
+}, (t) => ({
+    tenantNameUnique: uniqueIndex('idx_tags_tenant_name').on(t.tenantId, t.name),
+}));
+
+export const inspectionItemTagLinks = sqliteTable('inspection_item_tag_links', {
+    inspectionId: text('inspection_id').notNull(),
+    itemId:       text('item_id').notNull(),
+    tagId:        text('tag_id').notNull(),
+    tenantId:     text('tenant_id').notNull(),
+    createdAt:    integer('created_at').notNull(),
+});
+
 // Round-2 backlog #9 (Spectora §E.3) — Media Center pool. Photos uploaded
 // ahead of item placement live here until the inspector drags one onto an
 // item textarea, at which point InspectionService.attachPoolPhoto moves it

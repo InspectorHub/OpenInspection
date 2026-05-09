@@ -289,6 +289,36 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   </template>
                 </div>
 
+                {/* Sprint 3 S3-3 — Tag chips. Internal labels only (never on
+                    customer report). Click a chip to remove the link. */}
+                <div
+                  x-show="getItemTags(item.id).length > 0"
+                  style="display:none"
+                  class="flex items-center gap-1.5 flex-wrap mb-3"
+                  data-testid="item-tag-chips"
+                >
+                  <template x-for="t in getItemTags(item.id)" x-bind:key="t.id">
+                    <button
+                      type="button"
+                      {...{ 'x-on:click.stop': 'removeItemTag(item.id, t.id)' }}
+                      x-bind:title="'Remove tag: ' + t.name"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ring-1 ring-inset hover:opacity-80 transition"
+                      x-bind:class="
+                        t.color === 'amber'   ? 'bg-amber-100 text-amber-700 ring-amber-200'   :
+                        t.color === 'rose'    ? 'bg-rose-100 text-rose-700 ring-rose-200'      :
+                        t.color === 'indigo'  ? 'bg-indigo-100 text-indigo-700 ring-indigo-200':
+                        t.color === 'emerald' ? 'bg-emerald-100 text-emerald-700 ring-emerald-200':
+                        t.color === 'sky'     ? 'bg-sky-100 text-sky-700 ring-sky-200'         :
+                        t.color === 'fuchsia' ? 'bg-fuchsia-100 text-fuchsia-700 ring-fuchsia-200':
+                        t.color === 'lime'    ? 'bg-lime-100 text-lime-700 ring-lime-200'      :
+                                                'bg-slate-100 text-slate-700 ring-slate-200'"
+                    >
+                      <span x-text="t.name"></span>
+                      <svg class="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </template>
+                </div>
+
                 {/* Expand Toggle */}
                 <div class="flex items-center gap-3 text-xs" style="color: #94a3b8">
                   <button x-on:click="toggleExpand(item.id)" class="flex items-center gap-1 hover:text-gray-700">
@@ -1909,6 +1939,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">G + 0–9</span><span>Jump to section by index</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">/</span><span>Open Comment Library · <span class="font-mono">;</span> = My Snippets</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">P</span><span>Add photo to active item</span></li>
+                <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">T</span><span>Open tag picker for active item</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">⌘1 / ⌘2 / ⌘3</span><span>Split / Focus / Preview view mode</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">⌘K</span><span>Command palette (coming soon)</span></li>
                 <li class="flex items-start gap-3"><span class="mt-0.5 inline-block px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold" style="background: #eef2ff; color: var(--ih-primary, #6366f1)">?</span><span>Toggle this cheatsheet · <span class="font-mono">Esc</span> = close</span></li>
@@ -1982,6 +2013,86 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
             <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">↑↓</kbd> navigate
             <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">↵</kbd> jump
             <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">Esc</kbd> close
+          </div>
+        </div>
+      </div>
+
+      {/* Sprint 3 S3-3 — Tag picker popover. Triggered by T hotkey. Shares
+          the inspection-edit Alpine scope so toggles update tagsByItem
+          and chip rendering without an extra round-trip. */}
+      <div
+        x-show="tagPickerOpen"
+        style="display:none"
+        {...{
+          'x-cloak': '',
+          'x-on:keydown.escape.window': 'if (tagPickerOpen) closeTagPicker()',
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Tag picker"
+        aria-keyshortcuts="t"
+        class="fixed inset-0 z-[55] flex items-start justify-center pt-[12vh] px-4"
+      >
+        <div
+          class="absolute inset-0 bg-slate-900/30"
+          style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+          x-on:click="closeTagPicker()"
+          x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        ></div>
+        <div
+          class="relative w-80 rounded-lg bg-white border border-slate-200"
+          style="box-shadow: 0 12px 32px rgba(15,23,42,0.12);"
+          x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2 scale-[0.97]" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+          x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0 scale-100" x-transition:leave-end="opacity-0 translate-y-1 scale-[0.98]"
+        >
+          <div class="px-4 py-3 border-b border-slate-100">
+            <input
+              id="tag-picker-input"
+              type="text"
+              x-model="tagPickerQuery"
+              x-on:keydown="onTagPickerKeydown($event)"
+              placeholder="Filter tags…"
+              class="w-full h-8 px-3 rounded-md border border-slate-200 outline-none text-[13px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-colors"
+              aria-label="Tag search"
+              data-testid="tag-picker-input"
+            />
+          </div>
+          <div class="max-h-72 overflow-y-auto py-1" role="listbox" data-testid="tag-picker-list">
+            <template x-for="t in filteredTagsForPicker" x-bind:key="t.id">
+              <button
+                type="button"
+                x-on:click="toggleTag(t)"
+                x-bind:disabled="tagSavingId === t.id"
+                x-bind:class="isTagLinked(t) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'"
+                class="block w-full text-left px-3 py-2 text-[13px] font-medium transition-colors focus:outline-none flex items-center gap-2 disabled:opacity-50"
+                role="option"
+                data-testid="tag-picker-option"
+              >
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ring-1 ring-inset"
+                  x-bind:class="
+                    t.color === 'amber'   ? 'bg-amber-100 text-amber-700 ring-amber-200'   :
+                    t.color === 'rose'    ? 'bg-rose-100 text-rose-700 ring-rose-200'      :
+                    t.color === 'indigo'  ? 'bg-indigo-100 text-indigo-700 ring-indigo-200':
+                    t.color === 'emerald' ? 'bg-emerald-100 text-emerald-700 ring-emerald-200':
+                    t.color === 'sky'     ? 'bg-sky-100 text-sky-700 ring-sky-200'         :
+                    t.color === 'fuchsia' ? 'bg-fuchsia-100 text-fuchsia-700 ring-fuchsia-200':
+                    t.color === 'lime'    ? 'bg-lime-100 text-lime-700 ring-lime-200'      :
+                                            'bg-slate-100 text-slate-700 ring-slate-200'"
+                  x-text="t.name"
+                ></span>
+                <span x-show="isTagLinked(t)" class="ml-auto text-indigo-600 font-bold">✓</span>
+              </button>
+            </template>
+            <p x-show="filteredTagsForPicker.length === 0" class="px-3 py-3 text-[12px] italic text-slate-400">
+              No tags match. Manage tags in <a href="/library/tags" class="text-indigo-600 hover:underline">Library → Tags</a>.
+            </p>
+          </div>
+          <div class="px-4 py-2 border-t border-slate-100 bg-slate-50/50 rounded-b-lg text-[11px] text-slate-400 font-medium flex items-center gap-2">
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">T</kbd> open
+            <kbd class="inline-flex items-center px-1 rounded bg-slate-100 text-slate-600 text-[10px]">Esc</kbd> close
+            <a href="/library/tags" class="ml-auto text-indigo-600 hover:underline">Manage</a>
           </div>
         </div>
       </div>

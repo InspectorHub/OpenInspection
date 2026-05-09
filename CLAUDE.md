@@ -68,6 +68,7 @@ npm run deploy       # Deploy to Cloudflare Workers
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook HMAC verification |
 | `GA_MEASUREMENT_ID` | No | Google Analytics tracking ID |
 | `GOOGLE_PLACES_API_KEY` | No | Google Places API key powering address autocomplete on the dashboard new-inspection wizard and the public `/book` page (proxied via `/api/places/*` and `/api/public/geocode`). When unset, both endpoints return `{ data: [], reason: 'NO_API_KEY' }` and the address inputs degrade gracefully to plain text — the customer can still type a free-form address and submit. |
+| `ESTATED_API_KEY` | No | Sprint 3 S3-1 — Estated.io public-records key for the `POST /api/inspections/:id/property-facts/autofill` endpoint. Resolves year built / sqft / foundation / lot size / bedrooms / bathrooms by address. When unset, the endpoint returns `{ data: null, reason: 'NO_API_KEY' }` and the Property Facts card displays a polite "auto-fill not configured" hint while still accepting manual entry. Same graceful-degrade pattern as `GOOGLE_PLACES_API_KEY`. |
 
 ---
 

@@ -119,6 +119,25 @@ export const PropertyFactsSchema = z.object({
 
 export const PropertyFactsResponseSchema = createApiResponseSchema(PropertyFactsSchema).openapi('PropertyFactsResponse');
 
+/**
+ * Sprint 3 S3-1 — POST /api/inspections/:id/property-facts/autofill
+ * Body: free-text address. Server-side proxy hits Estated.io public-records
+ * API and returns a normalised PropertyFacts payload (or `null` + reason
+ * code when the provider can't supply data — graceful degrade pattern).
+ */
+export const PropertyFactsAutofillRequestSchema = z.object({
+    addressString: z.string().min(5, 'Address is too short').max(200),
+}).openapi('PropertyFactsAutofillRequest');
+
+export const PropertyFactsAutofillResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        facts:  PropertyFactsSchema.nullable(),
+        source: z.enum(['estated', 'manual_required']),
+        reason: z.enum(['NO_API_KEY', 'NOT_FOUND', 'PROVIDER_ERROR']).optional(),
+    }),
+}).openapi('PropertyFactsAutofillResponse');
+
 export const CancellationReasonSchema = z.enum([
     'client_cancelled',
     'weather',

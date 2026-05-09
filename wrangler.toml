@@ -46,6 +46,10 @@ TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 # TURNSTILE_SECRET_KEY    — Optional. Server-side Turnstile key (skipped if absent)
 # GOOGLE_CLIENT_ID        — Optional. Google Calendar OAuth client ID
 # GOOGLE_CLIENT_SECRET    — Optional. Google Calendar OAuth client secret
+# GOOGLE_PLACES_API_KEY   — Optional. Powers address autocomplete on /book + new-inspection wizard
+# ESTATED_API_KEY         — Optional. Sprint 3 S3-1 — public-records auto-fill for Property Facts.
+#                           Without it, /api/inspections/:id/property-facts/autofill returns
+#                           { data: null, reason: 'NO_API_KEY' } and the UI prompts manual entry.
 
 # ── Cloudflare resource bindings ─────────────────────────────────────────────
 # These IDs are populated automatically by `npm run setup:cloudflare`.
