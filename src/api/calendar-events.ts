@@ -7,6 +7,7 @@ import { users } from '../lib/db/schema/tenant';
 import type { HonoConfig } from '../types/hono';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
+import { getCalendarEventStyle } from '../lib/calendar-event-style';
 
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -88,15 +89,25 @@ calendarEventsRoutes.openapi(eventsRoute, async (c) => {
             lt(inspections.date, endDate),
         ));
 
-    const events: unknown[] = rows.map((r) => ({
-        id: r.id,
-        title: r.propertyAddress,
-        start: r.date,
-        allDay: true,
-        url: `/inspections/${r.id}/edit`,
-        color: '#6366F1',
-        extendedProps: { source: 'local', status: r.status },
-    }));
+    const events: unknown[] = rows.map((r) => {
+        // Iter-2 bug #5 — drafts must render on the calendar with a visual
+        // pill so inspectors can see un-confirmed work without clicking
+        // through. See src/lib/calendar-event-style.ts.
+        const style = getCalendarEventStyle(r.status);
+        return {
+            id: r.id,
+            title: `${style.titlePrefix}${r.propertyAddress}`,
+            start: r.date,
+            allDay: true,
+            url: `/inspections/${r.id}/edit`,
+            color: style.color,
+            extendedProps: {
+                source: 'local',
+                status: r.status,
+                isDraft: style.isDraft,
+            },
+        };
+    });
 
     // Google Calendar events — best-effort; failures don't break local events
     if (jwtUser?.sub && c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET) {

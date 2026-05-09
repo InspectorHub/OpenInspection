@@ -1,6 +1,13 @@
 /**
  * B4 — Three-column conflict resolution modal (base / yours / theirs).
  * Triggered when db.conflicts is non-empty.
+ *
+ * Iter-2 bug #12 — adds a "Reset local copy & reload" escape hatch as a
+ * fourth action separated from the primary three. Calling it deletes the
+ * Dexie offline DB (`oi_offline`) plus inspection-related localStorage,
+ * then reloads. The UX is intentionally one click + native confirm so a
+ * user trapped behind a stuck conflict no longer needs DevTools to dig
+ * out of an IDB corruption.
  */
 export const ConflictModal = () => (
     <div
@@ -27,6 +34,23 @@ export const ConflictModal = () => (
                 <button x-on:click="resolve('ours')"   class="px-5 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-indigo-700">Keep Mine</button>
                 <button x-on:click="resolve('theirs')" class="px-5 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-rose-700">Accept Theirs</button>
                 <button x-on:click="resolve('edit')"   class="px-5 py-2 rounded-lg ring-2 ring-slate-300 text-slate-700 text-xs font-bold uppercase tracking-widest hover:bg-slate-50">Edit Merged</button>
+                {/* Iter-2 bug #12 — visual separator + escape hatch. The
+                    `aria-hidden` divider keeps screen readers focused on the
+                    actionable buttons. The reset button itself is destructive
+                    so we surface it last and tag it with text-rose-600 ring
+                    treatment instead of the primary fill — readers should
+                    pause before pressing it. */}
+                <span aria-hidden="true" class="mx-2 h-6 w-px bg-slate-200"></span>
+                <button
+                    type="button"
+                    data-testid="conflict-reset-local"
+                    x-on:click="resetLocal()"
+                    x-bind:disabled="resetting"
+                    class="px-5 py-2 rounded-lg ring-2 ring-rose-200 text-rose-600 text-xs font-bold uppercase tracking-widest hover:bg-rose-50 disabled:opacity-50"
+                >
+                    <span x-show="!resetting">Reset Local Copy &amp; Reload</span>
+                    <span x-show="resetting" style="display:none">Resetting…</span>
+                </button>
             </footer>
         </div>
     </div>

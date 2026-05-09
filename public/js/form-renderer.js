@@ -127,12 +127,27 @@ document.addEventListener('alpine:init', () => {
     setItemStatus(itemId, status) {
       this.results[itemId].status = status;
       this.results[itemId].updatedAt = Date.now();
+      this._markDirty(itemId, 'status');
       this.saveLocally();
     },
 
     noteChanged(itemId) {
       if (this.results[itemId]) this.results[itemId].updatedAt = Date.now();
+      this._markDirty(itemId, 'notes');
       this.saveLocally();
+    },
+
+    /**
+     * Iter-2 bug #11 — track which (itemId, field) pairs the local user has
+     * edited since the last successful sync. The merge endpoint reads this
+     * to skip 3-way comparison on untouched fields, so a server-only write
+     * (admin paymentRequired toggle, automation, signature) cannot raise a
+     * conflict modal at the inspector for fields they never touched.
+     */
+    _markDirty(itemId, field) {
+      if (!this._dirtyFields) this._dirtyFields = {};
+      const set = (this._dirtyFields[itemId] ||= []);
+      if (!set.includes(field)) set.push(field);
     },
 
     async handleFileUpload(itemId, event) {
@@ -158,6 +173,7 @@ document.addEventListener('alpine:init', () => {
         await pendingPhotoDb.add({ id: localId, inspectionId: this.inspectionId, itemId, blob: uploadFile, type: 'upload' });
         this.results[itemId].photos.push({ key: localId, pending: true, dataUrl });
         this.results[itemId].updatedAt = Date.now();
+        this._markDirty(itemId, 'photos');
         this.saveLocally();
         event.target.value = '';
         return;
@@ -173,6 +189,7 @@ document.addEventListener('alpine:init', () => {
           const { key } = await res.json();
           this.results[itemId].photos.push({ key });
           this.results[itemId].updatedAt = Date.now();
+          this._markDirty(itemId, 'photos');
           this.saveLocally();
         } else {
           modalAlert('Failed to upload photo', 'Error');
@@ -188,6 +205,7 @@ document.addEventListener('alpine:init', () => {
     async removePhoto(itemId, index) {
       this.results[itemId].photos.splice(index, 1);
       this.results[itemId].updatedAt = Date.now();
+      this._markDirty(itemId, 'photos');
       // B4 trigger Task 2 — enqueue a photo.delete op so the sync engine hits
       // DELETE /api/inspections/:id/items/:itemId/photos/:photoIndex once online.
       try {
@@ -241,6 +259,7 @@ document.addEventListener('alpine:init', () => {
       }
       this.results[itemId].recommendations.push(snapshot);
       this.results[itemId].updatedAt = Date.now();
+      this._markDirty(itemId, 'recommendations');
       this.saveLocally();
     },
 
@@ -249,6 +268,7 @@ document.addEventListener('alpine:init', () => {
       if (!Array.isArray(arr)) return;
       arr.splice(ridx, 1);
       this.results[itemId].updatedAt = Date.now();
+      this._markDirty(itemId, 'recommendations');
       this.saveLocally();
     },
 
@@ -434,21 +454,52 @@ document.addEventListener('alpine:init', () => {
     async saveLocally() {
       await openOfflineDb();
       const now = Date.now();
+      // Iter-2 bug #11 — snapshot the dirty-field map and ship it with the
+      // queued merge. We deep-copy so subsequent edits during the queue
+      // drain race do not mutate the in-flight payload. The queue uses an
+      // upsert key (`merge:<id>`) so multiple edits between drains collapse
+      // into one merge; we therefore union dirty fields from any prior
+      // queued payload so dirty bits survive the collapse.
+      const baseRow = await offlineDb.bases.get(this.inspectionId);
+      const base = baseRow?.data || {};
+      const queuedKey = `merge:${this.inspectionId}`;
+      const prior = await offlineDb.syncQueue.get(queuedKey);
+      const priorDirty = (prior && prior.payload && prior.payload.dirtyFields) || {};
+      const dirtySnapshot = {};
+      const live = this._dirtyFields || {};
+      const ids = new Set([...Object.keys(priorDirty), ...Object.keys(live)]);
+      for (const id of ids) {
+        const seen = new Set();
+        const out = [];
+        for (const f of [...(priorDirty[id] || []), ...(live[id] || [])]) {
+          if (!seen.has(f)) { seen.add(f); out.push(f); }
+        }
+        dirtySnapshot[id] = out;
+      }
       await offlineDb.results.put({
         inspectionId: this.inspectionId,
         data: this.results,
         updatedAt: now,
         syncedAt: this._lastSyncedAt || 0,
       });
-      const baseRow = await offlineDb.bases.get(this.inspectionId);
-      const base = baseRow?.data || {};
       await offlineDb.syncQueue.put({
-        id: `merge:${this.inspectionId}`, // upsert key — multiple edits collapse to one queued merge
+        id: queuedKey,
         op: 'results.merge',
-        payload: { inspectionId: this.inspectionId, baseSyncedAt: this._lastSyncedAt || 0, base, ours: this.results },
+        payload: {
+          inspectionId: this.inspectionId,
+          baseSyncedAt: this._lastSyncedAt || 0,
+          base,
+          ours: this.results,
+          dirtyFields: dirtySnapshot,
+        },
         attempts: 0, createdAt: now,
       });
-      if (this.online) { drainQueue(); }
+      if (this.online) {
+        // Optimistically clear the dirty set — the sync engine reapplies it
+        // on retry by replaying the queued payload, so we don't lose anything.
+        this._dirtyFields = {};
+        drainQueue();
+      }
     },
 
     async getLocalData() {
