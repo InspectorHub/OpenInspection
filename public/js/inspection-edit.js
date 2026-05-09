@@ -75,6 +75,12 @@ function inspectionEditor(inspectionId) {
     publishing: false,
     sendingPdf: false,
     isDesktop: window.innerWidth >= 1024,
+    // Sprint 3 S3-4 — drawer state for the 1024-1279 tablet zone. The
+    // persistent right ACTIVE ITEM pane only renders at xl (≥1280); on a
+    // tablet the inspector taps the "Inspector" button in the toolbar to
+    // slide this drawer in. Defaults closed; auto-closes when the viewport
+    // grows past xl (no need for the drawer + persistent pane to coexist).
+    tabletInspectorOpen: false,
     saveTimer: null,
     saveState: 'idle',
     // Round 32 — one-time mobile gesture-discovery hint for R23 swipe nav
@@ -135,6 +141,13 @@ function inspectionEditor(inspectionId) {
 
       window.addEventListener('resize', () => {
         this.isDesktop = window.innerWidth >= 1024;
+        // Sprint 3 S3-4 — auto-close the tablet drawer when the viewport
+        // grows past xl (≥1280). At that width the persistent right pane
+        // takes over; keeping the drawer open would double-render its
+        // content over top of the persistent pane.
+        if (window.innerWidth >= 1280 && this.tabletInspectorOpen) {
+          this.tabletInspectorOpen = false;
+        }
       });
 
       // Spec 5G M1.1 mobile — horizontal swipe between sections (analog of

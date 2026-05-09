@@ -22,6 +22,12 @@ const VIEWPORTS = [
     { name: 'iphone-pro',   w: 414,  h: 896  },
     { name: 'tablet',       w: 768,  h: 1024 },
     { name: 'small-laptop', w: 1024, h: 768  },
+    // Sprint 3 S3-4 — tablet-mid is the 1024-1279 zone (iPad Pro 11"
+    // landscape sits at 1180px). The inspection-edit page now drops its
+    // right pane in this zone in favor of a slide-in drawer; this viewport
+    // pins the regression so a future layout change can't silently break
+    // the iPad inspector experience.
+    { name: 'tablet-mid',   w: 1100, h: 768  },
     { name: 'desktop',      w: 1440, h: 900  },
 ];
 

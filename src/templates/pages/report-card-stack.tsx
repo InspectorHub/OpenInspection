@@ -62,6 +62,11 @@ interface ReportPageProps {
   // Track E1 (ITB §11) — when true, surface a "View repair list" link in
   // the report header so realtors can jump to the contractor punch-list.
   enableRepairList?: boolean;
+  // Sprint 3 S3-2 — when true, surface a "Generate repair request" link
+  // (top-right of the report) that takes the customer to the public
+  // print-friendly export page. Independent of enableRepairList — the
+  // inspector list and the customer export are gated separately.
+  enableCustomerRepairExport?: boolean;
   // Round-2 backlog G1 (Spectora §E.2) — Property Facts banner payload.
   // Renders nothing when every field is null/empty.
   propertyFacts?: PropertyFactsBannerProps['facts'] | undefined;
@@ -88,6 +93,7 @@ export function ReportCardStackPage(props: ReportPageProps) {
   // the editor from the published view.
   const showEditAffordance = canEditSection(props.viewerRole ?? null);
   const enableRepairList = props.enableRepairList ?? false;
+  const enableCustomerRepairExport = props.enableCustomerRepairExport ?? false;
   // Server-side defect filter for ?summary=1 (PDF Summary mode).
   // Keeps only sections with at least one defect, and within each kept
   // section, only items whose severityBucket maps to defect.
@@ -217,6 +223,17 @@ export function ReportCardStackPage(props: ReportPageProps) {
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                   View Repair List
+                </a>
+              )}
+              {/* Sprint 3 S3-2 — Customer-facing repair-request export. */}
+              {enableCustomerRepairExport && (
+                <a
+                  href={`/r/${inspectionId}/repair-request`}
+                  data-testid="report-customer-repair-export-link"
+                  class="no-print px-4 py-2 text-sm font-medium rounded-lg theme-border border theme-text-secondary flex items-center gap-2 hover:bg-slate-50 transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  Generate repair request
                 </a>
               )}
               <button x-on:click="showRepairPanel = !showRepairPanel" class="px-4 py-2 text-sm font-semibold rounded-lg text-white flex items-center gap-2 theme-accent">

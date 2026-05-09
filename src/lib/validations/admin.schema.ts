@@ -15,6 +15,9 @@ export const UpdateBrandingSchema = z.object({
     showEstimates: z.boolean().optional().openapi({ example: true }),
     // Track E1 (ITB §11) — gate the "Repair List" tab on the published report.
     enableRepairList: z.boolean().optional().openapi({ example: true }),
+    // Sprint 3 S3-2 — gate the customer-driven "Generate repair request"
+    // export link on the published report. Independent of enableRepairList.
+    enableCustomerRepairExport: z.boolean().optional().openapi({ example: true }),
     // Round-2 backlog #10 — tenant-wide default for the per-inspection
     // paywall introduced in Sprint 1 D-7 (ReportGatePage). When true, every
     // newly created inspection inherits paymentRequired=true. Per-inspection

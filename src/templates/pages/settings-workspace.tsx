@@ -7,10 +7,11 @@ interface Props { branding?: BrandingConfig | undefined; }
 // Sprint 2 S2-4 + Track E1 + Round-2 #10 — extra props only used by the
 // new Reports sub-page so the toggles reflect persisted state on first paint.
 interface ReportsProps extends Props {
-    showEstimates?:          boolean;
-    enableRepairList?:       boolean;
-    blockUnpaid?:            boolean;
-    blockUnsignedAgreement?: boolean;
+    showEstimates?:               boolean;
+    enableRepairList?:            boolean;
+    enableCustomerRepairExport?:  boolean;
+    blockUnpaid?:                 boolean;
+    blockUnsignedAgreement?:      boolean;
 }
 
 // Round-2 backlog G3 — extra prop only used by the new Referral sub-page
@@ -190,9 +191,10 @@ export const SettingsWorkspaceTelemetryPage = ({ branding }: Props): JSX.Element
  * (block when invoice unpaid / block when agreement unsigned). Both groups
  * share the same Alpine `save()` shared method that PATCHes /api/branding.
  */
-export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRepairList, blockUnpaid, blockUnsignedAgreement }: ReportsProps): JSX.Element => {
+export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRepairList, enableCustomerRepairExport, blockUnpaid, blockUnsignedAgreement }: ReportsProps): JSX.Element => {
     const initialEstimates              = showEstimates ? 'true' : 'false';
     const initialRepairList             = enableRepairList ? 'true' : 'false';
+    const initialCustomerRepairExport   = enableCustomerRepairExport ? 'true' : 'false';
     const initialBlockUnpaid            = blockUnpaid ? 'true' : 'false';
     const initialBlockUnsignedAgreement = blockUnsignedAgreement ? 'true' : 'false';
     return (
@@ -209,6 +211,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                 x-data={`{
                     showEstimates: ${initialEstimates},
                     enableRepairList: ${initialRepairList},
+                    enableCustomerRepairExport: ${initialCustomerRepairExport},
                     blockUnpaid: ${initialBlockUnpaid},
                     blockUnsignedAgreement: ${initialBlockUnsignedAgreement},
                     saving: false,
@@ -278,6 +281,29 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                         {...(enableRepairList ? { checked: true } : {})}
+                    />
+                </label>
+
+                {/* Sprint 3 S3-2 — Customer-driven repair-request export. */}
+                <div class="border-t border-surface-200" />
+                <label class="flex items-start justify-between gap-6 cursor-pointer">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-ink-900">Enable customer repair-request export</div>
+                        <div class="text-xs text-ink-500 mt-1 leading-relaxed">
+                            Surfaces a "Generate repair request" link on the published report
+                            so the customer (homeowner / buyer) can produce a printable list
+                            to hand off to a contractor. They can also email a copy to themselves.
+                            The export honors the same payment + agreement gates as the report.
+                        </div>
+                    </div>
+                    <input
+                        type="checkbox"
+                        data-testid="settings-enable-customer-repair-export-toggle"
+                        x-model="enableCustomerRepairExport"
+                        x-on:change="save({ enableCustomerRepairExport: enableCustomerRepairExport })"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        style="background-position: left center; background-repeat: no-repeat;"
+                        {...(enableCustomerRepairExport ? { checked: true } : {})}
                     />
                 </label>
 
@@ -436,17 +462,18 @@ Referral partner"
  * `subPage` URL segment. Keeps `index.ts` route registrations short.
  */
 export const SettingsWorkspacePage = (
-    { branding, subPage, showEstimates, enableRepairList, blockUnpaid, blockUnsignedAgreement, customReferralSources }:
+    { branding, subPage, showEstimates, enableRepairList, enableCustomerRepairExport, blockUnpaid, blockUnsignedAgreement, customReferralSources }:
     ReportsProps & ReferralProps & { subPage: WorkspaceSubPage }
 ): JSX.Element => {
     if (subPage === 'theme') return SettingsWorkspaceThemePage({ branding });
     if (subPage === 'telemetry') return SettingsWorkspaceTelemetryPage({ branding });
     if (subPage === 'reports') {
         const props: ReportsProps = { branding };
-        if (typeof showEstimates          === 'boolean') props.showEstimates          = showEstimates;
-        if (typeof enableRepairList       === 'boolean') props.enableRepairList       = enableRepairList;
-        if (typeof blockUnpaid            === 'boolean') props.blockUnpaid            = blockUnpaid;
-        if (typeof blockUnsignedAgreement === 'boolean') props.blockUnsignedAgreement = blockUnsignedAgreement;
+        if (typeof showEstimates              === 'boolean') props.showEstimates              = showEstimates;
+        if (typeof enableRepairList           === 'boolean') props.enableRepairList           = enableRepairList;
+        if (typeof enableCustomerRepairExport === 'boolean') props.enableCustomerRepairExport = enableCustomerRepairExport;
+        if (typeof blockUnpaid                === 'boolean') props.blockUnpaid                = blockUnpaid;
+        if (typeof blockUnsignedAgreement     === 'boolean') props.blockUnsignedAgreement     = blockUnsignedAgreement;
         return SettingsWorkspaceReportsPage(props);
     }
     if (subPage === 'referral') {
