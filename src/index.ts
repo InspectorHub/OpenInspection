@@ -914,7 +914,7 @@ app.get('/report/:id', async (c) => {
                     reason:          'payment',
                     companyName,
                     primaryColor,
-                    actionUrl:       `${baseUrl}/invoices?inspection=${id}`,
+                    actionUrl:       `${baseUrl}/r/${id}/invoice`,
                     actionLabel:     'View invoice & pay',
                     propertyAddress: insp.propertyAddress ?? null,
                     inspectorName,
@@ -1000,6 +1000,84 @@ app.get('/report/:id', async (c) => {
         }));
     } catch {
         return c.text('Report not found', 404);
+    }
+});
+
+// iter-2 production bug #10 — public invoice payment page.
+//
+// Replaces `/invoices?inspection=<id>` as the report-gate "Pay invoice"
+// CTA target. The legacy `/invoices` route is JWT-protected (admin-only),
+// so an unauthenticated customer who clicked the gate CTA was redirected
+// to /login — a dead end for a buyer with no account.
+//
+// This route is public, scoped by inspection id; the inspection id itself
+// IS the secret (same pattern as `/r/:id/repair-request` and `/report/:id`).
+// We surface the invoice's line items, total, and either a hosted Stripe
+// Checkout link (when the workspace has Stripe Connect configured) or a
+// "Contact your inspector" fallback. No account required, no /login
+// detour.
+app.get('/r/:id/invoice', async (c) => {
+    const id = c.req.param('id') as string;
+    const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
+    if (!tenantId) return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+
+    try {
+        const db = drizzle(c.env.DB);
+        const insp = await db.select({
+            id:              schema.inspections.id,
+            propertyAddress: schema.inspections.propertyAddress,
+            date:            schema.inspections.date,
+            inspectorId:     schema.inspections.inspectorId,
+        }).from(schema.inspections)
+            .where(and(eq(schema.inspections.id, id), eq(schema.inspections.tenantId, tenantId as string)))
+            .get();
+        if (!insp) return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+
+        const branding = c.get('branding');
+        const companyName = branding?.siteName || c.env.APP_NAME || 'OpenInspection';
+        const primaryColor = branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1';
+
+        let inspectorName: string | null = null;
+        let inspectorEmail: string | null = null;
+        if (insp.inspectorId) {
+            const inspectorRow = await db.select({ name: users.name, email: users.email })
+                .from(users)
+                .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId as string)))
+                .get();
+            inspectorName = inspectorRow?.name ?? null;
+            inspectorEmail = inspectorRow?.email ?? null;
+        }
+
+        const invoice = await c.var.services.invoice.findByInspectionId(tenantId as string, id);
+
+        // No Stripe Connect integration in core today — payUrl stays null
+        // and the page renders the "Contact your inspector" fallback. When
+        // STRIPE_SECRET_KEY is wired up, mint a Checkout session here and
+        // pass its URL through. Tested by InvoicePublicPage's `payUrl=null`
+        // path which is the live behavior on every standalone deploy.
+        const payUrl: string | null = null;
+
+        const { InvoicePublicPage } = await import('./templates/pages/invoice-public');
+        return c.html(InvoicePublicPage({
+            companyName,
+            primaryColor,
+            propertyAddress: insp.propertyAddress ?? null,
+            inspectorName,
+            inspectorEmail,
+            scheduledDate: insp.date ?? null,
+            invoice: invoice ? {
+                id:          invoice.id,
+                amountCents: invoice.amountCents,
+                status:      invoice.status,
+                dueDate:     invoice.dueDate ?? null,
+                notes:       invoice.notes ?? null,
+                lineItems:   invoice.lineItems ?? [],
+            } : null,
+            payUrl,
+        }) as string);
+    } catch (e) {
+        logger.warn('public invoice page failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });
+        return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
     }
 });
 
@@ -1093,7 +1171,7 @@ app.get('/r/:id/repair-request', async (c) => {
                     reason:          'payment',
                     companyName,
                     primaryColor,
-                    actionUrl:       `${baseUrl}/invoices?inspection=${id}`,
+                    actionUrl:       `${baseUrl}/r/${id}/invoice`,
                     actionLabel:     'View invoice & pay',
                     propertyAddress: insp.propertyAddress ?? null,
                     inspectorName,

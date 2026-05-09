@@ -30,6 +30,33 @@ export class InvoiceService {
         }));
     }
 
+    /**
+     * iter-2 production bug #10 — given an inspection id, return its most
+     * recent invoice (if any) within the given tenant. Used by the public
+     * `/r/:id/invoice` payment page that the report-gate "Pay invoice" CTA
+     * now points at, so an unauthenticated customer can see what they owe
+     * and how to pay without being redirected to /login.
+     *
+     * Returns `null` when no invoice exists. Tenant-scoped — never crosses
+     * workspaces.
+     */
+    async findByInspectionId(tenantId: string, inspectionId: string) {
+        const db = this.getDrizzle();
+        const row = await db.select().from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
+            .orderBy(desc(invoices.createdAt))
+            .limit(1)
+            .get();
+        if (!row) return null;
+        return {
+            ...row,
+            status: getStatus(row),
+            createdAt: safeISODate(row.createdAt),
+            sentAt: row.sentAt ? safeISODate(row.sentAt) : null,
+            paidAt: row.paidAt ? safeISODate(row.paidAt) : null,
+        };
+    }
+
     async createInvoice(tenantId: string, data: {
         inspectionId?: string | null | undefined;
         clientName: string;
