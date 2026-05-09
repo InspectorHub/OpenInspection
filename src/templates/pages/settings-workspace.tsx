@@ -4,11 +4,13 @@ import type { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig | undefined; }
 
-// Sprint 2 S2-4 + Track E1 — extra props only used by the new Reports
-// sub-page so the toggles reflect persisted state on first paint.
+// Sprint 2 S2-4 + Track E1 + Round-2 #10 — extra props only used by the
+// new Reports sub-page so the toggles reflect persisted state on first paint.
 interface ReportsProps extends Props {
-    showEstimates?:    boolean;
-    enableRepairList?: boolean;
+    showEstimates?:          boolean;
+    enableRepairList?:       boolean;
+    blockUnpaid?:            boolean;
+    blockUnsignedAgreement?: boolean;
 }
 
 // Round-2 backlog G3 — extra prop only used by the new Referral sub-page
@@ -183,10 +185,16 @@ export const SettingsWorkspaceTelemetryPage = ({ branding }: Props): JSX.Element
  * `Estimated cost: $X – $Y` badge underneath the recommendation pill on
  * each defect item. Defaults to off so existing tenants don't suddenly
  * start showing dollar figures.
+ *
+ * Round-2 #10 — adds two more toggles for tenant-wide block-report policy
+ * (block when invoice unpaid / block when agreement unsigned). Both groups
+ * share the same Alpine `save()` shared method that PATCHes /api/branding.
  */
-export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRepairList }: ReportsProps): JSX.Element => {
-    const initialEstimates    = showEstimates ? 'true' : 'false';
-    const initialRepairList   = enableRepairList ? 'true' : 'false';
+export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRepairList, blockUnpaid, blockUnsignedAgreement }: ReportsProps): JSX.Element => {
+    const initialEstimates              = showEstimates ? 'true' : 'false';
+    const initialRepairList             = enableRepairList ? 'true' : 'false';
+    const initialBlockUnpaid            = blockUnpaid ? 'true' : 'false';
+    const initialBlockUnsignedAgreement = blockUnsignedAgreement ? 'true' : 'false';
     return (
         <SettingsLayout
             branding={branding}
@@ -194,13 +202,15 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
             group="workspace"
             subPage="reports"
             pageTitle="Reports"
-            pageSubtitle="Control how published reports surface optional defect annotations such as repair estimate ranges and the contractor punch-list."
+            pageSubtitle="Control how published reports surface optional defect annotations and how new inspections gate the public report URL."
         >
             <section
                 class="bg-white rounded-lg border border-surface-200 p-6 space-y-6"
                 x-data={`{
                     showEstimates: ${initialEstimates},
                     enableRepairList: ${initialRepairList},
+                    blockUnpaid: ${initialBlockUnpaid},
+                    blockUnsignedAgreement: ${initialBlockUnsignedAgreement},
                     saving: false,
                     async save(payload) {
                         this.saving = true;
@@ -222,6 +232,10 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                     }
                 }`}
             >
+                <h3 class="text-[11px] font-bold text-ink-500 uppercase tracking-[0.2em]">
+                    Defect annotations
+                </h3>
+
                 <label class="flex items-start justify-between gap-6 cursor-pointer">
                     <div class="flex-1">
                         <div class="text-sm font-bold text-ink-900">Show repair estimate ranges</div>
@@ -239,6 +253,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         x-on:change="save({ showEstimates: showEstimates })"
                         class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
+                        {...(showEstimates ? { checked: true } : {})}
                     />
                 </label>
 
@@ -262,8 +277,59 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         x-on:change="save({ enableRepairList: enableRepairList })"
                         class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
+                        {...(enableRepairList ? { checked: true } : {})}
                     />
                 </label>
+
+                {/* Round-2 #10 — Public report gating sub-section. The wrapper
+                    div doubles as the visual divider between the two groups. */}
+                <div class="pt-2 border-t border-surface-200">
+                    <h3 class="text-[11px] font-bold text-ink-500 uppercase tracking-[0.2em]">
+                        Public report gating
+                    </h3>
+                </div>
+
+                <label class="flex items-start justify-between gap-6 cursor-pointer">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-ink-900">Block report when invoice unpaid</div>
+                        <div class="text-xs text-ink-500 mt-1 leading-relaxed">
+                            New inspections withhold the public report URL until the invoice is paid.
+                            Stripe webhook auto-unlocks on payment. Per-inspection override remains
+                            available on the inspection edit page.
+                        </div>
+                    </div>
+                    <input
+                        type="checkbox"
+                        data-testid="settings-block-unpaid-toggle"
+                        x-model="blockUnpaid"
+                        x-on:change="save({ blockUnpaid: blockUnpaid })"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        style="background-position: left center; background-repeat: no-repeat;"
+                        {...(blockUnpaid ? { checked: true } : {})}
+                    />
+                </label>
+
+                <div class="border-t border-surface-200" />
+                <label class="flex items-start justify-between gap-6 cursor-pointer">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-ink-900">Block report when agreement unsigned</div>
+                        <div class="text-xs text-ink-500 mt-1 leading-relaxed">
+                            New inspections withhold the public report URL until the
+                            pre-inspection agreement is signed. Once the client signs, the
+                            report unlocks automatically.
+                        </div>
+                    </div>
+                    <input
+                        type="checkbox"
+                        data-testid="settings-block-unsigned-agreement-toggle"
+                        x-model="blockUnsignedAgreement"
+                        x-on:change="save({ blockUnsignedAgreement: blockUnsignedAgreement })"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        style="background-position: left center; background-repeat: no-repeat;"
+                        {...(blockUnsignedAgreement ? { checked: true } : {})}
+                    />
+                </label>
+
                 <p class="text-xs text-ink-400" x-show="saving">Saving…</p>
             </section>
 
@@ -370,15 +436,17 @@ Referral partner"
  * `subPage` URL segment. Keeps `index.ts` route registrations short.
  */
 export const SettingsWorkspacePage = (
-    { branding, subPage, showEstimates, enableRepairList, customReferralSources }:
+    { branding, subPage, showEstimates, enableRepairList, blockUnpaid, blockUnsignedAgreement, customReferralSources }:
     ReportsProps & ReferralProps & { subPage: WorkspaceSubPage }
 ): JSX.Element => {
     if (subPage === 'theme') return SettingsWorkspaceThemePage({ branding });
     if (subPage === 'telemetry') return SettingsWorkspaceTelemetryPage({ branding });
     if (subPage === 'reports') {
         const props: ReportsProps = { branding };
-        if (typeof showEstimates    === 'boolean') props.showEstimates    = showEstimates;
-        if (typeof enableRepairList === 'boolean') props.enableRepairList = enableRepairList;
+        if (typeof showEstimates          === 'boolean') props.showEstimates          = showEstimates;
+        if (typeof enableRepairList       === 'boolean') props.enableRepairList       = enableRepairList;
+        if (typeof blockUnpaid            === 'boolean') props.blockUnpaid            = blockUnpaid;
+        if (typeof blockUnsignedAgreement === 'boolean') props.blockUnsignedAgreement = blockUnsignedAgreement;
         return SettingsWorkspaceReportsPage(props);
     }
     if (subPage === 'referral') {
