@@ -57,4 +57,34 @@ describe('Sprint 3 S3-4 — inspection-edit tablet breakpoints', () => {
         expect(around).toMatch(/lg:flex/);
         expect(around).toMatch(/xl:hidden/);
     });
+
+    /**
+     * Snapshot-style structural shape — pin the three breakpoint surfaces
+     * so a future layout refactor that accidentally drops one of them
+     * trips a clear assertion instead of a Playwright pixel-diff hours
+     * later. This is the unit-level analog of a viewport screenshot at
+     * mobile / tablet-mid / desktop:
+     *
+     *   - mobile     surface: x-show="!isDesktop" branch (mobile chip nav)
+     *   - tablet-mid surface: tablet-active-item-toggle + drawer (1024-1279)
+     *   - desktop    surface: persistent right pane (xl ≥1280)
+     */
+    it('snapshot — every breakpoint surface present in a single render', () => {
+        const html = render(InspectionEditPage({ inspectionId: 'aaaa', enableRepairList: false }));
+
+        // Mobile surface — has the lg:hidden mobile container.
+        expect(html).toMatch(/x-show="!isDesktop" class="lg:hidden"/);
+
+        // Tablet-mid surface — toggle button + drawer + backdrop, all
+        // gated to the lg-not-xl zone.
+        expect(html).toContain('data-testid="tablet-active-item-toggle"');
+        expect(html).toContain('data-testid="tablet-active-item-drawer"');
+        // The backdrop uses lg:block xl:hidden so the click-outside layer
+        // only mounts in the tablet zone.
+        expect(html).toMatch(/hidden lg:block xl:hidden/);
+
+        // Desktop surface — the persistent right ACTIVE ITEM pane uses
+        // hidden xl:flex (post-S3-4); pre-S3-4 was hidden lg:flex.
+        expect(html).toMatch(/hidden xl:flex w-\[280px\]/);
+    });
 });
