@@ -982,9 +982,13 @@ app.get('/settings/workspace/reports', htmlAuthGuard(['owner', 'admin']), async 
         primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
         supportEmail: c.env.SENDER_EMAIL || 'support@example.com',
     });
-    const showEstimates    = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
-    const enableRepairList = Boolean((cfg as { enableRepairList?: boolean | number }).enableRepairList);
-    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates, enableRepairList }));
+    const showEstimates          = Boolean((cfg as { showEstimates?: boolean | number }).showEstimates);
+    const enableRepairList       = Boolean((cfg as { enableRepairList?: boolean | number }).enableRepairList);
+    // Round-2 #10 — surface tenant-wide block-report policy so the toggles
+    // hydrate with persisted state on first paint (no off-then-on flash).
+    const blockUnpaid            = Boolean((cfg as { blockUnpaid?: boolean | number }).blockUnpaid);
+    const blockUnsignedAgreement = Boolean((cfg as { blockUnsignedAgreement?: boolean | number }).blockUnsignedAgreement);
+    return c.html(SettingsWorkspacePage({ branding: c.get('branding'), subPage: 'reports', showEstimates, enableRepairList, blockUnpaid, blockUnsignedAgreement }));
 });
 // Round-2 backlog G3 — Custom referral sources sub-page. Reads
 // tenant_configs.custom_referral_sources via the BrandingService so the

@@ -298,6 +298,21 @@ export class InspectionService {
             }
         }
 
+        // Round-2 #10 — read tenant block-report policy. New inspections
+        // inherit `paymentRequired` / `agreementRequired` defaults from
+        // `tenant_configs`. Per-inspection override (if the caller sets
+        // either flag explicitly) still wins.
+        const tenantPolicy = await drizzle(this.db)
+            .select({
+                blockUnpaid:            tenantConfigs.blockUnpaid,
+                blockUnsignedAgreement: tenantConfigs.blockUnsignedAgreement,
+            })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        const defaultPaymentRequired   = tenantPolicy?.blockUnpaid ?? false;
+        const defaultAgreementRequired = tenantPolicy?.blockUnsignedAgreement ?? false;
+
         const newInspection = {
             id,
             tenantId,
@@ -323,6 +338,11 @@ export class InspectionService {
             addressLat:        (data.addressLat as number | null) ?? null,
             addressLng:        (data.addressLng as number | null) ?? null,
             addressGeocodedAt: data.addressPlaceId ? Date.now() : null,
+            // Round-2 #10 — block-report gating defaults inherited from tenant
+            // policy. The Sprint 1 D-7 ReportGatePage check at /report/:id
+            // reads these per-inspection columns directly.
+            paymentRequired:   data.paymentRequired   ?? defaultPaymentRequired,
+            agreementRequired: data.agreementRequired ?? defaultAgreementRequired,
             createdAt
         };
 

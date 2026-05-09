@@ -57,6 +57,11 @@ export const CreateInspectionSchema = z.object({
     discountCodeId: z.string().nullable().optional(),
     discountAmount: z.number().int().nullable().optional(),
     price:          z.number().int().min(0).optional(),
+    // Round-2 backlog #10 — explicit override of tenant gating policy.
+    // When omitted, createInspection inherits from tenant_configs.block_unpaid
+    // / block_unsigned_agreement. When provided, this caller-level value wins.
+    paymentRequired:   z.boolean().optional().openapi({ example: false }),
+    agreementRequired: z.boolean().optional().openapi({ example: false }),
 }).openapi('CreateInspection');
 
 /**
