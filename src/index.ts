@@ -1016,8 +1016,15 @@ app.get('/r/:id/repair-request', async (c) => {
             enableCustomerRepairExport = !!cfgRow?.enableCustomerRepairExport;
             enableRepairList = !!cfgRow?.enableRepairList;
         } catch { /* default off */ }
+        // Iter-2 Bug #14 — when the tenant has not enabled the customer
+        // repair-request export, render a friendly disabled-feature page that
+        // tells the customer to contact their inspector. Previously returned a
+        // generic 404 which made the link look broken from the customer's POV.
         if (!enableCustomerRepairExport) {
-            return c.html(NotFoundPage({ branding: c.get('branding') }), 404);
+            return c.html(
+                FeatureDisabledPage({ from: 'customer-repair-request', branding: c.get('branding') }),
+                403,
+            );
         }
         // Suppress unused-var lint — enableRepairList is read for symmetry
         // with /report/:id but the customer view never surfaces the link.
