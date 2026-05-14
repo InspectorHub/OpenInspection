@@ -107,6 +107,59 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
             aria-selected="false"
             class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 whitespace-nowrap transition-colors"
           >Settings</a>
+          {/* PDF download dropdown — ml-auto pushes it to the right edge */}
+          <div class="ml-auto flex-shrink-0 pl-2 py-1.5" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
+            <div class="relative">
+              <button
+                type="button"
+                x-on:click="open = !open"
+                x-bind:disabled="loading"
+                aria-label="Download PDF"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-300 transition-all disabled:opacity-60"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span x-text="loading ? 'Loading…' : 'PDF'"></span>
+                <svg class="w-3 h-3 transition-transform" x-bind:class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-[80] py-1"
+              >
+                <button
+                  type="button"
+                  x-on:click="download('summary')"
+                  class="w-full text-left px-4 py-2 text-[12px] text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium"
+                >
+                  <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Summary PDF
+                </button>
+                <button
+                  type="button"
+                  x-on:click="download('full')"
+                  class="w-full text-left px-4 py-2 text-[12px] text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-medium"
+                >
+                  <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v14a2 2 0 01-2 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-8H7v8M7 3v5h8" />
+                  </svg>
+                  Full Report PDF
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </nav>
       <div

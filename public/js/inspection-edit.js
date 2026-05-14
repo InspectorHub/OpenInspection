@@ -2198,3 +2198,36 @@ function inspectionEditor(inspectionId) {
     },
   };
 }
+
+// PDF download dropdown — registered as a standalone Alpine component so the
+// nav bar (which sits outside the inspectionEditor x-data scope) can call it.
+// Requires auth.js (authFetch) and toast.js (showToast) to be loaded first.
+function pdfDownloader(inspectionId) {
+    return {
+        open: false,
+        loading: false,
+        async download(type) {
+            this.open = false;
+            this.loading = true;
+            try {
+                var r = await authFetch('/api/inspections/' + inspectionId + '/pdf?type=' + type);
+                if (r.status === 200) {
+                    var blob = await r.blob();
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'report-' + type + '.pdf';
+                    a.click();
+                    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                } else if (r.status === 202) {
+                    if (typeof showToast === 'function') showToast('PDF is still generating — try again in a moment.', true);
+                } else {
+                    if (typeof showToast === 'function') showToast('PDF not available. Enable the PDF pipeline in Settings → Advanced.', true);
+                }
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('PDF download failed.', true);
+            }
+            this.loading = false;
+        },
+    };
+}

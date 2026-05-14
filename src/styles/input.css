@@ -682,11 +682,10 @@ html[data-color-scheme="dark"] .bg-slate-900\/50 { background-color: rgba(0,0,0,
 html[data-color-scheme="dark"] .divide-slate-200 > * + * { border-color: rgba(255,255,255,0.08) !important; }
 html[data-color-scheme="dark"] .divide-slate-100 > * + * { border-color: rgba(255,255,255,0.05) !important; }
 
-/* ── Theme toggle icon swap via CSS (no JS flicker) ──────── */
-html:not([data-color-scheme="dark"]) #themeSunIcon        { display: none; }
-html[data-color-scheme="dark"]       #themeMoonIcon       { display: none; }
-html:not([data-color-scheme="dark"]) #mobileThemeSunIcon  { display: none; }
-html[data-color-scheme="dark"]       #mobileThemeMoonIcon { display: none; }
+/* ── Theme toggle icon swap — JS (updateUI) controls which icon is shown ─ */
+/* Hide all three icons on initial paint; DOMContentLoaded updateUI reveals one. */
+#themeSunIcon, #themeMoonIcon, #themeAutoIcon                   { display: none; }
+#mobileThemeSunIcon, #mobileThemeMoonIcon, #mobileThemeAutoIcon { display: none; }
 
 /* ── Smooth color scheme transition ─────────────────────── */
 html { transition: background-color 0.15s ease; }
