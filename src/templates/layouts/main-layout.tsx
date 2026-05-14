@@ -28,8 +28,13 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             <title>{title}</title>
             <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+            {/* FOUC prevention: set data-color-scheme before any stylesheet loads. */}
+            <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
             <link rel="stylesheet" href="/fonts.css" />
             <link rel="stylesheet" href="/vendor/flatpickr.min.css" />
+            {/* Theme toggle runtime — sync load so toggleColorScheme() is available
+                before Alpine and DOMContentLoaded fire. */}
+            <script src="/js/theme.js"></script>
             {/* hotkeys.js exposes window.OIHotkeys (isTyping/shouldIgnoreSingleChar).
                 Loaded synchronously so global keydown handlers see it on first paint. */}
             <script src="/js/hotkeys.js"></script>
@@ -277,6 +282,11 @@ export const MainLayout = (props: {
                         </nav>
                         {/* Bottom section */}
                         <div class="p-4 border-t border-slate-100 bg-slate-50/50 space-y-1">
+                            <button type="button" onclick="toggleColorScheme()" class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-all font-semibold" aria-label="Toggle color scheme">
+                                <svg id="mobileThemeMoonIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                                <svg id="mobileThemeSunIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                <span id="mobileThemeLabel">Dark Mode</span>
+                            </button>
                             <button id="mobileLogoutBtn" class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-red-600 hover:bg-red-50 transition-all font-semibold">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                 <span>Sign Out</span>
@@ -368,6 +378,11 @@ export const MainLayout = (props: {
                                 <svg class="w-5 h-5 group-hover:rotate-45 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                 <span>Settings</span>
                             </a>
+                            <button type="button" onclick="toggleColorScheme()" class="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm transition-all font-semibold group mt-2" aria-label="Toggle color scheme">
+                                <svg id="themeMoonIcon" class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                                <svg id="themeSunIcon" class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                <span id="themeToggleLabel">Dark Mode</span>
+                            </button>
                             <button id="logoutBtn" class="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-red-600 hover:bg-red-50 transition-all font-semibold group mt-2">
                                 <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                 <span>Sign Out</span>

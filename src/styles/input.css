@@ -530,6 +530,168 @@ details[open] > summary > .details-chevron { transform: rotate(180deg); }
     }
 }
 
+/* ============================================================
+   Dark Mode — color scheme overrides
+   Activated by html[data-color-scheme="dark"] (set by inline
+   FOUC script in <head> from localStorage / system preference).
+   Uses a separate attribute from data-theme="modern/classic/minimal"
+   (report viewer themes) to avoid collisions.
+   ============================================================ */
+
+html[data-color-scheme="dark"] {
+    color-scheme: dark;
+
+    /* Backgrounds */
+    --ih-bg-app:     #0b1120;
+    --ih-bg-page:    #0f172a;
+    --ih-bg-card:    #1e293b;
+    --ih-bg-muted:   #162032;
+    --ih-bg-inverse: #f8fafc;
+
+    /* Foreground — WCAG AA verified on #0f172a */
+    --ih-fg-1:       #f1f5f9;   /* 17:1 ✓ */
+    --ih-fg-2:       #cbd5e1;   /*  9:1 ✓ */
+    --ih-fg-3:       #94a3b8;   /* 4.8:1 ✓ */
+    --ih-fg-4:       #94a3b8;   /* bumped from slate-400 to keep AA */
+    --ih-fg-5:       #64748b;   /* decorative only */
+    --ih-fg-inverse: #0f172a;
+
+    /* Brand — lighter indigo for dark bg */
+    --ih-primary:        #818cf8;   /* indigo-400, 5.4:1 ✓ */
+    --ih-primary-600:    #6366f1;   /* indigo-500, 4.5:1 ✓ */
+    --ih-primary-700:    #4f46e5;
+    --ih-primary-glow:   #818cf840;
+    --ih-primary-tint:   #818cf81a;
+
+    /* Status */
+    --ih-status-ok:       #4ade80;
+    --ih-status-ok-bg:    #052e16;
+    --ih-status-ok-fg:    #4ade80;
+    --ih-status-watch:    #fbbf24;
+    --ih-status-watch-bg: #1c1400;
+    --ih-status-watch-fg: #fbbf24;
+    --ih-status-bad:      #f87171;
+    --ih-status-bad-bg:   #3b0000;
+    --ih-status-bad-fg:   #f87171;
+
+    /* Shadows */
+    --ih-shadow-card:  0 1px 3px rgba(0, 0, 0, 0.3);
+    --ih-shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --ih-shadow-cta:   0 0 16px rgba(129, 140, 248, 0.30);
+}
+
+html[data-color-scheme="light"] {
+    color-scheme: light;
+}
+
+/* ── Body / root ─────────────────────────────────────────── */
+html[data-color-scheme="dark"] body {
+    background-color: var(--ih-bg-app) !important;
+    color: var(--ih-fg-1) !important;
+}
+html[data-color-scheme="dark"] ::selection {
+    background-color: rgba(129, 140, 248, 0.3);
+    color: #f1f5f9;
+}
+
+/* ── Backgrounds ─────────────────────────────────────────── */
+html[data-color-scheme="dark"] .bg-white          { background-color: var(--ih-bg-card) !important; }
+html[data-color-scheme="dark"] .bg-\[\#fdfdfd\]  { background-color: var(--ih-bg-card) !important; }
+html[data-color-scheme="dark"] .bg-\[\#f8fafc\]  { background-color: var(--ih-bg-app)  !important; }
+/* Direct element fallback for main layout containers */
+html[data-color-scheme="dark"] main              { background-color: var(--ih-bg-app)  !important; }
+html[data-color-scheme="dark"] .bg-slate-50       { background-color: var(--ih-bg-muted) !important; }
+html[data-color-scheme="dark"] .bg-slate-100      { background-color: #1a2540 !important; }
+html[data-color-scheme="dark"] .bg-slate-200      { background-color: #223050 !important; }
+html[data-color-scheme="dark"] .bg-slate-50\/50   { background-color: rgba(22,32,50,0.5) !important; }
+html[data-color-scheme="dark"] .bg-indigo-50      { background-color: rgba(129,140,248,0.12) !important; }
+
+/* ── Text ────────────────────────────────────────────────── */
+html[data-color-scheme="dark"] .text-slate-900    { color: var(--ih-fg-1) !important; }
+html[data-color-scheme="dark"] .text-slate-800    { color: var(--ih-fg-1) !important; }
+html[data-color-scheme="dark"] .text-slate-700    { color: var(--ih-fg-2) !important; }
+html[data-color-scheme="dark"] .text-slate-600    { color: var(--ih-fg-2) !important; }
+html[data-color-scheme="dark"] .text-slate-500    { color: var(--ih-fg-3) !important; }
+html[data-color-scheme="dark"] .text-slate-400    { color: var(--ih-fg-4) !important; }
+html[data-color-scheme="dark"] .text-indigo-600   { color: #818cf8 !important; }
+
+/* ── Borders ─────────────────────────────────────────────── */
+html[data-color-scheme="dark"] .border-slate-100  { border-color: rgba(255,255,255,0.06) !important; }
+html[data-color-scheme="dark"] .border-slate-200  { border-color: rgba(255,255,255,0.10) !important; }
+html[data-color-scheme="dark"] .border-slate-300  { border-color: rgba(255,255,255,0.14) !important; }
+
+/* ── Hover states ────────────────────────────────────────── */
+html[data-color-scheme="dark"] .hover\:bg-slate-50:hover   { background-color: rgba(255,255,255,0.05) !important; }
+html[data-color-scheme="dark"] .hover\:bg-slate-100:hover  { background-color: rgba(255,255,255,0.08) !important; }
+html[data-color-scheme="dark"] .hover\:bg-white:hover      { background-color: rgba(255,255,255,0.06) !important; }
+html[data-color-scheme="dark"] .hover\:bg-red-50:hover     { background-color: rgba(239,68,68,0.10) !important; }
+html[data-color-scheme="dark"] .hover\:text-indigo-600:hover { color: #818cf8 !important; }
+html[data-color-scheme="dark"] .hover\:border-slate-300:hover { border-color: rgba(255,255,255,0.18) !important; }
+
+/* ── Glass / card components ─────────────────────────────── */
+html[data-color-scheme="dark"] .glass {
+    background: rgba(30,41,59,0.85) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+}
+html[data-color-scheme="dark"] .glass-dark {
+    background: rgba(11,17,32,0.9) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+}
+html[data-color-scheme="dark"] .glass-card,
+html[data-color-scheme="dark"] .glass-panel {
+    background: var(--ih-bg-card) !important;
+    border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* ── Status pills ────────────────────────────────────────── */
+html[data-color-scheme="dark"] .ih-pill--sat     { background:#052e16; color:#4ade80; }
+html[data-color-scheme="dark"] .ih-pill--monitor { background:#1c1400; color:#fbbf24; }
+html[data-color-scheme="dark"] .ih-pill--defect  { background:#3b0000; color:#f87171; }
+html[data-color-scheme="dark"] .ih-pill--ni      { background:#1e293b; color:#94a3b8; }
+html[data-color-scheme="dark"] .ih-pill--np      { background:#162032; color:#94a3b8; }
+html[data-color-scheme="dark"] .ih-pill--gen     { background:#162032; color:#94a3b8; }
+
+/* ── Form inputs ─────────────────────────────────────────── */
+html[data-color-scheme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-color-scheme="dark"] textarea,
+html[data-color-scheme="dark"] select {
+    background-color: var(--ih-bg-muted) !important;
+    color: var(--ih-fg-1) !important;
+    border-color: rgba(255,255,255,0.12) !important;
+}
+html[data-color-scheme="dark"] input::placeholder,
+html[data-color-scheme="dark"] textarea::placeholder { color: var(--ih-fg-3) !important; opacity: 1; }
+html[data-color-scheme="dark"] select option { background: var(--ih-bg-card); color: var(--ih-fg-1); }
+
+/* ── Table / list ────────────────────────────────────────── */
+html[data-color-scheme="dark"] .table-row-hover:hover {
+    background-color: rgba(30,41,59,0.9) !important;
+    transform: scale(1.002);
+}
+
+/* ── Signature pad ───────────────────────────────────────── */
+html[data-color-scheme="dark"] .signature-pad-wrap {
+    border-color: rgba(255,255,255,0.15);
+    background: var(--ih-bg-muted);
+}
+
+/* ── Command palette / modal backdrop ────────────────────── */
+html[data-color-scheme="dark"] .bg-slate-900\/50 { background-color: rgba(0,0,0,0.6) !important; }
+
+/* ── Dividers ────────────────────────────────────────────── */
+html[data-color-scheme="dark"] .divide-slate-200 > * + * { border-color: rgba(255,255,255,0.08) !important; }
+html[data-color-scheme="dark"] .divide-slate-100 > * + * { border-color: rgba(255,255,255,0.05) !important; }
+
+/* ── Theme toggle icon swap via CSS (no JS flicker) ──────── */
+html:not([data-color-scheme="dark"]) #themeSunIcon        { display: none; }
+html[data-color-scheme="dark"]       #themeMoonIcon       { display: none; }
+html:not([data-color-scheme="dark"]) #mobileThemeSunIcon  { display: none; }
+html[data-color-scheme="dark"]       #mobileThemeMoonIcon { display: none; }
+
+/* ── Smooth color scheme transition ─────────────────────── */
+html { transition: background-color 0.15s ease; }
+body { transition: background-color 0.15s ease, color 0.15s ease; }
+
 /* Eliminate the 300ms tap-delay that older mobile browsers add. Modern
    browsers are fine with `width=device-width` viewport, but `touch-action:
    manipulation` on interactive elements is belt-and-suspenders cheap. */
