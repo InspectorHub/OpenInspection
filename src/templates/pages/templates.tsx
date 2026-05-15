@@ -38,14 +38,14 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
-                                <tr class="bg-slate-50/50">
-                                    <th scope="col" class="py-6 pl-10 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Name</th>
-                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Version</th>
-                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Items</th>
+                                <tr class="bg-slate-50/50 dark:bg-slate-800/50">
+                                    <th scope="col" class="py-6 pl-10 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Name</th>
+                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Version</th>
+                                    <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Items</th>
                                     <th scope="col" class="relative py-6 pl-3 pr-10"><span class="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
-                            <tbody id="templatesList" class="divide-y divide-slate-100">
+                            <tbody id="templatesList" class="divide-y divide-slate-100 dark:divide-slate-700/50">
                                 <tr id="loadingRow">
                                     <td colspan={4} class="py-32 text-center">
                                         <div class="flex flex-col items-center gap-4">

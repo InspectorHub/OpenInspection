@@ -1959,7 +1959,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         </div>
 
         {/* Photo Annotator Modal (T13) */}
-        <div x-data="photoAnnotator()" {...{'x-on:annotate.window': 'openPhoto($event.detail)'}} x-show="open" x-cloak class="fixed inset-0 z-50 flex flex-col" style="background:rgba(15,23,42,0.92);">
+        <div x-data="photoAnnotator()" {...{'x-on:annotate.window': 'openPhoto($event.detail)'}} x-show="open" x-cloak class="fixed inset-0 z-[70] flex flex-col" style="background:rgba(15,23,42,0.92);">
             {/* Toolbar */}
             <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-white" style="background:#1e293b;">
                 <div class="flex items-center gap-1 flex-wrap">
