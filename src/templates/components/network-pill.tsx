@@ -24,7 +24,7 @@ export const NetworkPill = ({ isPublic = false }: NetworkPillProps = {}): JSX.El
         <button
             type="button"
             x-on:click="popoverOpen = !popoverOpen"
-            class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-md ring-1 ring-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-800 shadow-md ring-1 ring-slate-200 dark:ring-slate-600 text-xs font-bold text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700"
         >
             <span class="w-2 h-2 rounded-full" x-bind:class="dotClass"></span>
             <span x-text="label"></span>
@@ -32,22 +32,22 @@ export const NetworkPill = ({ isPublic = false }: NetworkPillProps = {}): JSX.El
         <div
             x-show="popoverOpen"
             {...{ 'x-on:click.outside': 'popoverOpen = false' }}
-            class="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl ring-1 ring-slate-200 p-4 text-sm"
+            class="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-xl ring-1 ring-slate-200 dark:ring-slate-700 p-4 text-sm"
         >
             {/* Round 38 — replace 'Tier E — Android / Other' technical jargon
                 with a plain-English status line. Tier-specific guidance only
                 surfaces when actionable (offline, low-storage iOS device,
                 cap-approaching). When online with no pending changes there is
                 nothing for the user to do — show a single calm status only. */}
-            <div class="font-semibold text-slate-900 mb-2"
+            <div class="font-semibold text-slate-900 dark:text-slate-100 mb-2"
                  x-text="!online ? 'Working offline' : (pendingItems.length > 0 ? `Syncing ${pendingItems.length} change${pendingItems.length === 1 ? '' : 's'}` : 'All synced')">
             </div>
 
-            <div x-show="online && pendingItems.length === 0" class="text-xs text-slate-500">
+            <div x-show="online && pendingItems.length === 0" class="text-xs text-slate-500 dark:text-slate-400">
                 Your work auto-saves to this device and uploads automatically.
             </div>
 
-            <div x-show="!online" class="text-xs text-slate-600 mb-2">
+            <div x-show="!online" class="text-xs text-slate-600 dark:text-slate-400 mb-2">
                 Your work is being saved on this device. It will upload as soon
                 as you're back online.
             </div>
@@ -65,7 +65,7 @@ export const NetworkPill = ({ isPublic = false }: NetworkPillProps = {}): JSX.El
                 Tip: install this app from your browser menu so the device keeps your data permanently.
             </div>
 
-            <ul x-show="pendingItems.length > 0" class="space-y-2 max-h-60 overflow-y-auto mt-2 border-t border-slate-100 pt-2">
+            <ul x-show="pendingItems.length > 0" class="space-y-2 max-h-60 overflow-y-auto mt-2 border-t border-slate-100 dark:border-slate-700 pt-2">
                 <template x-for="it in pendingItems" {...{ 'x-bind:key': 'it.id' }}>
                     <li class="flex items-start justify-between gap-2 text-xs">
                         <span x-text="`${it.op} · ${new Date(it.createdAt).toLocaleTimeString()}`"></span>

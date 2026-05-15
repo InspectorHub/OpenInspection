@@ -21,6 +21,98 @@ const EDITOR_CSS = `
 .section-accent { border-left: 3px solid var(--section-color, var(--ih-primary, #6366f1)); }
 .rating-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 3px rgba(74, 114, 255, 0.15); }
+
+/* ── Dark mode overrides ───────────────────────────────────────────────────
+   Global styles.css overrides bg-surface-50/100 and all inputs/selects,
+   but misses /opacity variants (bg-surface-50/90) and bg-white/50 panels.
+   Semantic class names below restore the correct dark appearance. */
+[data-color-scheme=dark] .editor-header {
+  background-color: rgba(11,17,32,0.92) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+[data-color-scheme=dark] .editor-subheader {
+  background-color: rgba(11,17,32,0.92) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+}
+[data-color-scheme=dark] .editor-side-panel {
+  background-color: rgba(11,17,32,0.55) !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+/* Undo global input override for transparent inline title/section editors.
+   Selector specificity must exceed the global rule (0,4,2) — achieved by
+   replicating its :not() chain plus adding the class = (0,5,2). */
+html[data-color-scheme=dark] input.editor-title-input:not([type=checkbox]):not([type=radio]):not([type=range]),
+html[data-color-scheme=dark] input.editor-section-input:not([type=checkbox]):not([type=radio]):not([type=range]) {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+html[data-color-scheme=dark] input.editor-title-input:hover,
+html[data-color-scheme=dark] input.editor-section-input:hover { border-bottom-color: rgba(255,255,255,0.18) !important; }
+html[data-color-scheme=dark] input.editor-title-input:focus,
+html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-color: #4a72ff !important; }
+[data-color-scheme=dark] .bg-grid {
+  background-image: radial-gradient(circle, #334155 0.75px, transparent 0.75px);
+}
+[data-color-scheme=dark] .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; }
+[data-color-scheme=dark] .glass-warm {
+  background: rgba(15,23,42,0.85) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+[data-color-scheme=dark] .icon-picker-wrap {
+  background-color: #1e293b !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+[data-color-scheme=dark] .icon-btn:hover { background: rgba(74,114,255,0.2) !important; border-color: rgba(74,114,255,0.4) !important; }
+[data-color-scheme=dark] .icon-btn.active { background: rgba(74,114,255,0.2) !important; border-color: #4a72ff !important; }
+[data-color-scheme=dark] .editor-canned-panel {
+  background-color: #0f172a !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+[data-color-scheme=dark] .editor-canned-panel .bg-surface-50,
+[data-color-scheme=dark] .editor-canned-panel input {
+  background-color: rgba(255,255,255,0.05) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+[data-color-scheme=dark] .editor-props-header {
+  background-color: rgba(11,17,32,0.85) !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+/* Section list: selected card (bg-blueprint-50 = light blue → dark indigo tint) */
+[data-color-scheme=dark] #sectionsList .bg-blueprint-50 {
+  background-color: rgba(99,102,241,0.15) !important;
+}
+[data-color-scheme=dark] #sectionsList .text-blueprint-700 {
+  color: #a5b4fc !important;
+}
+/* Item cards: bg-white → dark slate surface */
+[data-color-scheme=dark] #itemsList .bg-white {
+  background-color: #1e293b !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+}
+/* Item selected highlight: bg-blueprint-50/40 → subtle indigo tint */
+[data-color-scheme=dark] #itemsList .bg-blueprint-50\/40 {
+  background-color: rgba(99,102,241,0.1) !important;
+}
+/* Section icon badge: unselected state has inline bg #f3f1ed (beige) → dark muted */
+[data-color-scheme=dark] #sectionsList > div:not(.bg-blueprint-50) .editor-section-icon {
+  background: rgba(255,255,255,0.07) !important;
+  color: rgba(255,255,255,0.4) !important;
+}
+/* Header blueprint-50 buttons (Comments active state, version badge, etc.) */
+[data-color-scheme=dark] .editor-header .bg-blueprint-50 {
+  background-color: rgba(99,102,241,0.18) !important;
+}
+[data-color-scheme=dark] .editor-header .text-blueprint-600,
+[data-color-scheme=dark] .editor-header .text-blueprint-700 {
+  color: #a5b4fc !important;
+}
+/* Add section (+) button in side panel header */
+[data-color-scheme=dark] .editor-side-panel > div .bg-blueprint-50 {
+  background-color: rgba(99,102,241,0.18) !important;
+}
+[data-color-scheme=dark] .editor-side-panel > div .text-blueprint-600 {
+  color: #a5b4fc !important;
+}
 `;
 
 export const TemplateEditorPage = ({ templateId, branding }: { templateId: string; branding?: BrandingConfig | undefined }): JSX.Element => {
@@ -35,7 +127,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
             <div class="bg-surface-50 bg-grid text-ink-900 antialiased min-h-screen" x-data="templateEditor()" x-cloak data-template-id={templateId}>
 
                 {/* Top Bar */}
-                <header class="sticky top-0 z-50 border-b border-surface-200/60 bg-surface-50/90 backdrop-blur-xl">
+                <header class="editor-header sticky top-0 z-50 border-b border-surface-200/60 bg-surface-50/90 backdrop-blur-xl">
                     <div class="flex items-center justify-between px-6 h-16">
                         <div class="flex items-center gap-4">
                             <a href="/templates" class="w-9 h-9 rounded-xl bg-surface-100 hover:bg-surface-200 flex items-center justify-center transition-colors group">
@@ -43,7 +135,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                             </a>
                             <div class="flex items-center gap-3">
                                 <input type="text" x-model="template.title"
-                                    class="text-xl font-display font-700 bg-transparent border-b-2 border-transparent hover:border-surface-200 focus:border-blueprint-500 px-1 py-0.5 transition-colors min-w-[200px]"
+                                    class="editor-title-input text-xl font-display font-700 bg-transparent border-b-2 border-transparent hover:border-surface-200 focus:border-blueprint-500 px-1 py-0.5 transition-colors min-w-[200px]"
                                     placeholder="Template Name" />
                                 <span class="font-mono text-[10px] font-600 text-ink-400 bg-surface-100 px-2.5 py-1 rounded-lg tracking-wide" x-text="'v' + template.version"></span>
                                 <span x-show="template.source" class="inline-flex items-center gap-1 text-[10px] font-600 px-2 py-0.5 rounded-md"
@@ -85,7 +177,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                 <div class="flex h-[calc(100vh-4rem)]">
 
                     {/* LEFT: Sections Panel */}
-                    <aside class="w-[260px] border-r border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0">
+                    <aside class="editor-side-panel w-[260px] border-r border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0">
                         <div class="px-4 pt-5 pb-3 flex items-center justify-between">
                             <h2 class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Sections</h2>
                             <button {...{'@click': 'addSection()'}} class="w-7 h-7 rounded-lg bg-blueprint-50 text-blueprint-600 hover:bg-blueprint-100 flex items-center justify-center transition-colors">
@@ -101,7 +193,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                         <span class="drag-handle text-ink-300 hover:text-ink-500 flex-shrink-0">
                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
                                         </span>
-                                        <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                                        <span class="editor-section-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                                             x-bind:style="selectedSectionId === section.id ? 'background:' + sectionColor(section) + '18; color:' + sectionColor(section) : 'background: #f3f1ed; color: #908a83'">
                                             <template x-if="getSectionIconSvg(section.icon)">
                                                 <span x-html="getSectionIconSvg(section.icon)"></span>
@@ -127,7 +219,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                     <main class="flex-1 overflow-y-auto bg-surface-50/50">
                         <template x-if="selectedSection">
                             <div class="animate-fade-in">
-                                <div class="sticky top-0 z-10 bg-surface-50/90 backdrop-blur-sm border-b border-surface-200/40 px-8 py-5">
+                                <div class="editor-subheader sticky top-0 z-10 bg-surface-50/90 backdrop-blur-sm border-b border-surface-200/40 px-8 py-5">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center gap-4">
                                             <div class="relative">
@@ -143,7 +235,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                                 </button>
                                                 <div x-show="showIconPicker" x-cloak {...{'@click.outside': 'showIconPicker = false'}}
                                                     x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                                                    class="absolute top-6 left-0 z-50 bg-white rounded-md shadow-2xl border border-surface-200 p-3 w-[280px]">
+                                                    class="icon-picker-wrap absolute top-6 left-0 z-50 bg-white rounded-md shadow-2xl border border-surface-200 p-3 w-[280px]">
                                                     <div class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400 mb-2 px-1">Section Icon</div>
                                                     <div class="icon-picker-grid">
                                                         <template x-for="ic in sectionIconKeys" x-bind:key="ic">
@@ -158,7 +250,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                                 </div>
                                             </div>
                                             <div>
-                                                <input x-model="selectedSection.title" class="text-lg font-display font-700 bg-transparent border-b border-transparent hover:border-surface-200 focus:border-blueprint-500 transition-colors" />
+                                                <input x-model="selectedSection.title" class="editor-section-input text-lg font-display font-700 bg-transparent border-b border-transparent hover:border-surface-200 focus:border-blueprint-500 transition-colors" />
                                                 <div class="flex items-center gap-3 mt-0.5">
                                                     <span x-show="selectedSection.identifier" class="font-mono text-[10px] text-ink-400" x-text="selectedSection.identifier"></span>
                                                     <span x-show="selectedSection.disclaimerText" class="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">has disclaimer</span>
@@ -275,12 +367,12 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                     </main>
 
                     {/* RIGHT: Properties Panel */}
-                    <aside class="w-[340px] border-l border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin"
+                    <aside class="editor-side-panel w-[340px] border-l border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin"
                         x-show="selectedItem" x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0">
                         <template x-if="selectedItem">
                             <div class="animate-fade-in">
-                                <div class="px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+                                <div class="editor-props-header px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
                                     <div class="flex items-center justify-between mb-1">
                                         <span class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Item Properties</span>
                                         <button {...{'@click': 'removeItem(selectedItemId)'}} class="text-ink-300 hover:text-red-500 transition-colors p-1">
@@ -516,7 +608,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
 
                 {/* Canned Comments Slide Panel */}
                 <div x-show="showCannedPanel" x-cloak
-                    class="fixed right-0 top-16 bottom-0 w-[380px] bg-white border-l border-surface-200 shadow-2xl z-40 flex flex-col"
+                    class="editor-canned-panel fixed right-0 top-16 bottom-0 w-[380px] bg-white border-l border-surface-200 shadow-2xl z-40 flex flex-col"
                     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
                     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
                     <div class="px-5 py-4 border-b border-surface-200/60 flex items-center justify-between">
