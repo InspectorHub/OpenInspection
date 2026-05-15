@@ -35,7 +35,7 @@ export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
                     <div class="hidden md:block">
                         <table class="w-full">
                             <thead>
-                                <tr class="bg-slate-50/40">
+                                <tr class="bg-slate-50/40 dark:bg-slate-700/50">
                                     <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Property</th>
                                     <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Client</th>
                                     <th class="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Date</th>
@@ -44,7 +44,7 @@ export const ReportsPage = ({ branding }: { branding?: BrandingConfig }) => {
                                     <th class="px-6 py-5"></th>
                                 </tr>
                             </thead>
-                            <tbody id="reportsList" class="divide-y divide-slate-100"></tbody>
+                            <tbody id="reportsList" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
                         </table>
                     </div>
                     <div id="reportsCardList" class="md:hidden flex flex-col gap-3 p-4"></div>

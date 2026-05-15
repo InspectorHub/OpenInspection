@@ -36,7 +36,7 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                 <template x-for="b in bucketTabs" {...{ 'x-bind:key': 'b.value' }}>
                     <button
                         x-on:click="setBucket(b.value)"
-                        x-bind:class="bucket === b.value ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                        x-bind:class="bucket === b.value ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'"
                         class="px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition"
                         x-text="b.label"
                     ></button>
@@ -44,13 +44,13 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
             </div>
 
             <div class="flex gap-3 flex-wrap">
-                <select x-model="categoryFilter" x-on:change="reload()" class="px-3 py-2 rounded-lg border border-slate-200 text-sm">
+                <select x-model="categoryFilter" x-on:change="reload()" class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 text-sm">
                     <option value="">All categories</option>
                     <template x-for="cat in distinctCategories" {...{ 'x-bind:key': 'cat' }}>
                         <option x-bind:value="cat" x-text="cat"></option>
                     </template>
                 </select>
-                <select x-model="sectionFilter" x-on:change="reload()" class="px-3 py-2 rounded-lg border border-slate-200 text-sm">
+                <select x-model="sectionFilter" x-on:change="reload()" class="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 text-sm">
                     <option value="">All sections</option>
                     <template x-for="s in distinctSections" {...{ 'x-bind:key': 's' }}>
                         <option x-bind:value="s" x-text="s"></option>
@@ -58,14 +58,14 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                 </select>
             </div>
 
-            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 rounded-md">
-                <p class="text-slate-500 font-semibold">No comments yet.</p>
-                <p class="text-slate-400 text-sm mt-2">Click "+ Add comment" above to create your first comment snippet.</p>
+            <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 dark:bg-slate-700/30 rounded-md">
+                <p class="text-slate-500 dark:text-slate-400 font-semibold">No comments yet.</p>
+                <p class="text-slate-400 dark:text-slate-500 text-sm mt-2">Click "+ Add comment" above to create your first comment snippet.</p>
             </div>
 
             <div x-show="items.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <template x-for="comment in items" {...{ 'x-bind:key': 'comment.id' }}>
-                    <div class="p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition">
+                    <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm hover:shadow-md transition">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1 flex-wrap">
@@ -79,10 +79,10 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                                         x-bind:class="comment.ratingBucket === 'satisfactory' ? 'ih-pill--sat' : comment.ratingBucket === 'monitor' ? 'ih-pill--monitor' : comment.ratingBucket === 'defect' ? 'ih-pill--defect' : 'ih-pill--gen'"
                                         x-text="comment.ratingBucket ? comment.ratingBucket : 'general'"
                                     ></span>
-                                    <span x-show="comment.section" class="text-[10px] font-bold uppercase tracking-wide text-slate-500" x-text="comment.section"></span>
-                                    <span x-show="comment.category" class="text-[10px] text-slate-400" x-text="'· ' + comment.category"></span>
+                                    <span x-show="comment.section" class="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" x-text="comment.section"></span>
+                                    <span x-show="comment.category" class="text-[10px] text-slate-400 dark:text-slate-500" x-text="'· ' + comment.category"></span>
                                 </div>
-                                <p class="text-sm text-slate-700 line-clamp-3" x-text="comment.text"></p>
+                                <p class="text-sm text-slate-700 dark:text-slate-300 line-clamp-3" x-text="comment.text"></p>
                             </div>
                             <div class="flex flex-col gap-1 flex-shrink-0">
                                 <button x-on:click="openEdit(comment)" class="text-xs text-indigo-600 hover:underline">Edit</button>
@@ -112,8 +112,8 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                 <div class="space-y-3">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Rating bucket</label>
-                            <select x-model="form.ratingBucket" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white">
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Rating bucket</label>
+                            <select x-model="form.ratingBucket" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm bg-white dark:bg-slate-700 dark:text-slate-100">
                                 <option value="">Unspecified</option>
                                 <option value="satisfactory">Satisfactory</option>
                                 <option value="monitor">Monitor</option>
@@ -122,14 +122,14 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                             <p class="text-[10px] text-slate-400 mt-1">Determines which tab it appears under in the Library drawer.</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1">Section</label>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Section</label>
                             <input
                                 type="text"
                                 list="commentSectionOptions"
                                 x-model="form.section"
                                 placeholder="e.g., Roof"
                                 autocomplete="off"
-                                class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"
+                                class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm"
                             />
                             <datalist id="commentSectionOptions">
                                 <template x-for="s in distinctSections" {...{ 'x-bind:key': 's' }}>
@@ -140,14 +140,14 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Category</label>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Category</label>
                         <input
                             type="text"
                             list="commentCategoryOptions"
                             x-model="form.category"
                             placeholder="e.g., Roof"
                             autocomplete="off"
-                            class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"
+                            class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm"
                         />
                         <datalist id="commentCategoryOptions">
                             <template x-for="cat in distinctCategories" {...{ 'x-bind:key': 'cat' }}>
@@ -157,8 +157,8 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
                         <p class="text-[10px] text-slate-400 mt-1">Optional free-text label, kept for backward compat.</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Comment text</label>
-                        <textarea x-model="form.text" required rows={4} placeholder="e.g., Evidence of previous repair was observed." class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"></textarea>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Comment text</label>
+                        <textarea x-model="form.text" required rows={4} placeholder="e.g., Evidence of previous repair was observed." class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm"></textarea>
                     </div>
                 </div>
             </Modal>

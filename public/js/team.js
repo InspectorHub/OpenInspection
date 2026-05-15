@@ -86,12 +86,12 @@ window.teamMeta = teamMeta;
             return;
         }
         membersList.innerHTML = members.map(m => `
-            <tr class="hover:bg-slate-50/80 transition-colors">
-                <td class="px-6 py-4 text-sm font-medium text-slate-900">${m.email}</td>
-                <td class="px-4 py-4 text-sm text-slate-500">
-                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700">${roleNames[m.role] || m.role}</span>
+            <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition-colors">
+                <td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">${m.email}</td>
+                <td class="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">${roleNames[m.role] || m.role}</span>
                 </td>
-                <td class="px-4 py-4 text-sm text-slate-400">${m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '—'}</td>
+                <td class="px-4 py-4 text-sm text-slate-400 dark:text-slate-500">${m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '—'}</td>
             </tr>
         `).join('');
     }
@@ -102,11 +102,11 @@ window.teamMeta = teamMeta;
             return;
         }
         invitesList.innerHTML = invites.map(i => `
-            <tr class="hover:bg-slate-50/80 transition-colors">
-                <td class="px-6 py-4 text-sm font-medium text-slate-900">${i.email}</td>
-                <td class="px-4 py-4 text-sm text-slate-500 font-bold">${roleNames[i.role] || i.role}</td>
+            <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition-colors">
+                <td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">${i.email}</td>
+                <td class="px-4 py-4 text-sm text-slate-500 dark:text-slate-400 font-bold">${roleNames[i.role] || i.role}</td>
                 <td class="px-4 py-4 text-sm">
-                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 uppercase">${i.status}</span>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-amber-50 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 uppercase">${i.status}</span>
                 </td>
             </tr>
         `).join('');

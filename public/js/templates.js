@@ -113,12 +113,12 @@ function renderTemplates() {
           <tr class="table-row-hover group">
             <td class="py-6 pl-10 pr-3">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                <div class="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                 </div>
                 <div>
                   <div class="flex items-center gap-2">
-                    <a href="/templates/${t.id}/edit" class="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors">${t.name}</a>
+                    <a href="/templates/${t.id}/edit" class="text-sm font-bold text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">${t.name}</a>
                     ${t.source === 'marketplace' ? '<span class="text-[9px] font-bold uppercase tracking-widest text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">Marketplace</span>' : ''}
                   </div>
                   <p class="text-[10px] text-slate-400 font-medium" title="${t.id}">${itemCount} items · v${t.version}.0${t.source === 'marketplace' ? ' · Imported from Marketplace' : ''}</p>
@@ -126,7 +126,7 @@ function renderTemplates() {
               </div>
             </td>
             <td class="px-6 py-6">
-              <span class="inline-flex items-center rounded-lg border border-indigo-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50/50 text-indigo-600">v${t.version}.0</span>
+              <span class="inline-flex items-center rounded-lg border border-indigo-100 dark:border-indigo-800 px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">v${t.version}.0</span>
             </td>
             <td class="px-6 py-6 text-sm text-slate-500 font-bold">${itemCount} items</td>
             <td class="py-6 pl-3 pr-10 text-right">

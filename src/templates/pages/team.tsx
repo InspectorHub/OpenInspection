@@ -21,7 +21,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                                 <div id="quotaBadge" class="hidden sm:flex items-center gap-2 px-3 h-8 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                                     <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
                                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none">Seats:</span>
-                                    <span class="text-[12px] font-bold text-slate-900 leading-none">Loading...</span>
+                                    <span class="text-[12px] font-bold text-slate-900 dark:text-slate-100 leading-none">Loading...</span>
                                 </div>
                                 <button
                                     type="button"
@@ -47,7 +47,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                         </div>
                         <div class="overflow-x-auto custom-scrollbar">
                             <table class="w-full text-left">
-                                <thead class="bg-slate-50/50">
+                                <thead class="bg-slate-50/50 dark:bg-slate-700/50">
                                     <tr>
                                         <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Name</th>
                                         <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Role</th>
@@ -99,8 +99,7 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                             <button
                                 type="button"
                                 id="closeInviteModalBtn"
-                                class="flex-1 h-10 px-4 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
-                                style="border-color: #e2e8f0"
+                                class="flex-1 h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-all"
                             >
                                 Cancel
                             </button>
@@ -116,14 +115,14 @@ export const TeamPage = ({ branding }: { branding?: BrandingConfig | undefined }
                 >
                     <form id="inviteForm" class="space-y-4">
                         <div class="space-y-3">
-                            <label for="inviteEmail" class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Email Address</label>
+                            <label for="inviteEmail" class="block text-xs font-bold text-slate-900 dark:text-slate-100 ml-1 uppercase tracking-[0.2em]">Email Address</label>
                             <input type="email" id="inviteEmail" name="email" required placeholder="colleague@example.com"
-                                class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 font-medium text-sm" />
+                                class="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-500 font-medium text-sm" />
                         </div>
                         <div class="space-y-3">
-                            <label for="inviteRole" class="block text-xs font-bold text-slate-900 ml-1 uppercase tracking-[0.2em]">Role</label>
+                            <label for="inviteRole" class="block text-xs font-bold text-slate-900 dark:text-slate-100 ml-1 uppercase tracking-[0.2em]">Role</label>
                             <select id="inviteRole" name="role"
-                                class="w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all appearance-none cursor-pointer font-medium text-sm bg-no-repeat bg-[right_1.5rem_center]">
+                                class="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all appearance-none cursor-pointer font-medium text-sm bg-no-repeat bg-[right_1.5rem_center]">
                                 <option value="admin">Admin</option>
                                 <option value="inspector">Inspector</option>
                                 <option value="office_staff">Office Staff</option>

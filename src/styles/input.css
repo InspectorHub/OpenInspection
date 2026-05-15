@@ -795,6 +795,7 @@ html[data-color-scheme="dark"] .text-ink-300 { color: var(--ih-fg-5) !important;
 html[data-color-scheme="dark"] .border-surface-200 { border-color: rgba(255,255,255,0.08) !important; }
 html[data-color-scheme="dark"] .bg-surface-50 { background-color: var(--ih-bg-app) !important; }
 html[data-color-scheme="dark"] .bg-surface-100 { background-color: var(--ih-bg-muted) !important; }
+html[data-color-scheme="dark"] .bg-blueprint-50  { background-color: rgba(99,102,241,0.12) !important; }
 html[data-color-scheme="dark"] .bg-blueprint-100 { background-color: rgba(99,102,241,0.15) !important; }
 html[data-color-scheme="dark"] .text-blueprint-700 { color: #818cf8 !important; }
 html[data-color-scheme="dark"] .hover\:bg-blueprint-500:hover { background-color: #6366f1 !important; }

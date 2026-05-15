@@ -19,11 +19,11 @@ export function MetricsPage({ appName, branding }: MetricsPageProps) {
                         <span x-text="data ? `${periodLabel(period)} · ${data.totalInspections} inspections · ${fmt(data.totalRevenue)}` : 'Loading…'"></span>
                     }
                     actions={
-                        <div class="flex gap-1 bg-slate-100 rounded-md p-1">
+                        <div class="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-md p-1">
                             {(['3m', '6m', '12m'] as const).map(p => (
                                 <button
                                     x-on:click={`period='${p}'; load()`}
-                                    x-bind:class={`period==='${p}' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'`}
+                                    x-bind:class={`period==='${p}' ? 'bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'`}
                                     class="h-6 px-3 rounded text-[12px] font-bold transition-all"
                                 >{p}</button>
                             ))}

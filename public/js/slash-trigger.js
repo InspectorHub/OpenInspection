@@ -76,20 +76,20 @@
             // Caller is expected to provide a `position: relative` parent
             // (form-renderer's `<div class="relative group mb-8">` qualifies).
             const p = document.createElement('div');
-            p.className = 'oi-slash-picker absolute z-50 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden hidden';
+            p.className = 'oi-slash-picker absolute z-50 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden hidden';
             p.style.minWidth = '320px';
             p.style.maxWidth = '480px';
             p.setAttribute('role', 'listbox');
             const header = document.createElement('div');
-            header.className = 'px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-slate-50 border-b border-slate-100';
+            header.className = 'px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700';
             header.textContent = 'Comment library · / to search';
             p.appendChild(header);
             const ul = document.createElement('ul');
             ul.className = 'max-h-72 overflow-y-auto';
             p.appendChild(ul);
             const footer = document.createElement('div');
-            footer.className = 'px-4 py-2 text-[10px] text-slate-400 bg-slate-50 border-t border-slate-100 flex justify-between';
-            footer.innerHTML = '<span><kbd class="px-1 py-0.5 bg-white border rounded text-[10px] font-mono">↑↓</kbd> nav · <kbd class="px-1 py-0.5 bg-white border rounded text-[10px] font-mono">⏎</kbd> insert · <kbd class="px-1 py-0.5 bg-white border rounded text-[10px] font-mono">Esc</kbd> close</span>';
+            footer.className = 'px-4 py-2 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-100 dark:border-slate-700 flex justify-between';
+            footer.innerHTML = '<span><kbd class="px-1 py-0.5 bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 rounded text-[10px] font-mono dark:text-slate-300">↑↓</kbd> nav · <kbd class="px-1 py-0.5 bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 rounded text-[10px] font-mono dark:text-slate-300">⏎</kbd> insert · <kbd class="px-1 py-0.5 bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 rounded text-[10px] font-mono dark:text-slate-300">Esc</kbd> close</span>';
             p.appendChild(footer);
             parent.appendChild(p);
             state.picker = p;
@@ -113,7 +113,7 @@
             ul.innerHTML = '';
             state.visibleItems.forEach((item, idx) => {
                 const li = document.createElement('li');
-                li.className = 'px-4 py-2 cursor-pointer text-sm transition-colors ' + (idx === state.highlighted ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50');
+                li.className = 'px-4 py-2 cursor-pointer text-sm transition-colors ' + (idx === state.highlighted ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50');
                 li.setAttribute('role', 'option');
                 li.setAttribute('data-idx', String(idx));
                 // Truncate long snippets visually

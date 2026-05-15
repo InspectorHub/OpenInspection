@@ -108,17 +108,17 @@ async function loadAgreements() {
                 <tr class="table-row-hover group">
                     <td class="py-6 pl-10 pr-3">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                            <div class="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             </div>
                             <div>
-                                <p class="text-sm font-bold text-slate-900">${a.name}</p>
+                                <p class="text-sm font-bold text-slate-900 dark:text-slate-100">${a.name}</p>
                                 <p class="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: ${a.id.split('-')[0]}</p>
                             </div>
                         </div>
                     </td>
                     <td class="px-6 py-6">
-                        <span class="inline-flex items-center rounded-lg border border-indigo-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50/50 text-indigo-600">v${a.version}.0</span>
+                        <span class="inline-flex items-center rounded-lg border border-indigo-100 dark:border-indigo-800 px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">v${a.version}.0</span>
                     </td>
                     <td class="px-6 py-6 text-sm text-slate-500 font-bold">${new Date(a.createdAt).toLocaleDateString()}</td>
                     <td class="py-6 pl-3 pr-10 text-right">

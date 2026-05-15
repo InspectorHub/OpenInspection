@@ -117,15 +117,15 @@ function render() {
         const dateStr = formatDate(r.date || r.createdAt);
         return `
         <tr class="table-row-hover group">
-            <td class="px-6 py-5"><a href="/inspections/${r.id}/edit" class="text-sm font-bold text-slate-900 hover:text-indigo-600 break-words">${_escapeHtml(r.propertyAddress || 'Untitled')}</a></td>
-            <td class="px-6 py-5 text-xs font-bold text-slate-700">${_escapeHtml(r.clientName || '—')}</td>
-            <td class="px-6 py-5 text-xs font-bold text-slate-500 font-mono">${_escapeHtml(dateStr)}</td>
+            <td class="px-6 py-5"><a href="/inspections/${r.id}/edit" class="text-sm font-bold text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 break-words">${_escapeHtml(r.propertyAddress || 'Untitled')}</a></td>
+            <td class="px-6 py-5 text-xs font-bold text-slate-700 dark:text-slate-300">${_escapeHtml(r.clientName || '—')}</td>
+            <td class="px-6 py-5 text-xs font-bold text-slate-500 dark:text-slate-400 font-mono">${_escapeHtml(dateStr)}</td>
             <td class="px-6 py-5"><span class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${statusStyle(r.status)} shadow-sm ring-1 ring-inset"><span class="w-1 h-1 rounded-full bg-current"></span>${_escapeHtml((r.status || '').replace('_', ' '))}</span></td>
             <td class="px-6 py-5"><span class="text-xs font-bold ${r.paymentStatus === 'paid' ? 'text-emerald-600' : 'text-amber-600'}">$${(r.price || 0).toLocaleString()} · ${_escapeHtml(r.paymentStatus || 'unpaid')}</span></td>
             <td class="px-6 py-5 text-right">
                 <div class="flex items-center justify-end gap-2">
                     <a href="/api/inspections/${r.id}/report" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-600 transition-all">View</a>
-                    <button onclick="copyReportLink('${r.id}')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all">Copy Link</button>
+                    <button onclick="copyReportLink('${r.id}')" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Copy Link</button>
                 </div>
             </td>
         </tr>`;
@@ -137,13 +137,13 @@ function render() {
             return `
             <a href="/inspections/${r.id}/edit" class="block glass-panel rounded-md p-4 hover:shadow-lg transition active:scale-[0.98]">
                 <div class="flex items-start justify-between gap-3 mb-2">
-                    <p class="text-sm font-bold text-slate-900 break-words flex-1">${_escapeHtml(r.propertyAddress || 'Untitled')}</p>
+                    <p class="text-sm font-bold text-slate-900 dark:text-slate-100 break-words flex-1">${_escapeHtml(r.propertyAddress || 'Untitled')}</p>
                     <span class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${statusStyle(r.status)} shadow-sm ring-1 ring-inset">
                         <span class="w-1 h-1 rounded-full bg-current"></span>${_escapeHtml((r.status || '').replace('_', ' '))}
                     </span>
                 </div>
                 <div class="text-xs text-slate-500 space-y-0.5">
-                    <p><span class="font-semibold text-slate-700">${_escapeHtml(r.clientName || '—')}</span></p>
+                    <p><span class="font-semibold text-slate-700 dark:text-slate-300">${_escapeHtml(r.clientName || '—')}</span></p>
                     <p class="font-mono text-[10px] text-slate-400">${_escapeHtml(dateStr || '')} · $${(r.price || 0).toLocaleString()}</p>
                 </div>
             </a>`;
@@ -153,11 +153,11 @@ function render() {
 
 function statusStyle(s) {
     const map = {
-        'completed': 'bg-amber-50 text-amber-600 ring-amber-100',
-        'delivered': 'bg-emerald-50 text-emerald-600 ring-emerald-100',
-        'signed': 'bg-violet-50 text-violet-600 ring-violet-100',
+        'completed': 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 ring-amber-100 dark:ring-amber-800',
+        'delivered': 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 ring-emerald-100 dark:ring-emerald-800',
+        'signed': 'bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 ring-violet-100 dark:ring-violet-800',
     };
-    return map[s] || 'bg-slate-100 text-slate-600 ring-slate-200';
+    return map[s] || 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 ring-slate-200 dark:ring-slate-600';
 }
 
 function formatDate(d) {

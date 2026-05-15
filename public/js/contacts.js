@@ -71,18 +71,18 @@ function renderContacts(list) {
     }
     tbody.innerHTML = list.map(function (c) {
         var typeBadge = c.type === 'agent'
-            ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">Agent</span>'
-            : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">Client</span>';
-        return '<tr class="border-t border-slate-100 hover:bg-slate-50 transition">' +
-            '<td class="py-5 px-10 text-sm font-bold text-slate-900">' + c.name + '</td>' +
+            ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">Agent</span>'
+            : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">Client</span>';
+        return '<tr class="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">' +
+            '<td class="py-5 px-10 text-sm font-bold text-slate-900 dark:text-slate-100">' + c.name + '</td>' +
             '<td class="py-5 px-8">' + typeBadge + '</td>' +
-            '<td class="py-5 px-8 text-sm text-slate-500">' + (c.email || '\u2014') + '</td>' +
-            '<td class="py-5 px-8 text-sm text-slate-500">' + (c.phone || '\u2014') + '</td>' +
-            '<td class="py-5 px-8 text-sm text-slate-500">' + (c.agency || '\u2014') + '</td>' +
-            '<td class="py-5 px-8 text-sm font-bold text-slate-700">' + (c.inspectionCount || 0) + '</td>' +
+            '<td class="py-5 px-8 text-sm text-slate-500 dark:text-slate-400">' + (c.email || '\u2014') + '</td>' +
+            '<td class="py-5 px-8 text-sm text-slate-500 dark:text-slate-400">' + (c.phone || '\u2014') + '</td>' +
+            '<td class="py-5 px-8 text-sm text-slate-500 dark:text-slate-400">' + (c.agency || '\u2014') + '</td>' +
+            '<td class="py-5 px-8 text-sm font-bold text-slate-700 dark:text-slate-300">' + (c.inspectionCount || 0) + '</td>' +
             '<td class="py-5 pr-10 text-right flex gap-2 justify-end">' +
-            '<button onclick="showEditModal(\'' + c.id + '\')" class="text-xs font-bold text-indigo-500 hover:text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition">Edit</button>' +
-            '<button onclick="deleteContactById(\'' + c.id + '\')" class="text-xs font-bold text-red-400 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Remove</button>' +
+            '<button onclick="showEditModal(\'' + c.id + '\')" class="text-xs font-bold text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 px-3 py-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition">Edit</button>' +
+            '<button onclick="deleteContactById(\'' + c.id + '\')" class="text-xs font-bold text-red-400 hover:text-red-600 dark:hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/40 transition">Remove</button>' +
             '</td></tr>';
     }).join('');
 }
