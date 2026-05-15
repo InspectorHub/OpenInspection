@@ -64,6 +64,9 @@ html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-co
 }
 [data-color-scheme=dark] .icon-btn:hover { background: rgba(74,114,255,0.2) !important; border-color: rgba(74,114,255,0.4) !important; }
 [data-color-scheme=dark] .icon-btn.active { background: rgba(74,114,255,0.2) !important; border-color: #4a72ff !important; }
+[data-color-scheme=dark] .editor-main {
+  background-color: rgba(11,17,32,0.6) !important;
+}
 [data-color-scheme=dark] .editor-canned-panel {
   background-color: #0f172a !important;
   border-color: rgba(255,255,255,0.08) !important;
@@ -216,7 +219,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                     </aside>
 
                     {/* CENTER: Items Panel */}
-                    <main class="flex-1 overflow-y-auto bg-surface-50/50">
+                    <main class="editor-main flex-1 overflow-y-auto bg-surface-50/50">
                         <template x-if="selectedSection">
                             <div class="animate-fade-in">
                                 <div class="editor-subheader sticky top-0 z-10 bg-surface-50/90 backdrop-blur-sm border-b border-surface-200/40 px-8 py-5">

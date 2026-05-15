@@ -111,13 +111,13 @@ function renderServicesSection() {
     if (!list) return;
     list.innerHTML = availableServices.map(svc => `
         <div onclick="toggleService('${svc.id}')" id="svc-card-${svc.id}"
-             class="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all border-slate-200 bg-white">
-            <div id="svc-check-${svc.id}" class="w-5 h-5 rounded-md border-2 border-slate-300 flex items-center justify-center text-xs font-bold text-white flex-shrink-0"></div>
+             class="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+            <div id="svc-check-${svc.id}" class="w-5 h-5 rounded-md border-2 border-slate-300 dark:border-slate-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0"></div>
             <div class="flex-1 min-w-0">
-                <div class="text-sm font-bold text-slate-900">${svc.name}</div>
-                ${svc.durationMinutes ? `<div class="text-xs text-slate-400">&#x23F1; ${svc.durationMinutes} min</div>` : ''}
+                <div class="text-sm font-bold text-slate-900 dark:text-slate-100">${svc.name}</div>
+                ${svc.durationMinutes ? `<div class="text-xs text-slate-400 dark:text-slate-400">&#x23F1; ${svc.durationMinutes} min</div>` : ''}
             </div>
-            <div class="text-sm font-bold text-slate-900">${formatCents(svc.price)}</div>
+            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">${formatCents(svc.price)}</div>
         </div>
     `).join('');
     updateTotalBar();
@@ -132,7 +132,7 @@ function toggleService(id) {
     const check = document.getElementById('svc-check-' + id);
     const selected = selectedServiceIds.includes(id);
     if (card) {
-        card.className = `flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${selected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white'}`;
+        card.className = `flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${selected ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700'}`;
     }
     if (check) {
         check.className = `w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${selected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300'}`;
@@ -470,9 +470,9 @@ function renderPlacesDropdown(results) {
     }
     dropdown.innerHTML = results.slice(0, 6).map(r => `
         <button type="button" data-place-id="${r.placeId}" data-place-text="${(r.description || '').replace(/"/g, '&quot;')}"
-                class="w-full text-left px-5 py-3 hover:bg-emerald-50 border-b border-slate-100 last:border-b-0 transition">
-          <div class="font-bold text-sm text-slate-900">${r.mainText || r.description}</div>
-          ${r.secondaryText ? `<div class="text-xs text-slate-500 mt-0.5">${r.secondaryText}</div>` : ''}
+                class="w-full text-left px-5 py-3 hover:bg-emerald-50 dark:hover:bg-slate-600 border-b border-slate-100 dark:border-slate-600 last:border-b-0 transition">
+          <div class="font-bold text-sm text-slate-900 dark:text-slate-100">${r.mainText || r.description}</div>
+          ${r.secondaryText ? `<div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${r.secondaryText}</div>` : ''}
         </button>
     `).join('');
     dropdown.classList.remove('hidden');

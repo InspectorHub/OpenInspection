@@ -21,7 +21,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                             x-show="items.length === 0"
                             x-on:click="seedDefaults()"
                             {...{ 'x-bind:disabled': 'loading' }}
-                            class="h-8 px-3 rounded-md bg-indigo-100 text-indigo-700 text-[13px] font-bold hover:bg-indigo-200 disabled:opacity-50 transition-all"
+                            class="h-8 px-3 rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[13px] font-bold hover:bg-indigo-200 dark:hover:bg-indigo-900/60 disabled:opacity-50 transition-all"
                         >
                             Seed defaults (80)
                         </button>
@@ -31,7 +31,7 @@ export const RecommendationsPage = ({ branding }: Props): JSX.Element => (
                             type="button"
                             onclick="window.print()"
                             aria-label="Print recommendations as PDF"
-                            class="h-8 px-4 rounded-md bg-white border border-slate-200 text-slate-700 text-[13px] font-bold inline-flex items-center gap-1.5 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            class="h-8 px-4 rounded-md bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-[13px] font-bold inline-flex items-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                         >
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                             Print as PDF

@@ -257,7 +257,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         data-testid="settings-show-estimates-toggle"
                         x-model="showEstimates"
                         x-on:change="save({ showEstimates: showEstimates })"
-                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 dark:bg-slate-600 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                         {...(showEstimates ? { checked: true } : {})}
                     />
@@ -281,7 +281,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         data-testid="settings-enable-repair-list-toggle"
                         x-model="enableRepairList"
                         x-on:change="save({ enableRepairList: enableRepairList })"
-                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 dark:bg-slate-600 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                         {...(enableRepairList ? { checked: true } : {})}
                     />
@@ -304,7 +304,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         data-testid="settings-enable-customer-repair-export-toggle"
                         x-model="enableCustomerRepairExport"
                         x-on:change="save({ enableCustomerRepairExport: enableCustomerRepairExport })"
-                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 dark:bg-slate-600 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                         {...(enableCustomerRepairExport ? { checked: true } : {})}
                     />
@@ -329,7 +329,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         data-testid="settings-enable-pdf-pipeline-toggle"
                         x-model="enablePdfPipeline"
                         x-on:change="save({ enablePdfPipeline: enablePdfPipeline })"
-                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 dark:bg-slate-600 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                         {...(enablePdfPipeline ? { checked: true } : {})}
                     />
@@ -357,7 +357,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         data-testid="settings-block-unpaid-toggle"
                         x-model="blockUnpaid"
                         x-on:change="save({ blockUnpaid: blockUnpaid })"
-                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 dark:bg-slate-600 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                         {...(blockUnpaid ? { checked: true } : {})}
                     />
@@ -378,7 +378,7 @@ export const SettingsWorkspaceReportsPage = ({ branding, showEstimates, enableRe
                         data-testid="settings-block-unsigned-agreement-toggle"
                         x-model="blockUnsignedAgreement"
                         x-on:change="save({ blockUnsignedAgreement: blockUnsignedAgreement })"
-                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
+                        class="mt-1 h-5 w-10 rounded-full appearance-none bg-surface-200 dark:bg-slate-600 checked:bg-blueprint-500 transition-colors cursor-pointer relative shrink-0"
                         style="background-position: left center; background-repeat: no-repeat;"
                         {...(blockUnsignedAgreement ? { checked: true } : {})}
                     />

@@ -30,8 +30,7 @@ export const CustomizeColumnsModal = (): JSX.Element => (
                     <button
                         type="button"
                         x-on:click="resetColumns()"
-                        class="h-10 px-4 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
-                        style="border-color: #e2e8f0"
+                        class="h-10 px-4 rounded-xl border bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-slate-200 dark:border-slate-600 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-all"
                     >
                         Reset to defaults
                     </button>
@@ -39,8 +38,7 @@ export const CustomizeColumnsModal = (): JSX.Element => (
                     <button
                         type="button"
                         onclick="document.getElementById('customizeColumnsModal')?.classList.add('hidden')"
-                        class="h-10 px-4 rounded-xl border bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
-                        style="border-color: #e2e8f0"
+                        class="h-10 px-4 rounded-xl border bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 border-slate-200 dark:border-slate-600 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-all"
                     >
                         Cancel
                     </button>
@@ -59,7 +57,7 @@ export const CustomizeColumnsModal = (): JSX.Element => (
                 {DASHBOARD_COLUMNS.map((col) => (
                     <label
                         key={col.id}
-                        class={`flex items-start gap-3 p-3 rounded-md border transition-all ${col.alwaysOn ? 'bg-slate-50 border-slate-200 cursor-not-allowed' : 'bg-white border-slate-200 hover:border-indigo-300 cursor-pointer'}`}
+                        class={`flex items-start gap-3 p-3 rounded-md border transition-all ${col.alwaysOn ? 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 cursor-not-allowed' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 cursor-pointer'}`}
                         data-column-id={col.id}
                     >
                         <input
@@ -72,16 +70,16 @@ export const CustomizeColumnsModal = (): JSX.Element => (
                         />
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
-                                <span class="text-sm font-bold text-slate-900">{col.label}</span>
+                                <span class="text-sm font-bold text-slate-900 dark:text-slate-100">{col.label}</span>
                                 {col.alwaysOn && (
-                                    <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Required</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-300 bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded">Required</span>
                                 )}
                                 {col.mobileVisible === false && (
-                                    <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded" title="Hidden on mobile to keep cards readable">Desktop only</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-300 bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded" title="Hidden on mobile to keep cards readable">Desktop only</span>
                                 )}
                             </div>
                             {col.description && (
-                                <p class="text-xs text-slate-500 mt-0.5">{col.description}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{col.description}</p>
                             )}
                         </div>
                     </label>
