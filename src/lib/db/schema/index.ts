@@ -49,3 +49,5 @@ export { inspectionUnits } from './units';
 export { observerLinks } from './observer';
 // Design System 0520 subsystem D — ReportVersions (snapshot-on-publish)
 export { reportVersions } from './report-versions';
+// Design System 0520 subsystem E — IdentitySwitcher links
+export { userIdentityLinks } from './identity-links';

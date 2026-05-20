@@ -2408,6 +2408,26 @@ inspectionsRoutes.get('/:id/presence/ws', async (c) => {
     return stub.fetch(fwd);
 });
 
+// Design System 0520 subsystem E P1.3 — Publish pre-flight gates.
+const preflightRoute = createRoute({
+    method:  'get',
+    path:    '/{id}/preflight',
+    tags:    ['Inspections'],
+    summary: 'Compute Publish pre-flight gates (rated / facts / cover / agreement)',
+    request: { params: z.object({ id: z.string().min(1) }) },
+    responses: {
+        200: { description: 'ok' },
+        404: { description: 'inspection not found in this tenant' },
+    },
+});
+inspectionsRoutes.openapi(preflightRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const out = await c.var.services.inspection.computePreflight(id, tenantId);
+    return c.json({ success: true as const, data: out }, 200);
+});
+
 // -----------------------------------------------------------------------------
 // Design System 0520 subsystem D phase 1 task 1.3 — UnitTree CRUD routes.
 // -----------------------------------------------------------------------------

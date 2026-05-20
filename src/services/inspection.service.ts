@@ -249,6 +249,57 @@ export class InspectionService {
     /**
      * Fetches a single inspection with its template.
      */
+    /**
+     * Design System 0520 subsystem E P1.2 — Publish pre-flight gates.
+     *
+     * Loads the inspection + parsed inspection_results.data and
+     * delegates to the pure aggregator in src/lib/preflight.ts. The
+     * apprentice pending count is read from apprentice_reviews; if
+     * that table is missing (subsystem C not yet merged) we pass
+     * `undefined` so the gate gracefully no-ops to "reviewed".
+     */
+    async computePreflight(inspectionId: string, tenantId: string) {
+        if (!this.sdb) throw new Error('ScopedDB session missing');
+
+        const ins = await this.sdb.getById(inspections, inspectionId);
+        if (!ins) throw Errors.NotFound('Inspection not found');
+
+        const resultsRow = await this.sdb.raw.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        const items: Record<string, { rating?: unknown; value?: unknown }> = (() => {
+            const raw = resultsRow?.data;
+            if (!raw) return {};
+            try {
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                return (parsed && typeof parsed === 'object') ? parsed as Record<string, never> : {};
+            } catch { return {}; }
+        })();
+
+        // Apprentice pending — subsystem C dependency. Wrap the query
+        // so a missing-table error degrades to undefined (gate passes).
+        let pendingApprenticeCount: number | undefined;
+        try {
+            const rows = await this.db.prepare(
+                'SELECT COUNT(*) AS cnt FROM apprentice_reviews WHERE inspection_id = ?1 AND tenant_id = ?2 AND status = "pending"'
+            ).bind(inspectionId, tenantId).first<{ cnt: number }>();
+            pendingApprenticeCount = rows?.cnt ?? 0;
+        } catch {
+            pendingApprenticeCount = undefined;
+        }
+
+        const { computePreflightFromData } = await import('../lib/preflight');
+        return computePreflightFromData(
+            {
+                coverPhotoId:      (ins.coverPhotoId as string | null) ?? null,
+                propertyFacts:     (ins.propertyFacts as Record<string, unknown> | null) ?? null,
+                agreementSignedAt: (ins.agreementSignedAt as number | null) ?? null,
+            },
+            items,
+            pendingApprenticeCount,
+        );
+    }
+
     async getInspection(id: string, tenantId: string) {
         if (!this.sdb) throw new Error('ScopedDB session missing');
 

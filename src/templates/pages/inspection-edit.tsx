@@ -2443,6 +2443,10 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         `,
       }}></script>
       <script src="/js/inspection-edit.js"></script>
+      {/* Design System 0520 subsystem E P1.4 — pre-flight checks factory.
+          Mounted inside publish-modal; reads inspection id from the
+          window global set by inspectionEditor() above. */}
+      <script src="/js/preflight.js"></script>
       {/* S3-6 — burst-camera Alpine factory. Loads after inspection-edit.js
           so the editor's _uploadBlobAsPhoto helper is reachable at commit
           time. */}

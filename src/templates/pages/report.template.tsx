@@ -2,6 +2,7 @@ import { BareLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
 import { ReportSidebar, type ReportSidebarSection } from '../components/report-sidebar';
 import { ReportTabBar } from '../components/report-tab-bar';
+import { TeamCredit, type TeamCreditMember } from '../components/team-credit';
 import { ReportUnitsSummary, type ReportUnit } from '../components/report-units-summary';
 import { ShareDropdown } from '../components/share-dropdown';
 import { PdfDropdown } from '../components/pdf-dropdown';
@@ -32,12 +33,10 @@ export function renderProfessionalReport(data: {
     branding?: BrandingConfig | undefined,
     isAuthenticated?: boolean | undefined,
     resolvedTheme?: 'modern' | 'classic' | 'minimal' | undefined,
+    // Design System 0520 subsystem E P8 — TeamCredit footer block.
+    team?: TeamCreditMember[],
+    nachiNumber?: string | null,
     // Design System 0520 subsystem D P3 — UnitTree summary on the report.
-    // When present, renders the navigable building/floor/unit card above
-    // the section list with per-unit defect counts. Items without a
-    // unitId continue to render under the existing section list (the
-    // unit_id stamping in inspectionEditor only attaches IDs to NEW
-    // ratings, so legacy reports are unaffected).
     units?: ReportUnit[],
 }): JSX.Element {
     const { inspection, template, results, branding } = data;
@@ -634,6 +633,11 @@ export function renderProfessionalReport(data: {
         });
     ` }} />
     </div>
+
+    {/* Design System 0520 subsystem E P8 — TeamCredit + NACHI badge. */}
+    {(data.team?.length ?? 0) > 0 || data.nachiNumber
+        ? <TeamCredit team={data.team ?? []} nachi={data.nachiNumber ?? null} />
+        : null}
 
     {/* Sub-spec D Task 1 — Alpine controller for the new sidebar / tabs / dropdowns. */}
     <script src="/js/report-viewer.js"></script>

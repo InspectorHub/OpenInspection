@@ -10,6 +10,9 @@ export const tenants = sqliteTable('tenants', {
     status: text('status').notNull().default('pending'),
     maxUsers: integer('max_users').notNull().default(3),
     deploymentMode: text('deployment_mode').notNull().default('shared'), // shared, silo
+    // Design System 0520 subsystem E P8 — optional InterNACHI inspector
+    // certification number, rendered in the TeamCredit report footer.
+    nachiNumber: text('nachi_number'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

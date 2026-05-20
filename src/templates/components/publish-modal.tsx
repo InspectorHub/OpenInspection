@@ -27,6 +27,7 @@
  */
 
 import { Modal } from './modal';
+import { PreflightChecks } from './preflight-checks';
 
 const ROLE_CHIP: Record<string, { label: string; bg: string; fg: string }> = {
     client:         { label: 'Buyer',         bg: '#eef2ff', fg: '#4338ca' },
@@ -54,7 +55,14 @@ export const PublishModal = (): JSX.Element => (
                     type="button"
                     x-show="recipients.length > 0"
                     x-on:click="publish()"
-                    x-bind:disabled="publishing || selectedRecipientCount() === 0"
+                    /* Design System 0520 subsystem E P1.4 — pre-flight gate.
+                       `preflightAllPassed` is mirrored from the panel's
+                       `preflight-status` window event by inspectionEditor.
+                       A pre-flight failure shows the gates above with
+                       remediation buttons so the inspector knows what
+                       to fix before the button becomes clickable. */
+                    x-bind:disabled="publishing || selectedRecipientCount() === 0 || !preflightAllPassed"
+                    x-bind:title="!preflightAllPassed ? 'Resolve pre-flight checks above first' : ''"
                     class="flex-1 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 transition-all"
                     data-test="publish-send-all"
                 >
@@ -91,6 +99,12 @@ export const PublishModal = (): JSX.Element => (
 
             {/* Body — only when recipients are loaded */}
             <div x-show="!loadingRecipients && recipients.length > 0" style="display:none" class="space-y-4">
+                {/* Design System 0520 subsystem E P1.4 — pre-flight gates.
+                    Re-fetches on `refresh-preflight` window event so user
+                    remediation (signing the agreement, etc.) is reflected
+                    without re-opening the modal. */}
+                <PreflightChecks />
+
                 {/* Report summary card (same as before) */}
                 <div class="p-3 rounded-xl bg-slate-100 dark:bg-slate-700/50">
                     <div class="text-xs font-mono text-slate-500 dark:text-slate-400">Report Summary</div>

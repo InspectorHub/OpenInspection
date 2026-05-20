@@ -81,6 +81,10 @@ export const inspections = sqliteTable('inspections', {
     // don't warrant their own column. Reads/writes go through
     // updatePropertyFacts() which merges with the dedicated columns.
     propertyFacts:       text('property_facts', { mode: 'json' }).$type<Record<string, unknown>>(),
+    // Design System 0520 subsystem E P1 — id of the inspection_media_pool
+    // row used as the report cover image. NULL until the inspector picks
+    // one; the Publish pre-flight surfaces this as a gate.
+    coverPhotoId:        text('cover_photo_id'),
     unit:                text('unit'),
     county:              text('county'),
     sellingAgentId:      text('selling_agent_id'),

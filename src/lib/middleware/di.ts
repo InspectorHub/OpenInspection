@@ -43,6 +43,9 @@ import { IcsService } from '../../services/ics.service';
 import { AgentService } from '../../services/agent.service';
 import { ConciergeService } from '../../services/concierge.service';
 import { QBOService } from '../../services/qbo.service';
+import { IdentityService } from '../../services/identity.service';
+import { IntegrationsService } from '../../services/integrations.service';
+import { AnalyticsService } from '../../services/analytics.service';
 
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../integration/portal';
@@ -272,24 +275,28 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     );
                     break;
                 case 'unit':
-                    // Design System 0520 subsystem D — UnitTree hierarchy
                     target.unit = new UnitService(c.env.DB);
                     break;
                 case 'observerLink':
-                    // Design System 0520 subsystem D — ObserverLink read-only
                     target.observerLink = new ObserverLinkService(c.env.DB);
                     break;
                 case 'reportVersion':
-                    // Design System 0520 subsystem D — ReportVersions snapshot
                     target.reportVersion = new ReportVersionService(c.env.DB);
                     break;
                 case 'apprentice':
-                    // Design System 0520 subsystem C — apprentice review queue
                     target.apprentice = new ApprenticeService(c.env.DB);
                     break;
                 case 'guestInvite':
-                    // Design System 0520 subsystem C — anonymous guest claim
                     target.guestInvite = new GuestInviteService(c.env.DB);
+                    break;
+                case 'identity':
+                    target.identity = new IdentityService(c.env.DB);
+                    break;
+                case 'integrations':
+                    target.integrations = new IntegrationsService(c.env.DB, c.env);
+                    break;
+                case 'analytics':
+                    target.analytics = new AnalyticsService(c.env.DB);
                     break;
             }
             return target[prop];

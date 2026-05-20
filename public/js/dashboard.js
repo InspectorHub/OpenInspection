@@ -811,10 +811,41 @@ function dashboardFactory() {
         eventTypes: [],
         // Spec 4E — prefetch progress pill
         cacheProgress: null,
+        // Design System 0520 subsystem E P2 — workflow-state filter mirror.
+        // Set by the WorkflowTabs component via the `workflow-filter-changed`
+        // window event and ANDed into _passesAllActiveFilters.
+        workflowFilter: 'all',
+        // Design System 0520 subsystem E P3.2 — Filters modal mirror.
+        // Apply / Reset on the modal broadcasts the full envelope and
+        // this mirror feeds _passesFiltersModal in the filter chain.
+        filtersModal: { dateFrom: '', dateTo: '', agentId: '', tagIds: [] },
 
         async init() {
             await this.reload();
             window.addEventListener('inspection-updated', () => this.reload());
+
+            // Design System 0520 subsystem E P2 — WorkflowTabs filter.
+            // The tab component broadcasts on every selection; the
+            // mirror state below is consumed by _passesAllActiveFilters.
+            // Also hydrate from URL on first paint so deep-links honour
+            // the selection.
+            const initial = new URLSearchParams(window.location.search).get('workflow');
+            if (initial) this.workflowFilter = initial;
+            window.addEventListener('workflow-filter-changed', (e) => {
+                this.workflowFilter = e?.detail?.workflow ?? 'all';
+            });
+
+            // Design System 0520 subsystem E P3.2 — Filters modal +
+            // Export CSV bridges.
+            window.addEventListener('filters-changed', (e) => {
+                this.filtersModal = {
+                    dateFrom: e?.detail?.dateFrom ?? '',
+                    dateTo:   e?.detail?.dateTo ?? '',
+                    agentId:  e?.detail?.agentId ?? '',
+                    tagIds:   Array.isArray(e?.detail?.tagIds) ? e.detail.tagIds : [],
+                };
+            });
+            window.addEventListener('export-csv', () => this.exportCsv());
             // Sprint 3 S3-3 — populate the tag filter dropdown. Best-effort —
             // a 4xx response (no permission) leaves the dropdown empty.
             try {
@@ -850,7 +881,60 @@ function dashboardFactory() {
             if (this.tagFilterIds) {
                 if (!insp || !insp.id || !this.tagFilterIds.has(insp.id)) return false;
             }
+            // Design System 0520 subsystem E P2 — workflow tab AND-filter.
+            if (this.workflowFilter && this.workflowFilter !== 'all') {
+                if (!this._matchesWorkflow(insp, this.workflowFilter)) return false;
+            }
+            // Design System 0520 subsystem E P3.2 — Filters modal AND-filter.
+            if (!this._passesFiltersModal(insp)) return false;
             return true;
+        },
+
+        // Design System 0520 subsystem E P3.2 — filters-modal predicate.
+        _passesFiltersModal(insp) {
+            const f = this.filtersModal;
+            if (!f) return true;
+            if (f.dateFrom && (!insp?.date || insp.date < f.dateFrom)) return false;
+            if (f.dateTo   && (!insp?.date || insp.date > f.dateTo))   return false;
+            if (f.agentId  && insp?.agentId !== f.agentId)             return false;
+            if (Array.isArray(f.tagIds) && f.tagIds.length > 0) {
+                const ids = Array.isArray(insp?.tagIds) ? insp.tagIds : [];
+                if (!f.tagIds.some(t => ids.includes(t))) return false;
+            }
+            return true;
+        },
+
+        exportCsv() {
+            const csv = window.csvExport;
+            if (!csv?.toCsv || !csv?.downloadCsv) {
+                if (typeof window.showToast === 'function') window.showToast('CSV exporter not loaded', true);
+                return;
+            }
+            const list = this.filteredInspections ?? [];
+            const rows = list.map(i => ({
+                id:            i.id ?? '',
+                address:       i.propertyAddress ?? i.address ?? '',
+                client:        i.clientName ?? '',
+                date:          i.date ?? '',
+                status:        i.status ?? '',
+                paymentStatus: i.paymentStatus ?? '',
+                agent:         i.agentName ?? '',
+                price:         i.price ?? '',
+            }));
+            const today = new Date().toISOString().slice(0, 10);
+            csv.downloadCsv(`inspections-${today}.csv`, csv.toCsv(rows));
+        },
+
+        _matchesWorkflow(i, tab) {
+            if (!i) return false;
+            switch (tab) {
+                case 'active':          return i.status === 'scheduled' || i.status === 'in_progress' || i.status === 'draft';
+                case 'drafts':          return i.status === 'draft';
+                case 'awaitingPayment': return (i.status === 'delivered' || i.status === 'published') && i.paymentStatus !== 'paid';
+                case 'published':       return i.status === 'delivered' || i.status === 'published';
+                case 'cancelled':       return i.status === 'cancelled';
+                default:                return true;
+            }
         },
 
         async reload() {
@@ -917,6 +1001,14 @@ function dashboardFactory() {
                     this.sections.later = true;
                 }
                 this.computeStats();
+
+                // Design System 0520 subsystem E P2 — let WorkflowTabs
+                // recount per-state badges from the same payload.
+                try {
+                    window.dispatchEvent(new CustomEvent('inspections-loaded', {
+                        detail: { inspections: this._allInspections },
+                    }));
+                } catch (_e) { /* getter may throw if buckets shape changes */ }
             } catch (e) {
                 if (typeof window.showToast === 'function') {
                     window.showToast('Failed to load dashboard: ' + e.message, true);

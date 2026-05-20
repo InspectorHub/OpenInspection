@@ -90,9 +90,54 @@ export function MetricsPage({ appName, branding }: MetricsPageProps) {
                     </div>
                 </div>
 
+                {/* Design System 0520 subsystem E P7 — AnalyticsPanel.
+                    Reads /api/analytics/growth + /api/analytics/findings-
+                    heatmap on init; SVG polyline + heatmap grid rendered
+                    inline (no Chart.js dep). */}
+                <section x-data="analyticsPanel()" {...{ 'x-init': 'init()' }}
+                         class="mt-8 space-y-6">
+                    <div class="bg-white border border-slate-200 rounded-xl p-5">
+                        <div class="text-sm font-bold text-slate-700 mb-3">Inspections per month</div>
+                        <svg viewBox="0 0 600 200" class="w-full h-48" preserveAspectRatio="none">
+                            <polyline {...{ ':points': 'growthPath' }}
+                                      fill="none" stroke="#6366f1" stroke-width="2" />
+                        </svg>
+                        <div class="grid grid-cols-12 gap-1 mt-2 text-[10px] text-slate-400">
+                            <template {...{ 'x-for': 'm in (growth?.months || [])', ':key': 'm.ym' }}>
+                                <div class="text-center" x-text="m.ym.slice(5)" />
+                            </template>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2" x-show="loading">Loading…</p>
+                    </div>
+
+                    <div class="bg-white border border-slate-200 rounded-xl p-5">
+                        <div class="text-sm font-bold text-slate-700 mb-3">Findings heatmap</div>
+                        <div class="grid grid-cols-[200px_1fr_1fr_1fr] gap-1 text-xs">
+                            <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Section</div>
+                            <div class="text-[10px] font-bold uppercase tracking-widest text-emerald-600 text-center">Satisfactory</div>
+                            <div class="text-[10px] font-bold uppercase tracking-widest text-amber-600 text-center">Monitor</div>
+                            <div class="text-[10px] font-bold uppercase tracking-widest text-rose-600 text-center">Defect</div>
+                            <template {...{ 'x-for': 'row in heatmapRows', ':key': 'row.section' }}>
+                                <template>
+                                    <div class="font-medium" x-text="row.section" />
+                                    <div class="text-center"
+                                         {...{ ':style': "`background-color: rgba(16,185,129,${row.satPct})`", 'x-text': 'row.satCount' }} />
+                                    <div class="text-center"
+                                         {...{ ':style': "`background-color: rgba(245,158,11,${row.monitorPct})`", 'x-text': 'row.monitorCount' }} />
+                                    <div class="text-center"
+                                         {...{ ':style': "`background-color: rgba(239,68,68,${row.defectPct})`", 'x-text': 'row.defectCount' }} />
+                                </template>
+                            </template>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2" x-show="heatmapRows.length === 0 && !loading">No findings yet.</p>
+                    </div>
+                </section>
+
                 <script src="/js/auth.js" />
                 <script src="/vendor/chart.min.js" />
                 <script src="/js/metrics.js" />
+                {/* Design System 0520 subsystem E P7 — AnalyticsPanel factory. */}
+                <script src="/js/analytics-panel.js" />
             </div>
         </MainLayout>
     );
