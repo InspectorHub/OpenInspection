@@ -153,3 +153,4 @@ For a remote (production) database replace `--local` with `--remote`.
 - **[Reports & Payment](./04_reports_and_payment.md)** — Deliver reports and collect payment
 - **[Team Management](./05_team_management.md)** — Invite inspectors and agents
 - **[Booking System](./06_booking_system.md)** — Accept online booking requests
+- **[Importing from Spectora](./07_importing_from_spectora.md)** — Bring your Spectora template over in under 5 minutes
