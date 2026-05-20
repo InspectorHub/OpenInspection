@@ -41,7 +41,9 @@ npm run deploy       # Deploy to Cloudflare Workers
 - Stable API surface designed to be extended by SaaS overlay branches (e.g., `saas` branch).
 
 ### Inspection Engine
-- JSON-schema based inspection templates.
+- JSON-schema based inspection templates (`src/types/template-schema.ts`, single canonical v2 — see `src/lib/validations/template.schema.ts`).
+- 9 item types: `rich` (rating + 3 canned-comment tabs) plus `boolean / text / textarea / number / select / multi_select / date / photo_only` for non-rated data points. Inspection side stores rating on `result.rating` and non-rich values on `result.value`.
+- Spectora import path: `POST /api/inspections/templates/import-spectora` accepts a raw Spectora export + a name, runs `lib/spectora-import.ts` (4-bucket → 3-tab mapping, identifier preservation via `source`), creates a template in one shot. UI entry point: "Import Spectora" button on `/templates`.
 - Support for field results, e-signatures, and report generation.
 - Integrated public booking system with Turnstile bot protection.
 
