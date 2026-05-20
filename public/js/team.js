@@ -56,7 +56,8 @@ window.teamMeta = teamMeta;
 
         } catch (e) {
             console.error('Error fetching team:', e);
-            membersList.innerHTML = '<tr><td colspan="3" class="px-6 py-8 text-sm text-center text-red-400">Network error. Please refresh.</td></tr>';
+            const detail = e instanceof Error ? e.message : String(e ?? 'unknown');
+            membersList.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-sm text-center text-red-400">Could not load team — ${detail}. Please refresh.</td></tr>`;
         }
     }
 
