@@ -458,9 +458,12 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
 
                 {/* Non-rich item type inputs — write to results[item.id].value.
-                    boolean / number / text / textarea / date get real controls
-                    here. select / multi_select / photo_only fall through to the
-                    amber explainer at the bottom (dedicated UI still pending). */}
+                    All 9 types have a dedicated control: boolean (Yes/No),
+                    number (with options.min/max/step + unit chip), text,
+                    textarea, date, select (dropdown from options.choices),
+                    multi_select (checkbox list, toggleMultiValue helper),
+                    photo_only (photo count + minPhotos threshold; upload
+                    rides the existing per-item photo-attach button below). */}
                 <div x-show="item.type === 'boolean'" class="mb-3 flex gap-2">
                   <button type="button"
                     x-on:click="setItemValue(item.id, true)"
