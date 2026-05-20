@@ -29,6 +29,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 - 3-pane editor with 248 canned comments, slash-trigger snippet picker, AI rewrite
 - Keyboard-driven: 1-5 ratings, ⌘K palette, `/` snippet picker, `?` HUD
 - Offline-capable PWA with photo upload queue
+- Migrate from Spectora in under 5 minutes via paste-JSON [import](docs/inspectors/07_importing_from_spectora.md)
 
 ### Customer experience
 - Public booking widget with Turnstile bot protection
