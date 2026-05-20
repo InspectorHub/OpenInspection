@@ -103,3 +103,71 @@ describe('convertSpectoraTemplate', () => {
         expect(stats.unknownCommentTypes).toEqual(['NOTE_FOR_BUILDER']);
     });
 });
+
+describe('convertSpectoraTemplate — extended fields', () => {
+    it('passes item.description through to v2 item.description', () => {
+        const { template } = convertSpectoraTemplate({
+            sections: [{
+                name: 'S',
+                items: [{ name: 'Item', description: '  Outer water barrier  ', comments: [] }],
+            }],
+        });
+        expect(template.sections[0]!.items[0]!.description).toBe('Outer water barrier');
+    });
+
+    it('maps section.disclaimer (or disclaimer_text) to v2 section.disclaimerText', () => {
+        const { template } = convertSpectoraTemplate({
+            sections: [
+                { name: 'A', disclaimer: 'Visual inspection only.', items: [] },
+                { name: 'B', disclaimer_text: 'Snake-cased variant.', items: [] },
+                { name: 'C', items: [] },
+            ],
+        });
+        expect(template.sections[0]!.disclaimerText).toBe('Visual inspection only.');
+        expect(template.sections[1]!.disclaimerText).toBe('Snake-cased variant.');
+        expect(template.sections[2]!.disclaimerText).toBeUndefined();
+    });
+
+    it('truncates section.disclaimer past 4 KB to the schema cap', () => {
+        const longText = 'x'.repeat(5000);
+        const { template } = convertSpectoraTemplate({
+            sections: [{ name: 'Long', disclaimer: longText, items: [] }],
+        });
+        expect(template.sections[0]!.disclaimerText!.length).toBe(4000);
+    });
+
+    it('maps top-level rating_levels to ratingSystem.levels with severity inferred from is_defect', () => {
+        const { template } = convertSpectoraTemplate({
+            sections: [],
+            rating_levels: [
+                { id: 'S', label: 'Satisfactory', abbreviation: 'S', color: '#22c55e', default: true },
+                { id: 'M', label: 'Monitor',      abbreviation: 'M', color: '#f59e0b' },
+                { id: 'D', label: 'Defect',       abbreviation: 'D', color: '#ef4444', is_defect: true },
+            ],
+        });
+        const rs = template.ratingSystem;
+        expect(rs).toBeDefined();
+        expect(rs!.levels).toHaveLength(3);
+        expect(rs!.levels[0]!.default).toBe(true);
+        expect(rs!.levels[0]!.severity).toBe('marginal'); // not is_defect
+        expect(rs!.levels[2]!.severity).toBe('significant'); // is_defect
+        expect(rs!.levels[2]!.isDefect).toBe(true);
+        expect(rs!.defaultLevelId).toBe('S');
+    });
+
+    it('accepts camelCase ratingLevels as an alias for rating_levels', () => {
+        const { template } = convertSpectoraTemplate({
+            sections: [],
+            ratingLevels: [
+                { id: 'X', label: 'X-rating', isDefect: false },
+            ],
+        });
+        expect(template.ratingSystem!.levels).toHaveLength(1);
+        expect(template.ratingSystem!.levels[0]!.id).toBe('X');
+    });
+
+    it('omits ratingSystem when neither rating_levels nor ratingLevels is provided', () => {
+        const { template } = convertSpectoraTemplate({ sections: [] });
+        expect(template.ratingSystem).toBeUndefined();
+    });
+});

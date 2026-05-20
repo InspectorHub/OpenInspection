@@ -18,7 +18,7 @@
  * the v2 `source` field so re-imports can detect already-mapped rows.
  */
 
-import type { TemplateSchemaV2, TemplateSection, TemplateItem, CannedInfoComment, CannedDefect } from '../types/template-schema';
+import type { TemplateSchemaV2, TemplateSection, TemplateItem, RatingLevel, CannedInfoComment, CannedDefect } from '../types/template-schema';
 
 const SPECTORA_PLATFORM = 'spectora';
 
@@ -27,6 +27,21 @@ export interface SpectoraTemplate {
     id?: string;
     name?: string;
     sections?: SpectoraSection[];
+    /** Custom rating levels defined at template level. */
+    rating_levels?: SpectoraRatingLevel[];
+    ratingLevels?: SpectoraRatingLevel[];
+}
+
+export interface SpectoraRatingLevel {
+    id?: string;
+    name?: string;
+    label?: string;
+    abbreviation?: string;
+    color?: string;
+    is_defect?: boolean;
+    isDefect?: boolean;
+    default?: boolean;
+    description?: string;
 }
 
 export interface SpectoraSection {
@@ -35,12 +50,17 @@ export interface SpectoraSection {
     title?: string;
     identifier?: string;
     items?: SpectoraItem[];
+    /** Legal text rendered at the bottom of the section in the published report. */
+    disclaimer?: string;
+    disclaimer_text?: string;
 }
 
 export interface SpectoraItem {
     id?: string;
     name?: string;
     label?: string;
+    /** Free-text description shown under the item label. */
+    description?: string;
     comments?: SpectoraComment[];
 }
 
@@ -169,11 +189,15 @@ export function convertSpectoraTemplate(input: SpectoraTemplate): ConvertResult 
                 ratingOptions: ['Satisfactory', 'Monitor', 'Defect', 'Not Inspected', 'Not Present'],
                 tabs,
             };
+            const description = (it.description ?? '').toString().trim();
+            if (description) item.description = description;
             if (it.id) item.source = { platform: SPECTORA_PLATFORM, externalId: String(it.id) };
             return item;
         });
         const section: TemplateSection = { id: sectionId, title: sectionTitle, items };
         if (s.identifier) section.identifier = String(s.identifier);
+        const disclaimer = (s.disclaimer ?? s.disclaimer_text ?? '').toString().trim();
+        if (disclaimer) section.disclaimerText = disclaimer.slice(0, 4000);
         if (s.id) section.source = { platform: SPECTORA_PLATFORM, externalId: String(s.id) };
         return section;
     });
@@ -182,5 +206,32 @@ export function convertSpectoraTemplate(input: SpectoraTemplate): ConvertResult 
         schemaVersion: 2,
         sections,
     };
+
+    // Custom rating levels from Spectora (top-level), if present. Map onto
+    // v2 RatingSystem.levels with the Spectora `is_defect` flag preserved
+    // and severity inferred from the `is_defect` bit (Spectora doesn't
+    // distinguish marginal vs significant — assume significant when
+    // is_defect, marginal otherwise; inspector can refine in the editor).
+    const rawLevels = input.rating_levels ?? input.ratingLevels;
+    if (Array.isArray(rawLevels) && rawLevels.length > 0) {
+        const levels: RatingLevel[] = rawLevels.map((rl, i) => {
+            const id = (rl.id ?? `L${i + 1}`).toString();
+            const label = (rl.label ?? rl.name ?? id).toString();
+            const isDefect = !!(rl.is_defect ?? rl.isDefect);
+            const lvl: RatingLevel = { id, label };
+            if (rl.abbreviation) lvl.abbreviation = rl.abbreviation;
+            if (rl.color)        lvl.color = rl.color;
+            lvl.severity = isDefect ? 'significant' : 'marginal';
+            lvl.isDefect = isDefect;
+            if (rl.default)      lvl.default = true;
+            if (rl.description)  lvl.description = rl.description;
+            return lvl;
+        });
+        const defaultLevel = levels.find(l => l.default);
+        template.ratingSystem = {
+            levels,
+            ...(defaultLevel ? { defaultLevelId: defaultLevel.id } : {}),
+        };
+    }
     return { template, stats };
 }
