@@ -102,7 +102,7 @@ function templateEditor() {
         selectItem(id) { this.selectedItemId = id; this.updateChoicesText(); },
 
         addSection() {
-            const id = 'sec_' + Date.now();
+            const id = 'sec_' + (crypto.randomUUID?.() ?? Date.now() + '_' + Math.random().toString(36).slice(2, 8));
             this.template.sections.push({ id, title: 'New Section', identifier: '', icon: '', priority: this.template.sections.length, isOverview: false, disclaimerText: '', source: null, items: [] });
             this.selectedSectionId = id;
             this.selectedItemId = null;
@@ -113,7 +113,7 @@ function templateEditor() {
         },
         addItem() {
             if (!this.selectedSection) return;
-            const id = 'item_' + Date.now();
+            const id = 'item_' + (crypto.randomUUID?.() ?? Date.now() + '_' + Math.random().toString(36).slice(2, 8));
             this.selectedSection.items.push({
                 id, label: 'New Item', description: '', type: 'rich',
                 ratingOptions: ['Inspected', 'Not Inspected', 'Not Present', 'Repair', 'Safety Hazard'],
@@ -134,7 +134,7 @@ function templateEditor() {
             if (!this.selectedItem) return;
             if (!this.selectedItem.attributes) this.selectedItem.attributes = [];
             this.selectedItem.attributes.push({
-                id: 'attr_' + Date.now(), name: '', type: 'boolean', choices: [], unit: '',
+                id: 'attr_' + (crypto.randomUUID?.() ?? Date.now() + '_' + Math.random().toString(36).slice(2, 8)), name: '', type: 'boolean', choices: [], unit: '',
                 required: false, isSafety: false, isDefect: false,
                 recommendation: null, estimateMin: null, estimateMax: null,
                 source: null, _choicesStr: ''
@@ -250,6 +250,73 @@ function templateEditor() {
             }
         },
 
+        // Normalize editor state to the strict v2 schema before PUT.
+        // The editor carries UI-only fields (priority, identifier, source,
+        // options, attributes, ...) that the server rejects with
+        // unrecognized_keys; strip them here so the editor stays free to
+        // hold transient state without polluting saved JSON.
+        toV2Payload() {
+            const pickInfo = (c) => ({
+                id: c.id, title: c.title || '', comment: c.comment || '',
+                default: !!c.default,
+            });
+            const pickDefect = (c) => ({
+                id: c.id, title: c.title || '',
+                category: c.category || 'recommendation',
+                location: c.location || '',
+                comment: c.comment || '',
+                photos: Array.isArray(c.photos) ? c.photos : [],
+                default: !!c.default,
+            });
+            const pickItem = (it) => {
+                const base = {
+                    id: it.id, label: it.label || '',
+                    type: it.type === 'text' ? 'text' : 'rich',
+                };
+                if (it.icon) base.icon = it.icon;
+                if (it.number) base.number = it.number;
+                if (base.type === 'text') return base;
+                base.ratingOptions = Array.isArray(it.ratingOptions) && it.ratingOptions.length
+                    ? it.ratingOptions
+                    : ['Inspected'];
+                const tabs = it.tabs || {};
+                base.tabs = {
+                    information: (tabs.information || []).map(pickInfo),
+                    limitations: (tabs.limitations || []).map(pickInfo),
+                    defects:     (tabs.defects     || []).map(pickDefect),
+                };
+                return base;
+            };
+            const pickSection = (s) => {
+                const out = {
+                    id: s.id, title: s.title || '',
+                    items: (s.items || []).map(pickItem),
+                };
+                if (s.icon) out.icon = s.icon;
+                if (s.disclaimerText) out.disclaimerText = s.disclaimerText;
+                if (s.alwaysPageBreak) out.alwaysPageBreak = !!s.alwaysPageBreak;
+                return out;
+            };
+            const payload = {
+                schemaVersion: 2,
+                sections: (this.template.sections || []).map(pickSection),
+            };
+            if (this.template.ratingSystem && Array.isArray(this.template.ratingSystem.levels)) {
+                payload.ratingSystem = {
+                    levels: this.template.ratingSystem.levels.map(l => {
+                        const lv = { id: l.id, label: l.label || '' };
+                        if (l.abbreviation) lv.abbreviation = l.abbreviation;
+                        if (l.color)        lv.color        = l.color;
+                        if (l.severity)     lv.severity     = l.severity;
+                        if (typeof l.isDefect === 'boolean') lv.isDefect = l.isDefect;
+                        if (l.description)  lv.description  = l.description;
+                        return lv;
+                    }),
+                };
+            }
+            return payload;
+        },
+
         async saveTemplate() {
             this.saving = true;
             this.saveError = '';
@@ -259,11 +326,7 @@ function templateEditor() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: this.template.title,
-                        schema: {
-                            schemaVersion: 2,
-                            sections: this.template.sections,
-                            ratingSystem: this.template.ratingSystem
-                        }
+                        schema: this.toV2Payload(),
                     })
                 });
                 if (res.ok) {
