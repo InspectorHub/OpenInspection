@@ -265,6 +265,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                             <div>
                                                 <input x-model="selectedSection.title" class="editor-section-input text-lg font-display font-700 bg-transparent border-b border-transparent hover:border-surface-200 focus:border-blueprint-500 transition-colors" />
                                                 <div class="flex items-center gap-3 mt-0.5">
+                                                    <span x-show="selectedSection.identifier" class="font-mono text-[10px] text-ink-400" x-text="selectedSection.identifier"></span>
                                                     <span x-show="selectedSection.disclaimerText" class="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">has disclaimer</span>
                                                 </div>
                                             </div>
@@ -294,19 +295,41 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                                 <div class="flex-1 min-w-0">
                                                     <div class="flex items-center gap-2">
                                                         <span class="text-sm font-600" x-text="item.label"></span>
+                                                        <span x-show="item.required" class="text-[9px] font-700 text-red-500 bg-red-50 px-1.5 py-0.5 rounded uppercase">req</span>
+                                                        <span x-show="item.isSafety" class="text-[9px] font-700 text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase">safety</span>
                                                     </div>
                                                     <div class="flex items-center gap-3 mt-1">
                                                         <span class="inline-flex items-center gap-1 text-[10px] font-mono font-500 text-ink-400 bg-surface-100 px-2 py-0.5 rounded">
                                                             <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16"/></svg>
                                                             <span x-text="item.type"></span>
                                                         </span>
-                                                        <span x-show="item.type === 'rich' && item.tabs" class="text-[10px] font-mono text-ink-400">
-                                                            <span x-text="(item.tabs?.information?.length || 0) + (item.tabs?.limitations?.length || 0) + (item.tabs?.defects?.length || 0)"></span> canned
+                                                        <span x-show="item.attributes && item.attributes.length" class="text-[10px] font-mono text-ink-400">
+                                                            <span x-text="item.attributes.length"></span> attrs
                                                         </span>
+                                                        <span x-show="item.source" class="text-[10px] px-1.5 py-0.5 rounded"
+                                                            x-bind:class="item.source?.platform === 'spectora' ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-500'"
+                                                            x-text="item.source?.platform"></span>
                                                     </div>
                                                 </div>
                                                 <div class="flex items-center gap-2">
+                                                    <span x-show="item.defaultRecommendation" class="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md font-500" x-text="item.defaultRecommendation"></span>
                                                     <svg class="w-4 h-4 text-ink-300 transition-transform" x-bind:class="selectedItemId === item.id ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                                </div>
+                                            </div>
+
+                                            <div x-show="selectedItemId === item.id && item.attributes && item.attributes.length > 0" x-collapse
+                                                class="px-5 pb-4 border-t border-surface-100">
+                                                <div class="mt-3 space-y-1.5">
+                                                    <div class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400 mb-2">Attributes</div>
+                                                    <template x-for="attr in item.attributes" x-bind:key="attr.id">
+                                                        <div class="flex items-center gap-3 py-1.5 px-3 rounded-lg bg-surface-50 text-sm">
+                                                            <span class="w-16 text-[10px] font-mono text-ink-400 uppercase" x-text="attr.type"></span>
+                                                            <span class="font-500 text-ink-700 flex-1 truncate" x-text="attr.name"></span>
+                                                            <span x-show="attr.choices && attr.choices.length" class="text-[10px] text-ink-400" x-text="attr.choices.length + ' opts'"></span>
+                                                            <span x-show="attr.isSafety" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                                            <span x-show="attr.isDefect" class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                                                        </div>
+                                                    </template>
                                                 </div>
                                             </div>
                                         </div>
@@ -378,26 +401,129 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                         <input type="text" x-model="selectedItem.label" class="w-full px-3 py-2.5 text-sm font-500 rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors" />
                                     </div>
                                     <div class="space-y-1.5">
+                                        <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Description</label>
+                                        <textarea x-model="selectedItem.description" rows={2} class="w-full px-3 py-2.5 text-sm rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors resize-none"></textarea>
+                                    </div>
+                                    <div class="space-y-1.5">
                                         <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Input Type</label>
                                         <select x-model="selectedItem.type" class="w-full px-3 py-2.5 text-sm font-500 rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors appearance-none"
                                             style="background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 viewBox=%220 0 24 24%22 stroke=%22%236b6560%22%3E%3Cpath stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%222%22 d=%22M19 9l-7 7-7-7%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px;">
-                                            <option value="rich">Rich (rating + canned comments)</option>
-                                            <option value="text">Text (free-form notes)</option>
+                                            <option value="rich">Rich (rating + tabs)</option>
+                                            <option value="boolean">Boolean (yes/no)</option>
+                                            <option value="text">Text (single line)</option>
+                                            <option value="textarea">Textarea (multi-line)</option>
+                                            <option value="number">Number</option>
+                                            <option value="select">Select (dropdown)</option>
+                                            <option value="multi_select">Multi-Select (checkboxes)</option>
+                                            <option value="date">Date</option>
+                                            <option value="photo_only">Photo Only</option>
                                         </select>
                                     </div>
-                                    <div x-show="selectedItem.type === 'rich'" class="space-y-1.5">
-                                        <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Rating Options</label>
-                                        <textarea
-                                            {...{'x-model': 'selectedItem._ratingOptionsText'}}
-                                            {...{'x-init': "selectedItem._ratingOptionsText = (selectedItem.ratingOptions || []).join('\\n')"}}
-                                            {...{'@input': "selectedItem.ratingOptions = selectedItem._ratingOptionsText.split('\\n').map(s => s.trim()).filter(Boolean)"}}
-                                            rows={5}
+                                    <div x-show="selectedItem.type === 'select' || selectedItem.type === 'multi_select'" class="space-y-1.5">
+                                        <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Choices</label>
+                                        <textarea x-model="choicesText" {...{'@input': 'updateChoices()'}} rows={3}
                                             class="w-full px-3 py-2.5 text-sm font-mono rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors resize-none"
-                                            placeholder="Inspected&#10;Repair&#10;Safety Hazard"></textarea>
-                                        <p class="text-[10px] text-ink-400 font-500">One option per line. Inspector picks one per item during inspection.</p>
+                                            placeholder="One choice per line..."></textarea>
                                     </div>
-                                    <div x-show="selectedItem.type === 'rich'" class="p-3 rounded-xl bg-surface-50 border border-surface-200/50 text-[11px] text-ink-500 leading-relaxed">
-                                        Canned comments (Information / Limitations / Defects) round-trip through the API; UI for editing them inline is on the roadmap. For now, seed them via template import or the Comments panel.
+                                    <div x-show="selectedItem.type === 'number'" class="grid grid-cols-3 gap-2">
+                                        <div class="space-y-1">
+                                            <label class="text-[9px] font-700 uppercase tracking-[0.1em] text-ink-400">Min</label>
+                                            <input type="number" {...{'x-model.number': 'selectedItem.options.min'}} class="w-full px-2 py-2 text-sm font-mono rounded-lg border border-surface-200 bg-white text-center" />
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label class="text-[9px] font-700 uppercase tracking-[0.1em] text-ink-400">Max</label>
+                                            <input type="number" {...{'x-model.number': 'selectedItem.options.max'}} class="w-full px-2 py-2 text-sm font-mono rounded-lg border border-surface-200 bg-white text-center" />
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label class="text-[9px] font-700 uppercase tracking-[0.1em] text-ink-400">Unit</label>
+                                            <input type="text" x-model="selectedItem.options.unit" class="w-full px-2 py-2 text-sm rounded-lg border border-surface-200 bg-white" placeholder="sqft" />
+                                        </div>
+                                    </div>
+                                    <hr class="border-surface-200/60" />
+                                    <div class="space-y-3">
+                                        <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Flags</label>
+                                        <label class="flex items-center gap-3 cursor-pointer group">
+                                            <input type="checkbox" x-model="selectedItem.required" class="w-4 h-4 rounded border-surface-200 text-blueprint-600 focus:ring-blueprint-500" />
+                                            <span class="text-sm font-500 text-ink-600 group-hover:text-ink-900 transition-colors">Required</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer group">
+                                            <input type="checkbox" x-model="selectedItem.isSafety" class="w-4 h-4 rounded border-surface-200 text-amber-500 focus:ring-amber-500" />
+                                            <span class="text-sm font-500 text-ink-600 group-hover:text-ink-900 transition-colors">Safety Item</span>
+                                        </label>
+                                    </div>
+                                    <hr class="border-surface-200/60" />
+                                    <div class="space-y-1.5">
+                                        <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Default Recommendation</label>
+                                        <select x-model="selectedItem.defaultRecommendation" class="w-full px-3 py-2.5 text-sm rounded-xl border border-surface-200 bg-white focus:border-blueprint-500 transition-colors"
+                                            style="background-image: url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 fill=%22none%22 viewBox=%220 0 24 24%22 stroke=%22%236b6560%22%3E%3Cpath stroke-linecap=%22round%22 stroke-linejoin=%22round%22 stroke-width=%222%22 d=%22M19 9l-7 7-7-7%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px;">
+                                            <option value="">None</option>
+                                            <template x-for="r in recommendationTypes" x-bind:key="r">
+                                                <option x-bind:value="r" x-text="r.replace(/_/g, ' ')"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div class="space-y-1">
+                                            <label class="text-[9px] font-700 uppercase tracking-[0.1em] text-ink-400">Est. Min ($)</label>
+                                            <input type="number" {...{'x-model.number': 'selectedItem.defaultEstimateMin'}} class="w-full px-3 py-2 text-sm font-mono rounded-lg border border-surface-200 bg-white" placeholder="0" />
+                                        </div>
+                                        <div class="space-y-1">
+                                            <label class="text-[9px] font-700 uppercase tracking-[0.1em] text-ink-400">Est. Max ($)</label>
+                                            <input type="number" {...{'x-model.number': 'selectedItem.defaultEstimateMax'}} class="w-full px-3 py-2 text-sm font-mono rounded-lg border border-surface-200 bg-white" placeholder="0" />
+                                        </div>
+                                    </div>
+                                    <hr class="border-surface-200/60" />
+                                    <div class="space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400">Attributes</label>
+                                            <button {...{'@click': 'addAttribute()'}} class="text-[10px] font-600 text-blueprint-600 hover:text-blueprint-700 transition-colors flex items-center gap-1">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14m7-7H5"/></svg>
+                                                Add
+                                            </button>
+                                        </div>
+                                        <template x-for="(attr, ai) in selectedItem.attributes" x-bind:key="attr.id">
+                                            <div class="p-3 rounded-xl bg-surface-50 space-y-2 animate-scale-in">
+                                                <div class="flex items-center justify-between">
+                                                    <input type="text" x-model="attr.name" class="text-sm font-500 bg-transparent border-b border-transparent hover:border-surface-200 focus:border-blueprint-500 flex-1 transition-colors" placeholder="Attribute name" />
+                                                    <button {...{'@click': 'selectedItem.attributes.splice(ai, 1)'}} class="text-ink-300 hover:text-red-500 transition-colors ml-2 p-0.5">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    </button>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <select x-model="attr.type" class="text-[10px] font-mono px-2 py-1 rounded-md border border-surface-200 bg-white">
+                                                        <option value="boolean">boolean</option>
+                                                        <option value="text">text</option>
+                                                        <option value="number">number</option>
+                                                        <option value="select">select</option>
+                                                        <option value="multi_select">multi_select</option>
+                                                        <option value="date">date</option>
+                                                    </select>
+                                                    <label class="flex items-center gap-1 text-[10px] text-ink-400">
+                                                        <input type="checkbox" x-model="attr.isSafety" class="w-3 h-3 rounded" /> safety
+                                                    </label>
+                                                    <label class="flex items-center gap-1 text-[10px] text-ink-400">
+                                                        <input type="checkbox" x-model="attr.isDefect" class="w-3 h-3 rounded" /> defect
+                                                    </label>
+                                                </div>
+                                                <div x-show="attr.type === 'select' || attr.type === 'multi_select'">
+                                                    <input type="text" x-model="attr._choicesStr" {...{'@input': "attr.choices = attr._choicesStr.split(',').map(s=>s.trim()).filter(Boolean)"}}
+                                                        class="w-full text-[11px] font-mono px-2 py-1.5 rounded-md border border-surface-200 bg-white"
+                                                        placeholder="Choice 1, Choice 2, ..." />
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <div x-show="!selectedItem.attributes || !selectedItem.attributes.length" class="text-center py-4">
+                                            <p class="text-[11px] text-ink-300">No attributes defined</p>
+                                        </div>
+                                    </div>
+                                    <div x-show="selectedItem.source" class="mt-4 p-3 rounded-xl bg-surface-50 border border-surface-200/50">
+                                        <div class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400 mb-2">Import Source</div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[10px] font-600 px-2 py-0.5 rounded"
+                                                x-bind:class="selectedItem.source?.platform === 'spectora' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'"
+                                                x-text="selectedItem.source?.platform"></span>
+                                            <span class="font-mono text-[10px] text-ink-300" x-text="selectedItem.source?.externalId"></span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
