@@ -122,7 +122,13 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 class="premium-input w-full px-3 py-2.5 rounded-md border-2 border-slate-100 focus:border-orange-500 focus:ring-4 focus:ring-orange-50 outline-none transition-all font-semibold" />
                         </div>
                         <div class="space-y-2">
-                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Spectora Export JSON</label>
+                            <div class="flex items-center justify-between">
+                                <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Spectora Export JSON</label>
+                                <button type="button" onclick="injectSpectoraSample()"
+                                    class="text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors">
+                                    Try with sample
+                                </button>
+                            </div>
                             <textarea id="importPayload" rows={10}
                                 placeholder='{"name":"...","sections":[{"name":"Roof","items":[{"name":"Roof Covering","comments":[...]}]}]}'
                                 class="premium-input w-full px-3 py-2.5 rounded-md border-2 border-slate-100 focus:border-orange-500 focus:ring-4 focus:ring-orange-50 outline-none transition-all font-mono text-xs resize-y"></textarea>

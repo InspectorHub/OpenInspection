@@ -167,6 +167,66 @@ function closeModal() {
     document.getElementById('tplName').value = '';
 }
 
+// A small Spectora-style fixture surfaced via the "Try with sample" link.
+// Hits every code path the converter handles (4 comment kinds, an unknown
+// kind to demonstrate the fall-through, rating_levels with is_defect +
+// default, section disclaimer, item description) so an inspector can see
+// what a clean import looks like without needing a real export on hand.
+const SPECTORA_SAMPLE = {
+    id: 'sample_spectora_template',
+    name: 'Spectora Sample Residential',
+    rating_levels: [
+        { id: 'S', label: 'Satisfactory',  abbreviation: 'S', color: '#22c55e', default: true,  description: 'Item is functioning as intended.' },
+        { id: 'M', label: 'Monitor',       abbreviation: 'M', color: '#f59e0b',                description: 'Functional but warrants periodic re-inspection.' },
+        { id: 'D', label: 'Defect',        abbreviation: 'D', color: '#ef4444', is_defect: true, description: 'Broken or unsafe; recommend repair.' }
+    ],
+    sections: [
+        {
+            id: 'sec_roof', name: 'Roof', identifier: '4.0',
+            disclaimer: 'Roof inspected from ground level and accessible eaves. Areas not safely accessible were excluded.',
+            items: [
+                {
+                    id: 'item_cover', name: 'Roof Covering',
+                    description: 'Outer waterproof barrier of the roof system.',
+                    comments: [
+                        { type: 'INFORMATIONAL', title: 'Material',   text: 'Asphalt composition shingles observed.',                                  default: true },
+                        { type: 'SATISFACTORY',                       text: 'No active leaks at the time of inspection.' },
+                        { type: 'MONITOR',       title: 'Granule loss', text: 'Mild granule loss observed; monitor and plan for replacement within 3-5 years.' },
+                        { type: 'DEFECT',        title: 'Lifted shingles', text: 'Several shingles lifted at the southeast corner; recommend repair by a qualified roofer.', location: 'Southeast corner' }
+                    ]
+                },
+                {
+                    id: 'item_flashings', name: 'Flashings',
+                    description: 'Metal transitions at chimneys, vents, and roof intersections.',
+                    comments: [
+                        { type: 'INFORMATIONAL', text: 'Galvanised steel flashings observed.' }
+                    ]
+                }
+            ]
+        },
+        {
+            id: 'sec_plumbing', name: 'Plumbing',
+            items: [
+                {
+                    id: 'item_wh', name: 'Water Heater',
+                    description: 'Tank or tankless water-heating appliance.',
+                    comments: [
+                        // Intentionally unknown kind — should land under information
+                        // with the bucket preserved in the title so the inspector
+                        // can re-categorise inside the editor.
+                        { type: 'NOTE_FOR_BUILDER', text: 'Builder confirmed unit was installed in 2022.' }
+                    ]
+                }
+            ]
+        }
+    ]
+};
+
+function injectSpectoraSample() {
+    document.getElementById('importName').value = 'Spectora Sample Residential';
+    document.getElementById('importPayload').value = JSON.stringify(SPECTORA_SAMPLE, null, 2);
+}
+
 function showImportSpectoraModal() {
     document.getElementById('importSpectoraModal').classList.remove('hidden');
 }
