@@ -99,12 +99,23 @@ test.describe.serial('Standalone Browser Tests', () => {
         adminToken = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
 
         // 2. Create template
+        const richItem = (id: string, label: string) => ({
+            id, label, type: 'rich' as const,
+            ratingOptions: ['Inspected', 'Repair'],
+            tabs: { information: [], limitations: [], defects: [] },
+        });
         const tplRes = await apiPost(request, '/api/inspections/templates', adminToken, {
             name: 'Browser Test Template',
-            schema: JSON.stringify([
-                { id: 'roof', label: 'Roof', type: 'pass_fail' },
-                { id: 'plumbing', label: 'Plumbing', type: 'pass_fail' },
-            ]),
+            schema: {
+                schemaVersion: 2,
+                sections: [
+                    {
+                        id: 's_general',
+                        title: 'General',
+                        items: [richItem('roof', 'Roof'), richItem('plumbing', 'Plumbing')],
+                    },
+                ],
+            },
         });
         expect(tplRes.status()).toBe(201);
         createdTemplateId = (await tplRes.json()).data?.template?.id;

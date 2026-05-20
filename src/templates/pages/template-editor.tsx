@@ -176,6 +176,16 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                     </div>
                 </header>
 
+                {/* Load error banner — surfaces legacy v1 schema or load failures */}
+                <div x-show="loadError" class="px-6 py-4 bg-amber-50 border-b border-amber-200 text-amber-800 flex items-start gap-3" x-cloak>
+                    <svg class="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="flex-1">
+                        <p class="font-700 text-sm">Cannot edit this template</p>
+                        <p class="text-sm mt-1" x-text="loadError"></p>
+                    </div>
+                    <a href="/templates" class="px-3 py-1.5 rounded-lg bg-white text-amber-700 text-xs font-700 hover:bg-amber-100 transition-colors">Back to Templates</a>
+                </div>
+
                 {/* Main 3-Panel Layout */}
                 <div class="flex h-[calc(100vh-4rem)]">
 

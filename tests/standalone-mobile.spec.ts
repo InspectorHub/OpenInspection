@@ -68,7 +68,21 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
         if (list.length === 0) {
             // Create a template + inspection so the mobile UI tests have something to render
             const tplRes = await request.post(`${BASE_URL}/api/inspections/templates`, {
-                data: { name: 'Mobile Test Template', schema: JSON.stringify([{ id: 'roof', label: 'Roof', type: 'pass_fail' }]) },
+                data: {
+                    name: 'Mobile Test Template',
+                    schema: {
+                        schemaVersion: 2,
+                        sections: [{
+                            id: 's_general',
+                            title: 'General',
+                            items: [{
+                                id: 'roof', label: 'Roof', type: 'rich',
+                                ratingOptions: ['Inspected', 'Repair'],
+                                tabs: { information: [], limitations: [], defects: [] },
+                            }],
+                        }],
+                    },
+                },
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
             });
             const tplId = (await tplRes.json()).data?.template?.id;

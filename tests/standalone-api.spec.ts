@@ -109,13 +109,23 @@ test.describe.serial('Standalone API Tests', () => {
     // ── Template CRUD ─────────────────────────────────────────────────────────
 
     test('API-03: POST /api/inspections/templates creates template', async ({ request }) => {
+        const richItem = (id: string, label: string) => ({
+            id, label, type: 'rich' as const,
+            ratingOptions: ['Inspected', 'Repair'],
+            tabs: { information: [], limitations: [], defects: [] },
+        });
         const res = await apiPost(request, '/api/inspections/templates', adminToken, {
             name: 'E2E Standard Residential',
-            schema: JSON.stringify([
-                { id: 'roof', label: 'Roof', type: 'pass_fail' },
-                { id: 'plumbing', label: 'Plumbing', type: 'pass_fail' },
-                { id: 'electrical', label: 'Electrical', type: 'pass_fail' },
-            ]),
+            schema: {
+                schemaVersion: 2,
+                sections: [
+                    {
+                        id: 's_general',
+                        title: 'General',
+                        items: [richItem('roof', 'Roof'), richItem('plumbing', 'Plumbing'), richItem('electrical', 'Electrical')],
+                    },
+                ],
+            },
         });
         expect(res.status(), 'Template creation must return 201').toBe(201);
         const body = await res.json();

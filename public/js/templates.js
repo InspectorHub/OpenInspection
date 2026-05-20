@@ -152,8 +152,9 @@ async function deleteTemplate(id) {
         allTemplates = allTemplates.filter(t => t.id !== id);
         renderTemplates();
     } else {
-        const err = await res.json();
-        modalAlert('Error: ' + (err.error || 'Failed to delete'), 'Error');
+        const err = await res.json().catch(() => ({}));
+        const msg = err?.error?.message || err?.error || err?.message || 'Failed to delete';
+        modalAlert('Error: ' + msg, 'Error');
     }
 }
 
@@ -178,7 +179,7 @@ async function submitTemplate() {
         const res = await authFetch('/api/inspections/templates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, schema: { sections: [], ratingLevels: [] } })
+            body: JSON.stringify({ name, schema: { schemaVersion: 2, sections: [] } })
         });
         if (res.ok) {
             const result = await res.json();
@@ -190,8 +191,9 @@ async function submitTemplate() {
                 loadTemplates();
             }
         } else {
-            const err = await res.json();
-            modalAlert('Error: ' + (err.error || 'Failed to create'), 'Error');
+            const err = await res.json().catch(() => ({}));
+            const msg = err?.error?.message || err?.error || err?.message || 'Failed to create';
+            modalAlert('Error: ' + msg, 'Error');
         }
     } catch (e) {
         modalAlert('Connection error: ' + e.message, 'Error');

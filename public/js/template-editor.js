@@ -260,6 +260,7 @@ function templateEditor() {
                     body: JSON.stringify({
                         name: this.template.title,
                         schema: {
+                            schemaVersion: 2,
                             sections: this.template.sections,
                             ratingSystem: this.template.ratingSystem
                         }
@@ -347,6 +348,13 @@ function templateEditor() {
                 this.template.title = tpl.name || '';
                 this.template.version = tpl.version || 1;
                 const schema = typeof tpl.schema === 'string' ? JSON.parse(tpl.schema) : (tpl.schema || {});
+                // Legacy v1: flat array of items, no sections. Pre-launch we
+                // reject v1 in the validator — surface that explicitly here
+                // instead of rendering an empty editor.
+                if (Array.isArray(schema) || schema.schemaVersion !== 2) {
+                    this.loadError = 'This template uses a legacy schema and cannot be edited. Please delete it and create a new one.';
+                    return;
+                }
                 if (schema.sections && Array.isArray(schema.sections)) {
                     // Normalize field names: API may use "name" but editor uses "title"/"label"
                     this.template.sections = schema.sections.map(function(sec) {
