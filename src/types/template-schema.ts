@@ -49,28 +49,89 @@ export interface ItemTabs {
     defects: CannedDefect[];
 }
 
-/** Item types. v2 uses 'rich' for rated inspectable items, 'text' for
- *  free-text-only items (e.g. "Overall Condition Notes"). */
-export type ItemType = 'rich' | 'text';
+/** Item types — `rich` is the headline interactive type (rating + three
+ *  canned-comment tabs). The 8 simpler types cover non-rated data points
+ *  the editor surfaces (booleans, numbers with min/max/unit, single- and
+ *  multi-select with choices, date pickers, photo-only fields, and plain
+ *  text / textarea inputs). */
+export type ItemType =
+    | 'rich'
+    | 'text'
+    | 'boolean'
+    | 'textarea'
+    | 'number'
+    | 'select'
+    | 'multi_select'
+    | 'date'
+    | 'photo_only';
+
+export type ItemAttributeType =
+    | 'boolean' | 'text' | 'number' | 'select' | 'multi_select' | 'date';
+
+/** Optional sub-fields nested under an item, e.g. tonnage on an HVAC unit. */
+export interface ItemAttribute {
+    id: string;
+    name: string;
+    type: ItemAttributeType;
+    choices?: string[];
+    unit?: string;
+    required?: boolean;
+    isSafety?: boolean;
+    isDefect?: boolean;
+    recommendation?: string | null;
+    estimateMin?: number | null;
+    estimateMax?: number | null;
+}
+
+/** Per-item sub-properties — only meaningful on non-rich types. */
+export interface ItemOptions {
+    min?: number | null;
+    max?: number | null;
+    unit?: string;
+    step?: number | null;
+    placeholder?: string;
+    maxLength?: number | null;
+    choices?: string[];
+    minPhotos?: number | null;
+}
+
+/** Provenance for templates imported from upstream platforms. */
+export interface ItemSource {
+    platform: string;
+    externalId: string;
+}
 
 export interface TemplateItem {
     id: string;
     label: string;
     type: ItemType;
+    description?: string;
     /** Rating options shown at the top of an item card. Required for 'rich'. */
     ratingOptions?: string[];
     /** Three tabs of canned comments. Required for 'rich'. */
     tabs?: ItemTabs;
+    /** Sub-properties on non-rich types (min/max/choices/...). */
+    options?: ItemOptions;
     /** Optional icon key + display number (used by some templates). */
     icon?: string;
     number?: string;
+    required?: boolean;
+    isSafety?: boolean;
+    defaultRecommendation?: string;
+    defaultEstimateMin?: number | null;
+    defaultEstimateMax?: number | null;
+    attributes?: ItemAttribute[];
+    source?: ItemSource | null;
 }
 
 export interface TemplateSection {
     id: string;
     title: string;
     icon?: string;
+    identifier?: string;
     items: TemplateItem[];
+    disclaimerText?: string | null;
+    alwaysPageBreak?: boolean;
 }
 
 export interface RatingLevel {

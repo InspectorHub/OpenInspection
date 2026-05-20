@@ -250,11 +250,11 @@ function templateEditor() {
             }
         },
 
-        // Normalize editor state to the strict v2 schema before PUT.
-        // The editor carries UI-only fields (priority, identifier, source,
-        // options, attributes, ...) that the server rejects with
-        // unrecognized_keys; strip them here so the editor stays free to
-        // hold transient state without polluting saved JSON.
+        // Normalize editor state to v2 schema shape before PUT. The
+        // schema accepts every field the editor surfaces, so this mostly
+        // drops UI-only scratch state (priority, _choicesStr, isOverview,
+        // _ratingOptionsText, ...) and clamps missing required values to
+        // safe defaults.
         toV2Payload() {
             const pickInfo = (c) => ({
                 id: c.id, title: c.title || '', comment: c.comment || '',
@@ -268,23 +268,61 @@ function templateEditor() {
                 photos: Array.isArray(c.photos) ? c.photos : [],
                 default: !!c.default,
             });
+            const pickAttribute = (a) => {
+                const out = {
+                    id: a.id, name: a.name || '',
+                    type: a.type || 'text',
+                };
+                if (a.choices && a.choices.length) out.choices = a.choices;
+                if (a.unit) out.unit = a.unit;
+                if (typeof a.required === 'boolean')      out.required = a.required;
+                if (typeof a.isSafety === 'boolean')      out.isSafety = a.isSafety;
+                if (typeof a.isDefect === 'boolean')      out.isDefect = a.isDefect;
+                if (a.recommendation != null)             out.recommendation = a.recommendation;
+                if (a.estimateMin != null)                out.estimateMin = a.estimateMin;
+                if (a.estimateMax != null)                out.estimateMax = a.estimateMax;
+                return out;
+            };
+            const pickOptions = (opts) => {
+                if (!opts || typeof opts !== 'object') return null;
+                const o = {};
+                if (opts.min != null)        o.min = opts.min;
+                if (opts.max != null)        o.max = opts.max;
+                if (opts.unit)               o.unit = opts.unit;
+                if (opts.step != null)       o.step = opts.step;
+                if (opts.placeholder)        o.placeholder = opts.placeholder;
+                if (opts.maxLength != null)  o.maxLength = opts.maxLength;
+                if (opts.choices && opts.choices.length) o.choices = opts.choices;
+                if (opts.minPhotos != null)  o.minPhotos = opts.minPhotos;
+                return Object.keys(o).length ? o : null;
+            };
             const pickItem = (it) => {
-                const base = {
-                    id: it.id, label: it.label || '',
-                    type: it.type === 'text' ? 'text' : 'rich',
-                };
-                if (it.icon) base.icon = it.icon;
-                if (it.number) base.number = it.number;
-                if (base.type === 'text') return base;
-                base.ratingOptions = Array.isArray(it.ratingOptions) && it.ratingOptions.length
-                    ? it.ratingOptions
-                    : ['Inspected'];
-                const tabs = it.tabs || {};
-                base.tabs = {
-                    information: (tabs.information || []).map(pickInfo),
-                    limitations: (tabs.limitations || []).map(pickInfo),
-                    defects:     (tabs.defects     || []).map(pickDefect),
-                };
+                const validTypes = ['rich', 'text', 'boolean', 'textarea', 'number', 'select', 'multi_select', 'date', 'photo_only'];
+                const type = validTypes.includes(it.type) ? it.type : 'rich';
+                const base = { id: it.id, label: it.label || '', type };
+                if (it.description)        base.description = it.description;
+                if (it.icon)               base.icon = it.icon;
+                if (it.number)             base.number = it.number;
+                if (typeof it.required === 'boolean') base.required = it.required;
+                if (typeof it.isSafety === 'boolean') base.isSafety = it.isSafety;
+                if (it.defaultRecommendation)            base.defaultRecommendation = it.defaultRecommendation;
+                if (it.defaultEstimateMin != null)       base.defaultEstimateMin = it.defaultEstimateMin;
+                if (it.defaultEstimateMax != null)       base.defaultEstimateMax = it.defaultEstimateMax;
+                if (it.attributes && it.attributes.length) base.attributes = it.attributes.map(pickAttribute);
+                if (it.source && it.source.platform && it.source.externalId) base.source = { platform: it.source.platform, externalId: it.source.externalId };
+                if (type === 'rich') {
+                    base.ratingOptions = Array.isArray(it.ratingOptions) && it.ratingOptions.length
+                        ? it.ratingOptions : ['Inspected'];
+                    const tabs = it.tabs || {};
+                    base.tabs = {
+                        information: (tabs.information || []).map(pickInfo),
+                        limitations: (tabs.limitations || []).map(pickInfo),
+                        defects:     (tabs.defects     || []).map(pickDefect),
+                    };
+                } else if (type !== 'boolean' && type !== 'date') {
+                    const o = pickOptions(it.options);
+                    if (o) base.options = o;
+                }
                 return base;
             };
             const pickSection = (s) => {
@@ -292,9 +330,10 @@ function templateEditor() {
                     id: s.id, title: s.title || '',
                     items: (s.items || []).map(pickItem),
                 };
-                if (s.icon) out.icon = s.icon;
-                if (s.disclaimerText) out.disclaimerText = s.disclaimerText;
-                if (s.alwaysPageBreak) out.alwaysPageBreak = !!s.alwaysPageBreak;
+                if (s.icon)             out.icon = s.icon;
+                if (s.identifier)       out.identifier = s.identifier;
+                if (s.disclaimerText)   out.disclaimerText = s.disclaimerText;
+                if (s.alwaysPageBreak)  out.alwaysPageBreak = !!s.alwaysPageBreak;
                 return out;
             };
             const payload = {
