@@ -8,11 +8,11 @@ import { ReportStatusPill } from '../components/report-status-pill';
 
 interface InspectionRecord { id: string; propertyAddress: string; clientName?: string | null; clientEmail?: string | null; date: string; price: number; paymentStatus: string; signed?: boolean; status?: string | null; }
 interface TemplateRecord { schema: string | Record<string, unknown>; }
-interface SchemaItemRaw { id: string; label?: string; name?: string; }
+interface SchemaItemRaw { id: string; label?: string; name?: string; type?: string; options?: { unit?: string; choices?: string[] } | undefined; }
 interface SchemaSectionRaw { title?: string; name?: string; items: SchemaItemRaw[]; }
-interface SchemaItem { id: string; label: string; }
+interface SchemaItem { id: string; label: string; type?: string; options?: { unit?: string; choices?: string[] } | undefined; }
 interface SchemaSection { id: string; title: string; items: SchemaItem[]; }
-interface ResultItem { rating?: string; status?: string; notes?: string; photos?: { key: string }[]; }
+interface ResultItem { rating?: string; status?: string; notes?: string; photos?: { key: string }[]; value?: unknown; }
 interface RatingLevel { id: string; label: string; abbreviation?: string; color: string; severity: string; isDefect: boolean; }
 
 /**
@@ -45,10 +45,15 @@ export function renderProfessionalReport(data: {
             return {
                 id: slugifySectionId(title, idx),
                 title,
-                items: (sec.items || []).map((item: SchemaItemRaw) => ({
-                    id: item.id,
-                    label: item.label || item.name || 'Untitled',
-                })),
+                items: (sec.items || []).map((item: SchemaItemRaw) => {
+                    const out: SchemaItem = {
+                        id: item.id,
+                        label: item.label || item.name || 'Untitled',
+                    };
+                    if (item.type)    out.type    = item.type;
+                    if (item.options) out.options = item.options;
+                    return out;
+                }),
             };
         }),
     };
@@ -365,6 +370,21 @@ export function renderProfessionalReport(data: {
                                                 <h3 class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
                                                 <span class={`ih-pill ${bucket === 'good' ? 'ih-pill--sat' : bucket === 'marginal' ? 'ih-pill--monitor' : bucket === 'defect' ? 'ih-pill--defect' : 'ih-pill--gen'}`}>{displayLabel}</span>
                                             </div>
+                                            {/* Non-rich item value — boolean/number/text/textarea/date/select/
+                                                multi_select store the captured value on res.value. The customer-
+                                                facing report viewer surfaces it inline so the inspector's entry
+                                                isn't silently hidden behind a rating pill that doesn't apply. */}
+                                            {item.type && item.type !== 'rich' && (res as { value?: unknown }).value !== undefined && (res as { value?: unknown }).value !== '' && (res as { value?: unknown }).value !== null && (
+                                                <p class="text-lg text-slate-700 font-semibold mb-3 item-value">
+                                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mr-3">{item.type}</span>
+                                                    {Array.isArray((res as { value?: unknown }).value)
+                                                        ? ((res as { value: unknown[] }).value).join(' · ')
+                                                        : (item.type === 'boolean'
+                                                            ? ((res as { value: boolean }).value ? 'Yes' : 'No')
+                                                            : String((res as { value: unknown }).value))}
+                                                    {item.options?.unit ? <span class="text-slate-400 ml-2">{item.options.unit}</span> : null}
+                                                </p>
+                                            )}
                                             <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl item-notes">{res.notes || 'No notes recorded.'}</p>
                                         </div>
 
