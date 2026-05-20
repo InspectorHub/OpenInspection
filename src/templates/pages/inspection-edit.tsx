@@ -431,16 +431,17 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   <span class="w-3 h-3 rounded-full" x-bind:style="'background:' + getRatingColor(getItemRating(item.id))"></span>
                 </div>
 
-                {/* Rating Buttons — `data-rating-row` is the anchor target the
-                    onboarding overlay (T6 / step 0) highlights so the user
-                    knows which buttons the tour is talking about. */}
+                {/* Rating Buttons — only meaningful for `rich` items.
+                    `data-rating-row` is the anchor target the onboarding
+                    overlay (T6 / step 0) highlights so the user knows which
+                    buttons the tour is talking about. */}
                 {/* Spec 5G mobile field-flow (Round 12) — 44px+ tap target on
                     mobile per Apple HIG; desktop keeps compact 28px height.
                     R7-16 — show the full rating label on tablet+ (≥640px) so
                     new inspectors can read "Satisfactory" instead of decoding
                     "Sat". Mobile keeps the abbreviation to fit 5 buttons in
                     one row. aria-label still provides the full name to AT. */}
-                <div data-rating-row class="flex flex-wrap gap-1.5 mb-3">
+                <div data-rating-row class="flex flex-wrap gap-1.5 mb-3" x-show="!item.type || item.type === 'rich'">
                   <template x-for="level in ratingLevels" x-bind:key="level.id">
                     <button
                       x-on:click="setRating(item.id, level.id)"
@@ -454,6 +455,17 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                       <span class="sm:hidden" x-text="level.abbreviation"></span>
                     </button>
                   </template>
+                </div>
+
+                {/* Non-rich item types — the editor lets template authors add
+                    boolean / number / select / date / etc. items, but the
+                    inspection-side input controls for these are still on the
+                    roadmap. Surface the type explicitly so inspectors know to
+                    record the value in the notes field for now, rather than
+                    seeing irrelevant rating buttons. */}
+                <div x-show="item.type && item.type !== 'rich'" class="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-800 flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span><span class="font-mono font-700" x-text="item.type"></span> input — record the value in notes below until the dedicated control ships.</span>
                 </div>
 
                 {/* Sprint 3 S3-3 — Tag chips. Internal labels only (never on
