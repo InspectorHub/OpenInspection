@@ -508,11 +508,45 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                     class="px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none transition-colors" />
                 </div>
 
-                {/* Remaining types (select / multi_select / photo_only) still
-                    show the amber explainer until dedicated controls ship. */}
-                <div x-show="item.type === 'select' || item.type === 'multi_select' || item.type === 'photo_only'" class="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-800 flex items-center gap-2">
-                  <svg class="w-3.5 h-3.5 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <span><span class="font-mono font-700" x-text="item.type"></span> input — record the value in notes below until the dedicated control ships.</span>
+                <div x-show="item.type === 'select'" class="mb-3">
+                  <select
+                    x-bind:value="getItemValue(item.id)"
+                    x-on:change="setItemValue(item.id, $event.target.value)"
+                    class="w-full max-w-sm px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none transition-colors">
+                    <option value="">— Select —</option>
+                    <template x-for="choice in (item.options && item.options.choices) || []" x-bind:key="choice">
+                      <option x-bind:value="choice" x-text="choice"></option>
+                    </template>
+                  </select>
+                </div>
+
+                <div x-show="item.type === 'multi_select'" class="mb-3 space-y-1.5">
+                  <template x-for="choice in (item.options && item.options.choices) || []" x-bind:key="choice">
+                    <label class="flex items-center gap-2 text-sm text-ink-700 cursor-pointer hover:text-ink-900 transition-colors">
+                      <input type="checkbox"
+                        x-bind:value="choice"
+                        x-bind:checked="(Array.isArray(getItemValue(item.id)) ? getItemValue(item.id) : []).indexOf(choice) !== -1"
+                        x-on:change="toggleMultiValue(item.id, choice, $event.target.checked)"
+                        class="w-4 h-4 rounded border-surface-200 text-blueprint-600 focus:ring-blueprint-500" />
+                      <span x-text="choice"></span>
+                    </label>
+                  </template>
+                </div>
+
+                {/* photo_only — the existing per-item photo-attach button
+                    (further down the card) remains the upload path; this
+                    strip just surfaces the min-photo requirement so the
+                    inspector knows when they're below threshold. */}
+                <div x-show="item.type === 'photo_only'" class="mb-3 px-3 py-2 rounded-lg border border-surface-200 text-[12px] text-ink-600 flex items-center justify-between gap-2">
+                  <span>
+                    <span x-text="(getItemPhotos(item.id) || []).length"></span>
+                    <span> photo(s) attached</span>
+                    <template x-if="item.options && item.options.minPhotos">
+                      <span class="ml-1 text-ink-400">(minimum <span x-text="item.options.minPhotos"></span>)</span>
+                    </template>
+                  </span>
+                  <span x-show="item.options && item.options.minPhotos && (getItemPhotos(item.id) || []).length < item.options.minPhotos"
+                        class="text-[10px] font-700 uppercase tracking-widest text-amber-600">below min</span>
                 </div>
 
                 {/* Sprint 3 S3-3 — Tag chips. Internal labels only (never on

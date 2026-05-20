@@ -904,6 +904,21 @@ function inspectionEditor(inspectionId) {
         ? this.results[itemId].value
         : '';
     },
+    // multi_select helper — toggles `choice` in the value array.
+    toggleMultiValue(itemId, choice, checked) {
+      const cur = Array.isArray(this.getItemValue(itemId))
+        ? this.getItemValue(itemId).slice()
+        : [];
+      const idx = cur.indexOf(choice);
+      if (checked && idx === -1) cur.push(choice);
+      else if (!checked && idx !== -1) cur.splice(idx, 1);
+      this.setItemValue(itemId, cur);
+    },
+    // photo_only helper — reads the photos array from the per-item result.
+    getItemPhotos(itemId) {
+      const r = this.results[itemId];
+      return r && Array.isArray(r.photos) ? r.photos : [];
+    },
 
     // Spec 5B — Defect Model + Canned Comment Library (v2 schema).
     // Per-item state is { rating, notes, photos, tabs: { information,
