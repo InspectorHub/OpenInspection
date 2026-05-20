@@ -150,6 +150,28 @@ function templateEditor() {
             if (!this.selectedItem.options) this.selectedItem.options = {};
             this.selectedItem.options.choices = this.choicesText.split('\n').map(s => s.trim()).filter(Boolean);
         },
+        // Per-item canned-comment editor — manipulates selectedItem.tabs in place.
+        // The three tab arrays follow CannedInfoComment / CannedDefect shapes;
+        // toV2Payload picks only the schema-valid fields on save.
+        addCannedToItem(tab) {
+            if (!this.selectedItem || this.selectedItem.type !== 'rich') return;
+            if (!this.selectedItem.tabs) this.selectedItem.tabs = { information: [], limitations: [], defects: [] };
+            if (!Array.isArray(this.selectedItem.tabs[tab])) this.selectedItem.tabs[tab] = [];
+            const prefix = tab === 'defects' ? 'rd_' : (tab === 'limitations' ? 'rl_' : 'ri_');
+            const id = prefix + (crypto.randomUUID?.() ?? Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+            const entry = { id, title: 'New entry', comment: '', default: false };
+            if (tab === 'defects') {
+                entry.category = 'recommendation';
+                entry.location = '';
+                entry.photos = [];
+            }
+            this.selectedItem.tabs[tab].push(entry);
+        },
+        removeCannedFromItem(tab, index) {
+            if (!this.selectedItem || !this.selectedItem.tabs) return;
+            if (!Array.isArray(this.selectedItem.tabs[tab])) return;
+            this.selectedItem.tabs[tab].splice(index, 1);
+        },
         async applyRatingPreset(preset) {
             // Guard against accidental overwrite of customised levels.
             // Only prompt if the user has actually edited away from a previous preset

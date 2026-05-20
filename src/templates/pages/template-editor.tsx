@@ -516,6 +516,58 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                             <p class="text-[11px] text-ink-300">No attributes defined</p>
                                         </div>
                                     </div>
+                                    {/* Per-item canned-comment editor — only for rich items.
+                                        Three tabs (Information / Limitations / Defects) match the v2
+                                        schema's ItemTabs shape. Each entry is { id, title, comment, default }
+                                        for info/limitations or adds { category, location, photos } for defects. */}
+                                    <div x-show="selectedItem.type === 'rich'" class="space-y-3" {...{'x-data': "{ tab: 'information' }"}}>
+                                        <hr class="border-surface-200/60" />
+                                        <div>
+                                            <label class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400 mb-2 block">Canned Comments</label>
+                                            <div class="flex gap-1 mb-3 bg-surface-100 rounded-lg p-0.5">
+                                                <template x-for="t in ['information','limitations','defects']" x-bind:key="t">
+                                                    <button type="button" {...{'@click': 'tab = t'}}
+                                                        x-bind:class="tab === t ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'"
+                                                        class="flex-1 px-2 py-1.5 text-[11px] font-600 rounded-md capitalize transition-colors">
+                                                        <span x-text="t"></span>
+                                                        <span class="ml-1 font-mono text-[10px] text-ink-400" x-text="'(' + ((selectedItem.tabs && selectedItem.tabs[t]) || []).length + ')'"></span>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <template x-for="(entry, ei) in ((selectedItem.tabs && selectedItem.tabs[tab]) || [])" x-bind:key="entry.id">
+                                                    <div class="p-2.5 rounded-lg bg-surface-50 border border-surface-200/50 space-y-1.5">
+                                                        <div class="flex items-center justify-between gap-2">
+                                                            <input type="text" x-model="entry.title" placeholder="Title" class="flex-1 text-xs font-600 bg-transparent border-b border-transparent hover:border-surface-200 focus:border-blueprint-500 transition-colors" />
+                                                            <label class="flex items-center gap-1 text-[10px] text-ink-500 cursor-pointer flex-shrink-0">
+                                                                <input type="checkbox" x-model="entry.default" class="w-3 h-3 rounded" />
+                                                                <span>default</span>
+                                                            </label>
+                                                            <button type="button" {...{'@click': 'removeCannedFromItem(tab, ei)'}} class="text-ink-300 hover:text-red-500 transition-colors flex-shrink-0 p-0.5">
+                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                            </button>
+                                                        </div>
+                                                        <textarea x-model="entry.comment" rows={2} placeholder="Comment body" class="w-full text-xs px-2 py-1 rounded border border-surface-200 bg-white focus:border-blueprint-500 transition-colors resize-none"></textarea>
+                                                        <div x-show="tab === 'defects'" class="grid grid-cols-2 gap-2">
+                                                            <select x-model="entry.category" class="text-[11px] px-2 py-1 rounded border border-surface-200 bg-white">
+                                                                <option value="maintenance">maintenance</option>
+                                                                <option value="recommendation">recommendation</option>
+                                                                <option value="safety">safety</option>
+                                                            </select>
+                                                            <input type="text" x-model="entry.location" placeholder="Default location" class="text-[11px] px-2 py-1 rounded border border-surface-200 bg-white" />
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <div x-show="!((selectedItem.tabs && selectedItem.tabs[tab]) || []).length" class="text-center py-3">
+                                                    <p class="text-[11px] text-ink-300">No <span x-text="tab"></span> comments yet</p>
+                                                </div>
+                                                <button type="button" {...{'@click': 'addCannedToItem(tab)'}} class="w-full px-3 py-2 rounded-lg text-[11px] font-600 text-blueprint-600 bg-blueprint-50 hover:bg-blueprint-100 transition-colors flex items-center justify-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14m7-7H5"/></svg>
+                                                    Add to <span x-text="tab"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div x-show="selectedItem.source" class="mt-4 p-3 rounded-xl bg-surface-50 border border-surface-200/50">
                                         <div class="text-[10px] font-700 uppercase tracking-[0.1em] text-ink-400 mb-2">Import Source</div>
                                         <div class="flex items-center gap-2">
