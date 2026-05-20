@@ -2,6 +2,7 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { seedFixtures } from './seed-fixtures';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,7 +77,14 @@ export default function globalSetup() {
             // KV may not be initialized — that's fine
         }
 
-        console.info('\n[globalSetup] Local D1 cleared — all tests will run against a fresh workspace.\n');
+        console.info('\n[globalSetup] Local D1 cleared — seeding E2E fixtures next.');
+        try {
+            seedFixtures(appDir);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn(`[globalSetup] seedFixtures failed: ${msg}`);
+        }
+        console.info('[globalSetup] Ready.\n');
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(
