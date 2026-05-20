@@ -309,6 +309,69 @@ inspectionsRoutes.openapi(createTemplateRoute, async (c) => {
 });
 
 /**
+ * POST /api/inspections/templates/import-spectora
+ * Thin wrapper over `convertSpectoraTemplate` + the existing createTemplate
+ * path. Accepts a raw Spectora export payload and returns both the freshly
+ * created template row and the conversion stats (for the diff display in
+ * the upcoming import-from-Spectora UI).
+ */
+const importSpectoraRoute = createRoute({
+    method: 'post',
+    path: '/templates/import-spectora',
+    tags: ['Templates'],
+    summary: 'Import Spectora template',
+    description: 'Convert a Spectora export to v2 and create a new template from it.',
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        name: z.string().min(1).max(100),
+                        // Spectora exports vary; keep the inner shape permissive
+                        // and let `convertSpectoraTemplate` do the structural work.
+                        spectora: z.object({
+                            id: z.string().optional(),
+                            name: z.string().optional(),
+                            sections: z.array(z.unknown()).optional(),
+                        }).passthrough(),
+                    }),
+                },
+            },
+        },
+    },
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    responses: {
+        201: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({
+                        template: z.unknown(),
+                        stats:    z.unknown(),
+                    })),
+                },
+            },
+            description: 'Imported',
+        },
+    },
+});
+
+inspectionsRoutes.openapi(importSpectoraRoute, async (c) => {
+    const body = c.req.valid('json');
+    const { convertSpectoraTemplate } = await import('../lib/spectora-import');
+    const { template: schema, stats } = convertSpectoraTemplate(body.spectora as Parameters<typeof convertSpectoraTemplate>[0]);
+    // createTemplate accepts a plain Record<string, unknown> schema; the
+    // converter's TemplateSchemaV2 interface is structurally compatible,
+    // so cast it through unknown to placate the strict index signature
+    // requirement on the service entry-point.
+    const template = await c.var.services.template.createTemplate(
+        c.get('tenantId'),
+        body.name,
+        schema as unknown as Record<string, unknown>,
+    );
+    return c.json({ success: true, data: { template, stats } }, 201);
+});
+
+/**
  * PUT /api/inspections/templates/:id
  */
 const updateTemplateRoute = createRoute({
