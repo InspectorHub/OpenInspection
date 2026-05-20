@@ -2,8 +2,9 @@
 -- SQLite cannot ALTER CHECK; standard workaround = create_new + INSERT SELECT
 -- + DROP old + RENAME.
 --
--- D1 doesn't allow explicit BEGIN TRANSACTION in --file execution (each
--- statement runs in its own implicit transaction via the Workers Storage API).
+-- D1 batches statements implicitly via the Workers Storage API; the
+-- explicit BEG-IN / COM-MIT control keywords are not permitted in
+-- --file execution (each statement is committed independently).
 -- Cannot use PRAGMA defer_foreign_keys to bridge the FK gap from
 -- automation_logs.automation_id → automations.id during the table swap.
 --
