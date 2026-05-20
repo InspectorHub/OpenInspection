@@ -341,12 +341,17 @@ export function renderProfessionalReport(data: {
                                 const photoCap = 8;
 
                                 // Sub-spec D Task 5 — collapse empty items: no rating + only the
-                                // "No notes recorded." placeholder + no photos. These are dead
-                                // weight in the report and clutter the Summary view.
+                                // "No notes recorded." placeholder + no photos + no captured
+                                // value. These are dead weight in the report and clutter the
+                                // Summary view. Non-rich item types (number/date/boolean/...)
+                                // ride on `res.value`, so an item with a value but no rating
+                                // is *not* empty — keep it.
                                 const hasRating = !!itemRatingId;
                                 const hasNotes  = !!(res.notes && res.notes !== 'No notes recorded.');
                                 const hasPhotos = photos.length > 0;
-                                if (!hasRating && !hasNotes && !hasPhotos) return null;
+                                const v = (res as { value?: unknown }).value;
+                                const hasValue  = v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0);
+                                if (!hasRating && !hasNotes && !hasPhotos && !hasValue) return null;
 
                                 // Defect category mapping (Sub-spec D Task 2 / 5):
                                 // bucket=defect   -> recommendation (per render-path heuristic)

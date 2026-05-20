@@ -157,7 +157,7 @@ describe('ReportCardStackPage — non-rich item value display (PR #64)', () => {
     function withValueItems(items: Array<Record<string, unknown>>) {
         return {
             ...baseProps,
-            sections: [{ id: 'mixed', title: 'Mixed', icon: null, defectCount: 0, items }],
+            sections: [{ id: 'mixed', title: 'Mixed', icon: null, defectCount: 0, items: items as never }],
         } as Parameters<typeof ReportCardStackPage>[0];
     }
 
