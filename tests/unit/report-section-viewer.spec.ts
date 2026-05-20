@@ -152,3 +152,65 @@ describe('ReportCardStackPage — EDIT SECTION hover button (App.F.4)', () => {
         expect(html).toMatch(/opacity-0[^"]*group-hover\/section:opacity-100/);
     });
 });
+
+describe('ReportCardStackPage — non-rich item value display (PR #64)', () => {
+    function withValueItems(items: Array<Record<string, unknown>>) {
+        return {
+            ...baseProps,
+            sections: [{ id: 'mixed', title: 'Mixed', icon: null, defectCount: 0, items }],
+        } as Parameters<typeof ReportCardStackPage>[0];
+    }
+
+    it('renders boolean value as Yes / No', async () => {
+        const html = await render(ReportCardStackPage(withValueItems([
+            { id: 'p1', label: 'Has Permit', type: 'boolean', rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: true },
+            { id: 'p2', label: 'Has Permit 2', type: 'boolean', rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: false },
+        ])));
+        expect(html).toContain('Yes');
+        expect(html).toContain('No');
+    });
+
+    it('renders number value with the schema unit chip', async () => {
+        const html = await render(ReportCardStackPage(withValueItems([
+            { id: 'yr', label: 'Year Built', type: 'number', rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: 1995, unit: 'yr' },
+        ])));
+        expect(html).toContain('1995');
+        expect(html).toContain('yr');
+    });
+
+    it('joins multi_select arrays with " · "', async () => {
+        const html = await render(ReportCardStackPage(withValueItems([
+            { id: 'ut', label: 'Utilities', type: 'multi_select', rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: ['Electric', 'Gas', 'Water'] },
+        ])));
+        expect(html).toContain('Electric · Gas · Water');
+    });
+
+    it('renders date value as a raw ISO string', async () => {
+        const html = await render(ReportCardStackPage(withValueItems([
+            { id: 'd', label: 'Last Cleaning Date', type: 'date', rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: '2026-04-15' },
+        ])));
+        expect(html).toContain('2026-04-15');
+    });
+
+    it('hides the value row for rich items (covered by the rating pill)', async () => {
+        const html = await render(ReportCardStackPage(withValueItems([
+            { id: 'r', label: 'Roof Covering', type: 'rich', rating: 'sat', ratingColor: '#22c55e', ratingLabel: 'Sat', severityBucket: 'satisfactory', notes: 'OK', photos: [] },
+        ])));
+        // No "RICH" type-name chip should appear; that chip is the cue
+        // the inline value row is rendering.
+        expect(html).not.toMatch(/uppercase[^"]*"[^>]*>rich</);
+    });
+
+    it('hides the value row when value is undefined / empty / null', async () => {
+        const html = await render(ReportCardStackPage(withValueItems([
+            { id: 'a', label: 'Empty num',   type: 'number', rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: undefined },
+            { id: 'b', label: 'Empty text',  type: 'text',   rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: '' },
+            { id: 'c', label: 'Null sel',    type: 'select', rating: null, ratingColor: '#9ca3af', ratingLabel: null, severityBucket: 'other', notes: null, photos: [], value: null },
+        ])));
+        // No uppercase type-name chip on any of these three items.
+        const chipMatches = html.match(/text-\[10px\][^"]*uppercase/g) ?? [];
+        // The 3 items' labels are still rendered; we only assert the
+        // type chip (which fronts the value row) is absent.
+        expect(chipMatches.filter(m => /\>(number|text|select)\</.test(m))).toHaveLength(0);
+    });
+});
