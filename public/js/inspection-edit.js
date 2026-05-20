@@ -891,6 +891,20 @@ function inspectionEditor(inspectionId) {
       this.debounceSave();
     },
 
+    // Non-rich item types (boolean / number / text / textarea / date)
+    // store their captured value here. Rich items continue to use `rating`
+    // exclusively. Same debounced PATCH path as setRating.
+    setItemValue(itemId, value) {
+      if (!this.results[itemId]) this.results[itemId] = { rating: null, notes: '', photos: [] };
+      this.results[itemId].value = value;
+      this.debounceSave();
+    },
+    getItemValue(itemId) {
+      return this.results[itemId] && 'value' in this.results[itemId]
+        ? this.results[itemId].value
+        : '';
+    },
+
     // Spec 5B — Defect Model + Canned Comment Library (v2 schema).
     // Per-item state is { rating, notes, photos, tabs: { information,
     // limitations, defects } }. Tab arrays hold one entry per template

@@ -457,13 +457,60 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   </template>
                 </div>
 
-                {/* Non-rich item types — the editor lets template authors add
-                    boolean / number / select / date / etc. items, but the
-                    inspection-side input controls for these are still on the
-                    roadmap. Surface the type explicitly so inspectors know to
-                    record the value in the notes field for now, rather than
-                    seeing irrelevant rating buttons. */}
-                <div x-show="item.type && item.type !== 'rich'" class="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-800 flex items-center gap-2">
+                {/* Non-rich item type inputs — write to results[item.id].value.
+                    boolean / number / text / textarea / date get real controls
+                    here. select / multi_select / photo_only fall through to the
+                    amber explainer at the bottom (dedicated UI still pending). */}
+                <div x-show="item.type === 'boolean'" class="mb-3 flex gap-2">
+                  <button type="button"
+                    x-on:click="setItemValue(item.id, true)"
+                    x-bind:class="getItemValue(item.id) === true ? 'bg-emerald-600 text-white border-transparent' : 'text-gray-500 hover:text-gray-700 border-surface-200'"
+                    class="px-5 py-2 text-sm font-semibold rounded-lg border transition-all">Yes</button>
+                  <button type="button"
+                    x-on:click="setItemValue(item.id, false)"
+                    x-bind:class="getItemValue(item.id) === false ? 'bg-rose-600 text-white border-transparent' : 'text-gray-500 hover:text-gray-700 border-surface-200'"
+                    class="px-5 py-2 text-sm font-semibold rounded-lg border transition-all">No</button>
+                </div>
+
+                <div x-show="item.type === 'number'" class="mb-3 flex items-center gap-2">
+                  <input type="number"
+                    x-bind:value="getItemValue(item.id)"
+                    x-on:input="setItemValue(item.id, $event.target.value === '' ? '' : Number($event.target.value))"
+                    x-bind:min="item.options && item.options.min != null ? item.options.min : null"
+                    x-bind:max="item.options && item.options.max != null ? item.options.max : null"
+                    x-bind:step="item.options && item.options.step != null ? item.options.step : null"
+                    class="w-40 px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none transition-colors" />
+                  <span x-show="item.options && item.options.unit" class="text-[11px] font-mono text-ink-400" x-text="item.options ? item.options.unit : ''"></span>
+                </div>
+
+                <div x-show="item.type === 'text'" class="mb-3">
+                  <input type="text"
+                    x-bind:value="getItemValue(item.id)"
+                    x-on:input="setItemValue(item.id, $event.target.value)"
+                    x-bind:placeholder="item.options && item.options.placeholder ? item.options.placeholder : ''"
+                    x-bind:maxlength="item.options && item.options.maxLength != null ? item.options.maxLength : null"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none transition-colors" />
+                </div>
+
+                <div x-show="item.type === 'textarea'" class="mb-3">
+                  <textarea rows={3}
+                    x-bind:value="getItemValue(item.id)"
+                    x-on:input="setItemValue(item.id, $event.target.value)"
+                    x-bind:placeholder="item.options && item.options.placeholder ? item.options.placeholder : ''"
+                    x-bind:maxlength="item.options && item.options.maxLength != null ? item.options.maxLength : null"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none resize-y transition-colors"></textarea>
+                </div>
+
+                <div x-show="item.type === 'date'" class="mb-3">
+                  <input type="date"
+                    x-bind:value="getItemValue(item.id)"
+                    x-on:input="setItemValue(item.id, $event.target.value)"
+                    class="px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none transition-colors" />
+                </div>
+
+                {/* Remaining types (select / multi_select / photo_only) still
+                    show the amber explainer until dedicated controls ship. */}
+                <div x-show="item.type === 'select' || item.type === 'multi_select' || item.type === 'photo_only'" class="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-800 flex items-center gap-2">
                   <svg class="w-3.5 h-3.5 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   <span><span class="font-mono font-700" x-text="item.type"></span> input — record the value in notes below until the dedicated control ships.</span>
                 </div>
