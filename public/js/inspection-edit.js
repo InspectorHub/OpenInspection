@@ -627,15 +627,26 @@ function inspectionEditor(inspectionId) {
     },
 
     get completionPercent() {
-      var total = 0, rated = 0;
+      var total = 0, completed = 0;
       for (var s = 0; s < this.sections.length; s++) {
         var items = this.sections[s].items;
         for (var i = 0; i < items.length; i++) {
           total++;
-          if (this.results[items[i].id]?.rating) rated++;
+          var r = this.results[items[i].id];
+          if (!r) continue;
+          // rich items count when a rating is picked; non-rich item types
+          // (boolean / number / text / textarea / date / select /
+          // multi_select / photo_only) capture their value on res.value
+          // and should also advance the progress bar.
+          if (r.rating) { completed++; continue; }
+          var v = r.value;
+          if (v !== undefined && v !== null && v !== ''
+              && !(Array.isArray(v) && v.length === 0)) {
+            completed++;
+          }
         }
       }
-      return total > 0 ? Math.round((rated / total) * 100) : 0;
+      return total > 0 ? Math.round((completed / total) * 100) : 0;
     },
 
     // Live-computed report summary used by the Publish modal "Report Summary"
