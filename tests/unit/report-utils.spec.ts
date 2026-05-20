@@ -91,6 +91,37 @@ describe('computeReportStats', () => {
     expect(partial.completionPercent).toBe(25);
   });
 
+  it('counts non-rich item values toward completionPercent', () => {
+    // 1 rated + 1 with numeric value + 1 empty + 1 missing = 2 / 4 = 50%
+    const mixed = computeReportStats(sections, {
+      i1: { rating: 'S' },
+      i2: { value: 1995 },
+      i3: { value: '' },
+    }, defaultLevels);
+    expect(mixed.completionPercent).toBe(50);
+
+    // Strings, booleans, dates, and non-empty multi_select arrays all count.
+    const allValues = computeReportStats(sections, {
+      i1: { value: 'note text' },
+      i2: { value: true },
+      i3: { value: '2026-04-15' },
+      i4: { value: ['Electric', 'Gas'] },
+    }, defaultLevels);
+    expect(allValues.completionPercent).toBe(100);
+
+    // false boolean is a legitimate captured value — still counts.
+    const falseyValue = computeReportStats(sections, {
+      i1: { value: false },
+    }, defaultLevels);
+    expect(falseyValue.completionPercent).toBe(25);
+
+    // Empty multi_select array does NOT count (nothing actually picked).
+    const emptyArray = computeReportStats(sections, {
+      i1: { value: [] as unknown as string[] },
+    }, defaultLevels);
+    expect(emptyArray.completionPercent).toBe(0);
+  });
+
   it('handles legacy 3-level format (no ratingSystem)', () => {
     const legacyResults: Record<string, { rating?: string }> = {
       i1: { rating: 'Defect' },

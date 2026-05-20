@@ -106,7 +106,7 @@ export function computeReportStats(
     completionPercent: 0,
   };
 
-  let ratedCount = 0;
+  let completedCount = 0;
 
   for (const section of sections) {
     let sectionDefects = 0;
@@ -117,13 +117,25 @@ export function computeReportStats(
       const bucket = getRatingBucket(ratingId, levels);
       stats[bucket]++;
       if (bucket === 'defect') sectionDefects++;
-      if (ratingId) ratedCount++;
+      // Mirror inspection-edit.js: an item counts toward completion when a
+      // rating is set OR a non-empty value is captured (non-rich types
+      // boolean / number / text / textarea / date / select / multi_select
+      // / photo_only persist their input on result.value).
+      if (ratingId) {
+        completedCount++;
+      } else {
+        const v = result?.value;
+        if (v !== undefined && v !== null && v !== ''
+            && !(Array.isArray(v) && v.length === 0)) {
+          completedCount++;
+        }
+      }
     }
     stats.sectionDefects[section.id] = sectionDefects;
   }
 
   stats.completionPercent =
-    stats.total > 0 ? Math.round((ratedCount / stats.total) * 100) : 0;
+    stats.total > 0 ? Math.round((completedCount / stats.total) * 100) : 0;
 
   return stats;
 }
