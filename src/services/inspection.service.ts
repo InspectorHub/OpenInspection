@@ -1172,6 +1172,12 @@ export class InspectionService {
                     recommendation: itemRecommendation,
                     estimateMin: itemEstimateMin,
                     estimateMax: itemEstimateMax,
+                    // Non-rich item types persist the captured value on
+                    // res.value; surface it to the report viewer plus the
+                    // unit from item.options so the customer sees "Year
+                    // built · 1995 · yr" instead of an empty rating chip.
+                    value: (res as { value?: unknown }).value ?? null,
+                    unit:  (item as unknown as { options?: { unit?: string } }).options?.unit ?? null,
                     // Spec 5B v2 resolved tab payload — report PDFs render
                     // only entries where `included === true`.
                     resolvedTabs: {

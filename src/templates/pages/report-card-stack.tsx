@@ -13,6 +13,7 @@ import {
 interface ReportItem {
   id: string;
   label: string;
+  type?: string;
   rating: string | null;
   ratingColor: string;
   ratingLabel: string | null;
@@ -22,6 +23,10 @@ interface ReportItem {
   recommendation?: string | null;
   estimateMin?: number | null;
   estimateMax?: number | null;
+  /** Non-rich item types capture their value here (boolean/number/text/...). */
+  value?: unknown;
+  /** From item.options.unit; rendered as a small chip after numbers. */
+  unit?: string | null;
 }
 
 interface ReportSection {
@@ -409,6 +414,22 @@ export function ReportCardStackPage(props: ReportPageProps) {
                           </span>
                         )}
                       </div>
+                      {/* Non-rich item value — surface what the inspector
+                          captured on results[id].value so the customer
+                          actually sees the recorded input. Hidden for rich
+                          items (covered by the rating pill above) and when
+                          value is empty / undefined / null. */}
+                      {item.type && item.type !== 'rich' && item.value !== undefined && item.value !== null && item.value !== '' && (
+                        <p class="mt-2 text-sm font-semibold theme-text-primary">
+                          <span class="text-[10px] font-bold uppercase tracking-[0.2em] theme-text-muted mr-2">{item.type}</span>
+                          {Array.isArray(item.value)
+                            ? (item.value as unknown[]).join(' · ')
+                            : (item.type === 'boolean'
+                                ? ((item.value as boolean) ? 'Yes' : 'No')
+                                : String(item.value))}
+                          {item.unit ? <span class="theme-text-muted ml-1.5">{item.unit}</span> : null}
+                        </p>
+                      )}
                       {item.notes && <p class="text-sm theme-text-secondary mt-2 leading-relaxed">{item.notes}</p>}
                       {item.recommendation && (
                         <div class="mt-2 flex items-center gap-2 flex-wrap">
