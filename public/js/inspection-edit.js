@@ -361,15 +361,49 @@ function inspectionEditor(inspectionId) {
           return;
         }
         // Navigation: ArrowUp / ArrowDown move active item up/down,
+        // J / K Vim-style aliases (Design 0520 M11.2),
         // Enter advances to next, Shift+Enter goes to previous.
-        if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) {
+        if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'J' || (e.key === 'Enter' && !e.shiftKey)) {
           e.preventDefault();
           this.navigateItem(1);
           return;
         }
-        if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) {
+        if (e.key === 'ArrowUp' || e.key === 'k' || (e.key === 'Enter' && e.shiftKey)) {
+          // Note: capital K is already used by an earlier handler (block toggle
+          // around line 261). Only lowercase k aliases ArrowUp to avoid a clash.
           e.preventDefault();
           this.navigateItem(-1);
+          return;
+        }
+        // R = repeat the previous item's rating + notes (Design 0520 M11.1).
+        // "Previous" = the nearest earlier item in the current section that
+        // already carries a rating, so an inspector can chain similar items
+        // without re-typing. Skips if no prior item has a rating yet.
+        if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault();
+          if (!this.activeItem) {
+            if (typeof showToast === 'function') showToast('Select an item first to repeat the previous rating');
+            return;
+          }
+          var section = (this.template?.sections || []).find(s => (s.items || []).some(it => it.id === this.activeItem.id));
+          var sectionItems = section ? section.items : (this.template?.sections?.[0]?.items || []);
+          var activeIdx = sectionItems.findIndex(it => it.id === this.activeItem.id);
+          var prior = null;
+          for (var pi = activeIdx - 1; pi >= 0; pi--) {
+            var candidate = sectionItems[pi];
+            var res = this.results?.[candidate.id];
+            if (res && res.ratingLevelId) { prior = { id: candidate.id, res: res }; break; }
+          }
+          if (!prior) {
+            if (typeof showToast === 'function') showToast('No earlier rated item to repeat from');
+            return;
+          }
+          // Copy rating + canned/custom comment payload to the active item.
+          // Existing comments on the active item are replaced — `R` is the
+          // explicit "clone above" gesture, not an accumulator.
+          this.results[this.activeItem.id] = JSON.parse(JSON.stringify(prior.res));
+          this.debounceSave();
+          if (typeof showToast === 'function') showToast('Cloned rating + notes from previous item');
           return;
         }
         // P = add photo to active item (triggers global hidden file input)
