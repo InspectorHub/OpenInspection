@@ -167,6 +167,67 @@ function closeModal() {
     document.getElementById('tplName').value = '';
 }
 
+function showImportSpectoraModal() {
+    document.getElementById('importSpectoraModal').classList.remove('hidden');
+}
+
+function closeImportSpectoraModal() {
+    document.getElementById('importSpectoraModal').classList.add('hidden');
+    document.getElementById('importName').value = '';
+    document.getElementById('importPayload').value = '';
+    const result = document.getElementById('importResult');
+    if (result) { result.classList.add('hidden'); result.textContent = ''; }
+}
+
+async function submitImportSpectora() {
+    const name = document.getElementById('importName').value.trim();
+    const raw  = document.getElementById('importPayload').value.trim();
+    if (!name) { modalAlert('Please enter a template name.', 'Validation'); return; }
+    if (!raw)  { modalAlert('Please paste a Spectora export JSON.', 'Validation'); return; }
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch (e) { modalAlert('Invalid JSON: ' + e.message, 'Validation'); return; }
+
+    const btn = document.getElementById('submitImportBtn');
+    btn.disabled = true;
+    btn.textContent = 'Importing...';
+
+    try {
+        const res = await authFetch('/api/inspections/templates/import-spectora', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, spectora: parsed })
+        });
+        if (res.ok) {
+            const result = await res.json();
+            const newId = result?.data?.template?.id;
+            const stats = result?.data?.stats;
+            if (stats) {
+                const note = document.getElementById('importResult');
+                if (note) {
+                    note.textContent = 'Imported · ' + stats.sections + ' sections, ' + stats.items + ' items, ' + (stats.information + stats.defects + stats.limitations) + ' comments mapped' + (stats.unknownCommentTypes?.length ? ' (unknown kinds: ' + stats.unknownCommentTypes.join(', ') + ')' : '');
+                    note.classList.remove('hidden');
+                }
+            }
+            if (newId) {
+                setTimeout(() => { window.location.href = '/templates/' + newId + '/edit'; }, 600);
+            } else {
+                loadTemplates();
+                closeImportSpectoraModal();
+            }
+        } else {
+            const err = await res.json().catch(() => ({}));
+            const msg = err?.error?.message || err?.error || err?.message || 'Import failed';
+            modalAlert('Error: ' + msg, 'Error');
+        }
+    } catch (e) {
+        modalAlert('Connection error: ' + e.message, 'Error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Import';
+    }
+}
+
 async function submitTemplate() {
     const name = document.getElementById('tplName').value.trim();
     if (!name) { modalAlert('Please enter a template name.', 'Validation'); return; }
