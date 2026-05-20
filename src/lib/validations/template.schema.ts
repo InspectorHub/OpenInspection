@@ -169,6 +169,10 @@ const TemplateSectionSchema = z.object({
     // Track E2 — when true, the published report forces a page break BEFORE
     // this section in PDF output.
     alwaysPageBreak: z.boolean().optional(),
+    // Provenance from upstream platform imports (e.g. Spectora). The editor
+    // surfaces this as a small colored dot next to the section title so
+    // imported sections are visually distinguishable.
+    source:          ItemSourceSchema.nullable().optional(),
 }).strict();
 
 const RatingLevelSchema = z.object({

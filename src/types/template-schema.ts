@@ -132,6 +132,7 @@ export interface TemplateSection {
     items: TemplateItem[];
     disclaimerText?: string | null;
     alwaysPageBreak?: boolean;
+    source?: ItemSource | null;
 }
 
 export interface RatingLevel {

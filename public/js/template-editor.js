@@ -334,6 +334,7 @@ function templateEditor() {
                 if (s.identifier)       out.identifier = s.identifier;
                 if (s.disclaimerText)   out.disclaimerText = s.disclaimerText;
                 if (s.alwaysPageBreak)  out.alwaysPageBreak = !!s.alwaysPageBreak;
+                if (s.source && s.source.platform && s.source.externalId) out.source = { platform: s.source.platform, externalId: s.source.externalId };
                 return out;
             };
             const payload = {
