@@ -94,7 +94,7 @@ export const DASHBOARD_COLUMNS: ReadonlyArray<DashboardColumn> = [
     {
         id: 'closingDate',
         label: 'Closing Date',
-        defaultOn: false,
+        defaultOn: true,
         mobileVisible: false,
     },
     {

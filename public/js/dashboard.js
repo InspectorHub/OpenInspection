@@ -235,14 +235,40 @@ function dashboardMeta() {
         total:      0,
         inProgress: 0,
         syncedAt:   '',
+        userName:        '',     // first-name fallback derived from email local-part
+        nextInspection:  null,   // { time: 'HH:mm', address: '...' } if any today/upcoming
+        // Design 0520 — time-aware greeting. Falls back to "Welcome back" when
+        // userName is empty (still loading or anon).
+        get dashTitle() {
+            const hr = new Date().getHours();
+            const tod = hr < 5 ? 'evening' : hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening';
+            const who = this.userName || '';
+            return who ? `Good ${tod}, ${who}` : 'Dashboard';
+        },
         get metaText() {
             const parts = [];
             if (this.total > 0) parts.push(this.total + ' inspection' + (this.total === 1 ? '' : 's'));
             if (this.inProgress > 0) parts.push(this.inProgress + ' in progress');
+            if (this.nextInspection) parts.push('next: ' + this.nextInspection.time + ' · ' + this.nextInspection.address);
             if (this.syncedAt) parts.push('last sync ' + this.syncedAt);
             return parts.length ? parts.join(' · ') : 'No inspections yet';
         },
         async init() {
+            // Pull user identity once for greeting. Same endpoint the outer
+            // dashboard.js init() hits — small payload, second cached fetch.
+            try {
+                const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+                if (meRes.ok) {
+                    const me = await meRes.json();
+                    const email = me?.data?.user?.email || '';
+                    if (email) {
+                        const local = email.split('@')[0];
+                        // Capitalize first letter, strip common separators
+                        const cleaned = local.replace(/[._-].*$/, '');
+                        this.userName = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+                    }
+                }
+            } catch {}
             await this.reload();
             window.addEventListener('inspection-updated', () => this.reload());
         },
@@ -264,6 +290,21 @@ function dashboardMeta() {
                     : all.length;
                 this.inProgress = all.filter(i => i.status === 'in_progress').length;
                 this.syncedAt = relativeTime(new Date());
+
+                // Find next inspection — earliest scheduledAt across today + thisWeek
+                // that is in the future. Skip cancelled / completed.
+                const candidates = [
+                    ...(d.today || []),
+                    ...(d.thisWeek || []),
+                ].filter(i => i.scheduledAt || i.date)
+                 .map(i => ({ ...i, when: new Date(i.scheduledAt || i.date) }))
+                 .filter(i => i.when.getTime() > Date.now())
+                 .sort((a, b) => a.when - b.when);
+                const next = candidates[0];
+                this.nextInspection = next ? {
+                    time: next.when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+                    address: (next.propertyAddress || next.address || '').split(',')[0],
+                } : null;
             } catch {}
         },
     };
@@ -1037,7 +1078,7 @@ const DASHBOARD_COLUMN_REGISTRY = [
     { id: 'defectChips',     label: 'Defect Counts',    defaultOn: true                    },
     { id: 'agent',           label: 'Agent',            defaultOn: true                    },
     { id: 'price',           label: 'Price',            defaultOn: true                    },
-    { id: 'closingDate',     label: 'Closing Date',     defaultOn: false                   },
+    { id: 'closingDate',     label: 'Closing Date',     defaultOn: true                    },
     { id: 'orderId',         label: 'Order ID',         defaultOn: false                   },
     { id: 'referralSource',  label: 'Referral Source',  defaultOn: false                   },
     { id: 'propertyFacts',   label: 'Property Facts',   defaultOn: false                   },

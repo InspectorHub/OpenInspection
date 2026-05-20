@@ -27,7 +27,10 @@ const EYEBROW_TONE: Record<EyebrowColor, string> = {
 export interface PageHeaderProps {
     eyebrow?:      string;
     eyebrowColor?: EyebrowColor;
-    title:         string;
+    /** Title accepts JSX so pages can wire dynamic Alpine bindings
+     *  (e.g. `<span x-text="dashTitle">Dashboard</span>`) for time-aware
+     *  greetings without losing the canonical 22px typography. */
+    title:         string | JSX.Element;
     meta?:         JSX.Element | string;
     breadcrumb?:   BreadcrumbItem[];
     actions?:      JSX.Element;

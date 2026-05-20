@@ -31,7 +31,7 @@ export const InspectionRow = (): JSX.Element => (
                 x-text="i.propertyAddress || i.address || '(no address)'"
                 data-column="propertyAddress"
             ></p>
-            <p class="text-[12px] text-slate-500 mt-0.5">
+            <p class="text-[11px] text-slate-500 mt-0.5">
                 {/* Client name */}
                 <span x-show="isVisible('clientName')" data-column="clientName">
                     <span x-text="i.clientName || '—'"></span>
@@ -53,9 +53,30 @@ export const InspectionRow = (): JSX.Element => (
                 <template x-if="isVisible('inspector') && i.inspectorName">
                     <span data-column="inspector"> · <span class="text-slate-400">by</span> <span x-text="i.inspectorName"></span></span>
                 </template>
-                {/* Closing date — competitive parity G2 (Spectora §E.2) */}
+                {/* Closing date — competitive parity G2 (Spectora §E.2).
+                    Design 0520 inspector-app v3:days ≤ 7 渲染 urgency 徽章:
+                      ≤ 0:Overdue(rose)
+                      ≤ 3:Due Nd(rose)
+                      ≤ 7:Closes Nd(amber)
+                    days > 7:回退到原"closes 06/28/26"纯文本。 */}
                 <template x-if="isVisible('closingDate') && i.closingDate">
-                    <span data-column="closingDate"> · <span class="text-slate-400">closes</span> <span x-text="new Date(i.closingDate).toLocaleDateString()"></span></span>
+                    <span
+                        data-column="closingDate"
+                        x-data="{ get _u() { const d = Math.round((new Date(i.closingDate) - new Date()) / 86400000); return { days: d, tone: d <= 0 ? 'late' : d <= 3 ? 'rush' : d <= 7 ? 'watch' : 'far' }; } }"
+                    >
+                        <template x-if="_u.tone === 'far'">
+                            <span> · <span class="text-slate-400">closes</span> <span x-text="new Date(i.closingDate).toLocaleDateString()"></span></span>
+                        </template>
+                        <template x-if="_u.tone !== 'far'">
+                            <span> · <span
+                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide"
+                                x-bind:class="_u.tone === 'watch' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'"
+                            >
+                                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                                <span x-text="_u.tone === 'late' ? 'Overdue' : (_u.tone === 'rush' ? 'Due ' + _u.days + 'd' : 'Closes ' + _u.days + 'd')"></span>
+                            </span></span>
+                        </template>
+                    </span>
                 </template>
                 {/* Order ID — competitive parity G3 (Spectora §4.1) */}
                 <template x-if="isVisible('orderId') && i.orderId">
@@ -92,7 +113,7 @@ export const InspectionRow = (): JSX.Element => (
         <div
             x-show="isVisible('price') && i.price > 0"
             data-column="price"
-            class="text-[13px] font-mono font-semibold text-slate-700 tabular-nums"
+            class="text-[12px] font-mono font-semibold text-slate-700 tabular-nums"
             x-text="'$' + ((i.price || 0) / 100).toFixed(0)"
         ></div>
         {/* Status icons — Round-2 F2 (📄 ready · 📋 signed · ✈️ sent · 🚩 flag) */}

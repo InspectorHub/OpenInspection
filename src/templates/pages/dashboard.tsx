@@ -20,7 +20,7 @@ export const DashboardPage = ({ branding }: { branding?: BrandingConfig | undefi
                     <PageHeader
                         eyebrow="DASHBOARD"
                         eyebrowColor="indigo"
-                        title="Inspections"
+                        title={<span x-text="dashTitle">Dashboard</span>}
                         meta={
                             <span x-text="metaText"></span>
                         }
