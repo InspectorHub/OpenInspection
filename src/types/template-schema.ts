@@ -141,13 +141,21 @@ export interface RatingLevel {
     color?: string;
     severity?: 'good' | 'minor' | 'marginal' | 'significant';
     isDefect?: boolean;
+    default?: boolean;
     description?: string;
+}
+
+export interface RatingSystem {
+    name?: string;
+    defaultLevelId?: string;
+    source?: string | null;
+    levels: RatingLevel[];
 }
 
 export interface TemplateSchemaV2 {
     schemaVersion: 2;
     sections: TemplateSection[];
-    ratingSystem?: { levels: RatingLevel[] };
+    ratingSystem?: RatingSystem;
 }
 
 /**

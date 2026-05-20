@@ -341,17 +341,22 @@ function templateEditor() {
                 sections: (this.template.sections || []).map(pickSection),
             };
             if (this.template.ratingSystem && Array.isArray(this.template.ratingSystem.levels)) {
-                payload.ratingSystem = {
+                const rs = {
                     levels: this.template.ratingSystem.levels.map(l => {
                         const lv = { id: l.id, label: l.label || '' };
                         if (l.abbreviation) lv.abbreviation = l.abbreviation;
                         if (l.color)        lv.color        = l.color;
                         if (l.severity)     lv.severity     = l.severity;
                         if (typeof l.isDefect === 'boolean') lv.isDefect = l.isDefect;
+                        if (typeof l.default  === 'boolean') lv.default  = l.default;
                         if (l.description)  lv.description  = l.description;
                         return lv;
                     }),
                 };
+                if (this.template.ratingSystem.name)           rs.name = this.template.ratingSystem.name;
+                if (this.template.ratingSystem.defaultLevelId) rs.defaultLevelId = this.template.ratingSystem.defaultLevelId;
+                if (this.template.ratingSystem.source !== undefined) rs.source = this.template.ratingSystem.source;
+                payload.ratingSystem = rs;
             }
             return payload;
         },

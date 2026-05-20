@@ -178,7 +178,15 @@ const RatingLevelSchema = z.object({
     color:        z.string().optional(),
     severity:     z.enum(['good', 'minor', 'marginal', 'significant']).optional(),
     isDefect:     z.boolean().optional(),
+    default:      z.boolean().optional(),
     description:  z.string().optional(),
+}).strict();
+
+const RatingSystemSchema = z.object({
+    name:           z.string().optional(),
+    defaultLevelId: z.string().optional(),
+    source:         z.string().nullable().optional(),
+    levels:         z.array(RatingLevelSchema),
 }).strict();
 
 /**
@@ -187,7 +195,7 @@ const RatingLevelSchema = z.object({
 export const TemplateSchemaV2Schema = z.object({
     schemaVersion: z.literal(2),
     sections:      z.array(TemplateSectionSchema),
-    ratingSystem:  z.object({ levels: z.array(RatingLevelSchema) }).optional(),
+    ratingSystem:  RatingSystemSchema.optional(),
 }).strict();
 
 /**
