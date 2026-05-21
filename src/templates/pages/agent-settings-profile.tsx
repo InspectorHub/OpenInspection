@@ -69,6 +69,7 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Settings | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
@@ -86,6 +87,21 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                         --slate: #64748b;
                         --slate-soft: #64748b14;
                         --error: #b91c1c;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
+                        --ink: #f1f5f9;
+                        --ink-soft: #cbd5e1;
+                        --ink-faint: #94a3b8;
+                        --line: rgba(255,255,255,0.10);
+                        --surface: #0b1120;
+                        --surface-card: #1e293b;
+                        --surface-soft: #162032;
+                        --good: #4ade80;
+                        --good-soft: rgba(74,222,128,0.16);
+                        --slate: #94a3b8;
+                        --slate-soft: rgba(148,163,184,0.16);
+                        --error: #f87171;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {

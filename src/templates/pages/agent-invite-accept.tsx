@@ -39,6 +39,7 @@ export const AgentInviteAcceptPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`You're invited | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
@@ -49,6 +50,18 @@ export const AgentInviteAcceptPage = ({
                         --ink-faint: #a8a29e;
                         --line: #e7e5e4;
                         --surface: #fafaf9;
+                        --surface-card: #ffffff;
+                        --surface-soft: #f5f5f4;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
+                        --ink: #f1f5f9;
+                        --ink-soft: #cbd5e1;
+                        --ink-faint: #94a3b8;
+                        --line: rgba(255,255,255,0.10);
+                        --surface: #0b1120;
+                        --surface-card: #1e293b;
+                        --surface-soft: #162032;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
@@ -97,7 +110,7 @@ export const AgentInviteAcceptPage = ({
                         align-items: center;
                         gap: 1rem;
                         padding: 1.25rem;
-                        background: #ffffff;
+                        background: var(--surface-card);
                         border: 1px solid var(--line);
                         border-radius: 16px;
                         margin-bottom: 2rem;
@@ -143,7 +156,7 @@ export const AgentInviteAcceptPage = ({
                     }
                     .value-card {
                         padding: 1rem 0.875rem;
-                        background: #ffffff;
+                        background: var(--surface-card);
                         border: 1px solid var(--line);
                         border-radius: 12px;
                         text-align: center;
@@ -181,7 +194,7 @@ export const AgentInviteAcceptPage = ({
                         font-size: 0.9375rem;
                         font-family: inherit;
                         color: var(--ink);
-                        background: #fff;
+                        background: var(--surface-card);
                         border: 1.5px solid var(--line);
                         border-radius: 12px;
                         outline: none;
@@ -192,7 +205,7 @@ export const AgentInviteAcceptPage = ({
                         box-shadow: 0 0 0 3px var(--primary-soft);
                     }
                     .form-input[readonly] {
-                        background: #f5f5f4;
+                        background: var(--surface-soft);
                         color: var(--ink-soft);
                         cursor: not-allowed;
                     }
@@ -221,6 +234,11 @@ export const AgentInviteAcceptPage = ({
                         border: 1px solid #fecaca;
                         color: #b91c1c;
                         font-size: 0.875rem;
+                    }
+                    html[data-color-scheme="dark"] .error-box {
+                        background: rgba(127,29,29,0.25);
+                        border-color: rgba(248,113,113,0.40);
+                        color: #fca5a5;
                     }
                     .error-box.hidden { display: none; }
                     .footer-note {

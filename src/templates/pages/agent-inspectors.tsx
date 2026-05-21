@@ -56,6 +56,7 @@ export const AgentInspectorsPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Your inspectors | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
@@ -68,6 +69,16 @@ export const AgentInspectorsPage = ({
                         --surface: #fafaf9;
                         --surface-card: #ffffff;
                         --surface-soft: #f5f5f4;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
+                        --ink: #f1f5f9;
+                        --ink-soft: #cbd5e1;
+                        --ink-faint: #94a3b8;
+                        --line: rgba(255,255,255,0.10);
+                        --surface: #0b1120;
+                        --surface-card: #1e293b;
+                        --surface-soft: #162032;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {

@@ -20,11 +20,13 @@ export const AgentRecommendationsPage = ({ branding }: Props): JSX.Element => {
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <title>Recommendations · {siteName}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/css/main.css" />
                 <link rel="stylesheet" href="/fonts.css" />
                 <script src="/vendor/alpine.min.js" defer>{''}</script>
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root { --primary: ${primary}; --ink: #0f172a; --ink-soft: #475569; --ink-faint: #94a3b8; --line: #e2e8f0; --surface: #f8fafc; --surface-card: #fff; }
+                    html[data-color-scheme="dark"] { --ink: #f1f5f9; --ink-soft: #cbd5e1; --ink-faint: #94a3b8; --line: rgba(255,255,255,0.10); --surface: #0b1120; --surface-card: #1e293b; }
                     body { font-family: 'DM Sans', system-ui, sans-serif; color: var(--ink); background: var(--surface); margin: 0; }
                     .topbar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid var(--line); background: var(--surface-card); }
                     .brand-row { display: flex; align-items: center; gap: 0.625rem; }
@@ -57,6 +59,8 @@ export const AgentRecommendationsPage = ({ branding }: Props): JSX.Element => {
                     .rec-comment { font-size: 0.875rem; color: var(--ink); line-height: 1.5; margin: 0; }
                     .rec-empty { font-size: 0.875rem; color: var(--ink-faint); padding: 1rem 0; }
                     .loading-state, .error-state { padding: 3rem 2rem; text-align: center; color: var(--ink-soft); }
+                    html[data-color-scheme="dark"] .group-title.safety { color: #f87171; }
+                    html[data-color-scheme="dark"] .group-title.maintenance { color: #60a5fa; }
                     @media print {
                         .no-print { display: none !important; }
                         body { background: white; }

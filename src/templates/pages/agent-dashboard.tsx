@@ -150,6 +150,7 @@ export const AgentDashboardPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Agent dashboard | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
@@ -165,6 +166,19 @@ export const AgentDashboardPage = ({
                         --good-soft: #15803d14;
                         --warn: #b45309;
                         --slate: #475569;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
+                        --ink: #f1f5f9;
+                        --ink-soft: #cbd5e1;
+                        --ink-faint: #94a3b8;
+                        --line: rgba(255,255,255,0.10);
+                        --surface: #0b1120;
+                        --surface-card: #1e293b;
+                        --good: #4ade80;
+                        --good-soft: rgba(74,222,128,0.16);
+                        --warn: #fbbf24;
+                        --slate: #94a3b8;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
