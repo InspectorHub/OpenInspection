@@ -45,36 +45,29 @@ const toBase64 = (s: string): string => {
 };
 
 const HERO_STYLES = `
-body { background: #fafaf7; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #0f172a; margin: 0; }
+/* Customer-portal page — uses the warm --cp-* / --ih-* tokens defined in
+   input.css (auto-swap to dark via [data-color-scheme="dark"]). No
+   duplicate dark CSS block is needed here. */
+body { background: var(--cp-bg); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--cp-fg-1); margin: 0; }
 .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: end; padding: 96px 64px 48px; max-width: 1200px; margin: 0 auto; }
-.hero-name { font-family: 'Fraunces', Georgia, serif; font-size: 96px; font-weight: 600; letter-spacing: -0.02em; line-height: 0.95; margin: 0; transform: translateX(-12px); color: #0f172a; }
+.hero-name { font-family: 'Fraunces', Georgia, serif; font-size: 96px; font-weight: 600; letter-spacing: -0.02em; line-height: 0.95; margin: 0; transform: translateX(-12px); color: var(--cp-fg-1); }
 .hero-photo-wrap { display: flex; justify-content: flex-end; }
 .hero-photo { width: 100%; max-width: 360px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; transform: translateY(48px); display: block; }
-.hero-photo--placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%); color: #64748b; font-family: 'Fraunces', serif; font-size: 96px; font-weight: 600; }
-.meta-strip { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.08em; color: #64748b; margin-top: 16px; text-transform: uppercase; }
-.area-chip { display: inline-block; padding: 4px 10px; border-radius: 100px; background: #f1f5f9; color: #475569; font-size: 12px; margin: 0 6px 6px 0; }
-.bio { max-width: 640px; padding: 24px 64px; font-size: 18px; line-height: 1.6; color: #1e293b; margin: 0 auto; }
+.hero-photo--placeholder { display: flex; align-items: center; justify-content: center; background: var(--cp-bg-muted); color: var(--cp-fg-4); font-family: 'Fraunces', serif; font-size: 96px; font-weight: 600; }
+.meta-strip { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.08em; color: var(--cp-fg-3); margin-top: 16px; text-transform: uppercase; }
+.area-chip { display: inline-block; padding: 4px 10px; border-radius: 100px; background: var(--cp-bg-muted); color: var(--cp-fg-2); font-size: 12px; margin: 0 6px 6px 0; }
+.bio { max-width: 640px; padding: 24px 64px; font-size: 18px; line-height: 1.6; color: var(--cp-fg-2); margin: 0 auto; }
 .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 1200px; margin: 48px auto; padding: 0 64px; }
-.service-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; }
-.service-duration { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #94a3b8; letter-spacing: 0.06em; text-transform: uppercase; }
+.service-card { background: var(--cp-bg-card); border: var(--cp-border); border-radius: 12px; padding: 24px; }
+.service-duration { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--cp-fg-4); letter-spacing: 0.06em; text-transform: uppercase; }
 .service-price { font-family: 'Fraunces', serif; font-size: 32px; font-weight: 600; margin: 8px 0; line-height: 1; }
-.service-name { font-size: 14px; color: #475569; }
-.trust-strip { background: #0f172a; color: #fafaf7; padding: 24px 64px; margin: 48px 0 0; display: flex; justify-content: center; gap: 48px; font-size: 13px; letter-spacing: 0.04em; flex-wrap: wrap; }
+.service-name { font-size: 14px; color: var(--cp-fg-2); }
+.trust-strip { background: var(--cp-hero-bg); color: var(--cp-hero-fg); padding: 24px 64px; margin: 48px 0 0; display: flex; justify-content: center; gap: 48px; font-size: 13px; letter-spacing: 0.04em; flex-wrap: wrap; }
 .cta-section { padding: 64px; text-align: center; }
 .cta-button { display: inline-block; background: var(--ih-primary, #6366f1); color: #fff; padding: 16px 32px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 16px; transition: opacity 150ms; }
 .cta-button:hover { opacity: 0.9; }
-.contact-footer { padding: 32px 64px; font-size: 13px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; }
+.contact-footer { padding: 32px 64px; font-size: 13px; color: var(--cp-fg-3); text-align: center; border-top: var(--cp-border); }
 .contact-link { background: none; border: none; color: inherit; cursor: pointer; text-decoration: underline; font: inherit; padding: 0; }
-html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
-html[data-color-scheme="dark"] .hero-name { color: #f1f5f9; }
-html[data-color-scheme="dark"] .hero-photo--placeholder { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #94a3b8; }
-html[data-color-scheme="dark"] .meta-strip { color: #94a3b8; }
-html[data-color-scheme="dark"] .area-chip { background: rgba(255,255,255,0.06); color: #cbd5e1; }
-html[data-color-scheme="dark"] .bio { color: #cbd5e1; }
-html[data-color-scheme="dark"] .service-card { background: #1e293b; border-color: rgba(255,255,255,0.10); }
-html[data-color-scheme="dark"] .service-duration { color: #94a3b8; }
-html[data-color-scheme="dark"] .service-name { color: #cbd5e1; }
-html[data-color-scheme="dark"] .contact-footer { color: #94a3b8; border-top-color: rgba(255,255,255,0.08); }
 @media (max-width: 600px) {
     .hero { grid-template-columns: 1fr; padding: 48px 24px 24px; gap: 16px; }
     .hero-name { font-size: 56px; transform: none; }

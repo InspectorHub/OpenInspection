@@ -84,12 +84,16 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                     no localStorage / no in-page toggle (per design system). */}
                 <script dangerouslySetInnerHTML={{ __html: `(function(){var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',p?'dark':'light');})()`}} />
                 <style dangerouslySetInnerHTML={{ __html: `
+                    /* Use the customer-portal warm palette tokens (defined
+                       in input.css) — they auto-swap to warm-dark under
+                       [data-color-scheme="dark"], so no duplicate dark
+                       rule block is needed here. */
                     :root { --brand: ${primaryColor}; }
                     * { box-sizing: border-box; }
                     body {
                         margin: 0;
-                        background: #f8fafc;
-                        color: #0f172a;
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Helvetica Neue', Arial, sans-serif;
                         font-size: 14px;
                         line-height: 1.5;
@@ -100,13 +104,15 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                         padding: 24px 16px;
                     }
                     .card {
-                        background: #ffffff;
-                        border: 1px solid #e2e8f0;
+                        background: var(--cp-bg-card);
+                        border: var(--cp-border);
                         border-radius: 12px;
                         padding: 32px;
                         max-width: 520px;
                         width: 100%;
                     }
+                    /* Status pills use the global --ih-status-* tokens, which
+                       also re-resolve to legible dark equivalents. */
                     .pill {
                         display: inline-flex;
                         align-items: center;
@@ -119,41 +125,41 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                         letter-spacing: 0.02em;
                         margin-bottom: 16px;
                     }
-                    .pill.amber { background: #fef3c7; color: #92400e; }
-                    .pill.green { background: #d1fae5; color: #065f46; }
+                    .pill.amber { background: var(--ih-status-watch-bg); color: var(--ih-status-watch-fg); }
+                    .pill.green { background: var(--ih-status-ok-bg);    color: var(--ih-status-ok-fg); }
                     .pill::before {
                         content: '';
                         display: inline-block;
                         width: 6px; height: 6px;
                         border-radius: 50%;
                     }
-                    .pill.amber::before { background: #f59e0b; }
-                    .pill.green::before { background: #10b981; }
+                    .pill.amber::before { background: var(--ih-status-watch); }
+                    .pill.green::before { background: var(--ih-status-ok); }
                     h1 {
                         margin: 0 0 8px 0;
                         font-size: 22px;
                         font-weight: 700;
                         letter-spacing: -0.015em;
-                        color: #0f172a;
+                        color: var(--cp-fg-1);
                     }
                     p.lead {
                         margin: 0 0 24px 0;
-                        color: #64748b;
+                        color: var(--cp-fg-3);
                         line-height: 1.6;
                     }
                     .meta {
-                        background: #f8fafc;
-                        border: 1px solid #e2e8f0;
+                        background: var(--cp-bg-muted);
+                        border: var(--cp-border);
                         border-radius: 6px;
                         padding: 12px 16px;
                         margin: 0 0 24px 0;
                         font-size: 13px;
-                        color: #475569;
+                        color: var(--cp-fg-2);
                     }
-                    .meta strong { color: #0f172a; font-weight: 600; }
+                    .meta strong { color: var(--cp-fg-1); font-weight: 600; }
                     .meta div + div { margin-top: 4px; }
                     .invoice-box {
-                        border: 1px solid #e2e8f0;
+                        border: var(--cp-border);
                         border-radius: 8px;
                         padding: 16px;
                         margin: 0 0 24px 0;
@@ -164,23 +170,23 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                         align-items: baseline;
                         padding: 6px 0;
                         font-size: 13px;
-                        color: #475569;
+                        color: var(--cp-fg-2);
                     }
-                    .invoice-box .row + .row { border-top: 1px solid #f1f5f9; }
+                    .invoice-box .row + .row { border-top: 1px solid var(--cp-divider); }
                     .invoice-box .row.total {
-                        border-top: 1px solid #cbd5e1;
+                        border-top: var(--cp-border-strong);
                         margin-top: 4px;
                         padding-top: 12px;
-                        color: #0f172a;
+                        color: var(--cp-fg-1);
                         font-weight: 700;
                         font-size: 15px;
                     }
                     .invoice-box .row.total .amount { color: var(--brand); }
-                    .invoice-box .desc { color: #475569; }
-                    .invoice-box .amount { color: #0f172a; font-variant-numeric: tabular-nums; font-weight: 600; }
+                    .invoice-box .desc { color: var(--cp-fg-2); }
+                    .invoice-box .amount { color: var(--cp-fg-1); font-variant-numeric: tabular-nums; font-weight: 600; }
                     .due-line {
                         font-size: 12px;
-                        color: #64748b;
+                        color: var(--cp-fg-3);
                         margin-top: 8px;
                     }
                     a.cta {
@@ -200,11 +206,11 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                     a.cta:hover { opacity: 0.92; }
                     a.cta:focus-visible {
                         outline: none;
-                        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.32);
+                        box-shadow: var(--ih-shadow-focus);
                     }
                     .contact-line {
                         font-size: 13px;
-                        color: #475569;
+                        color: var(--cp-fg-2);
                         margin-top: 4px;
                     }
                     .contact-line a { color: var(--brand); text-decoration: none; }
@@ -212,29 +218,12 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                     .brand {
                         margin-top: 24px;
                         font-size: 11px;
-                        color: #94a3b8;
+                        color: var(--cp-fg-4);
                         text-align: center;
                     }
                     @media (prefers-reduced-motion: reduce) {
                         a.cta { transition: none; }
                     }
-                    html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
-                    html[data-color-scheme="dark"] .card { background: #1e293b; border-color: rgba(255,255,255,0.10); }
-                    html[data-color-scheme="dark"] h1 { color: #f1f5f9; }
-                    html[data-color-scheme="dark"] p.lead { color: #94a3b8; }
-                    html[data-color-scheme="dark"] .meta { background: #162032; border-color: rgba(255,255,255,0.08); color: #cbd5e1; }
-                    html[data-color-scheme="dark"] .meta strong { color: #f1f5f9; }
-                    html[data-color-scheme="dark"] .invoice-box { border-color: rgba(255,255,255,0.08); }
-                    html[data-color-scheme="dark"] .invoice-box .row { color: #cbd5e1; }
-                    html[data-color-scheme="dark"] .invoice-box .row + .row { border-top-color: rgba(255,255,255,0.06); }
-                    html[data-color-scheme="dark"] .invoice-box .row.total { border-top-color: rgba(255,255,255,0.18); color: #f1f5f9; }
-                    html[data-color-scheme="dark"] .invoice-box .desc { color: #94a3b8; }
-                    html[data-color-scheme="dark"] .invoice-box .amount { color: #f1f5f9; }
-                    html[data-color-scheme="dark"] .due-line,
-                    html[data-color-scheme="dark"] .contact-line,
-                    html[data-color-scheme="dark"] .brand { color: #94a3b8; }
-                    html[data-color-scheme="dark"] .pill.amber { background: rgba(120,53,15,0.32); color: #fbbf24; }
-                    html[data-color-scheme="dark"] .pill.green { background: rgba(6,78,59,0.32); color: #4ade80; }
                 `}} />
             </head>
             <body>

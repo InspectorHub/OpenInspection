@@ -31,8 +31,7 @@ export const InlineTextPopover = (): JSX.Element => (
     >
         {/* Backdrop — neutral slate, not color-tinted */}
         <div
-            class="absolute inset-0 bg-slate-900/30"
-            style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+            class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             x-on:click="close()"
             x-transition:enter="ease-out duration-200"
             x-transition:enter-start="opacity-0"

@@ -41,14 +41,23 @@ export function ProgressStrip(): JSX.Element {
                 <span x-show="etaMin > 0" x-text={"` · ETA ${etaMin} min`"} />
             </div>
 
-            {/* Heat-map row */}
+            {/* Heat-map row — flat fill via two divs (no linear-gradient;
+                the design system reserves linear-gradient for the single
+                --ih-primary-gradient brand CTA). The outer is the unrated
+                track, the inner is the rated portion sized as a % width. */}
             <div class="flex-1 flex gap-1 overflow-hidden">
                 <template x-for="sec in heatMap" x-bind:key="sec.sectionId">
                     <div
-                        class="flex-1 h-2 rounded"
-                        x-bind:style={"`background: linear-gradient(to right, var(--ih-status-ok, #10b981) ${sec.percent}%, var(--ih-slate-200, #e2e8f0) ${sec.percent}%)`"}
+                        class="flex-1 h-2 rounded overflow-hidden relative"
+                        style="background: var(--ih-slate-200, #e2e8f0);"
                         x-bind:title={"`${sec.sectionId}: ${sec.percent}% (${sec.rated}/${sec.total})`"}
-                    ></div>
+                    >
+                        <div
+                            class="absolute inset-y-0 left-0"
+                            style="background: var(--ih-status-ok, #10b981);"
+                            x-bind:style={"`width: ${sec.percent}%`"}
+                        ></div>
+                    </div>
                 </template>
             </div>
         </div>

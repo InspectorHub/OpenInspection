@@ -37,10 +37,13 @@ export const AgentDashboardHero = (props: AgentDashboardHeroProps = {}): JSX.Ele
 
     return (
         <section class="relative rounded-xl overflow-hidden bg-slate-900 text-white">
-            {/* Dark slate gradient backdrop. NOT an atmospheric blob — just a flat
-                radial highlight that breaks up the slab without animating. */}
-            <div class="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950" aria-hidden="true"></div>
-            <div class="absolute inset-0" style="background-image: radial-gradient(circle at 30% 40%, rgba(99,102,241,0.15) 0%, transparent 50%);" aria-hidden="true"></div>
+            {/* Flat slate-900 slab with a subtle off-center indigo accent.
+                The design system allows exactly one gradient (the brand
+                --ih-primary-gradient on CTAs); replaced the previous
+                slate-800→slate-950 backdrop with a flat fill + accent
+                radial highlight at the same opacity so the editorial
+                feel survives without violating the gradient rule. */}
+            <div class="absolute inset-0" style="background-image: radial-gradient(circle at 30% 40%, rgba(99,102,241,0.18) 0%, transparent 55%);" aria-hidden="true"></div>
 
             <div class="relative px-6 py-8 md:px-10 md:py-10">
                 <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">

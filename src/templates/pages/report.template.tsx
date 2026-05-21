@@ -458,7 +458,7 @@ export function renderProfessionalReport(data: {
                     
                     <div class="flex flex-col sm:flex-row justify-center gap-6">
                         <button onclick="window.print()" class="px-12 py-5 bg-white text-slate-900 rounded-2xl text-sm font-bold uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-50 active:scale-95 transition-all">Print / Save PDF</button>
-                        <a href="/dashboard" class="px-12 py-5 bg-white/10 text-white border border-white/20 rounded-2xl text-sm font-bold uppercase tracking-[0.2em] backdrop-blur-md hover:bg-white/20 active:scale-95 transition-all">Back to Dashboard</a>
+                        <a href="/dashboard" class="px-12 py-5 bg-white/10 text-white border border-white/20 rounded-2xl text-sm font-bold uppercase tracking-[0.2em] hover:bg-white/20 active:scale-95 transition-all">Back to Dashboard</a>
                     </div>
                 </div>
             </div>
@@ -476,7 +476,7 @@ export function renderProfessionalReport(data: {
 
     {/* Report Paywall Gate */}
     <template x-if="showAgreement">
-        <div class="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-2xl">
+        <div class="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-sm">
             <div class="bg-white rounded-2xl shadow-[0_60px_120px_-20px_rgba(0,0,0,0.6)] max-w-3xl w-full p-16 space-y-12 animate-slide-in">
                 <div class="text-center">
                     <div class="w-20 h-20 bg-indigo-600 rounded-lg flex items-center justify-center mx-auto mb-8 shadow-md">
@@ -508,7 +508,7 @@ export function renderProfessionalReport(data: {
     </template>
 
     <template x-if="signed && showPayment && !paid">
-        <div class="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-2xl">
+        <div class="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-sm">
             <div class="bg-white rounded-2xl shadow-[0_60px_120px_-20px_rgba(0,0,0,0.6)] max-w-xl w-full p-16 text-center space-y-12 animate-slide-in">
                 <div class="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mx-auto shadow-md/50">
                     <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>

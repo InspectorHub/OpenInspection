@@ -1,9 +1,13 @@
 /**
  * Color scheme — auto / dark / light.
- * Reads/writes localStorage key 'ih-color-scheme'.
+ * Reads/writes localStorage key 'oi-color-scheme' (per design system).
  *   null / absent → auto  (follow OS prefers-color-scheme)
  *   'dark'        → dark
  *   'light'       → light
+ *
+ * One-time migration: pre-design-system builds wrote 'ih-color-scheme'.
+ * On first read we lift any legacy value over to the new key and drop the
+ * old one so the user's preference survives the rename.
  *
  * Public API:
  *   window.setColorScheme(mode)  — set 'auto'|'dark'|'light' explicitly
@@ -13,8 +17,22 @@
  * <head> before stylesheets load to prevent FOUC.
  */
 (function () {
+    var STORAGE_KEY = 'oi-color-scheme';
+    var LEGACY_KEY  = 'ih-color-scheme';
+
+    function migrateLegacy() {
+        try {
+            var legacy = localStorage.getItem(LEGACY_KEY);
+            if (legacy && !localStorage.getItem(STORAGE_KEY)) {
+                localStorage.setItem(STORAGE_KEY, legacy);
+            }
+            if (legacy) localStorage.removeItem(LEGACY_KEY);
+        } catch (e) { /* private mode etc. */ }
+    }
+    migrateLegacy();
+
     function currentMode() {
-        var s = localStorage.getItem('ih-color-scheme');
+        var s = localStorage.getItem(STORAGE_KEY);
         return s === 'dark' || s === 'light' ? s : 'auto';
     }
 
@@ -24,11 +42,11 @@
 
     function applyMode(mode) {
         if (mode === 'auto') {
-            localStorage.removeItem('ih-color-scheme');
+            localStorage.removeItem(STORAGE_KEY);
             var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.documentElement.setAttribute('data-color-scheme', sysDark ? 'dark' : 'light');
         } else {
-            localStorage.setItem('ih-color-scheme', mode);
+            localStorage.setItem(STORAGE_KEY, mode);
             document.documentElement.setAttribute('data-color-scheme', mode);
         }
     }

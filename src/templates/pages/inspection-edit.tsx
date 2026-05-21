@@ -2025,7 +2025,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
 
         {/* Onboarding overlay (T6) */}
         <div x-data="inspectionOnboarding()" {...{'x-on:rating-levels-ready.window': 'init($event.detail)'}}>
-            <div x-show="active" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,23,42,0.78);backdrop-filter:blur(6px);">
+            <div x-show="active" x-cloak class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
                 <div class="rounded-lg p-8 max-w-md w-full shadow-2xl" style="background:rgba(255,255,255,0.96);border:1px solid rgba(255,255,255,0.6);">
                     <div class="flex items-center gap-3 mb-4">
                         <span x-show="currentStep.abbr" class="px-3 py-1 rounded-lg text-white font-mono font-bold text-sm"
@@ -2290,8 +2290,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         class="fixed inset-0 z-[55] flex items-start justify-center pt-[12vh] px-4"
       >
         <div
-          class="absolute inset-0 bg-slate-900/30"
-          style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+          class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
           x-on:click="closeSectionPicker()"
           x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
           x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
@@ -2354,8 +2353,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         class="fixed inset-0 z-[55] flex items-start justify-center pt-[12vh] px-4"
       >
         <div
-          class="absolute inset-0 bg-slate-900/30"
-          style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+          class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
           x-on:click="closeTagPicker()"
           x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
           x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"

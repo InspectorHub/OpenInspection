@@ -45,7 +45,7 @@ export const ConciergeBookPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Book for ${inspectorName} | ${siteName}`}</title>
-                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
+                <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -67,11 +67,6 @@ export const ConciergeBookPage = ({
                     html[data-color-scheme="dark"] input[type="date"],
                     html[data-color-scheme="dark"] select { background: #162032; border-color: rgba(255,255,255,0.12); color: #f1f5f9; }
                     html[data-color-scheme="dark"] .toggle-row { background: #162032; border-color: rgba(255,255,255,0.08); }
-                    html[data-color-scheme="dark"] .err {
-                        background: rgba(127,29,29,0.25);
-                        border-color: rgba(248,113,113,0.40);
-                        color: #fca5a5;
-                    }
                     /* Mode-bar stays warm orange in dark mode — it's a branded
                        persistent context indicator, keep saturation. */
                     html[data-color-scheme="dark"] .mode-bar { background: rgba(154,52,18,0.30); border-color: rgba(254,215,170,0.20); color: #fdba74; }
@@ -130,8 +125,10 @@ export const ConciergeBookPage = ({
                     .cta:disabled { background: #a8a29e; cursor: progress; }
                     .err {
                         margin-top: 0.75rem; padding: 0.75rem 1rem;
-                        background: #fef2f2; color: #b91c1c;
-                        border: 1px solid #fecaca; border-radius: 8px;
+                        background: var(--ih-status-bad-bg);
+                        color: var(--ih-status-bad-fg);
+                        border: 1px solid var(--ih-status-bad);
+                        border-radius: 8px;
                         font-size: 0.875rem;
                     }
                     /* Post-submit timeline — appears after a successful submit. */
