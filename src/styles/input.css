@@ -1002,6 +1002,82 @@ html[data-color-scheme="dark"] .hover\:bg-blueprint-500:hover { background-color
 html[data-color-scheme="dark"] .divide-slate-200 > * + * { border-color: rgba(255,255,255,0.08) !important; }
 html[data-color-scheme="dark"] .divide-slate-100 > * + * { border-color: rgba(255,255,255,0.05) !important; }
 
+/* ── Generic page-chrome slate bgs (e.g. join, agreement-sign wrappers) ── */
+html[data-color-scheme="dark"] body > .bg-slate-50,
+html[data-color-scheme="dark"] body > div .bg-slate-50:not([class*="border-"]):not([class*="rounded-"]) {
+    background-color: var(--ih-bg-app) !important;
+}
+
+/* ── Status-color callouts (alerts, badges) — dark mode equivalents ─────
+   These are used as opaque alert backgrounds throughout the dashboard,
+   settings, and standalone pages (bg-{red,rose,amber,emerald}-50 + text-*-
+   600/700 + border-*-100/200). Without these the light pastel boxes look
+   stranded on the dark slate canvas. */
+html[data-color-scheme="dark"] .bg-red-50,
+html[data-color-scheme="dark"] .bg-rose-50 {
+    background-color: rgba(127,29,29,0.22) !important;
+}
+html[data-color-scheme="dark"] .border-red-100,
+html[data-color-scheme="dark"] .border-rose-100,
+html[data-color-scheme="dark"] .border-red-200,
+html[data-color-scheme="dark"] .border-rose-200 {
+    border-color: rgba(248,113,113,0.32) !important;
+}
+html[data-color-scheme="dark"] .text-red-600,
+html[data-color-scheme="dark"] .text-rose-600,
+html[data-color-scheme="dark"] .text-red-700,
+html[data-color-scheme="dark"] .text-rose-700,
+html[data-color-scheme="dark"] .text-red-500,
+html[data-color-scheme="dark"] .text-rose-500 {
+    color: #fca5a5 !important;
+}
+
+html[data-color-scheme="dark"] .bg-amber-50 {
+    background-color: rgba(120,53,15,0.28) !important;
+}
+html[data-color-scheme="dark"] .bg-amber-100 {
+    background-color: rgba(120,53,15,0.40) !important;
+}
+html[data-color-scheme="dark"] .border-amber-100,
+html[data-color-scheme="dark"] .border-amber-200,
+html[data-color-scheme="dark"] .border-amber-300 {
+    border-color: rgba(251,191,36,0.36) !important;
+}
+html[data-color-scheme="dark"] .text-amber-600,
+html[data-color-scheme="dark"] .text-amber-700,
+html[data-color-scheme="dark"] .text-amber-800,
+html[data-color-scheme="dark"] .text-amber-900 {
+    color: #fbbf24 !important;
+}
+
+html[data-color-scheme="dark"] .bg-emerald-50,
+html[data-color-scheme="dark"] .bg-green-50 {
+    background-color: rgba(6,78,59,0.28) !important;
+}
+html[data-color-scheme="dark"] .border-emerald-100,
+html[data-color-scheme="dark"] .border-emerald-200,
+html[data-color-scheme="dark"] .border-green-100,
+html[data-color-scheme="dark"] .border-green-200 {
+    border-color: rgba(74,222,128,0.32) !important;
+}
+html[data-color-scheme="dark"] .text-emerald-600,
+html[data-color-scheme="dark"] .text-emerald-700,
+html[data-color-scheme="dark"] .text-green-600,
+html[data-color-scheme="dark"] .text-green-700 {
+    color: #4ade80 !important;
+}
+
+html[data-color-scheme="dark"] .bg-indigo-50 {
+    background-color: rgba(99,102,241,0.14) !important;
+}
+html[data-color-scheme="dark"] .bg-indigo-100 {
+    background-color: rgba(99,102,241,0.20) !important;
+}
+html[data-color-scheme="dark"] .border-indigo-100,
+html[data-color-scheme="dark"] .border-indigo-200 {
+    border-color: rgba(129,140,248,0.36) !important;
+}
+
 /* ── Theme toggle icon swap — JS (updateUI) controls which icon is shown ─ */
 /* Hide all three icons on initial paint; DOMContentLoaded updateUI reveals one. */
 #themeSunIcon, #themeMoonIcon, #themeAutoIcon                   { display: none; }
