@@ -59,9 +59,6 @@ import { CommentsPage } from './templates/pages/comments';
 import { InvoicesPage } from './templates/pages/invoices';
 import { ReportCardStackPage } from './templates/pages/report-card-stack';
 import { InspectionEditPage } from './templates/pages/inspection-edit';
-import { InspectionPhotosPage } from './templates/pages/inspection/photos';
-import { InspectionSummaryPage } from './templates/pages/inspection/summary';
-import { InspectionSignaturesPage } from './templates/pages/inspection/signatures';
 import { InspectionSettingsPage } from './templates/pages/inspection/settings';
 import { RepairListPage } from './templates/pages/inspection/repair-list';
 import { CustomerRepairRequestPage } from './templates/pages/customer-repair-request';
@@ -2347,16 +2344,22 @@ app.get('/inspections/:id/form', htmlAuthGuard(['owner', 'admin', 'inspector']),
 //
 // `/edit` is preserved as a 302 redirect to `/report` for backward
 // compatibility with bookmarks and existing JS that still constructs the
-// legacy URL. The canonical surface is the 5-tab sub-route family:
+// legacy URL. The canonical surface is the sub-route family:
 //   /inspections/:id/report     — primary editor (existing inspection-edit)
-//   /inspections/:id/photos     — read-only gallery
-//   /inspections/:id/summary    — read-only defects preview
-//   /inspections/:id/signatures — agreement envelopes + audit chain timeline
 //   /inspections/:id/settings   — schedule / inspector / template / gates
 //
-// All five share <InspectionShell> for sub-nav + breadcrumb. The Report tab
-// keeps the existing BareLayout-based editor untouched so the Alpine sticky
-// header and full-canvas drawing surface continue to work.
+// Summary, Photos, and Signatures were retired in the design-alignment
+// rollback:
+//   - Summary lives in the editor's Preview link (renders defects view)
+//   - Photos lives in a slide-over sheet inside the editor, triggered by
+//     the editor toolbar's Photos button (photo-gallery-sheet.js)
+//   - Signatures envelopes + audit chain fold into PublishModal as a
+//     collapsible block (envelope-audit.js); the pre-flight check row
+//     is the primary signal for inspector and customer.
+//
+// All sub-routes share <InspectionShell> for sub-nav + breadcrumb. The Report
+// tab keeps the existing BareLayout-based editor untouched so the Alpine
+// sticky header and full-canvas drawing surface continue to work.
 async function loadInspectionShellData(c: Context<HonoConfig>, inspectionId: string) {
     const tenantId = c.get('tenantId');
     if (!tenantId) return null;
@@ -2437,48 +2440,6 @@ app.get('/inspections/:id/report', htmlAuthGuard(['owner', 'admin', 'inspector']
     return c.html(InspectionEditPage({ inspectionId: id, branding: c.get('branding'), enableRepairList }));
 });
 
-app.get('/inspections/:id/photos', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
-    const id = c.req.param('id');
-    if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionPhotosPage({
-        inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
-        branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
-    }));
-});
-
-app.get('/inspections/:id/summary', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
-    const id = c.req.param('id');
-    if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionSummaryPage({
-        inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
-        branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
-    }));
-});
-
-app.get('/inspections/:id/signatures', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
-    const id = c.req.param('id');
-    if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionSignaturesPage({
-        inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
-        tenantSlug: c.get('requestedSubdomain') ?? '',
-        branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
-    }));
-});
 
 app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
     const id = c.req.param('id');

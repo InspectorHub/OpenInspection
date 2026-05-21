@@ -210,18 +210,6 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 text-slate-900 dark:text-slate-100 whitespace-nowrap"
               style="border-color: var(--ih-primary, #6366f1);"
             >Report</a>
-            <a
-              href={`/inspections/${inspectionId}/photos`}
-              role="tab"
-              aria-selected="false"
-              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
-            >Photos</a>
-            <a
-              href={`/inspections/${inspectionId}/summary`}
-              role="tab"
-              aria-selected="false"
-              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
-            >Summary</a>
             {/* Track E1 (ITB §11) — opt-in 6th tab. */}
             {enableRepairList && (
               <a
@@ -232,12 +220,6 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
               >Repair List</a>
             )}
-            <a
-              href={`/inspections/${inspectionId}/signatures`}
-              role="tab"
-              aria-selected="false"
-              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
-            >Signatures</a>
             <a
               href={`/inspections/${inspectionId}/settings`}
               role="tab"
@@ -1451,6 +1433,23 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
                   Inspector
                 </button>
+                {/* Photo-gallery trigger — opens the slide-over sheet
+                    that replaced the retired /photos sub-tab. The sheet
+                    itself is mounted further down in the editor body so
+                    it can layer above the editor canvas. */}
+                <button
+                  type="button"
+                  x-on:click="$dispatch('photo-gallery:open')"
+                  aria-label="Open photo gallery"
+                  class="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <path d="M21 15l-5-5L5 21"/>
+                  </svg>
+                  Photos
+                </button>
                 <button x-on:click="previewReport()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl text-slate-500 dark:text-slate-400">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   Preview
@@ -2303,6 +2302,87 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
              Send All disabled when nothing is checked. Empty-state shown
              when the inspection has no contacts. */}
         <PublishModal />
+        {/* Design-alignment B+C — photo-gallery slide-over, replacing the
+            retired /inspections/:id/photos sub-tab. Opens via the editor
+            toolbar's Photos button (dispatches `photo-gallery:open`). */}
+        <div
+          x-data={`photoGallerySheet('${inspectionId}')`}
+          {...{
+            'x-on:photo-gallery:open.window': 'toggle()',
+            'x-on:keydown.escape.window': 'close()',
+          }}
+        >
+          <div
+            x-show="open"
+            x-cloak
+            x-on:click="close()"
+            class="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm"
+            aria-hidden="true"
+            {...{ 'x-transition.opacity': '' }}
+          ></div>
+          <aside
+            x-show="open"
+            x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="translate-x-full"
+            x-transition:enter-end="translate-x-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="translate-x-0"
+            x-transition:leave-end="translate-x-full"
+            role="dialog"
+            aria-modal="true"
+            aria-label="All photos"
+            class="fixed top-0 right-0 bottom-0 w-full max-w-2xl z-[61] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col"
+          >
+            <header class="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 dark:border-slate-700">
+              <div class="min-w-0">
+                <h2 class="text-[14px] font-bold text-slate-900 dark:text-slate-100">All photos</h2>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="totalPhotos + (totalPhotos === 1 ? ' photo' : ' photos') + ' across ' + sections.length + ' section' + (sections.length === 1 ? '' : 's')"></p>
+              </div>
+              <button
+                type="button"
+                x-on:click="close()"
+                aria-label="Close"
+                class="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </header>
+
+            <div x-show="loading" class="px-5 py-8 text-center text-[12px] text-slate-400 dark:text-slate-500">Loading photos…</div>
+            <div x-show="loaded && totalPhotos === 0" style="display:none" class="px-5 py-12 text-center">
+              <p class="text-[13px] text-slate-500 dark:text-slate-400">No photos uploaded yet.</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+              <template x-for="sec in sections" {...{ 'x-bind:key': 'sec.id' }}>
+                <section x-show="sec.photoCount > 0" style="display:none" class="space-y-3">
+                  <header class="flex items-baseline justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+                    <h3 class="text-[13px] font-bold text-slate-900 dark:text-slate-100" x-text="sec.title"></h3>
+                    <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono" x-text="sec.photoCount + ' photos'"></span>
+                  </header>
+                  <template x-for="item in sec.items" {...{ 'x-bind:key': 'item.id' }}>
+                    <div x-show="item.photos.length > 0" style="display:none" class="space-y-2">
+                      <h4 class="text-[11px] font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></h4>
+                      <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        <template x-for="photo in item.photos" {...{ 'x-bind:key': 'photo.url' }}>
+                          <a
+                            x-bind:href="photo.url"
+                            target="_blank"
+                            rel="noopener"
+                            class="block aspect-square rounded-md overflow-hidden bg-slate-100 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-600 hover:ring-indigo-300 dark:hover:ring-indigo-500 transition-all"
+                          >
+                            <img x-bind:src="photo.url" x-bind:alt="item.label" class="w-full h-full object-cover" loading="lazy" />
+                          </a>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </section>
+              </template>
+            </div>
+          </aside>
+        </div>
         {/* S3-6 — burst-camera modal lives at the page level so it stays
             mounted across item navigation. inspection-edit.js dispatches a
             `burst-camera:open` window event when the user taps a Camera
@@ -2849,6 +2929,14 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
           lazy-loaded by photo-annotator.js on the first `annotate` event so it
           doesn't block first paint of the inspection edit page. */}
       <script src="/js/photo-annotator.js"></script>
+      {/* Design-alignment B+C — photo-gallery sheet factory, replacing
+          the retired /inspections/:id/photos sub-tab. Mounted as a
+          slide-over on the editor itself. */}
+      <script src="/js/photo-gallery-sheet.js"></script>
+      {/* Design-alignment B+C — envelope-audit factory, replacing the
+          retired /inspections/:id/signatures sub-tab. Folds into
+          PublishModal as a collapsible block. */}
+      <script src="/js/envelope-audit.js"></script>
       <script src="/js/onboarding.js"></script>
       <script src="/js/voice-input.js"></script>
       {/* Phase T (T23) — Messages panel script */}

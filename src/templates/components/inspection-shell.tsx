@@ -1,8 +1,8 @@
 /**
  * Sprint 2 S2-5 — Inspection sub-route shell.
  *
- * All five inspection sub-routes (`/report`, `/photos`, `/summary`,
- * `/signatures`, `/settings`) share this chrome. It renders:
+ * Inspection sub-routes (`/report`, `/photos`, `/signatures`,
+ * `/settings`) share this chrome. It renders:
  *   - PageHeader with breadcrumb + property address as title
  *   - Optional "Part X of Y in request ABC" badge with sibling switcher
  *     (S2-2 integration — only shown when the inspection has a request_id
@@ -16,7 +16,7 @@
 
 import { PageHeader } from './page-header';
 
-export type InspectionSubRoute = 'report' | 'photos' | 'summary' | 'signatures' | 'settings' | 'repair-list';
+export type InspectionSubRoute = 'report' | 'settings' | 'repair-list';
 
 interface SubInspectionInfo {
     id:           string;
@@ -38,10 +38,7 @@ export interface InspectionShellProps {
 
 const TABS: Array<{ id: InspectionSubRoute; label: string }> = [
     { id: 'report',      label: 'Report' },
-    { id: 'photos',      label: 'Photos' },
-    { id: 'summary',     label: 'Summary' },
     { id: 'repair-list', label: 'Repair List' },
-    { id: 'signatures',  label: 'Signatures' },
     { id: 'settings',    label: 'Settings' },
 ];
 

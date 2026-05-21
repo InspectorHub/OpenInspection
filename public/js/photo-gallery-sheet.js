@@ -1,20 +1,34 @@
-// Sprint 2 S2-5 — Photos sub-page Alpine data factory.
-// Loads /api/inspections/:id and groups all photos by item.
+// Design-alignment B+C — photo gallery sheet, replacing the retired
+// /inspections/:id/photos sub-tab. Lives inside the inspection editor as
+// a slide-over so the gallery view stays reachable without leaving the
+// editing surface (matches the design's no-tab page chrome).
+//
+// Reads the same data the old sub-page did — /api/inspections/:id —
+// then groups every photo by section/item for a flat browse view.
 
 document.addEventListener('alpine:init', () => {
-    Alpine.data('inspectionPhotosPage', (inspectionId) => ({
+    Alpine.data('photoGallerySheet', (inspectionId) => ({
         inspectionId,
-        loading: true,
+        open: false,
+        loading: false,
+        loaded: false,
         sections: [],
         totalPhotos: 0,
 
+        toggle() {
+            this.open = !this.open;
+            if (this.open && !this.loaded) this.load();
+        },
+        close() { this.open = false; },
+
         async load() {
+            this.loading = true;
             try {
                 const res = await window.authFetch('/api/inspections/' + this.inspectionId);
-                if (!res.ok) { this.loading = false; return; }
+                if (!res.ok) return;
                 const j = await res.json();
                 const insp = (j.data && (j.data.inspection || j.data)) || {};
-                const tpl = (j.data && (j.data.template || (j.data.inspection && j.data.inspection.templateSnapshot))) || null;
+                const tpl  = (j.data && (j.data.template || (j.data.inspection && j.data.inspection.templateSnapshot))) || null;
                 const results = insp.results || (insp.inspectionResults && insp.inspectionResults.data) || {};
 
                 const schema = (tpl && (tpl.schema || tpl)) || {};
@@ -33,8 +47,9 @@ document.addEventListener('alpine:init', () => {
                     return { id: sec.id, title: sec.title || sec.label || 'Section', items: itemList, photoCount };
                 });
                 this.totalPhotos = total;
+                this.loaded = true;
             } catch (e) {
-                console.error('photos.load failed', e);
+                console.error('photoGallery.load failed', e);
             } finally {
                 this.loading = false;
             }

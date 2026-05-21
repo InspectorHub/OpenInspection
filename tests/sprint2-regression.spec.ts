@@ -8,10 +8,15 @@
  *   A2 — Sidebar in main-layout.tsx still rendered a "SOON" badge next to
  *        the Rating Systems link — Sprint 1 stub artifact that S2-1 was
  *        supposed to remove.
- *   A3 — /inspections/:id/report did NOT show the 5-tab inspection sub-nav
- *        (Report / Photos / Summary / Signatures / Settings) — InspectionShell
- *        only wrapped the four passive sub-pages, not the Report editor.
- *   A4 — Sub-pages (/photos /summary /signatures /settings) had a generic
+ *   A3 — /inspections/:id/report did NOT show the inspection sub-nav
+ *        (Report / Settings) — InspectionShell only wrapped the
+ *        passive sub-pages, not the Report editor.
+ *        (Summary + Photos + Signatures were retired in the
+ *        design-alignment rollback — defects preview is reached via
+ *        the /report Preview link; the photo gallery is a slide-over
+ *        sheet inside the editor; envelope audit chain folds into
+ *        PublishModal.)
+ *   A4 — Sub-pages (/settings) had a generic
  *        <title> ("Photos" instead of "OpenInspection | Photos") and the
  *        Alpine factories called window.authFetch which was undefined because
  *        auth.js declared authFetch as a top-level const — never attached to
@@ -118,7 +123,7 @@ test.describe('Sprint 2 regression — A3 inspection /report has 5-tab sub-nav',
         if (res.status() === 200) {
             const html = await res.text();
             expect(html).toContain('aria-label="Inspection sections"');
-            for (const tab of ['Report', 'Photos', 'Summary', 'Signatures', 'Settings']) {
+            for (const tab of ['Report', 'Settings']) {
                 expect(html, `Sub-nav must include ${tab} tab link`).toContain(`>${tab}</a>`);
             }
         } else {
@@ -129,7 +134,7 @@ test.describe('Sprint 2 regression — A3 inspection /report has 5-tab sub-nav',
             const tsxPath = path.resolve(process.cwd(), 'src/templates/pages/inspection-edit.tsx');
             const src = await fs.readFile(tsxPath, 'utf-8');
             expect(src, 'inspection-edit.tsx must include the inspection sections sub-nav').toContain('aria-label="Inspection sections"');
-            for (const tab of ['Report', 'Photos', 'Summary', 'Signatures', 'Settings']) {
+            for (const tab of ['Report', 'Settings']) {
                 expect(src, `Sub-nav must include ${tab} tab link`).toContain(`>${tab}</a>`);
             }
         }
@@ -138,9 +143,6 @@ test.describe('Sprint 2 regression — A3 inspection /report has 5-tab sub-nav',
 
 test.describe('Sprint 2 regression — A4 sub-pages have proper <title>', () => {
     const SUBS = [
-        { route: 'photos',     label: 'Photos' },
-        { route: 'summary',    label: 'Summary' },
-        { route: 'signatures', label: 'Signatures' },
         { route: 'settings',   label: 'Settings' },
     ];
 
@@ -159,7 +161,7 @@ test.describe('Sprint 2 regression — A4 sub-pages have proper <title>', () => 
 });
 
 test.describe('Sprint 2 regression — A4 sub-route HTTP smoke', () => {
-    const SUBS = ['photos', 'summary', 'signatures', 'settings'] as const;
+    const SUBS = ['settings'] as const;
 
     for (const sub of SUBS) {
         test(`A4: /inspections/:id/${sub} returns a route response (200 or auth 302), never 5xx`, async ({ request }) => {

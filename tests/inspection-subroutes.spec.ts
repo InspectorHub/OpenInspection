@@ -1,10 +1,14 @@
 /**
  * Sprint 2 Track 2 — Inspection sub-routes (S2-5) smoke.
  *
- * Verifies that the 5 sub-route URLs are wired into the router, that
+ * Verifies that the sub-route URLs are wired into the router, that
  * `/inspections/:id/edit` redirects to `/report` (302), and that the
  * sub-routes redirect to /login when called without a session — proving
  * htmlAuthGuard is mounted ahead of the page handlers.
+ *
+ * Note: /summary and /photos were retired in the design-alignment
+ * rollback. Summary is reached via the editor's Preview link; the photo
+ * gallery is a slide-over sheet inside the editor.
  *
  * Full editorial flows (clicking through tabs, switcher, browser back/
  * forward) are exercised by the Chrome MCP GIF capture; this spec is a
@@ -15,7 +19,7 @@ import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 
-const SUB_ROUTES = ['report', 'photos', 'summary', 'signatures', 'settings'] as const;
+const SUB_ROUTES = ['report', 'settings'] as const;
 const FAKE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 test.describe('Sprint 2 S2-5 — inspection sub-routes', () => {
@@ -50,7 +54,7 @@ test.describe('Sprint 2 S2-5 — inspection sub-routes', () => {
         });
     }
 
-    test('responsive sweep — /photos sub-route renders without horizontal scroll across 5 viewports', async ({ page }) => {
+    test('responsive sweep — /settings sub-route renders without horizontal scroll across 5 viewports', async ({ page }) => {
         const VIEWPORTS = [
             { name: 'iphone-se',    w: 375,  h: 667  },
             { name: 'iphone-pro',   w: 414,  h: 896  },
@@ -61,7 +65,7 @@ test.describe('Sprint 2 S2-5 — inspection sub-routes', () => {
 
         for (const vp of VIEWPORTS) {
             await page.setViewportSize({ width: vp.w, height: vp.h });
-            const res = await page.goto(`${BASE_URL}/inspections/${FAKE_ID}/photos`, {
+            const res = await page.goto(`${BASE_URL}/inspections/${FAKE_ID}/settings`, {
                 waitUntil: 'domcontentloaded',
             });
             // Auth bounce to /login still gives us a 200 on the login page; either
@@ -70,7 +74,7 @@ test.describe('Sprint 2 S2-5 — inspection sub-routes', () => {
             const hScroll = await page.evaluate(
                 () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
             );
-            expect(hScroll, `/photos has horizontal scroll at ${vp.w}px`).toBe(false);
+            expect(hScroll, `/settings has horizontal scroll at ${vp.w}px`).toBe(false);
         }
     });
 });
