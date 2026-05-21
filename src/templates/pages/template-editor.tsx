@@ -3,40 +3,43 @@ import { Modal } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 const EDITOR_CSS = `
-.bg-grid { background-image: radial-gradient(circle, #d5d0c8 0.75px, transparent 0.75px); background-size: 24px 24px; }
-.glass-warm { background: rgba(255, 253, 250, 0.82); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); }
+/* Slate-cool editor language — mirrors inspection-edit.tsx so an inspector
+   moving between the two surfaces (designing a template vs filling out an
+   inspection) sees one continuous visual system. All colour decisions are
+   pinned to the same dot / glass / surface values used over there. */
+.bg-grid { background-image: radial-gradient(circle, #cbd5e1 0.6px, transparent 0.6px); background-size: 20px 20px; }
+.glass-warm { background: rgba(255,255,255,0.85); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(226,232,240,0.6); }
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #d0cbc4; border-radius: 999px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
 .drag-handle { cursor: grab; touch-action: none; }
 .drag-handle:active { cursor: grabbing; }
 .sortable-ghost { opacity: 0.35; }
-.sortable-chosen { box-shadow: 0 8px 25px -5px rgba(74, 114, 255, 0.25); transform: scale(1.02); z-index: 50; }
+.sortable-chosen { box-shadow: 0 8px 25px -5px rgba(99,102,241,0.25); transform: scale(1.02); z-index: 50; }
 .sortable-drag { opacity: 0.9; }
 .icon-picker-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
 .icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; transition: all 0.15s; border: 2px solid transparent; }
-.icon-btn:hover { background: #eef4ff; border-color: #bcd2ff; }
-.icon-btn.active { background: #eef4ff; border-color: var(--ih-primary, #6366f1); }
+.icon-btn:hover { background: rgba(99,102,241,0.10); border-color: rgba(99,102,241,0.30); }
+.icon-btn.active { background: rgba(99,102,241,0.10); border-color: var(--ih-primary, #6366f1); }
 [x-cloak] { display: none !important; }
 .section-accent { border-left: 3px solid var(--section-color, var(--ih-primary, #6366f1)); }
 .rating-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 3px rgba(74, 114, 255, 0.15); }
+input:focus, textarea:focus, select:focus { outline: none; box-shadow: var(--ih-shadow-focus, 0 0 0 3px rgba(99,102,241,0.30)); }
 
 /* ── Dark mode overrides ───────────────────────────────────────────────────
-   Global styles.css overrides bg-surface-50/100 and all inputs/selects,
-   but misses /opacity variants (bg-surface-50/90) and bg-white/50 panels.
-   Semantic class names below restore the correct dark appearance. */
-[data-color-scheme=dark] .editor-header {
-  background-color: rgba(11,17,32,0.92) !important;
-  border-color: rgba(255,255,255,0.08) !important;
-}
+   Aligned 1:1 with inspection-edit.tsx so both editors flip dark to the
+   same slate-900 / slate-800 family (not the slate-bg-app slate-950 used
+   previously here). Global styles.css covers bg-surface-50/100 + inputs
+   + selects already; the rules below restore /opacity variants and
+   bg-white/50 panels the global rules can't reach. */
+[data-color-scheme=dark] .editor-header,
 [data-color-scheme=dark] .editor-subheader {
-  background-color: rgba(11,17,32,0.92) !important;
-  border-color: rgba(255,255,255,0.06) !important;
+  background-color: rgba(15,23,42,0.92) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 [data-color-scheme=dark] .editor-side-panel {
-  background-color: rgba(11,17,32,0.55) !important;
-  border-color: rgba(255,255,255,0.07) !important;
+  background-color: rgba(15,23,42,0.80) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 /* Undo global input override for transparent inline title/section editors.
    Selector specificity must exceed the global rule (0,4,2) — achieved by
@@ -49,36 +52,36 @@ html[data-color-scheme=dark] input.editor-section-input:not([type=checkbox]):not
 html[data-color-scheme=dark] input.editor-title-input:hover,
 html[data-color-scheme=dark] input.editor-section-input:hover { border-bottom-color: rgba(255,255,255,0.18) !important; }
 html[data-color-scheme=dark] input.editor-title-input:focus,
-html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-color: #4a72ff !important; }
+html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-color: var(--ih-primary, #6366f1) !important; }
 [data-color-scheme=dark] .bg-grid {
-  background-image: radial-gradient(circle, #334155 0.75px, transparent 0.75px);
+  background-image: radial-gradient(circle, #334155 0.6px, transparent 0.6px);
 }
 [data-color-scheme=dark] .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; }
 [data-color-scheme=dark] .glass-warm {
-  background: rgba(15,23,42,0.85) !important;
-  border-color: rgba(255,255,255,0.08) !important;
+  background: rgba(30,41,59,0.85) !important;
+  border-color: rgba(51,65,85,0.70) !important;
 }
 [data-color-scheme=dark] .icon-picker-wrap {
   background-color: #1e293b !important;
-  border-color: rgba(255,255,255,0.1) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
-[data-color-scheme=dark] .icon-btn:hover { background: rgba(74,114,255,0.2) !important; border-color: rgba(74,114,255,0.4) !important; }
-[data-color-scheme=dark] .icon-btn.active { background: rgba(74,114,255,0.2) !important; border-color: #4a72ff !important; }
+[data-color-scheme=dark] .icon-btn:hover { background: rgba(99,102,241,0.20) !important; border-color: rgba(99,102,241,0.40) !important; }
+[data-color-scheme=dark] .icon-btn.active { background: rgba(99,102,241,0.20) !important; border-color: var(--ih-primary, #818cf8) !important; }
 [data-color-scheme=dark] .editor-main {
-  background-color: rgba(11,17,32,0.6) !important;
+  background-color: rgba(15,23,42,0.60) !important;
 }
 [data-color-scheme=dark] .editor-canned-panel {
   background-color: #0f172a !important;
-  border-color: rgba(255,255,255,0.08) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 [data-color-scheme=dark] .editor-canned-panel .bg-surface-50,
 [data-color-scheme=dark] .editor-canned-panel input {
   background-color: rgba(255,255,255,0.05) !important;
-  border-color: rgba(255,255,255,0.08) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 [data-color-scheme=dark] .editor-props-header {
-  background-color: rgba(11,17,32,0.85) !important;
-  border-color: rgba(255,255,255,0.07) !important;
+  background-color: rgba(15,23,42,0.85) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 /* Section list: selected card (bg-blueprint-50 = light blue → dark indigo tint) */
 [data-color-scheme=dark] #sectionsList .bg-blueprint-50 {
@@ -87,19 +90,20 @@ html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-co
 [data-color-scheme=dark] #sectionsList .text-blueprint-700 {
   color: #a5b4fc !important;
 }
-/* Item cards: bg-white → dark slate surface */
+/* Item cards: bg-white → dark slate surface (matches inspection-edit
+   .item-card dark value rgba(30,41,59,0.85)). */
 [data-color-scheme=dark] #itemsList .bg-white {
   background-color: #1e293b !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
 }
 /* Item selected highlight: bg-blueprint-50/40 → subtle indigo tint */
 [data-color-scheme=dark] #itemsList .bg-blueprint-50\/40 {
-  background-color: rgba(99,102,241,0.1) !important;
+  background-color: rgba(99,102,241,0.10) !important;
 }
-/* Section icon badge: unselected state has inline bg #f3f1ed (beige) → dark muted */
+/* Section icon badge: unselected state uses inline slate-100 bg → dark muted */
 [data-color-scheme=dark] #sectionsList > div:not(.bg-blueprint-50) .editor-section-icon {
   background: rgba(255,255,255,0.07) !important;
-  color: rgba(255,255,255,0.4) !important;
+  color: rgba(255,255,255,0.40) !important;
 }
 /* Header blueprint-50 buttons (Comments active state, version badge, etc.) */
 [data-color-scheme=dark] .editor-header .bg-blueprint-50 {
@@ -207,7 +211,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
                                         </span>
                                         <span class="editor-section-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                                            x-bind:style="selectedSectionId === section.id ? 'background:' + sectionColor(section) + '18; color:' + sectionColor(section) : 'background: #f3f1ed; color: #908a83'">
+                                            x-bind:style="selectedSectionId === section.id ? 'background:' + sectionColor(section) + '18; color:' + sectionColor(section) : 'background: #f1f5f9; color: #94a3b8'">
                                             <template x-if="getSectionIconSvg(section.icon)">
                                                 <span x-html="getSectionIconSvg(section.icon)"></span>
                                             </template>
