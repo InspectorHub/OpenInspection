@@ -77,12 +77,20 @@ export default function globalSetup() {
             // KV may not be initialized — that's fine
         }
 
-        console.info('\n[globalSetup] Local D1 cleared — seeding E2E fixtures next.');
-        try {
-            seedFixtures(appDir);
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.warn(`[globalSetup] seedFixtures failed: ${msg}`);
+        // Opt-in: the subsystem-C/D/E E2E specs use the multi-user seed.
+        // Default off so the existing standalone-api/browser tests (which
+        // call /api/auth/setup themselves) still see a fresh workspace.
+        // Set SEED_E2E=1 when running the unskipped subsystem specs.
+        if (process.env.SEED_E2E === '1') {
+            console.info('\n[globalSetup] Local D1 cleared — seeding E2E fixtures (SEED_E2E=1) next.');
+            try {
+                seedFixtures(appDir);
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.warn(`[globalSetup] seedFixtures failed: ${msg}`);
+            }
+        } else {
+            console.info('\n[globalSetup] Local D1 cleared (set SEED_E2E=1 to also seed C/D/E fixtures).');
         }
         console.info('[globalSetup] Ready.\n');
     } catch (err: unknown) {
