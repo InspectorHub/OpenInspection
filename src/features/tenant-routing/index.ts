@@ -66,7 +66,12 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
             || path === '/status' || path.startsWith('/api/integration')
             || path === '/api/agent-signup' || path === '/api/agents/accept'
             || path === '/api/concierge/confirm'
-            || path.startsWith('/api/public/');
+            || path.startsWith('/api/public/')
+            // M2M admin endpoints carry tenantId in the request body, not in the
+            // URL/JWT. They authenticate via Bearer M2M secret instead of tenant
+            // routing. Bypass tenant resolution to avoid 503 when the M2M caller
+            // wants to act on a tenant other than the current host's tenant.
+            || path.startsWith('/api/admin/');
         if (!isBypassPath && path.startsWith('/api')) {
             logger.info('[TenantRouter] Tenant resolution failed', {
                 path,
