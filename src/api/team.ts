@@ -1,10 +1,13 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from '@hono/zod-openapi';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq, and, count } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireSeatAvailable } from '../features/seat-quota';
 import { getBaseUrl } from '../lib/url';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
+import { tenantConfigs, users, apprenticeReviews } from '../lib/db/schema';
 import {
     InviteMemberSchema,
     InviteResponseSchema,
@@ -274,10 +277,6 @@ teamRoutes.openapi(mintGuestInviteRoute, async (c) => {
 
 // ─── Design System 0520 subsystem C P10.2 — defaults / apprentices / guests ──
 
-import { drizzle } from 'drizzle-orm/d1';
-import { eq as eq2, and as and2, count as count2 } from 'drizzle-orm';
-import { tenantConfigs, users, apprenticeReviews } from '../lib/db/schema';
-
 const DefaultsSchema = z.object({
     teamModeDefault:          z.boolean().optional(),
     apprenticeReviewRequired: z.boolean().optional(),
@@ -297,7 +296,7 @@ teamRoutes.openapi({
         teamModeDefault:          tenantConfigs.teamModeDefault,
         apprenticeReviewRequired: tenantConfigs.apprenticeReviewRequired,
         guestInvitesEnabled:      tenantConfigs.guestInvitesEnabled,
-    }).from(tenantConfigs).where(eq2(tenantConfigs.tenantId, tenantId)).get();
+    }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
     return c.json({
         success: true as const,
         data: row ?? {
@@ -349,7 +348,7 @@ teamRoutes.openapi({
         email:    users.email,
         mentorId: users.mentorId,
     }).from(users)
-        .where(and2(eq2(users.tenantId, tenantId), eq2(users.role, 'apprentice')))
+        .where(and(eq(users.tenantId, tenantId), eq(users.role, 'apprentice')))
         .all();
 
     // Hydrate mentor names + pending counts. N+1 is acceptable here —
@@ -357,14 +356,14 @@ teamRoutes.openapi({
     const items = await Promise.all(apprentices.map(async a => {
         const mentor = a.mentorId
             ? await db.select({ name: users.name, email: users.email })
-                .from(users).where(eq2(users.id, a.mentorId)).get()
+                .from(users).where(eq(users.id, a.mentorId)).get()
             : null;
-        const pending = await db.select({ value: count2() })
+        const pending = await db.select({ value: count() })
             .from(apprenticeReviews)
-            .where(and2(
-                eq2(apprenticeReviews.tenantId, tenantId),
-                eq2(apprenticeReviews.apprenticeId, a.id),
-                eq2(apprenticeReviews.status, 'pending'),
+            .where(and(
+                eq(apprenticeReviews.tenantId, tenantId),
+                eq(apprenticeReviews.apprenticeId, a.id),
+                eq(apprenticeReviews.status, 'pending'),
             )).get();
         return {
             id:          a.id,
@@ -394,7 +393,7 @@ teamRoutes.openapi({
         email:     users.email,
         role:      users.role,
         expiresAt: users.expiresAt,
-    }).from(users).where(eq2(users.tenantId, tenantId)).all();
+    }).from(users).where(eq(users.tenantId, tenantId)).all();
 
     const guests = rows
         .filter(u => u.expiresAt != null && u.expiresAt > now)
@@ -425,13 +424,13 @@ teamRoutes.openapi({
     const db = drizzle(c.env.DB);
 
     const existing = await db.select({ id: users.id, expiresAt: users.expiresAt })
-        .from(users).where(and2(eq2(users.id, id), eq2(users.tenantId, tenantId))).get();
+        .from(users).where(and(eq(users.id, id), eq(users.tenantId, tenantId))).get();
     if (!existing) throw Errors.NotFound('Guest not found');
     if (existing.expiresAt == null) throw Errors.BadRequest('User is not a guest (no expires_at)');
 
     const now = Math.floor(Date.now() / 1000);
     await db.update(users).set({ expiresAt: now })
-        .where(and2(eq2(users.id, id), eq2(users.tenantId, tenantId)));
+        .where(and(eq(users.id, id), eq(users.tenantId, tenantId)));
     return c.json({ success: true as const, data: { revokedAt: now } }, 200);
 });
 

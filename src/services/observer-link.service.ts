@@ -13,16 +13,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { observerLinks } from '../lib/db/schema';
+import { generateRandomToken } from '../lib/random-token';
 
 const DEFAULT_DURATION_SECONDS = 7 * 24 * 3600;     // 7 days
-
-function generateToken(): string {
-    const bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    let s = '';
-    for (const b of bytes) s += String.fromCharCode(b);
-    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 export interface MintInput {
     inspectionId:    string;
@@ -52,7 +45,7 @@ export class ObserverLinkService {
     async mint(tenantId: string, input: MintInput): Promise<MintOutput> {
         const db        = this.getDrizzle();
         const id        = crypto.randomUUID();
-        const token     = generateToken();
+        const token     = generateRandomToken();
         const expiresAt = Math.floor(Date.now() / 1000) + (input.durationSeconds ?? DEFAULT_DURATION_SECONDS);
 
         await db.insert(observerLinks).values({

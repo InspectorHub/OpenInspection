@@ -18,17 +18,11 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { guestInvites, users } from '../lib/db/schema';
 import { hashPassword } from '../lib/password';
+import { generateRandomToken } from '../lib/random-token';
+import { computeSeatsUsed } from '../lib/middleware/seat-guard';
 
 const DEFAULT_DURATION_SECONDS = 86_400;
 const MIN_PASSWORD_LENGTH      = 8;
-
-function generateToken(): string {
-    const bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    let s = '';
-    for (const b of bytes) s += String.fromCharCode(b);
-    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 export interface MintInput {
     role:            'lead' | 'specialist' | 'apprentice' | 'office';
@@ -70,7 +64,7 @@ export class GuestInviteService {
     }> {
         const db        = this.getDrizzle();
         const id        = crypto.randomUUID();
-        const token     = generateToken();
+        const token     = generateRandomToken();
         const duration  = input.durationSeconds ?? DEFAULT_DURATION_SECONDS;
         const expiresAt = Math.floor(Date.now() / 1000) + duration;
 
@@ -105,14 +99,15 @@ export class GuestInviteService {
         if (invite.claimedByUserId) return { kind: 'claimed' };
         if (invite.expiresAt < Math.floor(Date.now() / 1000)) return { kind: 'expired' };
 
-        // Quota check — count active (non-expired) users in the tenant.
-        // Active = expires_at IS NULL OR expires_at > now.
-        const allUsers = await db.select().from(users)
+        // Quota check — defer to the shared computeSeatsUsed helper so
+        // permanent members + active guests are counted the same way
+        // here, in the seat-guard middleware, and on the billing summary.
+        const tenantUsers = await db.select({ id: users.id, expiresAt: users.expiresAt })
+            .from(users)
             .where(eq(users.tenantId, invite.tenantId))
             .all();
-        const now      = Math.floor(Date.now() / 1000);
-        const active   = allUsers.filter(u => u.expiresAt == null || u.expiresAt > now);
-        if (active.length >= ctx.maxUsers) {
+        const used = computeSeatsUsed(tenantUsers, Math.floor(Date.now() / 1000));
+        if (used >= ctx.maxUsers) {
             return { kind: 'over_quota' };
         }
 

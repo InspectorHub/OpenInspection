@@ -39,5 +39,5 @@ export const observerCookieGuard: MiddlewareHandler<HonoConfig> = async (c, next
     // the inspection id without re-fetching).
     c.set('observerPayload' as never, payload as never);
     await next();
-    return; // satisfy MaybePromise<Response | undefined>
+    return;
 };

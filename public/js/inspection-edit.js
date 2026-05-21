@@ -190,7 +190,6 @@ function inspectionEditor(inspectionId) {
       window.addEventListener('pagehide', clearLocalCheatsheet, { once: true });
       window.addEventListener('beforeunload', clearLocalCheatsheet, { once: true });
 
-<<<<<<< HEAD
       // Design System 0520 subsystem E P1.4 — pre-flight gate. The
       // PreflightChecks panel inside publish-modal broadcasts its
       // `allPassed` boolean on every load/refresh so the Send All
@@ -199,12 +198,6 @@ function inspectionEditor(inspectionId) {
         this.preflightAllPassed = !!(e?.detail?.allPassed);
       });
 
-      // Design System 0520 subsystem E P1.2 — pre-publish service
-      // wrapper requires inspectionId for the route call. Stash it on
-      // a global the PreflightChecks factory reads (matches the
-      // unit-tree factory pattern from subsystem D).
-      window.__inspectionEditorRoot = { inspectionId: this.inspectionId };
-=======
       // Design System 0520 subsystem D P2.2 — mirror the UnitTree
       // selection into Alpine state. The tree component fires this
       // event on every click; null means "show all units / no scope".
@@ -216,7 +209,6 @@ function inspectionEditor(inspectionId) {
       // so the publish-modal renders "Republish vN+1" when the inspection has
       // been published before.
       this.refreshPublishedVersion();
->>>>>>> origin/main
 
       // Slash-trigger inline popover sync — hide ACTIVE ITEM right pane while
       // the picker is open so the same canned comments are not rendered twice.

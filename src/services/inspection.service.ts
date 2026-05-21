@@ -12,6 +12,9 @@ import { safeISODate, safeTimestamp } from '../lib/date';
 import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
 import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../lib/recommendation-categories';
+import { computePreflightFromData } from '../lib/preflight';
+import { decideFieldWrite, applyFieldWrite } from '../lib/field-version';
+import { ApprenticeService } from './apprentice.service';
 
 /** Slug → label map for resolving aggregated recommendation badges in
  *  getReportData. Built once at module load. */
@@ -288,7 +291,6 @@ export class InspectionService {
             pendingApprenticeCount = undefined;
         }
 
-        const { computePreflightFromData } = await import('../lib/preflight');
         return computePreflightFromData(
             {
                 coverPhotoId:      (ins.coverPhotoId as string | null) ?? null,
@@ -1050,7 +1052,6 @@ export class InspectionService {
                     .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
                     .get();
                 if (u?.role === 'apprentice') {
-                    const { ApprenticeService } = await import('./apprentice.service');
                     const apprenticeSvc = new ApprenticeService(this.db);
                     const queued = await apprenticeSvc.submitForReview(
                         tenantId, userId, inspectionId, itemId, field, value,
@@ -1069,7 +1070,6 @@ export class InspectionService {
             }
         }
 
-        const { decideFieldWrite, applyFieldWrite } = await import('../lib/field-version');
         const db = this.getDrizzle();
 
         const existing = await db.select().from(inspectionResults)
