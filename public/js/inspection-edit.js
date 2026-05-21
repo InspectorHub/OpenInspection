@@ -793,6 +793,28 @@ function inspectionEditor(inspectionId) {
       return count;
     },
 
+    /**
+     * Per-section progress used by the SectionRail completion rings:
+     * returns { rated, total, percent } for the named section.
+     * Mirrors the shape that progress-strip-helpers.computeCompletion
+     * exposes globally so the rail + the top strip read consistent
+     * numbers (rounded half-up percent).
+     */
+    sectionProgress(sectionId) {
+      var sec = null;
+      for (var s = 0; s < this.sections.length; s++) {
+        if (this.sections[s].id === sectionId) { sec = this.sections[s]; break; }
+      }
+      if (!sec) return { rated: 0, total: 0, percent: 0 };
+      var total = sec.items.length;
+      if (total === 0) return { rated: 0, total: 0, percent: 0 };
+      var rated = 0;
+      for (var i = 0; i < total; i++) {
+        if (this.results[sec.items[i].id]?.rating != null) rated++;
+      }
+      return { rated: rated, total: total, percent: Math.round((rated / total) * 100) };
+    },
+
     getItemRating(itemId) {
       return this.results[itemId]?.rating || null;
     },

@@ -23,6 +23,36 @@ export function computeCompletion(items) {
 }
 
 /**
+ * Split items into the five rating buckets the design's ProgressStrip
+ * surfaces as tally chips at the top of the inspection editor:
+ *   def      — Defect (rating === 'DEF' / 'Defect' / similar)
+ *   mon      — Monitor
+ *   sat      — Satisfactory
+ *   ni       — Not Inspected
+ *   np       — Not Present
+ *   unrated  — rating == null
+ *
+ * Rating strings are matched case-insensitively against their canonical
+ * three-letter abbreviation OR full word. Anything else (e.g. custom
+ * tenant ratings) buckets into `other` so the chips still sum cleanly.
+ */
+export function tallyByRating(items) {
+    const out = { def: 0, mon: 0, sat: 0, ni: 0, np: 0, other: 0, unrated: 0 };
+    for (const it of items) {
+        const r = it?.rating;
+        if (r == null) { out.unrated++; continue; }
+        const code = String(r).toUpperCase();
+        if      (code === 'DEF' || code === 'DEFECT' || code === 'D')      out.def++;
+        else if (code === 'MON' || code === 'MONITOR' || code === 'M')     out.mon++;
+        else if (code === 'SAT' || code === 'SATISFACTORY' || code === 'S') out.sat++;
+        else if (code === 'NI'  || code === 'N/I' || code === 'NOT INSPECTED') out.ni++;
+        else if (code === 'NP'  || code === 'N/P' || code === 'NOT PRESENT')   out.np++;
+        else out.other++;
+    }
+    return out;
+}
+
+/**
  * Project remaining minutes from a rolling window of per-item durations
  * (seconds) and the unrated-item count. Returns 0 when either input is
  * empty so the UI can hide the pill cleanly.

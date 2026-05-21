@@ -945,9 +945,33 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 <span x-show="saveState === 'error'" x-cloak class="text-red-500">Save failed</span>
               </div>
             </div>
-            {/* Report Access */}
-            <div class="px-4 py-3 border-t space-y-2" style="border-color: rgba(226,232,240,0.5)">
-              <div class="text-[10px] font-mono font-semibold uppercase tracking-wide mb-2 text-slate-400 dark:text-slate-500">Report Access</div>
+            {/* Report Access — folded into a disclosure to free up vertical
+                space in the editor's left rail. The Agreement / Payment
+                requirements + Theme override + Share-with-Agent helpers
+                are setup affordances inspectors touch occasionally, not
+                during the rate-an-item core loop. Open state persists in
+                localStorage so users who use them often see them open. */}
+            <details
+              class="px-4 py-3 border-t group"
+              style="border-color: rgba(226,232,240,0.5)"
+              x-data="{
+                  get isOpen() {
+                      try { return localStorage.getItem('oi-editor-rep-access-open') === '1'; }
+                      catch (_) { return false; }
+                  },
+                  toggle($event) {
+                      try { localStorage.setItem('oi-editor-rep-access-open', $event.target.open ? '1' : '0'); }
+                      catch (_) {}
+                  },
+              }"
+              x-bind:open="isOpen"
+              x-on:toggle="toggle($event)"
+            >
+              <summary class="cursor-pointer flex items-center justify-between text-[10px] font-mono font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2 list-none hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                <span>Report Access</span>
+                <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
+              </summary>
+              <div class="space-y-2 pt-1">
               <label class="flex items-center justify-between cursor-pointer">
                 <span class="text-xs text-slate-600 dark:text-slate-300">Require Payment</span>
                 <button
@@ -1038,7 +1062,8 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
                 <div x-show="agentErr" x-text="agentErr" class="text-[10px] mt-1" style="color: #dc2626" />
               </div>
-            </div>
+              </div>
+            </details>
             {/* Property Info Card */}
             <div
                 x-data="{ editing: false, fields: {} }"
@@ -1098,15 +1123,37 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
             </div>
             <div class="flex-1 px-3 py-2 space-y-0.5">
+              {/* Each section row carries a small SVG completion ring on
+                  the left so the inspector can scan the rail and see at
+                  a glance which sections are done / in-progress / have
+                  defects. Ring colour follows the design's 4-state rule:
+                    - has defects (any) → status-bad (rose)
+                    - complete + clean  → status-ok (emerald)
+                    - in-progress       → primary (indigo)
+                    - untouched         → transparent (grey track only)
+                  Per-section progress sourced from sectionProgress() in
+                  the editor factory; defect count from sectionDefectCount(). */}
               <template x-for="(sec, idx) in sections" x-bind:key="sec.id">
                 <button
                   x-on:click="selectSection(idx)"
                   x-show="sectionMatchesSearch(sec)"
-                  class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
-                  x-bind:class="currentSectionIdx === idx ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-500 dark:text-slate-400'"
+                  class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
+                  x-bind:class="currentSectionIdx === idx ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'"
                   x-bind:style="currentSectionIdx === idx ? 'color: var(--ih-primary, #6366f1)' : ''"
                 >
-                  <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                  {/* Completion ring (18×18 SVG circle, r=7, circumference≈44). */}
+                  <span class="relative w-[18px] h-[18px] flex-shrink-0" aria-hidden="true">
+                    <svg viewBox="0 0 18 18" class="w-[18px] h-[18px]">
+                      <circle cx="9" cy="9" r="7" fill="none" stroke="var(--ih-slate-200, #e2e8f0)" stroke-width="2" />
+                      <circle
+                        cx="9" cy="9" r="7" fill="none" stroke-width="2" stroke-linecap="round"
+                        transform="rotate(-90 9 9)"
+                        x-bind:stroke={`sectionDefectCount(sec.id) > 0 ? 'var(--ih-status-bad)' : (sectionProgress(sec.id).percent >= 100 ? 'var(--ih-status-ok)' : (sectionProgress(sec.id).percent > 0 ? 'var(--ih-primary)' : 'transparent'))`}
+                        x-bind:stroke-dasharray={`(sectionProgress(sec.id).percent / 100 * 44) + ' 44'`}
+                      />
+                    </svg>
+                  </span>
+                  <span class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                     x-bind:class="currentSectionIdx === idx ? 'bg-indigo-100/80 dark:bg-indigo-800/40' : 'bg-slate-100 dark:bg-slate-700/50'"
                   >
                     <template x-if="getSectionIconSvg(sec.icon)">
@@ -1118,10 +1165,13 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   </span>
                   <div class="flex-1 min-w-0">
                     <div class="font-semibold truncate" x-text="sec.title"></div>
-                    <div class="text-[10px] font-mono opacity-60" x-text="sec.items.length + ' items'"></div>
+                    <div class="text-[10px] font-mono opacity-60 tabular-nums">
+                      <span x-text="sectionProgress(sec.id).rated"></span>
+                      <span class="opacity-70">/ <span x-text="sec.items.length"></span></span>
+                    </div>
                   </div>
                   <span x-show="sectionDefectCount(sec.id) > 0"
-                    class="w-5 h-5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center"
+                    class="w-5 h-5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center tabular-nums"
                     x-text="sectionDefectCount(sec.id)"></span>
                 </button>
               </template>
