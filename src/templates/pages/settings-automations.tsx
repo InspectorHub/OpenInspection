@@ -12,7 +12,7 @@ export function SettingsAutomationsPage({ branding }: SettingsAutomationsPagePro
             title="Settings | Automations"
             group="communication"
             subPage="automations"
-            pageTitle="Email Automations"
+            pageTitle="Email automations"
             pageSubtitle="Emails sent automatically when inspection events occur."
         >
             <div x-data="automations" class="max-w-3xl space-y-8">

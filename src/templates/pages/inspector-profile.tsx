@@ -145,7 +145,9 @@ export const InspectorProfilePage = ({ profile, services, host, tenantSlug }: Pr
                         href={`/inspector/${tenantSlug}/${slug}/calendar.ics`}
                     />
                 )}
-                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
+                {/* Customer-portal page — follow system color preference only;
+                    no localStorage / no in-page toggle (per design system). */}
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',p?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 {raw(`<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`)}
                 {raw(`<style>${HERO_STYLES}</style>`)}

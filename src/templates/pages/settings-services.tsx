@@ -7,10 +7,10 @@ interface Props { branding?: BrandingConfig; }
 export const SettingsServicesPage = ({ branding }: Props): JSX.Element => (
     <SettingsLayout
         branding={branding}
-        title="Settings | Services & Pricing"
+        title="Settings | Services & pricing"
         group="catalog"
         subPage="services"
-        pageTitle="Services & Pricing"
+        pageTitle="Services & pricing"
         pageSubtitle="Define the services you offer (e.g. Standard Inspection, Pre-Listing) and their prices, plus any discount codes."
     >
         <div x-data="settingsServices" x-init="init()" class="space-y-8">

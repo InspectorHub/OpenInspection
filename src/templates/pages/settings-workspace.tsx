@@ -101,10 +101,10 @@ export const SettingsWorkspaceThemePage = ({ branding }: Props): JSX.Element => 
     return (
         <SettingsLayout
             branding={branding}
-            title="Settings | Report Theme"
+            title="Settings | Report theme"
             group="workspace"
             subPage="theme"
-            pageTitle="Report Theme"
+            pageTitle="Report theme"
             pageSubtitle="Default visual style for client-facing reports. Per-inspection override is available on the inspection edit page."
         >
             <section
@@ -408,10 +408,10 @@ export const SettingsWorkspaceReferralPage = ({ branding, customReferralSources 
     return (
         <SettingsLayout
             branding={branding}
-            title="Settings | Referral Sources"
+            title="Settings | Referral sources"
             group="workspace"
             subPage="referral"
-            pageTitle="Referral Sources"
+            pageTitle="Referral sources"
             pageSubtitle="Extend the built-in referral source list shown on every inspection. One label per line."
         >
             <section

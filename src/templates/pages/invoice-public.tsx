@@ -80,7 +80,9 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{title} — {companyName}</title>
-                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
+                {/* Customer-portal page — follow system color preference only;
+                    no localStorage / no in-page toggle (per design system). */}
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',p?'dark':'light');})()`}} />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root { --brand: ${primaryColor}; }
                     * { box-sizing: border-box; }

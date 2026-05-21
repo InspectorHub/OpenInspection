@@ -49,7 +49,7 @@ export const SettingsAdvancedAIPage = ({ branding }: Props): JSX.Element => (
         title="Settings | AI"
         group="advanced"
         subPage="ai"
-        pageTitle="AI Features"
+        pageTitle="AI features"
         pageSubtitle="Google Gemini powers comment assist and inspection summaries. Get a key at aistudio.google.com."
     >
         <section class="bg-white rounded-lg border border-surface-200 p-6 space-y-5">

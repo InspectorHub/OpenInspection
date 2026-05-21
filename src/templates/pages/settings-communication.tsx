@@ -13,7 +13,7 @@ export const SettingsCommunicationEmailPage = ({ branding }: Props): JSX.Element
         title="Settings | Email"
         group="communication"
         subPage="email"
-        pageTitle="Email Delivery"
+        pageTitle="Email delivery"
         pageSubtitle="Resend is used for password resets, invitations, and report delivery. Domain must be verified in Resend."
     >
         <section class="bg-white rounded-lg border border-surface-200 p-6 space-y-5">

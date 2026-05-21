@@ -13,7 +13,7 @@ export const SettingsAccountPasswordPage = ({ branding }: Props): JSX.Element =>
         title="Settings | Change Password"
         group="account"
         subPage="password"
-        pageTitle="Change Password"
+        pageTitle="Change password"
         pageSubtitle="Update the password used to sign in to your dashboard."
     >
         <section class="bg-white rounded-lg border border-surface-200 p-6 space-y-5">
@@ -54,7 +54,7 @@ export const SettingsAccountBotProtectionPage = ({ branding }: Props): JSX.Eleme
         title="Settings | Bot Protection"
         group="account"
         subPage="bot-protection"
-        pageTitle="Bot Protection"
+        pageTitle="Bot protection"
         pageSubtitle="Cloudflare Turnstile keys for the public booking form. Site key is public; secret key is stored encrypted."
     >
         <section class="bg-white rounded-lg border border-surface-200 p-6 space-y-5">

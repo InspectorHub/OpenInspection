@@ -29,7 +29,6 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     <header class="space-y-2">
                         <span class="inline-flex items-center rounded-md bg-blueprint-100 px-2.5 py-1 text-[10px] font-bold text-blueprint-700 uppercase tracking-[0.2em]">Settings</span>
                         <h1 class="text-3xl font-bold tracking-tight text-ink-900 dark:text-slate-100">Settings</h1>
-                        <p class="text-base text-ink-600 dark:text-slate-400 max-w-2xl">Configure your workspace, catalog, integrations, and account. Pick a section to get started.</p>
                     </header>
 
                     {/* Group cards */}
