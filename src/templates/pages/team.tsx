@@ -166,7 +166,41 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                     <p class="text-sm text-slate-400" x-show="items.length === 0 && !loading">No active guests.</p>
                 </section>
 
-                <section class="rounded-xl p-6 bg-indigo-50 border border-indigo-200 flex items-center justify-between">
+                {/* Roles reference — surfaces the RBAC matrix so workspace
+                    admins know what each role actually does before they
+                    assign one. The roles themselves are defined globally
+                    in src/lib/middleware/rbac.ts; this card is purely a
+                    documentation surface (no edit affordance — roles can't
+                    be customised without a code change, matching the
+                    design's "Defined globally" subtitle). */}
+                <section class="glass-panel rounded-xl p-6 shadow-md">
+                    <header class="mb-4">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">Roles</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                            Defined globally. To request a custom role, file a ticket on the OpenInspection repo.
+                        </p>
+                    </header>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Lead inspector</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Full edit · can publish · approves apprentice ratings. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>lead</code> / <code>inspector</code>)</span></div>
+                        </div>
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Specialist</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Full edit within their assigned sections. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>specialist</code>)</span></div>
+                        </div>
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Apprentice</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Edits route through the lead's review queue at <a href="/apprentice-review" class="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">/apprentice-review</a> before publish. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>apprentice</code>)</span></div>
+                        </div>
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Office staff</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Read-only access to inspections + scheduling. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>office</code>)</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rounded-xl p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
                     <div>
                         <div class="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Billing</div>
                         <div class="text-lg font-medium text-slate-900">Manage seats, invoices, and payment in the billing portal</div>

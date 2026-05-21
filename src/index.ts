@@ -2267,7 +2267,17 @@ app.get('/settings/account/bot-protection', htmlAuthGuard(['owner', 'admin']), (
 // portal CTA. Owner/admin only — non-admins don't see billing UI.
 app.get('/settings/billing', htmlAuthGuard(['owner', 'admin']), (c) => {
     const b = c.get('branding');
-    return c.html(SettingsBillingPage(b ? { branding: b } : {}));
+    const p = c.var.profile;
+    // The page's three modes (standalone / saas-silo / saas-shared) are
+    // entirely driven by the deployment profile; we pass through the two
+    // flags the page actually branches on so the template stays a pure
+    // function of props.
+    return c.html(SettingsBillingPage({
+        ...(b ? { branding: b } : {}),
+        hasBilling:   p.hasBilling,
+        hasSeatQuota: p.hasSeatQuota,
+        saasTopology: p.saasTopology ?? null,
+    }));
 });
 
 // Advanced group

@@ -22,20 +22,32 @@
             submitting: false,
             error: '',
 
+            // Caller-supplied label (e.g. "Inspection roster · live add")
+            // so audit logs / analytics can tell where the invite came from.
+            sourceLabel: '',
+
             async init() {
-                window.addEventListener('invite-seat-modal:open', () => this.openModal());
+                window.addEventListener('invite-seat-modal:open', (e) => {
+                    const detail = (e && e.detail) || {};
+                    this.openModal({
+                        mode:        detail.mode === 'guest' ? 'guest' : 'permanent',
+                        sourceLabel: detail.sourceLabel || '',
+                    });
+                });
                 await Promise.all([this.loadLeads(), this.loadSections()]);
             },
 
-            openModal() {
-                this.open = true;
-                this.mode = 'permanent';
-                this.email = '';
-                this.role = 'lead';
-                this.mentorId = '';
-                this.sectionIds = [];
+            openModal(opts) {
+                opts = opts || {};
+                this.open         = true;
+                this.mode         = opts.mode === 'guest' ? 'guest' : 'permanent';
+                this.sourceLabel  = opts.sourceLabel || '';
+                this.email        = '';
+                this.role         = 'lead';
+                this.mentorId     = '';
+                this.sectionIds   = [];
                 this.generatedUrl = '';
-                this.error = '';
+                this.error        = '';
             },
 
             close() {

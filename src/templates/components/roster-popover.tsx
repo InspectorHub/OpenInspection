@@ -76,18 +76,22 @@ export function RosterPopover(): JSX.Element {
                     </li>
                 </ul>
 
-                <div class="mt-4 pt-3 border-t border-slate-100 flex gap-2">
+                {/* Live-add CTAs — dispatch the InviteSeatModal open event
+                    with a mode + sourceLabel so the modal opens pre-tuned
+                    to the right tab. The page mounting RosterPopover must
+                    also mount InviteSeatModal (inspection-edit.tsx does). */}
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex gap-2">
                     <button
                         type="button"
                         class="ih-btn ih-btn--sm ih-btn--secondary"
-                        disabled
-                        title="Available after subsystem C (M9 InviteSeatModal)"
+                        x-on:click="close(); window.dispatchEvent(new CustomEvent('invite-seat-modal:open', { detail: { mode: 'permanent', sourceLabel: 'Inspection roster · live add' } }))"
+                        title="Send an email invite to a new permanent inspector"
                     >Add inspector</button>
                     <button
                         type="button"
                         class="ih-btn ih-btn--sm ih-btn--secondary"
-                        disabled
-                        title="Available after subsystem C (M9 InviteSeatModal)"
+                        x-on:click="close(); window.dispatchEvent(new CustomEvent('invite-seat-modal:open', { detail: { mode: 'guest', sourceLabel: 'Inspection roster · live add' } }))"
+                        title="Generate a one-time guest invite link"
                     >Invite guest</button>
                 </div>
             </div>

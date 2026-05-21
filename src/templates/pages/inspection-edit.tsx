@@ -14,6 +14,7 @@ import { FooterBar } from '../components/footer-bar';
 import { ReconnectBanner } from '../components/reconnect-banner';
 import { UnitTree } from '../components/unit-tree';
 import { MintObserverLinkModal } from '../components/mint-observer-link-modal';
+import { InviteSeatModal } from '../components/invite-seat-modal';
 import type { BrandingConfig } from '../../types/auth';
 import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
 
@@ -2000,9 +2001,12 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         {/* Design System 0520 subsystem B phase 7 — RosterPopover. Opens
             via `open-roster-popover` window event; subscribes to the
             current inspection's PresenceClient to show who is editing
-            (and which item). Add/Invite buttons are stubs that activate
-            when subsystem C M9 InviteSeatModal ships. */}
+            (and which item). The Add inspector / Invite guest buttons
+            dispatch `invite-seat-modal:open` which the InviteSeatModal
+            mounted directly below listens for. */}
         <RosterPopover />
+        <InviteSeatModal />
+        <script src="/js/invite-seat-modal.js"></script>
         <Modal
             name="showLegacyPublishOptions"
             title="Publish options"
