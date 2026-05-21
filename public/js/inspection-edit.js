@@ -63,6 +63,12 @@ function inspectionEditor(inspectionId) {
     // 'property' = the property-facts form. The section rail's first
     // row (`__property__`) toggles between them.
     activeView: 'items',
+    // Design's SideRail tabs (Preview / Library / Recall). The 280 px
+    // right rail used to be a single "active item preview" surface;
+    // now the tab strip lets the inspector flip to the canned comment
+    // library or prior-inspection recall without leaving the editor.
+    sideRailMode: 'preview',
+    sideRailLibQuery: '',
     // Design System 0520 subsystem D P2.2 — when the inspector picks a
     // unit in the UnitTree left rail, the tree broadcasts
     // `unit-selected` on window and this state mirrors the active unit

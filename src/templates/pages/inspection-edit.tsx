@@ -1968,6 +1968,13 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               instead — see tablet-active-item-drawer below), and while the
               Comment Library drawer is open (Sprint 1 A-1: avoids the
               slash-trigger popover overlapping ACTIVE ITEM). */}
+          {/* Right SideRail — mirrors the design's 3-tab pattern
+              (Preview / Library / Recall). Sticky 280 px column with the
+              active item's preview, the canned-comment library, and a
+              recall pane that shows how the inspector wrote this kind of
+              finding in recent inspections. Hidden in focus mode (⌘2)
+              and on narrower-than-xl viewports; the tablet drawer below
+              handles 1024-1279 px. */}
           <aside x-show="viewMode !== 'focus' && activeItem && !showCommentLibrary && !slashPickerOpen" class="hidden xl:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden sidebar-glass">
             <header class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
               <h3 class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Active Item</h3>
@@ -1975,56 +1982,149 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               <p class="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5" x-text="activeItem?.number || ''"></p>
             </header>
 
-            {/* Photos */}
-            <section class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Photos · <span x-text="(results[activeItemId]?.photos || []).length"></span></span>
-                <label class="text-[10px] text-indigo-500 hover:underline cursor-pointer">
-                  + Add
-                  <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }" />
-                </label>
-              </div>
-              <div class="grid grid-cols-2 gap-1.5" x-show="(results[activeItemId]?.photos || []).length > 0">
-                <template x-for="(photo, pi) in (results[activeItemId]?.photos || []).slice(0, 8)" x-bind:key="pi">
-                  <div class="aspect-[4/3] rounded overflow-hidden bg-slate-100 dark:bg-slate-700 relative group">
-                    <img x-bind:src="'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.annotatedKey || photo.key)" class="w-full h-full object-cover" alt="Photo" />
-                    <button
-                      x-on:click="window.dispatchEvent(new CustomEvent('annotate', { detail: { inspectionId, itemId: activeItemId, photoIndex: pi, imageUrl: '/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.key), existingNodesJson: photo.annotationsJson || null } }))"
-                      class="absolute bottom-0.5 right-0.5 px-1.5 py-0.5 rounded bg-white/90 dark:bg-slate-800/90 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Annotate"
-                    >✎</button>
-                  </div>
-                </template>
-              </div>
-              <p x-show="(results[activeItemId]?.photos || []).length === 0" class="text-[11px] italic text-slate-400 dark:text-slate-500 py-2">
-                No photos. Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">P</kbd> to add.
-              </p>
-            </section>
+            {/* Tab strip — matches the design kit's pill-tab pattern
+                (active tab has bg-card + card-shadow; inactive tabs sit
+                on the muted track in the strip's background). */}
+            <nav role="tablist" aria-label="Side rail mode" class="flex gap-1 p-1 mx-2 my-2 rounded-md bg-slate-100 dark:bg-slate-800/60">
+              <template x-for="tab in [{id:'preview',label:'Preview'},{id:'library',label:'Library'},{id:'recall',label:'Recall'}]" x-bind:key="tab.id">
+                <button
+                  type="button"
+                  role="tab"
+                  x-on:click="sideRailMode = tab.id"
+                  x-bind:aria-selected="sideRailMode === tab.id ? 'true' : 'false'"
+                  x-bind:class="sideRailMode === tab.id
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
+                  class="flex-1 px-2 py-1.5 rounded text-[11px] font-bold transition-colors"
+                  x-text="tab.label"
+                ></button>
+              </template>
+            </nav>
 
-            {/* Quick comments */}
-            <section class="px-4 py-3 flex-1 overflow-y-auto">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Quick Comments</span>
-                <button x-on:click="openCommentLibrary()" class="text-[10px] text-indigo-500 hover:underline">Browse all</button>
-              </div>
-              <div class="space-y-1">
-                <template x-for="(c, i) in quickCommentsForActive" x-bind:key="i">
-                  <button x-on:click="insertComment(c.text)" class="w-full text-left p-2 rounded text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all">
-                    <div class="flex items-start gap-1.5">
-                      <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0 mt-0.5"
-                        x-bind:style="c.rating === 'satisfactory' ? 'background:#10b981' : (c.rating === 'monitor' ? 'background:#f59e0b' : (c.rating === 'defect' ? 'background:#ef4444' : 'background:#64748b'))"
-                        x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
-                      <span x-text="c.text"></span>
+            {/* ─────────── Preview tab ─────────── */}
+            <div x-show="sideRailMode === 'preview'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+              {/* Photos */}
+              <section class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Photos · <span x-text="(results[activeItemId]?.photos || []).length"></span></span>
+                  <label class="text-[10px] text-indigo-500 hover:underline cursor-pointer">
+                    + Add
+                    <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }" />
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5" x-show="(results[activeItemId]?.photos || []).length > 0">
+                  <template x-for="(photo, pi) in (results[activeItemId]?.photos || []).slice(0, 8)" x-bind:key="pi">
+                    <div class="aspect-[4/3] rounded overflow-hidden bg-slate-100 dark:bg-slate-700 relative group">
+                      <img x-bind:src="'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.annotatedKey || photo.key)" class="w-full h-full object-cover" alt="Photo" />
+                      <button
+                        x-on:click="window.dispatchEvent(new CustomEvent('annotate', { detail: { inspectionId, itemId: activeItemId, photoIndex: pi, imageUrl: '/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.key), existingNodesJson: photo.annotationsJson || null } }))"
+                        class="absolute bottom-0.5 right-0.5 px-1.5 py-0.5 rounded bg-white/90 dark:bg-slate-800/90 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Annotate"
+                      >✎</button>
                     </div>
+                  </template>
+                </div>
+                <p x-show="(results[activeItemId]?.photos || []).length === 0" class="text-[11px] italic text-slate-400 dark:text-slate-500 py-2">
+                  No photos. Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">P</kbd> to add.
+                </p>
+              </section>
+
+              {/* Quick comments */}
+              <section class="px-4 py-3 flex-1 overflow-y-auto">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Quick Comments</span>
+                  <button x-on:click="sideRailMode = 'library'" class="text-[10px] text-indigo-500 hover:underline">Browse all</button>
+                </div>
+                <div class="space-y-1">
+                  <template x-for="(c, i) in quickCommentsForActive" x-bind:key="i">
+                    <button x-on:click="insertComment(c.text)" class="w-full text-left p-2 rounded text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all">
+                      <div class="flex items-start gap-1.5">
+                        <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0 mt-0.5"
+                          x-bind:style="c.rating === 'satisfactory' ? 'background: var(--ih-status-ok)' : (c.rating === 'monitor' ? 'background: var(--ih-status-watch)' : (c.rating === 'defect' ? 'background: var(--ih-status-bad)' : 'background: #64748b'))"
+                          x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
+                        <span x-text="c.text"></span>
+                      </div>
+                    </button>
+                  </template>
+                </div>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 italic mt-3">
+                  Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">/</kbd> for full library
+                </p>
+              </section>
+            </div>
+
+            {/* ─────────── Library tab ─────────── */}
+            <div x-show="sideRailMode === 'library'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                  Comment library · <span x-text="(_commentLibraryPool || []).length"></span>
+                </div>
+                <input
+                  type="search"
+                  x-model="sideRailLibQuery"
+                  placeholder="Search snippets…"
+                  class="w-full px-3 py-2 text-[12px] rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500"
+                />
+              </div>
+              <div class="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
+                <template x-for="c in (_commentLibraryPool || []).filter(c => !sideRailLibQuery || (c.text || '').toLowerCase().includes(sideRailLibQuery.toLowerCase()) || (c.category || '').toLowerCase().includes(sideRailLibQuery.toLowerCase())).slice(0, 60)" x-bind:key="c.id || c.text">
+                  <button
+                    x-on:click="insertComment(c.text)"
+                    class="w-full text-left p-2.5 rounded-md text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+                  >
+                    <div class="flex items-center gap-1.5 mb-1">
+                      <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0"
+                        x-bind:style="c.rating === 'satisfactory' ? 'background: var(--ih-status-ok)' : (c.rating === 'monitor' ? 'background: var(--ih-status-watch)' : (c.rating === 'defect' ? 'background: var(--ih-status-bad)' : 'background: #64748b'))"
+                        x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
+                      <span x-show="c.category" class="text-[9px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500" x-text="c.category"></span>
+                    </div>
+                    <div x-text="c.text"></div>
                   </button>
                 </template>
+                <p x-show="!(_commentLibraryPool || []).length" class="text-[11px] italic text-slate-400 dark:text-slate-500 py-4 text-center">
+                  No canned comments configured. Add some in <a href="/recommendations" class="text-indigo-500 hover:underline">Recommendations library</a>.
+                </p>
               </div>
-              <p class="text-[10px] text-slate-400 dark:text-slate-500 italic mt-3">
-                Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">/</kbd> for full library
-              </p>
-            </section>
+            </div>
 
-            {/* Keyboard hint footer */}
+            {/* ─────────── Recall tab — design's PriorPane ─────────── */}
+            <div x-show="sideRailMode === 'recall'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  Recall · last 30 inspections
+                </div>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                  How you wrote this kind of finding in recent jobs. Click any row to clone the rating + note onto the active item.
+                </p>
+              </div>
+              {/* Placeholder until a /api/inspections/recall endpoint
+                  exists — the panel is wired to render an array on
+                  `recallEntries` if/when the factory populates it.
+                  Until then, an honest empty state. */}
+              <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                <template x-for="entry in (recallEntries || [])" x-bind:key="entry.id">
+                  <button
+                    x-on:click="if (typeof cloneRecallEntry === 'function') cloneRecallEntry(entry)"
+                    class="w-full text-left p-2.5 rounded-md text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+                  >
+                    <div class="flex items-center gap-1.5 mb-1">
+                      <span class="ih-pill" x-bind:class="entry.rating === 'DEF' ? 'ih-pill--defect' : entry.rating === 'MON' ? 'ih-pill--monitor' : 'ih-pill--sat'" x-text="entry.rating"></span>
+                      <span class="text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate" x-text="entry.address"></span>
+                      <span class="ml-auto text-[9px] text-slate-400 dark:text-slate-500" x-text="entry.when"></span>
+                    </div>
+                    <div class="text-[11px] text-slate-600 dark:text-slate-300" x-text="entry.note"></div>
+                    <div class="mt-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Clone rating + note →</div>
+                  </button>
+                </template>
+                <div x-show="!(recallEntries || []).length" class="ih-empty-state">
+                  <svg class="ih-empty-state__icon" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <h3 class="ih-empty-state__title">No recall data yet</h3>
+                  <p class="ih-empty-state__subline">Once you've published a few inspections, this pane will surface how you handled similar findings before.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Keyboard hint footer — shared across all tabs */}
             <footer class="px-4 py-2 border-t border-slate-200/50 dark:border-slate-700/50 text-[10px] text-slate-400 dark:text-slate-500">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">↑↓</kbd> nav
