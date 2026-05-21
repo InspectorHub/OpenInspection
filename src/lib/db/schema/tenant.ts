@@ -76,6 +76,11 @@ export const users = sqliteTable('users', {
     mentorId:             text('mentor_id'),
     assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
     expiresAt:            integer('expires_at'),
+    // Trial Sample-Data Mode spec (2026-05-20) — ICP signal captured at
+    // magic-link signup. Nullable: NULL for pre-migration users and for
+    // teammates who join via team invite (only the tenant owner answers
+    // the role survey at signup).
+    signupRole:           text('signup_role'),
 });
 
 // Booking #7 Sprint A — reserved/banned slug list. Seeded via migration 0052
