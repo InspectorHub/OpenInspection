@@ -59,7 +59,6 @@ import { CommentsPage } from './templates/pages/comments';
 import { InvoicesPage } from './templates/pages/invoices';
 import { ReportCardStackPage } from './templates/pages/report-card-stack';
 import { InspectionEditPage } from './templates/pages/inspection-edit';
-import { InspectionSettingsPage } from './templates/pages/inspection/settings';
 import { RepairListPage } from './templates/pages/inspection/repair-list';
 import { CustomerRepairRequestPage } from './templates/pages/customer-repair-request';
 import { FeatureDisabledPage } from './templates/pages/feature-disabled';
@@ -2344,18 +2343,17 @@ app.get('/inspections/:id/form', htmlAuthGuard(['owner', 'admin', 'inspector']),
 //
 // `/edit` is preserved as a 302 redirect to `/report` for backward
 // compatibility with bookmarks and existing JS that still constructs the
-// legacy URL. The canonical surface is the sub-route family:
-//   /inspections/:id/report     — primary editor (existing inspection-edit)
-//   /inspections/:id/settings   — schedule / inspector / template / gates
+// legacy URL. The primary surface is:
+//   /inspections/:id/report     — single-view editor (inspection-edit)
 //
-// Summary, Photos, and Signatures were retired in the design-alignment
-// rollback:
-//   - Summary lives in the editor's Preview link (renders defects view)
-//   - Photos lives in a slide-over sheet inside the editor, triggered by
-//     the editor toolbar's Photos button (photo-gallery-sheet.js)
-//   - Signatures envelopes + audit chain fold into PublishModal as a
-//     collapsible block (envelope-audit.js); the pre-flight check row
-//     is the primary signal for inspector and customer.
+// All ancillary tabs were retired in the design-alignment rollback and
+// folded back into the editor:
+//   - Summary    → editor's Preview link (renders /api/inspections/:id/report)
+//   - Photos     → slide-over sheet, triggered by toolbar Photos button
+//   - Signatures → collapsible block at the bottom of PublishModal
+//   - Settings   → slide-over sheet, triggered by toolbar gear button
+// /inspections/:id/settings still 302s to /report so external links
+// don't break.
 //
 // All sub-routes share <InspectionShell> for sub-nav + breadcrumb. The Report
 // tab keeps the existing BareLayout-based editor untouched so the Alpine
@@ -2426,35 +2424,43 @@ app.get('/inspections/:id/report', htmlAuthGuard(['owner', 'admin', 'inspector']
     if (!id) return c.redirect('/dashboard');
     // Track E1 — surface the per-tenant Repair List toggle so the editor's
     // sub-nav optionally renders the 6th tab.
+    // Round-2 G3 — also read customReferralSources for the settings sheet's
+    // Referral Source dropdown (merged with the seven seeds in the sheet).
     const tenantId = c.get('tenantId');
     let enableRepairList = false;
+    let customReferralSources: string[] | undefined;
     if (tenantId) {
         try {
-            const cfgRow = await drizzle(c.env.DB).select({ enableRepairList: schema.tenantConfigs.enableRepairList })
+            const cfgRow = await drizzle(c.env.DB).select({
+                enableRepairList:      schema.tenantConfigs.enableRepairList,
+                customReferralSources: schema.tenantConfigs.customReferralSources,
+            })
                 .from(schema.tenantConfigs)
                 .where(eq(schema.tenantConfigs.tenantId, tenantId))
                 .get();
             enableRepairList = !!cfgRow?.enableRepairList;
+            const raw = cfgRow?.customReferralSources;
+            if (Array.isArray(raw)) customReferralSources = raw as string[];
         } catch { /* default off */ }
     }
-    return c.html(InspectionEditPage({ inspectionId: id, branding: c.get('branding'), enableRepairList }));
-});
-
-
-app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
-    const id = c.req.param('id');
-    if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionSettingsPage({
+    return c.html(InspectionEditPage({
         inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
         branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
-        ...(shell?.customReferralSources ? { customReferralSources: shell.customReferralSources } : {}),
+        enableRepairList,
+        ...(customReferralSources ? { customReferralSources } : {}),
     }));
 });
+
+// Design-alignment B+C — /inspections/:id/settings is no longer a
+// standalone tab; the settings form is folded into a slide-over on the
+// editor. Redirect any deep links to /report so users land on the
+// editor (where the gear button opens the settings sheet).
+app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
+    const id = c.req.param('id');
+    if (!id) return c.redirect('/dashboard');
+    return c.redirect(`/inspections/${id}/report`, 302);
+});
+
 
 // Track E1 (ITB §11, UC-ITB-07) — Repair List sub-route. Server-renders
 // the punch-list of every flagged defect across the inspection. Available
@@ -2493,8 +2499,6 @@ app.get('/inspections/:id/repair-list', htmlAuthGuard(['owner', 'admin', 'inspec
             totals:          data.totals,
             showEstimates:   data.showEstimates,
             branding:        c.get('branding'),
-            ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-            ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
         }));
     } catch {
         return c.html(NotFoundPage({ branding: c.get('branding') }), 404);

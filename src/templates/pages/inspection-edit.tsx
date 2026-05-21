@@ -13,6 +13,7 @@ import { TeamBanner } from '../components/team-banner';
 import { FooterBar } from '../components/footer-bar';
 import { ReconnectBanner } from '../components/reconnect-banner';
 import { UnitTree } from '../components/unit-tree';
+import { InspectionSettingsSheet } from '../components/inspection-settings-sheet';
 import { MintObserverLinkModal } from '../components/mint-observer-link-modal';
 import { InviteSeatModal } from '../components/invite-seat-modal';
 import type { BrandingConfig } from '../../types/auth';
@@ -22,8 +23,12 @@ interface InspectionEditProps {
   inspectionId: string;
   branding?: BrandingConfig | undefined;
   // Track E1 — when true, the editor's sub-nav exposes the "Repair List"
-  // 6th tab. Default off so existing tenants keep the 5-tab layout.
+  // 6th tab. Default off so existing tenants keep the original layout.
   enableRepairList?: boolean;
+  // Round-2 backlog G3 — tenant-defined referral sources are appended
+  // to the seven seeds in the settings sheet's Referral Source dropdown.
+  // Threaded from the parent route loader.
+  customReferralSources?: string[];
 }
 
 /**
@@ -44,7 +49,7 @@ function buildRecoGroups(): Array<{ group: string; items: Array<{ id: string; la
     return Array.from(groups.entries()).map(([group, items]) => ({ group, items }));
 }
 
-export function InspectionEditPage({ inspectionId, branding, enableRepairList = false }: InspectionEditProps) {
+export function InspectionEditPage({ inspectionId, branding, enableRepairList = false, customReferralSources }: InspectionEditProps) {
   const siteName = branding?.siteName || 'OpenInspection';
   const recoGroups = buildRecoGroups();
 
@@ -183,104 +188,151 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
     ),
     children: (
       <>
-      {/* Sprint 2 S2-5 — Inspection sub-route nav. Renders the 5-tab bar
-          (Report / Photos / Summary / Signatures / Settings) at the top of
-          the editor so users can switch between sub-routes without leaving
-          the page. Kept outside the inspectionEditor x-data scope so it
-          stays interactive even if the editor's Alpine init fails. */}
-      {/* Sub-page tab strip — Inspection record (Report editor / Photos /
-          Summary / Repair List / Signatures / Settings) on the left;
-          actions group (Preview rendered report + PDF dropdown) on the
-          right, separated by a vertical divider so the two sets read as
-          distinct concerns. The active tab's underline uses --ih-primary
-          so it inherits the tenant's brand colour + flips for dark mode
-          via the token. */}
+      {/* Design-alignment B+C — PageChrome.
+          Matches the design spec's InspectionEditor header: back arrow,
+          property address (title) + secondary inspector/status line, then
+          a right-aligned action group (Speed / Photos / Settings / Repair
+          List / Preview / PDF / Publish). The original 5-tab Sprint 2
+          sub-nav (Report / Photos / Summary / Signatures / Settings) was
+          retired — Summary lives in the Preview link, Photos + Settings
+          fold into slide-over sheets triggered from this chrome.
+
+          The whole bar is inside the inspectionEditor x-data scope so
+          per-inspection values (propertyAddress, inspectorName, status)
+          bind directly. PDFDownloader carries its own nested scope. */}
+      {/* Unified Alpine scope wrapping the chrome + editor canvas. */}
+      <div
+        x-data={`inspectionEditor('${inspectionId}')`}
+        data-inspection-id={inspectionId}
+        class="min-h-screen editor-canvas"
+      >
       <nav
-        aria-label="Inspection sub-pages"
+        aria-label="Inspection header"
         class="sticky top-0 z-[60] border-b print:hidden"
         style="background: var(--ih-bg-card, #ffffff); border-color: var(--ih-slate-200, #e2e8f0);"
       >
-        <div class="max-w-full mx-auto px-4 flex items-stretch gap-1 overflow-x-auto hide-scrollbar">
-          <div role="tablist" aria-label="Inspection sections" class="flex items-stretch gap-0.5">
-            <a
-              href={`/inspections/${inspectionId}/report`}
-              role="tab"
-              aria-current="page"
-              aria-selected="true"
-              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 text-slate-900 dark:text-slate-100 whitespace-nowrap"
-              style="border-color: var(--ih-primary, #6366f1);"
-            >Report</a>
-            {/* Track E1 (ITB §11) — opt-in 6th tab. */}
+        <div class="max-w-full mx-auto px-3 sm:px-4 flex items-center gap-3 h-14">
+          <a
+            href="/dashboard"
+            title="Back to dashboard"
+            class="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            aria-label="Back to dashboard"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </a>
+
+          {/* Title + secondary line — the inspectionEditor factory
+              populates `inspection.propertyAddress` + `inspectorName` on
+              load; until then the secondary line stays empty and the
+              title falls back to a generic label. */}
+          <div class="min-w-0 flex-1">
+            <div class="text-[14px] font-bold text-slate-900 dark:text-slate-100 truncate" x-text="inspection.propertyAddress || 'Inspection'"></div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+              <span x-show="inspection.inspectorName" x-text="inspection.inspectorName"></span>
+              <span x-show="inspection.inspectorName && inspection.id" class="text-slate-300 dark:text-slate-600">·</span>
+              <span x-show="inspection.id" class="font-mono" x-text="'#' + String(inspection.id || '').slice(0, 8).toUpperCase()"></span>
+            </div>
+          </div>
+
+          {/* Status chip — derived from inspection.status. Tone follows
+              the design's status palette (draft/scheduled = slate;
+              in-progress = indigo; ready = emerald; etc.). */}
+          <span
+            x-show="inspection.status"
+            class="hidden sm:inline-flex items-center gap-1.5 px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-[0.12em] ring-1 ring-inset whitespace-nowrap"
+            x-bind:class="
+              inspection.status === 'completed'   ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800' :
+              inspection.status === 'in_progress' ? 'bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800' :
+              inspection.status === 'cancelled'   ? 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:ring-rose-800' :
+                                                    'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700/50 dark:text-slate-300 dark:ring-slate-600'"
+            x-text="(inspection.status || '').replace('_',' ')"
+          ></span>
+
+          <div class="flex items-center gap-1.5 flex-shrink-0">
             {enableRepairList && (
               <a
                 href={`/inspections/${inspectionId}/repair-list`}
-                role="tab"
-                aria-selected="false"
                 data-testid="inspection-edit-repair-list-tab"
-                class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
-              >Repair List</a>
+                class="hidden lg:inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+              >Repair list</a>
             )}
-            <a
-              href={`/inspections/${inspectionId}/settings`}
-              role="tab"
-              aria-selected="false"
-              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
-            >Settings</a>
-          </div>
 
-          {/* Actions group — right-aligned, separated from the tab nav by
-              a vertical divider so they don't read as a 7th/8th tab. */}
-          <span class="ml-auto flex items-stretch">
-            <span aria-hidden="true" class="self-center h-5 w-px mx-2 bg-slate-200 dark:bg-slate-700"></span>
-          </span>
-          {/* Speed mode toggle — Z hotkey already binds this; the explicit
-              button matches the design chrome and improves discoverability.
-              Flips `speedMode` on the editor factory, which `<SpeedMode />`
-              consumes via `x-show="speedMode"` for its full-screen view. */}
-          <button
-            type="button"
-            x-on:click="speedMode = !speedMode"
-            x-bind:aria-pressed="speedMode ? 'true' : 'false'"
-            title="Speed mode — full-screen single-item rating (Z)"
-            class="self-center flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-md border transition-all"
-            x-bind:class="speedMode
-                ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600'"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-              <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Speed
-            <kbd class="ih-kbd" style="padding: 1px 4px; font-size: 9px;">Z</kbd>
-          </button>
-          {/* Inspector report preview — opens the rendered (final) report in
-              a new tab. The /api/inspections/:id/report endpoint serves
-              HTML with `isAuthenticated: true`, so paywall + agreement
-              gates are bypassed and the dark sidebar (Edit / Publish
-              buttons) is rendered for the inspector's pre-publish review. */}
-          <a
-            href={`/api/inspections/${inspectionId}/report`}
-            target="_blank"
-            rel="noopener"
-            data-testid="inspection-edit-preview-report"
-            title="Open the rendered report in a new tab — what the customer will see"
-            class="self-center flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-              <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Preview
-          </a>
-          {/* PDF download dropdown */}
-          <div class="self-center ml-2 flex-shrink-0" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
-            <div class="relative">
+            {/* Speed mode toggle — Z hotkey already binds this; the
+                explicit button matches the design chrome's Speed
+                affordance and improves discoverability. */}
+            <button
+              type="button"
+              x-on:click="speedMode = !speedMode"
+              x-bind:aria-pressed="speedMode ? 'true' : 'false'"
+              title="Speed mode — full-screen single-item rating (Z)"
+              class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border transition-all"
+              x-bind:class="speedMode
+                  ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600'"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span class="hidden sm:inline">Speed</span>
+              <kbd class="ih-kbd hidden md:inline" style="padding: 1px 4px; font-size: 9px;">Z</kbd>
+            </button>
+
+            {/* Photos slide-over trigger */}
+            <button
+              type="button"
+              x-on:click="$dispatch('photo-gallery:open')"
+              aria-label="Open photo gallery"
+              class="hidden md:inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <span class="hidden lg:inline">Photos</span>
+            </button>
+
+            {/* Settings slide-over trigger */}
+            <button
+              type="button"
+              x-on:click="$dispatch('inspection-settings:open')"
+              aria-label="Open inspection settings"
+              class="hidden md:inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+              <span class="hidden lg:inline">Settings</span>
+            </button>
+
+            {/* Preview — opens the rendered (final) report in a new tab. */}
+            <a
+              href={`/api/inspections/${inspectionId}/report`}
+              target="_blank"
+              rel="noopener"
+              data-testid="inspection-edit-preview-report"
+              title="Open the rendered report in a new tab"
+              class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span class="hidden sm:inline">Preview</span>
+            </a>
+
+            {/* PDF download dropdown — nested x-data so the PDF state
+                doesn't leak into inspectionEditor. */}
+            <div class="relative flex-shrink-0" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
               <button
                 type="button"
                 x-on:click="open = !open"
                 x-bind:disabled="loading"
                 aria-label="Download PDF"
-                class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all disabled:opacity-60"
+                class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all disabled:opacity-60"
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -324,14 +376,23 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </button>
               </div>
             </div>
+
+            {/* Publish — primary CTA, design's Publish lives in the
+                header too. Opens PublishModal which carries the
+                pre-flight gates + envelope audit drawer. */}
+            <button
+              type="button"
+              x-on:click="showPublishModal = true"
+              class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-bold rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M5 12l5 5L20 7"/>
+              </svg>
+              Publish
+            </button>
           </div>
         </div>
       </nav>
-      <div
-        x-data={`inspectionEditor('${inspectionId}')`}
-        data-inspection-id={inspectionId}
-        class="min-h-screen editor-canvas"
-      >
         {/* Design System 0520 subsystem B phase 4 task 4.5 — ReconnectBanner.
             Sticky amber strip at top showing offline-queue status when
             pending writes are queued or conflicts have surfaced. */}
@@ -1433,35 +1494,6 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
                   Inspector
                 </button>
-                {/* Photo-gallery trigger — opens the slide-over sheet
-                    that replaced the retired /photos sub-tab. The sheet
-                    itself is mounted further down in the editor body so
-                    it can layer above the editor canvas. */}
-                <button
-                  type="button"
-                  x-on:click="$dispatch('photo-gallery:open')"
-                  aria-label="Open photo gallery"
-                  class="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <path d="M21 15l-5-5L5 21"/>
-                  </svg>
-                  Photos
-                </button>
-                <button x-on:click="previewReport()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl text-slate-500 dark:text-slate-400">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  Preview
-                </button>
-                <button
-                  x-on:click="showPublishModal = true"
-                  class="flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-xl text-white"
-                  style="background: #4f46e5"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                  Publish
-                </button>
               </div>
             </div>
 
@@ -2383,6 +2415,15 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
             </div>
           </aside>
         </div>
+        {/* Design-alignment B+C — inspection settings slide-over,
+            replacing the retired /inspections/:id/settings sub-tab.
+            Same form contents (schedule / people / property facts /
+            template / pricing / gates) reachable from the editor
+            toolbar's Settings gear button. */}
+        <InspectionSettingsSheet
+          inspectionId={inspectionId}
+          {...(customReferralSources ? { customReferralSources } : {})}
+        />
         {/* S3-6 — burst-camera modal lives at the page level so it stays
             mounted across item navigation. inspection-edit.js dispatches a
             `burst-camera:open` window event when the user taps a Camera
@@ -2937,6 +2978,11 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
           retired /inspections/:id/signatures sub-tab. Folds into
           PublishModal as a collapsible block. */}
       <script src="/js/envelope-audit.js"></script>
+      {/* Design-alignment B+C — inspection-settings factory, mounted
+          inside the InspectionSettingsSheet slide-over that replaced the
+          retired /inspections/:id/settings sub-tab. Same factory name +
+          shape as before. */}
+      <script src="/js/inspection-settings.js"></script>
       <script src="/js/onboarding.js"></script>
       <script src="/js/voice-input.js"></script>
       {/* Phase T (T23) — Messages panel script */}
