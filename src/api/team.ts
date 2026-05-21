@@ -184,8 +184,9 @@ teamRoutes.openapi(listApprenticeReviewsRoute, async (c) => {
     // name and the inspection's property address to be usable. Two batched
     // queries (one per join) keep this O(1) instead of N+1.
     const db = drizzle(c.env.DB);
-    const apprenticeIds = [...new Set(rows.map((r) => r.apprenticeId))];
-    const inspectionIds = [...new Set(rows.map((r) => r.inspectionId))];
+    const typedRows = rows as Array<{ apprenticeId: string; inspectionId: string } & Record<string, unknown>>;
+    const apprenticeIds: string[] = [...new Set(typedRows.map((r) => r.apprenticeId))];
+    const inspectionIds: string[] = [...new Set(typedRows.map((r) => r.inspectionId))];
 
     const apprenticeRows = await db
         .select({ id: users.id, name: users.name })
@@ -198,10 +199,10 @@ teamRoutes.openapi(listApprenticeReviewsRoute, async (c) => {
         .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, inspectionIds)))
         .all();
 
-    const apprenticeNameById  = Object.fromEntries(apprenticeRows.map((a) => [a.id, a.name]));
-    const inspectionAddrById  = Object.fromEntries(inspectionRows.map((i) => [i.id, i.address]));
+    const apprenticeNameById: Record<string, string | null> = Object.fromEntries(apprenticeRows.map((a) => [a.id, a.name]));
+    const inspectionAddrById: Record<string, string | null> = Object.fromEntries(inspectionRows.map((i) => [i.id, i.address]));
 
-    const items = rows.map((r) => ({
+    const items = typedRows.map((r) => ({
         ...r,
         apprenticeName:    apprenticeNameById[r.apprenticeId] ?? 'Unknown apprentice',
         inspectionAddress: inspectionAddrById[r.inspectionId] ?? r.inspectionId,
