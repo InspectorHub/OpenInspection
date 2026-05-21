@@ -46,6 +46,7 @@ import { MarketplacePage } from './templates/pages/marketplace';
 import { RatingSystemsPage } from './templates/pages/rating-systems';
 import { TagsPage } from './templates/pages/tags';
 import { TeamPage } from './templates/pages/team';
+import { ApprenticeReviewPage } from './templates/pages/apprentice-review';
 import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
 import { AgreementPrintablePage } from './templates/pages/agreement-printable';
@@ -2301,6 +2302,12 @@ app.get('/settings/team', htmlAuthGuard(['owner', 'admin']), async (c) => {
     return c.html(TeamPage({ ...(branding ? { branding } : {}), ...seatProps }));
 });
 app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/team', 301));
+// Design System 0520 subsystem C P3 — mentor-facing apprentice review queue.
+// PreflightChecks (publish modal) and the Apprentices side-rail link in here.
+app.get('/apprentice-review', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
+    const branding = c.get('branding');
+    return c.html(ApprenticeReviewPage(branding ? { branding } : {}));
+});
 app.get('/agreements', htmlAuthGuard(['owner', 'admin', 'agent']), (c) => c.html(AgreementsPage({ branding: c.get('branding') })));
 app.get('/contacts', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(ContactsPage({ branding: c.get('branding') })));
 app.get('/recommendations', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {

@@ -1,13 +1,13 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, inArray } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireSeatAvailable } from '../features/seat-quota';
 import { getBaseUrl } from '../lib/url';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
-import { tenantConfigs, users, apprenticeReviews } from '../lib/db/schema';
+import { tenantConfigs, users, apprenticeReviews, inspections } from '../lib/db/schema';
 import {
     InviteMemberSchema,
     InviteResponseSchema,
@@ -175,7 +175,38 @@ teamRoutes.openapi(listApprenticeReviewsRoute, async (c) => {
     const user     = c.get('user') as { sub?: string } | undefined;
     if (!user?.sub) throw Errors.Unauthorized('Missing user identity');
 
-    const items = await c.var.services.apprentice.listPendingForMentor(tenantId, user.sub);
+    const rows = await c.var.services.apprentice.listPendingForMentor(tenantId, user.sub);
+    if (rows.length === 0) {
+        return c.json({ success: true as const, data: { items: [] } }, 200);
+    }
+
+    // UI enrichment — the /apprentice-review page needs the apprentice's
+    // name and the inspection's property address to be usable. Two batched
+    // queries (one per join) keep this O(1) instead of N+1.
+    const db = drizzle(c.env.DB);
+    const apprenticeIds = [...new Set(rows.map((r) => r.apprenticeId))];
+    const inspectionIds = [...new Set(rows.map((r) => r.inspectionId))];
+
+    const apprenticeRows = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.tenantId, tenantId), inArray(users.id, apprenticeIds)))
+        .all();
+    const inspectionRows = await db
+        .select({ id: inspections.id, address: inspections.propertyAddress })
+        .from(inspections)
+        .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, inspectionIds)))
+        .all();
+
+    const apprenticeNameById  = Object.fromEntries(apprenticeRows.map((a) => [a.id, a.name]));
+    const inspectionAddrById  = Object.fromEntries(inspectionRows.map((i) => [i.id, i.address]));
+
+    const items = rows.map((r) => ({
+        ...r,
+        apprenticeName:    apprenticeNameById[r.apprenticeId] ?? 'Unknown apprentice',
+        inspectionAddress: inspectionAddrById[r.inspectionId] ?? r.inspectionId,
+    }));
+
     return c.json({ success: true as const, data: { items } }, 200);
 });
 
