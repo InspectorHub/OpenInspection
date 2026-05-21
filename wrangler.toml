@@ -18,74 +18,15 @@ APP_MODE = "standalone"
 # Default: Cloudflare's official always-pass test key (safe to use until you go live)
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
-# ── Sandbox mode (Sprint 1 CC-2) ───────────────────────────────────────────
-# Set to "true" only on the public demo deployment (sandbox.inspectorhub.io).
-# Enables a top banner on every authenticated page warning visitors that the
-# data resets nightly. Production self-hosters MUST leave this unset/empty.
-SANDBOX_MODE = ""
-
-# ── Sandbox environment override ───────────────────────────────────────────
-# Deploy with `wrangler deploy --env sandbox` to flip SANDBOX_MODE on without
-# touching the production worker. Used by the openinspection-sandbox Worker
-# bound to sandbox.<your-domain>.
-#
-# IMPORTANT: wrangler does NOT inherit top-level resource bindings into
-# env-specific overrides. Every [env.X] block must redeclare the bindings
-# it needs. The placeholders below match the top-level structure; in a
-# real sandbox deployment, point them at separate sandbox-only resources
-# (so demo writes never touch prod data).
-[env.sandbox]
-name = "openinspection-sandbox"
-[env.sandbox.vars]
-ENVIRONMENT = "sandbox"
-APP_MODE = "standalone"
-SANDBOX_MODE = "true"
-TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
-[[env.sandbox.d1_databases]]
-binding = "DB"
-database_name = "openinspection-sandbox-db"
-# Placeholder — create a separate D1 for sandbox to keep demo data isolated
-database_id = "00000000-0000-0000-0000-000000000000"
-migrations_dir = "migrations"
-[[env.sandbox.kv_namespaces]]
-binding = "TENANT_CACHE"
-id = "00000000000000000000000000000000"
-[[env.sandbox.unsafe.bindings]]
-type = "ratelimit"
-name = "RATE_LIMITER"
-namespace_id = "1002"
-simple = { limit = 10, period = 60 }
-[[env.sandbox.r2_buckets]]
-binding = "PHOTOS"
-bucket_name = "openinspection-sandbox-photos"
-[[env.sandbox.r2_buckets]]
-binding = "REPORTS"
-bucket_name = "openinspection-sandbox-reports"
-[env.sandbox.browser]
-binding = "BROWSER"
-[[env.sandbox.workflows]]
-binding = "SIGN_COMPLETION_WORKFLOW"
-name = "sign-completion-workflow-sandbox"
-class_name = "SignCompletionWorkflow"
-# Design System 0520 subsystem B — presence DOs mirrored into sandbox env.
-[[env.sandbox.durable_objects.bindings]]
-name       = "INSPECTION_PRESENCE"
-class_name = "InspectionPresenceDO"
-[[env.sandbox.durable_objects.bindings]]
-name       = "TENANT_PRESENCE"
-class_name = "TenantPresenceDO"
-[[env.sandbox.migrations]]
-tag = "v1"
-new_classes = ["InspectionPresenceDO", "TenantPresenceDO"]
-
 # ── SaaS environment override ──────────────────────────────────────────────
 # Deploy with `wrangler deploy --env saas` to bring up a multi-tenant
 # control-plane-fronted worker at app.<your-domain>. Pairs with
 # apps/portal for billing + onboarding. Replace PORTAL_API_URL with your
 # own portal worker that owns Stripe + onboarding workflows.
 #
-# Same inheritance caveat as [env.sandbox]: every binding must be
-# redeclared under env.saas.*. The SaaS topology typically uses a single
+# IMPORTANT: wrangler does NOT inherit top-level resource bindings into
+# env-specific overrides. Every binding must be redeclared under env.saas.*.
+# The SaaS topology typically uses a single
 # large D1 + a TENANT_CACHE KV partitioned by subdomain key prefix.
 [env.saas]
 name = "openinspection-saas"
@@ -94,7 +35,6 @@ ENVIRONMENT = "production"
 APP_MODE = "saas"
 SAAS_TOPOLOGY = "shared"
 PORTAL_API_URL = "https://portal.your-domain.com"
-SANDBOX_MODE = ""
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 [[env.saas.d1_databases]]
 binding = "DB"

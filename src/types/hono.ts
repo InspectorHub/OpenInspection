@@ -54,10 +54,6 @@ export interface AppEnv {
     SAAS_TOPOLOGY?: 'shared' | 'silo';
     SETUP_CODE?: string;
 
-    /** Sprint 1 CC-2 — set to "true" on sandbox.inspectorhub.io demo deployment.
-     *  Causes MainLayout/BareLayout to render the SandboxBanner. */
-    SANDBOX_MODE?: string;
-
     // Payments
     STRIPE_SECRET_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;
