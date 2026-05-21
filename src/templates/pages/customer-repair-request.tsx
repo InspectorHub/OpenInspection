@@ -84,6 +84,10 @@ const CUSTOMER_REPAIR_CSS = `
 textarea.crr-comments {
     background: #f8fafc;
 }
+html[data-color-scheme="dark"] textarea.crr-comments {
+    background: #162032;
+    color: #f1f5f9;
+}
 `;
 
 export const CustomerRepairRequestPage = ({

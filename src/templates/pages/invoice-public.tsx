@@ -80,6 +80,7 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{title} — {companyName}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root { --brand: ${primaryColor}; }
                     * { box-sizing: border-box; }
@@ -215,6 +216,23 @@ export const InvoicePublicPage: FC<InvoicePublicProps> = ({
                     @media (prefers-reduced-motion: reduce) {
                         a.cta { transition: none; }
                     }
+                    html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
+                    html[data-color-scheme="dark"] .card { background: #1e293b; border-color: rgba(255,255,255,0.10); }
+                    html[data-color-scheme="dark"] h1 { color: #f1f5f9; }
+                    html[data-color-scheme="dark"] p.lead { color: #94a3b8; }
+                    html[data-color-scheme="dark"] .meta { background: #162032; border-color: rgba(255,255,255,0.08); color: #cbd5e1; }
+                    html[data-color-scheme="dark"] .meta strong { color: #f1f5f9; }
+                    html[data-color-scheme="dark"] .invoice-box { border-color: rgba(255,255,255,0.08); }
+                    html[data-color-scheme="dark"] .invoice-box .row { color: #cbd5e1; }
+                    html[data-color-scheme="dark"] .invoice-box .row + .row { border-top-color: rgba(255,255,255,0.06); }
+                    html[data-color-scheme="dark"] .invoice-box .row.total { border-top-color: rgba(255,255,255,0.18); color: #f1f5f9; }
+                    html[data-color-scheme="dark"] .invoice-box .desc { color: #94a3b8; }
+                    html[data-color-scheme="dark"] .invoice-box .amount { color: #f1f5f9; }
+                    html[data-color-scheme="dark"] .due-line,
+                    html[data-color-scheme="dark"] .contact-line,
+                    html[data-color-scheme="dark"] .brand { color: #94a3b8; }
+                    html[data-color-scheme="dark"] .pill.amber { background: rgba(120,53,15,0.32); color: #fbbf24; }
+                    html[data-color-scheme="dark"] .pill.green { background: rgba(6,78,59,0.32); color: #4ade80; }
                 `}} />
             </head>
             <body>
