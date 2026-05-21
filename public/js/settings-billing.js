@@ -36,12 +36,7 @@
         };
     }
 
-    if (window.Alpine?.data) {
-        window.Alpine.data('settingsBilling', factory);
-    } else {
-        document.addEventListener('alpine:init', () => {
-            window.Alpine.data('settingsBilling', factory);
-        });
-    }
+    if (window.Alpine?.data) window.Alpine.data('settingsBilling', factory);
+    else document.addEventListener('alpine:init', () => window.Alpine.data('settingsBilling', factory));
     window.settingsBilling = factory;
 })();

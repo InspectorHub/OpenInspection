@@ -11,11 +11,18 @@
  * Switch and link write to audit_logs via AuditLogService when available.
  */
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
 import type { HonoConfig } from '../types/hono';
 
 const identityRoutes = new OpenAPIHono<HonoConfig>();
+
+function getCallerUserId(c: Context<HonoConfig>): string {
+    const sub = (c.get('user') as { sub?: string } | undefined)?.sub;
+    if (!sub) throw Errors.Unauthorized('Missing user identity');
+    return sub;
+}
 
 const listRoute = createRoute({
     method:  'get',
@@ -25,9 +32,7 @@ const listRoute = createRoute({
     responses: { 200: { description: 'ok' } },
 });
 identityRoutes.openapi(listRoute, async (c) => {
-    const user = c.get('user') as { sub?: string } | undefined;
-    if (!user?.sub) throw Errors.Unauthorized('Missing user identity');
-    const items = await c.var.services.identity.list(user.sub);
+    const items = await c.var.services.identity.list(getCallerUserId(c));
     return c.json({ success: true as const, data: { identities: items } }, 200);
 });
 
@@ -48,14 +53,12 @@ const switchRoute = createRoute({
     },
 });
 identityRoutes.openapi(switchRoute, async (c) => {
-    const user = c.get('user') as { sub?: string } | undefined;
-    if (!user?.sub) throw Errors.Unauthorized('Missing user identity');
-
+    const primaryUserId = getCallerUserId(c);
     const { linkedUserId } = c.req.valid('json');
     const keyring = await c.var.keyringPromise;
     if (!keyring) throw Errors.Internal('JWT keyring not initialised');
 
-    const out = await c.var.services.identity.switchTo(user.sub, linkedUserId, { keyring });
+    const out = await c.var.services.identity.switchTo(primaryUserId, linkedUserId, { keyring });
     if (out.kind === 'forbidden') throw Errors.Forbidden('Not linked to that identity');
     if (out.kind === 'not_found') throw Errors.NotFound('Linked user no longer exists');
 
@@ -84,15 +87,10 @@ const linkRoute = createRoute({
     },
 });
 identityRoutes.openapi(linkRoute, async (c) => {
-    const user = c.get('user') as { sub?: string } | undefined;
-    if (!user?.sub) throw Errors.Unauthorized('Missing user identity');
-
+    const primaryUserId = getCallerUserId(c);
     const { targetEmail } = c.req.valid('json');
     try {
-        const out = await c.var.services.identity.link({
-            primaryUserId: user.sub,
-            targetEmail,
-        });
+        const out = await c.var.services.identity.link({ primaryUserId, targetEmail });
         return c.json({ success: true as const, data: out }, 200);
     } catch (e) {
         if (e instanceof Error && /target user not found/i.test(e.message)) {

@@ -94,21 +94,19 @@ export class ApprenticeService {
         action:        Exclude<ApprenticeStatus, 'pending'>,
         decisionValue?: unknown,
     ): Promise<DecideResult> {
-        const db  = this.getDrizzle();
-        const row = await db.select().from(apprenticeReviews)
-            .where(and(eq(apprenticeReviews.id, reviewId), eq(apprenticeReviews.tenantId, tenantId)))
-            .get();
+        const db = this.getDrizzle();
+        const scope = and(eq(apprenticeReviews.id, reviewId), eq(apprenticeReviews.tenantId, tenantId));
+
+        const row = await db.select().from(apprenticeReviews).where(scope).get();
         if (!row) return { kind: 'not_found' };
 
-        const patch: { status: ApprenticeStatus; decisionAt: number; decisionValue?: string | null } = {
-            status:      action,
-            decisionAt:  Math.floor(Date.now() / 1000),
+        await db.update(apprenticeReviews).set({
+            status:        action,
+            decisionAt:    Math.floor(Date.now() / 1000),
             decisionValue: action === 'edited' && decisionValue !== undefined
                 ? JSON.stringify(decisionValue)
                 : null,
-        };
-        await db.update(apprenticeReviews).set(patch)
-            .where(and(eq(apprenticeReviews.id, reviewId), eq(apprenticeReviews.tenantId, tenantId)));
+        }).where(scope);
         return { kind: 'ok' };
     }
 }

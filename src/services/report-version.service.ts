@@ -21,6 +21,16 @@ export interface SnapshotResult {
     summary?:      string;
 }
 
+type ResultsData = Record<string, Record<string, unknown>>;
+
+function parseResultsData(raw: unknown): ResultsData {
+    if (raw == null) return {};
+    if (typeof raw === 'string') {
+        try { return JSON.parse(raw) as ResultsData; } catch { return {}; }
+    }
+    return raw as ResultsData;
+}
+
 export class ReportVersionService {
     constructor(private db: D1Database) {}
 
@@ -53,9 +63,7 @@ export class ReportVersionService {
         const results = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
-        const data: Record<string, Record<string, unknown>> = results?.data
-            ? (typeof results.data === 'string' ? JSON.parse(results.data) : results.data) as Record<string, Record<string, unknown>>
-            : {};
+        const data = parseResultsData(results?.data);
 
         const units = await db.select().from(inspectionUnits)
             .where(and(eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
@@ -64,7 +72,7 @@ export class ReportVersionService {
         const snapshot: Snapshot = {
             inspection: ins as unknown as Record<string, unknown>,
             data,
-            units:       units.map(u => ({ ...u })),
+            units,
         };
         const snapshotJson = JSON.stringify(snapshot);
         if (snapshotJson.length > MAX_SNAPSHOT_BYTES) {

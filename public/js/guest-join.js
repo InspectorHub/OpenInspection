@@ -5,10 +5,17 @@
 // we redirect to /login so the new user authenticates with the
 // credentials they just chose).
 (() => {
-    const form = document.getElementById('guestJoinForm');
-    const errBox = document.getElementById('guestJoinError');
+    const form      = document.getElementById('guestJoinForm');
+    const errBox    = document.getElementById('guestJoinError');
     const submitBtn = document.getElementById('submitBtn');
     if (!form || !errBox || !submitBtn) return;
+
+    const fieldValue = (id) => document.getElementById(id)?.value ?? '';
+
+    const showError = (msg) => {
+        errBox.textContent = msg;
+        errBox.classList.remove('hidden');
+    };
 
     form.addEventListener('submit', async (evt) => {
         evt.preventDefault();
@@ -16,10 +23,10 @@
         submitBtn.disabled = true;
 
         const payload = {
-            token:    document.getElementById('token').value,
-            name:     document.getElementById('name').value.trim(),
-            email:    document.getElementById('email').value.trim(),
-            password: document.getElementById('password').value,
+            token:    fieldValue('token'),
+            name:     fieldValue('name').trim(),
+            email:    fieldValue('email').trim(),
+            password: fieldValue('password'),
         };
 
         try {
@@ -40,13 +47,11 @@
 
             const code = body?.error?.code || 'unknown';
             const msg  = body?.error?.message || 'Could not complete invitation';
-            errBox.textContent = code === 'seat_limit_reached'
+            showError(code === 'seat_limit_reached'
                 ? 'Team is at its seat limit. Ask the admin to upgrade.'
-                : msg;
-            errBox.classList.remove('hidden');
-        } catch (e) {
-            errBox.textContent = 'Network error — please retry';
-            errBox.classList.remove('hidden');
+                : msg);
+        } catch (_e) {
+            showError('Network error — please retry');
         } finally {
             submitBtn.disabled = false;
         }

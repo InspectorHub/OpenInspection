@@ -10,13 +10,15 @@
  * published). Clicking a version on the left re-targets `from`.
  */
 (function () {
+    const emptyDiff = () => ({ items: [], units: { added: [], removed: [] } });
+
     function factory(inspectionId, toVersion) {
         return {
             inspectionId,
             toVersion,
             fromVersion: Math.max(1, toVersion - 1),
             versions: [],
-            diff: { items: [], units: { added: [], removed: [] } },
+            diff: emptyDiff(),
             loading: false,
 
             async init() {
@@ -38,7 +40,7 @@
 
             async loadDiff() {
                 if (this.fromVersion === this.toVersion) {
-                    this.diff = { items: [], units: { added: [], removed: [] } };
+                    this.diff = emptyDiff();
                     return;
                 }
                 this.loading = true;
@@ -47,7 +49,7 @@
                     const r = await fetch(url, { credentials: 'same-origin' });
                     if (r.ok) {
                         const body = await r.json();
-                        this.diff = body?.data ?? { items: [], units: { added: [], removed: [] } };
+                        this.diff = body?.data ?? emptyDiff();
                     }
                 } finally {
                     this.loading = false;

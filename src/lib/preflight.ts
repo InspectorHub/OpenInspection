@@ -56,9 +56,9 @@ export function computePreflightFromData(
     const unratedCount = entries.filter(i => i.rating == null && i.value == null).length;
     const allRated = entries.length > 0 && unratedCount === 0;
 
-    const facts = inspection.propertyFacts ?? {};
+    const facts: Record<string, unknown> = inspection.propertyFacts ?? {};
     const missingFacts = REQUIRED_FACT_KEYS.filter(k => {
-        const v = (facts as Record<string, unknown>)[k];
+        const v = facts[k];
         return v == null || v === '';
     });
 

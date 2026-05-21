@@ -147,23 +147,12 @@
         };
     }
 
-    // Register before Alpine boots so the modal's x-data resolves on
-    // first paint. Matches the existing "load factory scripts before
-    // alpine.min.js" pattern (feedback_alpine_register_timing).
-    if (document.readyState === 'loading') {
-        document.addEventListener('alpine:init', () => {
-            window.Alpine.data('inviteSeatModal', factory);
-        });
-    } else if (window.Alpine?.data) {
-        window.Alpine.data('inviteSeatModal', factory);
-    } else {
-        document.addEventListener('alpine:init', () => {
-            window.Alpine.data('inviteSeatModal', factory);
-        });
-    }
-
-    // Also expose as a plain factory for inline `x-data="inviteSeatModal()"`
-    // markup — Alpine resolves window-globals when the data attr name
-    // doesn't match an `Alpine.data` registration.
+    // Register against Alpine when ready, else queue for alpine:init.
+    // Also expose as a window-global so inline `x-data="inviteSeatModal()"`
+    // resolves even before the Alpine.data registration fires (Alpine
+    // falls back to window globals when the name isn't a registered
+    // factory). Matches feedback_alpine_register_timing.
+    if (window.Alpine?.data) window.Alpine.data('inviteSeatModal', factory);
+    else document.addEventListener('alpine:init', () => window.Alpine.data('inviteSeatModal', factory));
     window.inviteSeatModal = factory;
 })();

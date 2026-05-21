@@ -45,10 +45,9 @@ export class IdentityService {
     }
 
     async list(primaryUserId: string): Promise<IdentityLinkRow[]> {
-        const rows = await this.getDrizzle().select().from(userIdentityLinks)
+        return await this.getDrizzle().select().from(userIdentityLinks)
             .where(eq(userIdentityLinks.primaryUserId, primaryUserId))
             .all();
-        return rows as IdentityLinkRow[];
     }
 
     async switchTo(

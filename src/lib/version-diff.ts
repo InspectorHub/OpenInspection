@@ -44,14 +44,12 @@ export function computeDiff(from: Snapshot, to: Snapshot): DiffPayload {
     for (const id of ids) {
         const f = fromData[id];
         const t = toData[id];
-        if (!f && t)  { items.push({ itemId: id, kind: 'added' });   continue; }
-        if (f && !t)  { items.push({ itemId: id, kind: 'removed' }); continue; }
-        if (!f || !t) continue;
+        if (!f && t) { items.push({ itemId: id, kind: 'added' });   continue; }
+        if (f && !t) { items.push({ itemId: id, kind: 'removed' }); continue; }
+        if (!f || !t) continue;  // defensive — guards against both undefined
         for (const field of FIELDS_OF_INTEREST) {
-            const fv = f[field];
-            const tv = t[field];
-            if (fv !== tv) {
-                items.push({ itemId: id, field, kind: 'changed', from: fv, to: tv });
+            if (f[field] !== t[field]) {
+                items.push({ itemId: id, field, kind: 'changed', from: f[field], to: t[field] });
             }
         }
     }

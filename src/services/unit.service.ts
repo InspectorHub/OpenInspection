@@ -80,15 +80,13 @@ export class UnitService {
     }
 
     async list(tenantId: string, inspectionId: string): Promise<UnitRow[]> {
-        const db = this.getDrizzle();
-        const rows = await db.select().from(inspectionUnits)
+        return await this.getDrizzle().select().from(inspectionUnits)
             .where(and(
                 eq(inspectionUnits.tenantId, tenantId),
                 eq(inspectionUnits.inspectionId, inspectionId),
             ))
             .orderBy(asc(inspectionUnits.sortOrder))
             .all();
-        return rows as UnitRow[];
     }
 
     async update(tenantId: string, unitId: string, patch: { name?: string; sortOrder?: number }): Promise<void> {

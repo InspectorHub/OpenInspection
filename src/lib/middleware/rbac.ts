@@ -30,25 +30,18 @@ export const requireRole = (allowedRoles: string[]) => {
     // Expand the allow-list so callers can pass either 'inspector' or 'lead'
     // and we accept both — bidirectional aliasing.
     const expanded = new Set<string>(allowedRoles);
-    for (const r of allowedRoles) {
-        for (const [from, to] of Object.entries(ROLE_ALIASES)) {
-            if (r === to) expanded.add(from);
-            if (r === from) expanded.add(to);
-        }
+    for (const [from, to] of Object.entries(ROLE_ALIASES)) {
+        if (expanded.has(to))   expanded.add(from);
+        if (expanded.has(from)) expanded.add(to);
     }
 
     return async (c: Context, next: Next) => {
         const userRole = c.get('userRole'); // Populated by authMiddleware earlier
+        if (!userRole) throw Errors.Unauthorized('No role found in context');
 
-        if (!userRole) {
-            throw Errors.Unauthorized('No role found in context');
-        }
-
-        const normalised = normaliseRole(userRole);
-        if (!expanded.has(userRole) && !expanded.has(normalised)) {
+        if (!expanded.has(userRole) && !expanded.has(normaliseRole(userRole))) {
             throw Errors.Forbidden(`Requires one of [${allowedRoles.join(', ')}]`);
         }
-
         return next();
     };
 };

@@ -51,17 +51,11 @@ billingRoutes.openapi(summaryRoute, async (c) => {
     // Portal Customer Portal redirect URL — surfaced for the "Manage
     // billing" CTA on the page. Omitted when the portal isn't wired
     // (standalone deployments) so the UI hides the button.
-    const portalUrl = c.env.PORTAL_API_URL
-        ? `${c.env.PORTAL_API_URL}/api/billing/portal`
-        : undefined;
+    const data = c.env.PORTAL_API_URL
+        ? { ...summary, portalUrl: `${c.env.PORTAL_API_URL}/api/billing/portal` }
+        : summary;
 
-    return c.json({
-        success: true as const,
-        data: {
-            ...summary,
-            ...(portalUrl ? { portalUrl } : {}),
-        },
-    }, 200);
+    return c.json({ success: true as const, data }, 200);
 });
 
 export default billingRoutes;

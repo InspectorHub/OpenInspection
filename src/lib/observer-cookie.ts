@@ -12,6 +12,7 @@
  * compute the expected MAC then perform a byte-level compare. The body
  * itself is non-secret so leaking length is acceptable.
  */
+import { timingSafeEqual } from './password';
 
 const encoder = new TextEncoder();
 
@@ -34,13 +35,6 @@ function base64Url(bytes: Uint8Array): string {
 function base64UrlDecode(s: string): string {
     const padded = s + '='.repeat((4 - (s.length % 4)) % 4);
     return atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-    if (a.length !== b.length) return false;
-    let diff = 0;
-    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-    return diff === 0;
 }
 
 export interface ObserverPayload {

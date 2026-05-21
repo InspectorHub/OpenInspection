@@ -83,10 +83,7 @@
         };
     }
 
-    if (window.Alpine?.data) {
-        window.Alpine.data('unitTree', factory);
-    } else {
-        document.addEventListener('alpine:init', () => window.Alpine.data('unitTree', factory));
-    }
+    if (window.Alpine?.data) window.Alpine.data('unitTree', factory);
+    else document.addEventListener('alpine:init', () => window.Alpine.data('unitTree', factory));
     window.unitTree = factory;
 })();

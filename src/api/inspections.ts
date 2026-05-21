@@ -1,6 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { renderProfessionalReport } from '../templates/pages/report.template';
+import type { ReportUnit } from '../templates/components/report-units-summary';
 import { ReportGatePage } from '../templates/pages/report-gate';
 import { auditFromContext } from '../lib/audit';
 import { getBaseUrl, getBookingHost } from '../lib/url';
@@ -1385,7 +1386,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
     // UnitTreeSummary card. Failure (e.g. legacy DB without migration
     // 0065 yet) degrades to empty — the renderer's `units` prop is
     // optional and the summary card is gated on length > 0.
-    let units: Array<{ id: string; parentUnitId: string | null; kind: 'building'|'floor'|'unit'; name: string; sortOrder: number }> = [];
+    let units: ReportUnit[] = [];
     try {
         const rows = await db.select().from(inspectionUnits)
             .where(and(eq(inspectionUnits.inspectionId, id), eq(inspectionUnits.tenantId, c.get('tenantId'))))
@@ -1393,7 +1394,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
         units = rows.map(r => ({
             id:           r.id,
             parentUnitId: r.parentUnitId,
-            kind:         r.kind as 'building'|'floor'|'unit',
+            kind:         r.kind as ReportUnit['kind'],
             name:         r.name,
             sortOrder:    r.sortOrder ?? 0,
         }));
@@ -1904,21 +1905,20 @@ inspectionsRoutes.openapi(publishRoute, async (c) => {
     // the publish response. snapshot-too-large (> 1 MB) downgrades to a
     // warning audit entry rather than a 5xx — the report itself remains
     // viewable through the existing /reports/:id path.
-    const user = c.get('user') as { sub?: string } | undefined;
-    const userId = user?.sub;
+    const userId = (c.get('user') as { sub?: string } | undefined)?.sub;
     if (userId) {
         try {
             const out = await c.var.services.reportVersion.snapshotOnPublish(
                 tenantId, id, userId, body.summary,
             );
             logger.info('report-version snapshot saved', {
-                inspectionId: id,
+                inspectionId:  id,
                 versionNumber: out.versionNumber,
             });
         } catch (err) {
             logger.warn('report-version snapshot failed (non-fatal)', {
                 inspectionId: id,
-                error: err instanceof Error ? err.message : String(err),
+                error:        err instanceof Error ? err.message : String(err),
             });
         }
     }
@@ -2366,12 +2366,12 @@ inspectionsRoutes.get('/:id/presence/ws', async (c) => {
             return new Response('not found', { status: 404 });
         }
 
-        const helpers = (() => {
-            try {
-                const parsed = JSON.parse(ins.helperInspectorIds ?? '[]');
-                return Array.isArray(parsed) ? parsed as string[] : [];
-            } catch { return []; }
-        })();
+        let helpers: string[] = [];
+        try {
+            const parsed = JSON.parse(ins.helperInspectorIds ?? '[]');
+            if (Array.isArray(parsed)) helpers = parsed as string[];
+        } catch { /* malformed — treat as no helpers */ }
+
         const allowed = ins.inspectorId === userId
                      || ins.leadInspectorId === userId
                      || helpers.includes(userId);
@@ -2562,24 +2562,22 @@ const mintObserverLinkRoute = createRoute({
     responses: { 200: { description: 'ok' } },
 });
 inspectionsRoutes.openapi(mintObserverLinkRoute, async (c) => {
-    const { id } = c.req.valid('param');
-    const body   = c.req.valid('json');
-    const user   = c.get('user') as { sub?: string } | undefined;
-    if (!user?.sub) throw Errors.Unauthorized('Missing user identity');
+    const { id }   = c.req.valid('param');
+    const { durationSeconds } = c.req.valid('json');
+    const createdBy = (c.get('user') as { sub?: string } | undefined)?.sub;
+    if (!createdBy) throw Errors.Unauthorized('Missing user identity');
 
-    const mintInput: { inspectionId: string; createdBy: string; durationSeconds?: number } = {
+    const out = await c.var.services.observerLink.mint(c.get('tenantId'), {
         inspectionId: id,
-        createdBy:    user.sub,
-    };
-    if (body.durationSeconds !== undefined) mintInput.durationSeconds = body.durationSeconds;
-
-    const out = await c.var.services.observerLink.mint(c.get('tenantId'), mintInput);
+        createdBy,
+        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+    });
 
     // Augment the bare service output with a fully-qualified claim URL
     // so the InspectorToolsDock modal can render a copy-and-paste field
     // without re-deriving the host or token path on the client.
     const baseUrl = c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`;
-    const url = `${baseUrl}/observe/${out.token}`;
+    const url     = `${baseUrl}/observe/${out.token}`;
     return c.json({ success: true as const, data: { ...out, url } }, 200);
 });
 
