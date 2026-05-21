@@ -234,8 +234,29 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
             aria-selected="false"
             class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
           >Settings</a>
-          {/* PDF download dropdown — ml-auto pushes it to the right edge */}
-          <div class="ml-auto flex-shrink-0 pl-2 py-1.5" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
+          {/* Inspector report preview — opens the rendered (final) report in
+              a new tab. The /api/inspections/:id/report endpoint serves
+              HTML with `isAuthenticated: true`, so paywall + agreement
+              gates are bypassed and the dark sidebar (Edit / Publish
+              buttons) is rendered for the inspector's pre-publish review. */}
+          <a
+            href={`/api/inspections/${inspectionId}/report`}
+            target="_blank"
+            rel="noopener"
+            role="tab"
+            aria-selected="false"
+            data-testid="inspection-edit-preview-report"
+            title="Open the rendered report in a new tab — what the customer will see"
+            class="ml-auto flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Preview report
+          </a>
+          {/* PDF download dropdown — ml-2 separates it from the Preview link */}
+          <div class="ml-2 flex-shrink-0 pl-2 py-1.5" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
             <div class="relative">
               <button
                 type="button"
