@@ -27,7 +27,6 @@ body:
       options:
         - Cloudflare Workers (production)
         - Local dev (npm run dev)
-        - Sandbox (sandbox.inspectorhub.io)
         - Custom / fork
     validations:
       required: true

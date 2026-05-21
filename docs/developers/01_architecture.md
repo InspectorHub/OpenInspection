@@ -154,7 +154,7 @@ features/
     index.ts                  — tenantRouter middleware (strategy dispatch)
     resolve-by-path-param.ts  — /<prefix>/<tenant>/... URL matching
     resolve-by-subdomain.ts   — Host header → tenant + KV cache
-    resolve-by-fixed-tenant.ts — standalone / sandbox fallback
+    resolve-by-fixed-tenant.ts — standalone fallback
     db/
       schema/
         tenant.ts             — tenants, users, tenantInvites tables

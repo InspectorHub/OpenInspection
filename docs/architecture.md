@@ -11,7 +11,7 @@ OpenInspection is a multi-tenant home inspection app deployed as a Cloudflare Wo
 | ORM + DB | [Drizzle](https://orm.drizzle.team) + Cloudflare D1 (SQLite) |
 | Object storage | Cloudflare R2 (photos, future PDFs) |
 | KV cache | Cloudflare Workers KV (tenant config, signed tokens, rate-limit counters) |
-| Background jobs | Cloudflare Workflow (onboarding) + Cron Triggers (sandbox reset, automation sweeps) |
+| Background jobs | Cloudflare Workflow (onboarding) + Cron Triggers (automation sweeps) |
 | Frontend runtime | Alpine.js 3.x (no React/Vue runtime) + Tailwind CSS v3 |
 | AI | Google Gemini API (optional) |
 | Email | Resend |
@@ -100,7 +100,7 @@ Tenant resolution lives in `features/tenant-routing/` (entry point `index.ts`, w
 
 1. **Path-param resolution** (`resolve-by-path-param.ts`) — matches URL patterns like `/book/:tenant/:slug` first so public routes work uniformly across all deploy modes
 2. **Subdomain resolution** (`resolve-by-subdomain.ts`) — silo / shared SaaS: extracts the subdomain from the `Host` header, looks up the tenant via KV (5-minute TTL) with D1 fallback, then writes the result back to KV
-3. **Fixed-tenant fallback** (`resolve-by-fixed-tenant.ts`) — standalone / sandbox: pins the request to `profile.fixedTenantId`
+3. **Fixed-tenant fallback** (`resolve-by-fixed-tenant.ts`) — standalone: pins the request to `profile.fixedTenantId`
 
 ## Authentication
 
@@ -144,7 +144,7 @@ The DI proxy in `lib/middleware/di.ts` lazy-instantiates each service on first a
 ## Background work
 
 - **Onboarding workflow** (`workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
-- **Cron triggers**: sandbox reset (daily 00:00 UTC), notification reminder sweeps (hourly), report-ready automations.
+- **Cron triggers**: notification reminder sweeps (hourly), report-ready automations.
 
 ## Cost model (Cloudflare Free tier)
 

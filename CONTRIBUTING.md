@@ -8,7 +8,7 @@ Thanks for considering a contribution. OpenInspection is an open-source home ins
 - 💡 [Suggest a feature](https://github.com/InspectorHub/OpenInspection/issues/new?template=feature_request.yml)
 - 💬 [Ask a question](https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a)
 - 📣 [Roadmap & releases](https://github.com/InspectorHub/OpenInspection/discussions/categories/announcements)
-- 🧪 [Try the sandbox](https://sandbox.inspectorhub.io)
+- 🧪 [Start a free trial](https://inspectorhub.io/register)
 
 ## Development setup
 
@@ -20,7 +20,7 @@ npm run setup:cloudflare    # provisions D1 / R2 / KV (or use --local)
 npm run dev                 # http://localhost:8788
 ```
 
-Detailed setup including Cloudflare bindings, environment variables, and the sandbox runbook: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`docs/architecture.md`](docs/architecture.md). Extension cookbook: [`docs/extending.md`](docs/extending.md).
+Detailed setup including Cloudflare bindings and environment variables: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`docs/architecture.md`](docs/architecture.md). Extension cookbook: [`docs/extending.md`](docs/extending.md).
 
 ## Code conventions
 

@@ -30,8 +30,7 @@ Thanks for sending a PR! Before you submit:
 - [ ] `npm run type-check` is green
 - [ ] `npm run lint` is green
 - [ ] `npm run test:unit` is green (if relevant)
-- [ ] Tested manually in `npm run dev` against the sandbox seed
-- [ ] Tested in the deployed sandbox (`sandbox.inspectorhub.io`) — *if you have access*
+- [ ] Tested manually in `npm run dev`
 
 ## Checklist
 

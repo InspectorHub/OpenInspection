@@ -3,17 +3,16 @@
 > The first open-source SaaS-grade home inspection app. Self-host on Cloudflare for ~$0/month.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/InspectorHub/OpenInspection)
-[![Try the sandbox](https://img.shields.io/badge/sandbox-live-emerald)](https://sandbox.inspectorhub.io)
 [![GitHub Discussions](https://img.shields.io/github/discussions/InspectorHub/OpenInspection)](https://github.com/InspectorHub/OpenInspection/discussions)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
 
-🧪 **Live demo**: [sandbox.inspectorhub.io](https://sandbox.inspectorhub.io) — login `demo@inspectorhub.io` / `demo1234`. Data resets daily.
+🧪 **Live demo**: Start a [free 30-day trial](https://inspectorhub.io/register) — magic-link signup, no credit card. Trial workspace ships with starter templates + canned comments so you can explore the product immediately.
 
 ---
 
-<!-- Screenshots are committed after the sandbox demo deploys. Captured at 1440x900 from the live sandbox. -->
+<!-- Screenshots are committed after the trial workspace ships. Captured at 1440x900. -->
 
-> **Screenshot gallery — to be captured after sandbox deploy:**
+> **Screenshot gallery — to be captured:**
 > - `screenshots/dashboard.png` — Portfolio view with defect distribution + attention thresholds
 > - `screenshots/inspection-edit.png` — 3-pane editor with section nav, item editor, canned comments + photos
 > - `screenshots/report-viewer.png` — Left sidebar with defect badges, top tabs (Full / Summary / Safety), Share + PDF dropdowns
@@ -78,7 +77,7 @@ npm run dev                 # http://localhost:8788
 git clone https://github.com/InspectorHub/OpenInspection
 cd OpenInspection
 npm install
-npm run setup:cloudflare -- --local    # provisions a local-only sandbox
+npm run setup:cloudflare -- --local    # provisions a local dev environment
 npm run dev
 ```
 
@@ -86,7 +85,7 @@ Detailed setup: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`doc
 
 ## Documentation
 
-- [Deploy](docs/deploy.md) — first-time setup on Cloudflare, sandbox runbook
+- [Deploy](docs/deploy.md) — first-time setup on Cloudflare
 - [Architecture](docs/architecture.md) — module map, request flow, cost model
 - [Extending](docs/extending.md) — recipes for templates, payments, automation, themes
 - [Contributing](CONTRIBUTING.md) — code conventions and PR process

@@ -147,4 +147,4 @@ For more invasive customizations, see `src/templates/themes/` (TBD scaffold for 
 
 - 💬 [Q&A discussions](https://github.com/InspectorHub/OpenInspection/discussions/categories/q-a)
 - 🐛 [Issue tracker](https://github.com/InspectorHub/OpenInspection/issues)
-- 🧪 [Sandbox demo](https://sandbox.inspectorhub.io)
+- 🧪 [Start a free trial](https://inspectorhub.io/register)

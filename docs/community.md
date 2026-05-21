@@ -14,7 +14,7 @@
 
 Three threads are pinned to the top of Discussions for newcomers:
 
-1. **Welcome to OpenInspection — start here** ([#22](https://github.com/InspectorHub/OpenInspection/discussions/22)) — quick tour of the project, the sandbox, and where to post.
+1. **Welcome to OpenInspection — start here** ([#22](https://github.com/InspectorHub/OpenInspection/discussions/22)) — quick tour of the project and where to post.
 2. **How do I get help?** ([#23](https://github.com/InspectorHub/OpenInspection/discussions/23)) — checklist for support requests so we can help faster.
 3. **Roadmap and feature requests** ([#24](https://github.com/InspectorHub/OpenInspection/discussions/24)) — what is shipping, how to nominate, what we have explicitly chosen not to build.
 

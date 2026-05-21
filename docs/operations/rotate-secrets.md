@@ -118,7 +118,6 @@ After deploying with new secrets:
 ```bash
 # Per worker target, confirm new env vars are populated
 npx wrangler secret list                              # standalone
-npx wrangler secret list --env sandbox                # sandbox
 npx wrangler secret list --env saas                   # saas
 npx wrangler secret list -c wrangler.saas.toml        # inspectorhub-core-shared
 cd ../portal && npx wrangler secret list              # portal
@@ -178,4 +177,4 @@ Run `wrangler logout && wrangler login` to refresh OAuth token. Re-run the rotat
 | `node scripts/rotate-m2m-secret.js --dry-run` | Preview |
 | `node scripts/rotate-m2m-secret.js --prune-old-kid=v1` | Remove V1 from all targets |
 
-Both scripts target 5 workers: `openinspection-standalone`, `openinspection-sandbox`, `openinspection-saas`, `inspectorhub-core-shared`, `inspectorhub-portal`.
+Both scripts target 4 workers: `openinspection-standalone`, `openinspection-saas`, `inspectorhub-core-shared`, `inspectorhub-portal`.
