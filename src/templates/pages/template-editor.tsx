@@ -160,8 +160,13 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                 <span x-text="template.ratingSystem.name" class="max-w-[140px] truncate"></span>
                             </button>
                             <div class="w-px h-6 bg-surface-200 mx-1"></div>
-                            <button {...{'@click': 'showCannedPanel = !showCannedPanel'}} class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-600 transition-colors"
-                                x-bind:class="showCannedPanel ? 'bg-blueprint-50 text-blueprint-600' : 'text-ink-600 hover:bg-surface-100'">
+                            {/* Comments shortcut — flips the right rail to
+                                the Comments tab instead of opening a
+                                competing slide panel. The slide panel was
+                                removed when the rail picked up tabs (the
+                                two surfaces overlapped each other badly). */}
+                            <button {...{'@click': "rightRailMode = 'comments'"}} class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-600 transition-colors"
+                                x-bind:class="rightRailMode === 'comments' ? 'bg-blueprint-50 text-blueprint-600' : 'text-ink-600 hover:bg-surface-100'">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
                                 Comments
                                 <span class="bg-ink-300/20 text-ink-600 text-[10px] font-mono font-600 px-1.5 py-0.5 rounded" x-text="cannedComments.length"></span>
@@ -383,13 +388,37 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                         </template>
                     </main>
 
-                    {/* RIGHT: Properties Panel */}
-                    <aside class="editor-side-panel w-[340px] border-l border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin"
-                        x-show="selectedItem" x-transition:enter="transition ease-out duration-200"
-                        x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0">
+                    {/* RIGHT: Side Rail — Properties / Comments / Preview tabs.
+                        Mirrors the inspection-editor's SideRail tabbed model
+                        (Preview / Library / Recall) so the same right-edge
+                        affordance carries the right scope for whichever editor
+                        the user is in. Always visible (no longer gated on
+                        `selectedItem`) so the user can browse comments or
+                        preview a section before picking an item. */}
+                    <aside class="editor-side-panel w-[340px] border-l border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0 overflow-hidden">
+                        {/* Tab strip — pill-on-muted-track, matches the
+                            inspection editor's pattern. */}
+                        <nav role="tablist" aria-label="Right rail mode" class="flex gap-1 p-1 mx-3 mt-3 mb-2 rounded-md bg-surface-100">
+                            <template x-for="tab in [{id:'properties',label:'Properties'},{id:'comments',label:'Comments'},{id:'preview',label:'Preview'}]" x-bind:key="tab.id">
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    x-on:click="rightRailMode = tab.id"
+                                    x-bind:aria-selected="rightRailMode === tab.id ? 'true' : 'false'"
+                                    x-bind:class="rightRailMode === tab.id
+                                        ? 'bg-white text-ink-900 shadow-sm'
+                                        : 'text-ink-500 hover:text-ink-800'"
+                                    class="flex-1 px-2 py-1.5 rounded text-[11px] font-700 transition-colors"
+                                    x-text="tab.label"
+                                ></button>
+                            </template>
+                        </nav>
+
+                        {/* ─────────── Properties tab ─────────── */}
+                        <div x-show="rightRailMode === 'properties'" x-cloak class="flex-1 overflow-y-auto scrollbar-thin">
                         <template x-if="selectedItem">
                             <div class="animate-fade-in">
-                                <div class="editor-props-header px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+                                <div class="editor-props-header px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-surface-50/95 z-10">
                                     <div class="flex items-center justify-between mb-1">
                                         <span class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Item Properties</span>
                                         <button {...{'@click': 'removeItem(selectedItemId)'}} class="text-ink-300 hover:text-red-500 transition-colors p-1">
@@ -594,6 +623,81 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                 </div>
                             </div>
                         </template>
+                        </div>
+
+                        {/* ─────────── Comments tab ─────────── */}
+                        {/* Template-wide canned-comments library. Was a
+                            slide-over panel; folded into the rail so the
+                            user doesn't have to dismiss it before getting
+                            back to per-item editing. */}
+                        <div x-show="rightRailMode === 'comments'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+                            <div class="px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-surface-50/95 z-10">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Canned Comments</span>
+                                    <span class="font-mono text-[10px] text-ink-300" x-text="cannedComments.length + ' total'"></span>
+                                </div>
+                            </div>
+                            <div class="p-4 space-y-3 border-b border-surface-200/40">
+                                <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50">
+                                    <svg class="w-4 h-4 text-ink-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
+                                    <input type="text" x-model="commentSearch" class="flex-1 text-sm bg-transparent border-0 p-0 focus:ring-0" placeholder="Search comments..." />
+                                </div>
+                                <input type="text" x-model="newCommentText" placeholder="Comment text..." class="w-full text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="newCommentCategory" placeholder="Category (optional)" class="flex-1 text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
+                                    <button {...{'@click': 'addCannedComment()'}} class="px-4 py-2 rounded-xl bg-blueprint-600 text-white text-sm font-600 hover:bg-blueprint-700 transition-colors">Add</button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2 scrollbar-thin">
+                                <template x-for="cc in filteredComments()" x-bind:key="cc.id">
+                                    <div class="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors group flex items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <span x-show="cc.category" class="text-[9px] font-700 uppercase tracking-wide text-blueprint-500 mr-1" x-text="cc.category"></span>
+                                            <span class="text-sm font-600 text-ink-700" x-text="cc.text"></span>
+                                        </div>
+                                        <button {...{'@click': 'deleteCannedComment(cc.id)'}} class="shrink-0 text-ink-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all mt-0.5">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                    </div>
+                                </template>
+                                <div x-show="filteredComments().length === 0" class="ih-empty-state"><h3 class="ih-empty-state__title">No comments yet</h3></div>
+                            </div>
+                        </div>
+
+                        {/* ─────────── Preview tab ─────────── */}
+                        {/* Lightweight render of the selected section's
+                            items as they'll appear in the inspection
+                            editor. Read-only by design — for shape & flow
+                            checks; editing happens in the centre column. */}
+                        <div x-show="rightRailMode === 'preview'" x-cloak class="flex-1 overflow-y-auto scrollbar-thin">
+                            <div class="px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-surface-50/95 z-10">
+                                <span class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Section Preview</span>
+                                <div class="mt-1 text-[12px] font-600 text-ink-700 truncate" x-text="selectedSection ? selectedSection.title : 'No section selected'"></div>
+                            </div>
+                            <template x-if="!selectedSection">
+                                <div class="flex items-center justify-center h-48 text-center p-6">
+                                    <p class="text-sm text-ink-400 font-500">Pick a section to preview</p>
+                                </div>
+                            </template>
+                            <template x-if="selectedSection">
+                                <div class="p-4 space-y-3">
+                                    <template x-for="it in (selectedSection.items || [])" x-bind:key="it.id">
+                                        <div class="p-3 rounded-xl border border-surface-200/60 bg-white">
+                                            <div class="flex items-center justify-between gap-2 mb-1">
+                                                <span class="text-[12px] font-600 text-ink-800 truncate" x-text="it.label || 'Untitled item'"></span>
+                                                <span class="text-[9px] font-mono text-ink-300" x-text="it.type"></span>
+                                            </div>
+                                            <p x-show="it.description" class="text-[11px] text-ink-500 leading-snug" x-text="it.description"></p>
+                                            <div x-show="it.required || it.isSafety" class="mt-1.5 flex items-center gap-1.5">
+                                                <span x-show="it.required" class="text-[9px] font-700 uppercase tracking-wide text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">required</span>
+                                                <span x-show="it.isSafety" class="text-[9px] font-700 uppercase tracking-wide text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">safety</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="!(selectedSection.items || []).length" class="ih-empty-state"><h3 class="ih-empty-state__title">No items yet</h3></div>
+                                </div>
+                            </template>
+                        </div>
                     </aside>
                 </div>
 
@@ -674,46 +778,6 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                         </div>
                     </div>
                 </Modal>
-
-                {/* Canned Comments Slide Panel */}
-                <div x-show="showCannedPanel" x-cloak
-                    class="editor-canned-panel fixed right-0 top-16 bottom-0 w-[380px] bg-white border-l border-surface-200 shadow-2xl z-40 flex flex-col"
-                    x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-                    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
-                    <div class="px-5 py-4 border-b border-surface-200/60 flex items-center justify-between">
-                        <h3 class="text-sm font-display font-700">Canned Comments</h3>
-                        <button {...{'@click': 'showCannedPanel = false'}} class="text-ink-400 hover:text-ink-700 transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    <div class="p-4">
-                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50">
-                            <svg class="w-4 h-4 text-ink-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
-                            <input type="text" x-model="commentSearch" class="flex-1 text-sm bg-transparent border-0 p-0 focus:ring-0" placeholder="Search comments..." />
-                        </div>
-                    </div>
-                    <div class="px-4 pb-3 space-y-2">
-                        <input type="text" x-model="newCommentText" placeholder="Comment text..." class="w-full text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
-                        <div class="flex gap-2">
-                            <input type="text" x-model="newCommentCategory" placeholder="Category (optional)" class="flex-1 text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
-                            <button {...{'@click': 'addCannedComment()'}} class="px-4 py-2 rounded-xl bg-blueprint-600 text-white text-sm font-600 hover:bg-blueprint-700 transition-colors">Add</button>
-                        </div>
-                    </div>
-                    <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-2 scrollbar-thin">
-                        <template x-for="cc in filteredComments()" x-bind:key="cc.id">
-                            <div class="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors group flex items-start justify-between gap-2">
-                                <div class="min-w-0">
-                                    <span x-show="cc.category" class="text-[9px] font-700 uppercase tracking-wide text-blueprint-500 mr-1" x-text="cc.category"></span>
-                                    <span class="text-sm font-600 text-ink-700" x-text="cc.text"></span>
-                                </div>
-                                <button {...{'@click': 'deleteCannedComment(cc.id)'}} class="shrink-0 text-ink-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all mt-0.5">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                            </div>
-                        </template>
-                        <div x-show="filteredComments().length === 0" class="ih-empty-state"><h3 class="ih-empty-state__title">No comments yet</h3></div>
-                    </div>
-                </div>
 
             </div>
 
