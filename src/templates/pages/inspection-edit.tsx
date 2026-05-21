@@ -188,53 +188,69 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
           the editor so users can switch between sub-routes without leaving
           the page. Kept outside the inspectionEditor x-data scope so it
           stays interactive even if the editor's Alpine init fails. */}
+      {/* Sub-page tab strip — Inspection record (Report editor / Photos /
+          Summary / Repair List / Signatures / Settings) on the left;
+          actions group (Preview rendered report + PDF dropdown) on the
+          right, separated by a vertical divider so the two sets read as
+          distinct concerns. The active tab's underline uses --ih-primary
+          so it inherits the tenant's brand colour + flips for dark mode
+          via the token. */}
       <nav
-        role="tablist"
-        aria-label="Inspection sections"
-        class="sticky top-0 z-[60] bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 print:hidden"
+        aria-label="Inspection sub-pages"
+        class="sticky top-0 z-[60] border-b print:hidden"
+        style="background: var(--ih-bg-card, #ffffff); border-color: var(--ih-slate-200, #e2e8f0);"
       >
-        <div class="max-w-full mx-auto px-4 flex items-center gap-1 overflow-x-auto hide-scrollbar">
-          <a
-            href={`/inspections/${inspectionId}/report`}
-            role="tab"
-            aria-current="page"
-            aria-selected="true"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-indigo-500 text-slate-900 dark:text-slate-100 whitespace-nowrap"
-          >Report</a>
-          <a
-            href={`/inspections/${inspectionId}/photos`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Photos</a>
-          <a
-            href={`/inspections/${inspectionId}/summary`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Summary</a>
-          {/* Track E1 (ITB §11) — opt-in 6th tab. */}
-          {enableRepairList && (
+        <div class="max-w-full mx-auto px-4 flex items-stretch gap-1 overflow-x-auto hide-scrollbar">
+          <div role="tablist" aria-label="Inspection sections" class="flex items-stretch gap-0.5">
             <a
-              href={`/inspections/${inspectionId}/repair-list`}
+              href={`/inspections/${inspectionId}/report`}
+              role="tab"
+              aria-current="page"
+              aria-selected="true"
+              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 text-slate-900 dark:text-slate-100 whitespace-nowrap"
+              style="border-color: var(--ih-primary, #6366f1);"
+            >Report</a>
+            <a
+              href={`/inspections/${inspectionId}/photos`}
               role="tab"
               aria-selected="false"
-              data-testid="inspection-edit-repair-list-tab"
-              class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-            >Repair List</a>
-          )}
-          <a
-            href={`/inspections/${inspectionId}/signatures`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Signatures</a>
-          <a
-            href={`/inspections/${inspectionId}/settings`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Settings</a>
+              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
+            >Photos</a>
+            <a
+              href={`/inspections/${inspectionId}/summary`}
+              role="tab"
+              aria-selected="false"
+              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
+            >Summary</a>
+            {/* Track E1 (ITB §11) — opt-in 6th tab. */}
+            {enableRepairList && (
+              <a
+                href={`/inspections/${inspectionId}/repair-list`}
+                role="tab"
+                aria-selected="false"
+                data-testid="inspection-edit-repair-list-tab"
+                class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
+              >Repair List</a>
+            )}
+            <a
+              href={`/inspections/${inspectionId}/signatures`}
+              role="tab"
+              aria-selected="false"
+              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
+            >Signatures</a>
+            <a
+              href={`/inspections/${inspectionId}/settings`}
+              role="tab"
+              aria-selected="false"
+              class="px-3.5 py-2.5 text-[13px] font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-200 dark:hover:border-slate-700 whitespace-nowrap transition-colors"
+            >Settings</a>
+          </div>
+
+          {/* Actions group — right-aligned, separated from the tab nav by
+              a vertical divider so they don't read as a 7th/8th tab. */}
+          <span class="ml-auto flex items-stretch">
+            <span aria-hidden="true" class="self-center h-5 w-px mx-2 bg-slate-200 dark:bg-slate-700"></span>
+          </span>
           {/* Inspector report preview — opens the rendered (final) report in
               a new tab. The /api/inspections/:id/report endpoint serves
               HTML with `isAuthenticated: true`, so paywall + agreement
@@ -244,20 +260,18 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
             href={`/api/inspections/${inspectionId}/report`}
             target="_blank"
             rel="noopener"
-            role="tab"
-            aria-selected="false"
             data-testid="inspection-edit-preview-report"
             title="Open the rendered report in a new tab — what the customer will see"
-            class="ml-auto flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+            class="self-center flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
           >
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
               <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
               <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            Preview report
+            Preview
           </a>
-          {/* PDF download dropdown — ml-2 separates it from the Preview link */}
-          <div class="ml-2 flex-shrink-0 pl-2 py-1.5" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
+          {/* PDF download dropdown */}
+          <div class="self-center ml-2 flex-shrink-0" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
             <div class="relative">
               <button
                 type="button"
