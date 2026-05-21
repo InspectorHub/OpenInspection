@@ -75,39 +75,15 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                     :root {
                         --primary: ${primaryColor};
                         --primary-soft: ${primaryColor}14;
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #a8a29e;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
-                        --surface-card: #ffffff;
-                        --surface-soft: #f5f5f4;
-                        --good: #15803d;
-                        --good-soft: #15803d14;
-                        --slate: #64748b;
-                        --slate-soft: #64748b14;
-                        --error: #b91c1c;
                     }
                     html[data-color-scheme="dark"] {
                         --primary-soft: ${primaryColor}26;
-                        --ink: #f1f5f9;
-                        --ink-soft: #cbd5e1;
-                        --ink-faint: #94a3b8;
-                        --line: rgba(255,255,255,0.10);
-                        --surface: #0b1120;
-                        --surface-card: #1e293b;
-                        --surface-soft: #162032;
-                        --good: #4ade80;
-                        --good-soft: rgba(74,222,128,0.16);
-                        --slate: #94a3b8;
-                        --slate-soft: rgba(148,163,184,0.16);
-                        --error: #f87171;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         -webkit-font-smoothing: antialiased;
                     }
@@ -124,13 +100,13 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                     }
                     .topbar-actions { display: flex; gap: 0.5rem; }
                     .topbar-link {
-                        background: transparent; border: 1.5px solid var(--line);
-                        color: var(--ink); padding: 0.5rem 1rem;
+                        background: transparent; border: 1.5px solid var(--cp-border-color);
+                        color: var(--cp-fg-1); padding: 0.5rem 1rem;
                         font-family: inherit; font-size: 0.8125rem; font-weight: 600;
                         border-radius: 10px; cursor: pointer; text-decoration: none;
                         transition: border-color 0.15s, background 0.15s;
                     }
-                    .topbar-link:hover { border-color: var(--ink-faint); }
+                    .topbar-link:hover { border-color: var(--cp-fg-4); }
                     .topbar-link.active {
                         background: var(--primary-soft);
                         border-color: var(--primary);
@@ -147,11 +123,11 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                     }
                     .lede {
                         font-size: 0.9375rem; line-height: 1.55;
-                        color: var(--ink-soft); margin-bottom: 2rem;
+                        color: var(--cp-fg-2); margin-bottom: 2rem;
                     }
                     .card {
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 16px;
                         padding: 1.75rem;
                         margin-bottom: 1.25rem;
@@ -159,7 +135,7 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                     .card-eyebrow {
                         font-size: 0.6875rem; font-weight: 700;
                         text-transform: uppercase; letter-spacing: 0.18em;
-                        color: var(--ink-faint);
+                        color: var(--cp-fg-4);
                         margin-bottom: 0.5rem;
                     }
                     .card-title {
@@ -168,19 +144,19 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                         margin-bottom: 0.25rem;
                     }
                     .card-help {
-                        font-size: 0.8125rem; color: var(--ink-soft);
+                        font-size: 0.8125rem; color: var(--cp-fg-2);
                         margin-bottom: 1.25rem;
                     }
-                    label { display: block; font-size: 0.8125rem; color: var(--ink-soft); margin-bottom: 0.5rem; font-weight: 600; }
+                    label { display: block; font-size: 0.8125rem; color: var(--cp-fg-2); margin-bottom: 0.5rem; font-weight: 600; }
                     .input-row { display: flex; gap: 0.5rem; align-items: stretch; }
                     .input {
                         flex: 1;
                         padding: 0.625rem 0.875rem;
-                        border: 1.5px solid var(--line);
+                        border: 1.5px solid var(--cp-border-color);
                         border-radius: 10px;
                         font-family: inherit; font-size: 0.9375rem;
-                        background: var(--surface-card);
-                        color: var(--ink);
+                        background: var(--cp-bg-card);
+                        color: var(--cp-fg-1);
                         outline: none;
                         transition: border-color 0.15s, box-shadow 0.15s;
                     }
@@ -194,44 +170,44 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                         transition: background 0.15s;
                     }
                     .save-btn:hover { filter: brightness(0.95); }
-                    .save-btn:disabled { background: var(--ink-faint); cursor: not-allowed; }
+                    .save-btn:disabled { background: var(--cp-fg-4); cursor: not-allowed; }
                     .helper {
-                        font-size: 0.75rem; color: var(--ink-soft);
+                        font-size: 0.75rem; color: var(--cp-fg-2);
                         margin-top: 0.5rem;
                     }
-                    .helper.error { color: var(--error); }
-                    .helper.ok { color: var(--good); }
+                    .helper.error { color: var(--ih-status-bad-fg); }
+                    .helper.ok { color: var(--ih-status-ok-fg); }
                     .preview {
                         margin-top: 0.75rem;
-                        background: var(--surface-soft);
+                        background: var(--cp-bg-muted);
                         padding: 0.75rem 0.875rem;
                         border-radius: 10px;
                         font-family: ui-monospace, 'SF Mono', monospace;
-                        font-size: 0.75rem; color: var(--ink-soft);
+                        font-size: 0.75rem; color: var(--cp-fg-2);
                         word-break: break-all;
                     }
                     .toggle-row {
                         display: flex; align-items: center;
                         gap: 1rem;
                         padding: 1rem 0;
-                        border-top: 1px solid var(--line);
+                        border-top: 1px solid var(--cp-border-color);
                     }
                     .toggle-row:first-of-type { border-top: 0; }
                     .toggle-copy { flex: 1; min-width: 0; }
                     .toggle-title {
                         font-weight: 600; font-size: 0.9375rem;
-                        margin-bottom: 0.125rem; color: var(--ink);
+                        margin-bottom: 0.125rem; color: var(--cp-fg-1);
                     }
                     .toggle-sub {
-                        font-size: 0.75rem; color: var(--ink-soft);
+                        font-size: 0.75rem; color: var(--cp-fg-2);
                         line-height: 1.5;
                     }
                     .toggle {
                         flex-shrink: 0;
                         position: relative;
-                        background: var(--slate-soft);
-                        color: var(--slate);
-                        border: 1.5px solid var(--line);
+                        background: var(--cp-bg-muted);
+                        color: var(--cp-fg-3);
+                        border: 1.5px solid var(--cp-border-color);
                         border-radius: 999px;
                         padding: 0.25rem 0.75rem 0.25rem 2rem;
                         font-family: inherit; font-size: 0.75rem; font-weight: 700;
@@ -241,21 +217,21 @@ export const AgentSettingsProfilePage = ({ branding, agent, inspectors = [], boo
                         transition: background 0.15s, color 0.15s, border-color 0.15s;
                     }
                     .toggle.on {
-                        background: var(--good-soft);
-                        color: var(--good);
-                        border-color: var(--good);
+                        background: var(--ih-status-ok-bg);
+                        color: var(--ih-status-ok-fg);
+                        border-color: var(--ih-status-ok-fg);
                     }
                     .toggle .toggle-thumb {
                         position: absolute;
                         left: 0.25rem; top: 50%;
                         width: 1.125rem; height: 1.125rem;
-                        background: var(--slate); color: #fff;
+                        background: var(--cp-fg-3); color: #fff;
                         border-radius: 50%;
                         transform: translate(0, -50%);
                         transition: background 0.15s;
                     }
                     .toggle.on .toggle-thumb {
-                        background: var(--good);
+                        background: var(--ih-status-ok-fg);
                     }
                 ` }} />
             </head>

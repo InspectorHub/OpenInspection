@@ -48,25 +48,15 @@ export const ConciergeBookPage = ({
                 <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
+                    /* Uses the warm --cp-* tokens defined in input.css. The
+                       only page-local theming is the persistent orange
+                       mode-bar (branded "booking on behalf" context strip). */
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: #fafaf9; color: #1c1917;
+                        background: var(--cp-bg); color: var(--cp-fg-1);
                         min-height: 100vh; -webkit-font-smoothing: antialiased;
                     }
-                    html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
-                    html[data-color-scheme="dark"] h1 .who,
-                    html[data-color-scheme="dark"] .lede,
-                    html[data-color-scheme="dark"] label,
-                    html[data-color-scheme="dark"] .toggle-row { color: #cbd5e1; }
-                    html[data-color-scheme="dark"] .form-card,
-                    html[data-color-scheme="dark"] .timeline { background: #1e293b; border-color: rgba(255,255,255,0.10); }
-                    html[data-color-scheme="dark"] input[type="text"],
-                    html[data-color-scheme="dark"] input[type="email"],
-                    html[data-color-scheme="dark"] input[type="tel"],
-                    html[data-color-scheme="dark"] input[type="date"],
-                    html[data-color-scheme="dark"] select { background: #162032; border-color: rgba(255,255,255,0.12); color: #f1f5f9; }
-                    html[data-color-scheme="dark"] .toggle-row { background: #162032; border-color: rgba(255,255,255,0.08); }
                     /* Mode-bar stays warm orange in dark mode — it's a branded
                        persistent context indicator, keep saturation. */
                     html[data-color-scheme="dark"] .mode-bar { background: rgba(154,52,18,0.30); border-color: rgba(254,215,170,0.20); color: #fdba74; }
@@ -90,18 +80,18 @@ export const ConciergeBookPage = ({
                         font-size: 1.75rem; font-weight: 700;
                         line-height: 1.2; margin-bottom: 0.25rem;
                     }
-                    h1 .who { color: #57534e; }
-                    .lede { color: #57534e; font-size: 0.9375rem; line-height: 1.55; margin-bottom: 1.75rem; }
+                    h1 .who { color: var(--cp-fg-2); }
+                    .lede { color: var(--cp-fg-2); font-size: 0.9375rem; line-height: 1.55; margin-bottom: 1.75rem; }
                     .form-card {
-                        background: #fff; border: 1px solid #e7e5e4;
+                        background: var(--cp-bg-card); border: 1px solid var(--cp-border-color);
                         border-radius: 14px; padding: 1.75rem 1.5rem;
                         display: grid; gap: 1rem;
                     }
-                    label { display: grid; gap: 0.375rem; font-size: 0.8125rem; font-weight: 700; color: #44403c; text-transform: uppercase; letter-spacing: 0.08em; }
+                    label { display: grid; gap: 0.375rem; font-size: 0.8125rem; font-weight: 700; color: var(--cp-fg-2); text-transform: uppercase; letter-spacing: 0.08em; }
                     input[type="text"], input[type="email"], input[type="tel"], input[type="date"], select {
                         font-family: inherit; font-size: 1rem; padding: 0.625rem 0.75rem;
-                        border: 1px solid #d6d3d1; border-radius: 8px; background: #fff;
-                        color: #1c1917; font-weight: 400;
+                        border: 1px solid var(--cp-border-color); border-radius: 8px; background: var(--cp-bg-card);
+                        color: var(--cp-fg-1); font-weight: 400;
                     }
                     input:focus, select:focus { outline: 2px solid #F55A1A; outline-offset: 1px; border-color: #F55A1A; }
                     .row-2 { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
@@ -109,8 +99,8 @@ export const ConciergeBookPage = ({
                     .toggles { display: grid; gap: 0.625rem; }
                     .toggle-row {
                         display: flex; align-items: center; gap: 0.625rem;
-                        padding: 0.625rem 0.75rem; border: 1px solid #e7e5e4; border-radius: 8px;
-                        background: #fafaf9; font-size: 0.875rem; color: #44403c;
+                        padding: 0.625rem 0.75rem; border: 1px solid var(--cp-border-color); border-radius: 8px;
+                        background: var(--cp-bg); font-size: 0.875rem; color: var(--cp-fg-2);
                         text-transform: none; letter-spacing: 0; font-weight: 500;
                     }
                     .submit-row { margin-top: 0.5rem; }
@@ -122,7 +112,7 @@ export const ConciergeBookPage = ({
                         cursor: pointer; transition: filter 0.15s ease;
                     }
                     .cta:hover { filter: brightness(0.95); }
-                    .cta:disabled { background: #a8a29e; cursor: progress; }
+                    .cta:disabled { background: var(--cp-fg-4); cursor: progress; }
                     .err {
                         margin-top: 0.75rem; padding: 0.75rem 1rem;
                         background: var(--ih-status-bad-bg);
@@ -133,7 +123,7 @@ export const ConciergeBookPage = ({
                     }
                     /* Post-submit timeline — appears after a successful submit. */
                     .timeline {
-                        background: #fff; border: 1px solid #e7e5e4;
+                        background: var(--cp-bg-card); border: 1px solid var(--cp-border-color);
                         border-radius: 14px; padding: 1.75rem 1.5rem;
                         display: grid; gap: 0.875rem;
                     }
@@ -143,7 +133,7 @@ export const ConciergeBookPage = ({
                     }
                     .step .dot {
                         width: 24px; height: 24px; border-radius: 50%;
-                        background: #e7e5e4; color: #57534e;
+                        background: var(--cp-border-color); color: var(--cp-fg-2);
                         font-size: 0.75rem; font-weight: 700;
                         display: flex; align-items: center; justify-content: center;
                         flex-shrink: 0;
@@ -157,11 +147,8 @@ export const ConciergeBookPage = ({
                         0%, 100% { box-shadow: 0 0 0 0 rgba(245, 90, 26, 0.5); }
                         50% { box-shadow: 0 0 0 8px rgba(245, 90, 26, 0); }
                     }
-                    .step .label { font-size: 0.9375rem; font-weight: 600; color: #1c1917; }
-                    .step .sub { font-size: 0.8125rem; color: #57534e; margin-top: 0.125rem; }
-                    html[data-color-scheme="dark"] .step .dot { background: rgba(255,255,255,0.08); color: #cbd5e1; }
-                    html[data-color-scheme="dark"] .step .label { color: #f1f5f9; }
-                    html[data-color-scheme="dark"] .step .sub { color: #94a3b8; }
+                    .step .label { font-size: 0.9375rem; font-weight: 600; color: var(--cp-fg-1); }
+                    .step .sub { font-size: 0.8125rem; color: var(--cp-fg-2); margin-top: 0.125rem; }
                 `}} />
             </head>
             <body>

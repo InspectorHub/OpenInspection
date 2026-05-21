@@ -29,27 +29,15 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                     :root {
                         --primary: ${primaryColor};
                         --primary-soft: ${primaryColor}14;
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #a8a29e;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
-                        --surface-card: #ffffff;
                     }
                     html[data-color-scheme="dark"] {
                         --primary-soft: ${primaryColor}26;
-                        --ink: #f1f5f9;
-                        --ink-soft: #cbd5e1;
-                        --ink-faint: #94a3b8;
-                        --line: rgba(255,255,255,0.10);
-                        --surface: #0b1120;
-                        --surface-card: #1e293b;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         display: flex;
                         -webkit-font-smoothing: antialiased;
@@ -167,7 +155,7 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         margin-bottom: 0.5rem;
                     }
                     .form-sub {
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         font-size: 0.9375rem;
                         line-height: 1.55;
                         margin-bottom: 2rem;
@@ -177,7 +165,7 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         display: block;
                         font-size: 0.8125rem;
                         font-weight: 600;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         margin-bottom: 0.5rem;
                     }
                     .form-input {
@@ -185,9 +173,9 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         padding: 0.75rem 1rem;
                         font-size: 0.9375rem;
                         font-family: inherit;
-                        color: var(--ink);
-                        background: var(--surface-card);
-                        border: 1.5px solid var(--line);
+                        color: var(--cp-fg-1);
+                        background: var(--cp-bg-card);
+                        border: 1.5px solid var(--cp-border-color);
                         border-radius: 12px;
                         outline: none;
                         transition: border-color 0.15s, box-shadow 0.15s;
@@ -226,7 +214,7 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         display: block;
                         margin-top: 1.5rem;
                         font-size: 0.875rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         text-align: center;
                     }
                     .login-link a {

@@ -63,30 +63,18 @@ export const AgentInviteExpiredPage = ({
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #78716c;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
-                        --surface-card: #ffffff;
                         --badge-bg: #fef3c7;
                         --badge-fg: #92400e;
                     }
                     html[data-color-scheme="dark"] {
-                        --ink: #f1f5f9;
-                        --ink-soft: #cbd5e1;
-                        --ink-faint: #94a3b8;
-                        --line: rgba(255,255,255,0.10);
-                        --surface: #0b1120;
-                        --surface-card: #1e293b;
                         --badge-bg: rgba(251,191,36,0.18);
                         --badge-fg: #fbbf24;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         display: flex;
                         align-items: center;
@@ -97,8 +85,8 @@ export const AgentInviteExpiredPage = ({
                     .card {
                         max-width: 480px;
                         width: 100%;
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 18px;
                         padding: 2.5rem 2rem;
                         text-align: center;
@@ -126,7 +114,7 @@ export const AgentInviteExpiredPage = ({
                         margin-bottom: 0.75rem;
                     }
                     .explainer {
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         font-size: 0.9375rem;
                         line-height: 1.55;
                         margin-bottom: 1.75rem;
@@ -147,10 +135,10 @@ export const AgentInviteExpiredPage = ({
                         display: block;
                         margin-top: 1.25rem;
                         font-size: 0.875rem;
-                        color: var(--ink-faint);
+                        color: var(--cp-fg-4);
                         text-decoration: none;
                     }
-                    .secondary:hover { color: var(--ink); }
+                    .secondary:hover { color: var(--cp-fg-1); }
                 ` }} />
             </head>
             <body>
