@@ -58,6 +58,11 @@ function inspectionEditor(inspectionId) {
     expanded: {},
     activeItemId: null,
     currentSectionIdx: 0,
+    // Design's PropertyInfo-as-section: which view fills the centre
+    // pane. 'items' = the regular item list for currentSectionIdx;
+    // 'property' = the property-facts form. The section rail's first
+    // row (`__property__`) toggles between them.
+    activeView: 'items',
     // Design System 0520 subsystem D P2.2 — when the inspector picks a
     // unit in the UnitTree left rail, the tree broadcasts
     // `unit-selected` on window and this state mirrors the active unit
@@ -769,9 +774,39 @@ function inspectionEditor(inspectionId) {
     },
 
     selectSection(idx) {
+      this.activeView        = 'items';
       this.currentSectionIdx = idx;
-      this.batchMode = false;
-      this.batchSelected = {};
+      this.batchMode         = false;
+      this.batchSelected     = {};
+    },
+
+    /**
+     * Design's Property Info as a virtual section — clicking the row in
+     * the section rail swaps the centre pane from the item list to a
+     * property facts form. Mirrors how the SectionRail in
+     * InspectionEditor.jsx treats `__property__` as the first entry.
+     */
+    selectProperty() {
+      this.activeView = 'property';
+      // Don't clear currentSectionIdx — coming back from property view
+      // should land the user in the section they were last in.
+    },
+
+    /**
+     * Per-property-fact progress for the section rail's completion ring.
+     * Same { rated, total, percent } shape as sectionProgress() so the
+     * rail can render both with one template.
+     */
+    propertyProgress() {
+      var fields = ['yearBuilt','sqft','foundationType','bedrooms','bathrooms','unit','county'];
+      var insp = this.inspection || {};
+      var filled = 0;
+      for (var i = 0; i < fields.length; i++) {
+        var v = insp[fields[i]];
+        if (v !== null && v !== undefined && v !== '') filled++;
+      }
+      var total = fields.length;
+      return { rated: filled, total: total, percent: Math.round(filled / total * 100) };
     },
 
     sectionDefectCount(sectionId) {

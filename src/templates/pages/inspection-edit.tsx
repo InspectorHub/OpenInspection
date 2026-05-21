@@ -1123,6 +1123,44 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
             </div>
             <div class="flex-1 px-3 py-2 space-y-0.5">
+              {/* Design's PropertyInfo-as-section — first row in the rail
+                  is the property facts form rather than an inspection
+                  item list. Clicking it swaps the centre pane via
+                  activeView='property'. Ring counts non-empty fact
+                  fields out of seven (yearBuilt / sqft / foundation /
+                  bedrooms / bathrooms / unit / county). */}
+              <button
+                x-on:click="selectProperty()"
+                class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
+                x-bind:class="activeView === 'property' ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'"
+                x-bind:style="activeView === 'property' ? 'color: var(--ih-primary, #6366f1)' : ''"
+              >
+                {/* Completion ring for property facts (0 / 7 → 7 / 7). */}
+                <span class="relative w-[18px] h-[18px] flex-shrink-0" aria-hidden="true">
+                  <svg viewBox="0 0 18 18" class="w-[18px] h-[18px]">
+                    <circle cx="9" cy="9" r="7" fill="none" stroke="var(--ih-slate-200, #e2e8f0)" stroke-width="2" />
+                    <circle
+                      cx="9" cy="9" r="7" fill="none" stroke-width="2" stroke-linecap="round"
+                      transform="rotate(-90 9 9)"
+                      x-bind:stroke={`propertyProgress().percent >= 100 ? 'var(--ih-status-ok)' : (propertyProgress().percent > 0 ? 'var(--ih-primary)' : 'transparent')`}
+                      x-bind:stroke-dasharray={`(propertyProgress().percent / 100 * 44) + ' 44'`}
+                    />
+                  </svg>
+                </span>
+                <span class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+                  x-bind:class="activeView === 'property' ? 'bg-indigo-100/80 dark:bg-indigo-800/40' : 'bg-slate-100 dark:bg-slate-700/50'"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold truncate">Property Info</div>
+                  <div class="text-[10px] font-mono opacity-60 tabular-nums">
+                    <span x-text="propertyProgress().rated"></span>
+                    <span class="opacity-70">/ <span x-text="propertyProgress().total"></span> facts</span>
+                  </div>
+                </div>
+              </button>
+
               {/* Each section row carries a small SVG completion ring on
                   the left so the inspector can scan the rail and see at
                   a glance which sections are done / in-progress / have
@@ -1180,6 +1218,92 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
 
           {/* Center Content */}
           <main class="flex-1 min-w-0">
+            {/* Property Info view — design's __property__ section. Toggled
+                via the rail's Property Info row (selectProperty()). Body
+                shows a 7-field facts form using the same inline edit shape
+                the sidebar card used to use. Item-list view below stays
+                hidden while this is active. */}
+            <div x-show="activeView === 'property'" x-cloak class="px-6 py-6 max-w-3xl">
+              <header class="mb-6">
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Inspection</p>
+                <h2 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Property Info</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Fill the seven facts below — they print on the report cover and feed Estated auto-fill / Spectora exports.
+                </p>
+              </header>
+
+              <div
+                x-data="{ fields: {} }"
+                x-init={`fields = {
+                  yearBuilt:      inspection.yearBuilt || '',
+                  sqft:           inspection.sqft || '',
+                  foundationType: inspection.foundationType || '',
+                  bedrooms:       inspection.bedrooms || '',
+                  bathrooms:      inspection.bathrooms || '',
+                  unit:           inspection.unit || '',
+                  county:         inspection.county || inspection.addressCounty || ''
+                }`}
+                class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-6"
+              >
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Year built</span>
+                    <input type="number" x-model="fields.yearBuilt" placeholder="1973"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Sq ft</span>
+                    <input type="number" x-model="fields.sqft" placeholder="1840"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Foundation</span>
+                    <select x-model="fields.foundationType"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500">
+                      <option value="">—</option>
+                      <option value="basement">Basement</option>
+                      <option value="slab">Slab on grade</option>
+                      <option value="crawlspace">Crawlspace</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Unit</span>
+                    <input type="text" x-model="fields.unit" placeholder="Apt 4B"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Bedrooms</span>
+                    <input type="number" x-model="fields.bedrooms" placeholder="3"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Bathrooms</span>
+                    <input type="number" step="0.5" x-model="fields.bathrooms" placeholder="2"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block sm:col-span-2">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">County</span>
+                    <input type="text" x-model="fields.county" placeholder="San Francisco County"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                </div>
+                <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Saved to the inspection. Estated auto-fill from <code class="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded">/api/inspections/:id/property-facts/autofill</code> can pre-populate these from the address.
+                  </p>
+                  <button
+                    type="button"
+                    x-on:click={`authFetch('/api/inspections/${inspectionId}', {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({yearBuilt:fields.yearBuilt?parseInt(fields.yearBuilt):null,sqft:fields.sqft?parseInt(fields.sqft):null,foundationType:fields.foundationType||null,bedrooms:fields.bedrooms?parseInt(fields.bedrooms):null,bathrooms:fields.bathrooms?parseFloat(fields.bathrooms):null,unit:fields.unit||null,county:fields.county||null})}).then(r=>r.json()).then(d=>{if(d.success){Object.assign(inspection,{yearBuilt:fields.yearBuilt?parseInt(fields.yearBuilt):null,sqft:fields.sqft?parseInt(fields.sqft):null,foundationType:fields.foundationType||null,bedrooms:fields.bedrooms?parseInt(fields.bedrooms):null,bathrooms:fields.bathrooms?parseFloat(fields.bathrooms):null,unit:fields.unit||null,county:fields.county||null});showToast && showToast('Property facts saved');}})`}
+                    class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold transition-colors"
+                  >Save facts</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Items view — the regular per-section item list. Hidden
+                while the rail has Property Info active. */}
+            <div x-show="activeView === 'items'">
             {/* Sprint 2 S2-2 — request switcher banner.
                 Renders only when the inspection belongs to a multi-service
                 booking (request.inspections.length > 1). The banner shows
@@ -1835,6 +1959,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 <button x-on:click="clearSearch()" class="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear search</button>
               </div>
             </div>
+            </div>{/* /activeView === 'items' */}
           </main>
 
           {/* Spec 5G M1 — Right pane: active item photos + quick comments.
