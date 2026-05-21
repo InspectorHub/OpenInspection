@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
     getDeploymentProfile,
     STANDALONE_PROFILE,
-    SANDBOX_PROFILE,
     SAAS_SHARED_PROFILE,
     SAAS_SILO_PROFILE,
 } from '../../src/lib/deployment-profile';
@@ -16,19 +15,8 @@ describe('deployment profile constants', () => {
         expect(STANDALONE_PROFILE.hasBilling).toBe(false);
         expect(STANDALONE_PROFILE.hasSeatQuota).toBe(false);
         expect(STANDALONE_PROFILE.hasSetupWizard).toBe(true);
-        expect(STANDALONE_PROFILE.isPublicDemo).toBe(false);
         expect(STANDALONE_PROFILE.aiDevMockFallback).toBe(true);
-        expect(STANDALONE_PROFILE.showSandboxBanner).toBe(false);
         expect(STANDALONE_PROFILE.brandingSource).toBe('env');
-    });
-
-    it('SANDBOX_PROFILE flips sandbox-specific fields', () => {
-        expect(SANDBOX_PROFILE.mode).toBe('sandbox');
-        expect(SANDBOX_PROFILE.hasSetupWizard).toBe(false);
-        expect(SANDBOX_PROFILE.isPublicDemo).toBe(true);
-        expect(SANDBOX_PROFILE.demoResetCron).toBe('0 9 * * *');
-        expect(SANDBOX_PROFILE.showSandboxBanner).toBe(true);
-        expect(SANDBOX_PROFILE.fixedTenantId).toBe(FALLBACK_TENANT);
     });
 
     it('SAAS_SHARED_PROFILE marks billing + seat quota', () => {
@@ -63,12 +51,6 @@ describe('getDeploymentProfile factory', () => {
         expect(p.saasTopology).toBe('silo');
     });
 
-    it('returns SANDBOX_PROFILE when SANDBOX_MODE=true and APP_MODE not saas', () => {
-        const p = getDeploymentProfile({ SANDBOX_MODE: 'true' } as never);
-        expect(p.mode).toBe('sandbox');
-        expect(p.showSandboxBanner).toBe(true);
-    });
-
     it('returns STANDALONE_PROFILE by default with FALLBACK tenant id', () => {
         const p = getDeploymentProfile({} as never);
         expect(p.mode).toBe('standalone');
@@ -79,10 +61,5 @@ describe('getDeploymentProfile factory', () => {
         const tenantUuid = '11111111-2222-3333-4444-555555555555';
         const p = getDeploymentProfile({ SINGLE_TENANT_ID: tenantUuid } as never);
         expect(p.fixedTenantId).toBe(tenantUuid);
-    });
-
-    it('SANDBOX_MODE=true does not override APP_MODE=saas', () => {
-        const p = getDeploymentProfile({ APP_MODE: 'saas', SANDBOX_MODE: 'true' } as never);
-        expect(p.mode).toBe('saas');
     });
 });
