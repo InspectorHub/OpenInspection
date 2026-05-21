@@ -314,3 +314,22 @@ export const DashboardColumnPrefsResponseSchema = z.object({
     data: z.object({ columns: z.array(z.string()) }),
 }).openapi('DashboardColumnPrefsResponse');
 
+// ── Trial Sample-Data Mode (2026-05-20 spec) ───────────────────────────────
+// Portal calls POST /api/admin/seed-starter-content during step 2.5 of the
+// OnboardingWorkflow to populate a newly-provisioned tenant with starter
+// content. Idempotent — re-runs return all-zero counts.
+export const SeedStarterContentBodySchema = z.object({
+    tenantId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
+}).openapi('SeedStarterContentBody');
+
+export const SeedStarterContentResponseSchema = createApiResponseSchema(z.object({
+    inspectionTemplatesSeeded:  z.number().int().nonnegative(),
+    agreementTemplatesSeeded:   z.number().int().nonnegative(),
+    cannedCommentsSeeded:       z.number().int().nonnegative(),
+    eventTypesSeeded:           z.number().int().nonnegative(),
+    tagsSeeded:                 z.number().int().nonnegative(),
+    recommendationsSeeded:      z.number().int().nonnegative(),
+    ratingSystemsSeeded:        z.number().int().nonnegative(),
+    marketplaceLibrariesSeeded: z.number().int().nonnegative(),
+})).openapi('SeedStarterContentResponse');
+

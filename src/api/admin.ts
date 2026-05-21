@@ -36,6 +36,8 @@ import {
     ATTENTION_THRESHOLDS_DEFAULTS,
     DashboardColumnPrefsSchema,
     DashboardColumnPrefsResponseSchema,
+    SeedStarterContentBodySchema,
+    SeedStarterContentResponseSchema,
 } from '../lib/validations/admin.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
@@ -1650,6 +1652,49 @@ adminRoutes.openapi({
 
     logger.info('sync-quota applied', { tenantId, maxUsers });
     return c.json({ success: true as const, data: { success: true } }, 200);
+});
+
+/**
+ * POST /api/admin/seed-starter-content — Trial Sample-Data Mode spec (2026-05-20).
+ *
+ * Portal calls this from OnboardingWorkflow step 2.5 once a new tenant is
+ * provisioned, populating it with starter content (3 templates / 1 agreement /
+ * 250 canned comments / 3 event_types / 4 tags / recommendations /
+ * rating-systems / marketplace defaults). Idempotent — safe to retry on
+ * workflow re-run.
+ *
+ * Auth: `Authorization: Bearer <PORTAL_M2M_SECRET>` (or any active V<N>);
+ * matches the other portal → core M2M endpoints in this file.
+ */
+adminRoutes.openapi({
+    method: 'post',
+    path: '/seed-starter-content',
+    tags: ['Admin'],
+    summary: 'M2M — seed starter content into a newly-provisioned tenant',
+    request: { body: { content: { 'application/json': { schema: SeedStarterContentBodySchema } } } },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SeedStarterContentResponseSchema } },
+            description: 'Seed counts (zero on idempotent re-run)',
+        },
+        401: { description: 'Unauthorized' },
+        404: { description: 'Tenant not found' },
+    },
+}, async (c) => {
+    if (!verifyM2mAuth(c.req.header('authorization'), c.env as unknown as Record<string, string | undefined>)) {
+        throw Errors.Unauthorized();
+    }
+
+    const { tenantId } = c.req.valid('json');
+    const { tenants } = await import('../lib/db/schema');
+    const db = drizzle(c.env.DB);
+    const existing = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, tenantId)).get();
+    if (!existing) throw Errors.NotFound('Tenant not found');
+
+    const { seedStarterContent } = await import('../services/starter-content.service');
+    const result = await seedStarterContent(c.env.DB, tenantId);
+
+    return c.json({ success: true as const, data: result }, 200);
 });
 
 export default adminRoutes;
