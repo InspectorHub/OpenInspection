@@ -101,7 +101,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         c.env.GEMINI_API_KEY || dbSecrets.geminiApiKey || '',
                         // Sprint 1 A-4: pass effective deployment mode so the
                         // service can return dev-mock suggestions when the
-                        // active profile permits it (standalone/sandbox) and
+                        // active profile permits it (standalone) and
                         // no API key is configured, instead of throwing 503.
                         c.var.profile.aiDevMockFallback ? 'standalone' : 'saas',
                     );

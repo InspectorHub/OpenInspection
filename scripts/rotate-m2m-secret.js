@@ -27,7 +27,6 @@ const PORTAL_ROOT = join(CORE_ROOT, '..', 'portal');
 
 const TARGETS = [
     ['openinspection-standalone',  CORE_ROOT,   '',                          ''],
-    ['openinspection-sandbox',     CORE_ROOT,   '',                          '--env sandbox'],
     ['openinspection-saas',        CORE_ROOT,   '',                          '--env saas'],
     ['inspectorhub-core-shared',   CORE_ROOT,   '-c wrangler.saas.toml',     ''],
     ['inspectorhub-portal',        PORTAL_ROOT, '',                          ''],

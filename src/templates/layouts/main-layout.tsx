@@ -4,7 +4,6 @@ import { ConflictModal } from '../components/conflict-modal';
 import { KeyboardHUD } from '../components/keyboard-hud';
 import { CommandPalette } from '../components/command-palette';
 import { InlineTextPopover } from '../components/inline-text-popover';
-import { SandboxBanner } from '../components/sandbox-banner';
 
 function sanitizePrimaryColor(branding?: BrandingConfig): string {
     const raw = branding?.primaryColor || '#6366f1';
@@ -112,7 +111,6 @@ function SharedHead({ title, primaryColor, gaMeasurementId, extraHead }: {
 
 export const BareLayout = (props: { title: string, children: unknown, branding?: BrandingConfig | undefined, extraHead?: JSX.Element, dataTheme?: 'modern' | 'classic' | 'minimal' }): JSX.Element => {
     const { title, children, branding, extraHead, dataTheme } = props;
-    const sandboxMode = branding?.sandboxMode === true;
 
     return (
         <html lang="en" class="scroll-smooth" {...(dataTheme ? { 'data-theme': dataTheme } : {})}>
@@ -123,7 +121,6 @@ export const BareLayout = (props: { title: string, children: unknown, branding?:
                 {...(extraHead ? { extraHead } : {})}
             />
             <body class="bg-[#fdfdfd] text-slate-900 antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900">
-                {sandboxMode && <SandboxBanner />}
                 {children}
                 {/* Sprint 1 C-3 — NetworkPill is an inspector-only tool;
                     BareLayout serves public-facing pages so the pill renders
@@ -167,7 +164,6 @@ export const MainLayout = (props: {
     const { title, children, branding, extraHead } = props;
     const siteName = branding?.siteName || 'OpenInspection';
     const logoUrl = branding?.logoUrl;
-    const sandboxMode = branding?.sandboxMode === true;
     // Sprint B-1 — palette context falls back to the value the middleware
     // hydrated into branding so individual pages don't need to plumb it.
     const paletteSlug = props.currentUserSlug !== undefined ? props.currentUserSlug : (branding?.currentUserSlug ?? null);
@@ -183,7 +179,6 @@ export const MainLayout = (props: {
                 {...(extraHead ? { extraHead } : {})}
             />
             <body class="bg-[#f8fafc] dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased min-h-screen" x-data="{ mobileMenu: false }">
-                {sandboxMode && <SandboxBanner />}
                 {/* Mobile Header Bar */}
                 <div class="lg:hidden sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
                     <div class="flex items-center gap-3">

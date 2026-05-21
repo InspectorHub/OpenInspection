@@ -12,9 +12,6 @@ import { logger } from '../logger';
  */
 export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const tenantId = c.get('tenantId');
-    // Profile is injected by diMiddleware which runs before brandingMiddleware
-    // (see global middleware order in src/index.ts).
-    const sandboxMode = c.var.profile.showSandboxBanner;
 
     // Default system branding (fallback)
     const defaultBranding: BrandingConfig = {
@@ -24,7 +21,6 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         supportEmail: c.env.SENDER_EMAIL || 'support@openinspection.org',
         billingUrl: '/settings',
         gaMeasurementId: c.env.GA_MEASUREMENT_ID || null,
-        sandboxMode,
     };
 
     if (!tenantId) {
@@ -38,8 +34,6 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
     if (cached) {
         try {
             const parsed = JSON.parse(cached) as BrandingConfig;
-            // sandboxMode is env-driven, never cached — always recompute.
-            parsed.sandboxMode = sandboxMode;
             c.set('branding', parsed);
             return await next();
         } catch (e) {
@@ -70,15 +64,13 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             billingUrl: config.billingUrl || defaultBranding.billingUrl,
             gaMeasurementId: config.gaMeasurementId || defaultBranding.gaMeasurementId,
             reportTheme: (config.reportTheme || 'modern') as 'modern' | 'classic' | 'minimal',
-            sandboxMode,
         } : defaultBranding;
 
         c.set('branding', branding);
 
         if (config && c.env.TENANT_CACHE) {
             try {
-                // Strip sandboxMode before caching (env-driven, recomputed per request).
-                const cacheable: Omit<BrandingConfig, 'sandboxMode'> = {
+                const cacheable: BrandingConfig = {
                     siteName:     branding.siteName,
                     primaryColor: branding.primaryColor,
                     logoUrl:      branding.logoUrl,

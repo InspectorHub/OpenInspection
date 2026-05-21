@@ -26,8 +26,6 @@ import { logger } from './lib/logger';
 import { BUILD } from './generated/version';
 
 import { setupWizardRoutes } from './features/setup-wizard';
-import { reset as sandboxDemoReset } from './features/sandbox-demo';
-import { getDeploymentProfile } from './lib/deployment-profile';
 
 import { LoginPage } from './templates/pages/login';
 import { DashboardPage } from './templates/pages/dashboard';
@@ -1839,7 +1837,7 @@ app.get('/dashboard', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) 
     const tenantId = c.get('tenantId');
     // PR 3 Task 4 — surface a seat-quota status banner on the dashboard
     // whenever the active deployment profile enforces seat quotas. When the
-    // profile carries no quota (standalone / sandbox / saas-silo) we skip
+    // profile carries no quota (standalone / saas-silo) we skip
     // the DB hit entirely and the page renders identically to before.
     const seatProps = c.var.profile.hasSeatQuota && tenantId
         ? {
@@ -2546,12 +2544,6 @@ import { scheduled as baseScheduled } from './scheduled';
 export default {
     fetch: app.fetch.bind(app),
     scheduled: async (event: ScheduledEvent, env: HonoConfig['Bindings'], ctx: ExecutionContext) => {
-        // Profile-gated sandbox reset — only the sandbox deployment sets
-        // demoResetCron; standalone / saas profiles leave it null and skip.
-        const profile = getDeploymentProfile(env);
-        if (profile.demoResetCron && event.cron === profile.demoResetCron) {
-            await sandboxDemoReset(env);
-        }
         await baseScheduled(event, env, ctx);
     },
 };

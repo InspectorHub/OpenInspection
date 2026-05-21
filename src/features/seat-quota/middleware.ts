@@ -7,7 +7,7 @@ import { getSeatUsage } from './usage';
  * Guards POST /api/team/invite (and any other seat-allocating route it is
  * mounted on). The middleware is intended to be mounted unconditionally:
  * when the active deployment profile has no seat-quota enforcement
- * (standalone, sandbox, saas-silo) it short-circuits to `next()` without
+ * (standalone, saas-silo) it short-circuits to `next()` without
  * touching the database.
  *
  * When seat enforcement IS active (saas-shared today), it calls

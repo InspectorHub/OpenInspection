@@ -12,7 +12,7 @@ import { resolveBySubdomain } from './resolve-by-subdomain';
  * Reads `c.var.profile` (injected by DI middleware) to pick the resolution
  * strategy:
  *
- *   - profile.fixedTenantId       → resolveByFixedTenant   (standalone / sandbox)
+ *   - profile.fixedTenantId       → resolveByFixedTenant   (standalone)
  *   - profile.saasTopology=silo   → resolveBySubdomain      (silo)
  *   - profile.saasTopology=shared → leave unset; JWT mw fills it
  *

@@ -1,6 +1,6 @@
 /**
  * URL builders for tenant-scoped public routes. Uniform shape across
- * standalone / sandbox / saas-shared / saas-silo: /<prefix>/<tenant>/<slug-or-id>.
+ * standalone / saas-shared / saas-silo: /<prefix>/<tenant>/<slug-or-id>.
  *
  * Caller supplies the host. For request-relative links use
  *   c.req.header('host') with deriveBaseUrl(c)

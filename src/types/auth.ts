@@ -25,11 +25,6 @@ export interface BrandingConfig {
     billingUrl: string;
     gaMeasurementId?: string | null | undefined;
     reportTheme?: 'modern' | 'classic' | 'minimal' | undefined;
-    /** Sprint 1 CC-2 — true when the worker runs as the public sandbox demo
-     *  (resolved from `c.var.profile.showSandboxBanner`). Plumbed through
-     *  branding so every page template that already accepts branding gets it
-     *  for free. */
-    sandboxMode?: boolean | undefined;
     /** Sprint B-1 — signed-in user's booking slug. Plumbed via the
      *  inspectorPaletteMiddleware so MainLayout can pass it to
      *  <CommandPalette /> for the "Copy my booking link" action. Null when

@@ -5,7 +5,7 @@ import { tenants } from '../../lib/db/schema';
 import type { HonoConfig } from '../../types/hono';
 
 /**
- * Standalone / sandbox path: fixed tenant id from profile, with KV cache
+ * Standalone path: fixed tenant id from profile, with KV cache
  * for the row metadata (subdomain / tier / status).
  */
 export async function resolveByFixedTenant(c: Context<HonoConfig>, tenantId: string): Promise<void> {
