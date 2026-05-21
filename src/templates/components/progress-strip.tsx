@@ -23,8 +23,6 @@ export function ProgressStrip(): JSX.Element {
     return (
         <div
             x-data="progressStrip()"
-            x-show="completion.total > 0"
-            x-cloak
             class="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b"
             style="background: var(--ih-bg-card); border-color: var(--ih-slate-200, #e2e8f0);"
             aria-label="Inspection progress"

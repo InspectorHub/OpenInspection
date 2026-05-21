@@ -92,6 +92,10 @@ function inspectionEditor(inspectionId) {
     sectionPickerIdx: 0,
     batchMode: false,
     batchSelected: {},
+    // Design-aligned item filter row — All / Unrated / Issues / Flagged.
+    // Drives `itemPassesFilter()` which the centre-pane card grid
+    // consults alongside the search filter so the two filters compose.
+    itemFilter: 'all',
     showMenu: false,
     showPublishModal: false,
     publishing: false,
@@ -854,6 +858,50 @@ function inspectionEditor(inspectionId) {
         if (this.results[sec.items[i].id]?.rating != null) rated++;
       }
       return { rated: rated, total: total, percent: Math.round((rated / total) * 100) };
+    },
+
+    // Design-aligned filter predicate. Mirrors InspectionEditor.jsx
+    // ItemList filters:
+    //   all      — everything (no-op)
+    //   unrated  — no rating yet (rich items only)
+    //   issues   — rating maps to a defect/marginal severity
+    //   flagged  — user-tagged via getItemTags (safety/photo/follow-up tags)
+    itemPassesFilter(item) {
+      var f = this.itemFilter || 'all';
+      if (f === 'all') return true;
+      var r = this.results[item.id];
+      if (f === 'unrated') return !r || r.rating == null;
+      if (f === 'issues') {
+        if (!r || !r.rating) return false;
+        var levels = (this.ratingLevels || []);
+        for (var i = 0; i < levels.length; i++) {
+          if (levels[i].id !== r.rating) continue;
+          var sev = levels[i].severity;
+          return levels[i].isDefect || sev === 'significant' || sev === 'marginal';
+        }
+        return false;
+      }
+      if (f === 'flagged') {
+        var tags = (typeof this.getItemTags === 'function') ? this.getItemTags(item.id) : [];
+        return Array.isArray(tags) && tags.length > 0;
+      }
+      return true;
+    },
+
+    // Counts for the filter row chips. Cheap to recompute each frame —
+    // the page only renders a single section at a time so the loop is
+    // bounded by section.items.length (typically <40).
+    sectionFilterCounts() {
+      var items = this.currentSectionItems || [];
+      var counts = { all: items.length, unrated: 0, issues: 0, flagged: 0 };
+      var prev = this.itemFilter;
+      for (var i = 0; i < items.length; i++) {
+        this.itemFilter = 'unrated'; if (this.itemPassesFilter(items[i])) counts.unrated++;
+        this.itemFilter = 'issues';  if (this.itemPassesFilter(items[i])) counts.issues++;
+        this.itemFilter = 'flagged'; if (this.itemPassesFilter(items[i])) counts.flagged++;
+      }
+      this.itemFilter = prev;
+      return counts;
     },
 
     getItemRating(itemId) {

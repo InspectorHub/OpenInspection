@@ -251,6 +251,26 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
           <span class="ml-auto flex items-stretch">
             <span aria-hidden="true" class="self-center h-5 w-px mx-2 bg-slate-200 dark:bg-slate-700"></span>
           </span>
+          {/* Speed mode toggle — Z hotkey already binds this; the explicit
+              button matches the design chrome and improves discoverability.
+              Flips `speedMode` on the editor factory, which `<SpeedMode />`
+              consumes via `x-show="speedMode"` for its full-screen view. */}
+          <button
+            type="button"
+            x-on:click="speedMode = !speedMode"
+            x-bind:aria-pressed="speedMode ? 'true' : 'false'"
+            title="Speed mode — full-screen single-item rating (Z)"
+            class="self-center flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-md border transition-all"
+            x-bind:class="speedMode
+                ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600'"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Speed
+            <kbd class="ih-kbd" style="padding: 1px 4px; font-size: 9px;">Z</kbd>
+          </button>
           {/* Inspector report preview — opens the rendered (final) report in
               a new tab. The /api/inspections/:id/report endpoint serves
               HTML with `isAuthenticated: true`, so paywall + agreement
@@ -1137,6 +1157,11 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
             </div>
             <div class="flex-1 px-3 py-2 space-y-0.5">
+              {/* Inspection group — single Property Info row.
+                  Matches design's "INSPECTION" rail group: the property
+                  meta isn't a "system" being inspected, so it lives in
+                  its own group above SYSTEMS for visual separation. */}
+              <div class="px-3 pt-1 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Inspection</div>
               {/* Design's PropertyInfo-as-section — first row in the rail
                   is the property facts form rather than an inspection
                   item list. Clicking it swaps the centre pane via
@@ -1175,6 +1200,13 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
               </button>
 
+              {/* Systems group — the N home systems being inspected.
+                  Header shows the section count next to the label, same
+                  shape as the design's "Systems · 12" affordance. */}
+              <div class="flex items-center justify-between px-3 pt-3 pb-1">
+                <span class="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Systems</span>
+                <span class="text-[9px] font-mono text-slate-400 dark:text-slate-500 tabular-nums" x-text="`· ${sections.length}`"></span>
+              </div>
               {/* Each section row carries a small SVG completion ring on
                   the left so the inspector can scan the rail and see at
                   a glance which sections are done / in-progress / have
@@ -1434,6 +1466,28 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               </div>
             </div>
 
+            {/* Item filter tabs — design's All / Unrated / Issues / Flagged
+                row. Drives a `itemFilter` filter on currentSectionItems via
+                the `itemPassesFilter()` helper. Counts come from
+                sectionFilterCounts() so the user can see workload at a
+                glance. Hidden in batch mode to avoid two competing toolbars. */}
+            <div x-show="!batchMode && currentSectionItems.length > 0" class="px-6 pt-3 pb-1 flex items-center gap-1.5 flex-wrap">
+              <template x-for="tab in [{id:'all',label:'All'},{id:'unrated',label:'Unrated'},{id:'issues',label:'Issues'},{id:'flagged',label:'Flagged'}]" x-bind:key="tab.id">
+                <button
+                  type="button"
+                  x-on:click="itemFilter = tab.id"
+                  x-bind:aria-pressed="itemFilter === tab.id ? 'true' : 'false'"
+                  x-bind:class="itemFilter === tab.id
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-600 shadow-sm'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] font-semibold border transition-colors"
+                >
+                  <span x-text="tab.label"></span>
+                  <span class="text-[10px] font-mono opacity-70 tabular-nums" x-text="sectionFilterCounts()[tab.id] ?? 0"></span>
+                </button>
+              </template>
+            </div>
+
             {/* Batch Mode Toolbar */}
             <div x-show="batchMode" class="px-6 py-2 flex items-center gap-3 text-sm bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-200 dark:border-indigo-800">
               <span class="font-semibold" style="color: var(--ih-primary, #6366f1)" x-text="'Selected ' + selectedBatchCount + '/' + currentSectionItems.length"></span>
@@ -1601,7 +1655,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               <template x-for="item in currentSectionItems" x-bind:key="item.id">
                 <div
                   x-bind:data-item-id="item.id"
-                  x-show="itemMatchesSearch(currentSection, item)"
+                  x-show="itemMatchesSearch(currentSection, item) && itemPassesFilter(item)"
                   class="rounded-md p-4 transition-all cursor-pointer group item-card"
                   x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-top: 4px solid ' + getRatingColor(getItemRating(item.id))"
                   x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
@@ -2138,15 +2192,6 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               </div>
             </div>
 
-            {/* Keyboard hint footer — shared across all tabs */}
-            <footer class="px-4 py-2 border-t border-slate-200/50 dark:border-slate-700/50 text-[10px] text-slate-400 dark:text-slate-500">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">↑↓</kbd> nav
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">1-5</kbd> rate
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">/</kbd> lib
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">?</kbd> all
-              </div>
-            </footer>
           </aside>
 
           {/* Sprint 3 S3-4 — Tablet 1024-1279 ACTIVE ITEM drawer.
