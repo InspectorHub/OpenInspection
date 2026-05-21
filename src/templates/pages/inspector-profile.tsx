@@ -65,6 +65,16 @@ body { background: #fafaf7; font-family: 'Inter', -apple-system, BlinkMacSystemF
 .cta-button:hover { opacity: 0.9; }
 .contact-footer { padding: 32px 64px; font-size: 13px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; }
 .contact-link { background: none; border: none; color: inherit; cursor: pointer; text-decoration: underline; font: inherit; padding: 0; }
+html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
+html[data-color-scheme="dark"] .hero-name { color: #f1f5f9; }
+html[data-color-scheme="dark"] .hero-photo--placeholder { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #94a3b8; }
+html[data-color-scheme="dark"] .meta-strip { color: #94a3b8; }
+html[data-color-scheme="dark"] .area-chip { background: rgba(255,255,255,0.06); color: #cbd5e1; }
+html[data-color-scheme="dark"] .bio { color: #cbd5e1; }
+html[data-color-scheme="dark"] .service-card { background: #1e293b; border-color: rgba(255,255,255,0.10); }
+html[data-color-scheme="dark"] .service-duration { color: #94a3b8; }
+html[data-color-scheme="dark"] .service-name { color: #cbd5e1; }
+html[data-color-scheme="dark"] .contact-footer { color: #94a3b8; border-top-color: rgba(255,255,255,0.08); }
 @media (max-width: 600px) {
     .hero { grid-template-columns: 1fr; padding: 48px 24px 24px; gap: 16px; }
     .hero-name { font-size: 56px; transform: none; }
@@ -135,6 +145,7 @@ export const InspectorProfilePage = ({ profile, services, host, tenantSlug }: Pr
                         href={`/inspector/${tenantSlug}/${slug}/calendar.ics`}
                     />
                 )}
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 {raw(`<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`)}
                 {raw(`<style>${HERO_STYLES}</style>`)}

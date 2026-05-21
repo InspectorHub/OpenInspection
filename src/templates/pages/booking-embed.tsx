@@ -34,6 +34,21 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-
 @media (max-width: 480px) {
     .embed-grid { grid-template-columns: 1fr; }
 }
+/* Follow the embedding site's color scheme — host page sets it via
+   prefers-color-scheme; we keep body bg transparent so the host bg
+   bleeds through, then adjust just the card chrome. */
+@media (prefers-color-scheme: dark) {
+    body { color: #f1f5f9; }
+    .embed-card,
+    .embed-compact { background: #1e293b; border-color: rgba(255,255,255,0.10); }
+    .embed-subtitle,
+    .embed-compact-name { color: #94a3b8; }
+    .embed-field label { color: #94a3b8; }
+    .embed-field input,
+    .embed-field textarea { background: #162032; border-color: rgba(255,255,255,0.12); color: #f1f5f9; }
+    .embed-status--ok { color: #4ade80; }
+    .embed-status--error { color: #fca5a5; }
+}
 `;
 
 /**

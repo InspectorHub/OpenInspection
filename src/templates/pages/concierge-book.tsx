@@ -45,6 +45,7 @@ export const ConciergeBookPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Book for ${inspectorName} | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -53,6 +54,28 @@ export const ConciergeBookPage = ({
                         background: #fafaf9; color: #1c1917;
                         min-height: 100vh; -webkit-font-smoothing: antialiased;
                     }
+                    html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
+                    html[data-color-scheme="dark"] h1 .who,
+                    html[data-color-scheme="dark"] .lede,
+                    html[data-color-scheme="dark"] label,
+                    html[data-color-scheme="dark"] .toggle-row { color: #cbd5e1; }
+                    html[data-color-scheme="dark"] .form-card,
+                    html[data-color-scheme="dark"] .timeline { background: #1e293b; border-color: rgba(255,255,255,0.10); }
+                    html[data-color-scheme="dark"] input[type="text"],
+                    html[data-color-scheme="dark"] input[type="email"],
+                    html[data-color-scheme="dark"] input[type="tel"],
+                    html[data-color-scheme="dark"] input[type="date"],
+                    html[data-color-scheme="dark"] select { background: #162032; border-color: rgba(255,255,255,0.12); color: #f1f5f9; }
+                    html[data-color-scheme="dark"] .toggle-row { background: #162032; border-color: rgba(255,255,255,0.08); }
+                    html[data-color-scheme="dark"] .err {
+                        background: rgba(127,29,29,0.25);
+                        border-color: rgba(248,113,113,0.40);
+                        color: #fca5a5;
+                    }
+                    /* Mode-bar stays warm orange in dark mode — it's a branded
+                       persistent context indicator, keep saturation. */
+                    html[data-color-scheme="dark"] .mode-bar { background: rgba(154,52,18,0.30); border-color: rgba(254,215,170,0.20); color: #fdba74; }
+                    html[data-color-scheme="dark"] .mode-bar .right { color: #fb923c; }
                     /* Mode-bar — persistent, soft-orange. Sticks to top so agent can never
                        lose context of which mode they're in. */
                     .mode-bar {
@@ -139,6 +162,9 @@ export const ConciergeBookPage = ({
                     }
                     .step .label { font-size: 0.9375rem; font-weight: 600; color: #1c1917; }
                     .step .sub { font-size: 0.8125rem; color: #57534e; margin-top: 0.125rem; }
+                    html[data-color-scheme="dark"] .step .dot { background: rgba(255,255,255,0.08); color: #cbd5e1; }
+                    html[data-color-scheme="dark"] .step .label { color: #f1f5f9; }
+                    html[data-color-scheme="dark"] .step .sub { color: #94a3b8; }
                 `}} />
             </head>
             <body>

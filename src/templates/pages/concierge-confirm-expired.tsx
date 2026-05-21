@@ -33,6 +33,7 @@ export const ConciergeConfirmExpiredPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Confirmation link unavailable | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,6 +60,10 @@ export const ConciergeConfirmExpiredPage = ({
                         display: flex; align-items: center; justify-content: center;
                         font-size: 1.5rem; margin-bottom: 1rem;
                     }
+                    html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
+                    html[data-color-scheme="dark"] .card { background: #1e293b; border-color: rgba(255,255,255,0.10); }
+                    html[data-color-scheme="dark"] p { color: #cbd5e1; }
+                    html[data-color-scheme="dark"] .icon { background: ${primaryColor}26; }
                 `}} />
             </head>
             <body>

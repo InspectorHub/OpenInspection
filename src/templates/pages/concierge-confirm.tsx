@@ -58,6 +58,7 @@ export const ConciergeConfirmPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Confirm your inspection | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var s=localStorage.getItem('ih-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
@@ -69,6 +70,15 @@ export const ConciergeConfirmPage = ({
                         --line: #e7e5e4;
                         --surface: #fafaf9;
                         --surface-card: #ffffff;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
+                        --ink: #f1f5f9;
+                        --ink-soft: #cbd5e1;
+                        --ink-faint: #94a3b8;
+                        --line: rgba(255,255,255,0.10);
+                        --surface: #0b1120;
+                        --surface-card: #1e293b;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
@@ -159,6 +169,11 @@ export const ConciergeConfirmPage = ({
                         background: #fef2f2; color: #b91c1c;
                         border: 1px solid #fecaca; border-radius: 8px;
                         font-size: 0.875rem;
+                    }
+                    html[data-color-scheme="dark"] .err {
+                        background: rgba(127,29,29,0.25);
+                        border-color: rgba(248,113,113,0.40);
+                        color: #fca5a5;
                     }
                     .summary-toggle { display: none; }
                     @media (max-width: 600px) {

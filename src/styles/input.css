@@ -1002,9 +1002,13 @@ html[data-color-scheme="dark"] .hover\:bg-blueprint-500:hover { background-color
 html[data-color-scheme="dark"] .divide-slate-200 > * + * { border-color: rgba(255,255,255,0.08) !important; }
 html[data-color-scheme="dark"] .divide-slate-100 > * + * { border-color: rgba(255,255,255,0.05) !important; }
 
-/* ── Generic page-chrome slate bgs (e.g. join, agreement-sign wrappers) ── */
-html[data-color-scheme="dark"] body > .bg-slate-50,
-html[data-color-scheme="dark"] body > div .bg-slate-50:not([class*="border-"]):not([class*="rounded-"]) {
+/* ── Generic page-chrome slate bgs (full-viewport wrappers) ─────────────
+   Pages that aren't routed through MainLayout/SettingsLayout typically
+   wrap content in a `min-h-screen ... bg-slate-50` div as the page
+   canvas. This rule only matches that pattern so small bordered/
+   rounded bg-slate-50 badges remain untouched. */
+html[data-color-scheme="dark"] .min-h-screen.bg-slate-50,
+html[data-color-scheme="dark"] body > .bg-slate-50:not([class*="rounded-"]):not([class*="border "]) {
     background-color: var(--ih-bg-app) !important;
 }
 
