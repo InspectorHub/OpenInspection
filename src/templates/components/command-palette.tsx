@@ -91,7 +91,7 @@ export function CommandPalette(props?: CommandPaletteProps): JSX.Element {
                 {/* Results */}
                 <div class="flex-1 overflow-y-auto">
                     <template x-if="loading">
-                        <div class="px-5 py-8 text-center text-xs text-slate-400">Loading…</div>
+                        <div aria-busy="true" class="space-y-2 py-6"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="width: 50%; margin: 0 auto;"></div></div>
                     </template>
                     <template x-if="!loading && groups.length === 0">
                         <div class="px-5 py-12 text-center">

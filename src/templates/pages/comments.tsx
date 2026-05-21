@@ -59,7 +59,7 @@ export const CommentsPage = ({ branding }: Props): JSX.Element => (
             </div>
 
             <div x-show="items.length === 0 && !loading" class="text-center py-12 bg-slate-50 dark:bg-slate-700/30 rounded-md">
-                <p class="text-slate-500 dark:text-slate-400 font-semibold">No comments yet.</p>
+                <div class="ih-empty-state"><h3 class="ih-empty-state__title">No comments yet</h3></div>
                 <p class="text-slate-400 dark:text-slate-500 text-sm mt-2">Click "+ Add comment" above to create your first comment snippet.</p>
             </div>
 

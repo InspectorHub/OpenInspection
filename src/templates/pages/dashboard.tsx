@@ -470,12 +470,16 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                         </div>
                     </section>
 
-                    {/* Empty state */}
-                    <div x-show="!loading && allBucketsEmpty" {...{ 'x-cloak': true }} class="text-center py-10 text-slate-400">
-                        <div class="w-20 h-20 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    {/* Empty state — uses the design-system .ih-empty-state
+                        utility. The indigo accent badge stays page-local
+                        because it's a brand-coloured callout, not the
+                        default outline-icon empty-state shape. */}
+                    <div x-show="!loading && allBucketsEmpty" {...{ 'x-cloak': true }} class="ih-empty-state">
+                        <div class="w-20 h-20 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center mb-1">
+                            <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                         </div>
-                        <p class="text-sm">No inspections yet. Create one above to get started.</p>
+                        <h3 class="ih-empty-state__title">No inspections yet</h3>
+                        <p class="ih-empty-state__subline">Create one above to get started.</p>
                     </div>
 
                     <CancelModal />

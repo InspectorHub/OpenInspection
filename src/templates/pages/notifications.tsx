@@ -34,7 +34,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                 <div class="glass-panel rounded-xl shadow-xl shadow-slate-100/50 overflow-hidden">
                     <template x-if="items.length === 0 && !loading">
                         <div class="py-24 text-center space-y-3">
-                            <div class="text-slate-400 font-semibold">No notifications yet — events will appear here as they happen.</div>
+                            <div class="ih-empty-state"><h3 class="ih-empty-state__title">No notifications yet</h3><p class="ih-empty-state__subline">Events will appear here as they happen.</p></div>
                             <div class="text-xs text-slate-400">Tip: trigger your first booking on <a href="/book" class="text-indigo-600 font-bold hover:underline">/book</a> to see this inbox light up.</div>
                         </div>
                     </template>
@@ -56,7 +56,7 @@ export const NotificationsPage = ({ branding }: Props): JSX.Element => {
                         </div>
                     </template>
                     <template x-if="loading">
-                        <div class="py-6 text-center text-slate-400">Loading…</div>
+                        <div aria-busy="true" class="space-y-2 py-6"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="width: 50%; margin: 0 auto;"></div></div>
                     </template>
                 </div>
 

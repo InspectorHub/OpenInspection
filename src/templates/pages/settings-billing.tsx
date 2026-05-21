@@ -44,7 +44,7 @@ export const SettingsBillingPage = (
                     </div>
                 </div>
 
-                <p class="ih-meta mt-4" x-show="loading">Loading…</p>
+                <span x-show="loading" aria-busy="true" class="inline-block ih-skeleton ih-skeleton--text" style="width: 4rem; height: 0.875rem; vertical-align: middle;"><span class="sr-only">Loading…</span></span>
                 <p class="ih-meta text-rose-600 mt-4" x-show="error" x-text="error" />
             </div>
 

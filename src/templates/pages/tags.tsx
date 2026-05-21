@@ -64,7 +64,7 @@ export const TagsPage = ({ branding }: Props): JSX.Element => {
 
                 {/* Empty */}
                 <div x-show="!loading && tags.length === 0" style="display:none" class="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-md">
-                    <p class="text-slate-500 dark:text-slate-400 font-semibold">No tags yet.</p>
+                    <div class="ih-empty-state"><h3 class="ih-empty-state__title">No tags yet</h3></div>
                     <p class="text-slate-400 dark:text-slate-500 text-sm mt-2">Reload to plant the five seed tags, or add your own.</p>
                 </div>
 

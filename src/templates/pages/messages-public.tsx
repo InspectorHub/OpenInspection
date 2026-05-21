@@ -32,7 +32,7 @@ export function MessagesPublicPage({ token, branding }: MessagesPublicProps) {
                                 </div>
                             </div>
                         </template>
-                        <p x-show="messages.length === 0" class="text-center text-sm text-slate-400 py-8">No messages yet — send the first one below.</p>
+                        <div x-show="messages.length === 0" class="ih-empty-state"><h3 class="ih-empty-state__title">No messages yet</h3><p class="ih-empty-state__subline">Send the first one below.</p></div>
                     </div>
                     <div class="border-t border-slate-200 pt-3 bg-white p-4 rounded-md">
                         <textarea x-model="composeBody" rows={3} placeholder="Type your message..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm resize-none"></textarea>

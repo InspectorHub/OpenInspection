@@ -33,7 +33,8 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                                     <div id="quotaBadge" class="hidden sm:flex items-center gap-2 px-3 h-8 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                                         <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
                                         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none">Seats:</span>
-                                        <span class="text-[12px] font-bold text-slate-900 dark:text-slate-100 leading-none">Loading...</span>
+                                        <span class="sr-only">Loading seat count…</span>
+                                        <span class="ih-skeleton ih-skeleton--text inline-block" style="width: 3.5rem; height: 0.875rem; vertical-align: middle;" aria-hidden="true"></span>
                                     </div>
                                 ) : null}
                                 <button
@@ -68,7 +69,9 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                                     </tr>
                                 </thead>
                                 <tbody id="membersList" class="divide-y divide-slate-100/50">
-                                    <tr><td colspan={3} class="px-10 py-10 text-sm font-bold text-center text-slate-300 uppercase tracking-[0.2em]">Loading...</td></tr>
+                                    <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                                 </tbody>
                             </table>
                         </div>

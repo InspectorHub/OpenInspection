@@ -31,7 +31,7 @@ export function MetricsPage({ appName, branding }: MetricsPageProps) {
                     }
                 />
 
-                <div x-show="loading" class="text-sm text-slate-400 text-center py-10">Loading...</div>
+                <div x-show="loading" aria-busy="true" class="space-y-2 py-6"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="width: 60%;"></div><div class="ih-skeleton ih-skeleton--text" style="width: 85%;"></div><div class="ih-skeleton ih-skeleton--text" style="width: 70%;"></div></div>
 
                 <div x-show="!loading && data">
                     {/* KPI cards */}
@@ -107,7 +107,7 @@ export function MetricsPage({ appName, branding }: MetricsPageProps) {
                                 <div class="text-center" x-text="m.ym.slice(5)" />
                             </template>
                         </div>
-                        <p class="text-xs text-slate-400 mt-2" x-show="loading">Loading…</p>
+                        <span x-show="loading" aria-busy="true" class="inline-block ih-skeleton ih-skeleton--text" style="width: 4rem; height: 0.875rem; vertical-align: middle;"><span class="sr-only">Loading…</span></span>
                     </div>
 
                     <div class="bg-white border border-slate-200 rounded-xl p-5">
@@ -129,7 +129,7 @@ export function MetricsPage({ appName, branding }: MetricsPageProps) {
                                 </template>
                             </template>
                         </div>
-                        <p class="text-xs text-slate-400 mt-2" x-show="heatmapRows.length === 0 && !loading">No findings yet.</p>
+                        <div x-show="heatmapRows.length === 0 && !loading" class="ih-empty-state"><h3 class="ih-empty-state__title">No findings yet</h3></div>
                     </div>
                 </section>
 

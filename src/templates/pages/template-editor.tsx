@@ -339,7 +339,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                         <div class="w-16 h-16 rounded-md bg-surface-100 flex items-center justify-center mx-auto mb-4">
                                             <svg class="w-8 h-8 text-ink-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                         </div>
-                                        <p class="text-ink-400 font-500">No items yet</p>
+                                        <div class="ih-empty-state"><h3 class="ih-empty-state__title">No items yet</h3></div>
                                         <p class="text-ink-300 text-sm mt-1">Add inspection points to this section</p>
                                     </div>
                                 </div>
@@ -707,7 +707,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                 </button>
                             </div>
                         </template>
-                        <p x-show="filteredComments().length === 0" class="text-sm text-ink-400 text-center py-4">No comments yet.</p>
+                        <div x-show="filteredComments().length === 0" class="ih-empty-state"><h3 class="ih-empty-state__title">No comments yet</h3></div>
                     </div>
                 </div>
 

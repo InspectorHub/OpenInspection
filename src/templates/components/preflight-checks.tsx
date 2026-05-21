@@ -73,7 +73,7 @@ export const PreflightChecks: FC = () => (
                 action={{ kind: 'dispatch', event: 'open-agreement-flow', label: 'Send →' }} />
         </ul>
 
-        <p class="text-xs text-slate-400 mt-3" x-show="loading">Loading…</p>
+        <span x-show="loading" aria-busy="true" class="inline-block ih-skeleton ih-skeleton--text" style="width: 4rem; height: 0.875rem; vertical-align: middle;"><span class="sr-only">Loading…</span></span>
         <p class="text-xs text-rose-600 mt-3" x-show="error" x-text="error" />
     </div>
 );

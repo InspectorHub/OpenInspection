@@ -58,7 +58,7 @@ export const InspectionSettingsPage = ({
                 {...(siblings  ? { siblings  } : {})}
             >
                 <div x-data={`inspectionSettingsPage('${inspectionId}')`} x-init="load()" class="space-y-8 max-w-2xl">
-                    <div x-show="loading" class="text-center py-12 text-slate-400 text-[13px]">Loading…</div>
+                    <div x-show="loading" aria-busy="true" class="space-y-2 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="width: 50%;"></div><div class="ih-skeleton ih-skeleton--text" style="width: 75%;"></div></div>
 
                     {/* Round-2 F3 — People card with role chips. Auto-loads
                         from /api/inspections/:id/people via the settings

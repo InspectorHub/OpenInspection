@@ -22,7 +22,7 @@ export const SettingsServicesPage = ({ branding }: Props): JSX.Element => (
                 </header>
 
                 <div x-show="services.length === 0 && !loading" class="text-center py-10 bg-white border border-surface-200 rounded-lg">
-                    <p class="text-ink-700 font-semibold">No services yet.</p>
+                    <div class="ih-empty-state"><h3 class="ih-empty-state__title">No services yet</h3></div>
                     <p class="text-ink-500 text-sm mt-2">Click "Add service" to define your first service.</p>
                 </div>
 

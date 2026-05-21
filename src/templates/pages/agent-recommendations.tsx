@@ -96,7 +96,11 @@ export const AgentRecommendationsPage = ({ branding }: Props): JSX.Element => {
                         <button type="button" class="btn" {...{ 'x-on:click': 'load()' }}>Refresh</button>
                     </div>
 
-                    <div x-show="loading" class="loading-state" style="display: none">Loading…</div>
+                    <div x-show="loading" aria-busy="true" class="loading-state" style="display: none">
+                        <span class="sr-only">Loading…</span>
+                        <div class="ih-skeleton ih-skeleton--text" style="width: 50%; margin: 0 auto 0.5rem;"></div>
+                        <div class="ih-skeleton ih-skeleton--text" style="width: 75%; margin: 0 auto;"></div>
+                    </div>
                     <div x-show="error" class="error-state" style="display: none" x-text="error" />
 
                     <template x-if="!loading && !error">

@@ -56,14 +56,20 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         }
                     }
 
-                    /* Left: editorial value-prop */
+                    /* Left: editorial value-prop. Uses the shared
+                       --cp-hero-bg / --cp-hero-fg tokens (also used by
+                       inspector-profile's trust-strip) so the marketing
+                       hero shares one warm-dark palette across the
+                       customer-portal + agent surfaces. Flat fill +
+                       the existing radial accent (::before) — no
+                       linear-gradient (single brand gradient rule). */
                     .value-pane {
                         display: flex;
                         flex-direction: column;
                         justify-content: center;
                         padding: 3rem 2rem;
-                        background: linear-gradient(155deg, #1c1917 0%, #292524 100%);
-                        color: #fafaf9;
+                        background: var(--cp-hero-bg);
+                        color: var(--cp-hero-fg);
                         position: relative;
                         overflow: hidden;
                     }

@@ -50,7 +50,7 @@ export const InspectionSignaturesPage = ({
                         <p class="text-[12px] text-slate-500 dark:text-slate-400">Tracks every agreement envelope created for this inspection plus its tamper-evident audit chain.</p>
                     </div>
 
-                    <div x-show="loading" class="text-center py-12 text-slate-400 dark:text-slate-500 text-[13px]">Loading…</div>
+                    <div x-show="loading" aria-busy="true" class="space-y-2 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="width: 50%;"></div><div class="ih-skeleton ih-skeleton--text" style="width: 75%;"></div></div>
 
                     <div x-show="!loading && envelopes.length === 0" style="display:none" class="text-center py-12 px-6 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                         <p class="text-[13px] text-slate-500 dark:text-slate-400">No agreement envelopes attached to this inspection yet.</p>
