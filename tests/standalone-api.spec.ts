@@ -14,6 +14,7 @@ const BASE_URL = 'http://127.0.0.1:8789';
 
 const ADMIN_EMAIL = 'admin@autotest.com';
 const ADMIN_PASSWORD = 'Password123!';
+const ADMIN_NAME    = 'Automation Test Admin';
 const COMPANY_NAME = 'Automation Test Corp';
 const INSPECTOR_EMAIL = 'inspector@autotest.com';
 const INSPECTOR_PASSWORD = 'Inspector123!';
@@ -85,8 +86,9 @@ test.describe.serial('Standalone API Tests', () => {
         const res = await request.post(`${BASE_URL}/api/auth/setup`, {
             data: {
                 companyName: COMPANY_NAME,
-                email: ADMIN_EMAIL,
-                password: ADMIN_PASSWORD,
+                adminName:   ADMIN_NAME,
+                email:       ADMIN_EMAIL,
+                password:    ADMIN_PASSWORD,
                 verificationCode: '000000',
             },
             headers: {
