@@ -462,17 +462,13 @@ export const LoginPage = ({ branding, initialStep = 'password' }: LoginPageProps
 
                         <div id="errorMsg" class="error-box hidden"></div>
 
-                        <div class="divider-row enter-up delay-4">
-                            <div class="divider-line"></div>
-                            <span class="divider-text">or</span>
-                            <div class="divider-line"></div>
-                        </div>
-
-                        <a href="/book" class="alt-link enter-up delay-4">
-                            <span>Book a home inspection</span>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-                        </a>
-
+                        {/* "Book a home inspection" CTA used to live here.
+                            Removed per user feedback — the auth pages
+                            (login / forgot / reset) shouldn't push end-
+                            customers into the inspector booking flow,
+                            which sits on a tenant subdomain that this
+                            login page doesn't know. /book on the bare
+                            host showed an empty shell. */}
                         <p class="footer-note enter-up delay-4">
                             Protected workspace &middot; Credentials encrypted in transit
                         </p>
