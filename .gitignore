@@ -19,9 +19,12 @@ backups/
 .dev.vars*
 test-results/
 
-# Cloudflare config
+# Cloudflare config — wrangler.toml is generated from wrangler.toml.example
+# by scripts/setup-cloudflare.js (substitutes real D1 / KV / R2 IDs in place
+# of the 00000...000 placeholders). Only the .example template is tracked;
+# the populated wrangler.toml is local-only.
+wrangler.toml
 wrangler.*.toml
-!wrangler.toml
 
 # Qwen config
 .qwen/

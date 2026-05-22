@@ -17,6 +17,7 @@ const getArg = (key) => {
 
 // Configuration Paths & Naming
 const TOML_PATH = path.resolve(getArg('--config') || getArg('--toml') || 'wrangler.toml');
+const TOML_EXAMPLE_PATH = path.resolve(path.dirname(TOML_PATH), 'wrangler.toml.example');
 const PROJECT_SLUG = getArg('--name') || 'openinspection-standalone';
 const PROJECT_TITLE = getArg('--app-name') || getArg('--title') || 'OpenInspection';
 
@@ -42,6 +43,19 @@ const info = (msg) => console.log(`  ✓ ${msg}`);
 const step = (msg) => { console.log(`\n▶ ${msg}`); };
 const warn = (msg) => console.warn(`  ⚠ ${msg}`);
 const die = (msg) => { console.error(`\n  ✗ ERROR: ${msg}`); process.exit(1); };
+
+// wrangler.toml is gitignored — generated from wrangler.toml.example on first
+// setup. Real D1 / KV / R2 IDs are patched into the local copy further below;
+// the template stays untouched and tracked in git so self-hosters always have
+// a known-good starting point.
+function ensureTomlExists() {
+    if (fs.existsSync(TOML_PATH)) return;
+    if (!fs.existsSync(TOML_EXAMPLE_PATH)) {
+        die(`Neither ${TOML_PATH} nor ${TOML_EXAMPLE_PATH} found — cannot bootstrap wrangler config.`);
+    }
+    fs.copyFileSync(TOML_EXAMPLE_PATH, TOML_PATH);
+    info(`Created ${path.basename(TOML_PATH)} from ${path.basename(TOML_EXAMPLE_PATH)}`);
+}
 
 function run(cmd, options = {}) {
     const parts = cmd.split(' ');
@@ -167,6 +181,8 @@ function seedDatabase() {
 console.log("\n╔══════════════════════════════════════════════════════╗");
 console.log(`║     ${PROJECT_TITLE.padEnd(25)} — Cloudflare Setup              ║`);
 console.log("╚══════════════════════════════════════════════════════╝");
+
+ensureTomlExists();
 
 if (isRefreshCode) {
     step("Refreshing Setup Verification Code...");

@@ -316,18 +316,14 @@ async function executeTeardown() {
         }
     }
 
-    // 5. Reset wrangler.toml
-    step("Step 5: Resetting wrangler.toml to placeholder state...");
+    // 5. Remove wrangler.toml — it's gitignored and regenerated from
+    // wrangler.toml.example on the next `npm run setup:cloudflare`, so we
+    // don't need to scrub IDs in-place anymore (avoids the truncation /
+    // partial-write bugs that motivated the .example split).
+    step("Step 5: Removing wrangler.toml...");
     if (fs.existsSync(TOML_PATH)) {
-        let toml = fs.readFileSync(TOML_PATH, 'utf8');
-        // Reset Database ID to placeholder
-        toml = toml.replace(/database_id\s*=\s*"[^"]*"/g, 'database_id = "00000000-0000-0000-0000-000000000000"');
-        // Reset KV ID to placeholder
-        toml = toml.replace(/id\s*=\s*"[^"]*"/g, 'id = "00000000000000000000000000000000"');
-        // Reset Base URL to default
-        toml = toml.replace(/APP_BASE_URL\s*=\s*"https:\/\/[^"]*"/g, 'APP_BASE_URL = "https://openinspection.workers.dev"');
-        fs.writeFileSync(TOML_PATH, toml);
-        info("wrangler.toml reset");
+        fs.unlinkSync(TOML_PATH);
+        info("wrangler.toml removed (regenerated from wrangler.toml.example on next setup)");
     }
 
     // Verification
