@@ -59,6 +59,14 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
     extraHead: (
       <>
         <link rel="stylesheet" href="/fonts.css" />
+        {/* Flatpickr — replaces native <input type="date"> in the settings
+            sheet so the date picker doesn't show "年/月/日" placeholders on
+            zh-CN systems (Chromium ignores `lang="en"` on date inputs,
+            crbug.com/333392). main-layout already loads these; BareLayout
+            doesn't, so we wire them up here for the inspection editor. */}
+        <link rel="stylesheet" href="/vendor/flatpickr.min.css" />
+        <script defer src="/vendor/flatpickr.min.js"></script>
+        <script defer src="/js/flatpickr-init.js"></script>
         <style dangerouslySetInnerHTML={{ __html: `
           /* R41 (2026-05-07) — inspection editor migrated to v3 indigo/slate.
              Inter is the page body font (inherited from main-layout); JetBrains
@@ -641,7 +649,9 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
 
                 <div x-show="item.type === 'date'" class="mb-3">
-                  <input type="date"
+                  {/* Flatpickr — see extraHead comment. Native type=date leaks
+                      OS locale on zh-CN. */}
+                  <input type="text" data-flatpickr data-no-time placeholder="YYYY-MM-DD"
                     x-bind:value="getItemValue(item.id)"
                     x-on:input="setItemValue(item.id, $event.target.value)"
                     class="px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none transition-colors" />

@@ -95,9 +95,14 @@ export const InspectionSettingsSheet = ({
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <label class="block">
                                         <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Date</span>
+                                        {/* type=text + data-flatpickr — Chromium ignores `lang="en"`
+                                            on type=date inputs, leaking the OS locale (e.g. "年/月/日"
+                                            on zh-CN). Flatpickr renders a locale-independent picker
+                                            with the canonical "Y-m-d" format. */}
                                         <input
-                                            type="date"
-                                            lang="en"
+                                            type="text"
+                                            data-flatpickr
+                                            data-no-time
                                             placeholder="YYYY-MM-DD"
                                             x-model="form.date"
                                             class="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-[14px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
@@ -120,8 +125,9 @@ export const InspectionSettingsSheet = ({
                                     <label class="block">
                                         <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Closing Date</span>
                                         <input
-                                            type="date"
-                                            lang="en"
+                                            type="text"
+                                            data-flatpickr
+                                            data-no-time
                                             placeholder="YYYY-MM-DD"
                                             data-testid="inspection-closing-date"
                                             x-model="form.closingDate"

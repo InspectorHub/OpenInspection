@@ -45,7 +45,31 @@ import {
 } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 
-import { INSPECTION_TEMPLATES } from './starter-content/fixtures/templates';
+// Spec 4F + design-alignment B+C fix — the "bare" INSPECTION_TEMPLATES
+// fixture in starter-content/fixtures/templates.ts seeds section
+// scaffolding with `items: []`, which leaves users staring at templates
+// that look broken (the templates list shows "0 items" for every row).
+// Swap to the same rich JSON files TemplateSeedService.bulkSeed uses so
+// portal-onboarded tenants get the 40-item Standard Residential, the
+// 21-item Pre-Listing, the 9-item Sewer Scope, etc. Same shape (name +
+// schema), just populated. Idempotent — the loop below skips names that
+// already exist on the tenant.
+import residentialSeed         from '../data/seed-templates/residential.json';
+import preListingSeed          from '../data/seed-templates/pre-listing.json';
+import newConstructionSeed     from '../data/seed-templates/new-construction.json';
+import newConstructionFinalSeed from '../data/seed-templates/new-construction-final.json';
+import sewerScopeSeed          from '../data/seed-templates/sewer-scope.json';
+import radonSeed               from '../data/seed-templates/radon.json';
+import moldInspectionSeed      from '../data/seed-templates/mold-inspection.json';
+const INSPECTION_TEMPLATES = [
+    residentialSeed,
+    preListingSeed,
+    newConstructionSeed,
+    newConstructionFinalSeed,
+    sewerScopeSeed,
+    radonSeed,
+    moldInspectionSeed,
+] as ReadonlyArray<{ name: string; schema: unknown }>;
 import { AGREEMENT_TEMPLATE } from './starter-content/fixtures/agreement-template';
 import { CANNED_COMMENTS } from './starter-content/fixtures/canned-comments';
 import { EVENT_TYPES } from './starter-content/fixtures/event-types';
