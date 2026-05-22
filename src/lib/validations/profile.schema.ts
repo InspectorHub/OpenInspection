@@ -24,15 +24,15 @@ export const SlugSchema = z
 
 export const SetSlugRequestSchema = z
     .object({
-        slug: SlugSchema,
+        slug: SlugSchema.describe('TODO describe slug field for the OpenInspection MCP integration'),
     })
     .openapi('SetSlugRequest');
 
 export const SlugAvailabilityResponseSchema = z
     .object({
-        available: z.boolean(),
-        reason: z.enum(['taken', 'reserved', 'invalid']).optional(),
-        suggestions: z.array(z.string()).optional(),
+        available: z.boolean().describe('TODO describe available field for the OpenInspection MCP integration'),
+        reason: z.enum(['taken', 'reserved', 'invalid']).optional().describe('TODO describe reason field for the OpenInspection MCP integration'),
+        suggestions: z.array(z.string()).optional().describe('TODO describe suggestions field for the OpenInspection MCP integration'),
     })
     .openapi('SlugAvailability');
 

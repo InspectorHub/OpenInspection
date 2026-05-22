@@ -9,8 +9,8 @@
 import { z } from '@hono/zod-openapi';
 
 export const SyncQuotaSchema = z.object({
-    tenantId: z.string().min(1).max(128),
-    maxUsers: z.number().int().min(1).max(10_000),
+    tenantId: z.string().min(1).max(128).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    maxUsers: z.number().int().min(1).max(10_000).describe('TODO describe maxUsers field for the OpenInspection MCP integration'),
 }).openapi('SyncQuota');
 
 export type SyncQuotaInput = z.infer<typeof SyncQuotaSchema>;

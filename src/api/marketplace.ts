@@ -23,15 +23,15 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
         query: z.object({
-            search:   z.string().optional(),
-            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction']).optional(),
-            page:     z.coerce.number().int().min(1).optional(),
-            pageSize: z.coerce.number().int().min(1).max(100).optional(),
-        }),
+            search:   z.string().optional().describe('TODO describe search field for the OpenInspection MCP integration'),
+            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction']).optional().describe('TODO describe category field for the OpenInspection MCP integration'),
+            page:     z.coerce.number().int().min(1).optional().describe('TODO describe page field for the OpenInspection MCP integration'),
+            pageSize: z.coerce.number().int().min(1).max(100).optional().describe('TODO describe pageSize field for the OpenInspection MCP integration'),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.array(z.any()) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'OK',
         },
     },
@@ -54,10 +54,10 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["marketplace"],
     summary: 'Import marketplace template as tenant copy',
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ localTemplateId: z.string() }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ localTemplateId: z.string().describe('TODO describe localTemplateId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Imported',
         },
         404: { description: 'Not found' },
@@ -84,10 +84,10 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     summary: 'List marketplace libraries (comment packs, snippet packs)',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
-        query: z.object({ kind: z.enum(['comments', 'snippets']).optional() }),
+        query: z.object({ kind: z.enum(['comments', 'snippets']).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.array(z.any()) }) } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
     },
     operationId: "listMarketplaceLibraries",
     description: "Auto-generated placeholder for listMarketplaceLibraries (GET /libraries, marketplace domain). TODO: replace with a real description sourced from the handler."
@@ -106,17 +106,17 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["marketplace"],
     summary: 'Update tenant copy to latest marketplace version (creates new local copy)',
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean(),
+                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                 data: z.object({
-                    newLocalId: z.string(),
-                    newName: z.string(),
-                    fromSemver: z.string(),
-                    toSemver: z.string(),
-                }),
+                    newLocalId: z.string().describe('TODO describe newLocalId field for the OpenInspection MCP integration'),
+                    newName: z.string().describe('TODO describe newName field for the OpenInspection MCP integration'),
+                    fromSemver: z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
+                    toSemver: z.string().describe('TODO describe toSemver field for the OpenInspection MCP integration'),
+                }).describe('TODO describe data field for the OpenInspection MCP integration'),
             }) } },
             description: 'Updated',
         },
@@ -159,9 +159,9 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["marketplace"],
     summary: 'Import marketplace library into tenant',
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        201: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ rowCount: z.number(), localFirstId: z.string() }) }) } }, description: 'Imported' },
+        201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ rowCount: z.number().describe('TODO describe rowCount field for the OpenInspection MCP integration'), localFirstId: z.string().describe('TODO describe localFirstId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
         404: { description: 'Not found' },
     },
     operationId: "importMarketplace",
@@ -190,16 +190,16 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["marketplace"],
     summary: 'Update tenant library import to latest marketplace version (adds new rows)',
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean(),
+                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                 data: z.object({
-                    rowsAdded:  z.number(),
-                    newSemver:  z.string(),
-                    fromSemver: z.string(),
-                }),
+                    rowsAdded:  z.number().describe('TODO describe rowsAdded field for the OpenInspection MCP integration'),
+                    newSemver:  z.string().describe('TODO describe newSemver field for the OpenInspection MCP integration'),
+                    fromSemver: z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
+                }).describe('TODO describe data field for the OpenInspection MCP integration'),
             }) } },
             description: 'Updated',
         },
@@ -246,11 +246,11 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for replaceMarketplace (POST /libraries/{libraryId}/imports/replace, marketplace domain). TODO: replace with a real description sourced from the handler.",
     middleware: [requireRole(['owner', 'admin'])] as const,
     request: {
-        params: LibraryReplaceParamsSchema,
+        params: LibraryReplaceParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'application/json': {
-                    schema: LibraryReplaceBodySchema,
+                    schema: LibraryReplaceBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             required: false,
@@ -259,15 +259,15 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean(),
+                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                 data: z.object({
-                    rowsAdded:   z.number().int(),
-                    rowsDeleted: z.number().int(),
-                    fromSemver:  z.string(),
-                    toSemver:    z.string(),
-                    libraryName: z.string(),
-                    mode:        z.literal('replace'),
-                }),
+                    rowsAdded:   z.number().int().describe('TODO describe rowsAdded field for the OpenInspection MCP integration'),
+                    rowsDeleted: z.number().int().describe('TODO describe rowsDeleted field for the OpenInspection MCP integration'),
+                    fromSemver:  z.string().describe('TODO describe fromSemver field for the OpenInspection MCP integration'),
+                    toSemver:    z.string().describe('TODO describe toSemver field for the OpenInspection MCP integration'),
+                    libraryName: z.string().describe('TODO describe libraryName field for the OpenInspection MCP integration'),
+                    mode:        z.literal('replace').describe('TODO describe mode field for the OpenInspection MCP integration'),
+                }).describe('TODO describe data field for the OpenInspection MCP integration'),
             }) } },
             description: 'Replaced',
         },
@@ -314,17 +314,17 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     summary: 'List per-import history events',
     description: "Auto-generated placeholder for listMarketplaceImportsHistory (GET /imports/history, marketplace domain). TODO: replace with a real description sourced from the handler.",
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { query: ImportHistoryQuerySchema },
+    request: { query: ImportHistoryQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean(),
+                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                 data: z.object({
-                    items:    z.array(z.unknown()),
-                    page:     z.number().int(),
-                    pageSize: z.number().int(),
-                    hasMore:  z.boolean(),
-                }),
+                    items:    z.array(z.unknown()).describe('TODO describe items field for the OpenInspection MCP integration'),
+                    page:     z.number().int().describe('TODO describe page field for the OpenInspection MCP integration'),
+                    pageSize: z.number().int().describe('TODO describe pageSize field for the OpenInspection MCP integration'),
+                    hasMore:  z.boolean().describe('TODO describe hasMore field for the OpenInspection MCP integration'),
+                }).describe('TODO describe data field for the OpenInspection MCP integration'),
             }) } },
             description: 'OK',
         },

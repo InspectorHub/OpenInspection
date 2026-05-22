@@ -12,7 +12,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin'])],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ invoices: z.array(InvoiceResponseSchema) }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ invoices: z.array(InvoiceResponseSchema).describe('TODO describe invoices field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Success',
         },
     },
@@ -30,10 +30,10 @@ const createInvoiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["invoices"], summary: "Create invoice for current tenant",
     middleware: [requireRole(['owner', 'admin'])],
-    request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema } } } },
+    request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ invoice: InvoiceResponseSchema }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ invoice: InvoiceResponseSchema.describe('TODO describe invoice field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Created',
         },
     },
@@ -62,9 +62,9 @@ const markSentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-sent',
     tags: ["invoices"], summary: 'Mark invoice as sent',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Success' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Success' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markSentInvoice",
@@ -96,9 +96,9 @@ const markPaidRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-paid',
     tags: ["invoices"], summary: 'Mark invoice as paid',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Success' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Success' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markPaidInvoice",
@@ -124,9 +124,9 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["invoices"], summary: "Delete invoice for current tenant",
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteInvoice",

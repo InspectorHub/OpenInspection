@@ -30,13 +30,13 @@ const getReportsRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: "List agent my reports",
     request: {
-        query: AgentReportsQuerySchema,
+        query: AgentReportsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AgentReportsResponseSchema,
+                    schema: AgentReportsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -85,16 +85,16 @@ agentRoutes.openapi(getReportsRoute, async (c) => {
  * scoped via the same agent_tenant_links predicate as listReferrals.
  */
 const RecommendationRowSchema = z.object({
-    inspectionId:    z.string(),
-    propertyAddress: z.string(),
-    inspectionDate:  z.string(),
-    sectionTitle:    z.string(),
-    itemLabel:       z.string(),
-    defectTitle:     z.string(),
-    category:        z.enum(['safety', 'recommendation', 'maintenance']),
-    comment:         z.string(),
-    location:        z.string().nullable(),
-    photos:          z.array(z.string()),
+    inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
+    inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
+    sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
+    itemLabel:       z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
+    defectTitle:     z.string().describe('TODO describe defectTitle field for the OpenInspection MCP integration'),
+    category:        z.enum(['safety', 'recommendation', 'maintenance']).describe('TODO describe category field for the OpenInspection MCP integration'),
+    comment:         z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
+    location:        z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
+    photos:          z.array(z.string()).describe('TODO describe photos field for the OpenInspection MCP integration'),
 });
 const myRecommendationsRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -104,12 +104,12 @@ const myRecommendationsRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean(),
+                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                 data: z.object({
-                    safety:         z.array(RecommendationRowSchema),
-                    recommendation: z.array(RecommendationRowSchema),
-                    maintenance:    z.array(RecommendationRowSchema),
-                }),
+                    safety:         z.array(RecommendationRowSchema).describe('TODO describe safety field for the OpenInspection MCP integration'),
+                    recommendation: z.array(RecommendationRowSchema).describe('TODO describe recommendation field for the OpenInspection MCP integration'),
+                    maintenance:    z.array(RecommendationRowSchema).describe('TODO describe maintenance field for the OpenInspection MCP integration'),
+                }).describe('TODO describe data field for the OpenInspection MCP integration'),
             }) } },
             description: 'Success',
         },
@@ -141,7 +141,7 @@ const getLeaderboardRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: LeaderboardResponseSchema,
+                    schema: LeaderboardResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -197,11 +197,11 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: 'Update agent profile (slug + notification prefs)',
     request: {
-        body: { content: { 'application/json': { schema: AgentProfilePatchSchema } } },
+        body: { content: { 'application/json': { schema: AgentProfilePatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: AgentProfilePatchResponseSchema } },
+            content: { 'application/json': { schema: AgentProfilePatchResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Profile updated',
         },
         400: { description: 'Invalid input' },
@@ -244,11 +244,11 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     tags: ["agents"],
     summary: 'Agent submits a concierge booking on behalf of a client',
     request: {
-        body: { content: { 'application/json': { schema: ConciergeBookSchema } } },
+        body: { content: { 'application/json': { schema: ConciergeBookSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: ConciergeBookResponseSchema } },
+            content: { 'application/json': { schema: ConciergeBookResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Booking created — state machine entered',
         },
         400: { description: 'Invalid input' },

@@ -74,14 +74,14 @@ const loginRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: LoginSchema }
+                'application/json': { schema: LoginSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema }
+                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Login successful'
         },
@@ -149,14 +149,14 @@ const changePasswordRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: ChangePasswordSchema }
+                'application/json': { schema: ChangePasswordSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema }
+                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Password updated'
         },
@@ -188,14 +188,14 @@ const joinTeamRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: JoinTeamSchema }
+                'application/json': { schema: JoinTeamSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema }
+                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Team joined successfully'
         }
@@ -235,14 +235,14 @@ const forgotPasswordRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: ForgotPasswordSchema }
+                'application/json': { schema: ForgotPasswordSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema }
+                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Reset email sent (if user exists)'
         }
@@ -276,14 +276,14 @@ const resetPasswordRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: ResetPasswordSchema }
+                'application/json': { schema: ResetPasswordSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema }
+                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Password reset successful'
         }
@@ -306,14 +306,14 @@ const setupRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: SetupSchema }
+                'application/json': { schema: SetupSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             }
         }
     },
     responses: {
         200: {
             content: {
-                'application/json': { schema: AuthResponseSchema }
+                'application/json': { schema: AuthResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Success'
         },
@@ -415,7 +415,7 @@ const skipSetupRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema }
+                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Onboarding marked as skipped'
         },
@@ -450,14 +450,14 @@ const meRoute = createRoute(withMcpMetadata({
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
                         user: z.object({
-                            id: z.string(),
-                            email: z.string().optional(),
-                            tenantId: z.string().optional(),
-                            role: z.string(),
-                            onboardingState: z.record(z.string(), z.boolean()).nullable().optional(),
-                            totpEnabled: z.boolean().optional(),
-                            recoveryCodesRemaining: z.number().nullable().optional(),
-                        })
+                            id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
+                            email: z.string().optional().describe('TODO describe email field for the OpenInspection MCP integration'),
+                            tenantId: z.string().optional().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+                            role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
+                            onboardingState: z.record(z.string(), z.boolean()).nullable().optional().describe('TODO describe onboardingState field for the OpenInspection MCP integration'),
+                            totpEnabled: z.boolean().optional().describe('TODO describe totpEnabled field for the OpenInspection MCP integration'),
+                            recoveryCodesRemaining: z.number().nullable().optional().describe('TODO describe recoveryCodesRemaining field for the OpenInspection MCP integration'),
+                        }).describe('TODO describe user field for the OpenInspection MCP integration')
                     }))
                 }
             },
@@ -524,14 +524,14 @@ const updateProfileRoute = createRoute(withMcpMetadata({
                         name: z.string().max(100).optional().describe('Display name shown on dashboards, reports, and booking pages.'),
                         phone: z.string().max(30).optional().describe('Contact phone number; included on reports if set.'),
                         licenseNumber: z.string().max(50).optional().describe('Inspector license number; printed on reports as a credential.'),
-                    })
+                    }).describe('TODO describe schema field for the OpenInspection MCP integration')
                 }
             }
         }
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema } },
+            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Profile updated'
         },
         401: { description: 'Unauthorized' }
@@ -566,7 +566,7 @@ const logoutRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: {
-                'application/json': { schema: SuccessResponseSchema }
+                'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Logout successful'
         }
@@ -626,7 +626,7 @@ const totpSetupRoute = createRoute(withMcpMetadata({
     description: 'Generates a fresh TOTP secret plus recovery codes and returns the QR data URI. Caller must POST /2fa/verify before 2FA is actually enabled.',
     tags: ['auth'],
     responses: {
-        200: { content: { 'application/json': { schema: TotpSetupResponseSchema } }, description: 'Setup payload' },
+        200: { content: { 'application/json': { schema: TotpSetupResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Setup payload' },
         401: { description: 'Unauthorized' },
     }
 }, { scopes: [], tier: 'extended' }));
@@ -665,9 +665,9 @@ const totpVerifyRoute = createRoute(withMcpMetadata({
     summary: 'Activate TOTP two-factor authentication',
     description: 'Verifies the supplied TOTP code against the pending secret generated by /2fa/setup. On success, flips totpEnabled to true on the user record.',
     tags: ['auth'],
-    request: { body: { content: { 'application/json': { schema: TotpVerifySchema } } } },
+    request: { body: { content: { 'application/json': { schema: TotpVerifySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: '2FA enabled' },
+        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: '2FA enabled' },
         400: { description: 'Invalid code or no pending secret' },
         401: { description: 'Unauthorized' },
     }
@@ -697,9 +697,9 @@ const totpDisableRoute = createRoute(withMcpMetadata({
     summary: 'Disable TOTP two-factor authentication',
     description: 'Requires both the current password and a valid TOTP or recovery code to disable 2FA. Wipes all 2FA state (secret, enabled flag, recovery codes).',
     tags: ['auth'],
-    request: { body: { content: { 'application/json': { schema: TotpDisableSchema } } } },
+    request: { body: { content: { 'application/json': { schema: TotpDisableSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: '2FA disabled' },
+        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: '2FA disabled' },
         400: { description: 'Invalid input' },
         401: { description: 'Unauthorized — wrong password or code' },
     }
@@ -745,9 +745,9 @@ const totpRegenRoute = createRoute(withMcpMetadata({
     summary: 'Regenerate 2FA recovery codes',
     description: 'Invalidates all existing 2FA recovery codes and returns a fresh set of eight. Requires the current password plus a valid TOTP or recovery code.',
     tags: ['auth'],
-    request: { body: { content: { 'application/json': { schema: TotpRegenerateSchema } } } },
+    request: { body: { content: { 'application/json': { schema: TotpRegenerateSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: TotpSetupResponseSchema } }, description: 'New recovery codes' },
+        200: { content: { 'application/json': { schema: TotpSetupResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'New recovery codes' },
         401: { description: 'Unauthorized' },
     }
 }, { scopes: [], tier: 'extended' }));
@@ -795,9 +795,9 @@ const login2faRoute = createRoute(withMcpMetadata({
     description: 'Exchanges a short-lived 2FA challenge token plus TOTP or recovery code for a full session cookie. The challenge token is issued by /login when 2FA is enabled.',
     tags: ['auth', 'public'],
     middleware: [requireCsrfToken],
-    request: { body: { content: { 'application/json': { schema: TotpLoginSchema } } } },
+    request: { body: { content: { 'application/json': { schema: TotpLoginSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: Login2faResponseSchema } }, description: 'Login complete' },
+        200: { content: { 'application/json': { schema: Login2faResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Login complete' },
         401: { description: 'Invalid or expired challenge / code' },
     }
 }, { scopes: [], tier: 'excluded' }));

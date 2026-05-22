@@ -26,12 +26,12 @@ const shareTokenRoute = createRoute(withMcpMetadata({
     path: '/inspections/{id}/share-token',
     tags: ["inspections", "public"],
     summary: 'Mint a 30-day view-only share token (customer-initiated)',
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                success: z.boolean(),
-                data: z.object({ token: z.string(), url: z.string() }),
+                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+                data: z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
             }) } },
             description: 'Share URL minted',
         },

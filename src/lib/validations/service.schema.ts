@@ -2,73 +2,73 @@ import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
 
 export const ServiceSchema = z.object({
-    id:              z.string(),
-    tenantId:        z.string(),
-    name:            z.string(),
-    description:     z.string().nullable(),
-    price:           z.number().int(),
-    durationMinutes: z.number().int().nullable(),
-    templateId:      z.string().nullable(),
-    agreementId:     z.string().nullable(),
-    active:          z.boolean(),
-    sortOrder:       z.number().int(),
-    createdAt:       z.string().nullable(),
+    id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
+    tenantId:        z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
+    description:     z.string().nullable().describe('TODO describe description field for the OpenInspection MCP integration'),
+    price:           z.number().int().describe('TODO describe price field for the OpenInspection MCP integration'),
+    durationMinutes: z.number().int().nullable().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
+    templateId:      z.string().nullable().describe('TODO describe templateId field for the OpenInspection MCP integration'),
+    agreementId:     z.string().nullable().describe('TODO describe agreementId field for the OpenInspection MCP integration'),
+    active:          z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
+    sortOrder:       z.number().int().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
+    createdAt:       z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }).openapi('Service');
 
 export const CreateServiceSchema = z.object({
-    name:            z.string().min(1).max(200),
-    description:     z.string().max(1000).optional(),
-    price:           z.number().int().min(0),
-    durationMinutes: z.number().int().min(0).optional(),
-    templateId:      z.string().optional(),
-    agreementId:     z.string().optional(),
-    sortOrder:       z.number().int().optional(),
+    name:            z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
+    description:     z.string().max(1000).optional().describe('TODO describe description field for the OpenInspection MCP integration'),
+    price:           z.number().int().min(0).describe('TODO describe price field for the OpenInspection MCP integration'),
+    durationMinutes: z.number().int().min(0).optional().describe('TODO describe durationMinutes field for the OpenInspection MCP integration'),
+    templateId:      z.string().optional().describe('TODO describe templateId field for the OpenInspection MCP integration'),
+    agreementId:     z.string().optional().describe('TODO describe agreementId field for the OpenInspection MCP integration'),
+    sortOrder:       z.number().int().optional().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
 }).openapi('CreateService');
 
 export const UpdateServiceSchema = CreateServiceSchema.partial().extend({
-    active: z.boolean().optional(),
+    active: z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
 }).openapi('UpdateService');
 
 export const DiscountCodeSchema = z.object({
-    id:         z.string(),
-    tenantId:   z.string(),
-    code:       z.string(),
-    type:       z.enum(['fixed', 'percent']),
-    value:      z.number().int(),
-    maxUses:    z.number().int().nullable(),
-    usesCount:  z.number().int(),
-    expiresAt:  z.string().nullable(),
-    active:     z.boolean(),
-    createdAt:  z.string().nullable(),
+    id:         z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
+    tenantId:   z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    code:       z.string().describe('TODO describe code field for the OpenInspection MCP integration'),
+    type:       z.enum(['fixed', 'percent']).describe('TODO describe type field for the OpenInspection MCP integration'),
+    value:      z.number().int().describe('TODO describe value field for the OpenInspection MCP integration'),
+    maxUses:    z.number().int().nullable().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
+    usesCount:  z.number().int().describe('TODO describe usesCount field for the OpenInspection MCP integration'),
+    expiresAt:  z.string().nullable().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
+    active:     z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
+    createdAt:  z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }).openapi('DiscountCode');
 
 export const CreateDiscountCodeSchema = z.object({
-    code:      z.string().min(1).max(50),
-    type:      z.enum(['fixed', 'percent']),
-    value:     z.number().int().min(1),
-    maxUses:   z.number().int().min(1).optional(),
-    expiresAt: z.string().datetime().optional(),
+    code:      z.string().min(1).max(50).describe('TODO describe code field for the OpenInspection MCP integration'),
+    type:      z.enum(['fixed', 'percent']).describe('TODO describe type field for the OpenInspection MCP integration'),
+    value:     z.number().int().min(1).describe('TODO describe value field for the OpenInspection MCP integration'),
+    maxUses:   z.number().int().min(1).optional().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
+    expiresAt: z.string().datetime().optional().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
 }).openapi('CreateDiscountCode');
 
 export const UpdateDiscountCodeSchema = z.object({
-    code:      z.string().min(1).max(50).optional(),
-    type:      z.enum(['fixed', 'percent']).optional(),
-    value:     z.number().int().min(0).optional(),
-    maxUses:   z.number().int().min(0).nullable().optional(),
-    expiresAt: z.string().nullable().optional(),
-    active:    z.boolean().optional(),
+    code:      z.string().min(1).max(50).optional().describe('TODO describe code field for the OpenInspection MCP integration'),
+    type:      z.enum(['fixed', 'percent']).optional().describe('TODO describe type field for the OpenInspection MCP integration'),
+    value:     z.number().int().min(0).optional().describe('TODO describe value field for the OpenInspection MCP integration'),
+    maxUses:   z.number().int().min(0).nullable().optional().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
+    expiresAt: z.string().nullable().optional().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
+    active:    z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
 }).openapi('UpdateDiscountCode');
 
 export const ValidateDiscountSchema = z.object({
-    code:     z.string().min(1),
-    subtotal: z.number().int().min(0),
+    code:     z.string().min(1).describe('TODO describe code field for the OpenInspection MCP integration'),
+    subtotal: z.number().int().min(0).describe('TODO describe subtotal field for the OpenInspection MCP integration'),
 }).openapi('ValidateDiscount');
 
 export const ValidateDiscountResponseSchema = z.object({
-    valid:          z.boolean(),
-    discountAmount: z.number().int(),
-    discountCodeId: z.string().nullable(),
-    message:        z.string().optional(),
+    valid:          z.boolean().describe('TODO describe valid field for the OpenInspection MCP integration'),
+    discountAmount: z.number().int().describe('TODO describe discountAmount field for the OpenInspection MCP integration'),
+    discountCodeId: z.string().nullable().describe('TODO describe discountCodeId field for the OpenInspection MCP integration'),
+    message:        z.string().optional().describe('TODO describe message field for the OpenInspection MCP integration'),
 }).openapi('ValidateDiscountResponse');
 
 export const ServiceListResponseSchema = createApiResponseSchema(z.array(ServiceSchema));

@@ -59,7 +59,7 @@ const exportDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AdminExportResponseSchema,
+                    schema: AdminExportResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -92,7 +92,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: InviteMemberSchema,
+                    schema: InviteMemberSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -101,7 +101,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: InviteResponseSchema,
+                    schema: InviteResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Created',
@@ -141,11 +141,11 @@ const importDataRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        inspections: z.array(z.record(z.string(), z.unknown())).optional(),
-                        templates: z.array(z.record(z.string(), z.unknown())).optional(),
-                        agreements: z.array(z.record(z.string(), z.unknown())).optional(),
-                        inspectionResults: z.array(z.record(z.string(), z.unknown())).optional(),
-                    }),
+                        inspections: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe inspections field for the OpenInspection MCP integration'),
+                        templates: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe templates field for the OpenInspection MCP integration'),
+                        agreements: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe agreements field for the OpenInspection MCP integration'),
+                        inspectionResults: z.array(z.record(z.string(), z.unknown())).optional().describe('TODO describe inspectionResults field for the OpenInspection MCP integration'),
+                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -154,7 +154,7 @@ const importDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: ImportResponseSchema,
+                    schema: ImportResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -268,7 +268,7 @@ const listMembersRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: MemberListResponseSchema,
+                    schema: MemberListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -305,7 +305,7 @@ const listAgreementsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AgreementListResponseSchema,
+                    schema: AgreementListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -331,7 +331,7 @@ const createAgreementRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: AgreementSchema,
+                    schema: AgreementSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -340,7 +340,7 @@ const createAgreementRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: AgreementResponseSchema,
+                    schema: AgreementResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Created',
@@ -365,11 +365,11 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
     summary: "Update tenant agreement for current tenant",
     middleware: [requireRole(['owner', 'admin'])],
     request: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'application/json': {
-                    schema: AgreementSchema.partial(),
+                    schema: AgreementSchema.partial().describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -378,7 +378,7 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: AgreementResponseSchema,
+                    schema: AgreementResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -404,13 +404,13 @@ const deleteAgreementRoute = createRoute(withMcpMetadata({
     summary: "Delete tenant agreement for current tenant",
     middleware: [requireRole(['owner', 'admin'])],
     request: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema,
+                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -439,17 +439,17 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin'])],
     request: {
         query: z.object({
-            limit: z.string().optional(),
-            cursor: z.string().optional(),
-            action: z.string().optional(),
-            entityType: z.string().optional(),
-        }),
+            limit: z.string().optional().describe('TODO describe limit field for the OpenInspection MCP integration'),
+            cursor: z.string().optional().describe('TODO describe cursor field for the OpenInspection MCP integration'),
+            action: z.string().optional().describe('TODO describe action field for the OpenInspection MCP integration'),
+            entityType: z.string().optional().describe('TODO describe entityType field for the OpenInspection MCP integration'),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AuditLogResponseSchema,
+                    schema: AuditLogResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -505,18 +505,18 @@ const postAuditLogRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        action:       InspectorAuditActionSchema,
-                        resourceType: z.string().min(1).max(64),
-                        resourceId:   z.string().min(1).max(128),
-                        detail:       z.record(z.string(), z.unknown()).optional(),
-                    }),
+                        action:       InspectorAuditActionSchema.describe('TODO describe action field for the OpenInspection MCP integration'),
+                        resourceType: z.string().min(1).max(64).describe('TODO describe resourceType field for the OpenInspection MCP integration'),
+                        resourceId:   z.string().min(1).max(128).describe('TODO describe resourceId field for the OpenInspection MCP integration'),
+                        detail:       z.record(z.string(), z.unknown()).optional().describe('TODO describe detail field for the OpenInspection MCP integration'),
+                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SuccessResponseSchema } },
+            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Recorded',
         },
     },
@@ -546,7 +546,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: DataErasureSchema,
+                    schema: DataErasureSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -555,7 +555,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: EraseDataResponseSchema,
+                    schema: EraseDataResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -591,7 +591,7 @@ const getBrandingRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: BrandingResponseSchema,
+                    schema: BrandingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -635,7 +635,7 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: UpdateBrandingSchema,
+                    schema: UpdateBrandingSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -644,7 +644,7 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: BrandingResponseSchema,
+                    schema: BrandingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -686,8 +686,8 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
             content: {
                 'multipart/form-data': {
                     schema: z.object({
-                        logo: z.any().openapi({ type: 'string', format: 'binary' }),
-                    }),
+                        logo: z.any().openapi({ type: 'string', format: 'binary' }).describe('TODO describe logo field for the OpenInspection MCP integration'),
+                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -696,7 +696,7 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.boolean(), logoUrl: z.string() }),
+                    schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), logoUrl: z.string().describe('TODO describe logoUrl field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -719,17 +719,17 @@ adminRoutes.openapi(uploadLogoRoute, async (c) => {
 // ─── Integration Config & Secrets ────────────────────────────────────────────
 
 const IntegrationConfigSchema = z.object({
-    appBaseUrl: z.string().optional(),
-    turnstileSiteKey: z.string().optional(),
-    googleClientId: z.string().optional(),
+    appBaseUrl: z.string().optional().describe('TODO describe appBaseUrl field for the OpenInspection MCP integration'),
+    turnstileSiteKey: z.string().optional().describe('TODO describe turnstileSiteKey field for the OpenInspection MCP integration'),
+    googleClientId: z.string().optional().describe('TODO describe googleClientId field for the OpenInspection MCP integration'),
 }).openapi('IntegrationConfig');
 
 const SecretsInputSchema = z.object({
-    resendApiKey: z.string().optional(),
-    senderEmail: z.string().optional(),
-    turnstileSecretKey: z.string().optional(),
-    geminiApiKey: z.string().optional(),
-    googleClientSecret: z.string().optional(),
+    resendApiKey: z.string().optional().describe('TODO describe resendApiKey field for the OpenInspection MCP integration'),
+    senderEmail: z.string().optional().describe('TODO describe senderEmail field for the OpenInspection MCP integration'),
+    turnstileSecretKey: z.string().optional().describe('TODO describe turnstileSecretKey field for the OpenInspection MCP integration'),
+    geminiApiKey: z.string().optional().describe('TODO describe geminiApiKey field for the OpenInspection MCP integration'),
+    googleClientSecret: z.string().optional().describe('TODO describe googleClientSecret field for the OpenInspection MCP integration'),
 }).openapi('SecretsInput');
 
 const getConfigRoute = createRoute(withMcpMetadata({
@@ -740,7 +740,7 @@ const getConfigRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner'])],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.object({ integrationConfig: IntegrationConfigSchema, secrets: z.record(z.string(), z.string()) }) }).openapi('ConfigResponse') } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ integrationConfig: IntegrationConfigSchema.describe('TODO describe integrationConfig field for the OpenInspection MCP integration'), secrets: z.record(z.string(), z.string()).describe('TODO describe secrets field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }).openapi('ConfigResponse') } },
             description: 'Success',
         },
     },
@@ -764,9 +764,9 @@ const updateIntegrationConfigRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Save non-sensitive integration config (plaintext)',
     middleware: [requireRole(['owner'])],
-    request: { body: { content: { 'application/json': { schema: IntegrationConfigSchema } } } },
+    request: { body: { content: { 'application/json': { schema: IntegrationConfigSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Saved' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Saved' },
     },
     operationId: "createTenantConfig",
     description: "Auto-generated placeholder for createTenantConfig (POST /config, admin domain). TODO: replace with a real description sourced from the handler."
@@ -785,9 +785,9 @@ const updateSecretsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: "Create tenant config secrets",
     middleware: [requireRole(['owner'])],
-    request: { body: { content: { 'application/json': { schema: SecretsInputSchema } } } },
+    request: { body: { content: { 'application/json': { schema: SecretsInputSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'Saved' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Saved' },
     },
     operationId: "createTenantConfigSecrets",
     description: "Auto-generated placeholder for createTenantConfigSecrets (POST /config/secrets, admin domain). TODO: replace with a real description sourced from the handler."
@@ -808,10 +808,10 @@ const sendAgreementRoute = createRoute(withMcpMetadata({
     tags: ["admin", "agreements"],
     summary: 'Send an agreement signing request to a client',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { body: { content: { 'application/json': { schema: SendAgreementSchema } } } },
+    request: { body: { content: { 'application/json': { schema: SendAgreementSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ token: z.string(), signUrl: z.string() }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), signUrl: z.string().describe('TODO describe signUrl field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Signing request created and email sent',
         },
     },
@@ -922,7 +922,7 @@ const listSigningRequestsRoute = createRoute(withMcpMetadata({
     summary: 'List signing requests for tenant',
     middleware: [requireRole(['owner', 'admin'])],
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ requests: z.array(z.unknown()) }) }) } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ requests: z.array(z.unknown()).describe('TODO describe requests field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
     },
     operationId: "listTenantAgreementsRequests",
     description: "Auto-generated placeholder for listTenantAgreementsRequests (GET /agreements/requests, admin domain). TODO: replace with a real description sourced from the handler."
@@ -958,10 +958,10 @@ const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Get a signing request with full audit trail',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.unknown() }) } }, description: 'OK' },
-        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.unknown() }) } }, description: 'Not found' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.unknown().describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
+        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'), error: z.unknown().describe('TODO describe error field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Not found' },
     },
     operationId: "getTenantAgreementsRequest",
     description: "Auto-generated placeholder for getTenantAgreementsRequest (GET /agreements/requests/{id}, admin domain). TODO: replace with a real description sourced from the handler."
@@ -1019,9 +1019,9 @@ const downloadAuditTrailRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Download audit trail JSON for legal evidence',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: z.unknown() } }, description: 'Audit JSON download' },
+        200: { content: { 'application/json': { schema: z.unknown().describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Audit JSON download' },
     },
     operationId: "listTenantAgreementsRequestsAuditTrail",
     description: "Auto-generated placeholder for listTenantAgreementsRequestsAuditTrail (GET /agreements/requests/{id}/audit-trail, admin domain). TODO: replace with a real description sourced from the handler."
@@ -1097,10 +1097,10 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     // Inspectors need read access so the inspection-edit picker (T7+1) can
     // populate. Create/delete remain admin-only further below.
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
-    request: { query: ListCommentsQuerySchema },
+    request: { query: ListCommentsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comments: z.array(CommentResponseSchema) }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comments: z.array(CommentResponseSchema).describe('TODO describe comments field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Success',
         },
     },
@@ -1133,10 +1133,10 @@ const createCommentRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Create a comment library entry',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { body: { content: { 'application/json': { schema: CommentSchema } } } },
+    request: { body: { content: { 'application/json': { schema: CommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comment: CommentResponseSchema }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comment: CommentResponseSchema.describe('TODO describe comment field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Created',
         },
     },
@@ -1170,10 +1170,10 @@ const deleteCommentRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Delete a comment library entry',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean() }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Deleted',
         },
         404: { description: 'Not found' },
@@ -1201,12 +1201,12 @@ const updateCommentRoute = createRoute(withMcpMetadata({
     summary: 'Update a comment library entry',
     middleware: [requireRole(['owner', 'admin'])],
     request: {
-        params: z.object({ id: z.string().uuid() }),
-        body: { content: { 'application/json': { schema: UpdateCommentSchema } } },
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: UpdateCommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ comment: CommentResponseSchema }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comment: CommentResponseSchema.describe('TODO describe comment field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Updated',
         },
         404: { description: 'Not found' },
@@ -1256,7 +1256,7 @@ const getWidgetOriginsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin'])],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ origins: z.array(z.string()) }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ origins: z.array(z.string()).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Success',
         },
     },
@@ -1276,10 +1276,10 @@ const setWidgetOriginsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Replace widget allowed-origin list',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { body: { content: { 'application/json': { schema: z.object({ origins: z.array(z.string().min(1)).max(50) }) } } } },
+    request: { body: { content: { 'application/json': { schema: z.object({ origins: z.array(z.string().min(1)).max(50).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ origins: z.array(z.string()) }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ origins: z.array(z.string()).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Saved',
         },
     },
@@ -1304,7 +1304,7 @@ const getStripeConnectRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin'])],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.string().nullable() }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.string().nullable().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Success',
         },
     },
@@ -1324,10 +1324,10 @@ const setStripeConnectRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Set the tenant Stripe Connect account ID',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { body: { content: { 'application/json': { schema: StripeConnectAccountSchema } } } },
+    request: { body: { content: { 'application/json': { schema: StripeConnectAccountSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.string() }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.string().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Saved',
         },
     },
@@ -1351,7 +1351,7 @@ const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin'])],
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ accountId: z.null() }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.null().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Cleared',
         },
     },
@@ -1379,12 +1379,12 @@ const getEarningsSummaryRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true),
+                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
                         data: z.object({
-                            paid: z.number(),
-                            pending: z.number(),
-                            count: z.number(),
-                        }),
+                            paid: z.number().describe('TODO describe paid field for the OpenInspection MCP integration'),
+                            pending: z.number().describe('TODO describe pending field for the OpenInspection MCP integration'),
+                            count: z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
+                        }).describe('TODO describe data field for the OpenInspection MCP integration'),
                     }),
                 },
             },
@@ -1414,8 +1414,8 @@ const icsTokenRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true),
-                        data: z.object({ url: z.string() }),
+                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        data: z.object({ url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
                     }),
                 },
             },
@@ -1467,16 +1467,18 @@ adminRoutes.openapi(icsTokenRoute, async (c) => {
  * Auth: PORTAL_M2M_SECRET via Authorization: Bearer.
  * Use case: existing tenants that pre-date Spec 4F's auto-seed-on-tenant-init hook.
  */
-adminRoutes.openapi({
+adminRoutes.openapi(withMcpMetadata({
     method: 'post',
     path: '/backfill-default-templates',
-    tags: ['Admin'],
-    summary: 'Backfill default 7 templates for every tenant (one-shot, idempotent)',
+    operationId: 'backfillDefaultTemplates',
+    tags: ['sysadmin'],
+    summary: 'Backfill default templates across all tenants',
+    description: 'M2M one-shot endpoint that seeds the default 7 templates for every tenant. Idempotent — TemplateSeedService.bulkSeed skips templates that already exist by name per tenant.',
     responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
         401: { description: 'Unauthorized' },
     },
-}, async (c) => {
+}, { scopes: [], tier: 'excluded' }), async (c) => {
     if (!verifyM2mAuth(c.req.header('authorization'), c.env as unknown as Record<string, string | undefined>)) {
         throw Errors.Unauthorized();
     }
@@ -1515,7 +1517,7 @@ const getAttentionThresholdsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin'])] as const,
     responses: {
         200: {
-            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Success',
         },
     },
@@ -1540,10 +1542,10 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: "Patch tenant attention threshold",
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema } } } },
+    request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: AttentionThresholdsResponseSchema } },
+            content: { 'application/json': { schema: AttentionThresholdsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Success',
         },
     },
@@ -1594,7 +1596,7 @@ const getDashboardColumnsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     responses: {
         200: {
-            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Success',
         },
     },
@@ -1614,10 +1616,10 @@ const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Update tenant default dashboard column prefs',
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema } } } },
+    request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema } },
+            content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Success',
         },
     },
@@ -1640,12 +1642,12 @@ adminRoutes.openapi(updateDashboardColumnsRoute, async (c) => {
 // the settings UI surfaces directly. Currently only `conciergeReviewRequired`.
 // Adding more keys here in the future stays a one-line allowlist change.
 const TenantConfigPatchSchema = z.object({
-    conciergeReviewRequired: z.boolean().optional(),
+    conciergeReviewRequired: z.boolean().optional().describe('TODO describe conciergeReviewRequired field for the OpenInspection MCP integration'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
-    success: z.boolean(),
-    data: z.object({ ok: z.literal(true) }),
+    success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+    data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
 }).openapi('TenantConfigPatchResponse');
 
 const tenantConfigPatchRoute = createRoute(withMcpMetadata({
@@ -1654,10 +1656,10 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
     tags: ["admin"],
     summary: 'Patch a small allowlist of tenant_configs columns',
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema } } } },
+    request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: TenantConfigPatchResponseSchema } },
+            content: { 'application/json': { schema: TenantConfigPatchResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Updated',
         },
     },
@@ -1693,18 +1695,20 @@ adminRoutes.openapi(tenantConfigPatchRoute, async (c) => {
  *
  * Auth: `Authorization: Bearer <PORTAL_M2M_SECRET>` (or any active V<N>).
  */
-adminRoutes.openapi({
+adminRoutes.openapi(withMcpMetadata({
     method: 'post',
     path: '/sync-quota',
-    tags: ['Admin'],
-    summary: 'M2M — set tenant seat quota (max_users)',
-    request: { body: { content: { 'application/json': { schema: SyncQuotaSchema } } } },
+    operationId: 'syncTenantSeatQuota',
+    tags: ['sysadmin'],
+    summary: 'Sync tenant seat quota from portal',
+    description: 'M2M endpoint called by the portal whenever a tenant\'s subscription seat count changes. Updates the tenant\'s max_users column so InviteService.claim sees the new cap on the next request.',
+    request: { body: { content: { 'application/json': { schema: SyncQuotaSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
         401: { description: 'Unauthorized' },
         404: { description: 'Tenant not found' },
     },
-}, async (c) => {
+}, { scopes: [], tier: 'excluded' }), async (c) => {
     if (!verifyM2mAuth(c.req.header('authorization'), c.env as unknown as Record<string, string | undefined>)) {
         throw Errors.Unauthorized();
     }
@@ -1741,21 +1745,23 @@ adminRoutes.openapi({
  * Auth: `Authorization: Bearer <PORTAL_M2M_SECRET>` (or any active V<N>);
  * matches the other portal → core M2M endpoints in this file.
  */
-adminRoutes.openapi({
+adminRoutes.openapi(withMcpMetadata({
     method: 'post',
     path: '/seed-starter-content',
-    tags: ['Admin'],
-    summary: 'M2M — seed starter content into a newly-provisioned tenant',
-    request: { body: { content: { 'application/json': { schema: SeedStarterContentBodySchema } } } },
+    operationId: 'seedStarterContentForTenant',
+    tags: ['sysadmin'],
+    summary: 'Seed starter content into newly-provisioned tenant',
+    description: 'M2M endpoint invoked by the portal\'s OnboardingWorkflow once a tenant is provisioned. Seeds initial templates, agreements, rating-systems, and marketplace defaults. Idempotent — safe to retry.',
+    request: { body: { content: { 'application/json': { schema: SeedStarterContentBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: SeedStarterContentResponseSchema } },
+            content: { 'application/json': { schema: SeedStarterContentResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Seed counts (zero on idempotent re-run)',
         },
         401: { description: 'Unauthorized' },
         404: { description: 'Tenant not found' },
     },
-}, async (c) => {
+}, { scopes: [], tier: 'excluded' }), async (c) => {
     if (!verifyM2mAuth(c.req.header('authorization'), c.env as unknown as Record<string, string | undefined>)) {
         throw Errors.Unauthorized();
     }

@@ -9,12 +9,12 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 const messageRoutes = new OpenAPIHono<HonoConfig>();
 
 const AttachmentSchema = z.object({
-    id: z.string(),
-    key: z.string(),
-    name: z.string(),
-    size: z.number(),
-    type: z.string(),
-    uploadedAt: z.number(),
+    id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
+    key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
+    name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
+    size: z.number().describe('TODO describe size field for the OpenInspection MCP integration'),
+    type: z.string().describe('TODO describe type field for the OpenInspection MCP integration'),
+    uploadedAt: z.number().describe('TODO describe uploadedAt field for the OpenInspection MCP integration'),
 });
 
 // GET /api/messages/inspections/{inspectionId} — list inspector view
@@ -23,11 +23,11 @@ const listRoute = createRoute(withMcpMetadata({
     path: '/inspections/{inspectionId}',
     tags: ["messages"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ inspectionId: z.string() }) },
+    request: { params: z.object({ inspectionId: z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.boolean(),
-            data: z.object({ messages: z.array(z.any()), token: z.string().nullable() }),
+            success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+            data: z.object({ messages: z.array(z.any()).describe('TODO describe messages field for the OpenInspection MCP integration'), token: z.string().nullable().describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
         }) } }, description: 'OK' },
         401: { description: 'Unauthorized' },
     },
@@ -56,14 +56,14 @@ const sendRoute = createRoute(withMcpMetadata({
     tags: ["messages"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
-        params: z.object({ inspectionId: z.string() }),
+        params: z.object({ inspectionId: z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: z.object({
-            body: z.string().min(1).max(5000),
-            attachments: z.array(AttachmentSchema).max(5).optional(),
-        }) } } },
+            body: z.string().min(1).max(5000).describe('TODO describe body field for the OpenInspection MCP integration'),
+            attachments: z.array(AttachmentSchema).max(5).optional().describe('TODO describe attachments field for the OpenInspection MCP integration'),
+        }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        201: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.any() }) } }, description: 'Created' },
+        201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.any().describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
         401: { description: 'Unauthorized' },
     },
     operationId: "createMessageInspection",
@@ -101,8 +101,8 @@ const unreadRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.boolean(),
-            data: z.object({ count: z.number() }),
+            success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+            data: z.object({ count: z.number().describe('TODO describe count field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
         }) } }, description: 'OK' },
         401: { description: 'Unauthorized' },
     },
@@ -123,11 +123,11 @@ const publicListRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/public/{token}',
     tags: ["messages"],
-    request: { params: z.object({ token: z.string() }) },
+    request: { params: z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.boolean(),
-            data: z.object({ messages: z.array(z.any()), inspection: z.any() }),
+            success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+            data: z.object({ messages: z.array(z.any()).describe('TODO describe messages field for the OpenInspection MCP integration'), inspection: z.any().describe('TODO describe inspection field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
         }) } }, description: 'OK' },
         404: { description: 'Not found' },
     },
@@ -154,14 +154,14 @@ const publicSendRoute = createRoute(withMcpMetadata({
     path: '/public/{token}',
     tags: ["messages"],
     request: {
-        params: z.object({ token: z.string() }),
+        params: z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: z.object({
-            body: z.string().min(1).max(5000),
-            attachments: z.array(AttachmentSchema).max(5).optional(),
-        }) } } },
+            body: z.string().min(1).max(5000).describe('TODO describe body field for the OpenInspection MCP integration'),
+            attachments: z.array(AttachmentSchema).max(5).optional().describe('TODO describe attachments field for the OpenInspection MCP integration'),
+        }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        201: { content: { 'application/json': { schema: z.object({ success: z.boolean(), data: z.any() }) } }, description: 'Created' },
+        201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.any().describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
         404: { description: 'Not found' },
     },
     operationId: "createMessagePublic",
@@ -199,11 +199,11 @@ const uploadRoute = createRoute(withMcpMetadata({
     path: '/inspections/{inspectionId}/upload',
     tags: ["messages"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ inspectionId: z.string() }) },
+    request: { params: z.object({ inspectionId: z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.boolean(),
-            data: z.object({ id: z.string(), key: z.string(), name: z.string(), size: z.number(), type: z.string(), uploadedAt: z.number() }),
+            success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+            data: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'), key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'), size: z.number().describe('TODO describe size field for the OpenInspection MCP integration'), type: z.string().describe('TODO describe type field for the OpenInspection MCP integration'), uploadedAt: z.number().describe('TODO describe uploadedAt field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
         }) } }, description: 'OK' },
     },
     operationId: "uploadMessage",
@@ -233,11 +233,11 @@ const publicUploadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/public/{token}/upload',
     tags: ["messages"],
-    request: { params: z.object({ token: z.string() }) },
+    request: { params: z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.boolean(),
-            data: z.object({ id: z.string(), key: z.string(), name: z.string(), size: z.number(), type: z.string(), uploadedAt: z.number() }),
+            success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+            data: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'), key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'), size: z.number().describe('TODO describe size field for the OpenInspection MCP integration'), type: z.string().describe('TODO describe type field for the OpenInspection MCP integration'), uploadedAt: z.number().describe('TODO describe uploadedAt field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
         }) } }, description: 'OK' },
         404: { description: 'Not found' },
     },

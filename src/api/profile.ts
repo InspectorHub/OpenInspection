@@ -17,11 +17,11 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 const app = new OpenAPIHono<HonoConfig>();
 
 const SlugConflictResponseSchema = z.object({
-    success: z.literal(false),
+    success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'),
     error: z.object({
-        message: z.string(),
-        code: z.string(),
-        details: z.object({ suggestions: z.array(z.string()).optional() }).optional(),
+        message: z.string().describe('TODO describe message field for the OpenInspection MCP integration'),
+        code: z.string().describe('TODO describe code field for the OpenInspection MCP integration'),
+        details: z.object({ suggestions: z.array(z.string()).optional().describe('TODO describe suggestions field for the OpenInspection MCP integration') }).optional().describe('TODO describe details field for the OpenInspection MCP integration'),
     }),
 });
 
@@ -35,7 +35,7 @@ const setSlugRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'application/json': { schema: SetSlugRequestSchema },
+                'application/json': { schema: SetSlugRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') },
             },
         },
     },
@@ -43,14 +43,14 @@ const setSlugRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ slug: z.string() })),
+                    schema: createApiResponseSchema(z.object({ slug: z.string().describe('TODO describe slug field for the OpenInspection MCP integration') })),
                 },
             },
             description: 'Slug saved',
         },
         409: {
             content: {
-                'application/json': { schema: SlugConflictResponseSchema },
+                'application/json': { schema: SlugConflictResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') },
             },
             description: 'Slug conflict',
         },
@@ -100,7 +100,7 @@ const photoUploadRoute = createRoute(withMcpMetadata({
     request: {
         body: {
             content: {
-                'multipart/form-data': { schema: z.object({ photo: z.any().describe('Profile photo file — jpg, png, or webp; max 2 MB.') }) },
+                'multipart/form-data': { schema: z.object({ photo: z.any().describe('Profile photo file — jpg, png, or webp; max 2 MB.') }).describe('TODO describe schema field for the OpenInspection MCP integration') },
             },
         },
     },
@@ -108,7 +108,7 @@ const photoUploadRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ photoUrl: z.string() })),
+                    schema: createApiResponseSchema(z.object({ photoUrl: z.string().describe('TODO describe photoUrl field for the OpenInspection MCP integration') })),
                 },
             },
             description: 'Uploaded',
@@ -169,7 +169,7 @@ const detailsRoute = createRoute(withMcpMetadata({
     description: 'Updates the inspector\'s public-facing bio and service-area list. Both fields are optional; missing keys leave existing values unchanged.',
     request: {
         body: {
-            content: { 'application/json': { schema: ProfileDetailsSchema } },
+            content: { 'application/json': { schema: ProfileDetailsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
         },
     },
     responses: {

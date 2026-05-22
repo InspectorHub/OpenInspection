@@ -26,7 +26,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 const tagsRoutes = new OpenAPIHono<HonoConfig>();
 
-const IdParamSchema = z.object({ id: z.string().min(1) });
+const IdParamSchema = z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') });
 
 /* ── GET /api/tags ────────────────────────────────────────────────────── */
 tagsRoutes.openapi(createRoute(withMcpMetadata({
@@ -35,7 +35,7 @@ tagsRoutes.openapi(createRoute(withMcpMetadata({
     summary: 'List tags for the current tenant (seed + custom)',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     responses: {
-        200: { content: { 'application/json': { schema: TagListResponseSchema } }, description: 'List' },
+        200: { content: { 'application/json': { schema: TagListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
     },
     operationId: "listTags",
     description: "Auto-generated placeholder for listTags (GET /, tags domain). TODO: replace with a real description sourced from the handler."
@@ -53,9 +53,9 @@ tagsRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["tags"],
     summary: 'Create a custom tag',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { body: { content: { 'application/json': { schema: CreateTagSchema } } } },
+    request: { body: { content: { 'application/json': { schema: CreateTagSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: TagSingleResponseSchema } }, description: 'Created' },
+        200: { content: { 'application/json': { schema: TagSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
     },
     operationId: "createTag",
     description: "Auto-generated placeholder for createTag (POST /, tags domain). TODO: replace with a real description sourced from the handler."
@@ -73,11 +73,11 @@ tagsRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["tags"],
     middleware: [requireRole(['owner', 'admin'])] as const,
     request: {
-        params: IdParamSchema,
-        body: { content: { 'application/json': { schema: UpdateTagSchema } } },
+        params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: UpdateTagSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: TagSingleResponseSchema } }, description: 'Updated' },
+        200: { content: { 'application/json': { schema: TagSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Updated' },
     },
     operationId: "replaceTag",
     summary: "Replace tag for current tenant",
@@ -101,14 +101,14 @@ tagsRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["tags"],
     summary: 'List inspections that have any item tagged with this tag',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: IdParamSchema },
+    request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true),
-                        data:    z.object({ inspectionIds: z.array(z.string()) }),
+                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        data:    z.object({ inspectionIds: z.array(z.string()).describe('TODO describe inspectionIds field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
                     }),
                 },
             },
@@ -132,9 +132,9 @@ tagsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["tags"],
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { params: IdParamSchema },
+    request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: TagDeleteResponseSchema } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: TagDeleteResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' },
     },
     operationId: "deleteTag",
     summary: "Delete tag for current tenant",
@@ -158,17 +158,17 @@ export default tagsRoutes;
 export const inspectionTagRoutes = new OpenAPIHono<HonoConfig>();
 
 const InspectionItemTagParamsSchema = z.object({
-    id:     z.string().min(1),
-    itemId: z.string().min(1),
+    id:     z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+    itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
 });
 
 const InspectionItemTagWithTagParamsSchema = z.object({
-    id:     z.string().min(1),
-    itemId: z.string().min(1),
-    tagId:  z.string().min(1),
+    id:     z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+    itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+    tagId:  z.string().min(1).describe('TODO describe tagId field for the OpenInspection MCP integration'),
 });
 
-const LinkBodySchema = z.object({ tagId: z.string().min(1) }).strict();
+const LinkBodySchema = z.object({ tagId: z.string().min(1).describe('TODO describe tagId field for the OpenInspection MCP integration') }).strict();
 
 /* ── GET /api/inspections/:id/items/:itemId/tags ──────────────────────── */
 inspectionTagRoutes.openapi(createRoute(withMcpMetadata({
@@ -176,9 +176,9 @@ inspectionTagRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["tags"],
     summary: 'List tags linked to an inspection item',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: InspectionItemTagParamsSchema },
+    request: { params: InspectionItemTagParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: TagListResponseSchema } }, description: 'Item tags' },
+        200: { content: { 'application/json': { schema: TagListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Item tags' },
     },
     operationId: "listTagItemsTags",
     description: "Auto-generated placeholder for listTagItemsTags (GET /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
@@ -196,11 +196,11 @@ inspectionTagRoutes.openapi(createRoute(withMcpMetadata({
     summary: 'Link a tag to an inspection item',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
-        params: InspectionItemTagParamsSchema,
-        body: { content: { 'application/json': { schema: LinkBodySchema } } },
+        params: InspectionItemTagParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: LinkBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: TagLinkResponseSchema } }, description: 'Linked' },
+        200: { content: { 'application/json': { schema: TagLinkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Linked' },
     },
     operationId: "createTagItemsTags",
     description: "Auto-generated placeholder for createTagItemsTags (POST /{id}/items/{itemId}/tags, tags domain). TODO: replace with a real description sourced from the handler."
@@ -225,9 +225,9 @@ inspectionTagRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["tags"],
     summary: 'Unlink a tag from an inspection item',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: InspectionItemTagWithTagParamsSchema },
+    request: { params: InspectionItemTagWithTagParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: TagUnlinkResponseSchema } }, description: 'Unlinked' },
+        200: { content: { 'application/json': { schema: TagUnlinkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Unlinked' },
     },
     operationId: "deleteTagItemsTag",
     description: "Auto-generated placeholder for deleteTagItemsTag (DELETE /{id}/items/{itemId}/tags/{tagId}, tags domain). TODO: replace with a real description sourced from the handler."
@@ -249,27 +249,27 @@ inspectionTagRoutes.openapi(createRoute(withMcpMetadata({
  *  Bulk fetch — returns a map of itemId → Tag[] for the entire inspection.
  *  Used by inspection-edit to hydrate all chips on initial load.
  */
-const InspectionIdParamSchema = z.object({ id: z.string().min(1) });
+const InspectionIdParamSchema = z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') });
 
 inspectionTagRoutes.openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/tags',
     tags: ["tags"],
     summary: 'Map of itemId → tags for an inspection',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: InspectionIdParamSchema },
+    request: { params: InspectionIdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true),
+                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
                         data:    z.record(z.string(), z.array(z.object({
-                            id:        z.string(),
-                            name:      z.string(),
-                            color:     z.string().nullable().optional(),
-                            isSeed:    z.boolean(),
-                            createdAt: z.number(),
-                        }))),
+                            id:        z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
+                            name:      z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
+                            color:     z.string().nullable().optional().describe('TODO describe color field for the OpenInspection MCP integration'),
+                            isSeed:    z.boolean().describe('TODO describe isSeed field for the OpenInspection MCP integration'),
+                            createdAt: z.number().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+                        }))).describe('TODO describe data field for the OpenInspection MCP integration'),
                     }),
                 },
             },

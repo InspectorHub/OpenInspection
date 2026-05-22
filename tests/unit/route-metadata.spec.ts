@@ -22,47 +22,12 @@ import {
     PRIMARY_TIER_CAP,
 } from '../../src/lib/route-metadata-standards';
 
-// Modules not yet backfilled. Empty set = Phase 0 done.
-// Each entry is the first two segments of the path: `/api/<module>` or `/<top>`
-// Auth routes are intentionally double-mounted (see index.ts:443-445); they
-// appear in the doc under both /api/auth/* and root paths like /login, /join,
-// /profile, /2fa/*. The eachOperation() walker deduplicates by operationId so
-// only one needs metadata; we list both prefixes here for the skip-list phase.
-// Modules backfilled by `scripts/backfill-route-metadata.ts` (route metadata
-// only — Zod schemas not yet visited). Stay here until a follow-up codemod
-// adds `.describe()` to their input fields and the gate's field-description
-// walker passes for them.
+// Phase 0 done: every /api/* module has full route metadata + field descriptions
+// (route metadata from PR #21, Zod field descriptions from this PR).
+// Only root-mounted duplicates of /api/auth/* (see index.ts:444-445; their
+// operationId collides with the canonical version and is deduped) and HTML
+// page mounts remain.
 const SKIP_MODULES = new Set([
-    '/api/admin',
-    '/api/agent',
-    '/api/agents',
-    '/api/agent-signup',
-    '/api/ai',
-    '/api/analytics',
-    '/api/automations',
-    '/api/billing',
-    '/api/concierge',
-    '/api/contacts',
-    '/api/data',
-    '/api/guest',
-    '/api/inspection-requests',
-    '/api/inspections',
-    '/api/integration',
-    '/api/integrations',
-    '/api/invoices',
-    '/api/messages',
-    '/api/metrics',
-    '/api/notifications',
-    '/api/places',
-    '/api/public',
-    '/api/recommendations',
-    '/api/rating-systems',
-    '/api/services',
-    '/api/tags',
-    '/api/team',
-    '/api/templates',
-    '/api/tenant',
-    '/api/ics',
     // Root-mounted auth routes (mirror of /api/auth/*, see index.ts:444-445)
     '/login',
     '/logout',

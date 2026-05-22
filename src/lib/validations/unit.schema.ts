@@ -3,19 +3,19 @@
 import { z } from '@hono/zod-openapi';
 
 export const CreateUnitSchema = z.object({
-    parentUnitId: z.string().min(1).nullable(),
-    kind:         z.enum(['building', 'floor', 'unit']),
-    name:         z.string().min(1).max(80),
+    parentUnitId: z.string().min(1).nullable().describe('TODO describe parentUnitId field for the OpenInspection MCP integration'),
+    kind:         z.enum(['building', 'floor', 'unit']).describe('TODO describe kind field for the OpenInspection MCP integration'),
+    name:         z.string().min(1).max(80).describe('TODO describe name field for the OpenInspection MCP integration'),
 }).openapi('CreateUnit');
 
 export const UpdateUnitSchema = z.object({
-    name:      z.string().min(1).max(80).optional(),
-    sortOrder: z.number().int().min(0).optional(),
+    name:      z.string().min(1).max(80).optional().describe('TODO describe name field for the OpenInspection MCP integration'),
+    sortOrder: z.number().int().min(0).optional().describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
 }).openapi('UpdateUnit');
 
 export const MoveUnitSchema = z.object({
-    newParentUnitId: z.string().min(1).nullable(),
-    newSortOrder:    z.number().int().min(0),
+    newParentUnitId: z.string().min(1).nullable().describe('TODO describe newParentUnitId field for the OpenInspection MCP integration'),
+    newSortOrder:    z.number().int().min(0).describe('TODO describe newSortOrder field for the OpenInspection MCP integration'),
 }).openapi('MoveUnit');
 
 export type CreateUnitInput = z.infer<typeof CreateUnitSchema>;

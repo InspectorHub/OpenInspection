@@ -29,11 +29,11 @@ templateMigrationRoutes.openapi(
             description: "Auto-generated placeholder for createTemplateMigrationMigrateTo (POST /{oldId}/migrate-to/{newId}, templates domain). TODO: replace with a real description sourced from the handler.",
             middleware: [requireRole(['owner', 'admin'])] as const,
             request: {
-                params: MigrationParamsSchema,
+                params: MigrationParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
                 body: {
                     content: {
                         'application/json': {
-                            schema: MigrationBodySchema,
+                            schema: MigrationBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                         },
                     },
                 },
@@ -43,14 +43,14 @@ templateMigrationRoutes.openapi(
                     content: {
                         'application/json': {
                             schema: z.object({
-                                success: z.boolean(),
+                                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
                                 data: z.object({
-                                    dryRun:             z.boolean().optional(),
-                                    migrated:           z.number().int(),
-                                    strategy:           z.string(),
-                                    preview:            z.unknown(),
-                                    oldTemplateDeleted: z.boolean(),
-                                }),
+                                    dryRun:             z.boolean().optional().describe('TODO describe dryRun field for the OpenInspection MCP integration'),
+                                    migrated:           z.number().int().describe('TODO describe migrated field for the OpenInspection MCP integration'),
+                                    strategy:           z.string().describe('TODO describe strategy field for the OpenInspection MCP integration'),
+                                    preview:            z.unknown().describe('TODO describe preview field for the OpenInspection MCP integration'),
+                                    oldTemplateDeleted: z.boolean().describe('TODO describe oldTemplateDeleted field for the OpenInspection MCP integration'),
+                                }).describe('TODO describe data field for the OpenInspection MCP integration'),
                             }),
                         },
                     },

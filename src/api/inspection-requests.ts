@@ -30,10 +30,10 @@ const listRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "List inspection requests for current tenant",
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { query: InspectionRequestListQuerySchema },
+    request: { query: InspectionRequestListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestListResponseSchema } },
+            content: { 'application/json': { schema: InspectionRequestListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'List of requests with sub-inspections',
         },
     },
@@ -60,10 +60,10 @@ const detailRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Get inspection request for current tenant",
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ id: z.string().min(1) }) },
+    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Request detail',
         },
     },
@@ -90,14 +90,14 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Get parent request by inspection id',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ inspectionId: z.string().min(1) }) },
+    request: { params: z.object({ inspectionId: z.string().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        success: z.literal(true),
-                        data: z.object({ request: InspectionRequestResponseSchema.nullable() }),
+                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+                        data: z.object({ request: InspectionRequestResponseSchema.nullable().describe('TODO describe request field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
                     }),
                 },
             },
@@ -122,11 +122,11 @@ const createReqRoute = createRoute(withMcpMetadata({
     summary: 'Create inspection request with N sub-inspections',
     middleware: [requireRole(['owner', 'admin'])] as const,
     request: {
-        body: { content: { 'application/json': { schema: CreateInspectionRequestSchema } } },
+        body: { content: { 'application/json': { schema: CreateInspectionRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         201: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Created',
         },
     },
@@ -173,12 +173,12 @@ const updateReqRoute = createRoute(withMcpMetadata({
     summary: "Replace inspection request for current tenant",
     middleware: [requireRole(['owner', 'admin'])] as const,
     request: {
-        params: z.object({ id: z.string().min(1) }),
-        body: { content: { 'application/json': { schema: UpdateInspectionRequestSchema } } },
+        params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: UpdateInspectionRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Updated',
         },
     },
@@ -206,22 +206,22 @@ const addSubRoute = createRoute(withMcpMetadata({
     summary: 'Add a sub-inspection to an existing request',
     middleware: [requireRole(['owner', 'admin'])] as const,
     request: {
-        params: z.object({ id: z.string().min(1) }),
+        params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'application/json': {
                     schema: z.object({
-                        templateId: z.string().min(1),
-                        price:      z.number().int().min(0).optional(),
-                        notes:      z.string().max(500).optional().nullable(),
-                    }),
+                        templateId: z.string().min(1).describe('TODO describe templateId field for the OpenInspection MCP integration'),
+                        price:      z.number().int().min(0).optional().describe('TODO describe price field for the OpenInspection MCP integration'),
+                        notes:      z.string().max(500).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
+                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema } },
+            content: { 'application/json': { schema: InspectionRequestDetailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Sub-inspection added',
         },
     },

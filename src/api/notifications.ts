@@ -41,8 +41,8 @@ function requireUserId(c: any): string {
 }
 
 const OkResponseSchema = z.object({
-    success: z.literal(true),
-    data: z.object({ ok: z.literal(true) }),
+    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+    data: z.object({ ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
 });
 
 // GET / — list notifications for current user
@@ -51,10 +51,10 @@ const listRoute = createRoute(withMcpMetadata({
     path: '/',
     tags: ["notifications"],
     summary: 'List notifications for current user',
-    request: { query: ListNotificationsQuerySchema },
+    request: { query: ListNotificationsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: ListNotificationsResponseSchema } },
+            content: { 'application/json': { schema: ListNotificationsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'OK',
         },
     },
@@ -87,7 +87,7 @@ const unreadCountRoute = createRoute(withMcpMetadata({
     summary: 'Count unread notifications for current user',
     responses: {
         200: {
-            content: { 'application/json': { schema: UnreadCountResponseSchema } },
+            content: { 'application/json': { schema: UnreadCountResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'OK',
         },
     },
@@ -108,10 +108,10 @@ const markReadRoute = createRoute(withMcpMetadata({
     path: '/mark-read',
     tags: ["notifications"],
     summary: 'Mark a list of notifications as read',
-    request: { body: { content: { 'application/json': { schema: MarkReadSchema } } } },
+    request: { body: { content: { 'application/json': { schema: MarkReadSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: OkResponseSchema } },
+            content: { 'application/json': { schema: OkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'OK',
         },
     },
@@ -135,7 +135,7 @@ const markAllRoute = createRoute(withMcpMetadata({
     summary: 'Mark every unread notification as read',
     responses: {
         200: {
-            content: { 'application/json': { schema: OkResponseSchema } },
+            content: { 'application/json': { schema: OkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'OK',
         },
     },
@@ -156,10 +156,10 @@ const archiveRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["notifications"],
     summary: 'Archive a notification (soft-delete from inbox)',
-    request: { params: z.object({ id: z.string().min(1) }) },
+    request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: OkResponseSchema } },
+            content: { 'application/json': { schema: OkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'OK',
         },
     },

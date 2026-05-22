@@ -15,9 +15,9 @@ const recordEventRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        event: z.enum(['view', 'submit', 'success', 'error']),
-                        metadata: z.record(z.string(), z.unknown()).optional(),
-                    }),
+                        event: z.enum(['view', 'submit', 'success', 'error']).describe('TODO describe event field for the OpenInspection MCP integration'),
+                        metadata: z.record(z.string(), z.unknown()).optional().describe('TODO describe metadata field for the OpenInspection MCP integration'),
+                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -26,7 +26,7 @@ const recordEventRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.literal(true) }),
+                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Recorded',

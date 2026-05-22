@@ -17,8 +17,8 @@ const getOnboardingRoute = createRoute(withMcpMetadata({
     description: 'Returns the boolean map describing which onboarding tooltips, banners, and wizard steps the user has already completed or dismissed.',
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.boolean(),
-            data: z.object({ state: z.record(z.string(), z.boolean()) }),
+            success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+            data: z.object({ state: z.record(z.string(), z.boolean()).describe('TODO describe state field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
         }) } }, description: 'OK' },
         401: { description: 'Unauthorized' },
     },
@@ -47,10 +47,10 @@ const setOnboardingRoute = createRoute(withMcpMetadata({
         body: { content: { 'application/json': { schema: z.object({
             key: z.string().min(1).max(64).describe('Onboarding-step identifier (e.g. "dashboard.welcome", "templates.tour").'),
             completed: z.boolean().describe('True to mark the step as completed; false to clear / un-dismiss it.'),
-        }) } } },
+        }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean() }) } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
         401: { description: 'Unauthorized' },
     },
 }, { scopes: ['write'], tier: 'extended' }));

@@ -33,13 +33,13 @@ const listAvailabilityRoute = createRoute(withMcpMetadata({
     request: {
         query: z.object({
             inspectorId: z.string().uuid().optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
-        }),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: AvailabilityListResponseSchema,
+                    schema: AvailabilityListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -84,7 +84,7 @@ const updateScheduleRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: AvailabilitySchema,
+                    schema: AvailabilitySchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -93,7 +93,7 @@ const updateScheduleRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ count: z.number() })),
+                    schema: createApiResponseSchema(z.object({ count: z.number().describe('TODO describe count field for the OpenInspection MCP integration') })),
                 },
             },
             description: 'Success',
@@ -133,13 +133,13 @@ const listOverridesRoute = createRoute(withMcpMetadata({
     request: {
         query: z.object({
             inspectorId: z.string().uuid().optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
-        }),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: OverrideListResponseSchema,
+                    schema: OverrideListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -182,7 +182,7 @@ const createOverrideRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: OverrideSchema,
+                    schema: OverrideSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -191,7 +191,7 @@ const createOverrideRoute = createRoute(withMcpMetadata({
         201: {
             content: {
                 'application/json': {
-                    schema: OverrideResponseSchema,
+                    schema: OverrideResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Created',
@@ -236,13 +236,13 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
     description: 'Removes the specified availability override entry, restoring the default recurring schedule for that date.',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('UUID of the availability override entry to delete.') }),
+        params: z.object({ id: z.string().uuid().describe('UUID of the availability override entry to delete.') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema,
+                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',

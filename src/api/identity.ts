@@ -49,7 +49,7 @@ const switchRoute = createRoute(withMcpMetadata({
     request: {
         body: { content: { 'application/json': { schema: z.object({
             linkedUserId: z.string().min(1).describe('UUID of the linked identity to switch into; must be one of the caller\'s linked seats.'),
-        }) } } },
+        }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: { description: 'ok' },
@@ -86,7 +86,7 @@ const linkRoute = createRoute(withMcpMetadata({
     request: {
         body: { content: { 'application/json': { schema: z.object({
             targetEmail: z.string().email().describe('Email address of the other existing user account to link into the caller\'s identity set.'),
-        }) } } },
+        }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: { description: 'ok' },

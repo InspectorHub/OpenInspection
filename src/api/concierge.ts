@@ -18,13 +18,13 @@ const conciergeRoutes = new OpenAPIHono<HonoConfig>();
  * client-side script can route to the appropriate next step.
  */
 const ConfirmBodySchema = z.object({
-    token: z.string().min(8).max(128),
+    token: z.string().min(8).max(128).describe('TODO describe token field for the OpenInspection MCP integration'),
 }).openapi('ConciergeConfirmBody');
 
 const ConfirmResponseSchema = createApiResponseSchema(
     z.object({
-        inspectionId: z.string().uuid(),
-        redirect:     z.string(),
+        inspectionId: z.string().uuid().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+        redirect:     z.string().describe('TODO describe redirect field for the OpenInspection MCP integration'),
     }),
 ).openapi('ConciergeConfirmResponse');
 
@@ -34,11 +34,11 @@ const confirmRoute = createRoute(withMcpMetadata({
     tags: ["bookings"],
     summary: 'Client redeems a concierge magic-link token',
     request: {
-        body: { content: { 'application/json': { schema: ConfirmBodySchema } } },
+        body: { content: { 'application/json': { schema: ConfirmBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: ConfirmResponseSchema } },
+            content: { 'application/json': { schema: ConfirmResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Confirmed — caller redirects to either the agreement signing page or the inspection report',
         },
         400: { description: 'Token expired or already used' },

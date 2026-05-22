@@ -23,7 +23,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 const ratingSystemsRoutes = new OpenAPIHono<HonoConfig>();
 
-const IdParamSchema = z.object({ id: z.string().min(1) });
+const IdParamSchema = z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') });
 
 /* ── GET /api/rating-systems ──────────────────────────────────────────── */
 ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
@@ -32,7 +32,7 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     summary: 'List rating systems for the current tenant (seed + custom)',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     responses: {
-        200: { content: { 'application/json': { schema: RatingSystemListResponseSchema } }, description: 'List' },
+        200: { content: { 'application/json': { schema: RatingSystemListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
     },
     operationId: "listRatingSystems",
     description: "Auto-generated placeholder for listRatingSystems (GET /, ratings domain). TODO: replace with a real description sourced from the handler."
@@ -50,9 +50,9 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: IdParamSchema },
+    request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema } }, description: 'One system' },
+        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'One system' },
     },
     operationId: "getRatingSystem",
     summary: "Get rating system for current tenant",
@@ -70,9 +70,9 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { body: { content: { 'application/json': { schema: CreateRatingSystemSchema } } } },
+    request: { body: { content: { 'application/json': { schema: CreateRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema } }, description: 'Created' },
+        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
     },
     operationId: "createRatingSystem",
     summary: "Create rating system for current tenant",
@@ -91,11 +91,11 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
     request: {
-        params: IdParamSchema,
-        body: { content: { 'application/json': { schema: CloneRatingSystemSchema } } },
+        params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: CloneRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema } }, description: 'Cloned' },
+        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Cloned' },
     },
     operationId: "cloneRatingSystem",
     summary: "Clone rating system for current tenant",
@@ -115,11 +115,11 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
     request: {
-        params: IdParamSchema,
-        body: { content: { 'application/json': { schema: UpdateRatingSystemSchema } } },
+        params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: UpdateRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema } }, description: 'Updated' },
+        200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Updated' },
     },
     operationId: "replaceRatingSystem",
     summary: "Replace rating system for current tenant",
@@ -138,10 +138,10 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { params: IdParamSchema },
+    request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ deleted: z.literal(true) }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Deleted',
         },
     },

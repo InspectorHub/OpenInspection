@@ -8,7 +8,7 @@ import { z } from '@hono/zod-openapi';
  * comments (library_id IS NULL) are never touched.
  */
 export const LibraryReplaceParamsSchema = z.object({
-    libraryId: z.string().min(1, 'libraryId is required'),
+    libraryId: z.string().min(1, 'libraryId is required').describe('TODO describe libraryId field for the OpenInspection MCP integration'),
 });
 
 export const LibraryReplaceBodySchema = z.object({
@@ -23,7 +23,7 @@ export const LibraryReplaceBodySchema = z.object({
      * Until then, we conservatively flag any row whose text differs from the
      * original library entry as user-modified.
      */
-    confirmLossOfEdits: z.boolean().default(false),
+    confirmLossOfEdits: z.boolean().default(false).describe('TODO describe confirmLossOfEdits field for the OpenInspection MCP integration'),
 }).optional();
 
 export type LibraryReplaceBody = z.infer<typeof LibraryReplaceBodySchema>;

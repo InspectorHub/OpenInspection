@@ -59,11 +59,11 @@ const eventsRoute = createRoute(withMcpMetadata({
             // Accept either YYYY-MM-DD (FullCalendar dayGridMonth view) or full ISO 8601
             start: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Expected date or ISO datetime').describe('Window start as YYYY-MM-DD or full ISO 8601 timestamp.'),
             end: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Expected date or ISO datetime').describe('Window end (exclusive) as YYYY-MM-DD or full ISO 8601 timestamp.'),
-        }),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.array(z.any()) } },
+            content: { 'application/json': { schema: z.array(z.any()).describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Events array',
         },
         401: { description: 'Unauthorized' },

@@ -33,9 +33,9 @@ const checkSlugRoute = createRoute(withMcpMetadata({
     summary: 'Check whether a booking slug is available',
     request: {
         query: z.object({
-            value: z.string().min(1).max(64),
-            namespace: z.enum(['inspector', 'agent']).optional(),
-        }),
+            value: z.string().min(1).max(64).describe('TODO describe value field for the OpenInspection MCP integration'),
+            namespace: z.enum(['inspector', 'agent']).optional().describe('TODO describe namespace field for the OpenInspection MCP integration'),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {

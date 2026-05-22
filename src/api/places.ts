@@ -39,20 +39,20 @@ const autocompleteRoute = createRoute(withMcpMetadata({
     summary: 'Address autocomplete (Google Places proxy)',
     request: {
         query: z.object({
-            q: z.string().min(2).max(200).openapi({ example: '1005 S Gay' }),
-            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }),
-        }),
+            q: z.string().min(2).max(200).openapi({ example: '1005 S Gay' }).describe('TODO describe q field for the OpenInspection MCP integration'),
+            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
                 results: z.array(z.object({
-                    placeId: z.string(),
-                    description: z.string(),
-                    mainText: z.string(),
-                    secondaryText: z.string(),
-                })),
-                cached: z.boolean(),
+                    placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
+                    description: z.string().describe('TODO describe description field for the OpenInspection MCP integration'),
+                    mainText: z.string().describe('TODO describe mainText field for the OpenInspection MCP integration'),
+                    secondaryText: z.string().describe('TODO describe secondaryText field for the OpenInspection MCP integration'),
+                })).describe('TODO describe results field for the OpenInspection MCP integration'),
+                cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
             }) } },
             description: 'Autocomplete suggestions',
         },
@@ -125,24 +125,24 @@ const detailsRoute = createRoute(withMcpMetadata({
     summary: 'Address details (Google Places Details proxy)',
     request: {
         query: z.object({
-            placeId: z.string().min(8).max(200).openapi({ example: 'ChIJxxx' }),
-            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }),
-        }),
+            placeId: z.string().min(8).max(200).openapi({ example: 'ChIJxxx' }).describe('TODO describe placeId field for the OpenInspection MCP integration'),
+            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                placeId: z.string(),
-                formatted: z.string(),
-                street: z.string().nullable(),
-                city: z.string().nullable(),
-                state: z.string().nullable(),
-                zip: z.string().nullable(),
-                county: z.string().nullable(),
-                lat: z.number(),
-                lng: z.number(),
-                cached: z.boolean(),
-            }) } },
+                placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
+                formatted: z.string().describe('TODO describe formatted field for the OpenInspection MCP integration'),
+                street: z.string().nullable().describe('TODO describe street field for the OpenInspection MCP integration'),
+                city: z.string().nullable().describe('TODO describe city field for the OpenInspection MCP integration'),
+                state: z.string().nullable().describe('TODO describe state field for the OpenInspection MCP integration'),
+                zip: z.string().nullable().describe('TODO describe zip field for the OpenInspection MCP integration'),
+                county: z.string().nullable().describe('TODO describe county field for the OpenInspection MCP integration'),
+                lat: z.number().describe('TODO describe lat field for the OpenInspection MCP integration'),
+                lng: z.number().describe('TODO describe lng field for the OpenInspection MCP integration'),
+                cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
+            }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Place details',
         },
     },

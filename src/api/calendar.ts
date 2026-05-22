@@ -162,7 +162,7 @@ const disconnectRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: SuccessResponseSchema,
+                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -200,7 +200,7 @@ const syncRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: CalendarSyncResponseSchema,
+                    schema: CalendarSyncResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',

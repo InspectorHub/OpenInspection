@@ -18,18 +18,18 @@ export const MigrationStrategySchema = z.enum([
 ]);
 
 export const MigrationParamsSchema = z.object({
-    oldId: z.string().uuid({ message: 'oldId must be a UUID' }),
-    newId: z.string().uuid({ message: 'newId must be a UUID' }),
+    oldId: z.string().uuid({ message: 'oldId must be a UUID' }).describe('TODO describe oldId field for the OpenInspection MCP integration'),
+    newId: z.string().uuid({ message: 'newId must be a UUID' }).describe('TODO describe newId field for the OpenInspection MCP integration'),
 });
 
 export const MigrationBodySchema = z.object({
-    strategy: MigrationStrategySchema.default('preserve_unknown'),
-    dryRun:   z.boolean().optional(),
+    strategy: MigrationStrategySchema.default('preserve_unknown').describe('TODO describe strategy field for the OpenInspection MCP integration'),
+    dryRun:   z.boolean().optional().describe('TODO describe dryRun field for the OpenInspection MCP integration'),
     /**
      * If true and migration removes the last reference to oldId, the old
      * template is deleted. Defaults to false so callers must opt in.
      */
-    deleteOldTemplate: z.boolean().optional(),
+    deleteOldTemplate: z.boolean().optional().describe('TODO describe deleteOldTemplate field for the OpenInspection MCP integration'),
 });
 
 export type MigrationStrategy = z.infer<typeof MigrationStrategySchema>;

@@ -21,9 +21,9 @@ recommendationsRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["recommendations"],
     summary: 'List recommendations (filter: category, severity)',
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { query: ListRecommendationsQuerySchema },
+    request: { query: ListRecommendationsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationListResponseSchema } }, description: 'List' },
+        200: { content: { 'application/json': { schema: RecommendationListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
     },
     operationId: "listRecommendations",
     description: "Auto-generated placeholder for listRecommendations (GET /, recommendations domain). TODO: replace with a real description sourced from the handler."
@@ -42,9 +42,9 @@ recommendationsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["recommendations"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Single recommendation' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Single recommendation' },
     },
     operationId: "getRecommendation",
     summary: "Get recommendation for current tenant",
@@ -62,9 +62,9 @@ recommendationsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["recommendations"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema } } } },
+    request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Created' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
     },
     operationId: "createRecommendation",
     summary: "Create recommendation for current tenant",
@@ -84,11 +84,11 @@ recommendationsRoutes.openapi(createRoute(withMcpMetadata({
     tags: ["recommendations"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
-        params: z.object({ id: z.string().uuid() }),
-        body: { content: { 'application/json': { schema: UpdateRecommendationSchema } } },
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: UpdateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
-        200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Updated' },
+        200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Updated' },
     },
     operationId: "replaceRecommendation",
     summary: "Replace recommendation for current tenant",
@@ -107,9 +107,9 @@ recommendationsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["recommendations"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ deleted: z.literal(true) }) }) } }, description: 'Deleted' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
     },
     operationId: "deleteRecommendation",
     summary: "Delete recommendation for current tenant",
@@ -131,8 +131,8 @@ recommendationsRoutes.openapi(createRoute(withMcpMetadata({
     request: {},
     responses: {
         200: { content: { 'application/json': { schema: z.object({
-            success: z.literal(true),
-            data: z.object({ inserted: z.number(), skipped: z.number() }),
+            success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+            data: z.object({ inserted: z.number().describe('TODO describe inserted field for the OpenInspection MCP integration'), skipped: z.number().describe('TODO describe skipped field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
         }) } }, description: 'Bulk seed result' },
     },
     operationId: "seedDefaultsRecommendation",

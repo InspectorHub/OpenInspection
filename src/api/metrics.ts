@@ -13,8 +13,8 @@ metricsRoutes.openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["metrics"],
     middleware: [requireRole(['owner', 'admin'])] as const,
-    request: { query: MetricsQuerySchema },
-    responses: { 200: { content: { 'application/json': { schema: MetricsApiResponseSchema } }, description: 'Metrics' } },
+    request: { query: MetricsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
+    responses: { 200: { content: { 'application/json': { schema: MetricsApiResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Metrics' } },
     operationId: "listMetrics",
     summary: "List metrics for current tenant",
     description: "Auto-generated placeholder for listMetrics (GET /, metrics domain). TODO: replace with a real description sourced from the handler."

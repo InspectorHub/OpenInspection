@@ -5,8 +5,8 @@
 import { z } from '@hono/zod-openapi';
 
 export const UpdateMediaAnnotationsSchema = z.object({
-    annotations: z.string().max(8 * 1024, 'annotations must be ≤ 8 KB'),
-    caption:     z.string().max(200, 'caption must be ≤ 200 chars'),
+    annotations: z.string().max(8 * 1024, 'annotations must be ≤ 8 KB').describe('TODO describe annotations field for the OpenInspection MCP integration'),
+    caption:     z.string().max(200, 'caption must be ≤ 200 chars').describe('TODO describe caption field for the OpenInspection MCP integration'),
 }).openapi('UpdateMediaAnnotations');
 
 export type UpdateMediaAnnotationsInput = z.infer<typeof UpdateMediaAnnotationsSchema>;

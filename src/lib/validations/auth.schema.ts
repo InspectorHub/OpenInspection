@@ -20,7 +20,7 @@ export const LoginSchema = z.object({
  */
 export const AuthResponseSchema = createApiResponseSchema(
     z.object({
-        redirect: z.string().openapi({ example: '/dashboard' }),
+        redirect: z.string().openapi({ example: '/dashboard' }).describe('TODO describe redirect field for the OpenInspection MCP integration'),
     })
 );
 
@@ -112,14 +112,14 @@ export const TotpLoginSchema = z.object({
 });
 
 export const TotpSetupResponseSchema = createApiResponseSchema(z.object({
-    secret: z.string().openapi({ example: 'JBSWY3DPEHPK3PXP' }),
-    qrCodeDataUri: z.string().openapi({ example: 'data:image/png;base64,...' }),
-    recoveryCodes: z.array(z.string()).openapi({ example: ['ABCD-EFGH'] }),
+    secret: z.string().openapi({ example: 'JBSWY3DPEHPK3PXP' }).describe('TODO describe secret field for the OpenInspection MCP integration'),
+    qrCodeDataUri: z.string().openapi({ example: 'data:image/png;base64,...' }).describe('TODO describe qrCodeDataUri field for the OpenInspection MCP integration'),
+    recoveryCodes: z.array(z.string()).openapi({ example: ['ABCD-EFGH'] }).describe('TODO describe recoveryCodes field for the OpenInspection MCP integration'),
 }));
 
 export const Login2faResponseSchema = createApiResponseSchema(z.union([
-    z.object({ redirect: z.string() }),
-    z.object({ requires2fa: z.literal(true), challengeToken: z.string() }),
+    z.object({ redirect: z.string().describe('TODO describe redirect field for the OpenInspection MCP integration') }),
+    z.object({ requires2fa: z.literal(true).describe('TODO describe requires2fa field for the OpenInspection MCP integration'), challengeToken: z.string().describe('TODO describe challengeToken field for the OpenInspection MCP integration') }),
 ]));
 
 /**

@@ -7,25 +7,25 @@ import { Errors } from '../lib/errors';
 const routes = new OpenAPIHono<HonoConfig>();
 
 const TypeBody = z.object({
-    name:               z.string().min(1),
-    slug:               z.string().min(1).regex(/^[a-z0-9_]+$/),
-    defaultDurationMin: z.number().int().positive().default(30),
-    defaultPriceCents:  z.number().int().min(0).default(0),
-    color:              z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#6366f1'),
-    sortOrder:          z.number().int().min(0).default(0),
+    name:               z.string().min(1).describe('TODO describe name field for the OpenInspection MCP integration'),
+    slug:               z.string().min(1).regex(/^[a-z0-9_]+$/).describe('TODO describe slug field for the OpenInspection MCP integration'),
+    defaultDurationMin: z.number().int().positive().default(30).describe('TODO describe defaultDurationMin field for the OpenInspection MCP integration'),
+    defaultPriceCents:  z.number().int().min(0).default(0).describe('TODO describe defaultPriceCents field for the OpenInspection MCP integration'),
+    color:              z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#6366f1').describe('TODO describe color field for the OpenInspection MCP integration'),
+    sortOrder:          z.number().int().min(0).default(0).describe('TODO describe sortOrder field for the OpenInspection MCP integration'),
 });
 
 const EventBody = z.object({
-    eventTypeId:  z.string().min(1),
-    inspectorId:  z.string().optional(),
-    scheduledAt:  z.string().datetime(),
-    durationMin:  z.number().int().positive(),
-    priceCents:   z.number().int().min(0).default(0),
-    notes:        z.string().optional(),
+    eventTypeId:  z.string().min(1).describe('TODO describe eventTypeId field for the OpenInspection MCP integration'),
+    inspectorId:  z.string().optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    scheduledAt:  z.string().datetime().describe('TODO describe scheduledAt field for the OpenInspection MCP integration'),
+    durationMin:  z.number().int().positive().describe('TODO describe durationMin field for the OpenInspection MCP integration'),
+    priceCents:   z.number().int().min(0).default(0).describe('TODO describe priceCents field for the OpenInspection MCP integration'),
+    notes:        z.string().optional().describe('TODO describe notes field for the OpenInspection MCP integration'),
 });
 
 const EventStatusBody = z.object({
-    status: z.enum(['scheduled', 'completed', 'results_received', 'cancelled']),
+    status: z.enum(['scheduled', 'completed', 'results_received', 'cancelled']).describe('TODO describe status field for the OpenInspection MCP integration'),
 });
 
 // ---- Event types CRUD ----

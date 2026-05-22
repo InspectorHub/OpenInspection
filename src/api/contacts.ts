@@ -13,10 +13,10 @@ const listContactsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["contacts"], summary: "List contacts for current tenant",
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
-    request: { query: ContactListQuerySchema },
+    request: { query: ContactListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contacts: z.array(ContactResponseSchema), total: z.number() }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ contacts: z.array(ContactResponseSchema).describe('TODO describe contacts field for the OpenInspection MCP integration'), total: z.number().describe('TODO describe total field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Success',
         },
     },
@@ -39,10 +39,10 @@ const createContactRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["contacts"], summary: "Create contact for current tenant",
     middleware: [requireRole(['owner', 'admin'])],
-    request: { body: { content: { 'application/json': { schema: CreateContactSchema } } } },
+    request: { body: { content: { 'application/json': { schema: CreateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ contact: ContactResponseSchema.describe('TODO describe contact field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Created',
         },
     },
@@ -72,12 +72,12 @@ const updateContactRoute = createRoute(withMcpMetadata({
     tags: ["contacts"], summary: "Replace contact for current tenant",
     middleware: [requireRole(['owner', 'admin'])],
     request: {
-        params: z.object({ id: z.string().uuid() }),
-        body: { content: { 'application/json': { schema: UpdateContactSchema } } },
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: UpdateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ contact: ContactResponseSchema.describe('TODO describe contact field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Success',
         },
     },
@@ -111,10 +111,10 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["contacts"], summary: "Delete contact for current tenant",
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean() }) } },
+            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Deleted',
         },
     },

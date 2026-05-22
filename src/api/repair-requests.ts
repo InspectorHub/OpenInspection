@@ -30,16 +30,16 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 const repairRequestRoutes = new OpenAPIHono<HonoConfig>();
 
 const EmailRequestSchema = z.object({
-    inspectionId:     z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }),
-    recipientEmail:   z.string().email('Invalid email address').openapi({ example: 'buyer@example.com' }),
-    customerComments: z.string().max(5000).optional().openapi({ example: 'Roof › Shingles: please replace by end of June.' }),
+    inspectionId:     z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    recipientEmail:   z.string().email('Invalid email address').openapi({ example: 'buyer@example.com' }).describe('TODO describe recipientEmail field for the OpenInspection MCP integration'),
+    customerComments: z.string().max(5000).optional().openapi({ example: 'Roof › Shingles: please replace by end of June.' }).describe('TODO describe customerComments field for the OpenInspection MCP integration'),
 }).openapi('CustomerRepairRequestEmail');
 
 const EmailResponseSchema = z.object({
-    success: z.literal(true),
+    success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
     data: z.object({
-        sent: z.literal(true),
-    }),
+        sent: z.literal(true).describe('TODO describe sent field for the OpenInspection MCP integration'),
+    }).describe('TODO describe data field for the OpenInspection MCP integration'),
 });
 
 const sendEmailRoute = createRoute(withMcpMetadata({
@@ -51,14 +51,14 @@ const sendEmailRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: EmailRequestSchema,
+                    schema: EmailRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: EmailResponseSchema } },
+            content: { 'application/json': { schema: EmailResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Email queued for delivery',
         },
     },

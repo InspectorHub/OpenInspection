@@ -19,20 +19,20 @@ const agentSignupRoutes = new OpenAPIHono<HonoConfig>();
 
 const SignupBodySchema = z
     .object({
-        email: z.string().email(),
-        password: z.string().min(12).max(120),
-        name: z.string().min(2).max(120),
-        turnstileToken: z.string().optional(),
+        email: z.string().email().describe('TODO describe email field for the OpenInspection MCP integration'),
+        password: z.string().min(12).max(120).describe('TODO describe password field for the OpenInspection MCP integration'),
+        name: z.string().min(2).max(120).describe('TODO describe name field for the OpenInspection MCP integration'),
+        turnstileToken: z.string().optional().describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
     })
     .openapi('AgentSignupBody');
 
 const SignupResponseSchema = z
     .object({
-        success: z.literal(true),
+        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
         data: z.object({
-            redirect: z.string(),
-            userId: z.string(),
-        }),
+            redirect: z.string().describe('TODO describe redirect field for the OpenInspection MCP integration'),
+            userId: z.string().describe('TODO describe userId field for the OpenInspection MCP integration'),
+        }).describe('TODO describe data field for the OpenInspection MCP integration'),
     })
     .openapi('AgentSignupResponse');
 
@@ -43,11 +43,11 @@ const signupRoute = createRoute(withMcpMetadata({
     summary: "Create agent for current tenant",
     description: "Auto-generated placeholder for createAgent (POST /, agents domain). TODO: replace with a real description sourced from the handler.",
     request: {
-        body: { content: { 'application/json': { schema: SignupBodySchema } } },
+        body: { content: { 'application/json': { schema: SignupBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: SignupResponseSchema } },
+            content: { 'application/json': { schema: SignupResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
             description: 'Account created',
         },
         400: { description: 'Invalid input' },

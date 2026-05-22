@@ -19,7 +19,7 @@ const growthRoute = createRoute(withMcpMetadata({
     path:    '/growth',
     tags: ["metrics"],
     summary: 'Inspection count per month for the last N months',
-    request: { query: z.object({ months: z.coerce.number().int().min(1).max(36).default(12) }) },
+    request: { query: z.object({ months: z.coerce.number().int().min(1).max(36).default(12).describe('TODO describe months field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: { 200: { description: 'ok' } },
     operationId: "listAnalyticGrowth",
     description: "Auto-generated placeholder for listAnalyticGrowth (GET /growth, metrics domain). TODO: replace with a real description sourced from the handler."
