@@ -370,10 +370,11 @@ export const LoginPage = ({ branding, initialStep = 'password' }: LoginPageProps
                         {/* Spec 4A + B+C password-reset UI — four-step form:
                             password | 2fa | forgot | reset
                             login.js promotes step to 'reset' when it sees
-                            ?reset_token= on first load. Server-side initial
-                            step seeded by `data-initial-step` so /forgot-password
-                            renders the email-input form on first paint. */}
-                        <div x-data={`{ step: ($el.dataset.initialStep || 'password') }`} data-initial-step={initialStep}>
+                            ?reset_token= on first load. Server-side seeds the
+                            initial step directly into the x-data expression
+                            (Alpine v3's $el magic isn't available inside the
+                            init expression itself, only in child bindings). */}
+                        <div x-data={`{ step: '${initialStep}' }`} data-initial-step={initialStep}>
                             <h1 class="login-heading enter-up delay-1" x-text="(
                                 step === 'password' ? 'Sign in to your workspace' :
                                 step === '2fa'      ? 'Enter your 2FA code' :
