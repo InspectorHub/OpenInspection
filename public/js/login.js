@@ -28,10 +28,26 @@ function setStep(value) {
 // On first load, if the URL carried a reset_token, switch the form into the
 // "set new password" view. The user hit a /login?reset_token=... link from
 // their email — we honour it whether or not the server seeded a different
-// initial step (it didn't, but we don't trust that).
+// initial step. Alpine is loaded with `defer`, so we wait for its
+// initialization event before mutating the reactive scope; on the off chance
+// Alpine has already booted (cached, late script), we fall back to a polling
+// retry that gives up after a few hundred ms.
 if (_resetTokenFromUrl) {
-    // Defer to next tick so Alpine has had a chance to mount the data scope.
-    setTimeout(() => setStep('reset'), 0);
+    if (window.Alpine && document.querySelector('[data-initial-step]')?._x_dataStack) {
+        setStep('reset');
+    } else {
+        document.addEventListener('alpine:initialized', () => setStep('reset'), { once: true });
+        // Belt-and-suspenders polling in case the event already fired.
+        let tries = 0;
+        const poll = () => {
+            if (document.querySelector('[data-initial-step]')?._x_dataStack) {
+                setStep('reset');
+            } else if (++tries < 20) {
+                setTimeout(poll, 50);
+            }
+        };
+        setTimeout(poll, 50);
+    }
 }
 
 // Spec 4A — challenge token from /api/auth/login when 2FA is enabled.

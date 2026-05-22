@@ -513,6 +513,11 @@ export const LoginPage = ({ branding, initialStep = 'password' }: LoginPageProps
                     </div>
                 </div>
 
+                {/* Alpine is required for the x-show / x-text bindings that
+                    switch between password / 2fa / forgot / reset forms.
+                    Without it, every form would either show all at once or
+                    behave according to its static inline display style. */}
+                <script defer src="/vendor/alpine.min.js"></script>
                 <script src="/js/login.js"></script>
             </body>
         </html>
