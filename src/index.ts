@@ -618,6 +618,30 @@ app.get('/login', async (c) => {
     return c.html(LoginPage({ branding }));
 });
 
+// Forgot password — renders the same LoginPage template but starts the
+// Alpine `step` on 'forgot' so the email-input form paints on first render.
+// The form POSTs to /api/auth/forgot-password which emails a reset link
+// (when RESEND_API_KEY + SENDER_EMAIL are configured) pointing back at
+// /login?reset_token=... The login.js bootstrap captures that token before
+// scrubbing the URL bar, then flips step → 'reset' so the user can type a
+// new password without ever leaving the same page.
+app.get('/forgot-password', async (c) => {
+    const token = getCookie(c, '__Host-inspector_token');
+    if (token) {
+        try {
+            const keyring = await c.var.keyringPromise!;
+            const payload = await verifyJwt(token, keyring);
+            const role = (payload as Record<string, unknown>)['custom:userRole'] || (payload as Record<string, unknown>).role;
+            return c.redirect(role === 'agent' ? '/agent-dashboard' : '/dashboard');
+        } catch {
+            // Invalid/expired token — show forgot-password page
+        }
+    }
+    issueCsrfCookie(c);
+    const branding = c.get('branding');
+    return c.html(LoginPage({ branding, initialStep: 'forgot' }));
+});
+
 // Design System 0520 subsystem D P5.1 — observer viewer (cookie-gated).
 app.get('/observe/inspections/:id', observerCookieGuard, (c) => {
     const id = c.req.param('id');

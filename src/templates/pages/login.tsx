@@ -1,6 +1,18 @@
 import { BrandingConfig } from '../../types/auth';
 
-export const LoginPage = ({ branding }: { branding?: BrandingConfig | undefined } = {}): JSX.Element => {
+export interface LoginPageProps {
+    branding?: BrandingConfig | undefined;
+    /**
+     * Which form should render on first paint.
+     *  - 'password' (default) — sign-in form, used by GET /login
+     *  - 'forgot'              — email-input form, used by GET /forgot-password
+     * Client-side, login.js promotes step to 'reset' when it detects a
+     * `?reset_token=` query param on the URL (the reset email link).
+     */
+    initialStep?: 'password' | 'forgot';
+}
+
+export const LoginPage = ({ branding, initialStep = 'password' }: LoginPageProps = {}): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     const primaryColor = branding?.primaryColor || '#6366f1';
     const logoUrl = branding?.logoUrl;
@@ -355,10 +367,25 @@ export const LoginPage = ({ branding }: { branding?: BrandingConfig | undefined 
                             <span class="brand-name">{siteName}</span>
                         </div>
 
-                        {/* Spec 4A — Two-step: password first, then optional 2FA code. */}
-                        <div x-data="{ step: 'password' }">
-                            <h1 class="login-heading enter-up delay-1" x-text="step === 'password' ? 'Sign in to your workspace' : 'Enter your 2FA code'"></h1>
-                            <p class="login-sub enter-up delay-1" x-text="step === 'password' ? 'Enter your credentials to access inspections, reports, and team tools.' : 'Open your authenticator app and enter the 6-digit code.'"></p>
+                        {/* Spec 4A + B+C password-reset UI — four-step form:
+                            password | 2fa | forgot | reset
+                            login.js promotes step to 'reset' when it sees
+                            ?reset_token= on first load. Server-side initial
+                            step seeded by `data-initial-step` so /forgot-password
+                            renders the email-input form on first paint. */}
+                        <div x-data={`{ step: ($el.dataset.initialStep || 'password') }`} data-initial-step={initialStep}>
+                            <h1 class="login-heading enter-up delay-1" x-text="(
+                                step === 'password' ? 'Sign in to your workspace' :
+                                step === '2fa'      ? 'Enter your 2FA code' :
+                                step === 'forgot'   ? 'Reset your password' :
+                                                      'Set a new password'
+                            )"></h1>
+                            <p class="login-sub enter-up delay-1" x-text="(
+                                step === 'password' ? 'Enter your credentials to access inspections, reports, and team tools.' :
+                                step === '2fa'      ? 'Open your authenticator app and enter the 6-digit code.' :
+                                step === 'forgot'   ? 'Enter the email tied to your workspace. We will send a link to reset your password.' :
+                                                      'Pick a new password for your account. The link from your reset email stays valid for one hour.'
+                            )"></p>
 
                             <form id="loginForm" autocomplete="on" x-show="step === 'password'">
                                 <div class="form-group enter-up delay-2">
@@ -389,6 +416,46 @@ export const LoginPage = ({ branding }: { branding?: BrandingConfig | undefined 
                                     <span>Verify</span>
                                 </button>
                                 <button type="button" id="twofaBackBtn" x-on:click="step = 'password'; document.getElementById('twofaCode').value = '';" style="background:none; border:none; color:#78716c; font-size:13px; margin-top:12px; cursor:pointer; width:100%; text-align:center;">Use a different account</button>
+                            </form>
+
+                            {/* Forgot password — email input. POSTs to
+                                /api/auth/forgot-password which always returns
+                                200 (enumeration-safe). Success state below
+                                advises the user to check their inbox without
+                                confirming whether the email is registered. */}
+                            <form id="forgotForm" x-show="step === 'forgot'" style="display:none" autocomplete="on">
+                                <div class="form-group">
+                                    <label class="form-label" for="forgotEmail">Email address</label>
+                                    <input class="form-input" id="forgotEmail" name="email" type="email" autocomplete="email" required placeholder="you@company.com" />
+                                </div>
+                                <button class="submit-btn" type="submit" id="forgotSubmitBtn">
+                                    <span>Send reset link</span>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                                </button>
+                                <div id="forgotSuccess" class="hidden" style="margin-top:16px; padding:12px; border-radius:8px; background:#ecfdf5; color:#065f46; font-size:13px; line-height:1.5;">
+                                    If that email is registered, we just sent a reset link. The link is valid for one hour. Check your spam folder if it doesn't arrive in a minute.
+                                </div>
+                                <button type="button" x-on:click="step = 'password'; document.getElementById('forgotEmail').value = ''; document.getElementById('forgotSuccess').classList.add('hidden');" style="background:none; border:none; color:#78716c; font-size:13px; margin-top:12px; cursor:pointer; width:100%; text-align:center;">Back to sign in</button>
+                            </form>
+
+                            {/* Reset password — set new password. Reached when
+                                login.js detects ?reset_token= on first load
+                                (the email reset link). Token is kept in a
+                                module-local variable so it never reappears in
+                                the URL bar after the initial scrub. */}
+                            <form id="resetForm" x-show="step === 'reset'" style="display:none" autocomplete="on">
+                                <div class="form-group">
+                                    <label class="form-label" for="resetPassword">New password</label>
+                                    <input class="form-input" id="resetPassword" name="new-password" type="password" autocomplete="new-password" required minlength={8} placeholder="At least 8 characters" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="resetPasswordConfirm">Confirm new password</label>
+                                    <input class="form-input" id="resetPasswordConfirm" name="new-password" type="password" autocomplete="new-password" required minlength={8} placeholder="Repeat the new password" />
+                                </div>
+                                <button class="submit-btn" type="submit" id="resetSubmitBtn">
+                                    <span>Set new password</span>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+                                </button>
                             </form>
                         </div>
 
