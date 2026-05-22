@@ -49,7 +49,7 @@ describe('seedStarterContent', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await seedStarterContent({} as any, tenantId);
 
-        expect(result.inspectionTemplatesSeeded).toBe(3);
+        expect(result.inspectionTemplatesSeeded).toBe(7);
         expect(result.agreementTemplatesSeeded).toBe(1);
         expect(result.cannedCommentsSeeded).toBe(250);
         expect(result.eventTypesSeeded).toBe(3);

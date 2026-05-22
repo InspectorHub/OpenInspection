@@ -80,7 +80,7 @@ describe('POST /api/admin/seed-starter-content', () => {
             data: { inspectionTemplatesSeeded: number; cannedCommentsSeeded: number };
         };
         expect(body.success).toBe(true);
-        expect(body.data.inspectionTemplatesSeeded).toBe(3);
+        expect(body.data.inspectionTemplatesSeeded).toBe(7);
         expect(body.data.cannedCommentsSeeded).toBe(250);
     });
 

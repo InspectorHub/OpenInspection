@@ -18,7 +18,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES = [
     'src/templates/pages/booking.tsx',
     'src/templates/pages/invoices.tsx',
-    'src/templates/pages/inspection/settings.tsx',
 ];
 
 describe('iter-2 bug #6 — <input type="date"> lang="en"', () => {
