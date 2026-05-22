@@ -56,24 +56,21 @@ export const AgentInspectorsPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Your inspectors | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
                         --primary: ${primaryColor};
                         --primary-soft: ${primaryColor}14;
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #a8a29e;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
-                        --surface-card: #ffffff;
-                        --surface-soft: #f5f5f4;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         -webkit-font-smoothing: antialiased;
                     }
@@ -90,13 +87,13 @@ export const AgentInspectorsPage = ({
                     }
                     .topbar-actions { display: flex; gap: 0.5rem; }
                     .topbar-link {
-                        background: transparent; border: 1.5px solid var(--line);
-                        color: var(--ink); padding: 0.5rem 1rem;
+                        background: transparent; border: 1.5px solid var(--cp-border-color);
+                        color: var(--cp-fg-1); padding: 0.5rem 1rem;
                         font-family: inherit; font-size: 0.8125rem; font-weight: 600;
                         border-radius: 10px; cursor: pointer; text-decoration: none;
                         transition: border-color 0.15s, background 0.15s;
                     }
-                    .topbar-link:hover { border-color: var(--ink-faint); }
+                    .topbar-link:hover { border-color: var(--cp-fg-4); }
                     .topbar-link.active {
                         background: var(--primary-soft);
                         border-color: var(--primary);
@@ -113,7 +110,7 @@ export const AgentInspectorsPage = ({
                     }
                     .lede {
                         font-size: 1rem; line-height: 1.55;
-                        color: var(--ink-soft); margin-bottom: 2rem;
+                        color: var(--cp-fg-2); margin-bottom: 2rem;
                     }
                     .card-grid {
                         display: grid; gap: 1.25rem;
@@ -126,8 +123,8 @@ export const AgentInspectorsPage = ({
                         .card-grid { grid-template-columns: 1fr; }
                     }
                     .card {
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 16px;
                         padding: 1.5rem;
                         display: flex; flex-direction: column; gap: 1rem;
@@ -144,12 +141,12 @@ export const AgentInspectorsPage = ({
                         flex-shrink: 0;
                         width: 64px; height: 64px;
                         border-radius: 50%;
-                        background: var(--surface-soft);
+                        background: var(--cp-bg-muted);
                         display: flex; align-items: center; justify-content: center;
                         overflow: hidden;
                         font-family: 'Fraunces', serif; font-weight: 700;
                         font-size: 1.5rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                     }
                     .avatar img {
                         width: 100%; height: 100%; object-fit: cover;
@@ -158,19 +155,19 @@ export const AgentInspectorsPage = ({
                     .card-name {
                         font-family: 'Fraunces', serif; font-weight: 700;
                         font-size: 1.125rem; letter-spacing: -0.01em;
-                        line-height: 1.2; color: var(--ink);
+                        line-height: 1.2; color: var(--cp-fg-1);
                         margin-bottom: 0.25rem;
                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                     }
                     .card-tenant {
                         font-size: 0.75rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         text-transform: uppercase; letter-spacing: 0.12em;
                         font-weight: 600;
                     }
                     .card-body {
                         font-size: 0.875rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         line-height: 1.5;
                     }
                     .copy-row {
@@ -198,7 +195,7 @@ export const AgentInspectorsPage = ({
                     .copy-preview {
                         position: absolute;
                         left: 0; right: 0; bottom: calc(100% + 0.5rem);
-                        background: var(--ink);
+                        background: var(--cp-fg-1);
                         color: #fff;
                         padding: 0.5rem 0.75rem;
                         border-radius: 8px;
@@ -217,16 +214,16 @@ export const AgentInspectorsPage = ({
                         transform: translateY(0);
                     }
                     .empty-card {
-                        background: var(--surface-card);
-                        border: 1px dashed var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px dashed var(--cp-border-color);
                         border-radius: 16px;
                         padding: 3rem 2rem;
                         text-align: center;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                     }
                     .empty-card h3 {
                         font-family: 'Fraunces', serif; font-weight: 700;
-                        font-size: 1.25rem; color: var(--ink);
+                        font-size: 1.25rem; color: var(--cp-fg-1);
                         margin-bottom: 0.5rem;
                     }
                 ` }} />

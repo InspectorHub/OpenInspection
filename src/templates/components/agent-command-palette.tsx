@@ -259,6 +259,22 @@ export const AgentCommandPalette = (props: AgentCommandPaletteProps): JSX.Elemen
                     box-shadow: 0 8px 24px -8px rgba(0,0,0,0.4);
                     z-index: 10001;
                 }
+                html[data-color-scheme="dark"] .agent-cmdk-backdrop { background: rgba(0,0,0,0.55); }
+                html[data-color-scheme="dark"] .agent-cmdk-shell { background: #1e293b; border-color: rgba(255,255,255,0.10); box-shadow: 0 24px 48px -12px rgba(0,0,0,0.5); }
+                html[data-color-scheme="dark"] .agent-cmdk-header { border-bottom-color: rgba(255,255,255,0.06); }
+                html[data-color-scheme="dark"] .agent-cmdk-header-title { color: #f1f5f9; }
+                html[data-color-scheme="dark"] .agent-cmdk-esc { color: #94a3b8; border-color: rgba(255,255,255,0.10); background: rgba(255,255,255,0.03); }
+                html[data-color-scheme="dark"] .agent-cmdk-search { border-bottom-color: rgba(255,255,255,0.06); }
+                html[data-color-scheme="dark"] .agent-cmdk-search input { color: #f1f5f9; }
+                html[data-color-scheme="dark"] .agent-cmdk-search input::placeholder { color: #64748b; }
+                html[data-color-scheme="dark"] .agent-cmdk-search-icon { color: #64748b; }
+                html[data-color-scheme="dark"] .agent-cmdk-group-label { color: #64748b; }
+                html[data-color-scheme="dark"] .agent-cmdk-empty { color: #94a3b8; }
+                html[data-color-scheme="dark"] .agent-cmdk-item { color: #e2e8f0; }
+                html[data-color-scheme="dark"] .agent-cmdk-item-hint { color: #64748b; }
+                html[data-color-scheme="dark"] .agent-cmdk-footer { background: rgba(255,255,255,0.02); border-top-color: rgba(255,255,255,0.06); color: #94a3b8; }
+                html[data-color-scheme="dark"] .agent-cmdk-footer kbd { background: #162032; border-color: rgba(255,255,255,0.10); color: #cbd5e1; }
+                html[data-color-scheme="dark"] .agent-cmdk-toast { background: #f1f5f9; color: #0f172a; }
             ` }} />
 
             {/* Backdrop */}

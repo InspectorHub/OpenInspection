@@ -50,10 +50,25 @@
         };
     }
 
+    // Mirrors footerBar() in footer-bar.js — sticky sync-status footer
+    // on the inspection editor. Real factory in /js/footer-bar.js is a
+    // `<script type="module">` so it loads after Alpine; without this
+    // stub the chip's x-show/x-text bindings throw "syncStatus is not
+    // defined" until the module catches up.
+    function footerBarStub() {
+        return {
+            state: { online: true, length: 0, syncing: false, lastSyncedAt: null, conflicts: [] },
+            syncStatus: 'online',
+            lastSyncedRel: '',
+            init: noop,
+        };
+    }
+
     document.addEventListener('alpine:init', function () {
         if (window.Alpine && typeof window.Alpine.data === 'function') {
             window.Alpine.data('networkPill', networkPillStub);
             window.Alpine.data('conflictModal', conflictModalStub);
+            window.Alpine.data('footerBar', footerBarStub);
         }
     });
 })();

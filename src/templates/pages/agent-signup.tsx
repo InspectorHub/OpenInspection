@@ -23,22 +23,21 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Become a partner agent | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
                         --primary: ${primaryColor};
                         --primary-soft: ${primaryColor}14;
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #a8a29e;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         display: flex;
                         -webkit-font-smoothing: antialiased;
@@ -57,14 +56,20 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         }
                     }
 
-                    /* Left: editorial value-prop */
+                    /* Left: editorial value-prop. Uses the shared
+                       --cp-hero-bg / --cp-hero-fg tokens (also used by
+                       inspector-profile's trust-strip) so the marketing
+                       hero shares one warm-dark palette across the
+                       customer-portal + agent surfaces. Flat fill +
+                       the existing radial accent (::before) — no
+                       linear-gradient (single brand gradient rule). */
                     .value-pane {
                         display: flex;
                         flex-direction: column;
                         justify-content: center;
                         padding: 3rem 2rem;
-                        background: linear-gradient(155deg, #1c1917 0%, #292524 100%);
-                        color: #fafaf9;
+                        background: var(--cp-hero-bg);
+                        color: var(--cp-hero-fg);
                         position: relative;
                         overflow: hidden;
                     }
@@ -156,7 +161,7 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         margin-bottom: 0.5rem;
                     }
                     .form-sub {
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         font-size: 0.9375rem;
                         line-height: 1.55;
                         margin-bottom: 2rem;
@@ -166,7 +171,7 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         display: block;
                         font-size: 0.8125rem;
                         font-weight: 600;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         margin-bottom: 0.5rem;
                     }
                     .form-input {
@@ -174,9 +179,9 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         padding: 0.75rem 1rem;
                         font-size: 0.9375rem;
                         font-family: inherit;
-                        color: var(--ink);
-                        background: #ffffff;
-                        border: 1.5px solid var(--line);
+                        color: var(--cp-fg-1);
+                        background: var(--cp-bg-card);
+                        border: 1.5px solid var(--cp-border-color);
                         border-radius: 12px;
                         outline: none;
                         transition: border-color 0.15s, box-shadow 0.15s;
@@ -205,9 +210,9 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         margin-top: 1rem;
                         padding: 0.75rem 1rem;
                         border-radius: 10px;
-                        background: #fef2f2;
-                        border: 1px solid #fecaca;
-                        color: #b91c1c;
+                        background: var(--ih-status-bad-bg);
+                        border: 1px solid var(--ih-status-bad);
+                        color: var(--ih-status-bad-fg);
                         font-size: 0.875rem;
                     }
                     .error-box.hidden { display: none; }
@@ -215,7 +220,7 @@ export const AgentSignupPage = ({ siteKey, branding }: AgentSignupProps = {}): J
                         display: block;
                         margin-top: 1.5rem;
                         font-size: 0.875rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         text-align: center;
                     }
                     .login-link a {

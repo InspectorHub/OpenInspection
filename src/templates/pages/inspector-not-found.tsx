@@ -11,6 +11,9 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .title { font-family: 'Fraunces', Georgia, serif; font-size: 32px; margin: 0 0 16px; font-weight: 600; }
 .body { color: #475569; line-height: 1.6; font-size: 15px; }
 code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; }
+html[data-color-scheme="dark"] body { background: #0b1120; color: #f1f5f9; }
+html[data-color-scheme="dark"] .body { color: #cbd5e1; }
+html[data-color-scheme="dark"] code { background: rgba(255,255,255,0.06); color: #cbd5e1; }
 `;
 
 /**
@@ -23,6 +26,7 @@ export const InspectorNotFoundPage = ({ slug, companyName }: Props): JSX.Element
             <meta charset="UTF-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             <title>Inspector not found</title>
+            <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
             <link rel="stylesheet" href="/fonts.css" />
             {raw(`<style>${NOT_FOUND_STYLES}</style>`)}
         </head>

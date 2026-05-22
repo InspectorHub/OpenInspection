@@ -33,17 +33,23 @@ export const ConciergeConfirmExpiredPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Confirmation link unavailable | ${siteName}`}</title>
+                {/* Customer-portal page — follow system color preference only;
+                    no localStorage / no in-page toggle (per design system). */}
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',p?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
+                    /* Customer-portal page — uses the warm --cp-* tokens
+                       defined in input.css (auto-swap to warm-dark via the
+                       [data-color-scheme="dark"] attribute set by FOUC). */
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: #fafaf9; color: #1c1917;
+                        background: var(--cp-bg); color: var(--cp-fg-1);
                         min-height: 100vh; display: flex; align-items: center; justify-content: center;
                         padding: 2rem 1.25rem;
                     }
                     .card {
-                        background: #fff; border: 1px solid #e7e5e4;
+                        background: var(--cp-bg-card); border: var(--cp-border);
                         border-radius: 14px; padding: 2.25rem 1.75rem;
                         max-width: 480px; width: 100%;
                     }
@@ -52,10 +58,10 @@ export const ConciergeConfirmExpiredPage = ({
                         font-size: 1.5rem; font-weight: 700;
                         line-height: 1.2; margin-bottom: 0.625rem;
                     }
-                    p { font-size: 0.9375rem; color: #57534e; line-height: 1.55; }
+                    p { font-size: 0.9375rem; color: var(--cp-fg-2); line-height: 1.55; }
                     .icon {
                         width: 48px; height: 48px; border-radius: 12px;
-                        background: ${primaryColor}14; color: ${primaryColor};
+                        background: ${primaryColor}26; color: ${primaryColor};
                         display: flex; align-items: center; justify-content: center;
                         font-size: 1.5rem; margin-bottom: 1rem;
                     }

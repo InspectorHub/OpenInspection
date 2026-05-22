@@ -4,9 +4,13 @@
 function templateEditor() {
     return {
         showRatingModal: false,
-        showCannedPanel: false,
         showIconPicker: false,
         previewMode: false,
+        // Right-rail tab — 'properties' | 'comments' | 'preview'.
+        // Mirrors the inspection editor's SideRail Preview/Library/Recall
+        // pattern so an inspector flipping between the two surfaces
+        // builds one mental model for the right rail.
+        rightRailMode: 'properties',
         selectedSectionId: null,
         selectedItemId: null,
         commentSearch: '',
@@ -99,7 +103,14 @@ function templateEditor() {
             this.selectedSectionId = id;
             this.selectedItemId = null;
         },
-        selectItem(id) { this.selectedItemId = id; this.updateChoicesText(); },
+        selectItem(id) {
+            this.selectedItemId = id;
+            this.updateChoicesText();
+            // Auto-flip the right rail to Properties so the user lands on
+            // the per-item config without an extra click. Keep Comments
+            // / Preview deliberate (user has to tab over explicitly).
+            this.rightRailMode  = 'properties';
+        },
 
         addSection() {
             const id = 'sec_' + (crypto.randomUUID?.() ?? Date.now() + '_' + Math.random().toString(36).slice(2, 8));

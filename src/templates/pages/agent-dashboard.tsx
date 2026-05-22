@@ -150,27 +150,21 @@ export const AgentDashboardPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Agent dashboard | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
                         --primary: ${primaryColor};
                         --primary-soft: ${primaryColor}14;
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #a8a29e;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
-                        --surface-card: #ffffff;
-                        --good: #15803d;
-                        --good-soft: #15803d14;
-                        --warn: #b45309;
-                        --slate: #475569;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         -webkit-font-smoothing: antialiased;
                     }
@@ -187,13 +181,13 @@ export const AgentDashboardPage = ({
                     }
                     .topbar-actions { display: flex; gap: 0.5rem; }
                     .topbar-link {
-                        background: transparent; border: 1.5px solid var(--line);
-                        color: var(--ink); padding: 0.5rem 1rem;
+                        background: transparent; border: 1.5px solid var(--cp-border-color);
+                        color: var(--cp-fg-1); padding: 0.5rem 1rem;
                         font-family: inherit; font-size: 0.8125rem; font-weight: 600;
                         border-radius: 10px; cursor: pointer; text-decoration: none;
                         transition: border-color 0.15s;
                     }
-                    .topbar-link:hover { border-color: var(--ink-faint); }
+                    .topbar-link:hover { border-color: var(--cp-fg-4); }
                     .shell {
                         max-width: 1080px; margin: 0 auto;
                         padding: 1rem 1.5rem 4rem;
@@ -206,7 +200,7 @@ export const AgentDashboardPage = ({
                     .editorial-h1 em { font-style: italic; color: var(--primary); }
                     .lede {
                         font-size: 1rem; line-height: 1.55;
-                        color: var(--ink-soft); margin-bottom: 2rem;
+                        color: var(--cp-fg-2); margin-bottom: 2rem;
                     }
                     .stats {
                         display: grid; gap: 1rem;
@@ -214,8 +208,8 @@ export const AgentDashboardPage = ({
                         margin-bottom: 2rem;
                     }
                     .stat-card {
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 16px;
                         padding: 1.25rem 1.5rem;
                         display: flex; flex-direction: column; gap: 0.5rem;
@@ -228,15 +222,15 @@ export const AgentDashboardPage = ({
                     .stat-eyebrow {
                         font-size: 0.6875rem; font-weight: 700;
                         text-transform: uppercase; letter-spacing: 0.18em;
-                        color: var(--ink-faint);
+                        color: var(--cp-fg-4);
                     }
                     .stat-value {
                         font-family: 'Fraunces', serif; font-weight: 700;
                         font-size: 2.5rem; line-height: 1; letter-spacing: -0.02em;
-                        color: var(--ink);
+                        color: var(--cp-fg-1);
                     }
                     .stat-card.has-attention .stat-value { color: var(--primary); }
-                    .stat-help { font-size: 0.8125rem; color: var(--ink-soft); }
+                    .stat-help { font-size: 0.8125rem; color: var(--cp-fg-2); }
                     /* Frontend-design polish #1 — inline sparkline on the
                        'Active referrals' card. The flex row keeps the big
                        Fraunces number anchor-left and the trend line tucked
@@ -251,8 +245,8 @@ export const AgentDashboardPage = ({
                         margin-bottom: 0.25rem;
                     }
                     .tenant-section {
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 16px;
                         margin-bottom: 1rem;
                         overflow: hidden;
@@ -261,8 +255,8 @@ export const AgentDashboardPage = ({
                         display: flex; align-items: center; gap: 0.75rem;
                         padding: 1rem 1.25rem;
                         cursor: pointer;
-                        background: var(--surface);
-                        border-bottom: 1px solid var(--line);
+                        background: var(--cp-bg);
+                        border-bottom: 1px solid var(--cp-border-color);
                     }
                     .tenant-band {
                         width: 4px; align-self: stretch;
@@ -275,11 +269,11 @@ export const AgentDashboardPage = ({
                     }
                     .tenant-meta {
                         margin-left: auto;
-                        font-size: 0.75rem; color: var(--ink-faint);
+                        font-size: 0.75rem; color: var(--cp-fg-4);
                         font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em;
                     }
                     .tenant-toggle {
-                        font-size: 0.75rem; color: var(--ink-faint);
+                        font-size: 0.75rem; color: var(--cp-fg-4);
                         transition: transform 0.15s;
                     }
                     .tenant-section[data-open="false"] .tenant-toggle { transform: rotate(-90deg); }
@@ -290,7 +284,7 @@ export const AgentDashboardPage = ({
                         grid-template-columns: 1fr 220px auto;
                         gap: 1rem; align-items: center;
                         padding: 1rem 1.25rem;
-                        border-bottom: 1px solid var(--line);
+                        border-bottom: 1px solid var(--cp-border-color);
                         /* UC-A-4 — entire row is an <a>; strip default link styles so it
                            inherits the surface look. */
                         color: inherit;
@@ -319,48 +313,48 @@ export const AgentDashboardPage = ({
                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                     }
                     .referral-meta {
-                        font-size: 0.75rem; color: var(--ink-soft);
+                        font-size: 0.75rem; color: var(--cp-fg-2);
                         display: flex; gap: 0.5rem; flex-wrap: wrap;
                     }
-                    .referral-meta .sep { color: var(--ink-faint); }
+                    .referral-meta .sep { color: var(--cp-fg-4); }
                     .sparkline {
                         display: flex; align-items: center; gap: 0.25rem;
                     }
                     .sparkline-step {
                         width: 28px; height: 6px; border-radius: 3px;
-                        background: var(--line);
+                        background: var(--cp-border-color);
                         transition: background 0.15s;
                     }
                     .sparkline-step.on { background: var(--primary); }
-                    .sparkline-step.on.paid { background: var(--good); }
+                    .sparkline-step.on.paid { background: var(--ih-status-ok-fg); }
                     .sparkline-label {
                         font-size: 0.6875rem; font-weight: 700;
                         text-transform: uppercase; letter-spacing: 0.12em;
-                        color: var(--ink-faint); margin-left: 0.5rem;
+                        color: var(--cp-fg-4); margin-left: 0.5rem;
                     }
                     .row-cta {
                         font-size: 0.8125rem; font-weight: 600;
                         color: var(--primary); text-decoration: none;
                         padding: 0.375rem 0.75rem; border-radius: 8px;
-                        border: 1px solid var(--line);
+                        border: 1px solid var(--cp-border-color);
                         transition: border-color 0.15s, background 0.15s;
                     }
                     .row-cta:hover { border-color: var(--primary); background: var(--primary-soft); }
                     .row-cta.disabled {
-                        color: var(--ink-faint); cursor: default;
+                        color: var(--cp-fg-4); cursor: default;
                         pointer-events: none;
                     }
                     .empty-card {
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 16px;
                         padding: 2.5rem 2rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
                     }
                     .empty-card h3 {
                         font-family: 'Fraunces', serif; font-weight: 600;
-                        font-size: 1.5rem; color: var(--ink);
+                        font-size: 1.5rem; color: var(--cp-fg-1);
                         margin: 0 0 0.5rem;
                         letter-spacing: -0.01em;
                     }
@@ -379,8 +373,8 @@ export const AgentDashboardPage = ({
                         grid-template-columns: 28px 1fr;
                         gap: 0.875rem;
                         padding: 1rem 1.25rem;
-                        background: var(--surface);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 12px;
                     }
                     .empty-step-num {
@@ -392,13 +386,13 @@ export const AgentDashboardPage = ({
                         font-size: 0.875rem;
                     }
                     .empty-step-title {
-                        font-weight: 600; color: var(--ink);
+                        font-weight: 600; color: var(--cp-fg-1);
                         font-size: 0.9375rem;
                         margin: 0 0 0.25rem;
                     }
                     .empty-step-body {
                         font-size: 0.8125rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         margin: 0;
                     }
                     .empty-step-body a {

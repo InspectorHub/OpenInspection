@@ -12,7 +12,7 @@
  */
 
 import { MainLayout } from '../../layouts/main-layout';
-import { InspectionShell } from '../../components/inspection-shell';
+import { PageHeader } from '../../components/page-header';
 import type { BrandingConfig } from '../../../types/auth';
 
 export interface RepairListEntry {
@@ -47,8 +47,6 @@ export interface RepairListPageProps {
     };
     showEstimates:   boolean;
     branding?:       BrandingConfig | undefined;
-    requestId?:      string | undefined;
-    siblings?:       Array<{ id: string; templateName: string; status: string }> | undefined;
 }
 
 const CATEGORY_TONE: Record<RepairListEntry['category'], { bg: string; text: string; ring: string; label: string }> = {
@@ -95,8 +93,6 @@ export const RepairListPage = ({
     totals,
     showEstimates,
     branding,
-    requestId,
-    siblings,
 }: RepairListPageProps): JSX.Element => {
     const siteName = branding?.siteName || 'OpenInspection';
     const grouped = groupBySection(defects);
@@ -107,14 +103,16 @@ export const RepairListPage = ({
             {...(branding ? { branding } : {})}
             extraHead={<style dangerouslySetInnerHTML={{ __html: REPAIR_LIST_CSS }} />}
         >
-            <InspectionShell
-                inspectionId={inspectionId}
-                propertyAddress={propertyAddress}
-                current="repair-list"
-                enableRepairList={true}
-                {...(requestId ? { requestId } : {})}
-                {...(siblings  ? { siblings  } : {})}
-            >
+            <div class="space-y-6">
+                <PageHeader
+                    breadcrumb={[
+                        { label: 'Inspections', href: '/dashboard' },
+                        { label: 'Editor', href: `/inspections/${inspectionId}/report` },
+                        { label: 'Repair List' },
+                    ]}
+                    title={propertyAddress || 'Inspection'}
+                    showBack={true}
+                />
                 <div class="space-y-6">
                     {/* Header summary + Print button */}
                     <div class="flex flex-wrap items-end justify-between gap-3">
@@ -258,7 +256,7 @@ export const RepairListPage = ({
                         </section>
                     ))}
                 </div>
-            </InspectionShell>
+            </div>
         </MainLayout>
     );
 };

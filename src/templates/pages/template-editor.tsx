@@ -3,40 +3,43 @@ import { Modal } from '../components/modal';
 import { BrandingConfig } from '../../types/auth';
 
 const EDITOR_CSS = `
-.bg-grid { background-image: radial-gradient(circle, #d5d0c8 0.75px, transparent 0.75px); background-size: 24px 24px; }
-.glass-warm { background: rgba(255, 253, 250, 0.82); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255,255,255,0.7); }
+/* Slate-cool editor language — mirrors inspection-edit.tsx so an inspector
+   moving between the two surfaces (designing a template vs filling out an
+   inspection) sees one continuous visual system. All colour decisions are
+   pinned to the same dot / glass / surface values used over there. */
+.bg-grid { background-image: radial-gradient(circle, #cbd5e1 0.6px, transparent 0.6px); background-size: 20px 20px; }
+.glass-warm { background: rgba(255,255,255,0.85); backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(226,232,240,0.6); }
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #d0cbc4; border-radius: 999px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
 .drag-handle { cursor: grab; touch-action: none; }
 .drag-handle:active { cursor: grabbing; }
 .sortable-ghost { opacity: 0.35; }
-.sortable-chosen { box-shadow: 0 8px 25px -5px rgba(74, 114, 255, 0.25); transform: scale(1.02); z-index: 50; }
+.sortable-chosen { box-shadow: 0 8px 25px -5px rgba(99,102,241,0.25); transform: scale(1.02); z-index: 50; }
 .sortable-drag { opacity: 0.9; }
 .icon-picker-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
 .icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; transition: all 0.15s; border: 2px solid transparent; }
-.icon-btn:hover { background: #eef4ff; border-color: #bcd2ff; }
-.icon-btn.active { background: #eef4ff; border-color: var(--ih-primary, #6366f1); }
+.icon-btn:hover { background: rgba(99,102,241,0.10); border-color: rgba(99,102,241,0.30); }
+.icon-btn.active { background: rgba(99,102,241,0.10); border-color: var(--ih-primary, #6366f1); }
 [x-cloak] { display: none !important; }
 .section-accent { border-left: 3px solid var(--section-color, var(--ih-primary, #6366f1)); }
 .rating-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 3px rgba(74, 114, 255, 0.15); }
+input:focus, textarea:focus, select:focus { outline: none; box-shadow: var(--ih-shadow-focus, 0 0 0 3px rgba(99,102,241,0.30)); }
 
 /* ── Dark mode overrides ───────────────────────────────────────────────────
-   Global styles.css overrides bg-surface-50/100 and all inputs/selects,
-   but misses /opacity variants (bg-surface-50/90) and bg-white/50 panels.
-   Semantic class names below restore the correct dark appearance. */
-[data-color-scheme=dark] .editor-header {
-  background-color: rgba(11,17,32,0.92) !important;
-  border-color: rgba(255,255,255,0.08) !important;
-}
+   Aligned 1:1 with inspection-edit.tsx so both editors flip dark to the
+   same slate-900 / slate-800 family (not the slate-bg-app slate-950 used
+   previously here). Global styles.css covers bg-surface-50/100 + inputs
+   + selects already; the rules below restore /opacity variants and
+   bg-white/50 panels the global rules can't reach. */
+[data-color-scheme=dark] .editor-header,
 [data-color-scheme=dark] .editor-subheader {
-  background-color: rgba(11,17,32,0.92) !important;
-  border-color: rgba(255,255,255,0.06) !important;
+  background-color: rgba(15,23,42,0.92) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 [data-color-scheme=dark] .editor-side-panel {
-  background-color: rgba(11,17,32,0.55) !important;
-  border-color: rgba(255,255,255,0.07) !important;
+  background-color: rgba(15,23,42,0.80) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 /* Undo global input override for transparent inline title/section editors.
    Selector specificity must exceed the global rule (0,4,2) — achieved by
@@ -49,36 +52,36 @@ html[data-color-scheme=dark] input.editor-section-input:not([type=checkbox]):not
 html[data-color-scheme=dark] input.editor-title-input:hover,
 html[data-color-scheme=dark] input.editor-section-input:hover { border-bottom-color: rgba(255,255,255,0.18) !important; }
 html[data-color-scheme=dark] input.editor-title-input:focus,
-html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-color: #4a72ff !important; }
+html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-color: var(--ih-primary, #6366f1) !important; }
 [data-color-scheme=dark] .bg-grid {
-  background-image: radial-gradient(circle, #334155 0.75px, transparent 0.75px);
+  background-image: radial-gradient(circle, #334155 0.6px, transparent 0.6px);
 }
 [data-color-scheme=dark] .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; }
 [data-color-scheme=dark] .glass-warm {
-  background: rgba(15,23,42,0.85) !important;
-  border-color: rgba(255,255,255,0.08) !important;
+  background: rgba(30,41,59,0.85) !important;
+  border-color: rgba(51,65,85,0.70) !important;
 }
 [data-color-scheme=dark] .icon-picker-wrap {
   background-color: #1e293b !important;
-  border-color: rgba(255,255,255,0.1) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
-[data-color-scheme=dark] .icon-btn:hover { background: rgba(74,114,255,0.2) !important; border-color: rgba(74,114,255,0.4) !important; }
-[data-color-scheme=dark] .icon-btn.active { background: rgba(74,114,255,0.2) !important; border-color: #4a72ff !important; }
+[data-color-scheme=dark] .icon-btn:hover { background: rgba(99,102,241,0.20) !important; border-color: rgba(99,102,241,0.40) !important; }
+[data-color-scheme=dark] .icon-btn.active { background: rgba(99,102,241,0.20) !important; border-color: var(--ih-primary, #818cf8) !important; }
 [data-color-scheme=dark] .editor-main {
-  background-color: rgba(11,17,32,0.6) !important;
+  background-color: rgba(15,23,42,0.60) !important;
 }
 [data-color-scheme=dark] .editor-canned-panel {
   background-color: #0f172a !important;
-  border-color: rgba(255,255,255,0.08) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 [data-color-scheme=dark] .editor-canned-panel .bg-surface-50,
 [data-color-scheme=dark] .editor-canned-panel input {
   background-color: rgba(255,255,255,0.05) !important;
-  border-color: rgba(255,255,255,0.08) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 [data-color-scheme=dark] .editor-props-header {
-  background-color: rgba(11,17,32,0.85) !important;
-  border-color: rgba(255,255,255,0.07) !important;
+  background-color: rgba(15,23,42,0.85) !important;
+  border-color: rgba(226,232,240,0.10) !important;
 }
 /* Section list: selected card (bg-blueprint-50 = light blue → dark indigo tint) */
 [data-color-scheme=dark] #sectionsList .bg-blueprint-50 {
@@ -87,19 +90,20 @@ html[data-color-scheme=dark] input.editor-section-input:focus { border-bottom-co
 [data-color-scheme=dark] #sectionsList .text-blueprint-700 {
   color: #a5b4fc !important;
 }
-/* Item cards: bg-white → dark slate surface */
+/* Item cards: bg-white → dark slate surface (matches inspection-edit
+   .item-card dark value rgba(30,41,59,0.85)). */
 [data-color-scheme=dark] #itemsList .bg-white {
   background-color: #1e293b !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
 }
 /* Item selected highlight: bg-blueprint-50/40 → subtle indigo tint */
 [data-color-scheme=dark] #itemsList .bg-blueprint-50\/40 {
-  background-color: rgba(99,102,241,0.1) !important;
+  background-color: rgba(99,102,241,0.10) !important;
 }
-/* Section icon badge: unselected state has inline bg #f3f1ed (beige) → dark muted */
+/* Section icon badge: unselected state uses inline slate-100 bg → dark muted */
 [data-color-scheme=dark] #sectionsList > div:not(.bg-blueprint-50) .editor-section-icon {
   background: rgba(255,255,255,0.07) !important;
-  color: rgba(255,255,255,0.4) !important;
+  color: rgba(255,255,255,0.40) !important;
 }
 /* Header blueprint-50 buttons (Comments active state, version badge, etc.) */
 [data-color-scheme=dark] .editor-header .bg-blueprint-50 {
@@ -156,8 +160,13 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                 <span x-text="template.ratingSystem.name" class="max-w-[140px] truncate"></span>
                             </button>
                             <div class="w-px h-6 bg-surface-200 mx-1"></div>
-                            <button {...{'@click': 'showCannedPanel = !showCannedPanel'}} class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-600 transition-colors"
-                                x-bind:class="showCannedPanel ? 'bg-blueprint-50 text-blueprint-600' : 'text-ink-600 hover:bg-surface-100'">
+                            {/* Comments shortcut — flips the right rail to
+                                the Comments tab instead of opening a
+                                competing slide panel. The slide panel was
+                                removed when the rail picked up tabs (the
+                                two surfaces overlapped each other badly). */}
+                            <button {...{'@click': "rightRailMode = 'comments'"}} class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-600 transition-colors"
+                                x-bind:class="rightRailMode === 'comments' ? 'bg-blueprint-50 text-blueprint-600' : 'text-ink-600 hover:bg-surface-100'">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
                                 Comments
                                 <span class="bg-ink-300/20 text-ink-600 text-[10px] font-mono font-600 px-1.5 py-0.5 rounded" x-text="cannedComments.length"></span>
@@ -207,7 +216,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
                                         </span>
                                         <span class="editor-section-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                                            x-bind:style="selectedSectionId === section.id ? 'background:' + sectionColor(section) + '18; color:' + sectionColor(section) : 'background: #f3f1ed; color: #908a83'">
+                                            x-bind:style="selectedSectionId === section.id ? 'background:' + sectionColor(section) + '18; color:' + sectionColor(section) : 'background: #f1f5f9; color: #94a3b8'">
                                             <template x-if="getSectionIconSvg(section.icon)">
                                                 <span x-html="getSectionIconSvg(section.icon)"></span>
                                             </template>
@@ -339,7 +348,7 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                         <div class="w-16 h-16 rounded-md bg-surface-100 flex items-center justify-center mx-auto mb-4">
                                             <svg class="w-8 h-8 text-ink-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                                         </div>
-                                        <p class="text-ink-400 font-500">No items yet</p>
+                                        <div class="ih-empty-state"><h3 class="ih-empty-state__title">No items yet</h3></div>
                                         <p class="text-ink-300 text-sm mt-1">Add inspection points to this section</p>
                                     </div>
                                 </div>
@@ -379,13 +388,37 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                         </template>
                     </main>
 
-                    {/* RIGHT: Properties Panel */}
-                    <aside class="editor-side-panel w-[340px] border-l border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin"
-                        x-show="selectedItem" x-transition:enter="transition ease-out duration-200"
-                        x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0">
+                    {/* RIGHT: Side Rail — Properties / Comments / Preview tabs.
+                        Mirrors the inspection-editor's SideRail tabbed model
+                        (Preview / Library / Recall) so the same right-edge
+                        affordance carries the right scope for whichever editor
+                        the user is in. Always visible (no longer gated on
+                        `selectedItem`) so the user can browse comments or
+                        preview a section before picking an item. */}
+                    <aside class="editor-side-panel w-[340px] border-l border-surface-200/60 bg-white/50 flex flex-col flex-shrink-0 overflow-hidden">
+                        {/* Tab strip — pill-on-muted-track, matches the
+                            inspection editor's pattern. */}
+                        <nav role="tablist" aria-label="Right rail mode" class="flex gap-1 p-1 mx-3 mt-3 mb-2 rounded-md bg-surface-100">
+                            <template x-for="tab in [{id:'properties',label:'Properties'},{id:'comments',label:'Comments'},{id:'preview',label:'Preview'}]" x-bind:key="tab.id">
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    x-on:click="rightRailMode = tab.id"
+                                    x-bind:aria-selected="rightRailMode === tab.id ? 'true' : 'false'"
+                                    x-bind:class="rightRailMode === tab.id
+                                        ? 'bg-white text-ink-900 shadow-sm'
+                                        : 'text-ink-500 hover:text-ink-800'"
+                                    class="flex-1 px-2 py-1.5 rounded text-[11px] font-700 transition-colors"
+                                    x-text="tab.label"
+                                ></button>
+                            </template>
+                        </nav>
+
+                        {/* ─────────── Properties tab ─────────── */}
+                        <div x-show="rightRailMode === 'properties'" x-cloak class="flex-1 overflow-y-auto scrollbar-thin">
                         <template x-if="selectedItem">
                             <div class="animate-fade-in">
-                                <div class="editor-props-header px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+                                <div class="editor-props-header px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-surface-50/95 z-10">
                                     <div class="flex items-center justify-between mb-1">
                                         <span class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Item Properties</span>
                                         <button {...{'@click': 'removeItem(selectedItemId)'}} class="text-ink-300 hover:text-red-500 transition-colors p-1">
@@ -590,6 +623,81 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                                 </div>
                             </div>
                         </template>
+                        </div>
+
+                        {/* ─────────── Comments tab ─────────── */}
+                        {/* Template-wide canned-comments library. Was a
+                            slide-over panel; folded into the rail so the
+                            user doesn't have to dismiss it before getting
+                            back to per-item editing. */}
+                        <div x-show="rightRailMode === 'comments'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+                            <div class="px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-surface-50/95 z-10">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Canned Comments</span>
+                                    <span class="font-mono text-[10px] text-ink-300" x-text="cannedComments.length + ' total'"></span>
+                                </div>
+                            </div>
+                            <div class="p-4 space-y-3 border-b border-surface-200/40">
+                                <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50">
+                                    <svg class="w-4 h-4 text-ink-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
+                                    <input type="text" x-model="commentSearch" class="flex-1 text-sm bg-transparent border-0 p-0 focus:ring-0" placeholder="Search comments..." />
+                                </div>
+                                <input type="text" x-model="newCommentText" placeholder="Comment text..." class="w-full text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="newCommentCategory" placeholder="Category (optional)" class="flex-1 text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
+                                    <button {...{'@click': 'addCannedComment()'}} class="px-4 py-2 rounded-xl bg-blueprint-600 text-white text-sm font-600 hover:bg-blueprint-700 transition-colors">Add</button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2 scrollbar-thin">
+                                <template x-for="cc in filteredComments()" x-bind:key="cc.id">
+                                    <div class="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors group flex items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <span x-show="cc.category" class="text-[9px] font-700 uppercase tracking-wide text-blueprint-500 mr-1" x-text="cc.category"></span>
+                                            <span class="text-sm font-600 text-ink-700" x-text="cc.text"></span>
+                                        </div>
+                                        <button {...{'@click': 'deleteCannedComment(cc.id)'}} class="shrink-0 text-ink-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all mt-0.5">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                    </div>
+                                </template>
+                                <div x-show="filteredComments().length === 0" class="ih-empty-state"><h3 class="ih-empty-state__title">No comments yet</h3></div>
+                            </div>
+                        </div>
+
+                        {/* ─────────── Preview tab ─────────── */}
+                        {/* Lightweight render of the selected section's
+                            items as they'll appear in the inspection
+                            editor. Read-only by design — for shape & flow
+                            checks; editing happens in the centre column. */}
+                        <div x-show="rightRailMode === 'preview'" x-cloak class="flex-1 overflow-y-auto scrollbar-thin">
+                            <div class="px-5 py-4 border-b border-surface-200/40 sticky top-0 bg-surface-50/95 z-10">
+                                <span class="text-[11px] font-800 uppercase tracking-[0.12em] text-ink-400 font-display">Section Preview</span>
+                                <div class="mt-1 text-[12px] font-600 text-ink-700 truncate" x-text="selectedSection ? selectedSection.title : 'No section selected'"></div>
+                            </div>
+                            <template x-if="!selectedSection">
+                                <div class="flex items-center justify-center h-48 text-center p-6">
+                                    <p class="text-sm text-ink-400 font-500">Pick a section to preview</p>
+                                </div>
+                            </template>
+                            <template x-if="selectedSection">
+                                <div class="p-4 space-y-3">
+                                    <template x-for="it in (selectedSection.items || [])" x-bind:key="it.id">
+                                        <div class="p-3 rounded-xl border border-surface-200/60 bg-white">
+                                            <div class="flex items-center justify-between gap-2 mb-1">
+                                                <span class="text-[12px] font-600 text-ink-800 truncate" x-text="it.label || 'Untitled item'"></span>
+                                                <span class="text-[9px] font-mono text-ink-300" x-text="it.type"></span>
+                                            </div>
+                                            <p x-show="it.description" class="text-[11px] text-ink-500 leading-snug" x-text="it.description"></p>
+                                            <div x-show="it.required || it.isSafety" class="mt-1.5 flex items-center gap-1.5">
+                                                <span x-show="it.required" class="text-[9px] font-700 uppercase tracking-wide text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">required</span>
+                                                <span x-show="it.isSafety" class="text-[9px] font-700 uppercase tracking-wide text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">safety</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="!(selectedSection.items || []).length" class="ih-empty-state"><h3 class="ih-empty-state__title">No items yet</h3></div>
+                                </div>
+                            </template>
+                        </div>
                     </aside>
                 </div>
 
@@ -670,46 +778,6 @@ export const TemplateEditorPage = ({ templateId, branding }: { templateId: strin
                         </div>
                     </div>
                 </Modal>
-
-                {/* Canned Comments Slide Panel */}
-                <div x-show="showCannedPanel" x-cloak
-                    class="editor-canned-panel fixed right-0 top-16 bottom-0 w-[380px] bg-white border-l border-surface-200 shadow-2xl z-40 flex flex-col"
-                    x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-                    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
-                    <div class="px-5 py-4 border-b border-surface-200/60 flex items-center justify-between">
-                        <h3 class="text-sm font-display font-700">Canned Comments</h3>
-                        <button {...{'@click': 'showCannedPanel = false'}} class="text-ink-400 hover:text-ink-700 transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    <div class="p-4">
-                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50">
-                            <svg class="w-4 h-4 text-ink-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
-                            <input type="text" x-model="commentSearch" class="flex-1 text-sm bg-transparent border-0 p-0 focus:ring-0" placeholder="Search comments..." />
-                        </div>
-                    </div>
-                    <div class="px-4 pb-3 space-y-2">
-                        <input type="text" x-model="newCommentText" placeholder="Comment text..." class="w-full text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
-                        <div class="flex gap-2">
-                            <input type="text" x-model="newCommentCategory" placeholder="Category (optional)" class="flex-1 text-sm px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/50 focus:outline-none focus:border-blueprint-400" />
-                            <button {...{'@click': 'addCannedComment()'}} class="px-4 py-2 rounded-xl bg-blueprint-600 text-white text-sm font-600 hover:bg-blueprint-700 transition-colors">Add</button>
-                        </div>
-                    </div>
-                    <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-2 scrollbar-thin">
-                        <template x-for="cc in filteredComments()" x-bind:key="cc.id">
-                            <div class="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors group flex items-start justify-between gap-2">
-                                <div class="min-w-0">
-                                    <span x-show="cc.category" class="text-[9px] font-700 uppercase tracking-wide text-blueprint-500 mr-1" x-text="cc.category"></span>
-                                    <span class="text-sm font-600 text-ink-700" x-text="cc.text"></span>
-                                </div>
-                                <button {...{'@click': 'deleteCannedComment(cc.id)'}} class="shrink-0 text-ink-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all mt-0.5">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                            </div>
-                        </template>
-                        <p x-show="filteredComments().length === 0" class="text-sm text-ink-400 text-center py-4">No comments yet.</p>
-                    </div>
-                </div>
 
             </div>
 

@@ -13,7 +13,9 @@ import { TeamBanner } from '../components/team-banner';
 import { FooterBar } from '../components/footer-bar';
 import { ReconnectBanner } from '../components/reconnect-banner';
 import { UnitTree } from '../components/unit-tree';
+import { InspectionSettingsSheet } from '../components/inspection-settings-sheet';
 import { MintObserverLinkModal } from '../components/mint-observer-link-modal';
+import { InviteSeatModal } from '../components/invite-seat-modal';
 import type { BrandingConfig } from '../../types/auth';
 import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
 
@@ -21,8 +23,12 @@ interface InspectionEditProps {
   inspectionId: string;
   branding?: BrandingConfig | undefined;
   // Track E1 — when true, the editor's sub-nav exposes the "Repair List"
-  // 6th tab. Default off so existing tenants keep the 5-tab layout.
+  // 6th tab. Default off so existing tenants keep the original layout.
   enableRepairList?: boolean;
+  // Round-2 backlog G3 — tenant-defined referral sources are appended
+  // to the seven seeds in the settings sheet's Referral Source dropdown.
+  // Threaded from the parent route loader.
+  customReferralSources?: string[];
 }
 
 /**
@@ -43,7 +49,7 @@ function buildRecoGroups(): Array<{ group: string; items: Array<{ id: string; la
     return Array.from(groups.entries()).map(([group, items]) => ({ group, items }));
 }
 
-export function InspectionEditPage({ inspectionId, branding, enableRepairList = false }: InspectionEditProps) {
+export function InspectionEditPage({ inspectionId, branding, enableRepairList = false, customReferralSources }: InspectionEditProps) {
   const siteName = branding?.siteName || 'OpenInspection';
   const recoGroups = buildRecoGroups();
 
@@ -53,6 +59,14 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
     extraHead: (
       <>
         <link rel="stylesheet" href="/fonts.css" />
+        {/* Flatpickr — replaces native <input type="date"> in the settings
+            sheet so the date picker doesn't show "年/月/日" placeholders on
+            zh-CN systems (Chromium ignores `lang="en"` on date inputs,
+            crbug.com/333392). main-layout already loads these; BareLayout
+            doesn't, so we wire them up here for the inspection editor. */}
+        <link rel="stylesheet" href="/vendor/flatpickr.min.css" />
+        <script defer src="/vendor/flatpickr.min.js"></script>
+        <script defer src="/js/flatpickr-init.js"></script>
         <style dangerouslySetInnerHTML={{ __html: `
           /* R41 (2026-05-07) — inspection editor migrated to v3 indigo/slate.
              Inter is the page body font (inherited from main-layout); JetBrains
@@ -182,67 +196,151 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
     ),
     children: (
       <>
-      {/* Sprint 2 S2-5 — Inspection sub-route nav. Renders the 5-tab bar
-          (Report / Photos / Summary / Signatures / Settings) at the top of
-          the editor so users can switch between sub-routes without leaving
-          the page. Kept outside the inspectionEditor x-data scope so it
-          stays interactive even if the editor's Alpine init fails. */}
-      <nav
-        role="tablist"
-        aria-label="Inspection sections"
-        class="sticky top-0 z-[60] bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 print:hidden"
+      {/* Design-alignment B+C — PageChrome.
+          Matches the design spec's InspectionEditor header: back arrow,
+          property address (title) + secondary inspector/status line, then
+          a right-aligned action group (Speed / Photos / Settings / Repair
+          List / Preview / PDF / Publish). The original 5-tab Sprint 2
+          sub-nav (Report / Photos / Summary / Signatures / Settings) was
+          retired — Summary lives in the Preview link, Photos + Settings
+          fold into slide-over sheets triggered from this chrome.
+
+          The whole bar is inside the inspectionEditor x-data scope so
+          per-inspection values (propertyAddress, inspectorName, status)
+          bind directly. PDFDownloader carries its own nested scope. */}
+      {/* Unified Alpine scope wrapping the chrome + editor canvas. */}
+      <div
+        x-data={`inspectionEditor('${inspectionId}')`}
+        data-inspection-id={inspectionId}
+        class="min-h-screen editor-canvas"
       >
-        <div class="max-w-full mx-auto px-4 flex items-center gap-1 overflow-x-auto hide-scrollbar">
+      <nav
+        aria-label="Inspection header"
+        class="sticky top-0 z-[60] border-b print:hidden"
+        style="background: var(--ih-bg-card, #ffffff); border-color: var(--ih-slate-200, #e2e8f0);"
+      >
+        <div class="max-w-full mx-auto px-3 sm:px-4 flex items-center gap-3 h-14">
           <a
-            href={`/inspections/${inspectionId}/report`}
-            role="tab"
-            aria-current="page"
-            aria-selected="true"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-indigo-500 text-slate-900 dark:text-slate-100 whitespace-nowrap"
-          >Report</a>
-          <a
-            href={`/inspections/${inspectionId}/photos`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Photos</a>
-          <a
-            href={`/inspections/${inspectionId}/summary`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Summary</a>
-          {/* Track E1 (ITB §11) — opt-in 6th tab. */}
-          {enableRepairList && (
+            href="/dashboard"
+            title="Back to dashboard"
+            class="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            aria-label="Back to dashboard"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </a>
+
+          {/* Title + secondary line — the inspectionEditor factory
+              populates `inspection.propertyAddress` + `inspectorName` on
+              load; until then the secondary line stays empty and the
+              title falls back to a generic label. */}
+          <div class="min-w-0 flex-1">
+            <div class="text-[14px] font-bold text-slate-900 dark:text-slate-100 truncate" x-text="inspection.propertyAddress || 'Inspection'"></div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+              <span x-show="inspection.inspectorName" x-text="inspection.inspectorName"></span>
+              <span x-show="inspection.inspectorName && inspection.id" class="text-slate-300 dark:text-slate-600">·</span>
+              <span x-show="inspection.id" class="font-mono" x-text="'#' + String(inspection.id || '').slice(0, 8).toUpperCase()"></span>
+            </div>
+          </div>
+
+          {/* Status chip — derived from inspection.status. Tone follows
+              the design's status palette (draft/scheduled = slate;
+              in-progress = indigo; ready = emerald; etc.). */}
+          <span
+            x-show="inspection.status"
+            class="hidden sm:inline-flex items-center gap-1.5 px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-[0.12em] ring-1 ring-inset whitespace-nowrap"
+            x-bind:class="
+              inspection.status === 'completed'   ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800' :
+              inspection.status === 'in_progress' ? 'bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800' :
+              inspection.status === 'cancelled'   ? 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:ring-rose-800' :
+                                                    'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700/50 dark:text-slate-300 dark:ring-slate-600'"
+            x-text="(inspection.status || '').replace('_',' ')"
+          ></span>
+
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            {enableRepairList && (
+              <a
+                href={`/inspections/${inspectionId}/repair-list`}
+                data-testid="inspection-edit-repair-list-tab"
+                class="hidden lg:inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+              >Repair list</a>
+            )}
+
+            {/* Speed mode toggle — Z hotkey already binds this; the
+                explicit button matches the design chrome's Speed
+                affordance and improves discoverability. */}
+            <button
+              type="button"
+              x-on:click="speedMode = !speedMode"
+              x-bind:aria-pressed="speedMode ? 'true' : 'false'"
+              title="Speed mode — full-screen single-item rating (Z)"
+              class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border transition-all"
+              x-bind:class="speedMode
+                  ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600'"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span class="hidden sm:inline">Speed</span>
+              <kbd class="ih-kbd hidden md:inline" style="padding: 1px 4px; font-size: 9px;">Z</kbd>
+            </button>
+
+            {/* Photos slide-over trigger */}
+            <button
+              type="button"
+              x-on:click="$dispatch('photo-gallery:open')"
+              aria-label="Open photo gallery"
+              class="hidden md:inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <span class="hidden lg:inline">Photos</span>
+            </button>
+
+            {/* Settings slide-over trigger */}
+            <button
+              type="button"
+              x-on:click="$dispatch('inspection-settings:open')"
+              aria-label="Open inspection settings"
+              class="hidden md:inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+              <span class="hidden lg:inline">Settings</span>
+            </button>
+
+            {/* Preview — opens the rendered (final) report in a new tab. */}
             <a
-              href={`/inspections/${inspectionId}/repair-list`}
-              role="tab"
-              aria-selected="false"
-              data-testid="inspection-edit-repair-list-tab"
-              class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-            >Repair List</a>
-          )}
-          <a
-            href={`/inspections/${inspectionId}/signatures`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Signatures</a>
-          <a
-            href={`/inspections/${inspectionId}/settings`}
-            role="tab"
-            aria-selected="false"
-            class="px-4 py-2.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 whitespace-nowrap transition-colors"
-          >Settings</a>
-          {/* PDF download dropdown — ml-auto pushes it to the right edge */}
-          <div class="ml-auto flex-shrink-0 pl-2 py-1.5" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
-            <div class="relative">
+              href={`/api/inspections/${inspectionId}/report`}
+              target="_blank"
+              rel="noopener"
+              data-testid="inspection-edit-preview-report"
+              title="Open the rendered report in a new tab"
+              class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span class="hidden sm:inline">Preview</span>
+            </a>
+
+            {/* PDF download dropdown — nested x-data so the PDF state
+                doesn't leak into inspectionEditor. */}
+            <div class="relative flex-shrink-0" x-data={`pdfDownloader('${inspectionId}')`} {...{'x-on:click.outside': 'open = false'}}>
               <button
                 type="button"
                 x-on:click="open = !open"
                 x-bind:disabled="loading"
                 aria-label="Download PDF"
-                class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all disabled:opacity-60"
+                class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all disabled:opacity-60"
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -286,14 +384,23 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </button>
               </div>
             </div>
+
+            {/* Publish — primary CTA, design's Publish lives in the
+                header too. Opens PublishModal which carries the
+                pre-flight gates + envelope audit drawer. */}
+            <button
+              type="button"
+              x-on:click="showPublishModal = true"
+              class="inline-flex items-center gap-1.5 px-3 h-8 text-[12px] font-bold rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-all"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <path d="M5 12l5 5L20 7"/>
+              </svg>
+              Publish
+            </button>
           </div>
         </div>
       </nav>
-      <div
-        x-data={`inspectionEditor('${inspectionId}')`}
-        data-inspection-id={inspectionId}
-        class="min-h-screen editor-canvas"
-      >
         {/* Design System 0520 subsystem B phase 4 task 4.5 — ReconnectBanner.
             Sticky amber strip at top showing offline-queue status when
             pending writes are queued or conflicts have surfaced. */}
@@ -542,7 +649,9 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
 
                 <div x-show="item.type === 'date'" class="mb-3">
-                  <input type="date"
+                  {/* Flatpickr — see extraHead comment. Native type=date leaks
+                      OS locale on zh-CN. */}
+                  <input type="text" data-flatpickr data-no-time placeholder="YYYY-MM-DD"
                     x-bind:value="getItemValue(item.id)"
                     x-on:input="setItemValue(item.id, $event.target.value)"
                     class="px-3 py-2 text-sm rounded-lg border border-surface-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 focus:border-blueprint-500 focus:outline-none transition-colors" />
@@ -923,9 +1032,33 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 <span x-show="saveState === 'error'" x-cloak class="text-red-500">Save failed</span>
               </div>
             </div>
-            {/* Report Access */}
-            <div class="px-4 py-3 border-t space-y-2" style="border-color: rgba(226,232,240,0.5)">
-              <div class="text-[10px] font-mono font-semibold uppercase tracking-wide mb-2 text-slate-400 dark:text-slate-500">Report Access</div>
+            {/* Report Access — folded into a disclosure to free up vertical
+                space in the editor's left rail. The Agreement / Payment
+                requirements + Theme override + Share-with-Agent helpers
+                are setup affordances inspectors touch occasionally, not
+                during the rate-an-item core loop. Open state persists in
+                localStorage so users who use them often see them open. */}
+            <details
+              class="px-4 py-3 border-t group"
+              style="border-color: rgba(226,232,240,0.5)"
+              x-data="{
+                  get isOpen() {
+                      try { return localStorage.getItem('oi-editor-rep-access-open') === '1'; }
+                      catch (_) { return false; }
+                  },
+                  toggle($event) {
+                      try { localStorage.setItem('oi-editor-rep-access-open', $event.target.open ? '1' : '0'); }
+                      catch (_) {}
+                  },
+              }"
+              x-bind:open="isOpen"
+              x-on:toggle="toggle($event)"
+            >
+              <summary class="cursor-pointer flex items-center justify-between text-[10px] font-mono font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2 list-none hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                <span>Report Access</span>
+                <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
+              </summary>
+              <div class="space-y-2 pt-1">
               <label class="flex items-center justify-between cursor-pointer">
                 <span class="text-xs text-slate-600 dark:text-slate-300">Require Payment</span>
                 <button
@@ -1016,7 +1149,8 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
                 <div x-show="agentErr" x-text="agentErr" class="text-[10px] mt-1" style="color: #dc2626" />
               </div>
-            </div>
+              </div>
+            </details>
             {/* Property Info Card */}
             <div
                 x-data="{ editing: false, fields: {} }"
@@ -1076,15 +1210,87 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </div>
             </div>
             <div class="flex-1 px-3 py-2 space-y-0.5">
+              {/* Inspection group — single Property Info row.
+                  Matches design's "INSPECTION" rail group: the property
+                  meta isn't a "system" being inspected, so it lives in
+                  its own group above SYSTEMS for visual separation. */}
+              <div class="px-3 pt-1 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Inspection</div>
+              {/* Design's PropertyInfo-as-section — first row in the rail
+                  is the property facts form rather than an inspection
+                  item list. Clicking it swaps the centre pane via
+                  activeView='property'. Ring counts non-empty fact
+                  fields out of seven (yearBuilt / sqft / foundation /
+                  bedrooms / bathrooms / unit / county). */}
+              <button
+                x-on:click="selectProperty()"
+                class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
+                x-bind:class="activeView === 'property' ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'"
+                x-bind:style="activeView === 'property' ? 'color: var(--ih-primary, #6366f1)' : ''"
+              >
+                {/* Completion ring for property facts (0 / 7 → 7 / 7). */}
+                <span class="relative w-[18px] h-[18px] flex-shrink-0" aria-hidden="true">
+                  <svg viewBox="0 0 18 18" class="w-[18px] h-[18px]">
+                    <circle cx="9" cy="9" r="7" fill="none" stroke="var(--ih-slate-200, #e2e8f0)" stroke-width="2" />
+                    <circle
+                      cx="9" cy="9" r="7" fill="none" stroke-width="2" stroke-linecap="round"
+                      transform="rotate(-90 9 9)"
+                      x-bind:stroke={`propertyProgress().percent >= 100 ? 'var(--ih-status-ok)' : (propertyProgress().percent > 0 ? 'var(--ih-primary)' : 'transparent')`}
+                      x-bind:stroke-dasharray={`(propertyProgress().percent / 100 * 44) + ' 44'`}
+                    />
+                  </svg>
+                </span>
+                <span class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+                  x-bind:class="activeView === 'property' ? 'bg-indigo-100/80 dark:bg-indigo-800/40' : 'bg-slate-100 dark:bg-slate-700/50'"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold truncate">Property Info</div>
+                  <div class="text-[10px] font-mono opacity-60 tabular-nums">
+                    <span x-text="propertyProgress().rated"></span>
+                    <span class="opacity-70">/ <span x-text="propertyProgress().total"></span> facts</span>
+                  </div>
+                </div>
+              </button>
+
+              {/* Systems group — the N home systems being inspected.
+                  Header shows the section count next to the label, same
+                  shape as the design's "Systems · 12" affordance. */}
+              <div class="flex items-center justify-between px-3 pt-3 pb-1">
+                <span class="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Systems</span>
+                <span class="text-[9px] font-mono text-slate-400 dark:text-slate-500 tabular-nums" x-text="`· ${sections.length}`"></span>
+              </div>
+              {/* Each section row carries a small SVG completion ring on
+                  the left so the inspector can scan the rail and see at
+                  a glance which sections are done / in-progress / have
+                  defects. Ring colour follows the design's 4-state rule:
+                    - has defects (any) → status-bad (rose)
+                    - complete + clean  → status-ok (emerald)
+                    - in-progress       → primary (indigo)
+                    - untouched         → transparent (grey track only)
+                  Per-section progress sourced from sectionProgress() in
+                  the editor factory; defect count from sectionDefectCount(). */}
               <template x-for="(sec, idx) in sections" x-bind:key="sec.id">
                 <button
                   x-on:click="selectSection(idx)"
                   x-show="sectionMatchesSearch(sec)"
-                  class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
-                  x-bind:class="currentSectionIdx === idx ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-500 dark:text-slate-400'"
+                  class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm transition-all"
+                  x-bind:class="currentSectionIdx === idx ? 'bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'"
                   x-bind:style="currentSectionIdx === idx ? 'color: var(--ih-primary, #6366f1)' : ''"
                 >
-                  <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                  {/* Completion ring (18×18 SVG circle, r=7, circumference≈44). */}
+                  <span class="relative w-[18px] h-[18px] flex-shrink-0" aria-hidden="true">
+                    <svg viewBox="0 0 18 18" class="w-[18px] h-[18px]">
+                      <circle cx="9" cy="9" r="7" fill="none" stroke="var(--ih-slate-200, #e2e8f0)" stroke-width="2" />
+                      <circle
+                        cx="9" cy="9" r="7" fill="none" stroke-width="2" stroke-linecap="round"
+                        transform="rotate(-90 9 9)"
+                        x-bind:stroke={`sectionDefectCount(sec.id) > 0 ? 'var(--ih-status-bad)' : (sectionProgress(sec.id).percent >= 100 ? 'var(--ih-status-ok)' : (sectionProgress(sec.id).percent > 0 ? 'var(--ih-primary)' : 'transparent'))`}
+                        x-bind:stroke-dasharray={`(sectionProgress(sec.id).percent / 100 * 44) + ' 44'`}
+                      />
+                    </svg>
+                  </span>
+                  <span class="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                     x-bind:class="currentSectionIdx === idx ? 'bg-indigo-100/80 dark:bg-indigo-800/40' : 'bg-slate-100 dark:bg-slate-700/50'"
                   >
                     <template x-if="getSectionIconSvg(sec.icon)">
@@ -1096,10 +1302,13 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   </span>
                   <div class="flex-1 min-w-0">
                     <div class="font-semibold truncate" x-text="sec.title"></div>
-                    <div class="text-[10px] font-mono opacity-60" x-text="sec.items.length + ' items'"></div>
+                    <div class="text-[10px] font-mono opacity-60 tabular-nums">
+                      <span x-text="sectionProgress(sec.id).rated"></span>
+                      <span class="opacity-70">/ <span x-text="sec.items.length"></span></span>
+                    </div>
                   </div>
                   <span x-show="sectionDefectCount(sec.id) > 0"
-                    class="w-5 h-5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center"
+                    class="w-5 h-5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center tabular-nums"
                     x-text="sectionDefectCount(sec.id)"></span>
                 </button>
               </template>
@@ -1108,6 +1317,92 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
 
           {/* Center Content */}
           <main class="flex-1 min-w-0">
+            {/* Property Info view — design's __property__ section. Toggled
+                via the rail's Property Info row (selectProperty()). Body
+                shows a 7-field facts form using the same inline edit shape
+                the sidebar card used to use. Item-list view below stays
+                hidden while this is active. */}
+            <div x-show="activeView === 'property'" x-cloak class="px-6 py-6 max-w-3xl">
+              <header class="mb-6">
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Inspection</p>
+                <h2 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Property Info</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Fill the seven facts below — they print on the report cover and feed Estated auto-fill / Spectora exports.
+                </p>
+              </header>
+
+              <div
+                x-data="{ fields: {} }"
+                x-init={`fields = {
+                  yearBuilt:      inspection.yearBuilt || '',
+                  sqft:           inspection.sqft || '',
+                  foundationType: inspection.foundationType || '',
+                  bedrooms:       inspection.bedrooms || '',
+                  bathrooms:      inspection.bathrooms || '',
+                  unit:           inspection.unit || '',
+                  county:         inspection.county || inspection.addressCounty || ''
+                }`}
+                class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md p-6"
+              >
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Year built</span>
+                    <input type="number" x-model="fields.yearBuilt" placeholder="1973"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Sq ft</span>
+                    <input type="number" x-model="fields.sqft" placeholder="1840"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Foundation</span>
+                    <select x-model="fields.foundationType"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500">
+                      <option value="">—</option>
+                      <option value="basement">Basement</option>
+                      <option value="slab">Slab on grade</option>
+                      <option value="crawlspace">Crawlspace</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Unit</span>
+                    <input type="text" x-model="fields.unit" placeholder="Apt 4B"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Bedrooms</span>
+                    <input type="number" x-model="fields.bedrooms" placeholder="3"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Bathrooms</span>
+                    <input type="number" step="0.5" x-model="fields.bathrooms" placeholder="2"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono tabular-nums focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                  <label class="block sm:col-span-2">
+                    <span class="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">County</span>
+                    <input type="text" x-model="fields.county" placeholder="San Francisco County"
+                      class="mt-1 w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500" />
+                  </label>
+                </div>
+                <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Saved to the inspection. Estated auto-fill from <code class="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded">/api/inspections/:id/property-facts/autofill</code> can pre-populate these from the address.
+                  </p>
+                  <button
+                    type="button"
+                    x-on:click={`authFetch('/api/inspections/${inspectionId}', {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({yearBuilt:fields.yearBuilt?parseInt(fields.yearBuilt):null,sqft:fields.sqft?parseInt(fields.sqft):null,foundationType:fields.foundationType||null,bedrooms:fields.bedrooms?parseInt(fields.bedrooms):null,bathrooms:fields.bathrooms?parseFloat(fields.bathrooms):null,unit:fields.unit||null,county:fields.county||null})}).then(r=>r.json()).then(d=>{if(d.success){Object.assign(inspection,{yearBuilt:fields.yearBuilt?parseInt(fields.yearBuilt):null,sqft:fields.sqft?parseInt(fields.sqft):null,foundationType:fields.foundationType||null,bedrooms:fields.bedrooms?parseInt(fields.bedrooms):null,bathrooms:fields.bathrooms?parseFloat(fields.bathrooms):null,unit:fields.unit||null,county:fields.county||null});showToast && showToast('Property facts saved');}})`}
+                    class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold transition-colors"
+                  >Save facts</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Items view — the regular per-section item list. Hidden
+                while the rail has Property Info active. */}
+            <div x-show="activeView === 'items'">
             {/* Sprint 2 S2-2 — request switcher banner.
                 Renders only when the inspection belongs to a multi-service
                 booking (request.inspections.length > 1). The banner shows
@@ -1209,19 +1504,29 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
                   Inspector
                 </button>
-                <button x-on:click="previewReport()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl text-slate-500 dark:text-slate-400">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  Preview
-                </button>
-                <button
-                  x-on:click="showPublishModal = true"
-                  class="flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-xl text-white"
-                  style="background: #4f46e5"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                  Publish
-                </button>
               </div>
+            </div>
+
+            {/* Item filter tabs — design's All / Unrated / Issues / Flagged
+                row. Drives a `itemFilter` filter on currentSectionItems via
+                the `itemPassesFilter()` helper. Counts come from
+                sectionFilterCounts() so the user can see workload at a
+                glance. Hidden in batch mode to avoid two competing toolbars. */}
+            <div x-show="!batchMode && currentSectionItems.length > 0" class="px-6 pt-3 pb-1 flex items-center gap-1.5 flex-wrap">
+              <template x-for="tab in [{id:'all',label:'All'},{id:'unrated',label:'Unrated'},{id:'issues',label:'Issues'},{id:'flagged',label:'Flagged'}]" x-bind:key="tab.id">
+                <button
+                  type="button"
+                  x-on:click="itemFilter = tab.id"
+                  x-bind:aria-pressed="itemFilter === tab.id ? 'true' : 'false'"
+                  x-bind:class="itemFilter === tab.id
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-600 shadow-sm'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] font-semibold border transition-colors"
+                >
+                  <span x-text="tab.label"></span>
+                  <span class="text-[10px] font-mono opacity-70 tabular-nums" x-text="sectionFilterCounts()[tab.id] ?? 0"></span>
+                </button>
+              </template>
             </div>
 
             {/* Batch Mode Toolbar */}
@@ -1391,7 +1696,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               <template x-for="item in currentSectionItems" x-bind:key="item.id">
                 <div
                   x-bind:data-item-id="item.id"
-                  x-show="itemMatchesSearch(currentSection, item)"
+                  x-show="itemMatchesSearch(currentSection, item) && itemPassesFilter(item)"
                   class="rounded-md p-4 transition-all cursor-pointer group item-card"
                   x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-top: 4px solid ' + getRatingColor(getItemRating(item.id))"
                   x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
@@ -1763,6 +2068,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 <button x-on:click="clearSearch()" class="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear search</button>
               </div>
             </div>
+            </div>{/* /activeView === 'items' */}
           </main>
 
           {/* Spec 5G M1 — Right pane: active item photos + quick comments.
@@ -1771,6 +2077,13 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               instead — see tablet-active-item-drawer below), and while the
               Comment Library drawer is open (Sprint 1 A-1: avoids the
               slash-trigger popover overlapping ACTIVE ITEM). */}
+          {/* Right SideRail — mirrors the design's 3-tab pattern
+              (Preview / Library / Recall). Sticky 280 px column with the
+              active item's preview, the canned-comment library, and a
+              recall pane that shows how the inspector wrote this kind of
+              finding in recent inspections. Hidden in focus mode (⌘2)
+              and on narrower-than-xl viewports; the tablet drawer below
+              handles 1024-1279 px. */}
           <aside x-show="viewMode !== 'focus' && activeItem && !showCommentLibrary && !slashPickerOpen" class="hidden xl:flex w-[280px] sticky top-0 h-screen flex-shrink-0 flex-col border-l overflow-hidden sidebar-glass">
             <header class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
               <h3 class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Active Item</h3>
@@ -1778,64 +2091,148 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               <p class="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5" x-text="activeItem?.number || ''"></p>
             </header>
 
-            {/* Photos */}
-            <section class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Photos · <span x-text="(results[activeItemId]?.photos || []).length"></span></span>
-                <label class="text-[10px] text-indigo-500 hover:underline cursor-pointer">
-                  + Add
-                  <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }" />
-                </label>
-              </div>
-              <div class="grid grid-cols-2 gap-1.5" x-show="(results[activeItemId]?.photos || []).length > 0">
-                <template x-for="(photo, pi) in (results[activeItemId]?.photos || []).slice(0, 8)" x-bind:key="pi">
-                  <div class="aspect-[4/3] rounded overflow-hidden bg-slate-100 dark:bg-slate-700 relative group">
-                    <img x-bind:src="'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.annotatedKey || photo.key)" class="w-full h-full object-cover" alt="Photo" />
-                    <button
-                      x-on:click="window.dispatchEvent(new CustomEvent('annotate', { detail: { inspectionId, itemId: activeItemId, photoIndex: pi, imageUrl: '/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.key), existingNodesJson: photo.annotationsJson || null } }))"
-                      class="absolute bottom-0.5 right-0.5 px-1.5 py-0.5 rounded bg-white/90 dark:bg-slate-800/90 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Annotate"
-                    >✎</button>
-                  </div>
-                </template>
-              </div>
-              <p x-show="(results[activeItemId]?.photos || []).length === 0" class="text-[11px] italic text-slate-400 dark:text-slate-500 py-2">
-                No photos. Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">P</kbd> to add.
-              </p>
-            </section>
+            {/* Tab strip — matches the design kit's pill-tab pattern
+                (active tab has bg-card + card-shadow; inactive tabs sit
+                on the muted track in the strip's background). */}
+            <nav role="tablist" aria-label="Side rail mode" class="flex gap-1 p-1 mx-2 my-2 rounded-md bg-slate-100 dark:bg-slate-800/60">
+              <template x-for="tab in [{id:'preview',label:'Preview'},{id:'library',label:'Library'},{id:'recall',label:'Recall'}]" x-bind:key="tab.id">
+                <button
+                  type="button"
+                  role="tab"
+                  x-on:click="sideRailMode = tab.id"
+                  x-bind:aria-selected="sideRailMode === tab.id ? 'true' : 'false'"
+                  x-bind:class="sideRailMode === tab.id
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
+                  class="flex-1 px-2 py-1.5 rounded text-[11px] font-bold transition-colors"
+                  x-text="tab.label"
+                ></button>
+              </template>
+            </nav>
 
-            {/* Quick comments */}
-            <section class="px-4 py-3 flex-1 overflow-y-auto">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Quick Comments</span>
-                <button x-on:click="openCommentLibrary()" class="text-[10px] text-indigo-500 hover:underline">Browse all</button>
-              </div>
-              <div class="space-y-1">
-                <template x-for="(c, i) in quickCommentsForActive" x-bind:key="i">
-                  <button x-on:click="insertComment(c.text)" class="w-full text-left p-2 rounded text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all">
-                    <div class="flex items-start gap-1.5">
-                      <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0 mt-0.5"
-                        x-bind:style="c.rating === 'satisfactory' ? 'background:#10b981' : (c.rating === 'monitor' ? 'background:#f59e0b' : (c.rating === 'defect' ? 'background:#ef4444' : 'background:#64748b'))"
-                        x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
-                      <span x-text="c.text"></span>
+            {/* ─────────── Preview tab ─────────── */}
+            <div x-show="sideRailMode === 'preview'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+              {/* Photos */}
+              <section class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Photos · <span x-text="(results[activeItemId]?.photos || []).length"></span></span>
+                  <label class="text-[10px] text-indigo-500 hover:underline cursor-pointer">
+                    + Add
+                    <input type="file" accept="image/*" capture="environment" class="hidden" x-on:change="if (activeItemId) { uploadPhoto(activeItemId, $event); $event.target.value = ''; }" />
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5" x-show="(results[activeItemId]?.photos || []).length > 0">
+                  <template x-for="(photo, pi) in (results[activeItemId]?.photos || []).slice(0, 8)" x-bind:key="pi">
+                    <div class="aspect-[4/3] rounded overflow-hidden bg-slate-100 dark:bg-slate-700 relative group">
+                      <img x-bind:src="'/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.annotatedKey || photo.key)" class="w-full h-full object-cover" alt="Photo" />
+                      <button
+                        x-on:click="window.dispatchEvent(new CustomEvent('annotate', { detail: { inspectionId, itemId: activeItemId, photoIndex: pi, imageUrl: '/api/inspections/' + inspectionId + '/photos/' + encodeURIComponent(photo.key), existingNodesJson: photo.annotationsJson || null } }))"
+                        class="absolute bottom-0.5 right-0.5 px-1.5 py-0.5 rounded bg-white/90 dark:bg-slate-800/90 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Annotate"
+                      >✎</button>
                     </div>
+                  </template>
+                </div>
+                <p x-show="(results[activeItemId]?.photos || []).length === 0" class="text-[11px] italic text-slate-400 dark:text-slate-500 py-2">
+                  No photos. Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">P</kbd> to add.
+                </p>
+              </section>
+
+              {/* Quick comments */}
+              <section class="px-4 py-3 flex-1 overflow-y-auto">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Quick Comments</span>
+                  <button x-on:click="sideRailMode = 'library'" class="text-[10px] text-indigo-500 hover:underline">Browse all</button>
+                </div>
+                <div class="space-y-1">
+                  <template x-for="(c, i) in quickCommentsForActive" x-bind:key="i">
+                    <button x-on:click="insertComment(c.text)" class="w-full text-left p-2 rounded text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all">
+                      <div class="flex items-start gap-1.5">
+                        <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0 mt-0.5"
+                          x-bind:style="c.rating === 'satisfactory' ? 'background: var(--ih-status-ok)' : (c.rating === 'monitor' ? 'background: var(--ih-status-watch)' : (c.rating === 'defect' ? 'background: var(--ih-status-bad)' : 'background: #64748b'))"
+                          x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
+                        <span x-text="c.text"></span>
+                      </div>
+                    </button>
+                  </template>
+                </div>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 italic mt-3">
+                  Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">/</kbd> for full library
+                </p>
+              </section>
+            </div>
+
+            {/* ─────────── Library tab ─────────── */}
+            <div x-show="sideRailMode === 'library'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                  Comment library · <span x-text="(_commentLibraryPool || []).length"></span>
+                </div>
+                <input
+                  type="search"
+                  x-model="sideRailLibQuery"
+                  placeholder="Search snippets…"
+                  class="w-full px-3 py-2 text-[12px] rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-[3px] focus:ring-indigo-500/30 focus:border-indigo-500"
+                />
+              </div>
+              <div class="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
+                <template x-for="c in (_commentLibraryPool || []).filter(c => !sideRailLibQuery || (c.text || '').toLowerCase().includes(sideRailLibQuery.toLowerCase()) || (c.category || '').toLowerCase().includes(sideRailLibQuery.toLowerCase())).slice(0, 60)" x-bind:key="c.id || c.text">
+                  <button
+                    x-on:click="insertComment(c.text)"
+                    class="w-full text-left p-2.5 rounded-md text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+                  >
+                    <div class="flex items-center gap-1.5 mb-1">
+                      <span class="px-1 py-0.5 text-[8px] font-bold uppercase rounded text-white shrink-0"
+                        x-bind:style="c.rating === 'satisfactory' ? 'background: var(--ih-status-ok)' : (c.rating === 'monitor' ? 'background: var(--ih-status-watch)' : (c.rating === 'defect' ? 'background: var(--ih-status-bad)' : 'background: #64748b'))"
+                        x-text="c.rating === 'all' ? 'GEN' : c.rating.slice(0, 3)"></span>
+                      <span x-show="c.category" class="text-[9px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500" x-text="c.category"></span>
+                    </div>
+                    <div x-text="c.text"></div>
                   </button>
                 </template>
+                <p x-show="!(_commentLibraryPool || []).length" class="text-[11px] italic text-slate-400 dark:text-slate-500 py-4 text-center">
+                  No canned comments configured. Add some in <a href="/recommendations" class="text-indigo-500 hover:underline">Recommendations library</a>.
+                </p>
               </div>
-              <p class="text-[10px] text-slate-400 dark:text-slate-500 italic mt-3">
-                Press <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">/</kbd> for full library
-              </p>
-            </section>
+            </div>
 
-            {/* Keyboard hint footer */}
-            <footer class="px-4 py-2 border-t border-slate-200/50 dark:border-slate-700/50 text-[10px] text-slate-400 dark:text-slate-500">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">↑↓</kbd> nav
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">1-5</kbd> rate
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">/</kbd> lib
-                <kbd class="px-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded font-mono">?</kbd> all
+            {/* ─────────── Recall tab — design's PriorPane ─────────── */}
+            <div x-show="sideRailMode === 'recall'" x-cloak class="flex-1 flex flex-col overflow-hidden">
+              <div class="px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                  Recall · last 30 inspections
+                </div>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                  How you wrote this kind of finding in recent jobs. Click any row to clone the rating + note onto the active item.
+                </p>
               </div>
-            </footer>
+              {/* Placeholder until a /api/inspections/recall endpoint
+                  exists — the panel is wired to render an array on
+                  `recallEntries` if/when the factory populates it.
+                  Until then, an honest empty state. */}
+              <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                <template x-for="entry in (recallEntries || [])" x-bind:key="entry.id">
+                  <button
+                    x-on:click="if (typeof cloneRecallEntry === 'function') cloneRecallEntry(entry)"
+                    class="w-full text-left p-2.5 rounded-md text-[11px] text-slate-700 dark:text-slate-200 leading-snug border border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+                  >
+                    <div class="flex items-center gap-1.5 mb-1">
+                      <span class="ih-pill" x-bind:class="entry.rating === 'DEF' ? 'ih-pill--defect' : entry.rating === 'MON' ? 'ih-pill--monitor' : 'ih-pill--sat'" x-text="entry.rating"></span>
+                      <span class="text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate" x-text="entry.address"></span>
+                      <span class="ml-auto text-[9px] text-slate-400 dark:text-slate-500" x-text="entry.when"></span>
+                    </div>
+                    <div class="text-[11px] text-slate-600 dark:text-slate-300" x-text="entry.note"></div>
+                    <div class="mt-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Clone rating + note →</div>
+                  </button>
+                </template>
+                <div x-show="!(recallEntries || []).length" class="ih-empty-state">
+                  <svg class="ih-empty-state__icon" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <h3 class="ih-empty-state__title">No recall data yet</h3>
+                  <p class="ih-empty-state__subline">Once you've published a few inspections, this pane will surface how you handled similar findings before.</p>
+                </div>
+              </div>
+            </div>
+
           </aside>
 
           {/* Sprint 3 S3-4 — Tablet 1024-1279 ACTIVE ITEM drawer.
@@ -1947,6 +2344,96 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
              Send All disabled when nothing is checked. Empty-state shown
              when the inspection has no contacts. */}
         <PublishModal />
+        {/* Design-alignment B+C — photo-gallery slide-over, replacing the
+            retired /inspections/:id/photos sub-tab. Opens via the editor
+            toolbar's Photos button (dispatches `photo-gallery:open`). */}
+        <div
+          x-data={`photoGallerySheet('${inspectionId}')`}
+          {...{
+            'x-on:photo-gallery:open.window': 'toggle()',
+            'x-on:keydown.escape.window': 'close()',
+          }}
+        >
+          <div
+            x-show="open"
+            x-cloak
+            x-on:click="close()"
+            class="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm"
+            aria-hidden="true"
+            {...{ 'x-transition.opacity': '' }}
+          ></div>
+          <aside
+            x-show="open"
+            x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="translate-x-full"
+            x-transition:enter-end="translate-x-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="translate-x-0"
+            x-transition:leave-end="translate-x-full"
+            role="dialog"
+            aria-modal="true"
+            aria-label="All photos"
+            class="fixed top-0 right-0 bottom-0 w-full max-w-2xl z-[61] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col"
+          >
+            <header class="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 dark:border-slate-700">
+              <div class="min-w-0">
+                <h2 class="text-[14px] font-bold text-slate-900 dark:text-slate-100">All photos</h2>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400" x-text="totalPhotos + (totalPhotos === 1 ? ' photo' : ' photos') + ' across ' + sections.length + ' section' + (sections.length === 1 ? '' : 's')"></p>
+              </div>
+              <button
+                type="button"
+                x-on:click="close()"
+                aria-label="Close"
+                class="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </header>
+
+            <div x-show="loading" class="px-5 py-8 text-center text-[12px] text-slate-400 dark:text-slate-500">Loading photos…</div>
+            <div x-show="loaded && totalPhotos === 0" style="display:none" class="px-5 py-12 text-center">
+              <p class="text-[13px] text-slate-500 dark:text-slate-400">No photos uploaded yet.</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+              <template x-for="sec in sections" {...{ 'x-bind:key': 'sec.id' }}>
+                <section x-show="sec.photoCount > 0" style="display:none" class="space-y-3">
+                  <header class="flex items-baseline justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+                    <h3 class="text-[13px] font-bold text-slate-900 dark:text-slate-100" x-text="sec.title"></h3>
+                    <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono" x-text="sec.photoCount + ' photos'"></span>
+                  </header>
+                  <template x-for="item in sec.items" {...{ 'x-bind:key': 'item.id' }}>
+                    <div x-show="item.photos.length > 0" style="display:none" class="space-y-2">
+                      <h4 class="text-[11px] font-semibold text-slate-700 dark:text-slate-300" x-text="item.label"></h4>
+                      <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        <template x-for="photo in item.photos" {...{ 'x-bind:key': 'photo.url' }}>
+                          <a
+                            x-bind:href="photo.url"
+                            target="_blank"
+                            rel="noopener"
+                            class="block aspect-square rounded-md overflow-hidden bg-slate-100 dark:bg-slate-700 ring-1 ring-slate-200 dark:ring-slate-600 hover:ring-indigo-300 dark:hover:ring-indigo-500 transition-all"
+                          >
+                            <img x-bind:src="photo.url" x-bind:alt="item.label" class="w-full h-full object-cover" loading="lazy" />
+                          </a>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </section>
+              </template>
+            </div>
+          </aside>
+        </div>
+        {/* Design-alignment B+C — inspection settings slide-over,
+            replacing the retired /inspections/:id/settings sub-tab.
+            Same form contents (schedule / people / property facts /
+            template / pricing / gates) reachable from the editor
+            toolbar's Settings gear button. */}
+        <InspectionSettingsSheet
+          inspectionId={inspectionId}
+          {...(customReferralSources ? { customReferralSources } : {})}
+        />
         {/* S3-6 — burst-camera modal lives at the page level so it stays
             mounted across item navigation. inspection-edit.js dispatches a
             `burst-camera:open` window event when the user taps a Camera
@@ -1979,9 +2466,12 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         {/* Design System 0520 subsystem B phase 7 — RosterPopover. Opens
             via `open-roster-popover` window event; subscribes to the
             current inspection's PresenceClient to show who is editing
-            (and which item). Add/Invite buttons are stubs that activate
-            when subsystem C M9 InviteSeatModal ships. */}
+            (and which item). The Add inspector / Invite guest buttons
+            dispatch `invite-seat-modal:open` which the InviteSeatModal
+            mounted directly below listens for. */}
         <RosterPopover />
+        <InviteSeatModal />
+        <script src="/js/invite-seat-modal.js"></script>
         <Modal
             name="showLegacyPublishOptions"
             title="Publish options"
@@ -2025,7 +2515,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
 
         {/* Onboarding overlay (T6) */}
         <div x-data="inspectionOnboarding()" {...{'x-on:rating-levels-ready.window': 'init($event.detail)'}}>
-            <div x-show="active" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,23,42,0.78);backdrop-filter:blur(6px);">
+            <div x-show="active" x-cloak class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
                 <div class="rounded-lg p-8 max-w-md w-full shadow-2xl" style="background:rgba(255,255,255,0.96);border:1px solid rgba(255,255,255,0.6);">
                     <div class="flex items-center gap-3 mb-4">
                         <span x-show="currentStep.abbr" class="px-3 py-1 rounded-lg text-white font-mono font-bold text-sm"
@@ -2290,8 +2780,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         class="fixed inset-0 z-[55] flex items-start justify-center pt-[12vh] px-4"
       >
         <div
-          class="absolute inset-0 bg-slate-900/30"
-          style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+          class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
           x-on:click="closeSectionPicker()"
           x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
           x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
@@ -2354,8 +2843,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
         class="fixed inset-0 z-[55] flex items-start justify-center pt-[12vh] px-4"
       >
         <div
-          class="absolute inset-0 bg-slate-900/30"
-          style="backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);"
+          class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
           x-on:click="closeTagPicker()"
           x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
           x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
@@ -2492,6 +2980,19 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
           lazy-loaded by photo-annotator.js on the first `annotate` event so it
           doesn't block first paint of the inspection edit page. */}
       <script src="/js/photo-annotator.js"></script>
+      {/* Design-alignment B+C — photo-gallery sheet factory, replacing
+          the retired /inspections/:id/photos sub-tab. Mounted as a
+          slide-over on the editor itself. */}
+      <script src="/js/photo-gallery-sheet.js"></script>
+      {/* Design-alignment B+C — envelope-audit factory, replacing the
+          retired /inspections/:id/signatures sub-tab. Folds into
+          PublishModal as a collapsible block. */}
+      <script src="/js/envelope-audit.js"></script>
+      {/* Design-alignment B+C — inspection-settings factory, mounted
+          inside the InspectionSettingsSheet slide-over that replaced the
+          retired /inspections/:id/settings sub-tab. Same factory name +
+          shape as before. */}
+      <script src="/js/inspection-settings.js"></script>
       <script src="/js/onboarding.js"></script>
       <script src="/js/voice-input.js"></script>
       {/* Phase T (T23) — Messages panel script */}

@@ -12,11 +12,11 @@ export function SettingsAutomationsPage({ branding }: SettingsAutomationsPagePro
             title="Settings | Automations"
             group="communication"
             subPage="automations"
-            pageTitle="Email Automations"
+            pageTitle="Email automations"
             pageSubtitle="Emails sent automatically when inspection events occur."
         >
             <div x-data="automations" class="max-w-3xl space-y-8">
-                <div x-show="loading" class="text-sm text-ink-500 py-8 text-center">Loading...</div>
+                <div x-show="loading" aria-busy="true" class="space-y-2 py-6"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="width: 60%;"></div><div class="ih-skeleton ih-skeleton--text" style="width: 85%;"></div><div class="ih-skeleton ih-skeleton--text" style="width: 70%;"></div></div>
                 <div x-show="!!error" x-text="error" class="text-sm text-rose-600 py-4" />
 
                 <div x-show="!loading && !error" class="space-y-2">
@@ -56,7 +56,7 @@ export function SettingsAutomationsPage({ branding }: SettingsAutomationsPagePro
                         </p>
                     </div>
 
-                    <div x-show="loading" class="text-xs text-ink-500">Loading…</div>
+                    <div x-show="loading" aria-busy="true" class="space-y-2 py-2"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="width: 40%;"></div><div class="ih-skeleton ih-skeleton--text" style="width: 30%;"></div></div>
                     <div x-show="!!saveError" x-text="saveError" class="text-xs text-rose-600" />
 
                     <div x-show="!loading" class="bg-white border border-surface-200 rounded-md divide-y divide-surface-200">

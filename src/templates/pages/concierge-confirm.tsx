@@ -58,23 +58,27 @@ export const ConciergeConfirmPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Confirm your inspection | ${siteName}`}</title>
+                {/* Customer-portal page — follow system color preference only;
+                    no localStorage / no in-page toggle (per design system). */}
+                <script dangerouslySetInnerHTML={{ __html: `(function(){var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',p?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
+                    /* Page-local primary alias; everything else reads directly
+                       from the shared --cp-* customer-portal tokens (defined
+                       in input.css) so dark mode auto-swaps without a
+                       second [data-color-scheme="dark"] block here. */
                     :root {
                         --primary: ${primaryColor};
                         --primary-soft: ${primaryColor}14;
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #a8a29e;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
-                        --surface-card: #ffffff;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         -webkit-font-smoothing: antialiased;
                     }
@@ -89,15 +93,15 @@ export const ConciergeConfirmPage = ({
                         margin-bottom: 2.5rem;
                     }
                     .summary {
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 14px;
                         overflow: hidden;
                     }
                     .summary-hero {
                         padding: 1.75rem 1.5rem;
                         display: flex; gap: 1rem; align-items: center;
-                        border-bottom: 1px solid var(--line);
+                        border-bottom: 1px solid var(--cp-border-color);
                     }
                     .avatar {
                         width: 72px; height: 72px; border-radius: 50%;
@@ -109,39 +113,39 @@ export const ConciergeConfirmPage = ({
                     .avatar img { width: 100%; height: 100%; object-fit: cover; }
                     .hero-text .label {
                         font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
-                        letter-spacing: 0.12em; color: var(--ink-faint); margin-bottom: 0.375rem;
+                        letter-spacing: 0.12em; color: var(--cp-fg-4); margin-bottom: 0.375rem;
                     }
                     .hero-text .name {
                         font-family: 'Fraunces', serif; font-size: 1.5rem;
-                        font-weight: 700; color: var(--ink); line-height: 1.15;
+                        font-weight: 700; color: var(--cp-fg-1); line-height: 1.15;
                     }
                     .summary-body { padding: 1.5rem; display: grid; gap: 0.875rem; }
                     .row { display: grid; gap: 0.25rem; }
                     .row .k {
                         font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
-                        letter-spacing: 0.12em; color: var(--ink-faint);
+                        letter-spacing: 0.12em; color: var(--cp-fg-4);
                     }
                     .row .v {
-                        font-size: 1rem; font-weight: 600; color: var(--ink);
+                        font-size: 1rem; font-weight: 600; color: var(--cp-fg-1);
                     }
                     .agreement {
                         margin-top: 1.5rem;
-                        background: var(--surface-card);
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 14px;
                         padding: 1.5rem;
                     }
                     .agreement h3 {
                         font-family: 'Fraunces', serif; font-size: 1.125rem;
-                        font-weight: 700; margin-bottom: 0.5rem; color: var(--ink);
+                        font-weight: 700; margin-bottom: 0.5rem; color: var(--cp-fg-1);
                     }
                     .agreement .preview-text {
-                        font-size: 0.9375rem; line-height: 1.5; color: var(--ink-soft);
+                        font-size: 0.9375rem; line-height: 1.5; color: var(--cp-fg-2);
                         font-style: italic;
                     }
                     .agreement .note {
                         margin-top: 0.875rem;
-                        font-size: 0.8125rem; color: var(--ink-faint);
+                        font-size: 0.8125rem; color: var(--cp-fg-4);
                     }
                     .actions { margin-top: 1.75rem; }
                     .cta {
@@ -153,11 +157,13 @@ export const ConciergeConfirmPage = ({
                         transition: filter 0.15s ease;
                     }
                     .cta:hover { filter: brightness(0.95); }
-                    .cta:disabled { background: var(--ink-faint); cursor: progress; }
+                    .cta:disabled { background: var(--cp-fg-4); cursor: progress; }
                     .err {
                         margin-top: 0.75rem; padding: 0.75rem 1rem;
-                        background: #fef2f2; color: #b91c1c;
-                        border: 1px solid #fecaca; border-radius: 8px;
+                        background: var(--ih-status-bad-bg);
+                        color: var(--ih-status-bad-fg);
+                        border: 1px solid var(--ih-status-bad);
+                        border-radius: 8px;
                         font-size: 0.875rem;
                     }
                     .summary-toggle { display: none; }
@@ -165,9 +171,9 @@ export const ConciergeConfirmPage = ({
                         .summary-toggle {
                             display: block; width: 100%; text-align: left;
                             padding: 0.75rem 1.5rem;
-                            background: var(--surface-card);
-                            border-top: 1px solid var(--line);
-                            font-size: 0.875rem; color: var(--ink-soft); cursor: pointer;
+                            background: var(--cp-bg-card);
+                            border-top: 1px solid var(--cp-border-color);
+                            font-size: 0.875rem; color: var(--cp-fg-2); cursor: pointer;
                             border-left: 0; border-right: 0; border-bottom: 0;
                         }
                     }
@@ -183,7 +189,7 @@ export const ConciergeConfirmPage = ({
                     <h1 style="font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 700; line-height: 1.15; margin-bottom: 0.5rem;">
                         Confirm your inspection
                     </h1>
-                    <p style="font-size: 1rem; color: var(--ink-soft); margin-bottom: 2rem; line-height: 1.5;">
+                    <p style="font-size: 1rem; color: var(--cp-fg-2); margin-bottom: 2rem; line-height: 1.5;">
                         {inspector.name ? <strong>{inspector.name}</strong> : 'Your inspector'} has scheduled an inspection on your behalf.
                         Review the details below and confirm to lock it in.
                     </p>

@@ -46,6 +46,7 @@ import { MarketplacePage } from './templates/pages/marketplace';
 import { RatingSystemsPage } from './templates/pages/rating-systems';
 import { TagsPage } from './templates/pages/tags';
 import { TeamPage } from './templates/pages/team';
+import { ApprenticeReviewPage } from './templates/pages/apprentice-review';
 import { AgreementsPage } from './templates/pages/agreements';
 import { AgreementSignPage } from './templates/pages/agreement-sign';
 import { AgreementPrintablePage } from './templates/pages/agreement-printable';
@@ -58,10 +59,6 @@ import { CommentsPage } from './templates/pages/comments';
 import { InvoicesPage } from './templates/pages/invoices';
 import { ReportCardStackPage } from './templates/pages/report-card-stack';
 import { InspectionEditPage } from './templates/pages/inspection-edit';
-import { InspectionPhotosPage } from './templates/pages/inspection/photos';
-import { InspectionSummaryPage } from './templates/pages/inspection/summary';
-import { InspectionSignaturesPage } from './templates/pages/inspection/signatures';
-import { InspectionSettingsPage } from './templates/pages/inspection/settings';
 import { RepairListPage } from './templates/pages/inspection/repair-list';
 import { CustomerRepairRequestPage } from './templates/pages/customer-repair-request';
 import { FeatureDisabledPage } from './templates/pages/feature-disabled';
@@ -619,6 +616,30 @@ app.get('/login', async (c) => {
     issueCsrfCookie(c);
     const branding = c.get('branding');
     return c.html(LoginPage({ branding }));
+});
+
+// Forgot password — renders the same LoginPage template but starts the
+// Alpine `step` on 'forgot' so the email-input form paints on first render.
+// The form POSTs to /api/auth/forgot-password which emails a reset link
+// (when RESEND_API_KEY + SENDER_EMAIL are configured) pointing back at
+// /login?reset_token=... The login.js bootstrap captures that token before
+// scrubbing the URL bar, then flips step → 'reset' so the user can type a
+// new password without ever leaving the same page.
+app.get('/forgot-password', async (c) => {
+    const token = getCookie(c, '__Host-inspector_token');
+    if (token) {
+        try {
+            const keyring = await c.var.keyringPromise!;
+            const payload = await verifyJwt(token, keyring);
+            const role = (payload as Record<string, unknown>)['custom:userRole'] || (payload as Record<string, unknown>).role;
+            return c.redirect(role === 'agent' ? '/agent-dashboard' : '/dashboard');
+        } catch {
+            // Invalid/expired token — show forgot-password page
+        }
+    }
+    issueCsrfCookie(c);
+    const branding = c.get('branding');
+    return c.html(LoginPage({ branding, initialStep: 'forgot' }));
 });
 
 // Design System 0520 subsystem D P5.1 — observer viewer (cookie-gated).
@@ -2266,7 +2287,17 @@ app.get('/settings/account/bot-protection', htmlAuthGuard(['owner', 'admin']), (
 // portal CTA. Owner/admin only — non-admins don't see billing UI.
 app.get('/settings/billing', htmlAuthGuard(['owner', 'admin']), (c) => {
     const b = c.get('branding');
-    return c.html(SettingsBillingPage(b ? { branding: b } : {}));
+    const p = c.var.profile;
+    // The page's three modes (standalone / saas-silo / saas-shared) are
+    // entirely driven by the deployment profile; we pass through the two
+    // flags the page actually branches on so the template stays a pure
+    // function of props.
+    return c.html(SettingsBillingPage({
+        ...(b ? { branding: b } : {}),
+        hasBilling:   p.hasBilling,
+        hasSeatQuota: p.hasSeatQuota,
+        saasTopology: p.saasTopology ?? null,
+    }));
 });
 
 // Advanced group
@@ -2301,6 +2332,12 @@ app.get('/settings/team', htmlAuthGuard(['owner', 'admin']), async (c) => {
     return c.html(TeamPage({ ...(branding ? { branding } : {}), ...seatProps }));
 });
 app.get('/team', htmlAuthGuard(['owner', 'admin']), (c) => c.redirect('/settings/team', 301));
+// Design System 0520 subsystem C P3 — mentor-facing apprentice review queue.
+// PreflightChecks (publish modal) and the Apprentices side-rail link in here.
+app.get('/apprentice-review', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
+    const branding = c.get('branding');
+    return c.html(ApprenticeReviewPage(branding ? { branding } : {}));
+});
 app.get('/agreements', htmlAuthGuard(['owner', 'admin', 'agent']), (c) => c.html(AgreementsPage({ branding: c.get('branding') })));
 app.get('/contacts', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => c.html(ContactsPage({ branding: c.get('branding') })));
 app.get('/recommendations', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
@@ -2330,16 +2367,21 @@ app.get('/inspections/:id/form', htmlAuthGuard(['owner', 'admin', 'inspector']),
 //
 // `/edit` is preserved as a 302 redirect to `/report` for backward
 // compatibility with bookmarks and existing JS that still constructs the
-// legacy URL. The canonical surface is the 5-tab sub-route family:
-//   /inspections/:id/report     — primary editor (existing inspection-edit)
-//   /inspections/:id/photos     — read-only gallery
-//   /inspections/:id/summary    — read-only defects preview
-//   /inspections/:id/signatures — agreement envelopes + audit chain timeline
-//   /inspections/:id/settings   — schedule / inspector / template / gates
+// legacy URL. The primary surface is:
+//   /inspections/:id/report     — single-view editor (inspection-edit)
 //
-// All five share <InspectionShell> for sub-nav + breadcrumb. The Report tab
-// keeps the existing BareLayout-based editor untouched so the Alpine sticky
-// header and full-canvas drawing surface continue to work.
+// All ancillary tabs were retired in the design-alignment rollback and
+// folded back into the editor:
+//   - Summary    → editor's Preview link (renders /api/inspections/:id/report)
+//   - Photos     → slide-over sheet, triggered by toolbar Photos button
+//   - Signatures → collapsible block at the bottom of PublishModal
+//   - Settings   → slide-over sheet, triggered by toolbar gear button
+// /inspections/:id/settings still 302s to /report so external links
+// don't break.
+//
+// All sub-routes share <InspectionShell> for sub-nav + breadcrumb. The Report
+// tab keeps the existing BareLayout-based editor untouched so the Alpine
+// sticky header and full-canvas drawing surface continue to work.
 async function loadInspectionShellData(c: Context<HonoConfig>, inspectionId: string) {
     const tenantId = c.get('tenantId');
     if (!tenantId) return null;
@@ -2406,77 +2448,43 @@ app.get('/inspections/:id/report', htmlAuthGuard(['owner', 'admin', 'inspector']
     if (!id) return c.redirect('/dashboard');
     // Track E1 — surface the per-tenant Repair List toggle so the editor's
     // sub-nav optionally renders the 6th tab.
+    // Round-2 G3 — also read customReferralSources for the settings sheet's
+    // Referral Source dropdown (merged with the seven seeds in the sheet).
     const tenantId = c.get('tenantId');
     let enableRepairList = false;
+    let customReferralSources: string[] | undefined;
     if (tenantId) {
         try {
-            const cfgRow = await drizzle(c.env.DB).select({ enableRepairList: schema.tenantConfigs.enableRepairList })
+            const cfgRow = await drizzle(c.env.DB).select({
+                enableRepairList:      schema.tenantConfigs.enableRepairList,
+                customReferralSources: schema.tenantConfigs.customReferralSources,
+            })
                 .from(schema.tenantConfigs)
                 .where(eq(schema.tenantConfigs.tenantId, tenantId))
                 .get();
             enableRepairList = !!cfgRow?.enableRepairList;
+            const raw = cfgRow?.customReferralSources;
+            if (Array.isArray(raw)) customReferralSources = raw as string[];
         } catch { /* default off */ }
     }
-    return c.html(InspectionEditPage({ inspectionId: id, branding: c.get('branding'), enableRepairList }));
-});
-
-app.get('/inspections/:id/photos', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
-    const id = c.req.param('id');
-    if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionPhotosPage({
+    return c.html(InspectionEditPage({
         inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
         branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
+        enableRepairList,
+        ...(customReferralSources ? { customReferralSources } : {}),
     }));
 });
 
-app.get('/inspections/:id/summary', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
+// Design-alignment B+C — /inspections/:id/settings is no longer a
+// standalone tab; the settings form is folded into a slide-over on the
+// editor. Redirect any deep links to /report so users land on the
+// editor (where the gear button opens the settings sheet).
+app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector']), (c) => {
     const id = c.req.param('id');
     if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionSummaryPage({
-        inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
-        branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
-    }));
+    return c.redirect(`/inspections/${id}/report`, 302);
 });
 
-app.get('/inspections/:id/signatures', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
-    const id = c.req.param('id');
-    if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionSignaturesPage({
-        inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
-        tenantSlug: c.get('requestedSubdomain') ?? '',
-        branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
-    }));
-});
-
-app.get('/inspections/:id/settings', htmlAuthGuard(['owner', 'admin', 'inspector']), async (c) => {
-    const id = c.req.param('id');
-    if (!id) return c.redirect('/dashboard');
-    const shell = await loadInspectionShellData(c, id);
-    return c.html(InspectionSettingsPage({
-        inspectionId: id,
-        propertyAddress: shell?.propertyAddress ?? 'Inspection',
-        branding: c.get('branding'),
-        enableRepairList: !!shell?.enableRepairList,
-        ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-        ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
-        ...(shell?.customReferralSources ? { customReferralSources: shell.customReferralSources } : {}),
-    }));
-});
 
 // Track E1 (ITB §11, UC-ITB-07) — Repair List sub-route. Server-renders
 // the punch-list of every flagged defect across the inspection. Available
@@ -2515,8 +2523,6 @@ app.get('/inspections/:id/repair-list', htmlAuthGuard(['owner', 'admin', 'inspec
             totals:          data.totals,
             showEstimates:   data.showEstimates,
             branding:        c.get('branding'),
-            ...(shell?.requestId ? { requestId: shell.requestId } : {}),
-            ...(shell?.siblings  ? { siblings: shell.siblings  } : {}),
         }));
     } catch {
         return c.html(NotFoundPage({ branding: c.get('branding') }), 404);

@@ -8,10 +8,14 @@
  *   A2 — Sidebar in main-layout.tsx still rendered a "SOON" badge next to
  *        the Rating Systems link — Sprint 1 stub artifact that S2-1 was
  *        supposed to remove.
- *   A3 — /inspections/:id/report did NOT show the 5-tab inspection sub-nav
- *        (Report / Photos / Summary / Signatures / Settings) — InspectionShell
- *        only wrapped the four passive sub-pages, not the Report editor.
- *   A4 — Sub-pages (/photos /summary /signatures /settings) had a generic
+ *   A3 — /inspections/:id/report did NOT show the inspection sub-nav.
+ *        (Summary + Photos + Signatures + Settings were retired in
+ *        the design-alignment rollback — defects preview is reached
+ *        via the /report Preview link; the photo gallery is a
+ *        slide-over sheet inside the editor; envelope audit chain
+ *        folds into PublishModal; settings is a slide-over from the
+ *        editor's gear button.)
+ *   A4 — Sub-pages had a generic
  *        <title> ("Photos" instead of "OpenInspection | Photos") and the
  *        Alpine factories called window.authFetch which was undefined because
  *        auth.js declared authFetch as a top-level const — never attached to
@@ -104,73 +108,22 @@ test.describe('Sprint 2 regression — A2 SOON badge removed', () => {
     });
 });
 
-test.describe('Sprint 2 regression — A3 inspection /report has 5-tab sub-nav', () => {
-    test('A3: /inspections/:id/report renders the 5-tab inspection sub-nav', async ({ request }) => {
-        // The route is htmlAuthGuard'd — without auth we get redirected to
-        // /login. We assert at the template-source level instead, since the
-        // actual fix is in inspection-edit.tsx.
+test.describe('Sprint 2 regression — A3 inspection /report editor mounts', () => {
+    test('A3: /inspections/:id/report responds (200 or auth 302), never 5xx', async ({ request }) => {
+        // The original sub-nav (Report / Photos / Summary / Signatures /
+        // Settings) was retired in the design-alignment rollback — the
+        // editor is now single-view with slide-over sheets for Photos and
+        // Settings. This test now just guards that the route is mounted
+        // and renders without a server error.
         const res = await request.get(`${BASE_URL}/inspections/${FAKE_INSPECTION_ID}/report`, {
             failOnStatusCode: false,
             maxRedirects: 0,
         });
-        // Either 302 (auth redirect) or 200 (the actual page). For 200, scan
-        // for the sub-nav.
-        if (res.status() === 200) {
-            const html = await res.text();
-            expect(html).toContain('aria-label="Inspection sections"');
-            for (const tab of ['Report', 'Photos', 'Summary', 'Signatures', 'Settings']) {
-                expect(html, `Sub-nav must include ${tab} tab link`).toContain(`>${tab}</a>`);
-            }
-        } else {
-            // Source-level fallback — verify inspection-edit.tsx contains the
-            // 5-tab nav block we added.
-            const fs = await import('node:fs/promises');
-            const path = await import('node:path');
-            const tsxPath = path.resolve(process.cwd(), 'src/templates/pages/inspection-edit.tsx');
-            const src = await fs.readFile(tsxPath, 'utf-8');
-            expect(src, 'inspection-edit.tsx must include the inspection sections sub-nav').toContain('aria-label="Inspection sections"');
-            for (const tab of ['Report', 'Photos', 'Summary', 'Signatures', 'Settings']) {
-                expect(src, `Sub-nav must include ${tab} tab link`).toContain(`>${tab}</a>`);
-            }
-        }
+        expect([200, 301, 302, 303, 307, 308]).toContain(res.status());
     });
 });
 
-test.describe('Sprint 2 regression — A4 sub-pages have proper <title>', () => {
-    const SUBS = [
-        { route: 'photos',     label: 'Photos' },
-        { route: 'summary',    label: 'Summary' },
-        { route: 'signatures', label: 'Signatures' },
-        { route: 'settings',   label: 'Settings' },
-    ];
-
-    for (const { route, label } of SUBS) {
-        test(`A4: /inspections/:id/${route} template uses '\${siteName} | ${label}' title`, async () => {
-            const fs = await import('node:fs/promises');
-            const path = await import('node:path');
-            const tsxPath = path.resolve(process.cwd(), `src/templates/pages/inspection/${route}.tsx`);
-            const src = await fs.readFile(tsxPath, 'utf-8');
-            // The title prop must include the siteName branding pattern, NOT a
-            // bare label like "Photos".
-            expect(src, `${route}.tsx must derive siteName from branding`).toContain('siteName');
-            expect(src, `${route}.tsx title must follow '\${siteName} | ${label}' pattern`).toContain(`\${siteName} | ${label}`);
-        });
-    }
-});
-
-test.describe('Sprint 2 regression — A4 sub-route HTTP smoke', () => {
-    const SUBS = ['photos', 'summary', 'signatures', 'settings'] as const;
-
-    for (const sub of SUBS) {
-        test(`A4: /inspections/:id/${sub} returns a route response (200 or auth 302), never 5xx`, async ({ request }) => {
-            const res = await request.get(`${BASE_URL}/inspections/${FAKE_INSPECTION_ID}/${sub}`, {
-                failOnStatusCode: false,
-                maxRedirects: 0,
-                timeout: 10000,
-            });
-            // 200 = page renders, 302 = auth guard redirect to /login.
-            // 404 means the route is not mounted, 5xx means it errors out.
-            expect([200, 301, 302, 303, 307, 308]).toContain(res.status());
-        });
-    }
-});
+// A4 sub-page title + HTTP-smoke blocks were dropped together with the
+// /photos /summary /signatures /settings standalone pages that they
+// guarded — none of those routes render a page any more. The settings
+// 302-redirect is exercised by the sub-route smoke spec below.

@@ -105,6 +105,67 @@ export const PublishModal = (): JSX.Element => (
                     without re-opening the modal. */}
                 <PreflightChecks />
 
+                {/* Design-alignment B+C — envelope audit drawer, replacing
+                    the retired /inspections/:id/signatures sub-tab. Folds
+                    into Publish modal so inspector can peek the full
+                    envelope list + tamper-evident audit chain without
+                    leaving the publish workflow. Collapsed by default —
+                    pre-flight's "agreement signed" check is the primary
+                    signal; this drawer is the long-form detail. */}
+                <div
+                    x-data={`envelopeAudit(inspectionId)`}
+                    class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                >
+                    <button
+                        type="button"
+                        x-on:click="toggle()"
+                        x-bind:aria-expanded="open ? 'true' : 'false'"
+                        class="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left"
+                    >
+                        <span class="text-[12px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                            Agreement envelopes
+                        </span>
+                        <svg
+                            class="w-4 h-4 text-slate-400 transition-transform"
+                            x-bind:class="open ? 'rotate-180' : ''"
+                            fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                        ><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-cloak class="px-4 pb-3 space-y-3 border-t border-slate-200 dark:border-slate-700">
+                        <div x-show="loading" class="py-3 text-[12px] text-slate-400 dark:text-slate-500">Loading envelopes…</div>
+                        <div x-show="loaded && envelopes.length === 0" style="display:none" class="py-3 text-[12px] text-slate-500 dark:text-slate-400">
+                            No agreement envelopes attached to this inspection yet.
+                        </div>
+                        <template x-for="env in envelopes" {...{ 'x-bind:key': 'env.id' }}>
+                            <article class="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 p-3 space-y-2">
+                                <header class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <div class="text-[12px] font-bold text-slate-900 dark:text-slate-100 truncate" x-text="env.agreementName"></div>
+                                        <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate" x-text="env.clientEmail"></div>
+                                    </div>
+                                    <span
+                                        class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-[0.18em] ring-1 ring-inset"
+                                        {...{ 'x-bind:class': "{'bg-emerald-50 text-emerald-700 ring-emerald-200': env.status==='signed','bg-amber-50 text-amber-700 ring-amber-200': env.status==='viewed' || env.status==='sent','bg-slate-100 text-slate-600 ring-slate-200': env.status==='pending','bg-rose-50 text-rose-700 ring-rose-200': env.status==='declined' || env.status==='expired'}" }}
+                                        x-text="env.status"
+                                    ></span>
+                                </header>
+                                <div x-show="env.events && env.events.length > 0" style="display:none" class="border-t border-slate-200 dark:border-slate-700 pt-2">
+                                    <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 mb-1">Audit chain</div>
+                                    <ol class="space-y-1">
+                                        <template x-for="ev in env.events" {...{ 'x-bind:key': 'ev.hash' }}>
+                                            <li class="flex items-center gap-2 text-[11px]">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                                                <span class="font-mono text-slate-500 dark:text-slate-400" x-text="new Date(ev.createdAtUtc).toLocaleString()"></span>
+                                                <span class="font-semibold text-slate-700 dark:text-slate-300" x-text="ev.event"></span>
+                                            </li>
+                                        </template>
+                                    </ol>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </div>
+
                 {/* Report summary card (same as before) */}
                 <div class="p-3 rounded-xl bg-slate-100 dark:bg-slate-700/50">
                     <div class="text-xs font-mono text-slate-500 dark:text-slate-400">Report Summary</div>

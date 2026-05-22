@@ -84,6 +84,15 @@ const CUSTOMER_REPAIR_CSS = `
 textarea.crr-comments {
     background: #f8fafc;
 }
+/* Customer-portal surface — follow OS preference only, not the
+   data-color-scheme attribute (which a paired inspector tab might
+   have flipped via localStorage). */
+@media (prefers-color-scheme: dark) {
+    textarea.crr-comments {
+        background: #162032;
+        color: #f1f5f9;
+    }
+}
 `;
 
 export const CustomerRepairRequestPage = ({

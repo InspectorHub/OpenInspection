@@ -16,6 +16,13 @@ import type { BrandingConfig } from '../../types/auth';
 
 interface Props { branding?: BrandingConfig | undefined }
 
+/* Tag color palette — restricted to the design-system-approved hues
+   (slate + indigo + the three status colors emerald / amber / rose, plus
+   sky for info-leaning tags). Fuchsia / lime were dropped to stop
+   user-chosen tag colors from violating the brand restriction. Existing
+   tags stored with the dropped values still render via the runtime
+   `colorClass()` helper in public/js/tags.js — the data is preserved
+   even though the values are no longer pickable. */
 const TAG_COLORS: ReadonlyArray<{ value: string; label: string; tw: string }> = [
     { value: 'slate',   label: 'Slate',   tw: 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 ring-slate-200 dark:ring-slate-500' },
     { value: 'amber',   label: 'Amber',   tw: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 ring-amber-200 dark:ring-amber-700' },
@@ -23,8 +30,6 @@ const TAG_COLORS: ReadonlyArray<{ value: string; label: string; tw: string }> = 
     { value: 'indigo',  label: 'Indigo',  tw: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 ring-indigo-200 dark:ring-indigo-700' },
     { value: 'emerald', label: 'Emerald', tw: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-700' },
     { value: 'sky',     label: 'Sky',     tw: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 ring-sky-200 dark:ring-sky-700' },
-    { value: 'fuchsia', label: 'Fuchsia', tw: 'bg-fuchsia-100 dark:bg-fuchsia-900/40 text-fuchsia-700 dark:text-fuchsia-300 ring-fuchsia-200 dark:ring-fuchsia-700' },
-    { value: 'lime',    label: 'Lime',    tw: 'bg-lime-100 dark:bg-lime-900/40 text-lime-700 dark:text-lime-300 ring-lime-200 dark:ring-lime-700' },
 ];
 
 export const TagsPage = ({ branding }: Props): JSX.Element => {
@@ -59,7 +64,7 @@ export const TagsPage = ({ branding }: Props): JSX.Element => {
 
                 {/* Empty */}
                 <div x-show="!loading && tags.length === 0" style="display:none" class="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-md">
-                    <p class="text-slate-500 dark:text-slate-400 font-semibold">No tags yet.</p>
+                    <div class="ih-empty-state"><h3 class="ih-empty-state__title">No tags yet</h3></div>
                     <p class="text-slate-400 dark:text-slate-500 text-sm mt-2">Reload to plant the five seed tags, or add your own.</p>
                 </div>
 

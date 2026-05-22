@@ -9,10 +9,10 @@ export function SettingsDataPage({ branding }: SettingsDataPageProps) {
     return (
         <SettingsLayout
             branding={branding}
-            title="Settings | Data Import / Export"
+            title="Settings | Data import / export"
             group="advanced"
             subPage="data"
-            pageTitle="Data Import / Export"
+            pageTitle="Data import / export"
             pageSubtitle="Download your data as CSV, or import contacts from Spectora / Inspector Toolbelt exports."
         >
             <div x-data="dataExport" class="max-w-2xl space-y-5">

@@ -39,22 +39,21 @@ export const AgentInviteAcceptPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`You're invited | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
                     :root {
                         --primary: ${primaryColor};
                         --primary-soft: ${primaryColor}14;
-                        --ink: #1c1917;
-                        --ink-soft: #57534e;
-                        --ink-faint: #a8a29e;
-                        --line: #e7e5e4;
-                        --surface: #fafaf9;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --primary-soft: ${primaryColor}26;
                     }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: var(--surface);
-                        color: var(--ink);
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         -webkit-font-smoothing: antialiased;
                     }
@@ -87,7 +86,7 @@ export const AgentInviteAcceptPage = ({
                     .lede {
                         font-size: 1rem;
                         line-height: 1.55;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         margin-bottom: 2.25rem;
                     }
 
@@ -97,8 +96,8 @@ export const AgentInviteAcceptPage = ({
                         align-items: center;
                         gap: 1rem;
                         padding: 1.25rem;
-                        background: #ffffff;
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 16px;
                         margin-bottom: 2rem;
                     }
@@ -123,11 +122,11 @@ export const AgentInviteAcceptPage = ({
                     .inspector-name {
                         font-weight: 600;
                         font-size: 1rem;
-                        color: var(--ink);
+                        color: var(--cp-fg-1);
                     }
                     .inspector-tenant {
                         font-size: 0.875rem;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         margin-top: 0.125rem;
                     }
 
@@ -143,8 +142,8 @@ export const AgentInviteAcceptPage = ({
                     }
                     .value-card {
                         padding: 1rem 0.875rem;
-                        background: #ffffff;
-                        border: 1px solid var(--line);
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 12px;
                         text-align: center;
                     }
@@ -156,12 +155,12 @@ export const AgentInviteAcceptPage = ({
                     .value-label {
                         font-size: 0.8125rem;
                         font-weight: 600;
-                        color: var(--ink);
+                        color: var(--cp-fg-1);
                         line-height: 1.3;
                     }
                     .value-sub {
                         font-size: 0.75rem;
-                        color: var(--ink-faint);
+                        color: var(--cp-fg-4);
                         margin-top: 0.25rem;
                         line-height: 1.4;
                     }
@@ -172,7 +171,7 @@ export const AgentInviteAcceptPage = ({
                         display: block;
                         font-size: 0.8125rem;
                         font-weight: 600;
-                        color: var(--ink-soft);
+                        color: var(--cp-fg-2);
                         margin-bottom: 0.5rem;
                     }
                     .form-input {
@@ -180,9 +179,9 @@ export const AgentInviteAcceptPage = ({
                         padding: 0.75rem 1rem;
                         font-size: 0.9375rem;
                         font-family: inherit;
-                        color: var(--ink);
-                        background: #fff;
-                        border: 1.5px solid var(--line);
+                        color: var(--cp-fg-1);
+                        background: var(--cp-bg-card);
+                        border: 1.5px solid var(--cp-border-color);
                         border-radius: 12px;
                         outline: none;
                         transition: border-color 0.15s, box-shadow 0.15s;
@@ -192,8 +191,8 @@ export const AgentInviteAcceptPage = ({
                         box-shadow: 0 0 0 3px var(--primary-soft);
                     }
                     .form-input[readonly] {
-                        background: #f5f5f4;
-                        color: var(--ink-soft);
+                        background: var(--cp-bg-muted);
+                        color: var(--cp-fg-2);
                         cursor: not-allowed;
                     }
                     .submit-btn {
@@ -217,16 +216,16 @@ export const AgentInviteAcceptPage = ({
                         margin-top: 1rem;
                         padding: 0.75rem 1rem;
                         border-radius: 10px;
-                        background: #fef2f2;
-                        border: 1px solid #fecaca;
-                        color: #b91c1c;
+                        background: var(--ih-status-bad-bg);
+                        border: 1px solid var(--ih-status-bad);
+                        color: var(--ih-status-bad-fg);
                         font-size: 0.875rem;
                     }
                     .error-box.hidden { display: none; }
                     .footer-note {
                         margin-top: 2.5rem;
                         font-size: 0.75rem;
-                        color: var(--ink-faint);
+                        color: var(--cp-fg-4);
                         text-align: center;
                         line-height: 1.6;
                     }

@@ -58,6 +58,17 @@ function inspectionEditor(inspectionId) {
     expanded: {},
     activeItemId: null,
     currentSectionIdx: 0,
+    // Design's PropertyInfo-as-section: which view fills the centre
+    // pane. 'items' = the regular item list for currentSectionIdx;
+    // 'property' = the property-facts form. The section rail's first
+    // row (`__property__`) toggles between them.
+    activeView: 'items',
+    // Design's SideRail tabs (Preview / Library / Recall). The 280 px
+    // right rail used to be a single "active item preview" surface;
+    // now the tab strip lets the inspector flip to the canned comment
+    // library or prior-inspection recall without leaving the editor.
+    sideRailMode: 'preview',
+    sideRailLibQuery: '',
     // Design System 0520 subsystem D P2.2 — when the inspector picks a
     // unit in the UnitTree left rail, the tree broadcasts
     // `unit-selected` on window and this state mirrors the active unit
@@ -81,6 +92,10 @@ function inspectionEditor(inspectionId) {
     sectionPickerIdx: 0,
     batchMode: false,
     batchSelected: {},
+    // Design-aligned item filter row — All / Unrated / Issues / Flagged.
+    // Drives `itemPassesFilter()` which the centre-pane card grid
+    // consults alongside the search filter so the two filters compose.
+    itemFilter: 'all',
     showMenu: false,
     showPublishModal: false,
     publishing: false,
@@ -769,9 +784,39 @@ function inspectionEditor(inspectionId) {
     },
 
     selectSection(idx) {
+      this.activeView        = 'items';
       this.currentSectionIdx = idx;
-      this.batchMode = false;
-      this.batchSelected = {};
+      this.batchMode         = false;
+      this.batchSelected     = {};
+    },
+
+    /**
+     * Design's Property Info as a virtual section — clicking the row in
+     * the section rail swaps the centre pane from the item list to a
+     * property facts form. Mirrors how the SectionRail in
+     * InspectionEditor.jsx treats `__property__` as the first entry.
+     */
+    selectProperty() {
+      this.activeView = 'property';
+      // Don't clear currentSectionIdx — coming back from property view
+      // should land the user in the section they were last in.
+    },
+
+    /**
+     * Per-property-fact progress for the section rail's completion ring.
+     * Same { rated, total, percent } shape as sectionProgress() so the
+     * rail can render both with one template.
+     */
+    propertyProgress() {
+      var fields = ['yearBuilt','sqft','foundationType','bedrooms','bathrooms','unit','county'];
+      var insp = this.inspection || {};
+      var filled = 0;
+      for (var i = 0; i < fields.length; i++) {
+        var v = insp[fields[i]];
+        if (v !== null && v !== undefined && v !== '') filled++;
+      }
+      var total = fields.length;
+      return { rated: filled, total: total, percent: Math.round(filled / total * 100) };
     },
 
     sectionDefectCount(sectionId) {
@@ -791,6 +836,72 @@ function inspectionEditor(inspectionId) {
         if ((level && level.isDefect) || rating === 'Defect') count++;
       }
       return count;
+    },
+
+    /**
+     * Per-section progress used by the SectionRail completion rings:
+     * returns { rated, total, percent } for the named section.
+     * Mirrors the shape that progress-strip-helpers.computeCompletion
+     * exposes globally so the rail + the top strip read consistent
+     * numbers (rounded half-up percent).
+     */
+    sectionProgress(sectionId) {
+      var sec = null;
+      for (var s = 0; s < this.sections.length; s++) {
+        if (this.sections[s].id === sectionId) { sec = this.sections[s]; break; }
+      }
+      if (!sec) return { rated: 0, total: 0, percent: 0 };
+      var total = sec.items.length;
+      if (total === 0) return { rated: 0, total: 0, percent: 0 };
+      var rated = 0;
+      for (var i = 0; i < total; i++) {
+        if (this.results[sec.items[i].id]?.rating != null) rated++;
+      }
+      return { rated: rated, total: total, percent: Math.round((rated / total) * 100) };
+    },
+
+    // Design-aligned filter predicate. Mirrors InspectionEditor.jsx
+    // ItemList filters:
+    //   all      — everything (no-op)
+    //   unrated  — no rating yet (rich items only)
+    //   issues   — rating maps to a defect/marginal severity
+    //   flagged  — user-tagged via getItemTags (safety/photo/follow-up tags)
+    itemPassesFilter(item) {
+      var f = this.itemFilter || 'all';
+      if (f === 'all') return true;
+      var r = this.results[item.id];
+      if (f === 'unrated') return !r || r.rating == null;
+      if (f === 'issues') {
+        if (!r || !r.rating) return false;
+        var levels = (this.ratingLevels || []);
+        for (var i = 0; i < levels.length; i++) {
+          if (levels[i].id !== r.rating) continue;
+          var sev = levels[i].severity;
+          return levels[i].isDefect || sev === 'significant' || sev === 'marginal';
+        }
+        return false;
+      }
+      if (f === 'flagged') {
+        var tags = (typeof this.getItemTags === 'function') ? this.getItemTags(item.id) : [];
+        return Array.isArray(tags) && tags.length > 0;
+      }
+      return true;
+    },
+
+    // Counts for the filter row chips. Cheap to recompute each frame —
+    // the page only renders a single section at a time so the loop is
+    // bounded by section.items.length (typically <40).
+    sectionFilterCounts() {
+      var items = this.currentSectionItems || [];
+      var counts = { all: items.length, unrated: 0, issues: 0, flagged: 0 };
+      var prev = this.itemFilter;
+      for (var i = 0; i < items.length; i++) {
+        this.itemFilter = 'unrated'; if (this.itemPassesFilter(items[i])) counts.unrated++;
+        this.itemFilter = 'issues';  if (this.itemPassesFilter(items[i])) counts.issues++;
+        this.itemFilter = 'flagged'; if (this.itemPassesFilter(items[i])) counts.flagged++;
+      }
+      this.itemFilter = prev;
+      return counts;
     },
 
     getItemRating(itemId) {

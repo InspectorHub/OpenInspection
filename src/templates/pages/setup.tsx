@@ -25,49 +25,34 @@ export const SetupPage = ({ branding }: { branding?: BrandingConfig | undefined 
                         <form id="setupForm" class="space-y-4">
                             <div>
                                 <label for="companyName" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Business Name</label>
-                                <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
-                                    <input id="companyName" name="companyName" type="text" required placeholder="Acme Inspections"
-                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
-                                </div>
+                                <input id="companyName" name="companyName" type="text" required placeholder="Acme Inspections"
+                                    class="block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/30 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                             </div>
 
                             <div>
                                 <label for="adminName" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Your Name</label>
-                                <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
-                                    <input id="adminName" name="adminName" type="text" autocomplete="name" required placeholder="Mike Reynolds"
-                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
-                                </div>
+                                <input id="adminName" name="adminName" type="text" autocomplete="name" required placeholder="Mike Reynolds"
+                                    class="block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/30 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 <p class="mt-2 ml-1 text-[11px] text-slate-500 font-medium leading-relaxed">Shown on your public booking link, signed agreements, and invoices.</p>
                             </div>
 
                             <div>
                                 <label for="email" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Admin Email</label>
-                                <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
-                                    <input id="email" name="email" type="email" autocomplete="email" required placeholder="admin@company.com"
-                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
-                                </div>
+                                <input id="email" name="email" type="email" autocomplete="email" required placeholder="admin@company.com"
+                                    class="block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/30 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                             </div>
 
                             <div>
                                 <label for="password" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Password</label>
-                                <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
-                                    <input id="password" name="password" type="password" required placeholder="••••••••"
-                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
-                                </div>
+                                <input id="password" name="password" type="password" required placeholder="••••••••"
+                                    class="block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/30 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 <p class="mt-2 ml-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Minimum 8 characters</p>
                             </div>
 
                             <div>
                                 <label for="verificationCode" class="block text-sm font-bold text-slate-900 tracking-tight ml-1 mb-3 uppercase">Verification Code</label>
-                                <div class="relative group">
-                                    <div class="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-500 rounded-md blur opacity-0 group-focus-within:opacity-20 transition-opacity"></div>
-                                    <input id="verificationCode" name="verificationCode" type="text" required placeholder="000000"
-                                        class="relative block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
-                                </div>
+                                <input id="verificationCode" name="verificationCode" type="text" required placeholder="000000"
+                                    class="block w-full px-3 py-2 rounded-md border border-slate-200 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/30 outline-none transition-all font-medium text-sm placeholder:text-slate-400" />
                                 <p class="mt-2 ml-1 text-[11px] text-slate-500 font-medium leading-relaxed">
                                     Find the 6-digit code in your Cloudflare deployment logs,
                                     or check the <code class="px-1 py-0.5 bg-slate-100 rounded text-slate-700 font-mono">setup_verification_code</code> key in KV namespace.

@@ -54,7 +54,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                         <td colspan={4} class="py-32 text-center">
                                             <div class="flex flex-col items-center gap-4">
                                                 <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-md"></div>
-                                                <p class="text-sm font-bold text-slate-400 animate-pulse">Loading...</p>
+                                                <span class="sr-only">Loading…</span><div aria-busy="true" class="ih-skeleton ih-skeleton--text" style="width: 30%; height: 0.875rem;"></div>
                                             </div>
                                         </td>
                                     </tr>
@@ -78,7 +78,8 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-                                    <tr x-show="reqLoading"><td colspan={6} class="py-16 text-center text-sm text-slate-400 italic">Loading…</td></tr>
+                                    <tr aria-busy="true"><td colspan={6} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                                    <tr aria-busy="true"><td colspan={6} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
                                     <tr x-show="!reqLoading && requests.length === 0"><td colspan={6} class="py-16 text-center text-sm text-slate-400 italic">No signing requests yet. Use a template's "Send" action.</td></tr>
                                     <template x-for="r in requests" x-bind:key="r.id">
                                         <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/50">

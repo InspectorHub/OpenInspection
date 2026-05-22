@@ -15,10 +15,10 @@ interface Props {
 export const SettingsWidgetPage = ({ branding, currentUserSlug, bookingHost, tenantSubdomain }: Props) => (
     <SettingsLayout
         branding={branding}
-        title="Settings | Embed Booking Widget"
+        title="Settings | Embed booking widget"
         group="catalog"
         subPage="widget"
-        pageTitle="Embed Booking Widget"
+        pageTitle="Embed booking widget"
         pageSubtitle="Paste a snippet on your marketing site. Bookings flow into your inspections list."
     >
         <div class="space-y-5 max-w-3xl">

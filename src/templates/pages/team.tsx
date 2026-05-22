@@ -33,7 +33,8 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                                     <div id="quotaBadge" class="hidden sm:flex items-center gap-2 px-3 h-8 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                                         <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
                                         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none">Seats:</span>
-                                        <span class="text-[12px] font-bold text-slate-900 dark:text-slate-100 leading-none">Loading...</span>
+                                        <span class="sr-only">Loading seat count…</span>
+                                        <span class="ih-skeleton ih-skeleton--text inline-block" style="width: 3.5rem; height: 0.875rem; vertical-align: middle;" aria-hidden="true"></span>
                                     </div>
                                 ) : null}
                                 <button
@@ -68,7 +69,9 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                                     </tr>
                                 </thead>
                                 <tbody id="membersList" class="divide-y divide-slate-100/50">
-                                    <tr><td colspan={3} class="px-10 py-10 text-sm font-bold text-center text-slate-300 uppercase tracking-[0.2em]">Loading...</td></tr>
+                                    <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -163,7 +166,41 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                     <p class="text-sm text-slate-400" x-show="items.length === 0 && !loading">No active guests.</p>
                 </section>
 
-                <section class="rounded-xl p-6 bg-indigo-50 border border-indigo-200 flex items-center justify-between">
+                {/* Roles reference — surfaces the RBAC matrix so workspace
+                    admins know what each role actually does before they
+                    assign one. The roles themselves are defined globally
+                    in src/lib/middleware/rbac.ts; this card is purely a
+                    documentation surface (no edit affordance — roles can't
+                    be customised without a code change, matching the
+                    design's "Defined globally" subtitle). */}
+                <section class="glass-panel rounded-xl p-6 shadow-md">
+                    <header class="mb-4">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">Roles</h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                            Defined globally. To request a custom role, file a ticket on the OpenInspection repo.
+                        </p>
+                    </header>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Lead inspector</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Full edit · can publish · approves apprentice ratings. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>lead</code> / <code>inspector</code>)</span></div>
+                        </div>
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Specialist</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Full edit within their assigned sections. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>specialist</code>)</span></div>
+                        </div>
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Apprentice</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Edits route through the lead's review queue at <a href="/apprentice-review" class="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">/apprentice-review</a> before publish. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>apprentice</code>)</span></div>
+                        </div>
+                        <div class="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+                            <div class="text-sm font-bold text-slate-900 dark:text-slate-100">Office staff</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Read-only access to inspections + scheduling. <span class="font-mono text-slate-400 dark:text-slate-500">(role: <code>office</code>)</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rounded-xl p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
                     <div>
                         <div class="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Billing</div>
                         <div class="text-lg font-medium text-slate-900">Manage seats, invoices, and payment in the billing portal</div>

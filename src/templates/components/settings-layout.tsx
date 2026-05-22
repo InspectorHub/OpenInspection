@@ -50,21 +50,21 @@ export const SETTINGS_GROUPS: readonly GroupConfig[] = [
         icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z',
         subPages: [
             { slug: 'branding', label: 'Branding', href: '/settings/workspace/branding', description: 'Site name, color, logo' },
-            { slug: 'theme', label: 'Report Theme', href: '/settings/workspace/theme', description: 'Modern / classic / minimal' },
+            { slug: 'theme', label: 'Report theme', href: '/settings/workspace/theme', description: 'Modern / classic / minimal' },
             { slug: 'reports', label: 'Reports', href: '/settings/workspace/reports', description: 'Estimate display, defect badges' },
-            { slug: 'referral', label: 'Referral Sources', href: '/settings/workspace/referral', description: 'Custom referral labels' },
+            { slug: 'referral', label: 'Referral sources', href: '/settings/workspace/referral', description: 'Custom referral labels' },
             { slug: 'telemetry', label: 'Telemetry', href: '/settings/workspace/telemetry', description: 'Google Analytics' },
         ],
     },
     {
         slug: 'catalog',
-        label: 'Services & Catalog',
+        label: 'Services & catalog',
         description: 'Inspection types, fees, add-ons, embed widget.',
         icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
         subPages: [
-            { slug: 'services', label: 'Services & Pricing', href: '/settings/catalog/services', description: 'Standard fees, discounts' },
-            { slug: 'event-types', label: 'Event Types', href: '/settings/catalog/event-types', description: 'Radon, sewer scope, follow-ups' },
-            { slug: 'widget', label: 'Embed Widget', href: '/settings/catalog/widget', description: 'Booking snippet for your site' },
+            { slug: 'services', label: 'Services & pricing', href: '/settings/catalog/services', description: 'Standard fees, discounts' },
+            { slug: 'event-types', label: 'Event types', href: '/settings/catalog/event-types', description: 'Radon, sewer scope, follow-ups' },
+            { slug: 'widget', label: 'Embed widget', href: '/settings/catalog/widget', description: 'Booking snippet for your site' },
             // Agent Accounts A3 — concierge review-mode toggle.
             { slug: 'booking', label: 'Booking', href: '/settings/catalog/booking', description: 'Concierge review mode for agent bookings' },
         ],
@@ -87,9 +87,9 @@ export const SETTINGS_GROUPS: readonly GroupConfig[] = [
         description: 'Password, two-factor, bot protection.',
         icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
         subPages: [
-            { slug: 'password', label: 'Change Password', href: '/settings/account/password', description: 'Update your password' },
+            { slug: 'password', label: 'Change password', href: '/settings/account/password', description: 'Update your password' },
             { slug: 'security', label: 'Two-factor (2FA)', href: '/settings/account/security', description: 'TOTP authenticator' },
-            { slug: 'bot-protection', label: 'Bot Protection', href: '/settings/account/bot-protection', description: 'Cloudflare Turnstile' },
+            { slug: 'bot-protection', label: 'Bot protection', href: '/settings/account/bot-protection', description: 'Cloudflare Turnstile' },
         ],
     },
     {

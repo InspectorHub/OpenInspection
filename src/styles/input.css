@@ -1002,6 +1002,86 @@ html[data-color-scheme="dark"] .hover\:bg-blueprint-500:hover { background-color
 html[data-color-scheme="dark"] .divide-slate-200 > * + * { border-color: rgba(255,255,255,0.08) !important; }
 html[data-color-scheme="dark"] .divide-slate-100 > * + * { border-color: rgba(255,255,255,0.05) !important; }
 
+/* ── Generic page-chrome slate bgs (full-viewport wrappers) ─────────────
+   Pages that aren't routed through MainLayout/SettingsLayout typically
+   wrap content in a `min-h-screen ... bg-slate-50` div as the page
+   canvas. This rule only matches that pattern so small bordered/
+   rounded bg-slate-50 badges remain untouched. */
+html[data-color-scheme="dark"] .min-h-screen.bg-slate-50,
+html[data-color-scheme="dark"] body > .bg-slate-50:not([class*="rounded-"]):not([class*="border "]) {
+    background-color: var(--ih-bg-app) !important;
+}
+
+/* ── Status-color callouts (alerts, badges) — dark mode equivalents ─────
+   These are used as opaque alert backgrounds throughout the dashboard,
+   settings, and standalone pages (bg-{red,rose,amber,emerald}-50 + text-*-
+   600/700 + border-*-100/200). Without these the light pastel boxes look
+   stranded on the dark slate canvas. */
+html[data-color-scheme="dark"] .bg-red-50,
+html[data-color-scheme="dark"] .bg-rose-50 {
+    background-color: rgba(127,29,29,0.22) !important;
+}
+html[data-color-scheme="dark"] .border-red-100,
+html[data-color-scheme="dark"] .border-rose-100,
+html[data-color-scheme="dark"] .border-red-200,
+html[data-color-scheme="dark"] .border-rose-200 {
+    border-color: rgba(248,113,113,0.32) !important;
+}
+html[data-color-scheme="dark"] .text-red-600,
+html[data-color-scheme="dark"] .text-rose-600,
+html[data-color-scheme="dark"] .text-red-700,
+html[data-color-scheme="dark"] .text-rose-700,
+html[data-color-scheme="dark"] .text-red-500,
+html[data-color-scheme="dark"] .text-rose-500 {
+    color: #fca5a5 !important;
+}
+
+html[data-color-scheme="dark"] .bg-amber-50 {
+    background-color: rgba(120,53,15,0.28) !important;
+}
+html[data-color-scheme="dark"] .bg-amber-100 {
+    background-color: rgba(120,53,15,0.40) !important;
+}
+html[data-color-scheme="dark"] .border-amber-100,
+html[data-color-scheme="dark"] .border-amber-200,
+html[data-color-scheme="dark"] .border-amber-300 {
+    border-color: rgba(251,191,36,0.36) !important;
+}
+html[data-color-scheme="dark"] .text-amber-600,
+html[data-color-scheme="dark"] .text-amber-700,
+html[data-color-scheme="dark"] .text-amber-800,
+html[data-color-scheme="dark"] .text-amber-900 {
+    color: #fbbf24 !important;
+}
+
+html[data-color-scheme="dark"] .bg-emerald-50,
+html[data-color-scheme="dark"] .bg-green-50 {
+    background-color: rgba(6,78,59,0.28) !important;
+}
+html[data-color-scheme="dark"] .border-emerald-100,
+html[data-color-scheme="dark"] .border-emerald-200,
+html[data-color-scheme="dark"] .border-green-100,
+html[data-color-scheme="dark"] .border-green-200 {
+    border-color: rgba(74,222,128,0.32) !important;
+}
+html[data-color-scheme="dark"] .text-emerald-600,
+html[data-color-scheme="dark"] .text-emerald-700,
+html[data-color-scheme="dark"] .text-green-600,
+html[data-color-scheme="dark"] .text-green-700 {
+    color: #4ade80 !important;
+}
+
+html[data-color-scheme="dark"] .bg-indigo-50 {
+    background-color: rgba(99,102,241,0.14) !important;
+}
+html[data-color-scheme="dark"] .bg-indigo-100 {
+    background-color: rgba(99,102,241,0.20) !important;
+}
+html[data-color-scheme="dark"] .border-indigo-100,
+html[data-color-scheme="dark"] .border-indigo-200 {
+    border-color: rgba(129,140,248,0.36) !important;
+}
+
 /* ── Theme toggle icon swap — JS (updateUI) controls which icon is shown ─ */
 /* Hide all three icons on initial paint; DOMContentLoaded updateUI reveals one. */
 #themeSunIcon, #themeMoonIcon, #themeAutoIcon                   { display: none; }
@@ -1035,4 +1115,141 @@ button, a, [role="button"] {
    white intermediate between two pages with different bg colors. */
 html {
     background-color: var(--ih-bg-app, #f8fafc);
+}
+
+/* ============================================================
+   Design-system additions — empty-state / skeleton / focus-visible
+   Added in the post-design-system handoff polish round. These
+   close gaps the design doc flagged ("not yet specified") so the
+   rest of the app has a single source of truth to draw against.
+   ============================================================ */
+
+/* ── Empty-state illustrations ──────────────────────────────
+   The pattern across the app: a large outline SVG, soft ink-300
+   color, sitting above a short heading + one-line subline. Stroke
+   1.5 (not the default 2 of chrome icons) because at 48px+ the
+   thinner stroke reads as illustration rather than control. */
+.ih-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 3rem 1.5rem;
+    text-align: center;
+}
+.ih-empty-state__icon {
+    width: 48px;
+    height: 48px;
+    color: var(--ih-slate-300, #cbd5e1);
+    stroke-width: 1.5;
+    flex-shrink: 0;
+}
+.ih-empty-state__title {
+    font-size: var(--ih-text-body, 13px);
+    font-weight: 600;
+    color: var(--ih-fg-2, #475569);
+}
+.ih-empty-state__subline {
+    font-size: var(--ih-text-meta, 12px);
+    color: var(--ih-fg-3, #64748b);
+    max-width: 32ch;
+    line-height: 1.5;
+}
+html[data-color-scheme="dark"] .ih-empty-state__icon { color: var(--ih-fg-5, #64748b); }
+
+/* ── Skeleton loaders ───────────────────────────────────────
+   Replaces the bare "Loading..." text with a shimmer placeholder.
+   Two shapes (block + text) cover 95% of cases. */
+.ih-skeleton {
+    display: block;
+    background:
+        linear-gradient(90deg,
+            rgba(15,23,42,0.04) 0%,
+            rgba(15,23,42,0.08) 50%,
+            rgba(15,23,42,0.04) 100%);
+    background-size: 200% 100%;
+    animation: ih-skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: 6px;
+}
+.ih-skeleton--text {
+    height: 0.875em;
+    border-radius: 3px;
+    margin: 0.25em 0;
+}
+.ih-skeleton--block { height: 100%; min-height: 1.5rem; }
+@keyframes ih-skeleton-shimmer {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+html[data-color-scheme="dark"] .ih-skeleton {
+    background:
+        linear-gradient(90deg,
+            rgba(255,255,255,0.04) 0%,
+            rgba(255,255,255,0.08) 50%,
+            rgba(255,255,255,0.04) 100%);
+    background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+    .ih-skeleton { animation: none; background-position: 0 0; }
+}
+
+/* ── Focus-visible — covers links, icon buttons, chips ──────
+   The design's "3px indigo glow ring" applies to inputs and CTAs
+   via component CSS, but bare <a>, ghost icon buttons, and chips
+   were falling back to the browser default outline (inconsistent
+   across Chrome/Firefox/Safari). Pin one global treatment. */
+a:focus-visible,
+button:focus-visible:not(.ih-btn):not(.ih-input),
+[role="button"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[tabindex]:focus-visible:not(input):not(textarea):not(select) {
+    outline: none;
+    box-shadow: var(--ih-shadow-focus, 0 0 0 3px rgba(99,102,241,0.30));
+    border-radius: var(--ih-radius-button, 6px);
+}
+/* Suppress the global ring on disabled / aria-disabled elements. */
+:disabled:focus-visible,
+[aria-disabled="true"]:focus-visible {
+    box-shadow: none;
+}
+
+/* ── Mobile touch targets ───────────────────────────────────
+   Apple HIG & Material guidelines call for ≥44px minimum touch
+   target on coarse-pointer devices (touchscreens). The desktop
+   inspector dashboard ships dense 32–36px controls intentionally;
+   this rule keeps the dense desktop look but enforces a 44px
+   floor on touch devices so the same buttons remain comfortably
+   tappable on phones / tablets. Excludes utility chips
+   ([role="status"], <kbd>) so badges keep their compact size. */
+@media (pointer: coarse) {
+    button:not([role="status"]):not(.ih-pill):not(.ih-kbd),
+    [role="button"],
+    a.ih-btn,
+    a[role="menuitem"] {
+        min-height: 44px;
+    }
+    /* Inputs already render 36-44px tall — only nudge if
+       collapsed by inline classes. */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+        min-height: 40px;
+    }
+}
+
+/* ── Stat-number tabular alignment ──────────────────────────
+   Dashboard / metrics surfaces frequently render running counts
+   that update via Alpine x-text. Without tabular-nums the digits
+   re-flow each tick. This rule auto-applies tabular-nums to the
+   common stat-display patterns so future code doesn't have to
+   remember the utility class. */
+[id*="Badge"],
+[id*="Count"],
+[id*="Stat"],
+[data-stat],
+.ih-pill,
+.ih-kbd,
+td.text-right,
+td[align="right"] {
+    font-variant-numeric: tabular-nums;
 }

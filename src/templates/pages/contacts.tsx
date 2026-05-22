@@ -90,7 +90,9 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             </tr>
                         </thead>
                         <tbody id="contactsBody">
-                            <tr><td colspan={7} class="px-10 py-8 text-center text-slate-400 font-semibold">Loading...</td></tr>
+                            <tr aria-busy="true"><td colspan={7} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={7} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={7} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -113,7 +115,9 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                             </tr>
                         </thead>
                         <tbody id="agentLinksBody">
-                            <tr><td colspan={4} class="px-10 py-8 text-center text-slate-400 font-semibold">Loading...</td></tr>
+                            <tr aria-busy="true"><td colspan={4} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={4} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={4} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                         </tbody>
                     </table>
                 </div>

@@ -140,10 +140,10 @@ export const MarketplacePage = ({ branding }: { branding?: BrandingConfig | unde
                         </div>
                     </template>
                     <template x-if="templates.length === 0 && !loading">
-                        <div class="col-span-3 py-10 text-center text-slate-400 font-semibold">No templates found. Try a different search or category.</div>
+                        <div class="col-span-3 ih-empty-state"><h3 class="ih-empty-state__title">No templates found</h3><p class="ih-empty-state__subline">Try a different search or category.</p></div>
                     </template>
                     <template x-if="loading">
-                        <div class="col-span-3 py-10 text-center text-slate-400 font-semibold">Loading...</div>
+                        <div aria-busy="true" class="col-span-3 space-y-3 py-10"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--block" style="height: 8rem;"></div></div>
                     </template>
                 </div>
 

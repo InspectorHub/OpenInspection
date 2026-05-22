@@ -59,13 +59,22 @@ export const AgentInviteExpiredPage = ({
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>{`Invite expired | ${siteName}`}</title>
+                <script dangerouslySetInnerHTML={{ __html: `(function(){try{var L=localStorage.getItem('ih-color-scheme');if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}var s=localStorage.getItem('oi-color-scheme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-color-scheme',s==='dark'||(s===null&&p)?'dark':'light');})()`}} />
                 <link rel="stylesheet" href="/fonts.css" />
                 <style dangerouslySetInnerHTML={{ __html: `
+                    :root {
+                        --badge-bg: #fef3c7;
+                        --badge-fg: #92400e;
+                    }
+                    html[data-color-scheme="dark"] {
+                        --badge-bg: rgba(251,191,36,0.18);
+                        --badge-fg: #fbbf24;
+                    }
                     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: 'DM Sans', system-ui, sans-serif;
-                        background: #fafaf9;
-                        color: #1c1917;
+                        background: var(--cp-bg);
+                        color: var(--cp-fg-1);
                         min-height: 100vh;
                         display: flex;
                         align-items: center;
@@ -76,8 +85,8 @@ export const AgentInviteExpiredPage = ({
                     .card {
                         max-width: 480px;
                         width: 100%;
-                        background: #ffffff;
-                        border: 1px solid #e7e5e4;
+                        background: var(--cp-bg-card);
+                        border: 1px solid var(--cp-border-color);
                         border-radius: 18px;
                         padding: 2.5rem 2rem;
                         text-align: center;
@@ -87,8 +96,8 @@ export const AgentInviteExpiredPage = ({
                         align-items: center;
                         gap: 0.375rem;
                         padding: 0.375rem 0.875rem;
-                        background: #fef3c7;
-                        color: #92400e;
+                        background: var(--badge-bg);
+                        color: var(--badge-fg);
                         border-radius: 999px;
                         font-size: 0.75rem;
                         font-weight: 600;
@@ -105,7 +114,7 @@ export const AgentInviteExpiredPage = ({
                         margin-bottom: 0.75rem;
                     }
                     .explainer {
-                        color: #57534e;
+                        color: var(--cp-fg-2);
                         font-size: 0.9375rem;
                         line-height: 1.55;
                         margin-bottom: 1.75rem;
@@ -126,10 +135,10 @@ export const AgentInviteExpiredPage = ({
                         display: block;
                         margin-top: 1.25rem;
                         font-size: 0.875rem;
-                        color: #78716c;
+                        color: var(--cp-fg-4);
                         text-decoration: none;
                     }
-                    .secondary:hover { color: #1c1917; }
+                    .secondary:hover { color: var(--cp-fg-1); }
                 ` }} />
             </head>
             <body>

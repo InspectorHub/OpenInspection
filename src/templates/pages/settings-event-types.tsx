@@ -7,10 +7,10 @@ interface Props { branding?: BrandingConfig; }
 export const SettingsEventTypesPage = ({ branding }: Props): JSX.Element => (
     <SettingsLayout
         branding={branding}
-        title="Settings | Event Types"
+        title="Settings | Event types"
         group="catalog"
         subPage="event-types"
-        pageTitle="Event Types"
+        pageTitle="Event types"
         pageSubtitle="Define ancillary inspection events (radon test pickup, sewer scope, follow-up visit, etc.) that can be attached to an inspection."
     >
         <div x-data="settingsEventTypes" x-init="init()" class="space-y-5">

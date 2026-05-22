@@ -72,6 +72,19 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                     .max-h-96 { max-height: none !important; overflow: visible !important; }
                     @page { margin: 0.5in; }
                 }
+                /* The agreement content is rendered with an inline color:#1e293b
+                   to guarantee readable contrast in light mode; that inline
+                   color wins over global CSS in dark mode and turns the body
+                   text invisible. Override at higher specificity.
+
+                   Customer-portal surface: scope the override to a media
+                   query (not the data-color-scheme attribute) so a same-
+                   browser inspector toggle on a paired dashboard tab cannot
+                   force the customer's signing page into dark when their
+                   own OS pref is light. */
+                @media (prefers-color-scheme: dark) {
+                    #agreementContent { color: #cbd5e1 !important; }
+                }
             `}} />
             <div class="min-h-screen bg-slate-50 py-6 px-4 font-sans">
                 <div class="max-w-2xl mx-auto">
@@ -166,6 +179,9 @@ export const AgreementSignPage = ({ token, agreementName, agreementContent, clie
                 }
 
                 if (canvas && ctx) {
+                    // Keep ink dark in both color schemes. The signature wrap
+                    // stays light (bg-slate-50) so the signature PNG embeds
+                    // correctly into the light-only signed PDF.
                     ctx.strokeStyle = '#1e293b';
                     ctx.lineWidth = 2.5;
                     ctx.lineCap = 'round';
