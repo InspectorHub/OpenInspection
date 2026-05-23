@@ -1,9 +1,10 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { users, tenantInvites } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { logger } from '../lib/logger';
+import { OutboxService } from './outbox.service';
 
 /** Dummy PBKDF2 hash used to equalize verify() timing when the email lookup misses. */
 const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000';
@@ -11,9 +12,14 @@ const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:00000000000000000000
 /**
  * Service to handle all authentication-related business logic.
  * Decouples database operations from the HTTP routing layer.
+ *
+ * The optional `outbox` dependency is used to forward user-lifecycle
+ * events (password changed / team join / reset) to portal so a portal
+ * identity with N workspace memberships stays in sync without manual
+ * intervention.
  */
 export class AuthService {
-    constructor(private db: D1Database, private kv?: KVNamespace) {}
+    constructor(private db: D1Database, private kv?: KVNamespace, private outbox?: OutboxService) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -85,10 +91,25 @@ export class AuthService {
         const newHash = await hashPassword(newPassword);
         await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
         await this.writeInvalidation(userId);
+
+        // Forward to portal so the matching identity row gets the new hash
+        // — without this an identity that holds memberships in multiple
+        //   workspaces would silently desync (login at portal fails next
+        //   time even though the user just rotated their password here).
+        if (this.outbox && user.tenantId) {
+            await this.outbox.append({
+                type: 'user.password_changed',
+                payload: { tenantId: user.tenantId, email: user.email, passwordHash: newHash },
+            });
+        }
     }
 
     /**
      * Joins a team using an invitation token.
+     *
+     * Post-multi-workspace: same email can already exist in another
+     * tenant — we only reject when it already exists within THIS tenant.
+     * UNIQUE(tenant_id, email) at the DB layer is the hard backstop.
      */
     async joinTeam(token: string, password: string) {
         const db = this.getDrizzle();
@@ -98,8 +119,10 @@ export class AuthService {
         if (invite.status !== 'pending') throw Errors.BadRequest('Invitation has already been used');
         if (invite.expiresAt < new Date()) throw Errors.BadRequest('Invitation has expired');
 
-        const existing = await db.select().from(users).where(eq(users.email, invite.email)).get();
-        if (existing) throw Errors.Conflict('An account with this email already exists');
+        const existing = await db.select().from(users)
+            .where(and(eq(users.tenantId, invite.tenantId), eq(users.email, invite.email)))
+            .get();
+        if (existing) throw Errors.Conflict('An account with this email already exists in this workspace');
 
         const passwordHash = await hashPassword(password);
         const userId = crypto.randomUUID();
@@ -114,6 +137,20 @@ export class AuthService {
         });
 
         await db.update(tenantInvites).set({ status: 'accepted' }).where(eq(tenantInvites.id, token));
+
+        // Tell portal about the new membership so its `/workspace/select`
+        // picker shows this workspace next time the identity signs in.
+        if (this.outbox) {
+            await this.outbox.append({
+                type: 'user.invited',
+                payload: {
+                    tenantId: invite.tenantId,
+                    email: invite.email,
+                    role: invite.role,
+                    passwordHash,
+                },
+            });
+        }
 
         return { id: userId, email: invite.email, tenantId: invite.tenantId, role: invite.role };
     }
@@ -162,6 +199,18 @@ export class AuthService {
         await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
         await this.kv.delete(kvKey);
         await this.writeInvalidation(userId);
+
+        // Mirror the new hash to portal for the matching identity.
+        if (this.outbox) {
+            const row = await db.select({ tenantId: users.tenantId, email: users.email })
+                .from(users).where(eq(users.id, userId)).get();
+            if (row?.tenantId) {
+                await this.outbox.append({
+                    type: 'user.password_changed',
+                    payload: { tenantId: row.tenantId, email: row.email, passwordHash: newHash },
+                });
+            }
+        }
     }
 
     /**

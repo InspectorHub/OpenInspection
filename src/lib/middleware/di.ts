@@ -8,6 +8,7 @@ import { ApprenticeService } from '../../services/apprentice.service';
 import { GuestInviteService } from '../../services/guest-invite.service';
 import { AIService } from '../../services/ai.service';
 import { AuthService } from '../../services/auth.service';
+import { OutboxService } from '../../services/outbox.service';
 import { BookingService } from '../../services/booking.service';
 import { BrandingService } from '../../services/branding.service';
 import { EmailService } from '../../services/email.service';
@@ -107,7 +108,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     );
                     break;
                 case 'auth':
-                    target.auth = new AuthService(c.env.DB, c.env.TENANT_CACHE);
+                    target.auth = new AuthService(c.env.DB, c.env.TENANT_CACHE, new OutboxService(c.env.DB));
+                    break;
+                case 'outbox':
+                    target.outbox = new OutboxService(c.env.DB);
                     break;
                 case 'booking':
                     target.booking = new BookingService(c.env.DB);
