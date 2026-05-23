@@ -20,6 +20,7 @@ export enum ErrorCode {
     // client can surface a clear "open AI settings" path instead of a
     // generic 503.
     AI_NOT_CONFIGURED = 'ai_not_configured',
+    TENANT_SUSPENDED = 'tenant_suspended',
 }
 
 /**
@@ -62,4 +63,6 @@ export const Errors = {
     ServiceUnavailable: (msg: string, details?: unknown) => new AppError(503, ErrorCode.SERVICE_UNAVAILABLE, msg, details),
     AINotConfigured: (msg: string = 'AI is not configured. Set GEMINI_API_KEY in Settings.') =>
         new AppError(503, ErrorCode.AI_NOT_CONFIGURED, msg),
+    TenantSuspended: (msg: string = 'This workspace has been suspended. Existing content remains accessible in read-only mode. Contact your administrator to restore full access.') =>
+        new AppError(403, ErrorCode.TENANT_SUSPENDED, msg),
 };

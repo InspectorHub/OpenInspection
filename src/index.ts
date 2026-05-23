@@ -11,6 +11,7 @@ import { users } from './lib/db/schema';
 import * as schema from './lib/db/schema';
 
 import { brandingMiddleware } from './lib/middleware/branding';
+import { enforceTenantActive } from './lib/middleware/tenant-status-guard';
 import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
 import { tenantRouter } from './features/tenant-routing';
@@ -239,6 +240,7 @@ app.use('*', securityHeaders);
 app.use('*', diMiddleware);
 app.use('*', tenantRouter);
 app.use('*', brandingMiddleware);
+app.use('*', enforceTenantActive);
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
 // rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")

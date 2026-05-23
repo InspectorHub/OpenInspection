@@ -49,6 +49,9 @@ export interface BrandingConfig {
      *  time. Null when running standalone or when `PORTAL_API_URL` is
      *  unset (in which case the bounce/switch UI degrades to a no-op). */
     portalBaseUrl?: string | null | undefined;
+    /** Current tenant lifecycle status. Used by MainLayout to show a
+     *  suspension banner when status === 'suspended'. */
+    tenantStatus?: string | undefined;
 }
 
 import { ScopedDB } from '../lib/db/scoped';

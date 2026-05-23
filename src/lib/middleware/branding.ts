@@ -20,6 +20,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
     const profile = c.var.profile;
     const isSharedSaas = profile?.mode === 'saas' && profile?.saasTopology === 'shared';
     const portalBaseUrl = c.env.PORTAL_API_URL ? c.env.PORTAL_API_URL.replace(/\/$/, '') : null;
+    const tenantStatus = c.get('tenantStatus') ?? 'active';
 
     // Default system branding (fallback)
     const defaultBranding: BrandingConfig = {
@@ -31,6 +32,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         gaMeasurementId: c.env.GA_MEASUREMENT_ID || null,
         isSharedSaas,
         portalBaseUrl,
+        tenantStatus,
     };
 
     if (!tenantId) {
@@ -81,6 +83,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             // value on the next request without waiting for the KV TTL.
             isSharedSaas,
             portalBaseUrl,
+            tenantStatus,
         } : defaultBranding;
 
         c.set('branding', branding);

@@ -179,6 +179,34 @@ export const MainLayout = (props: {
                 {...(extraHead ? { extraHead } : {})}
             />
             <body class="bg-[#f8fafc] dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased min-h-screen" x-data="{ mobileMenu: false }">
+                {branding?.tenantStatus === 'suspended' && (
+                    <div id="suspensionBanner" class="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700 px-4 py-3 flex items-center justify-center gap-3 relative z-50">
+                        <svg class="w-5 h-5 flex-shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+                        <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                            This workspace is suspended. You can view existing content but cannot create or edit inspections. Contact your administrator.
+                        </p>
+                        <button type="button" id="dismissSuspensionBanner" class="ml-auto flex-shrink-0 p-1 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/50 hover:text-amber-800 dark:hover:text-amber-200 transition-colors" aria-label="Dismiss">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                )}
+                {branding?.tenantStatus === 'suspended' && (
+                    <script dangerouslySetInnerHTML={{ __html: `
+                        (function() {
+                            var banner = document.getElementById('suspensionBanner');
+                            var btn = document.getElementById('dismissSuspensionBanner');
+                            if (sessionStorage.getItem('oi-suspension-dismissed')) {
+                                if (banner) banner.style.display = 'none';
+                            }
+                            if (btn) {
+                                btn.addEventListener('click', function() {
+                                    sessionStorage.setItem('oi-suspension-dismissed', '1');
+                                    if (banner) banner.style.display = 'none';
+                                });
+                            }
+                        })();
+                    ` }} />
+                )}
                 {/* Mobile Header Bar */}
                 <div class="lg:hidden sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
                     <div class="flex items-center gap-3">
