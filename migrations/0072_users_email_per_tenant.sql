@@ -12,6 +12,16 @@
 -- declared inline with the column, so this migration recreates the
 -- table. The column list mirrors src/lib/db/schema/tenant.ts at the
 -- time of writing — keep them in lock-step.
+--
+-- defer_foreign_keys is REQUIRED here. Many tables (inspections,
+-- audit_logs, bookings, …) carry FK references into users(id); a
+-- naive DROP TABLE users mid-rebuild trips SQLITE_CONSTRAINT_FOREIGNKEY
+-- because for the duration of (DROP + RENAME) those FKs point at a
+-- non-existent target. `defer_foreign_keys = TRUE` postpones the check
+-- to COMMIT, by which time users_new has been renamed back to users
+-- and every FK row still resolves to the same id it did before. D1
+-- supports this PRAGMA (unlike `foreign_keys = OFF`, which D1 ignores).
+PRAGMA defer_foreign_keys = TRUE;
 
 CREATE TABLE users_new (
     id                     TEXT PRIMARY KEY,
