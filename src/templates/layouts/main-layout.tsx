@@ -514,10 +514,32 @@ export const MainLayout = (props: {
                 {/* B4 module loads moved into SharedHead so BareLayout pages
                     (form-renderer) get the offline pill / modal / banner too. */}
                 <script src="/js/toast.js"></script>
+                {/* Sign Out — wire both desktop + mobile buttons directly to
+                    the logout POST. Previously this only bridged mobile to
+                    desktop and relied on per-page JS to bind
+                    logoutBtn.onclick = logout (auth.js). When that per-page
+                    JS wasn't loaded — or its DOMContentLoaded handler raced
+                    the click — the button silently did nothing. Inlining
+                    the fetch removes the dependency and keeps the buttons
+                    working on every page that ships MainLayout. */}
                 <script dangerouslySetInnerHTML={{ __html: `
-                    document.getElementById('mobileLogoutBtn')?.addEventListener('click', function() {
-                        document.getElementById('logoutBtn')?.click();
-                    });
+                    (function() {
+                        async function performLogout(e) {
+                            if (e) e.preventDefault();
+                            try {
+                                await fetch('/api/auth/logout', {
+                                    method: 'POST',
+                                    credentials: 'same-origin',
+                                });
+                            } catch (_) { /* network failure still navigates */ }
+                            window.location.href = '/login';
+                        }
+                        // Expose so the command palette + any legacy
+                        // call-site that does window.logout() still works.
+                        window.logout = performLogout;
+                        document.getElementById('logoutBtn')?.addEventListener('click', performLogout);
+                        document.getElementById('mobileLogoutBtn')?.addEventListener('click', performLogout);
+                    })();
                 ` }} />
                 <div id="statusToast" class="fixed bottom-8 right-8 hidden items-center gap-3 px-3 py-2 rounded-2xl shadow-2xl text-sm font-bold text-white z-50 transition-all"></div>
                 {/* Phase T (T25) — sidebar unread message badge polling */}
