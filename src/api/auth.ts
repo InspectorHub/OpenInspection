@@ -91,6 +91,24 @@ const loginRoute = createRoute(withMcpMetadata({
 }, { scopes: [], tier: 'excluded' }));
 
 coreAuthRoutes.openapi(loginRoute, async (c) => {
+    // Shared-SaaS deploys disable the local password form — see the
+    // matching guard on GET /login. Returning Gone (410) + a redirect
+    // hint lets stale clients (cached SPA build, scripted callers) bail
+    // out cleanly instead of attempting credential validation against
+    // a per-(tenant_id,email) row they can't disambiguate.
+    const profile = c.var.profile;
+    if (profile?.mode === 'saas' && profile?.saasTopology === 'shared') {
+        const portal = c.env.PORTAL_API_URL?.replace(/\/$/, '') ?? null;
+        return c.json({
+            success: false,
+            error: {
+                code: 'LOGIN_MOVED_TO_PORTAL',
+                message: 'Sign in via the workspace portal; this tenant runs in shared-SaaS mode.',
+                ...(portal ? { details: { redirect: `${portal}/login` } } : {}),
+            },
+        }, 410);
+    }
+
     await checkRateLimit(c, 'login');
 
     const body = c.req.valid('json');
@@ -251,7 +269,9 @@ const ssoConsumeRoute = createRoute(withMcpMetadata({
     description: 'Reads sso:<code> from KV, issues a session cookie, redirects to /dashboard.',
     tags: ['auth', 'public'],
     request: {
-        query: z.object({ code: z.string().min(8) }),
+        query: z.object({
+            code: z.string().min(8).describe('One-time SSO handoff code minted by the portal at POST /api/integration/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume.'),
+        }),
     },
     responses: {
         302: { description: 'Redirect to /dashboard on success or /login on failure' },

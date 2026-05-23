@@ -34,6 +34,8 @@ npm run deploy       # Deploy to Cloudflare Workers
 - JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `src/lib/jwt-keyring.ts`.
 - Supports both Cookie (for dashboard) and Bearer Header (for API) token delivery.
 - PBKDF2-SHA256 password hashing (100k iterations, 16-byte salt). Legacy SHA-256 hashes auto-rehashed on login.
+- **Shared-SaaS login is portal-only.** When `APP_MODE=saas` + `SAAS_TOPOLOGY=shared`, `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: a single core D1 holds users for many tenants and `users.email` is now unique per-`(tenant_id, email)` (migration 0072), so a local form cannot disambiguate which tenant the user means. Entry into core in this mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone and silo deploys are unchanged — the local form still works because their email-to-tenant mapping is unambiguous.
+- **Switch workspace UI.** `MainLayout` renders a "Switch workspace" entry in the sidebar (desktop bottom section + mobile drawer) whenever `branding.isSharedSaas` is true and `PORTAL_API_URL` is set. The link points at `${PORTAL_API_URL}/workspace/select`. Because the JWT carries a single `custom:tenantId`, this portal bounce is the only correct way to swap tenants without losing the session — portal will SSO us back here with the new tenant's cookie (which overwrites the old one).
 
 ### Standalone Engine (Single-Tenant)
 - Optimized for single-tenant deployments (Private Instances).

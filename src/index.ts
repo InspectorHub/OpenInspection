@@ -612,6 +612,18 @@ app.get('/login', async (c) => {
             // Invalid/expired token — show login page
         }
     }
+    // Shared-SaaS mode: a single core D1 holds users for many tenants and
+    // `users.email` is unique per-(tenantId,email) (see migration 0072), so
+    // a local email+password form cannot disambiguate which tenant the user
+    // means. Portal owns the identity → membership picker; bounce there and
+    // let portal SSO-handoff us back via /sso?code=. Standalone and silo
+    // deploys keep the local form because their email-to-tenant mapping
+    // is unambiguous.
+    const profile = c.var.profile;
+    if (profile?.mode === 'saas' && profile?.saasTopology === 'shared' && c.env.PORTAL_API_URL) {
+        const portal = c.env.PORTAL_API_URL.replace(/\/$/, '');
+        return c.redirect(`${portal}/login`, 302);
+    }
     // Issue the CSRF cookie before rendering so the form's submit handler can echo it back.
     issueCsrfCookie(c);
     const branding = c.get('branding');
@@ -636,6 +648,14 @@ app.get('/forgot-password', async (c) => {
         } catch {
             // Invalid/expired token — show forgot-password page
         }
+    }
+    // Shared-SaaS: same reasoning as GET /login — password lives in portal's
+    // identities table, not in core's per-tenant users row, so the recovery
+    // UI must live on the portal side.
+    const profile = c.var.profile;
+    if (profile?.mode === 'saas' && profile?.saasTopology === 'shared' && c.env.PORTAL_API_URL) {
+        const portal = c.env.PORTAL_API_URL.replace(/\/$/, '');
+        return c.redirect(`${portal}/forgot-password`, 302);
     }
     issueCsrfCookie(c);
     const branding = c.get('branding');

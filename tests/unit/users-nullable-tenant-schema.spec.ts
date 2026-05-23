@@ -16,9 +16,11 @@ describe('users schema — A1', () => {
         expect(col.notNull).toBe(false);
     });
 
-    it('users.email has a global UNIQUE constraint after migration 0055', () => {
-        // After migration 0055, the unique constraint on email is global (not per-tenant).
-        // Insert two rows with the same email but different tenant_ids and expect a constraint failure.
+    it('users.email is UNIQUE per (tenant_id, email) after migration 0072', () => {
+        // Migration 0072 (sync-multi-workspace) replaced the prior global
+        // UNIQUE(email) constraint with UNIQUE(tenant_id, email). A single
+        // human can now hold one users row per tenant in core's shared D1,
+        // matching the per-identity / per-membership model on the portal side.
         const row1 = sqlite.prepare(
             `INSERT INTO tenants (id, name, subdomain, tier, status, max_users, deployment_mode, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -30,9 +32,14 @@ describe('users schema — A1', () => {
             `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)
              VALUES (?, ?, ?, ?, ?, ?)`,
         );
+        // Same email + different tenant → allowed.
         insertUser.run('u1', 't-a', 'jane@realty.com', 'h', 'inspector', Date.now());
         expect(() =>
             insertUser.run('u2', 't-b', 'jane@realty.com', 'h', 'inspector', Date.now()),
+        ).not.toThrow();
+        // Same email + same tenant → still rejected.
+        expect(() =>
+            insertUser.run('u3', 't-a', 'jane@realty.com', 'h', 'inspector', Date.now()),
         ).toThrow(/UNIQUE constraint/);
     });
 
