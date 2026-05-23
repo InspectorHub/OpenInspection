@@ -21,11 +21,20 @@
 -- to COMMIT, by which time users_new has been renamed back to users
 -- and every FK row still resolves to the same id it did before. D1
 -- supports this PRAGMA (unlike `foreign_keys = OFF`, which D1 ignores).
+-- Mirrors migration 0055 (already on prod) which uses the same pattern.
 PRAGMA defer_foreign_keys = TRUE;
 
+-- IMPORTANT: tenant_id is NOT declared `REFERENCES tenants(id)` here, even
+-- though that looks tempting. Migration 0055 deliberately dropped that FK
+-- because prod has user rows whose tenant was deleted out from under them
+-- (or never inserted in the agent-account path). Re-introducing the FK
+-- would fail INSERT INTO users_new on every orphaned row. The tenant_id
+-- column type + nullability is preserved; tenant scoping is enforced at
+-- the application layer (see Tenant Isolation Rules in CLAUDE.md), not
+-- by SQL FK.
 CREATE TABLE users_new (
     id                     TEXT PRIMARY KEY,
-    tenant_id              TEXT REFERENCES tenants(id),
+    tenant_id              TEXT,
     email                  TEXT NOT NULL,
     password_hash          TEXT NOT NULL,
     name                   TEXT,
