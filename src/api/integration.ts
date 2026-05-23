@@ -151,4 +151,51 @@ api.post('/tenants/:subdomain/purge', verifyPortalSignature, async (c) => {
     }
 });
 
+/**
+ * POST /api/integration/sso-handoff
+ *
+ * Issues a one-time SSO code that the portal hands to the browser
+ * so the user lands at `GET /sso?code=...` and gets a workspace-
+ * scoped session cookie. Body: { tenantId, email, ttlSeconds? }.
+ * Returns: { code } — caller redirects the browser to
+ * `https://app.{domain}/sso?code=<code>`.
+ *
+ * The code is stored in TENANT_CACHE under `sso:<code>` for ttl
+ * seconds; consume-side deletes the key on success (single-use).
+ * No JWT material in the body — only the lookup tuple — so an
+ * exposed code can't be replayed indefinitely.
+ */
+api.post('/sso-handoff', verifyPortalSignature, async (c) => {
+    const body = await c.req.json().catch(() => ({})) as {
+        tenantId?: string;
+        email?: string;
+        ttlSeconds?: number;
+    };
+    if (!body.tenantId || !body.email) {
+        return c.json({ error: 'tenantId and email required' }, 400);
+    }
+    const ttl = Math.min(Math.max(body.ttlSeconds ?? 60, 5), 300);
+
+    const { drizzle } = await import('drizzle-orm/d1');
+    const { eq, and } = await import('drizzle-orm');
+    const { users } = await import('../lib/db/schema');
+    const d = drizzle(c.env.DB);
+    const user = await d.select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.tenantId, body.tenantId), eq(users.email, body.email)))
+        .get();
+    if (!user) return c.json({ error: 'No user for that tenant + email' }, 404);
+
+    if (!c.env.TENANT_CACHE) {
+        return c.json({ error: 'KV unavailable' }, 503);
+    }
+    const code = crypto.randomUUID();
+    await c.env.TENANT_CACHE.put(
+        `sso:${code}`,
+        JSON.stringify({ userId: user.id, tenantId: body.tenantId }),
+        { expirationTtl: ttl },
+    );
+    return c.json({ success: true, code, expiresIn: ttl });
+});
+
 export default api;
