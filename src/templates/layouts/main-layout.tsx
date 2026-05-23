@@ -514,16 +514,26 @@ export const MainLayout = (props: {
                 {/* B4 module loads moved into SharedHead so BareLayout pages
                     (form-renderer) get the offline pill / modal / banner too. */}
                 <script src="/js/toast.js"></script>
-                {/* Sign Out — wire both desktop + mobile buttons directly to
-                    the logout POST. Previously this only bridged mobile to
-                    desktop and relied on per-page JS to bind
-                    logoutBtn.onclick = logout (auth.js). When that per-page
-                    JS wasn't loaded — or its DOMContentLoaded handler raced
-                    the click — the button silently did nothing. Inlining
-                    the fetch removes the dependency and keeps the buttons
-                    working on every page that ships MainLayout. */}
+                {/* Sign Out — wire both desktop + mobile buttons directly.
+                    Two-stage logout in shared-SaaS mode: kill core's cookie
+                    (POST /api/auth/logout on this origin) then redirect
+                    through portal's GET /api/account/logout?returnTo=/login
+                    so portal's __Host-inspector_workspace cookie also gets
+                    cleared. Without that second hop, signing out on core
+                    leaves the portal session alive and clicking /login again
+                    silently SSOs the user back in — the opposite of what
+                    a "sign out" button promises.
+
+                    Standalone deploys (no PORTAL_API_URL) short-circuit to
+                    /login on this origin — there is no portal cookie to
+                    clear, so the extra hop would just be a confusing 404. */}
                 <script dangerouslySetInnerHTML={{ __html: `
                     (function() {
+                        var portalLogoutUrl = ${JSON.stringify(
+                            branding?.portalBaseUrl
+                                ? `${branding.portalBaseUrl}/api/account/logout?returnTo=/login`
+                                : null,
+                        )};
                         async function performLogout(e) {
                             if (e) e.preventDefault();
                             try {
@@ -532,10 +542,8 @@ export const MainLayout = (props: {
                                     credentials: 'same-origin',
                                 });
                             } catch (_) { /* network failure still navigates */ }
-                            window.location.href = '/login';
+                            window.location.href = portalLogoutUrl || '/login';
                         }
-                        // Expose so the command palette + any legacy
-                        // call-site that does window.logout() still works.
                         window.logout = performLogout;
                         document.getElementById('logoutBtn')?.addEventListener('click', performLogout);
                         document.getElementById('mobileLogoutBtn')?.addEventListener('click', performLogout);
