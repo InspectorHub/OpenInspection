@@ -4,6 +4,7 @@ import { AutomationService } from './services/automation.service';
 import { AgreementService } from './services/agreement.service';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
+import { flushOutboxOnce } from './services/outbox.service';
 import { qboConnections } from './lib/db/schema/qbo';
 import { logger } from './lib/logger';
 
@@ -18,6 +19,28 @@ export interface ScheduledEnv {
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
     QBO_WEBHOOK_SECRET?: string;
+    // Multi-workspace sync: portal base URL + M2M secret(s) for the
+    // outbox flush worker. Optional — flush is a no-op when missing.
+    PORTAL_API_URL?: string;
+    PORTAL_M2M_SECRET?: string;
+    PORTAL_M2M_CURRENT_KID?: string;
+    PORTAL_M2M_SECRET_V1?: string;
+    PORTAL_M2M_SECRET_V2?: string;
+    PORTAL_M2M_SECRET_V3?: string;
+}
+
+/**
+ * Pick the outbound M2M secret for portal → core or core → portal calls.
+ * Prefers the keyring slot named by PORTAL_M2M_CURRENT_KID, falls back
+ * to the legacy single-secret env, returns null when nothing is set.
+ */
+function resolveOutboundM2mSecret(env: ScheduledEnv): string | null {
+    const kid = env.PORTAL_M2M_CURRENT_KID;
+    if (kid) {
+        const slot = (env as unknown as Record<string, string | undefined>)[`PORTAL_M2M_SECRET_${kid.toUpperCase()}`];
+        if (slot) return slot;
+    }
+    return env.PORTAL_M2M_SECRET ?? null;
 }
 
 async function runQBOCDC(env: ScheduledEnv): Promise<void> {
@@ -99,6 +122,24 @@ export async function scheduled(
             env.APP_NAME || 'OpenInspection',
             env.APP_BASE_URL || '',
         );
+    }
+
+    // Every-minute — drain the user-sync outbox to portal so identities
+    // + memberships stay coherent across the two apps. No-op when the
+    // portal base URL / M2M secret is missing (e.g. standalone deploys).
+    if (env.PORTAL_API_URL) {
+        const m2mSecret = resolveOutboundM2mSecret(env);
+        if (m2mSecret) {
+            try {
+                await flushOutboxOnce(env.DB, env.PORTAL_API_URL, m2mSecret, 50);
+            } catch (err) {
+                // flushOutboxOnce handles per-row errors internally; only
+                // catch the catastrophic "couldn't even start" case here.
+                logger.error('[cron:outbox] flush threw', {}, err instanceof Error ? err : undefined);
+            }
+        } else {
+            logger.info('[cron:outbox] flush skipped (no M2M secret)');
+        }
     }
 
     // Phase T (T26): clean up abandoned _pending message attachments older than 24h.
