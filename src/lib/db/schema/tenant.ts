@@ -22,7 +22,12 @@ export const users = sqliteTable('users', {
     // accessing multiple tenants via agent_tenant_links). Inspector / owner /
     // admin accounts still always carry a tenant_id.
     tenantId: text('tenant_id').references(() => tenants.id),
-    email: text('email').unique().notNull(),
+    // After migration 0072, UNIQUE moved to (tenant_id, email) via the
+    // `users_tenant_email_unique` index. A portal identity that belongs
+    // to multiple workspaces now has one row per workspace, each scoped
+    // to that workspace's tenant_id, sharing the same email. Per-tenant
+    // uniqueness is still enforced; globally a duplicate email is fine.
+    email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     name: text('name'),
     phone: text('phone'),
@@ -81,6 +86,30 @@ export const users = sqliteTable('users', {
     // teammates who join via team invite (only the tenant owner answers
     // the role survey at signup).
     signupRole:           text('signup_role'),
+});
+
+/**
+ * Outbox for core → portal sync events (migration 0073). Append happens
+ * inside the same DB write that produced the user-side mutation so the
+ * event row is atomic with the change; a scheduled worker drains pending
+ * rows by posting them to portal's /api/integration/from-core endpoint.
+ *
+ * Event payload shape is determined by `event_type`:
+ *   'user.invited'           → { tenantId, email, role, name? }
+ *   'user.password_changed'  → { tenantId, email, passwordHash }
+ *   'user.deleted'           → { tenantId, email }
+ * Portal upserts into `identities` + `memberships` and uses `id` as the
+ * dedup key so retries are idempotent on the receiving side.
+ */
+export const syncOutbox = sqliteTable('sync_outbox', {
+    id:           text('id').primaryKey(),
+    eventType:    text('event_type').notNull(),
+    payload:      text('payload').notNull(),
+    status:       text('status').notNull().default('pending'),
+    attempts:     integer('attempts').notNull().default(0),
+    createdAt:    integer('created_at').notNull(),
+    lastTriedAt:  integer('last_tried_at'),
+    lastError:    text('last_error'),
 });
 
 // Booking #7 Sprint A — reserved/banned slug list. Seeded via migration 0052
