@@ -138,7 +138,7 @@ export class AuthService {
 
         await db.update(tenantInvites).set({ status: 'accepted' }).where(eq(tenantInvites.id, token));
 
-        // Tell portal about the new membership so its `/workspace/select`
+        // Tell portal about the new membership so its `/workspace/switch`
         // picker shows this workspace next time the identity signs in.
         if (this.outbox) {
             await this.outbox.append({

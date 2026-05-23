@@ -296,10 +296,10 @@ export const MainLayout = (props: {
                                 A multi-workspace identity has no in-core way to swap
                                 tenants (the JWT carries a single tenantId), so the
                                 only correct move is to bounce to portal where the
-                                memberships list lives — portal's /workspace/select
+                                memberships list lives — portal's /workspace/switch
                                 will SSO us back here with the picked tenant's cookie. */}
                             {branding?.isSharedSaas && branding?.portalBaseUrl && (
-                                <a href={`${branding.portalBaseUrl}/workspace/select`}
+                                <a href={`${branding.portalBaseUrl}/workspace/switch`}
                                    class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all font-semibold">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                     <span class="flex-1 text-left text-sm">Switch workspace</span>
@@ -425,7 +425,7 @@ export const MainLayout = (props: {
                             </a>
                             {/* Shared-SaaS only — mirrors the mobile drawer entry. */}
                             {branding?.isSharedSaas && branding?.portalBaseUrl && (
-                                <a href={`${branding.portalBaseUrl}/workspace/select`}
+                                <a href={`${branding.portalBaseUrl}/workspace/switch`}
                                    class="flex items-center gap-3 px-5 py-4 mt-2 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all font-semibold group">
                                     <svg class="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                     <span class="flex-1">Switch workspace</span>
