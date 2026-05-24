@@ -14,6 +14,8 @@ export const PatchItemFieldSchema = z.object({
     /** Set true after the user resolves a 409 via ConflictModal — bypasses
      *  the version check for that single retry. */
     force:           z.boolean().optional().describe('TODO describe force field for the OpenInspection MCP integration'),
+    /** Section ID for composite finding key (_default:sectionId:itemId). */
+    sectionId:       z.string().min(1).optional().describe('Section ID for composite finding key'),
 }).openapi('PatchItemField');
 
 export const PatchPropertyFactSchema = z.object({

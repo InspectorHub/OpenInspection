@@ -907,6 +907,7 @@ export class InspectionService {
         tenantId: string,
         poolId: string,
         itemId: string,
+        sectionId?: string,
     ): Promise<{ key: string; itemId: string; photoIndex: number }> {
         if (!itemId) throw Errors.BadRequest('itemId is required');
         await this.getInspection(inspectionId, tenantId); // ownership check
@@ -922,7 +923,7 @@ export class InspectionService {
         if (!poolRow) throw Errors.NotFound('Pool photo not found');
 
         // Locate or create the inspection_results row, then append the
-        // photo to data[itemId].photos[].
+        // photo to data[key].photos[].
         interface ResultEntry { photos?: Array<{ key: string }> }
         const existing = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
@@ -931,11 +932,12 @@ export class InspectionService {
         const data: Record<string, ResultEntry> = existing?.data
             ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) as Record<string, ResultEntry>
             : {};
-        // TODO: use composite key when sectionId is available in API
-        const entry = data[itemId] ?? {};
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId] ?? {};
         const photos = Array.isArray(entry.photos) ? entry.photos.slice() : [];
         photos.push({ key: poolRow.r2Key });
-        data[itemId] = { ...entry, photos };
+        data[key] = { ...entry, photos };
+        if (key !== itemId) delete data[itemId]; // migrate on write
         const photoIndex = photos.length - 1;
 
         if (existing) {
@@ -1029,6 +1031,7 @@ export class InspectionService {
         expectedVersion: number,
         userId: string,
         opts?: { force?: boolean },
+        sectionId?: string,
     ): Promise<
         | { kind: 'ok'; newVersion: number; by: string; at: number }
         | { kind: 'conflict'; current: { value: unknown; by?: string; at?: number; v: number }; yours: { value: unknown; expectedVersion: number } }
@@ -1086,14 +1089,15 @@ export class InspectionService {
             ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) as Record<string, Record<string, unknown>>
             : {};
 
-        // TODO: use composite key when sectionId is available in API
-        const cur = data[itemId];
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const cur = data[key] ?? data[itemId]; // fallback for legacy
         const decision = decideFieldWrite(cur, field, value, expectedVersion, { force: opts?.force ?? false });
         if (decision.kind === 'conflict') return decision;
 
         const now = Math.floor(Date.now() / 1000);
         const { entry, newVersion } = applyFieldWrite(cur, field, value, userId, now);
-        data[itemId] = entry;
+        data[key] = entry;
+        if (key !== itemId) delete data[itemId]; // migrate on write
 
         if (existing) {
             await db.update(inspectionResults)
@@ -1165,6 +1169,7 @@ export class InspectionService {
         photoIndex: number,
         compositeBytes: ArrayBuffer,
         nodesJson: string,
+        sectionId?: string,
     ): Promise<{ annotatedKey: string }> {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.getInspection(inspectionId, tenantId);
@@ -1187,12 +1192,13 @@ export class InspectionService {
         const data: Record<string, ResultEntry> = (typeof row?.data === 'string'
             ? JSON.parse(row.data)
             : row?.data) ?? {};
-        // TODO: use composite key when sectionId is available in API
-        const entry = data[itemId] ?? {};
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId] ?? {};
         const photos = entry.photos ?? [];
         if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
         photos[photoIndex] = { ...photos[photoIndex], annotatedKey, annotationsJson: nodesJson };
-        data[itemId] = { ...entry, photos };
+        data[key] = { ...entry, photos };
+        if (key !== itemId) delete data[itemId]; // migrate on write
 
         if (row) {
             await db.update(inspectionResults)

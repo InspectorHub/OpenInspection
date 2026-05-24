@@ -404,6 +404,7 @@ export const MediaPoolUploadResponseSchema = z.object({
 export const MediaAttachRequestSchema = z.object({
     poolId: z.string().min(1).describe('TODO describe poolId field for the OpenInspection MCP integration'),
     itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+    sectionId: z.string().min(1).optional().describe('Section ID for composite finding key'),
 }).openapi('MediaAttachRequest');
 
 export const MediaAttachResponseSchema = z.object({

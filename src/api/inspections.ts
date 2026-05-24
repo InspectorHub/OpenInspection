@@ -1247,11 +1247,11 @@ const mediaAttachRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 inspectionsRoutes.openapi(mediaAttachRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const { poolId, itemId } = c.req.valid('json');
-    const result = await c.var.services.inspection.attachPoolPhoto(id, c.get('tenantId'), poolId, itemId);
+    const { poolId, itemId, sectionId } = c.req.valid('json');
+    const result = await c.var.services.inspection.attachPoolPhoto(id, c.get('tenantId'), poolId, itemId, sectionId);
     auditFromContext(c, 'inspection.media.attach', 'inspection', {
         entityId: id,
-        metadata: { poolId, itemId },
+        metadata: { poolId, itemId, sectionId },
     });
     return c.json({ success: true, data: result }, 200);
 });
@@ -2239,6 +2239,7 @@ const saveAnnotationRoute = createRoute(withMcpMetadata({
                     schema: z.object({
                         image: z.unknown().openapi({ type: 'string', format: 'binary' }).describe('TODO describe image field for the OpenInspection MCP integration'),
                         nodes: z.string().describe('TODO describe nodes field for the OpenInspection MCP integration'),
+                        sectionId: z.string().optional().describe('Section ID for composite finding key'),
                     }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
@@ -2261,10 +2262,13 @@ inspectionsRoutes.openapi(saveAnnotationRoute, async (c) => {
     const formData = await c.req.parseBody();
     const file = formData['image'] as File | undefined;
     const nodesJson = String(formData['nodes'] ?? '[]');
+    const sectionId = typeof formData['sectionId'] === 'string' && formData['sectionId'].length > 0
+        ? formData['sectionId']
+        : undefined;
     if (!file) throw Errors.BadRequest('image file required');
     const bytes = await file.arrayBuffer();
     const result = await c.var.services.inspection.saveAnnotation(
-        id, tenantId, itemId, photoIndex, bytes, nodesJson,
+        id, tenantId, itemId, photoIndex, bytes, nodesJson, sectionId,
     );
     return c.json({ success: true, data: result }, 200);
 });
@@ -2377,14 +2381,14 @@ const patchItemFieldRoute = createRoute(withMcpMetadata({
 
 inspectionsRoutes.openapi(patchItemFieldRoute, async (c) => {
     const { id, itemId } = c.req.valid('param');
-    const { field, value, expectedVersion, force } = c.req.valid('json');
+    const { field, value, expectedVersion, force, sectionId } = c.req.valid('json');
     const tenantId = c.get('tenantId');
     const user     = c.get('user') as { sub?: string } | undefined;
     const userId   = user?.sub;
     if (!userId) throw Errors.Unauthorized('Missing user identity');
 
     const out = await c.var.services.inspection.patchItem(
-        id, tenantId, itemId, field, value, expectedVersion, userId, { force: force ?? false },
+        id, tenantId, itemId, field, value, expectedVersion, userId, { force: force ?? false }, sectionId,
     );
 
     if (out.kind === 'not_found') {

@@ -62,7 +62,8 @@ export type AuditAction =
     | 'tag.deleted'
     | 'tag.linked'
     | 'tag.unlinked'
-    | 'inspection.property_facts.autofill';
+    | 'inspection.property_facts.autofill'
+    | 'admin.migrate_finding_keys';
 
 export interface AuditParams {
     db: D1Database;

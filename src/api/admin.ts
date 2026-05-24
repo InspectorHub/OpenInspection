@@ -1782,4 +1782,145 @@ adminRoutes.openapi(withMcpMetadata({
     return c.json({ success: true as const, data: result }, 200);
 });
 
+// --- Finding Key Migration (one-time data migration) ---
+//
+// Batch-converts inspection_results.data keys from the legacy `itemId`
+// format to the composite `_default:sectionId:itemId` format. Idempotent —
+// keys that already contain 2+ colons are skipped.
+
+const migrateFindingKeysRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/migrate-finding-keys',
+    tags: ['admin'],
+    summary: 'One-time migration: rewrite legacy finding keys to composite format',
+    middleware: [requireRole(['owner'])] as const,
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(true),
+                        data: z.object({
+                            processed: z.number(),
+                            migrated: z.number(),
+                            skipped: z.number(),
+                        }),
+                    }),
+                },
+            },
+            description: 'Migration complete',
+        },
+    },
+    operationId: 'migrateFindingKeys',
+    description: 'Batch-converts inspection_results.data keys from legacy itemId format to composite _default:sectionId:itemId format. Idempotent — already-composite keys are skipped.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+adminRoutes.openapi(migrateFindingKeysRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+
+    let processed = 0;
+    let migrated = 0;
+    let skipped = 0;
+
+    const BATCH_SIZE = 50;
+    let offset = 0;
+
+    // Process inspections in batches
+    while (true) {
+        const batch = await db.select({
+            id:                inspections.id,
+            templateId:        inspections.templateId,
+            templateSnapshot:  inspections.templateSnapshot,
+        })
+        .from(inspections)
+        .where(eq(inspections.tenantId, tenantId))
+        .limit(BATCH_SIZE)
+        .offset(offset);
+
+        if (batch.length === 0) break;
+        offset += batch.length;
+
+        for (const insp of batch) {
+            // Load the results row for this inspection
+            const resultsRow = await db.select()
+                .from(inspectionResults)
+                .where(and(
+                    eq(inspectionResults.inspectionId, insp.id),
+                    eq(inspectionResults.tenantId, tenantId),
+                ))
+                .get();
+
+            if (!resultsRow || !resultsRow.data) {
+                skipped++;
+                continue;
+            }
+
+            const data: Record<string, unknown> = typeof resultsRow.data === 'string'
+                ? JSON.parse(resultsRow.data)
+                : resultsRow.data as Record<string, unknown>;
+
+            // Build itemId → sectionId mapping from template snapshot or
+            // live template schema
+            const itemToSection = new Map<string, string>();
+
+            interface SchemaSectionLite { id: string; items?: Array<{ id: string }> }
+            let sections: SchemaSectionLite[] = [];
+
+            const snap = insp.templateSnapshot as { sections?: SchemaSectionLite[] } | null;
+            if (snap && Array.isArray(snap?.sections)) {
+                sections = snap.sections;
+            } else if (insp.templateId) {
+                const tpl = await db.select().from(templates)
+                    .where(and(eq(templates.id, insp.templateId), eq(templates.tenantId, tenantId)))
+                    .get();
+                const live = tpl?.schema as { sections?: SchemaSectionLite[] } | null;
+                if (live && Array.isArray(live?.sections)) {
+                    sections = live.sections;
+                }
+            }
+
+            for (const sec of sections) {
+                for (const item of (sec.items ?? [])) {
+                    itemToSection.set(item.id, sec.id);
+                }
+            }
+
+            // Rewrite legacy keys
+            let changed = false;
+            const newData: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(data)) {
+                // Already composite (has 2+ colons) — keep as-is
+                if (key.split(':').length >= 3) {
+                    newData[key] = value;
+                    continue;
+                }
+                const sectionId = itemToSection.get(key) ?? '_unknown';
+                const compositeKey = `_default:${sectionId}:${key}`;
+                newData[compositeKey] = value;
+                changed = true;
+            }
+
+            if (changed) {
+                await db.update(inspectionResults)
+                    .set({ data: newData as unknown as object, lastSyncedAt: new Date() })
+                    .where(eq(inspectionResults.id, resultsRow.id));
+                migrated++;
+            } else {
+                skipped++;
+            }
+            processed++;
+        }
+    }
+
+    auditFromContext(c, 'admin.migrate_finding_keys', 'inspection_results', {
+        metadata: { processed, migrated, skipped },
+    });
+
+    return c.json({
+        success: true as const,
+        data: { processed, migrated, skipped },
+    }, 200);
+});
+
 export default adminRoutes;
