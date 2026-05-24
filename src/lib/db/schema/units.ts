@@ -18,6 +18,7 @@ export const inspectionUnits = sqliteTable('inspection_units', {
     inspectionId: text('inspection_id').notNull(),
     parentUnitId: text('parent_unit_id'),
     kind:         text('kind', { enum: ['building', 'floor', 'unit'] }).notNull(),
+    type:         text('type', { enum: ['unit', 'common'] }).notNull().default('unit'),
     name:         text('name').notNull(),
     sortOrder:    integer('sort_order').notNull().default(0),
     createdAt:    text('created_at').notNull(),

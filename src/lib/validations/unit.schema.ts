@@ -5,6 +5,7 @@ import { z } from '@hono/zod-openapi';
 export const CreateUnitSchema = z.object({
     parentUnitId: z.string().min(1).nullable().describe('TODO describe parentUnitId field for the OpenInspection MCP integration'),
     kind:         z.enum(['building', 'floor', 'unit']).describe('TODO describe kind field for the OpenInspection MCP integration'),
+    type:         z.enum(['unit', 'common']).default('unit').describe('Purpose: regular unit or common area'),
     name:         z.string().min(1).max(80).describe('TODO describe name field for the OpenInspection MCP integration'),
 }).openapi('CreateUnit');
 

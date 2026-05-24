@@ -21,6 +21,7 @@ export interface CreateUnitInput {
     inspectionId: string;
     parentUnitId: string | null;
     kind:         'building' | 'floor' | 'unit';
+    type?:        'unit' | 'common';
     name:         string;
 }
 
@@ -30,6 +31,7 @@ export interface UnitRow {
     inspectionId: string;
     parentUnitId: string | null;
     kind:         string;
+    type:         string;
     name:         string;
     sortOrder:    number;
     createdAt:    string;
@@ -72,6 +74,7 @@ export class UnitService {
             inspectionId: input.inspectionId,
             parentUnitId: input.parentUnitId,
             kind:         input.kind,
+            type:         input.type || 'unit',
             name:         input.name,
             sortOrder:    nextSort,
             createdAt:    new Date().toISOString(),
