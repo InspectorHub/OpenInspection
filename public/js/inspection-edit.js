@@ -165,6 +165,7 @@ function inspectionEditor(inspectionId) {
     speedMode: false,
     speedQueue: [],     // flat indices into the materialised items list (see _flatItems)
     speedCurrent: 0,
+    speedSectionPicker: false,  // section-picker dropdown visibility
 
     // Design System 0520 M15 — InspectorTools FAB dock (subsystem A, phase 5).
     // Right-bottom floating action button consolidating mouse entry points
@@ -2671,6 +2672,27 @@ function inspectionEditor(inspectionId) {
       var total = this.speedTotalCount;
       if (!total) return '0%';
       return Math.round((this.speedRatedCount / total) * 100) + '%';
+    },
+    get speedItemNote() {
+      if (!this.speedMode) return '';
+      var idx = this.speedQueue[this.speedCurrent];
+      if (idx == null || !this._speedItems) return '';
+      var item = this._speedItems[idx];
+      if (!item) return '';
+      var r = this._getResult(item.id);
+      return r && r.notes ? r.notes : '';
+    },
+
+    speedJumpSection(sectionIdx) {
+      if (!this.speedMode || !this._speedItems) return;
+      // Find the first queue entry whose underlying item belongs to sectionIdx.
+      for (var i = 0; i < this.speedQueue.length; i++) {
+        var item = this._speedItems[this.speedQueue[i]];
+        if (item && item.sectionIdx === sectionIdx) {
+          this.speedCurrent = i;
+          return;
+        }
+      }
     },
 
     speedRate(value) {
