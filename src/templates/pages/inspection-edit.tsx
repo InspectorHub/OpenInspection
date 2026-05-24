@@ -1490,21 +1490,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                   class="text-[11px] font-mono text-slate-500"
                   x-text="searchMatchCount + ' match' + (searchMatchCount === 1 ? '' : 'es')"
                 ></span>
-                {/* Sprint 3 S3-4 — Tablet 1024-1279: ACTIVE ITEM lives in a
-                    drawer (the persistent right pane only renders at xl ≥1280).
-                    Visible only at lg-not-xl (compound `hidden lg:inline-flex
-                    xl:hidden`) so mobile + desktop are unaffected. */}
-                <button
-                  type="button"
-                  x-show="activeItem"
-                  x-on:click="tabletInspectorOpen = !tabletInspectorOpen"
-                  data-testid="tablet-active-item-toggle"
-                  aria-label="Toggle active item inspector"
-                  class="hidden lg:inline-flex xl:hidden items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
-                  Inspector
-                </button>
+                {/* Tablet toggle removed — SideRail replaces it (Gap 2D) */}
               </div>
             </div>
 
