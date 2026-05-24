@@ -505,17 +505,20 @@ export class InspectionService {
             bathrooms:       null,
         } as unknown as CreateInspectionData & { inspectorId?: string });
 
-        // Set team_mode / lead / helpers via direct UPDATE — createInspection
-        // doesn't know about subsystem B's new columns yet.
-        if (input.teamMode || input.leadInspectorId || (input.helperInspectorIds?.length ?? 0) > 0) {
+        {
             const db = this.getDrizzle();
-            await db.update(inspections)
-                .set({
-                    teamMode:           input.teamMode,
-                    leadInspectorId:    input.teamMode ? (input.leadInspectorId ?? creatorUserId) : null,
-                    helperInspectorIds: JSON.stringify(input.teamMode ? (input.helperInspectorIds ?? []) : []),
-                })
-                .where(and(eq(inspections.id, created.id), eq(inspections.tenantId, tenantId)));
+            const patch: Record<string, unknown> = {};
+            if (input.property.propertyType) patch.propertyType = input.property.propertyType;
+            if (input.teamMode || input.leadInspectorId || (input.helperInspectorIds?.length ?? 0) > 0) {
+                patch.teamMode           = input.teamMode;
+                patch.leadInspectorId    = input.teamMode ? (input.leadInspectorId ?? creatorUserId) : null;
+                patch.helperInspectorIds = JSON.stringify(input.teamMode ? (input.helperInspectorIds ?? []) : []);
+            }
+            if (Object.keys(patch).length > 0) {
+                await db.update(inspections)
+                    .set(patch)
+                    .where(and(eq(inspections.id, created.id), eq(inspections.tenantId, tenantId)));
+            }
         }
 
         return { id: created.id };

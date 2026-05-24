@@ -28,6 +28,10 @@ export const templates = sqliteTable('templates', {
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     // Sprint 2 S2-1 — selects the active rating system. Null = use tenant default.
     ratingSystemId: text('rating_system_id'),
+    propertyType: text('property_type'),
+    commercialSubtype: text('commercial_subtype'),
+    description: text('description'),
+    featured: integer('featured').notNull().default(0),
 });
 
 export const inspections = sqliteTable('inspections', {
@@ -86,6 +90,8 @@ export const inspections = sqliteTable('inspections', {
     // one; the Publish pre-flight surfaces this as a gate.
     coverPhotoId:        text('cover_photo_id'),
     unit:                text('unit'),
+    propertyType:        text('property_type'),
+    commercialSubtype:   text('commercial_subtype'),
     county:              text('county'),
     sellingAgentId:      text('selling_agent_id'),
     disableAutomations:  integer('disable_automations', { mode: 'boolean' }).notNull().default(false),
