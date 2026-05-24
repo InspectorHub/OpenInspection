@@ -8,11 +8,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_exterior_finish",
+        "id": "exterior-finishes",
         "title": "Exterior Finishes",
         "items": [
           {
-            "id": "i_siding",
+            "id": "siding",
             "label": "Siding & Trim Installation",
             "type": "rich",
             "ratingOptions": [
@@ -62,7 +62,7 @@
             }
           },
           {
-            "id": "i_paint_ext",
+            "id": "paint-ext",
             "label": "Exterior Paint Coverage",
             "type": "rich",
             "ratingOptions": [
@@ -112,7 +112,7 @@
             }
           },
           {
-            "id": "i_roof_visible",
+            "id": "roof-visible",
             "label": "Roof — Visible from Ground",
             "type": "rich",
             "ratingOptions": [
@@ -162,7 +162,7 @@
             }
           },
           {
-            "id": "i_grading",
+            "id": "grading",
             "label": "Final Grading & Drainage",
             "type": "rich",
             "ratingOptions": [
@@ -212,7 +212,7 @@
             }
           },
           {
-            "id": "i_walkways",
+            "id": "walkways",
             "label": "Walkways & Driveway Finish",
             "type": "rich",
             "ratingOptions": [
@@ -264,11 +264,11 @@
         ]
       },
       {
-        "id": "s_interior_finish",
+        "id": "interior-finishes",
         "title": "Interior Finishes",
         "items": [
           {
-            "id": "i_drywall",
+            "id": "drywall",
             "label": "Drywall Finish & Texture",
             "type": "rich",
             "ratingOptions": [
@@ -318,7 +318,7 @@
             }
           },
           {
-            "id": "i_paint_int",
+            "id": "paint-int",
             "label": "Interior Paint Coverage",
             "type": "rich",
             "ratingOptions": [
@@ -368,7 +368,7 @@
             }
           },
           {
-            "id": "i_flooring",
+            "id": "flooring",
             "label": "Flooring Installation",
             "type": "rich",
             "ratingOptions": [
@@ -418,7 +418,7 @@
             }
           },
           {
-            "id": "i_trim",
+            "id": "trim",
             "label": "Trim, Baseboards, Casings",
             "type": "rich",
             "ratingOptions": [
@@ -468,7 +468,7 @@
             }
           },
           {
-            "id": "i_doors",
+            "id": "doors",
             "label": "Interior Doors & Hardware",
             "type": "rich",
             "ratingOptions": [
@@ -520,11 +520,11 @@
         ]
       },
       {
-        "id": "s_kitchen_baths",
+        "id": "kitchen-baths",
         "title": "Kitchen & Baths",
         "items": [
           {
-            "id": "i_cabinets",
+            "id": "cabinets",
             "label": "Cabinets — Alignment & Hardware",
             "type": "rich",
             "ratingOptions": [
@@ -574,7 +574,7 @@
             }
           },
           {
-            "id": "i_countertops",
+            "id": "countertops",
             "label": "Countertops — Seams & Edges",
             "type": "rich",
             "ratingOptions": [
@@ -624,7 +624,7 @@
             }
           },
           {
-            "id": "i_appliances",
+            "id": "appliances",
             "label": "Appliance Installation",
             "type": "rich",
             "ratingOptions": [
@@ -674,7 +674,7 @@
             }
           },
           {
-            "id": "i_caulk",
+            "id": "caulk",
             "label": "Caulking — Tubs / Sinks / Tile",
             "type": "rich",
             "ratingOptions": [
@@ -726,11 +726,11 @@
         ]
       },
       {
-        "id": "s_systems_commission",
+        "id": "systems-commissioning",
         "title": "Systems Commissioning",
         "items": [
           {
-            "id": "i_hvac_op",
+            "id": "hvac-op",
             "label": "HVAC — Heating & Cooling Test",
             "type": "rich",
             "ratingOptions": [
@@ -780,7 +780,7 @@
             }
           },
           {
-            "id": "i_water_heat",
+            "id": "water-heat",
             "label": "Water Heater — Operation",
             "type": "rich",
             "ratingOptions": [
@@ -830,7 +830,7 @@
             }
           },
           {
-            "id": "i_outlets",
+            "id": "outlets",
             "label": "All Outlets — Test (incl. GFCI)",
             "type": "rich",
             "ratingOptions": [
@@ -880,7 +880,7 @@
             }
           },
           {
-            "id": "i_fixtures",
+            "id": "fixtures",
             "label": "Plumbing Fixtures — All Operate",
             "type": "rich",
             "ratingOptions": [
@@ -932,11 +932,11 @@
         ]
       },
       {
-        "id": "s_safety",
+        "id": "safety",
         "title": "Safety",
         "items": [
           {
-            "id": "i_smoke",
+            "id": "smoke",
             "label": "Smoke Detectors — Each Bedroom + Hall",
             "type": "rich",
             "ratingOptions": [
@@ -986,7 +986,7 @@
             }
           },
           {
-            "id": "i_co",
+            "id": "co",
             "label": "CO Detectors (per code)",
             "type": "rich",
             "ratingOptions": [
@@ -1036,7 +1036,7 @@
             }
           },
           {
-            "id": "i_handrails",
+            "id": "handrails",
             "label": "Handrails — Stairs & Decks",
             "type": "rich",
             "ratingOptions": [
@@ -1088,11 +1088,11 @@
         ]
       },
       {
-        "id": "s_punch",
+        "id": "punch-list",
         "title": "Punch List",
         "items": [
           {
-            "id": "i_punch_critical",
+            "id": "punch-critical",
             "label": "Critical Items (block closing)",
             "type": "rich",
             "ratingOptions": [
@@ -1142,7 +1142,7 @@
             }
           },
           {
-            "id": "i_punch_cosmetic",
+            "id": "punch-cosmetic",
             "label": "Cosmetic Items (post-closing)",
             "type": "rich",
             "ratingOptions": [
@@ -1192,7 +1192,7 @@
             }
           },
           {
-            "id": "i_warranty",
+            "id": "warranty",
             "label": "Items for Builder Warranty",
             "type": "rich",
             "ratingOptions": [

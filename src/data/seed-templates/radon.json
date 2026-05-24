@@ -8,11 +8,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_test_setup",
+        "id": "test-setup",
         "title": "Test Setup & Conditions",
         "items": [
           {
-            "id": "i_device_type",
+            "id": "device-type",
             "label": "Device Type & Serial",
             "type": "rich",
             "ratingOptions": [
@@ -62,7 +62,7 @@
             }
           },
           {
-            "id": "i_calibration",
+            "id": "calibration",
             "label": "Calibration / Cert Date",
             "type": "rich",
             "ratingOptions": [
@@ -112,7 +112,7 @@
             }
           },
           {
-            "id": "i_test_start",
+            "id": "test-start",
             "label": "Test Start Date / Time",
             "type": "rich",
             "ratingOptions": [
@@ -162,7 +162,7 @@
             }
           },
           {
-            "id": "i_test_end",
+            "id": "test-end",
             "label": "Test End Date / Time",
             "type": "rich",
             "ratingOptions": [
@@ -212,7 +212,7 @@
             }
           },
           {
-            "id": "i_test_duration",
+            "id": "test-duration",
             "label": "Test Duration (hrs)",
             "type": "rich",
             "ratingOptions": [
@@ -264,11 +264,11 @@
         ]
       },
       {
-        "id": "s_placement",
+        "id": "device-placement",
         "title": "Device Placement",
         "items": [
           {
-            "id": "i_floor_level",
+            "id": "floor-level",
             "label": "Floor Level (Lowest Lived-In)",
             "type": "rich",
             "ratingOptions": [
@@ -318,7 +318,7 @@
             }
           },
           {
-            "id": "i_distance_walls",
+            "id": "distance-walls",
             "label": "Distance from Walls / Floor",
             "type": "rich",
             "ratingOptions": [
@@ -368,7 +368,7 @@
             }
           },
           {
-            "id": "i_no_drafts",
+            "id": "no-drafts",
             "label": "Free of Drafts / Direct Sun",
             "type": "rich",
             "ratingOptions": [
@@ -418,7 +418,7 @@
             }
           },
           {
-            "id": "i_no_obstruct",
+            "id": "no-obstruct",
             "label": "Free of Obstructions",
             "type": "rich",
             "ratingOptions": [
@@ -470,11 +470,11 @@
         ]
       },
       {
-        "id": "s_closed_house",
+        "id": "closed-house",
         "title": "Closed-House Conditions",
         "items": [
           {
-            "id": "i_doors_closed",
+            "id": "doors-closed",
             "label": "Exterior Doors Closed (12hr+)",
             "type": "rich",
             "ratingOptions": [
@@ -524,7 +524,7 @@
             }
           },
           {
-            "id": "i_windows_closed",
+            "id": "windows-closed",
             "label": "Windows Closed Throughout Test",
             "type": "rich",
             "ratingOptions": [
@@ -574,7 +574,7 @@
             }
           },
           {
-            "id": "i_hvac_normal",
+            "id": "hvac-normal",
             "label": "HVAC Operating Normally",
             "type": "rich",
             "ratingOptions": [
@@ -624,7 +624,7 @@
             }
           },
           {
-            "id": "i_no_fans",
+            "id": "no-fans",
             "label": "No Window/Whole-House Fans Used",
             "type": "rich",
             "ratingOptions": [
@@ -676,11 +676,11 @@
         ]
       },
       {
-        "id": "s_results",
+        "id": "results",
         "title": "Results & Calculation",
         "items": [
           {
-            "id": "i_avg_picocuries",
+            "id": "avg-picocuries",
             "label": "Average Radon Concentration (pCi/L)",
             "type": "rich",
             "ratingOptions": [
@@ -730,7 +730,7 @@
             }
           },
           {
-            "id": "i_high_reading",
+            "id": "high-reading",
             "label": "Highest Hourly Reading",
             "type": "rich",
             "ratingOptions": [
@@ -780,7 +780,7 @@
             }
           },
           {
-            "id": "i_low_reading",
+            "id": "low-reading",
             "label": "Lowest Hourly Reading",
             "type": "rich",
             "ratingOptions": [
@@ -830,7 +830,7 @@
             }
           },
           {
-            "id": "i_temp_humidity",
+            "id": "temp-humidity",
             "label": "Temp / Humidity Logged",
             "type": "rich",
             "ratingOptions": [
@@ -882,11 +882,11 @@
         ]
       },
       {
-        "id": "s_recommendation",
+        "id": "recommendation",
         "title": "Recommendation",
         "items": [
           {
-            "id": "i_action_threshold",
+            "id": "action-threshold",
             "label": "Above EPA 4.0 pCi/L Action Level",
             "type": "rich",
             "ratingOptions": [
@@ -936,7 +936,7 @@
             }
           },
           {
-            "id": "i_mitigation",
+            "id": "mitigation",
             "label": "Mitigation Recommended",
             "type": "rich",
             "ratingOptions": [
@@ -986,7 +986,7 @@
             }
           },
           {
-            "id": "i_retest",
+            "id": "retest",
             "label": "Retest Recommended (+90 days)",
             "type": "rich",
             "ratingOptions": [

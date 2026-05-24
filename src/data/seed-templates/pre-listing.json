@@ -8,11 +8,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_curb_appeal",
+        "id": "curb-appeal",
         "title": "Curb Appeal & Exterior",
         "items": [
           {
-            "id": "i_landscaping",
+            "id": "landscaping",
             "label": "Landscaping First Impression",
             "type": "rich",
             "ratingOptions": [
@@ -62,7 +62,7 @@
             }
           },
           {
-            "id": "i_paint",
+            "id": "paint",
             "label": "Exterior Paint Condition",
             "type": "rich",
             "ratingOptions": [
@@ -112,7 +112,7 @@
             }
           },
           {
-            "id": "i_walkways",
+            "id": "walkways",
             "label": "Walkways & Driveway",
             "type": "rich",
             "ratingOptions": [
@@ -162,7 +162,7 @@
             }
           },
           {
-            "id": "i_entry_door",
+            "id": "entry-door",
             "label": "Front Entry Door",
             "type": "rich",
             "ratingOptions": [
@@ -214,11 +214,11 @@
         ]
       },
       {
-        "id": "s_roof",
+        "id": "roof",
         "title": "Roof",
         "items": [
           {
-            "id": "i_roof_age",
+            "id": "roof-age",
             "label": "Roof Age (Years)",
             "type": "rich",
             "ratingOptions": [
@@ -268,7 +268,7 @@
             }
           },
           {
-            "id": "i_roof_visible",
+            "id": "roof-visible",
             "label": "Visible Damage / Missing Tabs",
             "type": "rich",
             "ratingOptions": [
@@ -318,7 +318,7 @@
             }
           },
           {
-            "id": "i_gutters",
+            "id": "gutters",
             "label": "Gutters & Downspouts",
             "type": "rich",
             "ratingOptions": [
@@ -370,11 +370,11 @@
         ]
       },
       {
-        "id": "s_systems_quick",
+        "id": "systems-quick-check",
         "title": "Systems Quick-Check",
         "items": [
           {
-            "id": "i_hvac_age",
+            "id": "hvac-age",
             "label": "HVAC Age & Service History",
             "type": "rich",
             "ratingOptions": [
@@ -424,7 +424,7 @@
             }
           },
           {
-            "id": "i_water_heat",
+            "id": "water-heat",
             "label": "Water Heater Age",
             "type": "rich",
             "ratingOptions": [
@@ -474,7 +474,7 @@
             }
           },
           {
-            "id": "i_electrical",
+            "id": "electrical",
             "label": "Electrical Panel Condition",
             "type": "rich",
             "ratingOptions": [
@@ -524,7 +524,7 @@
             }
           },
           {
-            "id": "i_plumb",
+            "id": "plumb",
             "label": "Visible Plumbing Issues",
             "type": "rich",
             "ratingOptions": [
@@ -576,11 +576,11 @@
         ]
       },
       {
-        "id": "s_interior",
+        "id": "interior",
         "title": "Interior",
         "items": [
           {
-            "id": "i_walls",
+            "id": "walls",
             "label": "Walls & Ceilings",
             "type": "rich",
             "ratingOptions": [
@@ -630,7 +630,7 @@
             }
           },
           {
-            "id": "i_floor",
+            "id": "floor",
             "label": "Flooring Condition",
             "type": "rich",
             "ratingOptions": [
@@ -680,7 +680,7 @@
             }
           },
           {
-            "id": "i_windows",
+            "id": "windows",
             "label": "Windows & Doors",
             "type": "rich",
             "ratingOptions": [
@@ -730,7 +730,7 @@
             }
           },
           {
-            "id": "i_lighting",
+            "id": "lighting",
             "label": "Lighting & Fixtures",
             "type": "rich",
             "ratingOptions": [
@@ -782,11 +782,11 @@
         ]
       },
       {
-        "id": "s_kitchen",
+        "id": "kitchen",
         "title": "Kitchen & Baths",
         "items": [
           {
-            "id": "i_kitchen_appliances",
+            "id": "kitchen-appliances",
             "label": "Kitchen Appliances",
             "type": "rich",
             "ratingOptions": [
@@ -836,7 +836,7 @@
             }
           },
           {
-            "id": "i_bath_fixtures",
+            "id": "bath-fixtures",
             "label": "Bathroom Fixtures",
             "type": "rich",
             "ratingOptions": [
@@ -886,7 +886,7 @@
             }
           },
           {
-            "id": "i_caulk_grout",
+            "id": "caulk-grout",
             "label": "Caulking & Grout",
             "type": "rich",
             "ratingOptions": [
@@ -938,11 +938,11 @@
         ]
       },
       {
-        "id": "s_seller_recos",
+        "id": "pre-listing-recommendations",
         "title": "Pre-Listing Recommendations",
         "items": [
           {
-            "id": "i_quick_wins",
+            "id": "quick-wins",
             "label": "Quick Wins (Under $500)",
             "type": "rich",
             "ratingOptions": [
@@ -992,7 +992,7 @@
             }
           },
           {
-            "id": "i_address",
+            "id": "address",
             "label": "Items to Address",
             "type": "rich",
             "ratingOptions": [
@@ -1042,7 +1042,7 @@
             }
           },
           {
-            "id": "i_disclose",
+            "id": "disclose",
             "label": "Items to Disclose",
             "type": "rich",
             "ratingOptions": [

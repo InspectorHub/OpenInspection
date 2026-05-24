@@ -7,11 +7,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_site",
+        "id": "site",
         "title": "Site",
         "items": [
           {
-            "id": "i_site_grading",
+            "id": "site-grading",
             "label": "Grading & Drainage",
             "type": "rich",
             "ratingOptions": [
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "i_parking",
+            "id": "parking",
             "label": "Parking & Paving",
             "type": "rich",
             "ratingOptions": [
@@ -111,7 +111,7 @@
             }
           },
           {
-            "id": "i_landscaping",
+            "id": "landscaping",
             "label": "Landscaping",
             "type": "rich",
             "ratingOptions": [
@@ -163,11 +163,11 @@
         ]
       },
       {
-        "id": "s_envelope",
+        "id": "building-envelope",
         "title": "Building Envelope",
         "items": [
           {
-            "id": "i_roof_c",
+            "id": "roof-c",
             "label": "Roof",
             "type": "rich",
             "ratingOptions": [
@@ -217,7 +217,7 @@
             }
           },
           {
-            "id": "i_facade",
+            "id": "facade",
             "label": "Facade / Cladding",
             "type": "rich",
             "ratingOptions": [
@@ -267,7 +267,7 @@
             }
           },
           {
-            "id": "i_windows_c",
+            "id": "windows-c",
             "label": "Windows & Glazing",
             "type": "rich",
             "ratingOptions": [
@@ -319,11 +319,11 @@
         ]
       },
       {
-        "id": "s_struct_c",
+        "id": "structure-commercial",
         "title": "Structure",
         "items": [
           {
-            "id": "i_foundation_c",
+            "id": "foundation-c",
             "label": "Foundation",
             "type": "rich",
             "ratingOptions": [
@@ -373,7 +373,7 @@
             }
           },
           {
-            "id": "i_frame_c",
+            "id": "frame-c",
             "label": "Structural Frame",
             "type": "rich",
             "ratingOptions": [
@@ -423,7 +423,7 @@
             }
           },
           {
-            "id": "i_slab",
+            "id": "slab",
             "label": "Elevated Slabs/Floors",
             "type": "rich",
             "ratingOptions": [
@@ -475,11 +475,11 @@
         ]
       },
       {
-        "id": "s_mep",
+        "id": "mep",
         "title": "Mechanical / Electrical / Plumbing",
         "items": [
           {
-            "id": "i_hvac_c",
+            "id": "hvac-c",
             "label": "HVAC",
             "type": "rich",
             "ratingOptions": [
@@ -529,7 +529,7 @@
             }
           },
           {
-            "id": "i_elec_c",
+            "id": "elec-c",
             "label": "Electrical Service",
             "type": "rich",
             "ratingOptions": [
@@ -579,7 +579,7 @@
             }
           },
           {
-            "id": "i_plumbing_c",
+            "id": "plumbing-c",
             "label": "Plumbing",
             "type": "rich",
             "ratingOptions": [
@@ -629,7 +629,7 @@
             }
           },
           {
-            "id": "i_fire",
+            "id": "fire",
             "label": "Fire Protection",
             "type": "rich",
             "ratingOptions": [
@@ -679,7 +679,7 @@
             }
           },
           {
-            "id": "i_elevator",
+            "id": "elevator",
             "label": "Vertical Transportation",
             "type": "rich",
             "ratingOptions": [
@@ -731,11 +731,11 @@
         ]
       },
       {
-        "id": "s_interior_c",
+        "id": "interior-commercial",
         "title": "Interior",
         "items": [
           {
-            "id": "i_floors_c",
+            "id": "floors-c",
             "label": "Floors",
             "type": "rich",
             "ratingOptions": [
@@ -785,7 +785,7 @@
             }
           },
           {
-            "id": "i_ceilings_c",
+            "id": "ceilings-c",
             "label": "Ceilings",
             "type": "rich",
             "ratingOptions": [
@@ -835,7 +835,7 @@
             }
           },
           {
-            "id": "i_walls_c",
+            "id": "walls-c",
             "label": "Walls & Partitions",
             "type": "rich",
             "ratingOptions": [
@@ -885,7 +885,7 @@
             }
           },
           {
-            "id": "i_restrooms",
+            "id": "restrooms",
             "label": "Restrooms",
             "type": "rich",
             "ratingOptions": [
@@ -937,11 +937,11 @@
         ]
       },
       {
-        "id": "s_accessibility",
+        "id": "accessibility",
         "title": "Accessibility (ADA)",
         "items": [
           {
-            "id": "i_ada_parking",
+            "id": "ada-parking",
             "label": "Accessible Parking",
             "type": "rich",
             "ratingOptions": [
@@ -991,7 +991,7 @@
             }
           },
           {
-            "id": "i_ada_entry",
+            "id": "ada-entry",
             "label": "Building Entry",
             "type": "rich",
             "ratingOptions": [
@@ -1041,7 +1041,7 @@
             }
           },
           {
-            "id": "i_ada_rest",
+            "id": "ada-rest",
             "label": "Restrooms",
             "type": "rich",
             "ratingOptions": [
@@ -1093,16 +1093,16 @@
         ]
       },
       {
-        "id": "s_env",
+        "id": "environmental",
         "title": "Environmental",
         "items": [
           {
-            "id": "i_asbestos",
+            "id": "asbestos",
             "label": "Asbestos Concerns",
             "type": "text"
           },
           {
-            "id": "i_mold",
+            "id": "mold",
             "label": "Mold / Moisture",
             "type": "rich",
             "ratingOptions": [
@@ -1152,23 +1152,23 @@
             }
           },
           {
-            "id": "i_lead",
+            "id": "lead",
             "label": "Lead Paint Concerns",
             "type": "text"
           }
         ]
       },
       {
-        "id": "s_summary_c",
+        "id": "summary-commercial",
         "title": "Summary & Recommendations",
         "items": [
           {
-            "id": "i_summary_c",
+            "id": "summary-c",
             "label": "Overall Assessment",
             "type": "text"
           },
           {
-            "id": "i_deferred",
+            "id": "deferred",
             "label": "Deferred Maintenance",
             "type": "text"
           }

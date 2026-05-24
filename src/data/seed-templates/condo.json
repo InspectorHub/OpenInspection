@@ -7,11 +7,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_unit_entry",
+        "id": "unit-entry",
         "title": "Unit Entry & Common Door",
         "items": [
           {
-            "id": "i_entry_door",
+            "id": "entry-door",
             "label": "Entry Door & Lock",
             "type": "rich",
             "ratingOptions": [
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "i_peephole",
+            "id": "peephole",
             "label": "Peephole / Viewer",
             "type": "rich",
             "ratingOptions": [
@@ -111,7 +111,7 @@
             }
           },
           {
-            "id": "i_intercom",
+            "id": "intercom",
             "label": "Intercom / Buzzer System",
             "type": "rich",
             "ratingOptions": [
@@ -163,11 +163,11 @@
         ]
       },
       {
-        "id": "s_kitchen",
+        "id": "kitchen",
         "title": "Kitchen",
         "items": [
           {
-            "id": "i_appliances",
+            "id": "appliances",
             "label": "Built-in Appliances",
             "type": "rich",
             "ratingOptions": [
@@ -217,7 +217,7 @@
             }
           },
           {
-            "id": "i_cabinets",
+            "id": "cabinets",
             "label": "Cabinets & Countertops",
             "type": "rich",
             "ratingOptions": [
@@ -267,7 +267,7 @@
             }
           },
           {
-            "id": "i_kitchen_plumb",
+            "id": "kitchen-plumb",
             "label": "Sink & Plumbing",
             "type": "rich",
             "ratingOptions": [
@@ -317,7 +317,7 @@
             }
           },
           {
-            "id": "i_kitchen_electric",
+            "id": "kitchen-electric",
             "label": "Electrical Outlets",
             "type": "rich",
             "ratingOptions": [
@@ -369,11 +369,11 @@
         ]
       },
       {
-        "id": "s_bathrooms",
+        "id": "bathrooms",
         "title": "Bathrooms",
         "items": [
           {
-            "id": "i_tub_shower",
+            "id": "tub-shower",
             "label": "Tub / Shower",
             "type": "rich",
             "ratingOptions": [
@@ -423,7 +423,7 @@
             }
           },
           {
-            "id": "i_toilet",
+            "id": "toilet",
             "label": "Toilet",
             "type": "rich",
             "ratingOptions": [
@@ -473,7 +473,7 @@
             }
           },
           {
-            "id": "i_bath_vanity",
+            "id": "bath-vanity",
             "label": "Vanity / Sink",
             "type": "rich",
             "ratingOptions": [
@@ -523,7 +523,7 @@
             }
           },
           {
-            "id": "i_bath_vent",
+            "id": "bath-vent",
             "label": "Exhaust Fan / Ventilation",
             "type": "rich",
             "ratingOptions": [
@@ -575,11 +575,11 @@
         ]
       },
       {
-        "id": "s_living",
+        "id": "living-areas",
         "title": "Living Areas",
         "items": [
           {
-            "id": "i_walls_ceil",
+            "id": "walls-ceil",
             "label": "Walls & Ceilings",
             "type": "rich",
             "ratingOptions": [
@@ -629,7 +629,7 @@
             }
           },
           {
-            "id": "i_flooring",
+            "id": "flooring",
             "label": "Flooring",
             "type": "rich",
             "ratingOptions": [
@@ -679,7 +679,7 @@
             }
           },
           {
-            "id": "i_windows",
+            "id": "windows",
             "label": "Windows & Sliding Doors",
             "type": "rich",
             "ratingOptions": [
@@ -729,7 +729,7 @@
             }
           },
           {
-            "id": "i_balcony",
+            "id": "balcony",
             "label": "Balcony / Patio (Limited)",
             "type": "rich",
             "ratingOptions": [
@@ -781,11 +781,11 @@
         ]
       },
       {
-        "id": "s_unit_systems",
+        "id": "unit-systems",
         "title": "In-Unit Systems",
         "items": [
           {
-            "id": "i_hvac",
+            "id": "hvac",
             "label": "HVAC / In-Unit Climate",
             "type": "rich",
             "ratingOptions": [
@@ -835,7 +835,7 @@
             }
           },
           {
-            "id": "i_electrical_panel",
+            "id": "electrical-panel",
             "label": "Unit Electrical Panel",
             "type": "rich",
             "ratingOptions": [
@@ -885,7 +885,7 @@
             }
           },
           {
-            "id": "i_water_heater",
+            "id": "water-heater",
             "label": "Water Heater (if in-unit)",
             "type": "rich",
             "ratingOptions": [
@@ -935,7 +935,7 @@
             }
           },
           {
-            "id": "i_smoke_co",
+            "id": "smoke-co",
             "label": "Smoke / CO Detectors",
             "type": "rich",
             "ratingOptions": [
@@ -987,11 +987,11 @@
         ]
       },
       {
-        "id": "s_common_obs",
+        "id": "common-areas",
         "title": "Common Areas (Observation Only)",
         "items": [
           {
-            "id": "i_hallway",
+            "id": "hallway",
             "label": "Shared Hallway Condition",
             "type": "rich",
             "ratingOptions": [
@@ -1041,7 +1041,7 @@
             }
           },
           {
-            "id": "i_stairs_elev",
+            "id": "stairs-elev",
             "label": "Stairs / Elevator (visual)",
             "type": "rich",
             "ratingOptions": [
@@ -1091,7 +1091,7 @@
             }
           },
           {
-            "id": "i_parking",
+            "id": "parking",
             "label": "Assigned Parking Space",
             "type": "rich",
             "ratingOptions": [

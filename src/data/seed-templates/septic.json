@@ -7,11 +7,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_records",
+        "id": "system-records",
         "title": "System Records & History",
         "items": [
           {
-            "id": "i_install_year",
+            "id": "install-year",
             "label": "Original Installation Year",
             "type": "rich",
             "ratingOptions": [
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "i_last_pump",
+            "id": "last-pump",
             "label": "Last Pump-Out Date",
             "type": "rich",
             "ratingOptions": [
@@ -111,7 +111,7 @@
             }
           },
           {
-            "id": "i_permit_records",
+            "id": "permit-records",
             "label": "Permit / As-Built Records",
             "type": "rich",
             "ratingOptions": [
@@ -163,11 +163,11 @@
         ]
       },
       {
-        "id": "s_tank",
+        "id": "septic-tank",
         "title": "Septic Tank",
         "items": [
           {
-            "id": "i_tank_material",
+            "id": "tank-material",
             "label": "Tank Material (Concrete/Plastic/Steel)",
             "type": "rich",
             "ratingOptions": [
@@ -217,7 +217,7 @@
             }
           },
           {
-            "id": "i_tank_capacity",
+            "id": "tank-capacity",
             "label": "Tank Capacity (gal)",
             "type": "rich",
             "ratingOptions": [
@@ -267,7 +267,7 @@
             }
           },
           {
-            "id": "i_tank_lid",
+            "id": "tank-lid",
             "label": "Lid Condition & Risers",
             "type": "rich",
             "ratingOptions": [
@@ -317,7 +317,7 @@
             }
           },
           {
-            "id": "i_baffles",
+            "id": "baffles",
             "label": "Inlet / Outlet Baffles",
             "type": "rich",
             "ratingOptions": [
@@ -367,7 +367,7 @@
             }
           },
           {
-            "id": "i_scum_layer",
+            "id": "scum-layer",
             "label": "Scum Layer Depth",
             "type": "rich",
             "ratingOptions": [
@@ -417,7 +417,7 @@
             }
           },
           {
-            "id": "i_sludge_depth",
+            "id": "sludge-depth",
             "label": "Sludge Depth Measurement",
             "type": "rich",
             "ratingOptions": [
@@ -469,11 +469,11 @@
         ]
       },
       {
-        "id": "s_distribution",
+        "id": "distribution",
         "title": "Distribution",
         "items": [
           {
-            "id": "i_dbox",
+            "id": "dbox",
             "label": "Distribution Box Condition",
             "type": "rich",
             "ratingOptions": [
@@ -523,7 +523,7 @@
             }
           },
           {
-            "id": "i_d_lines",
+            "id": "d-lines",
             "label": "Distribution Lines / Headers",
             "type": "rich",
             "ratingOptions": [
@@ -573,7 +573,7 @@
             }
           },
           {
-            "id": "i_pump_chamber",
+            "id": "pump-chamber",
             "label": "Pump Chamber (if applicable)",
             "type": "rich",
             "ratingOptions": [
@@ -625,11 +625,11 @@
         ]
       },
       {
-        "id": "s_drainfield",
+        "id": "drain-field",
         "title": "Drain Field / Leach Field",
         "items": [
           {
-            "id": "i_field_visible",
+            "id": "field-visible",
             "label": "Field Surface Condition",
             "type": "rich",
             "ratingOptions": [
@@ -679,7 +679,7 @@
             }
           },
           {
-            "id": "i_ponding",
+            "id": "ponding",
             "label": "Ponding / Surface Effluent",
             "type": "rich",
             "ratingOptions": [
@@ -729,7 +729,7 @@
             }
           },
           {
-            "id": "i_vegetation",
+            "id": "vegetation",
             "label": "Unusual Vegetation Patterns",
             "type": "rich",
             "ratingOptions": [
@@ -779,7 +779,7 @@
             }
           },
           {
-            "id": "i_setback",
+            "id": "setback",
             "label": "Setback from Wells/Property Lines",
             "type": "rich",
             "ratingOptions": [
@@ -831,11 +831,11 @@
         ]
       },
       {
-        "id": "s_function",
+        "id": "functional-test",
         "title": "Functional Test",
         "items": [
           {
-            "id": "i_flow_test",
+            "id": "flow-test",
             "label": "Hydraulic Loading / Flow Test",
             "type": "rich",
             "ratingOptions": [
@@ -885,7 +885,7 @@
             }
           },
           {
-            "id": "i_house_drain",
+            "id": "house-drain",
             "label": "House-to-Tank Sewer Drain Flow",
             "type": "rich",
             "ratingOptions": [
@@ -935,7 +935,7 @@
             }
           },
           {
-            "id": "i_alarm_panel",
+            "id": "alarm-panel",
             "label": "Alarm Panel (advanced systems)",
             "type": "rich",
             "ratingOptions": [
@@ -987,11 +987,11 @@
         ]
       },
       {
-        "id": "s_recs",
+        "id": "recommendations",
         "title": "Recommendations",
         "items": [
           {
-            "id": "i_pump_due",
+            "id": "pump-due",
             "label": "Pump-Out Recommended Within",
             "type": "rich",
             "ratingOptions": [
@@ -1041,7 +1041,7 @@
             }
           },
           {
-            "id": "i_repairs_needed",
+            "id": "repairs-needed",
             "label": "Repairs Needed Before Sale",
             "type": "rich",
             "ratingOptions": [

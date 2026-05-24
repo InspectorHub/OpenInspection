@@ -8,11 +8,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_visible",
+        "id": "visible-mold",
         "title": "Visible Mold",
         "items": [
           {
-            "id": "i_basement_mold",
+            "id": "basement-mold",
             "label": "Basement Visible Mold",
             "type": "rich",
             "ratingOptions": [
@@ -62,7 +62,7 @@
             }
           },
           {
-            "id": "i_attic_mold",
+            "id": "attic-mold",
             "label": "Attic Visible Mold",
             "type": "rich",
             "ratingOptions": [
@@ -112,7 +112,7 @@
             }
           },
           {
-            "id": "i_crawlspace",
+            "id": "crawlspace",
             "label": "Crawl Space Visible Mold",
             "type": "rich",
             "ratingOptions": [
@@ -162,7 +162,7 @@
             }
           },
           {
-            "id": "i_living",
+            "id": "living",
             "label": "Living Areas Visible Mold",
             "type": "rich",
             "ratingOptions": [
@@ -214,11 +214,11 @@
         ]
       },
       {
-        "id": "s_moisture",
+        "id": "moisture-sources",
         "title": "Moisture Sources",
         "items": [
           {
-            "id": "i_roof_leak",
+            "id": "roof-leak",
             "label": "Roof / Attic Leak Indicators",
             "type": "rich",
             "ratingOptions": [
@@ -268,7 +268,7 @@
             }
           },
           {
-            "id": "i_plumb_leak",
+            "id": "plumb-leak",
             "label": "Plumbing Leak Indicators",
             "type": "rich",
             "ratingOptions": [
@@ -318,7 +318,7 @@
             }
           },
           {
-            "id": "i_grading",
+            "id": "grading",
             "label": "Exterior Grading / Drainage",
             "type": "rich",
             "ratingOptions": [
@@ -370,11 +370,11 @@
         ]
       },
       {
-        "id": "s_hvac",
+        "id": "hvac",
         "title": "HVAC",
         "items": [
           {
-            "id": "i_coil",
+            "id": "coil",
             "label": "Evaporator Coil Condition",
             "type": "rich",
             "ratingOptions": [
@@ -424,7 +424,7 @@
             }
           },
           {
-            "id": "i_drain_pan",
+            "id": "drain-pan",
             "label": "Condensate Drain Pan",
             "type": "rich",
             "ratingOptions": [
@@ -474,7 +474,7 @@
             }
           },
           {
-            "id": "i_ductwork",
+            "id": "ductwork",
             "label": "Ductwork Visible Mold",
             "type": "rich",
             "ratingOptions": [
@@ -526,11 +526,11 @@
         ]
       },
       {
-        "id": "s_basement",
+        "id": "basement",
         "title": "Basement",
         "items": [
           {
-            "id": "i_b_efflorescence",
+            "id": "b-efflorescence",
             "label": "Efflorescence on Walls",
             "type": "rich",
             "ratingOptions": [
@@ -580,7 +580,7 @@
             }
           },
           {
-            "id": "i_b_humidity",
+            "id": "b-humidity",
             "label": "Relative Humidity (% reading)",
             "type": "rich",
             "ratingOptions": [
@@ -632,11 +632,11 @@
         ]
       },
       {
-        "id": "s_kitchen",
+        "id": "kitchen",
         "title": "Kitchen",
         "items": [
           {
-            "id": "i_k_under_sink",
+            "id": "k-under-sink",
             "label": "Under-Sink Cabinet Moisture",
             "type": "rich",
             "ratingOptions": [
@@ -688,11 +688,11 @@
         ]
       },
       {
-        "id": "s_bath",
+        "id": "bathrooms",
         "title": "Bath",
         "items": [
           {
-            "id": "i_bath_caulk",
+            "id": "bath-caulk",
             "label": "Caulking & Grout Condition",
             "type": "rich",
             "ratingOptions": [
@@ -742,7 +742,7 @@
             }
           },
           {
-            "id": "i_bath_vent",
+            "id": "bath-vent",
             "label": "Exhaust Fan Operation",
             "type": "rich",
             "ratingOptions": [

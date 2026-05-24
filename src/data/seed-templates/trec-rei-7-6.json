@@ -7,11 +7,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_structural",
+        "id": "structural-systems",
         "title": "I. Structural Systems",
         "items": [
           {
-            "id": "i_foundations",
+            "id": "foundations",
             "label": "A. Foundations",
             "type": "rich",
             "ratingOptions": [
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "i_grading_dr",
+            "id": "grading-dr",
             "label": "B. Grading & Drainage",
             "type": "rich",
             "ratingOptions": [
@@ -111,7 +111,7 @@
             }
           },
           {
-            "id": "i_roof_cover",
+            "id": "roof-cover",
             "label": "C. Roof Covering Materials",
             "type": "rich",
             "ratingOptions": [
@@ -161,7 +161,7 @@
             }
           },
           {
-            "id": "i_roof_struct",
+            "id": "roof-struct",
             "label": "D. Roof Structure & Attic",
             "type": "rich",
             "ratingOptions": [
@@ -211,7 +211,7 @@
             }
           },
           {
-            "id": "i_walls_ext",
+            "id": "walls-ext",
             "label": "E. Walls (Exterior)",
             "type": "rich",
             "ratingOptions": [
@@ -261,7 +261,7 @@
             }
           },
           {
-            "id": "i_walls_int",
+            "id": "walls-int",
             "label": "F. Walls (Interior)",
             "type": "rich",
             "ratingOptions": [
@@ -311,7 +311,7 @@
             }
           },
           {
-            "id": "i_ceilings",
+            "id": "ceilings",
             "label": "G. Ceilings & Floors",
             "type": "rich",
             "ratingOptions": [
@@ -361,7 +361,7 @@
             }
           },
           {
-            "id": "i_doors_ext",
+            "id": "doors-ext",
             "label": "H. Doors (Exterior)",
             "type": "rich",
             "ratingOptions": [
@@ -411,7 +411,7 @@
             }
           },
           {
-            "id": "i_doors_int",
+            "id": "doors-int",
             "label": "I. Doors (Interior)",
             "type": "rich",
             "ratingOptions": [
@@ -461,7 +461,7 @@
             }
           },
           {
-            "id": "i_windows",
+            "id": "windows",
             "label": "J. Windows",
             "type": "rich",
             "ratingOptions": [
@@ -511,7 +511,7 @@
             }
           },
           {
-            "id": "i_stairways",
+            "id": "stairways",
             "label": "K. Stairways",
             "type": "rich",
             "ratingOptions": [
@@ -561,7 +561,7 @@
             }
           },
           {
-            "id": "i_fireplace",
+            "id": "fireplace",
             "label": "L. Fireplaces & Chimneys",
             "type": "rich",
             "ratingOptions": [
@@ -611,7 +611,7 @@
             }
           },
           {
-            "id": "i_porches",
+            "id": "porches",
             "label": "M. Porches, Balconies, Decks & Carports",
             "type": "rich",
             "ratingOptions": [
@@ -661,18 +661,18 @@
             }
           },
           {
-            "id": "i_other_str",
+            "id": "other-str",
             "label": "N. Other",
             "type": "text"
           }
         ]
       },
       {
-        "id": "s_electrical",
+        "id": "electrical",
         "title": "II. Electrical Systems",
         "items": [
           {
-            "id": "i_service",
+            "id": "service",
             "label": "A. Service Entrance & Panels",
             "type": "rich",
             "ratingOptions": [
@@ -722,7 +722,7 @@
             }
           },
           {
-            "id": "i_branch",
+            "id": "branch",
             "label": "B. Branch Circuits",
             "type": "rich",
             "ratingOptions": [
@@ -772,7 +772,7 @@
             }
           },
           {
-            "id": "i_connected",
+            "id": "connected",
             "label": "C. Connected Devices & Fixtures",
             "type": "rich",
             "ratingOptions": [
@@ -824,11 +824,11 @@
         ]
       },
       {
-        "id": "s_hvac_trec",
+        "id": "hvac-trec",
         "title": "III. HVAC Systems",
         "items": [
           {
-            "id": "i_heating",
+            "id": "heating",
             "label": "A. Heating",
             "type": "rich",
             "ratingOptions": [
@@ -878,7 +878,7 @@
             }
           },
           {
-            "id": "i_cooling",
+            "id": "cooling",
             "label": "B. Cooling",
             "type": "rich",
             "ratingOptions": [
@@ -930,11 +930,11 @@
         ]
       },
       {
-        "id": "s_plumbing_trec",
+        "id": "plumbing-trec",
         "title": "IV. Plumbing System",
         "items": [
           {
-            "id": "i_supply_p",
+            "id": "supply-p",
             "label": "A. Plumbing Supply",
             "type": "rich",
             "ratingOptions": [
@@ -984,7 +984,7 @@
             }
           },
           {
-            "id": "i_drain_p",
+            "id": "drain-p",
             "label": "B. Plumbing Drains",
             "type": "rich",
             "ratingOptions": [
@@ -1034,7 +1034,7 @@
             }
           },
           {
-            "id": "i_wh_trec",
+            "id": "wh-trec",
             "label": "C. Water Heaters",
             "type": "rich",
             "ratingOptions": [
@@ -1084,7 +1084,7 @@
             }
           },
           {
-            "id": "i_hydro",
+            "id": "hydro",
             "label": "D. Hydro-Massage Therapy",
             "type": "rich",
             "ratingOptions": [
@@ -1136,11 +1136,11 @@
         ]
       },
       {
-        "id": "s_appliances_trec",
+        "id": "appliances-trec",
         "title": "V. Appliances",
         "items": [
           {
-            "id": "i_dishwasher",
+            "id": "dishwasher",
             "label": "A. Dishwasher",
             "type": "rich",
             "ratingOptions": [
@@ -1190,7 +1190,7 @@
             }
           },
           {
-            "id": "i_disposal",
+            "id": "disposal",
             "label": "B. Food Waste Disposer",
             "type": "rich",
             "ratingOptions": [
@@ -1240,7 +1240,7 @@
             }
           },
           {
-            "id": "i_range",
+            "id": "range",
             "label": "C. Range/Oven/Microwave",
             "type": "rich",
             "ratingOptions": [
@@ -1292,11 +1292,11 @@
         ]
       },
       {
-        "id": "s_optional",
+        "id": "optional-systems",
         "title": "VI. Optional Systems",
         "items": [
           {
-            "id": "i_pool",
+            "id": "pool",
             "label": "A. Lawn Sprinkler Systems",
             "type": "rich",
             "ratingOptions": [
@@ -1346,7 +1346,7 @@
             }
           },
           {
-            "id": "i_gas",
+            "id": "gas",
             "label": "B. Gas Distribution System",
             "type": "rich",
             "ratingOptions": [

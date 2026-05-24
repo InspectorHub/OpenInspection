@@ -8,11 +8,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_site",
+        "id": "site",
         "title": "Site & Foundation",
         "items": [
           {
-            "id": "i_lot_grading",
+            "id": "lot-grading",
             "label": "Lot Grading & Drainage",
             "type": "rich",
             "ratingOptions": [
@@ -62,7 +62,7 @@
             }
           },
           {
-            "id": "i_foundation_walls",
+            "id": "foundation-walls",
             "label": "Foundation Walls (visible)",
             "type": "rich",
             "ratingOptions": [
@@ -112,7 +112,7 @@
             }
           },
           {
-            "id": "i_waterproofing",
+            "id": "waterproofing",
             "label": "Foundation Waterproofing",
             "type": "rich",
             "ratingOptions": [
@@ -162,7 +162,7 @@
             }
           },
           {
-            "id": "i_anchor_bolts",
+            "id": "anchor-bolts",
             "label": "Anchor Bolts / Hold-downs",
             "type": "rich",
             "ratingOptions": [
@@ -214,11 +214,11 @@
         ]
       },
       {
-        "id": "s_framing",
+        "id": "framing",
         "title": "Framing",
         "items": [
           {
-            "id": "i_floor_joists",
+            "id": "floor-joists",
             "label": "Floor Joists & Subfloor",
             "type": "rich",
             "ratingOptions": [
@@ -268,7 +268,7 @@
             }
           },
           {
-            "id": "i_wall_framing",
+            "id": "wall-framing",
             "label": "Wall Studs & Plates",
             "type": "rich",
             "ratingOptions": [
@@ -318,7 +318,7 @@
             }
           },
           {
-            "id": "i_headers",
+            "id": "headers",
             "label": "Headers & Lintels",
             "type": "rich",
             "ratingOptions": [
@@ -368,7 +368,7 @@
             }
           },
           {
-            "id": "i_roof_framing",
+            "id": "roof-framing",
             "label": "Roof Trusses / Rafters",
             "type": "rich",
             "ratingOptions": [
@@ -418,7 +418,7 @@
             }
           },
           {
-            "id": "i_sheathing",
+            "id": "sheathing",
             "label": "Wall & Roof Sheathing",
             "type": "rich",
             "ratingOptions": [
@@ -468,7 +468,7 @@
             }
           },
           {
-            "id": "i_fasteners",
+            "id": "fasteners",
             "label": "Nail Patterns & Fasteners",
             "type": "rich",
             "ratingOptions": [
@@ -520,11 +520,11 @@
         ]
       },
       {
-        "id": "s_envelope",
+        "id": "building-envelope",
         "title": "Building Envelope",
         "items": [
           {
-            "id": "i_house_wrap",
+            "id": "house-wrap",
             "label": "House Wrap / Weather Barrier",
             "type": "rich",
             "ratingOptions": [
@@ -574,7 +574,7 @@
             }
           },
           {
-            "id": "i_window_flashing",
+            "id": "window-flashing",
             "label": "Window Rough Openings & Flashing",
             "type": "rich",
             "ratingOptions": [
@@ -624,7 +624,7 @@
             }
           },
           {
-            "id": "i_door_flashing",
+            "id": "door-flashing",
             "label": "Door Rough Openings & Flashing",
             "type": "rich",
             "ratingOptions": [
@@ -674,7 +674,7 @@
             }
           },
           {
-            "id": "i_roof_underlay",
+            "id": "roof-underlay",
             "label": "Roof Underlayment / Ice & Water",
             "type": "rich",
             "ratingOptions": [
@@ -726,11 +726,11 @@
         ]
       },
       {
-        "id": "s_rough_plumbing",
+        "id": "rough-plumbing",
         "title": "Rough Plumbing",
         "items": [
           {
-            "id": "i_supply_lines",
+            "id": "supply-lines",
             "label": "Supply Line Materials & Routing",
             "type": "rich",
             "ratingOptions": [
@@ -780,7 +780,7 @@
             }
           },
           {
-            "id": "i_dwv",
+            "id": "dwv",
             "label": "Drain / Waste / Vent (DWV)",
             "type": "rich",
             "ratingOptions": [
@@ -830,7 +830,7 @@
             }
           },
           {
-            "id": "i_pressure_test",
+            "id": "pressure-test",
             "label": "Pressure Test Verification",
             "type": "rich",
             "ratingOptions": [
@@ -880,7 +880,7 @@
             }
           },
           {
-            "id": "i_shut_offs",
+            "id": "shut-offs",
             "label": "Shut-off Valve Locations",
             "type": "rich",
             "ratingOptions": [
@@ -932,11 +932,11 @@
         ]
       },
       {
-        "id": "s_rough_electric",
+        "id": "rough-electrical",
         "title": "Rough Electrical",
         "items": [
           {
-            "id": "i_panel_location",
+            "id": "panel-location",
             "label": "Service Panel Location & Size",
             "type": "rich",
             "ratingOptions": [
@@ -986,7 +986,7 @@
             }
           },
           {
-            "id": "i_wire_routing",
+            "id": "wire-routing",
             "label": "Wire Routing & Stapling",
             "type": "rich",
             "ratingOptions": [
@@ -1036,7 +1036,7 @@
             }
           },
           {
-            "id": "i_box_install",
+            "id": "box-install",
             "label": "Receptacle / Switch Box Install",
             "type": "rich",
             "ratingOptions": [
@@ -1086,7 +1086,7 @@
             }
           },
           {
-            "id": "i_grounding",
+            "id": "grounding",
             "label": "Grounding & Bonding",
             "type": "rich",
             "ratingOptions": [
@@ -1138,11 +1138,11 @@
         ]
       },
       {
-        "id": "s_hvac_rough",
+        "id": "hvac-rough",
         "title": "HVAC Rough-In",
         "items": [
           {
-            "id": "i_duct_install",
+            "id": "duct-install",
             "label": "Ductwork Installation & Sealing",
             "type": "rich",
             "ratingOptions": [
@@ -1192,7 +1192,7 @@
             }
           },
           {
-            "id": "i_register_loc",
+            "id": "register-loc",
             "label": "Register / Return Locations",
             "type": "rich",
             "ratingOptions": [
@@ -1242,7 +1242,7 @@
             }
           },
           {
-            "id": "i_equip_pad",
+            "id": "equip-pad",
             "label": "Equipment Pad / Platform",
             "type": "rich",
             "ratingOptions": [
@@ -1294,11 +1294,11 @@
         ]
       },
       {
-        "id": "s_insulation",
+        "id": "insulation-readiness",
         "title": "Insulation Readiness",
         "items": [
           {
-            "id": "i_air_seal",
+            "id": "air-seal",
             "label": "Air Sealing at Penetrations",
             "type": "rich",
             "ratingOptions": [
@@ -1348,7 +1348,7 @@
             }
           },
           {
-            "id": "i_fire_caulk",
+            "id": "fire-caulk",
             "label": "Fire Caulk at Plates / Penetrations",
             "type": "rich",
             "ratingOptions": [
@@ -1398,7 +1398,7 @@
             }
           },
           {
-            "id": "i_blocking",
+            "id": "blocking",
             "label": "Blocking for Fixtures",
             "type": "rich",
             "ratingOptions": [

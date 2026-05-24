@@ -7,11 +7,11 @@
     "schemaVersion": 2,
     "sections": [
       {
-        "id": "s_building_code",
+        "id": "building-code",
         "title": "Building Code & Year Built",
         "items": [
           {
-            "id": "i_year_built",
+            "id": "year-built",
             "label": "Year Built / Permit Date",
             "type": "rich",
             "ratingOptions": [
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "i_fbc_compliance",
+            "id": "fbc-compliance",
             "label": "FBC / IRC Compliance Evidence",
             "type": "rich",
             "ratingOptions": [
@@ -113,11 +113,11 @@
         ]
       },
       {
-        "id": "s_roof_covering",
+        "id": "roof-covering",
         "title": "Roof Covering",
         "items": [
           {
-            "id": "i_roof_material",
+            "id": "roof-material",
             "label": "Roof Covering Type & Permit",
             "type": "rich",
             "ratingOptions": [
@@ -167,7 +167,7 @@
             }
           },
           {
-            "id": "i_roof_install_year",
+            "id": "roof-install-year",
             "label": "Roof Covering Installation Year",
             "type": "rich",
             "ratingOptions": [
@@ -217,7 +217,7 @@
             }
           },
           {
-            "id": "i_meets_fbc_2001",
+            "id": "meets-fbc-2001",
             "label": "Meets FBC 2001+ Compliance",
             "type": "rich",
             "ratingOptions": [
@@ -269,11 +269,11 @@
         ]
       },
       {
-        "id": "s_roof_deck",
+        "id": "roof-deck",
         "title": "Roof Deck Attachment",
         "items": [
           {
-            "id": "i_deck_type",
+            "id": "deck-type",
             "label": "Deck Type (Plywood/OSB/Other)",
             "type": "rich",
             "ratingOptions": [
@@ -323,7 +323,7 @@
             }
           },
           {
-            "id": "i_nail_size",
+            "id": "nail-size",
             "label": "Nail Size (6d / 8d / Larger)",
             "type": "rich",
             "ratingOptions": [
@@ -373,7 +373,7 @@
             }
           },
           {
-            "id": "i_nail_spacing",
+            "id": "nail-spacing",
             "label": "Nail Spacing (Edge / Field)",
             "type": "rich",
             "ratingOptions": [
@@ -425,11 +425,11 @@
         ]
       },
       {
-        "id": "s_roof_to_wall",
+        "id": "roof-to-wall",
         "title": "Roof-to-Wall Attachment",
         "items": [
           {
-            "id": "i_attachment_type",
+            "id": "attachment-type",
             "label": "Toe Nails / Clips / Single Wrap / Double Wrap",
             "type": "rich",
             "ratingOptions": [
@@ -479,7 +479,7 @@
             }
           },
           {
-            "id": "i_min_3_nails",
+            "id": "min-3-nails",
             "label": "Minimum 3 Nails per Connector",
             "type": "rich",
             "ratingOptions": [
@@ -531,11 +531,11 @@
         ]
       },
       {
-        "id": "s_roof_geometry",
+        "id": "roof-geometry",
         "title": "Roof Geometry",
         "items": [
           {
-            "id": "i_geometry",
+            "id": "geometry",
             "label": "Hip / Non-Hip / Other Geometry",
             "type": "rich",
             "ratingOptions": [
@@ -585,7 +585,7 @@
             }
           },
           {
-            "id": "i_hip_percentage",
+            "id": "hip-percentage",
             "label": "Total Hip Roof Perimeter %",
             "type": "rich",
             "ratingOptions": [
@@ -637,11 +637,11 @@
         ]
       },
       {
-        "id": "s_secondary_water",
+        "id": "secondary-water-resistance",
         "title": "Secondary Water Resistance (SWR)",
         "items": [
           {
-            "id": "i_swr_present",
+            "id": "swr-present",
             "label": "SWR Barrier Present",
             "type": "rich",
             "ratingOptions": [
@@ -691,7 +691,7 @@
             }
           },
           {
-            "id": "i_swr_meets_code",
+            "id": "swr-meets-code",
             "label": "SWR Meets Code Requirements",
             "type": "rich",
             "ratingOptions": [
@@ -743,11 +743,11 @@
         ]
       },
       {
-        "id": "s_openings",
+        "id": "opening-protection",
         "title": "Opening Protection",
         "items": [
           {
-            "id": "i_windows_protect",
+            "id": "windows-protect",
             "label": "All Glazed Openings Protected",
             "type": "rich",
             "ratingOptions": [
@@ -797,7 +797,7 @@
             }
           },
           {
-            "id": "i_doors_protect",
+            "id": "doors-protect",
             "label": "All Exterior Doors Protected",
             "type": "rich",
             "ratingOptions": [
@@ -847,7 +847,7 @@
             }
           },
           {
-            "id": "i_garage_protect",
+            "id": "garage-protect",
             "label": "Garage Door Wind-Rated",
             "type": "rich",
             "ratingOptions": [
@@ -897,7 +897,7 @@
             }
           },
           {
-            "id": "i_protection_class",
+            "id": "protection-class",
             "label": "Protection Class (Impact-Rated A / Other B-C-N)",
             "type": "rich",
             "ratingOptions": [
