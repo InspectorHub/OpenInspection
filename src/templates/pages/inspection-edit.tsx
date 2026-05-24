@@ -1692,15 +1692,14 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 </Modal>
             </section>
 
-            {/* Card Grid */}
-            <div class="p-6 grid grid-cols-2 xl:grid-cols-3 gap-4">
+            {/* Item List — single-column (Gap 2B) */}
+            <div class="flex flex-col">
               <template x-for="item in currentSectionItems" x-bind:key="item.id">
                 <div
                   x-bind:data-item-id="item.id"
                   x-show="itemMatchesSearch(currentSection, item) && itemPassesFilter(item)"
-                  class="rounded-md p-4 transition-all cursor-pointer group item-card"
-                  x-bind:style="(activeItemId === item.id ? 'border-color: #6366f1; ' : '') + 'border-top: 4px solid ' + getRatingColor(getItemRating(item.id))"
-                  x-bind:class="activeItemId === item.id ? 'ring-2 ring-indigo-100' : ''"
+                  class="flex items-center gap-2 px-3 py-2 border-b border-slate-100 dark:border-slate-700 cursor-pointer group transition-all"
+                  x-bind:class="activeItemId === item.id ? 'border-l-[3px] border-l-indigo-600 bg-white dark:bg-slate-800 shadow-sm' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'"
                   x-on:click="batchMode ? toggleBatchSelect(item.id) : (setActiveItem(item.id), toggleExpand(item.id))"
                 >
                   <div x-show="batchMode" class="mb-2">
@@ -2063,7 +2062,7 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
                 x-show="hasSearchQuery && searchMatchCount === 0"
                 style="display:none"
                 data-testid="editor-search-empty-desktop"
-                class="col-span-2 xl:col-span-3 rounded-md bg-white dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center"
+                class="rounded-md bg-white dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center"
               >
                 <p class="text-sm text-slate-500 dark:text-slate-400">No matches for &ldquo;<span class="font-semibold text-slate-700 dark:text-slate-200" x-text="searchQuery"></span>&rdquo;.</p>
                 <button x-on:click="clearSearch()" class="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear search</button>
