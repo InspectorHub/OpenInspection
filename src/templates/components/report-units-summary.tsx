@@ -18,6 +18,8 @@ export interface ReportUnit {
     id:           string;
     parentUnitId: string | null;
     kind:         'building' | 'floor' | 'unit';
+    /** 'common' for shared areas (lobby, hallways); 'unit' for individual units. */
+    type:         'unit' | 'common';
     name:         string;
     sortOrder:    number;
 }

@@ -1440,6 +1440,7 @@ inspectionsRoutes.get('/:id/report', async (c) => {
             id:           r.id,
             parentUnitId: r.parentUnitId,
             kind:         r.kind as ReportUnit['kind'],
+            type:         (r.type ?? 'unit') as ReportUnit['type'],
             name:         r.name,
             sortOrder:    r.sortOrder ?? 0,
         }));

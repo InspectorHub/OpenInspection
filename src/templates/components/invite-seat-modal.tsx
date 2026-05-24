@@ -38,10 +38,14 @@ export const InviteSeatModal: FC = () => (
             </header>
 
             <div class="p-6 space-y-4">
-                <div x-show="mode === 'permanent'">
+                <div x-show="mode === 'permanent'" class="space-y-3">
                     <label class="block">
                         <span class="ih-eyebrow block mb-1">Email</span>
                         <input class="ih-input w-full" type="email" {...{ 'x-model': 'email' }} />
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" {...{ 'x-model': 'notify' }} />
+                        Send email notification
                     </label>
                 </div>
 
@@ -54,6 +58,7 @@ export const InviteSeatModal: FC = () => (
                         <option value="office">Office staff</option>
                     </select>
                 </label>
+                <p class="ih-meta mt-1" x-text="roleDesc[role]" />
 
                 <div x-show="role === 'apprentice'">
                     <label class="block">
@@ -86,17 +91,20 @@ export const InviteSeatModal: FC = () => (
                     <span class="ih-eyebrow block mb-1">Duration</span>
                     <div class="flex gap-2 flex-wrap">
                         <label class="flex items-center gap-1 text-sm">
-                            <input type="radio" {...{ 'x-model.number': 'durationSeconds', ':value': '86400' }} />24h
+                            <input type="radio" {...{ 'x-model.number': 'durationSeconds', ':value': '86400' }} />
+                            <span>1 day <span class="ih-meta">$1.49</span></span>
                         </label>
                         <label class="flex items-center gap-1 text-sm">
-                            <input type="radio" {...{ 'x-model.number': 'durationSeconds', ':value': '259200' }} />3d
+                            <input type="radio" {...{ 'x-model.number': 'durationSeconds', ':value': '259200' }} />
+                            <span>3 days <span class="ih-meta">$4.47</span></span>
                         </label>
                         <label class="flex items-center gap-1 text-sm">
-                            <input type="radio" {...{ 'x-model.number': 'durationSeconds', ':value': '604800' }} />7d
+                            <input type="radio" {...{ 'x-model.number': 'durationSeconds', ':value': '604800' }} />
+                            <span>7 days <span class="ih-meta">$10.43</span></span>
                         </label>
                     </div>
                     <p class="ih-meta mt-2">
-                        Guest counts against your team's seat quota while active. No separate charge.
+                        Guest counts against your team's seat quota while active.
                     </p>
 
                     <div x-show="generatedUrl" class="ih-card p-3 mt-3 bg-emerald-50 border border-emerald-200 rounded-md">
@@ -105,6 +113,11 @@ export const InviteSeatModal: FC = () => (
                         <button class="ih-btn ih-btn--sm ih-btn--secondary mt-2"
                                 {...{ '@click': 'copy(generatedUrl)' }}>Copy link</button>
                     </div>
+                </div>
+
+                <div x-show="mode === 'guest'" class="ih-card p-3 bg-amber-50 border border-amber-200 rounded-md text-sm">
+                    <span class="font-medium">Estimated cost:</span>{' '}
+                    <span x-text="guestPriceLabel" />
                 </div>
 
                 <p class="ih-meta text-rose-600" x-show="error" x-text="error" />

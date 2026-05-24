@@ -13,6 +13,7 @@
             mode: 'permanent',
             email: '',
             role: 'lead',
+            notify: true,
             mentorId: '',
             sectionIds: [],
             durationSeconds: 86400,
@@ -25,6 +26,19 @@
             // Caller-supplied label (e.g. "Inspection roster · live add")
             // so audit logs / analytics can tell where the invite came from.
             sourceLabel: '',
+
+            roleDesc: {
+                lead:       'Full edit + can publish + approve apprentices',
+                specialist: 'Full edit within assigned sections',
+                apprentice: 'Edits queue for lead review',
+                office:     'Read-only + scheduling',
+            },
+
+            _guestPrices: { 86400: '$1.49', 259200: '$4.47', 604800: '$10.43' },
+
+            get guestPriceLabel() {
+                return this._guestPrices[this.durationSeconds] || '';
+            },
 
             async init() {
                 window.addEventListener('invite-seat-modal:open', (e) => {
@@ -44,6 +58,7 @@
                 this.sourceLabel  = opts.sourceLabel || '';
                 this.email        = '';
                 this.role         = 'lead';
+                this.notify       = true;
                 this.mentorId     = '';
                 this.sectionIds   = [];
                 this.generatedUrl = '';
@@ -94,8 +109,9 @@
                 this.error = '';
                 try {
                     const payload = {
-                        email: this.email,
-                        role:  this.role,
+                        email:  this.email,
+                        role:   this.role,
+                        notify: this.notify,
                     };
                     if (this.role === 'apprentice') payload.mentorId = this.mentorId;
                     if (this.role === 'specialist') payload.assignedSectionIds = this.sectionIds;

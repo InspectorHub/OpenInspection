@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { childrenOf, type ReportUnit } from '../../src/templates/components/report-units-summary';
 
 const u = (id: string, parent: string | null, kind: 'building'|'floor'|'unit', name: string, order = 0): ReportUnit =>
-    ({ id, parentUnitId: parent, kind, name, sortOrder: order });
+    ({ id, parentUnitId: parent, kind, type: 'unit', name, sortOrder: order });
 
 describe('childrenOf (subsystem D P3)', () => {
     it('returns top-level buildings when parentId is null', () => {
@@ -49,8 +49,8 @@ describe('childrenOf (subsystem D P3)', () => {
 
     it('treats missing sortOrder as 0 (stable insertion order)', () => {
         const tree = [
-            { id: 'b1', parentUnitId: null, kind: 'building' as const, name: 'A', sortOrder: 0 },
-            { id: 'b2', parentUnitId: null, kind: 'building' as const, name: 'B', sortOrder: 0 },
+            { id: 'b1', parentUnitId: null, kind: 'building' as const, type: 'unit' as const, name: 'A', sortOrder: 0 },
+            { id: 'b2', parentUnitId: null, kind: 'building' as const, type: 'unit' as const, name: 'B', sortOrder: 0 },
         ];
         const out = childrenOf(tree, null);
         expect(out.map(x => x.id)).toEqual(['b1', 'b2']);

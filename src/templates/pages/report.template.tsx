@@ -3,12 +3,13 @@ import { BrandingConfig } from '../../types/auth';
 import { ReportSidebar, type ReportSidebarSection } from '../components/report-sidebar';
 import { ReportTabBar } from '../components/report-tab-bar';
 import { TeamCredit, type TeamCreditMember } from '../components/team-credit';
-import { ReportUnitsSummary, type ReportUnit } from '../components/report-units-summary';
+import { ReportUnitsSummary, childrenOf, type ReportUnit } from '../components/report-units-summary';
+import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
 import { ShareDropdown } from '../components/share-dropdown';
 import { PdfDropdown } from '../components/pdf-dropdown';
 import { ReportStatusPill } from '../components/report-status-pill';
 
-interface InspectionRecord { id: string; propertyAddress: string; clientName?: string | null; clientEmail?: string | null; date: string; price: number; paymentStatus: string; signed?: boolean; status?: string | null; }
+interface InspectionRecord { id: string; propertyAddress: string; clientName?: string | null; clientEmail?: string | null; date: string; price: number; paymentStatus: string; signed?: boolean; status?: string | null; propertyType?: string | null; }
 interface TemplateRecord { schema: string | Record<string, unknown>; }
 interface SchemaItemRaw { id: string; label?: string; name?: string; type?: string; options?: { unit?: string; choices?: string[] } | undefined; }
 interface SchemaSectionRaw { title?: string; name?: string; items: SchemaItemRaw[]; }
@@ -333,7 +334,11 @@ export function renderProfessionalReport(data: {
                 })()
                 : null}
 
-            {/* Inspection Details */}
+            {/* Inspection Details — D7 propertyType-aware rendering.
+                Single-family (or no units): flat section list (unchanged).
+                Multi-unit / commercial: sections grouped by unit, with
+                building → floor → unit headers wrapping the same section
+                rendering logic. */}
             <div class="px-6 py-10 md:px-10 md:py-12 space-y-10 bg-white">
                 {/* Spec 5F.9 — section + item wrappers gain report-pdf-* classes
                     that ONLY apply in @media print (defined in input.css). On
@@ -341,109 +346,211 @@ export function renderProfessionalReport(data: {
                     to a 2-col grid with hairline borders; defect items break
                     back to full-row red bg; photos shrink to 4-col mini grid
                     capped at 8 per item. */}
-                {schema.sections.map((section: SchemaSection) => {
-                    const sectionCounts = sectionDefects.get(section.id) ?? { safety: 0, recommendation: 0, maintenance: 0 };
-                    return (
-                    <section
-                        class="page-break report-pdf-section report-section"
-                        id={`section-${section.id}`}
-                        key={section.id}
-                        data-defect-safety={sectionCounts.safety > 0 ? '1' : '0'}
-                    >
-                        <div class="flex items-center gap-4 mb-16">
-                            <h2 class="text-3xl font-bold tracking-tight text-slate-900 shrink-0">{section.title}</h2>
-                            <div class="flex-grow h-0.5 bg-gradient-to-r from-slate-100 to-transparent"></div>
-                            <span class="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-300">Section {schema.sections.indexOf(section) + 1}</span>
-                        </div>
+                {(() => {
+                    // ---------- shared item renderer (unchanged logic) ----------
+                    const renderItem = (item: SchemaItem, res: ResultItem) => {
+                        const itemRatingId = res.rating || res.status;
+                        const bucket = resolveSeverity(itemRatingId);
+                        const level = itemRatingId ? levelMap.get(itemRatingId) : undefined;
+                        const displayLabel = level?.label || itemRatingId || 'NO DATA';
+                        const itemClass = bucket === 'defect' ? 'report-pdf-item report-pdf-item--defect' : 'report-pdf-item';
+                        const photos = res.photos || [];
+                        const photoCap = 8;
 
-                        <div class="space-y-6 report-pdf-grid">
-                            {section.items.map((item: SchemaItem) => {
-                                const res: ResultItem = resultData[item.id] || {};
-                                const itemRatingId = res.rating || res.status;
-                                const bucket = resolveSeverity(itemRatingId);
-                                const level = itemRatingId ? levelMap.get(itemRatingId) : undefined;
-                                const displayLabel = level?.label || itemRatingId || 'NO DATA';
-                                const itemClass = bucket === 'defect' ? 'report-pdf-item report-pdf-item--defect' : 'report-pdf-item';
-                                const photos = res.photos || [];
-                                const photoCap = 8;
+                        const hasRating = !!itemRatingId;
+                        const hasNotes  = !!(res.notes && res.notes !== 'No notes recorded.');
+                        const hasPhotos = photos.length > 0;
+                        const v = (res as { value?: unknown }).value;
+                        const hasValue  = v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0);
+                        if (!hasRating && !hasNotes && !hasPhotos && !hasValue) return null;
 
-                                // Sub-spec D Task 5 — collapse empty items: no rating + only the
-                                // "No notes recorded." placeholder + no photos + no captured
-                                // value. These are dead weight in the report and clutter the
-                                // Summary view. Non-rich item types (number/date/boolean/...)
-                                // ride on `res.value`, so an item with a value but no rating
-                                // is *not* empty — keep it.
-                                const hasRating = !!itemRatingId;
-                                const hasNotes  = !!(res.notes && res.notes !== 'No notes recorded.');
-                                const hasPhotos = photos.length > 0;
-                                const v = (res as { value?: unknown }).value;
-                                const hasValue  = v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0);
-                                if (!hasRating && !hasNotes && !hasPhotos && !hasValue) return null;
+                        const itemDefectCount = bucket === 'defect' ? 1 : bucket === 'marginal' ? 1 : 0;
+                        const itemSafetyFlag  = '0';
 
-                                // Defect category mapping (Sub-spec D Task 2 / 5):
-                                // bucket=defect   -> recommendation (per render-path heuristic)
-                                // bucket=marginal -> maintenance
-                                // bucket=good/null -> none
-                                const itemDefectCount = bucket === 'defect' ? 1 : bucket === 'marginal' ? 1 : 0;
-                                // Per-render-path: safety category isn't classified at item level
-                                // here (only the v2 defect-tabs path has that data). Mirror the
-                                // section-level zero so the print filter behaves consistently.
-                                const itemSafetyFlag  = '0';
+                        return (
+                            <div
+                                class={`flex flex-col lg:flex-row gap-16 avoid-break group report-item ${itemClass}`}
+                                key={item.id}
+                                data-defects={String(itemDefectCount)}
+                                data-defect-safety={itemSafetyFlag}
+                            >
+                                <div class="flex-grow">
+                                    <div class="flex justify-between items-start gap-4 mb-6">
+                                        <h3 class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
+                                        <span class={`ih-pill ${bucket === 'good' ? 'ih-pill--sat' : bucket === 'marginal' ? 'ih-pill--monitor' : bucket === 'defect' ? 'ih-pill--defect' : 'ih-pill--gen'}`}>{displayLabel}</span>
+                                    </div>
+                                    {item.type && item.type !== 'rich' && (res as { value?: unknown }).value !== undefined && (res as { value?: unknown }).value !== '' && (res as { value?: unknown }).value !== null && (
+                                        <p class="text-lg text-slate-700 font-semibold mb-3 item-value">
+                                            <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mr-3">{item.type}</span>
+                                            {Array.isArray((res as { value?: unknown }).value)
+                                                ? ((res as { value: unknown[] }).value).join(' · ')
+                                                : (item.type === 'boolean'
+                                                    ? ((res as { value: boolean }).value ? 'Yes' : 'No')
+                                                    : String((res as { value: unknown }).value))}
+                                            {item.options?.unit ? <span class="text-slate-400 ml-2">{item.options.unit}</span> : null}
+                                        </p>
+                                    )}
+                                    <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl item-notes">{res.notes || 'No notes recorded.'}</p>
+                                </div>
 
-                                return (
-                                    <div
-                                        class={`flex flex-col lg:flex-row gap-16 avoid-break group report-item ${itemClass}`}
-                                        key={item.id}
-                                        data-defects={String(itemDefectCount)}
-                                        data-defect-safety={itemSafetyFlag}
-                                    >
-                                        <div class="flex-grow">
-                                            <div class="flex justify-between items-start gap-4 mb-6">
-                                                <h3 class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">{item.label}</h3>
-                                                <span class={`ih-pill ${bucket === 'good' ? 'ih-pill--sat' : bucket === 'marginal' ? 'ih-pill--monitor' : bucket === 'defect' ? 'ih-pill--defect' : 'ih-pill--gen'}`}>{displayLabel}</span>
+                                {photos.length > 0 ? (
+                                    <div class="lg:w-[480px] shrink-0 grid grid-cols-2 gap-4 avoid-break report-pdf-photos">
+                                        {photos.slice(0, photoCap).map((p: { key: string }) => (
+                                            <div class="aspect-square bg-slate-50 rounded-lg overflow-hidden border-4 border-white shadow-md/20 group/photo transition-transform hover:scale-[1.02]" key={p.key}>
+                                                <img src={`/api/inspections/files/${p.key}`} class="w-full h-full object-cover grayscale-[0.2] transition-all group-hover/photo:grayscale-0" />
                                             </div>
-                                            {/* Non-rich item value — boolean/number/text/textarea/date/select/
-                                                multi_select store the captured value on res.value. The customer-
-                                                facing report viewer surfaces it inline so the inspector's entry
-                                                isn't silently hidden behind a rating pill that doesn't apply. */}
-                                            {item.type && item.type !== 'rich' && (res as { value?: unknown }).value !== undefined && (res as { value?: unknown }).value !== '' && (res as { value?: unknown }).value !== null && (
-                                                <p class="text-lg text-slate-700 font-semibold mb-3 item-value">
-                                                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mr-3">{item.type}</span>
-                                                    {Array.isArray((res as { value?: unknown }).value)
-                                                        ? ((res as { value: unknown[] }).value).join(' · ')
-                                                        : (item.type === 'boolean'
-                                                            ? ((res as { value: boolean }).value ? 'Yes' : 'No')
-                                                            : String((res as { value: unknown }).value))}
-                                                    {item.options?.unit ? <span class="text-slate-400 ml-2">{item.options.unit}</span> : null}
-                                                </p>
-                                            )}
-                                            <p class="text-xl text-slate-500 leading-relaxed font-medium max-w-3xl item-notes">{res.notes || 'No notes recorded.'}</p>
-                                        </div>
-
-                                        {/* High-Resolution Evidence Architecture */}
-                                        {photos.length > 0 ? (
-                                            <div class="lg:w-[480px] shrink-0 grid grid-cols-2 gap-4 avoid-break report-pdf-photos">
-                                                {photos.slice(0, photoCap).map((p: { key: string }) => (
-                                                    <div class="aspect-square bg-slate-50 rounded-lg overflow-hidden border-4 border-white shadow-md/20 group/photo transition-transform hover:scale-[1.02]" key={p.key}>
-                                                        <img src={`/api/inspections/files/${p.key}`} class="w-full h-full object-cover grayscale-[0.2] transition-all group-hover/photo:grayscale-0" />
-                                                    </div>
-                                                ))}
-                                                {photos.length > photoCap && (
-                                                    <div class="hidden print:block col-span-full text-[8pt] text-slate-400 italic">+{photos.length - photoCap} more in web report</div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div class="lg:w-[480px] shrink-0 h-40 border-2 border-dashed border-slate-50 rounded-lg flex items-center justify-center grayscale opacity-20">
-                                                <span class="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-300">No photos</span>
-                                            </div>
+                                        ))}
+                                        {photos.length > photoCap && (
+                                            <div class="hidden print:block col-span-full text-[8pt] text-slate-400 italic">+{photos.length - photoCap} more in web report</div>
                                         )}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </section>
+                                ) : (
+                                    <div class="lg:w-[480px] shrink-0 h-40 border-2 border-dashed border-slate-50 rounded-lg flex items-center justify-center grayscale opacity-20">
+                                        <span class="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-300">No photos</span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    };
+
+                    // ---------- shared section renderer ----------
+                    // resolveKey: given (section, item) → the key into resultData.
+                    // idSuffix: appended to section element ids to disambiguate
+                    //           the same section rendered for different units.
+                    const renderSections = (
+                        resolveKey: (sec: SchemaSection, item: SchemaItem) => string,
+                        idSuffix?: string,
+                    ): JSX.Element[] =>
+                        schema.sections.map((section: SchemaSection) => {
+                            const sectionCounts = sectionDefects.get(section.id) ?? { safety: 0, recommendation: 0, maintenance: 0 };
+                            const sectionElId = idSuffix
+                                ? `section-${section.id}--${idSuffix}`
+                                : `section-${section.id}`;
+
+                            // Pre-filter items to those with any result data under
+                            // the resolved key. Skip sections that are entirely empty
+                            // for this unit so unit blocks stay clean.
+                            const itemsWithResults = section.items.filter((item: SchemaItem) => {
+                                const key = resolveKey(section, item);
+                                return !!resultData[key];
+                            });
+                            if (idSuffix && itemsWithResults.length === 0) return null as unknown as JSX.Element;
+
+                            return (
+                                <section
+                                    class="page-break report-pdf-section report-section"
+                                    id={sectionElId}
+                                    key={sectionElId}
+                                    data-defect-safety={sectionCounts.safety > 0 ? '1' : '0'}
+                                >
+                                    <div class="flex items-center gap-4 mb-16">
+                                        <h2 class="text-3xl font-bold tracking-tight text-slate-900 shrink-0">{section.title}</h2>
+                                        <div class="flex-grow h-0.5 bg-gradient-to-r from-slate-100 to-transparent"></div>
+                                        <span class="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-300">Section {schema.sections.indexOf(section) + 1}</span>
+                                    </div>
+
+                                    <div class="space-y-6 report-pdf-grid">
+                                        {section.items.map((item: SchemaItem) => {
+                                            const key = resolveKey(section, item);
+                                            const res: ResultItem = resultData[key] || {};
+                                            return renderItem(item, res);
+                                        })}
+                                    </div>
+                                </section>
+                            );
+                        }).filter(Boolean);
+
+                    // ---------- D7 dispatch: flat vs unit-grouped ----------
+                    const units = data.units ?? [];
+                    const isMultiUnit = units.length > 0 && (
+                        inspection.propertyType === 'multi-unit'
+                        || inspection.propertyType === 'commercial'
                     );
-                })}
+
+                    if (!isMultiUnit) {
+                        // Single-family / no units — original flat rendering.
+                        // Composite key with fallback to plain item.id for
+                        // backward compat with pre-findingKey result data.
+                        return renderSections(
+                            (sec, item) => resultData[findingKey(DEFAULT_UNIT, sec.id, item.id)] ? findingKey(DEFAULT_UNIT, sec.id, item.id) : item.id,
+                        );
+                    }
+
+                    // ------ Multi-unit / commercial: unit-grouped rendering ------
+                    const buildings = childrenOf(units, null);
+
+                    // Helper: render a leaf unit's sections
+                    const renderUnitBlock = (unit: ReportUnit): JSX.Element => (
+                        <div class="report-unit-group" id={`unit-${unit.id}`} data-unit-id={unit.id}>
+                            <div class="flex items-center gap-3 mb-8 mt-4">
+                                <div class={`w-2 h-6 rounded-full ${unit.type === 'common' ? 'bg-slate-400' : 'bg-indigo-500'}`}></div>
+                                <h3 class="text-xl font-bold tracking-tight text-slate-800">
+                                    {unit.name}
+                                    {unit.type === 'common' && (
+                                        <span class="ml-2 text-xs font-bold uppercase tracking-widest text-slate-400">Common</span>
+                                    )}
+                                </h3>
+                            </div>
+                            <div class="space-y-10 pl-5 border-l-2 border-slate-100">
+                                {renderSections(
+                                    (sec, item) => findingKey(unit.id, sec.id, item.id),
+                                    unit.id,
+                                )}
+                            </div>
+                        </div>
+                    );
+
+                    // Helper: render a floor node (contains leaf units)
+                    const renderFloorBlock = (floor: ReportUnit): JSX.Element => {
+                        const floorUnits = childrenOf(units, floor.id);
+                        // Common areas sort first, then regular units
+                        const common  = floorUnits.filter(u => u.type === 'common');
+                        const regular = floorUnits.filter(u => u.type !== 'common');
+                        return (
+                            <div class="report-floor-group mb-10" id={`unit-${floor.id}`}>
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-1.5 h-5 bg-slate-600 rounded-full"></div>
+                                    <h3 class="text-lg font-bold uppercase tracking-widest text-slate-500">{floor.name}</h3>
+                                </div>
+                                <div class="space-y-8 pl-4">
+                                    {common.map(u => renderUnitBlock(u))}
+                                    {regular.map(u => renderUnitBlock(u))}
+                                </div>
+                            </div>
+                        );
+                    };
+
+                    return buildings.map(building => {
+                        const children = childrenOf(units, building.id);
+                        // If the building has floor children, render 3-level
+                        // (commercial). Otherwise, children are direct units
+                        // (multi-unit without floor nesting).
+                        const hasFloors = children.some(c => c.kind === 'floor');
+
+                        // Common areas directly under the building (no floor parent)
+                        const directCommon  = children.filter(c => c.kind !== 'floor' && c.type === 'common');
+                        const directUnits   = children.filter(c => c.kind !== 'floor' && c.type !== 'common');
+                        const floors        = children.filter(c => c.kind === 'floor');
+
+                        return (
+                            <div class="report-building-group" id={`unit-${building.id}`} key={building.id}>
+                                <div class="flex items-center gap-4 mb-10 pb-4 border-b-2 border-slate-200">
+                                    <div class="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                                    </div>
+                                    <h2 class="text-2xl font-bold tracking-tight text-slate-900">{building.name}</h2>
+                                </div>
+
+                                <div class="space-y-10">
+                                    {directCommon.map(u => renderUnitBlock(u))}
+                                    {hasFloors
+                                        ? floors.map(f => renderFloorBlock(f))
+                                        : directUnits.map(u => renderUnitBlock(u))}
+                                </div>
+                            </div>
+                        );
+                    });
+                })()}
             </div>
 
             {/* Document Finalization Tier */}
