@@ -71,6 +71,9 @@ export const PreflightChecks: FC = () => (
                 action={{ kind: 'dispatch', event: 'open-cover-photo-picker', label: 'Set →' }} />
             <CheckRow passed="checks.agreementSigned" label="Buyer agreement signed"
                 action={{ kind: 'dispatch', event: 'open-agreement-flow', label: 'Send →' }} />
+            <CheckRow passed="checks.noOpenFields" label="No unresolved [FIELD] placeholders"
+                detail="checks.openFieldCount + ' placeholder' + (checks.openFieldCount === 1 ? '' : 's')"
+                action={{ kind: 'dispatch', event: 'scroll-to-first-open-field', label: 'Fix →' }} />
         </ul>
 
         <span x-show="loading" aria-busy="true" class="inline-block ih-skeleton ih-skeleton--text" style="width: 4rem; height: 0.875rem; vertical-align: middle;"><span class="sr-only">Loading…</span></span>

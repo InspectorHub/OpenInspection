@@ -34,6 +34,7 @@ export interface PreflightInspectionInput {
 export interface PreflightItem {
     rating?: unknown;
     value?:  unknown;
+    notes?:  string;
 }
 
 export interface PreflightResult {
@@ -45,6 +46,8 @@ export interface PreflightResult {
     missingFacts:          string[];
     coverPhotoSet:         boolean;
     agreementSigned:       boolean;
+    noOpenFields:          boolean;
+    openFieldCount:        number;
 }
 
 export function computePreflightFromData(
@@ -65,6 +68,15 @@ export function computePreflightFromData(
     // Subsystem C dependency — when the count is undefined the
     // apprentice_reviews table is presumed absent and the gate passes.
     const pending = pendingApprenticeCount ?? 0;
+    const FIELD_RE = /\[[A-Z_]+\]/g;
+    let openFieldCount = 0;
+    for (const item of entries) {
+        if (typeof item.notes === 'string') {
+            const matches = item.notes.match(FIELD_RE);
+            if (matches) openFieldCount += matches.length;
+        }
+    }
+
     return {
         allRated,
         unratedCount,
@@ -74,5 +86,7 @@ export function computePreflightFromData(
         missingFacts,
         coverPhotoSet:         inspection.coverPhotoId != null,
         agreementSigned:       inspection.agreementSignedAt != null,
+        noOpenFields:          openFieldCount === 0,
+        openFieldCount,
     };
 }

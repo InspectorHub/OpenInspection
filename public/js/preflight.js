@@ -14,6 +14,7 @@
                 apprenticeReviewed: false, apprenticePending: 0,
                 propertyFactsComplete: false, missingFacts: [],
                 coverPhotoSet: false, agreementSigned: false,
+                noOpenFields: true, openFieldCount: 0,
             },
             loading: false,
             error: '',
@@ -22,7 +23,7 @@
                 const c = this.checks;
                 return c.allRated && c.apprenticeReviewed
                     && c.propertyFactsComplete && c.coverPhotoSet
-                    && c.agreementSigned;
+                    && c.agreementSigned && c.noOpenFields;
             },
 
             async init() {
