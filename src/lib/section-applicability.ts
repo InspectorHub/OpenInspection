@@ -8,7 +8,7 @@
  */
 
 import type { TemplateSection } from '../types/template-schema';
-import { getSubtypeDef } from './commercial-subtypes';
+import type { } from './commercial-subtypes';
 
 export function sectionApplies(
     section: TemplateSection,
