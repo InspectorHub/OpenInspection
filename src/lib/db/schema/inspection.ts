@@ -267,6 +267,10 @@ export const comments = sqliteTable('comments', {
     // tenant-authored comments. Used by replace-mode update to delete only
     // prior-import rows, never touching the tenant's own comments.
     libraryId: text('library_id'),
+    sectionIds: text('section_ids'),
+    itemLabels: text('item_labels'),
+    triggerCode: text('trigger_code'),
+    searchKeywords: text('search_keywords'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

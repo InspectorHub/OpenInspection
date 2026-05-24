@@ -161,6 +161,10 @@ export async function seedStarterContent(
                 category:     c.category,
                 ratingBucket: c.ratingBucket,
                 section:      c.category,
+                sectionIds:   null,
+                itemLabels:   null,
+                triggerCode:  null,
+                searchKeywords: null,
                 createdAt:    now,
             }).run();
             cannedCommentsSeeded++;
