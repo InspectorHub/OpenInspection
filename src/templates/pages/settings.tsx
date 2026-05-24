@@ -2,6 +2,7 @@ import { MainLayout } from '../layouts/main-layout';
 import { BrandingConfig } from '../../types/auth';
 import { BUILD } from '../../generated/version';
 import { SETTINGS_GROUPS } from '../components/settings-layout';
+import { PageHeader } from '../components/page-header';
 
 /**
  * Hub page at `/settings` — shows the 6 group cards (Profile / Workspace / Catalog /
@@ -26,10 +27,11 @@ export const SettingsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     </div>
 
                     {/* Header */}
-                    <header class="space-y-2">
-                        <span class="inline-flex items-center rounded-md bg-blueprint-100 px-2.5 py-1 text-[10px] font-bold text-blueprint-700 uppercase tracking-[0.2em]">Settings</span>
-                        <h1 class="text-3xl font-bold tracking-tight text-ink-900 dark:text-slate-100">Settings</h1>
-                    </header>
+                    <PageHeader
+                        eyebrow="SETTINGS"
+                        eyebrowColor="slate"
+                        title="Settings"
+                    />
 
                     {/* Group cards */}
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

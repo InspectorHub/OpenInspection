@@ -93,28 +93,13 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                                 </button>
                                 <button
                                     type="button"
-                                    onclick="showCreateModal()"
+                                    onclick="window.dispatchEvent(new CustomEvent('open-new-inspection-wizard'))"
                                     class="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                                 >
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                     </svg>
                                     New Inspection
-                                </button>
-                                {/* Design System 0520 subsystem B phase 5 — discoverable
-                                    wizard launcher. Coexists with the legacy quick-create
-                                    button above; wizard offers the 4-step flow with
-                                    team-mode + service picker + scheduled time + duration. */}
-                                <button
-                                    type="button"
-                                    onclick="window.dispatchEvent(new CustomEvent('open-new-inspection-wizard'))"
-                                    class="h-8 px-3 rounded-md ring-1 ring-indigo-300 text-indigo-700 text-[13px] font-semibold hover:bg-indigo-50 inline-flex items-center gap-1.5"
-                                    title="Open 4-step wizard"
-                                >
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                                    </svg>
-                                    Wizard
                                 </button>
                             </>
                         }
@@ -174,13 +159,6 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                                     style="display: none;"
                                 ></p>
                             ) : null}
-                            {/* Portfolio defect chips — only when bucket has at least one defect.
-                                ih-pill canonical class lives in input.css. */}
-                            <div class="mt-3 flex items-center gap-1 flex-wrap" x-show={`agg('${stat.target}').safety + agg('${stat.target}').recommendation + agg('${stat.target}').maintenance > 0`}>
-                                <span x-show={`agg('${stat.target}').safety > 0`} class="ih-pill ih-pill--defect" title="Safety defects" x-text={`'\u{1F534} ' + agg('${stat.target}').safety`}></span>
-                                <span x-show={`agg('${stat.target}').recommendation > 0`} class="ih-pill ih-pill--monitor" title="Recommendations" x-text={`'\u{1F7E1} ' + agg('${stat.target}').recommendation`}></span>
-                                <span x-show={`agg('${stat.target}').maintenance > 0`} class="ih-pill ih-pill--info" title="Maintenance items" x-text={`'\u{1F535} ' + agg('${stat.target}').maintenance`}></span>
-                            </div>
                         </button>
                     ))}
                 </div>

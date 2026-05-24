@@ -11,7 +11,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                 <div x-data="contactsMeta">
                     <PageHeader
                         eyebrow="CONTACTS"
-                        eyebrowColor="slate"
+                        eyebrowColor="indigo"
                         title="Contacts"
                         meta={<span x-text="metaText"></span>}
                         actions={

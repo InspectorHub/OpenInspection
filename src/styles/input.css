@@ -333,6 +333,8 @@ textarea {
         transition: width var(--ih-dur-slow) var(--ih-ease-out);
     }
     .ih-sidebar.is-collapsed { width: var(--ih-sidebar-collapsed-w); }
+    html[data-sidebar-collapsed="1"] .ih-sidebar { width: var(--ih-sidebar-collapsed-w); }
+    html[data-sidebar-collapsed="1"] .ih-sidebar [x-show="!sbc"] { display: none !important; }
 
     .ih-btn {
         display: inline-flex;
