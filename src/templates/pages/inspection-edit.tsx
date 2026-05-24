@@ -13,6 +13,7 @@ import { TeamBanner } from '../components/team-banner';
 import { FooterBar } from '../components/footer-bar';
 import { ReconnectBanner } from '../components/reconnect-banner';
 import { SideRail } from '../components/side-rail';
+import { BreadcrumbDropdown } from '../components/breadcrumb-dropdown';
 import { UnitTree } from '../components/unit-tree';
 import { InspectionSettingsSheet } from '../components/inspection-settings-sheet';
 import { MintObserverLinkModal } from '../components/mint-observer-link-modal';
@@ -236,13 +237,16 @@ export function InspectionEditPage({ inspectionId, branding, enableRepairList = 
               populates `inspection.propertyAddress` + `inspectorName` on
               load; until then the secondary line stays empty and the
               title falls back to a generic label. */}
-          <div class="min-w-0 flex-1">
-            <div class="text-[14px] font-bold text-slate-900 dark:text-slate-100 truncate" x-text="inspection.propertyAddress || 'Inspection'"></div>
-            <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
-              <span x-show="inspection.inspectorName" x-text="inspection.inspectorName"></span>
-              <span x-show="inspection.inspectorName && inspection.id" class="text-slate-300 dark:text-slate-600">·</span>
-              <span x-show="inspection.id" class="font-mono" x-text="'#' + String(inspection.id || '').slice(0, 8).toUpperCase()"></span>
+          <div class="min-w-0 flex-1 flex items-center gap-1">
+            <div class="min-w-0">
+              <div class="text-[14px] font-bold text-slate-900 dark:text-slate-100 truncate" x-text="inspection.propertyAddress || 'Inspection'"></div>
+              <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+                <span x-show="inspection.inspectorName" x-text="inspection.inspectorName"></span>
+                <span x-show="inspection.inspectorName && inspection.id" class="text-slate-300 dark:text-slate-600">·</span>
+                <span x-show="inspection.id" class="font-mono" x-text="'#' + String(inspection.id || '').slice(0, 8).toUpperCase()"></span>
+              </div>
             </div>
+            <BreadcrumbDropdown inspectionId={inspectionId} />
           </div>
 
           {/* Status chip — derived from inspection.status. Tone follows
