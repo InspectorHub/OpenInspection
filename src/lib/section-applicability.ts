@@ -14,6 +14,7 @@ export function sectionApplies(
     section: TemplateSection,
     propertyType: string,
     subtypeId?: string | null,
+    basedOn?: string | null,
 ): boolean {
     const app = section.applicableTo;
     if (!app) return true;
@@ -29,7 +30,8 @@ export function sectionApplies(
 
     if (subtypeId && subs.includes(subtypeId)) return true;
 
-    // TODO: for org subtypes, check if basedOn is in the subs list (requires DB lookup)
+    // For org subtypes, check if their platform parent (basedOn) matches
+    if (basedOn && subs.includes(basedOn)) return true;
 
     return false;
 }
@@ -38,6 +40,7 @@ export function getApplicableSections(
     allSections: TemplateSection[],
     propertyType: string,
     subtypeId?: string | null,
+    basedOn?: string | null,
 ): TemplateSection[] {
-    return allSections.filter(s => sectionApplies(s, propertyType, subtypeId));
+    return allSections.filter(s => sectionApplies(s, propertyType, subtypeId, basedOn));
 }

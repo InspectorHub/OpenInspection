@@ -1,0 +1,514 @@
+{
+  "id": "seed_commercial_hospitality_v1",
+  "name": "Hospitality Property Inspection",
+  "description": "Commercial hospitality property condition assessment — includes guest rooms, commercial kitchen, and pool/spa facilities.",
+  "version": 2,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "site",
+        "title": "Site",
+        "items": [
+          {
+            "id": "site-grading",
+            "label": "Grading & Drainage",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_site_grading_ok", "title": "Condition", "comment": "Grading & Drainage was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_site_grading_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_site_grading_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Grading & Drainage requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "parking",
+            "label": "Parking & Paving",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_parking_ok", "title": "Condition", "comment": "Parking & Paving was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_parking_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_parking_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Parking & Paving requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "building-envelope",
+        "title": "Building Envelope",
+        "items": [
+          {
+            "id": "roof-c",
+            "label": "Roof",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_roof_c_ok", "title": "Condition", "comment": "Roof was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_roof_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_roof_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Roof requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "facade",
+            "label": "Facade / Cladding",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_facade_ok", "title": "Condition", "comment": "Facade / Cladding was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_facade_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_facade_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Facade / Cladding requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "structure-commercial",
+        "title": "Structure",
+        "items": [
+          {
+            "id": "foundation-c",
+            "label": "Foundation",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_foundation_c_ok", "title": "Condition", "comment": "Foundation was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_foundation_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_foundation_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Foundation requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "frame-c",
+            "label": "Structural Frame",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_frame_c_ok", "title": "Condition", "comment": "Structural Frame was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_frame_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_frame_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Structural Frame requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "mep",
+        "title": "Mechanical / Electrical / Plumbing",
+        "items": [
+          {
+            "id": "hvac-c",
+            "label": "HVAC",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_hvac_c_ok", "title": "Condition", "comment": "HVAC was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_hvac_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_hvac_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "HVAC requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "elec-c",
+            "label": "Electrical Service",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_elec_c_ok", "title": "Condition", "comment": "Electrical Service was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_elec_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_elec_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Electrical Service requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "plumbing-c",
+            "label": "Plumbing",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_plumbing_c_ok", "title": "Condition", "comment": "Plumbing was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_plumbing_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_plumbing_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Plumbing requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "fire",
+            "label": "Fire Protection",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_fire_ok", "title": "Condition", "comment": "Fire Protection was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_fire_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_fire_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Fire Protection requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "elevator",
+            "label": "Vertical Transportation",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_elevator_ok", "title": "Condition", "comment": "Vertical Transportation was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_elevator_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_elevator_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Vertical Transportation requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "guest-rooms",
+        "title": "Guest Rooms",
+        "items": [
+          {
+            "id": "room-hvac",
+            "label": "Room HVAC",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_room_hvac_ok", "title": "Condition", "comment": "Guest room HVAC units were inspected in a representative sample and appear in serviceable condition. Thermostats are responsive and airflow is adequate.", "default": true },
+                { "id": "ri_room_hvac_ptac", "title": "PTAC units", "comment": "Guest rooms are equipped with packaged terminal air conditioning (PTAC) units in serviceable condition.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_room_hvac_visual", "title": "Visual scope", "comment": "Inspection limited to a representative sample of guest rooms; not all units were individually tested.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_room_hvac_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Guest room HVAC units show signs of inadequate cooling/heating, excessive noise, or condensate leaks; recommend service by an HVAC technician.", "photos": [], "default": false },
+                { "id": "rd_room_hvac_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Guest room HVAC unit presents a safety concern due to electrical deficiency or gas leak; recommend immediate lock-out and repair.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "room-plumbing",
+            "label": "Room Plumbing",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_room_plumbing_ok", "title": "Condition", "comment": "Guest room plumbing fixtures were inspected in a representative sample. Faucets, drains, and toilets appear in serviceable condition with adequate water pressure.", "default": true },
+                { "id": "ri_room_plumbing_anti_scald", "title": "Anti-scald valves", "comment": "Shower and tub fixtures are equipped with anti-scald mixing valves per code requirements.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_room_plumbing_visual", "title": "Visual scope", "comment": "Inspection limited to a representative sample of guest rooms; concealed piping not evaluated.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_room_plumbing_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Guest room plumbing shows leaks, low pressure, or fixture deterioration; recommend repair by a licensed plumber.", "photos": [], "default": false },
+                { "id": "rd_room_plumbing_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Guest room plumbing presents a safety concern due to missing anti-scald protection or cross-connection risk; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "room-finishes",
+            "label": "Room Finishes",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_room_finishes_ok", "title": "Condition", "comment": "Guest room finishes — flooring, walls, ceilings, and millwork — were inspected in a representative sample and appear in serviceable condition.", "default": true },
+                { "id": "ri_room_finishes_recent", "title": "Recently renovated", "comment": "Guest room finishes appear to have been recently renovated and are in good condition.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_room_finishes_visual", "title": "Visual scope", "comment": "Inspection limited to a representative sample of guest rooms; cosmetic conditions vary room to room.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_room_finishes_repair", "title": "Repair needed", "category": "maintenance", "location": "", "comment": "Guest room finishes show wear, water staining, or damage requiring cosmetic repair or renovation.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "room-fire-safety",
+            "label": "Room Fire Safety",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_room_fire_safety_ok", "title": "Condition", "comment": "Guest room fire safety features — smoke detectors, sprinkler heads, and egress signage — were inspected in a representative sample and appear functional.", "default": true },
+                { "id": "ri_room_fire_safety_sprinkler", "title": "Sprinklered", "comment": "Guest rooms are fully sprinklered with heads in serviceable condition.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_room_fire_safety_visual", "title": "Visual scope", "comment": "Inspection limited to visual observation; functional testing of alarm and suppression systems is beyond the scope of this assessment.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_room_fire_safety_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Guest room fire safety devices are missing, obstructed, or appear non-functional; recommend evaluation by a fire protection specialist.", "photos": [], "default": false },
+                { "id": "rd_room_fire_safety_critical", "title": "Safety concern", "category": "safety", "location": "", "comment": "Guest room fire safety deficiency poses an immediate life-safety risk; recommend urgent correction and fire marshal notification.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "kitchen-commercial",
+        "title": "Commercial Kitchen",
+        "items": [
+          {
+            "id": "kitchen-ventilation",
+            "label": "Kitchen Ventilation",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_kitchen_vent_ok", "title": "Condition", "comment": "Commercial kitchen exhaust hood and make-up air system were inspected and appear in serviceable condition. Grease filters are present and airflow is adequate.", "default": true },
+                { "id": "ri_kitchen_vent_clean", "title": "Recently cleaned", "comment": "Kitchen exhaust ductwork appears to have been recently cleaned per NFPA 96 schedule.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_kitchen_vent_visual", "title": "Visual scope", "comment": "Inspection limited to visible hood, filters, and ductwork access panels; internal ductwork condition not fully verified.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_kitchen_vent_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Kitchen ventilation system shows grease build-up, damaged filters, or inadequate airflow; recommend cleaning and service per NFPA 96.", "photos": [], "default": false },
+                { "id": "rd_kitchen_vent_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Kitchen ventilation system presents a fire hazard due to excessive grease accumulation; recommend immediate professional cleaning.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "kitchen-fire-suppression",
+            "label": "Kitchen Fire Suppression",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_kitchen_fire_ok", "title": "Condition", "comment": "Kitchen fire suppression system (Ansul/wet chemical) was inspected and appears in serviceable condition with current inspection tags.", "default": true },
+                { "id": "ri_kitchen_fire_tagged", "title": "Current inspection", "comment": "Fire suppression system has a current semi-annual inspection tag from a licensed contractor.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_kitchen_fire_visual", "title": "Visual scope", "comment": "Inspection limited to visible nozzles, tanks, and inspection tags; internal agent charge and fusible links not tested.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_kitchen_fire_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Kitchen fire suppression system shows expired inspection tags, missing nozzle caps, or improperly aimed nozzles; recommend service by a licensed fire protection contractor.", "photos": [], "default": false },
+                { "id": "rd_kitchen_fire_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Kitchen fire suppression system appears non-functional or has lapsed certification; recommend immediate service and fire marshal notification.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "kitchen-plumbing",
+            "label": "Kitchen Plumbing",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_kitchen_plumbing_ok", "title": "Condition", "comment": "Commercial kitchen plumbing — sinks, floor drains, grease trap, and hot water supply — was inspected and appears in serviceable condition.", "default": true },
+                { "id": "ri_kitchen_plumbing_grease", "title": "Grease trap adequate", "comment": "Grease interceptor is properly sized and appears to be on a regular pumping schedule.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_kitchen_plumbing_visual", "title": "Visual scope", "comment": "Inspection limited to visible fixtures and accessible grease trap; underground waste lines not scoped.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_kitchen_plumbing_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Kitchen plumbing shows leaks, slow drains, or grease trap overflow; recommend service by a licensed plumber.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "kitchen-equipment",
+            "label": "Kitchen Equipment",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_kitchen_equip_ok", "title": "Condition", "comment": "Built-in commercial kitchen equipment (walk-in coolers, ovens, dishwashers) was inspected and appears in serviceable condition.", "default": true },
+                { "id": "ri_kitchen_equip_walkin", "title": "Walk-in cooler", "comment": "Walk-in cooler/freezer is maintaining proper temperature with adequate door seals and functional compressor.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_kitchen_equip_visual", "title": "Visual scope", "comment": "Inspection limited to permanently installed equipment; portable small-wares and tenant-owned equipment excluded.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_kitchen_equip_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Built-in kitchen equipment shows malfunction, improper temperature, or worn components; recommend evaluation by a commercial kitchen equipment technician.", "photos": [], "default": false },
+                { "id": "rd_kitchen_equip_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Kitchen equipment presents a safety concern due to gas leak, electrical fault, or refrigerant leak; recommend immediate lock-out and repair.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "pool-spa",
+        "title": "Pool & Spa",
+        "items": [
+          {
+            "id": "pool-equipment",
+            "label": "Pool Equipment",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_pool_equip_ok", "title": "Condition", "comment": "Pool mechanical equipment — pumps, filters, heater, and chemical controller — was inspected and appears in serviceable condition.", "default": true },
+                { "id": "ri_pool_equip_compliant", "title": "VGB compliant", "comment": "Pool drain covers appear compliant with the Virginia Graeme Baker Pool and Spa Safety Act (VGB Act).", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_pool_equip_visual", "title": "Visual scope", "comment": "Inspection limited to visible equipment; water chemistry, flow rates, and turnover calculations not performed.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_pool_equip_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Pool equipment shows leaks, corroded fittings, or malfunctioning components; recommend service by a certified pool operator.", "photos": [], "default": false },
+                { "id": "rd_pool_equip_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Pool equipment presents a safety hazard due to non-compliant drain covers, electrical bonding deficiency, or chemical handling violation; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "pool-deck",
+            "label": "Pool Deck",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_pool_deck_ok", "title": "Condition", "comment": "Pool deck surfaces were inspected and appear in serviceable condition with adequate slip-resistant finish and proper drainage.", "default": true },
+                { "id": "ri_pool_deck_code", "title": "Code markings", "comment": "Pool depth markers and safety signage are present and legible per local health code requirements.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_pool_deck_visual", "title": "Visual scope", "comment": "Inspection limited to visible deck surfaces; sub-grade conditions and waterproofing membranes not evaluated.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_pool_deck_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Pool deck shows cracking, settling, or deteriorated non-slip surface; recommend repair to prevent trip hazards.", "photos": [], "default": false },
+                { "id": "rd_pool_deck_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Pool deck presents a safety hazard due to trip hazard, missing depth markers, or sharp edges; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "pool-fencing",
+            "label": "Pool Fencing",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_pool_fencing_ok", "title": "Condition", "comment": "Pool barrier fencing and self-closing/self-latching gates were inspected and appear in serviceable condition per applicable code.", "default": true },
+                { "id": "ri_pool_fencing_height", "title": "Code height", "comment": "Pool fencing meets minimum height requirement per local building code.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_pool_fencing_visual", "title": "Visual scope", "comment": "Inspection limited to visible fencing and gate hardware; full perimeter code compliance survey not performed.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_pool_fencing_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Pool fencing shows damage, gaps, or non-functional gate hardware; recommend repair to maintain barrier integrity.", "photos": [], "default": false },
+                { "id": "rd_pool_fencing_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Pool fencing is inadequate or gate latch is non-functional, creating an unsupervised access risk; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "spa-equipment",
+            "label": "Spa Equipment",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_spa_equip_ok", "title": "Condition", "comment": "Spa/hot tub equipment — pumps, heater, jets, and controls — was inspected and appears in serviceable condition.", "default": true },
+                { "id": "ri_spa_equip_compliant", "title": "VGB compliant", "comment": "Spa drain covers appear compliant with the VGB Act requirements.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_spa_equip_visual", "title": "Visual scope", "comment": "Inspection limited to visible equipment and controls; internal piping and water chemistry not evaluated.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_spa_equip_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Spa equipment shows jet malfunction, heater issues, or worn seals; recommend service by a certified spa technician.", "photos": [], "default": false },
+                { "id": "rd_spa_equip_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Spa equipment presents a safety hazard due to non-compliant drains, excessive temperature, or electrical bonding deficiency; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "interior-commercial",
+        "title": "Interior - Common Areas",
+        "items": [
+          {
+            "id": "floors-c",
+            "label": "Floors",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_floors_c_ok", "title": "Condition", "comment": "Common area floors were inspected and appear in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_floors_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_floors_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Floors require repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "restrooms",
+            "label": "Public Restrooms",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_restrooms_ok", "title": "Condition", "comment": "Public restrooms were inspected and appear in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_restrooms_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_restrooms_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Restrooms require repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-commercial",
+        "title": "Summary & Recommendations",
+        "items": [
+          { "id": "summary-c", "label": "Overall Assessment", "type": "text" },
+          { "id": "deferred", "label": "Deferred Maintenance", "type": "text" }
+        ]
+      }
+    ]
+  }
+}

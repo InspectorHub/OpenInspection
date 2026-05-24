@@ -102,6 +102,18 @@ export function NewInspectionWizard(): JSX.Element {
                                 <option value="commercial">Commercial</option>
                             </select>
                         </label>
+                        <div x-show="property.propertyType === 'commercial'" x-cloak class="mt-3">
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Commercial subtype</label>
+                            <select x-model="property.commercialSubtype" class="ih-input w-full">
+                                <option value="">Select subtype...</option>
+                                <option value="office">Office</option>
+                                <option value="retail">Retail</option>
+                                <option value="hospitality">Hospitality</option>
+                                <option value="industrial">Industrial</option>
+                                <option value="institutional">Institutional</option>
+                                <option value="mixed-use">Mixed-use</option>
+                            </select>
+                        </div>
                     </div>
 
                     {/* Step 2: Services */}

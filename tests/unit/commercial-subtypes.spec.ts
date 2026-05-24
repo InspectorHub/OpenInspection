@@ -115,6 +115,22 @@ describe('sectionApplies', () => {
             'commercial', 'office',
         )).toBe(false);
     });
+
+    it('applies when org subtype basedOn matches a listed platform subtype', () => {
+        // An org subtype "custom-retail" is based on platform subtype "retail".
+        // The section allows "retail" — so it should apply via basedOn inheritance.
+        expect(sectionApplies(
+            makeSection({ propertyTypes: ['commercial'], commercialSubtypes: ['retail', 'hospitality'] }),
+            'commercial', 'custom-retail', 'retail',
+        )).toBe(true);
+    });
+
+    it('does not apply when neither subtypeId nor basedOn matches', () => {
+        expect(sectionApplies(
+            makeSection({ propertyTypes: ['commercial'], commercialSubtypes: ['retail'] }),
+            'commercial', 'custom-office', 'office',
+        )).toBe(false);
+    });
 });
 
 describe('getApplicableSections', () => {

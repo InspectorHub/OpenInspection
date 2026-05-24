@@ -510,6 +510,9 @@ export class InspectionService {
             const db = this.getDrizzle();
             const patch: Record<string, unknown> = {};
             if (input.property.propertyType) patch.propertyType = input.property.propertyType;
+            if (input.property.propertyType === 'commercial' && input.property.commercialSubtype) {
+                patch.commercialSubtype = input.property.commercialSubtype;
+            }
             if (input.teamMode || input.leadInspectorId || (input.helperInspectorIds?.length ?? 0) > 0) {
                 patch.teamMode           = input.teamMode;
                 patch.leadInspectorId    = input.teamMode ? (input.leadInspectorId ?? creatorUserId) : null;

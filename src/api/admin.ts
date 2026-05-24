@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, eq as eqDz, asc as ascDz, desc as descDz } from 'drizzle-orm';
+import { eq, and, like, eq as eqDz, asc as ascDz, desc as descDz } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
@@ -1111,7 +1111,7 @@ const listCommentsRoute = createRoute(withMcpMetadata({
 
 adminRoutes.openapi(listCommentsRoute, async (c) => {
     const tenantId = c.get('tenantId');
-    const { rating, section, search } = c.req.valid('query');
+    const { rating, section, sectionId, triggerCode, search } = c.req.valid('query');
     const db = drizzle(c.env.DB);
     // Filters layered defensively: tenantId always first (multi-tenant
     // isolation rule from CLAUDE.md), then optional rating bucket / section
@@ -1119,6 +1119,12 @@ adminRoutes.openapi(listCommentsRoute, async (c) => {
     const conditions = [eq(comments.tenantId, tenantId)];
     if (rating) conditions.push(eq(comments.ratingBucket, rating));
     if (section) conditions.push(eq(comments.section, section));
+    if (sectionId) {
+        conditions.push(like(comments.sectionIds, `%"${sectionId}"%`));
+    }
+    if (triggerCode) {
+        conditions.push(eq(comments.triggerCode, triggerCode));
+    }
     let rows = await db.select().from(comments).where(and(...conditions)).all();
     if (search && search.trim()) {
         const needle = search.trim().toLowerCase();

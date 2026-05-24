@@ -1,0 +1,412 @@
+{
+  "id": "seed_commercial_retail_v1",
+  "name": "Retail Property Inspection",
+  "description": "Commercial retail property condition assessment — includes storefront and loading dock systems.",
+  "version": 2,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "site",
+        "title": "Site",
+        "items": [
+          {
+            "id": "site-grading",
+            "label": "Grading & Drainage",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_site_grading_ok", "title": "Condition", "comment": "Grading & Drainage was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_site_grading_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_site_grading_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Grading & Drainage requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "parking",
+            "label": "Parking & Paving",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_parking_ok", "title": "Condition", "comment": "Parking & Paving was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_parking_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_parking_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Parking & Paving requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "landscaping",
+            "label": "Landscaping",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_landscaping_ok", "title": "Condition", "comment": "Landscaping was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_landscaping_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_landscaping_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Landscaping requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "building-envelope",
+        "title": "Building Envelope",
+        "items": [
+          {
+            "id": "roof-c",
+            "label": "Roof",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_roof_c_ok", "title": "Condition", "comment": "Roof was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_roof_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_roof_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Roof requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "facade",
+            "label": "Facade / Cladding",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_facade_ok", "title": "Condition", "comment": "Facade / Cladding was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_facade_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_facade_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Facade / Cladding requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "storefront",
+        "title": "Storefront",
+        "items": [
+          {
+            "id": "storefront-glass",
+            "label": "Storefront Glass",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_storefront_glass_ok", "title": "Condition", "comment": "Storefront glass and framing was inspected and appears in serviceable condition. Seals are intact with no visible fogging or cracks.", "default": true },
+                { "id": "ri_storefront_glass_tempered", "title": "Tempered glass", "comment": "Storefront glazing is tempered safety glass per code requirements.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_storefront_glass_visual", "title": "Visual scope", "comment": "Inspection limited to visible glass surfaces; thermal performance and structural glazing integrity not tested.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_storefront_glass_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Storefront glass shows seal failure, chips, or cracks; recommend evaluation and replacement by a glazing contractor.", "photos": [], "default": false },
+                { "id": "rd_storefront_glass_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Storefront glass presents a safety hazard due to cracking or improper glazing; recommend immediate remediation.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "signage",
+            "label": "Signage",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_signage_ok", "title": "Condition", "comment": "Exterior signage and mounting hardware was inspected and appears in serviceable condition.", "default": true },
+                { "id": "ri_signage_illuminated", "title": "Illumination functional", "comment": "Illuminated signage is operational with all lamps and transformers functioning.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_signage_visual", "title": "Visual scope", "comment": "Inspection limited to visible signage and mounting; electrical connections behind fascia not fully accessible.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_signage_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Signage shows deterioration, failed illumination, or loose mounting; recommend repair by a sign contractor.", "photos": [], "default": false },
+                { "id": "rd_signage_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Signage mounting is compromised and poses a falling hazard; recommend immediate securing or removal.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "customer-entry",
+            "label": "Customer Entry",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_customer_entry_ok", "title": "Condition", "comment": "Customer entry doors and hardware were inspected and appear in serviceable condition. Automatic closers and ADA-compliant features are operational.", "default": true },
+                { "id": "ri_customer_entry_auto", "title": "Automatic doors", "comment": "Automatic entry doors are operational with functioning sensors and safety reversals.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_customer_entry_visual", "title": "Visual scope", "comment": "Inspection limited to visible door hardware, closers, and access features.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_customer_entry_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Customer entry doors require adjustment, hardware replacement, or closer repair by a qualified door technician.", "photos": [], "default": false },
+                { "id": "rd_customer_entry_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Customer entry presents a safety concern due to malfunctioning closer, broken glass, or trip hazard; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "structure-commercial",
+        "title": "Structure",
+        "items": [
+          {
+            "id": "foundation-c",
+            "label": "Foundation",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_foundation_c_ok", "title": "Condition", "comment": "Foundation was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_foundation_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_foundation_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Foundation requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "frame-c",
+            "label": "Structural Frame",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_frame_c_ok", "title": "Condition", "comment": "Structural Frame was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_frame_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_frame_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Structural Frame requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "mep",
+        "title": "Mechanical / Electrical / Plumbing",
+        "items": [
+          {
+            "id": "hvac-c",
+            "label": "HVAC",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_hvac_c_ok", "title": "Condition", "comment": "HVAC was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_hvac_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_hvac_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "HVAC requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "elec-c",
+            "label": "Electrical Service",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_elec_c_ok", "title": "Condition", "comment": "Electrical Service was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_elec_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_elec_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Electrical Service requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "plumbing-c",
+            "label": "Plumbing",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_plumbing_c_ok", "title": "Condition", "comment": "Plumbing was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_plumbing_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_plumbing_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Plumbing requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "fire",
+            "label": "Fire Protection",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_fire_ok", "title": "Condition", "comment": "Fire Protection was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_fire_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_fire_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Fire Protection requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "loading-dock",
+        "title": "Loading Dock",
+        "items": [
+          {
+            "id": "dock-doors",
+            "label": "Dock Doors",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_dock_doors_ok", "title": "Condition", "comment": "Dock doors were inspected and appear in serviceable condition. Overhead doors operate smoothly with functional safety mechanisms.", "default": true },
+                { "id": "ri_dock_doors_insulated", "title": "Insulated doors", "comment": "Dock doors are insulated and equipped with perimeter weather seals to maintain interior climate.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_dock_doors_visual", "title": "Visual scope", "comment": "Inspection limited to visible door panels, tracks, and hardware; motor internals not tested.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_dock_doors_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Dock doors require repair — damaged panels, worn seals, or malfunctioning opener observed; recommend service by a dock door specialist.", "photos": [], "default": false },
+                { "id": "rd_dock_doors_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Dock door presents a safety hazard due to failed safety reversal or broken cable; recommend immediate lock-out and repair.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "dock-levelers",
+            "label": "Dock Levelers",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_dock_levelers_ok", "title": "Condition", "comment": "Dock levelers were inspected and appear in serviceable condition. Lip extends and retracts properly.", "default": true },
+                { "id": "ri_dock_levelers_hydraulic", "title": "Hydraulic operation", "comment": "Hydraulic dock levelers operate smoothly with no visible fluid leaks.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_dock_levelers_visual", "title": "Visual scope", "comment": "Inspection limited to surface operation; hydraulic cylinders and pit conditions below deck not fully accessible.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_dock_levelers_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Dock levelers show wear, hydraulic leaks, or lip malfunction; recommend service by a loading dock equipment specialist.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "dock-lighting",
+            "label": "Dock Lighting",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_dock_lighting_ok", "title": "Condition", "comment": "Dock area lighting was inspected and appears adequate for safe loading and unloading operations.", "default": true },
+                { "id": "ri_dock_lighting_led", "title": "LED fixtures", "comment": "Dock lighting utilizes LED fixtures providing adequate lumen output for safe operations.", "default": false }
+              ],
+              "limitations": [
+                { "id": "rl_dock_lighting_visual", "title": "Visual scope", "comment": "Inspection limited to visible light fixtures and general illumination levels; lux measurements not taken.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_dock_lighting_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Dock lighting is insufficient or fixtures are damaged; recommend replacement to ensure safe loading operations.", "photos": [], "default": false },
+                { "id": "rd_dock_lighting_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Dock area has inadequate lighting creating a safety hazard for personnel and equipment operators; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "interior-commercial",
+        "title": "Interior",
+        "items": [
+          {
+            "id": "floors-c",
+            "label": "Floors",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_floors_c_ok", "title": "Condition", "comment": "Floors was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_floors_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_floors_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Floors requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "ceilings-c",
+            "label": "Ceilings",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_ceilings_c_ok", "title": "Condition", "comment": "Ceilings was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_ceilings_c_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_ceilings_c_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Ceilings requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          },
+          {
+            "id": "restrooms",
+            "label": "Restrooms",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_restrooms_ok", "title": "Condition", "comment": "Restrooms was inspected and appears in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_restrooms_visual", "title": "Visual scope", "comment": "Inspection limited to visible, accessible components at the time of inspection.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_restrooms_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Restrooms requires repair or further evaluation by a qualified professional.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-commercial",
+        "title": "Summary & Recommendations",
+        "items": [
+          { "id": "summary-c", "label": "Overall Assessment", "type": "text" },
+          { "id": "deferred", "label": "Deferred Maintenance", "type": "text" }
+        ]
+      }
+    ]
+  }
+}

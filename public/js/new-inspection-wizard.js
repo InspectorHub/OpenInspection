@@ -12,7 +12,7 @@ window.newInspectionWizard = function () {
     return {
         open: false,
         step: 1,
-        property: { address: '', yearBuilt: null, sqft: null, propertyType: '' },
+        property: { address: '', yearBuilt: null, sqft: null, propertyType: '', commercialSubtype: '' },
         services: ['general'],
         schedule: { date: '', startTime: '09:00', durationMinutes: 180 },
         teamMode: false,
@@ -41,7 +41,7 @@ window.newInspectionWizard = function () {
         openWizard() {
             this.open = true;
             this.step = 1;
-            this.property = { address: '', yearBuilt: null, sqft: null, propertyType: '' };
+            this.property = { address: '', yearBuilt: null, sqft: null, propertyType: '', commercialSubtype: '' };
             this.services = ['general'];
             this.schedule = { date: '', startTime: '09:00', durationMinutes: 180 };
             this.teamMode = false;
@@ -98,6 +98,9 @@ window.newInspectionWizard = function () {
                 if (this.property.yearBuilt) payload.property.yearBuilt = this.property.yearBuilt;
                 if (this.property.sqft)      payload.property.sqft = this.property.sqft;
                 if (this.property.propertyType) payload.property.propertyType = this.property.propertyType;
+                if (this.property.propertyType === 'commercial' && this.property.commercialSubtype) {
+                    payload.property.commercialSubtype = this.property.commercialSubtype;
+                }
                 if (this.teamMode) {
                     if (this.leadInspectorId)        payload.leadInspectorId = this.leadInspectorId;
                     if (this.helperInspectorIds?.length) payload.helperInspectorIds = this.helperInspectorIds;

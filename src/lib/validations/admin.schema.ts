@@ -278,6 +278,8 @@ export const CommentResponseSchema = z.object({
 export const ListCommentsQuerySchema = z.object({
     rating: RatingBucketSchema.optional().openapi({ example: 'defect' }).describe('TODO describe rating field for the OpenInspection MCP integration'),
     section: z.string().max(64).optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    sectionId: z.string().max(64).optional().openapi({ example: 'roof-general' }).describe('Filter by section ID (matches within the section_ids JSON array)'),
+    triggerCode: z.string().max(64).optional().openapi({ example: 'NI' }).describe('Filter by trigger code'),
     search: z.string().max(200).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
 }).openapi('ListCommentsQuery');
 
