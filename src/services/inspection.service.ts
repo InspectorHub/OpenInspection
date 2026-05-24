@@ -15,6 +15,7 @@ import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../lib/r
 import { computePreflightFromData } from '../lib/preflight';
 import { decideFieldWrite, applyFieldWrite } from '../lib/field-version';
 import { ApprenticeService } from './apprentice.service';
+import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
 
 /** Slug → label map for resolving aggregated recommendation badges in
  *  getReportData. Built once at module load. */
@@ -799,11 +800,13 @@ export class InspectionService {
             photoIndex: number;
             annotated: boolean;
         }> = [];
-        for (const [itemId, entry] of Object.entries(resultData)) {
+        for (const [key, entry] of Object.entries(resultData)) {
+            const parsedKey = parseFindingKey(key);
+            const itemId = parsedKey.itemId;
             const photos = Array.isArray(entry?.photos) ? entry.photos : [];
             const meta = itemMeta.get(itemId) ?? {
                 itemLabel:    itemId,
-                sectionId:    'unknown',
+                sectionId:    parsedKey.sectionId || 'unknown',
                 sectionTitle: 'Unsectioned',
             };
             photos.forEach((p, idx) => {
@@ -928,6 +931,7 @@ export class InspectionService {
         const data: Record<string, ResultEntry> = existing?.data
             ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) as Record<string, ResultEntry>
             : {};
+        // TODO: use composite key when sectionId is available in API
         const entry = data[itemId] ?? {};
         const photos = Array.isArray(entry.photos) ? entry.photos.slice() : [];
         photos.push({ key: poolRow.r2Key });
@@ -1082,6 +1086,7 @@ export class InspectionService {
             ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) as Record<string, Record<string, unknown>>
             : {};
 
+        // TODO: use composite key when sectionId is available in API
         const cur = data[itemId];
         const decision = decideFieldWrite(cur, field, value, expectedVersion, { force: opts?.force ?? false });
         if (decision.kind === 'conflict') return decision;
@@ -1182,6 +1187,7 @@ export class InspectionService {
         const data: Record<string, ResultEntry> = (typeof row?.data === 'string'
             ? JSON.parse(row.data)
             : row?.data) ?? {};
+        // TODO: use composite key when sectionId is available in API
         const entry = data[itemId] ?? {};
         const photos = entry.photos ?? [];
         if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
@@ -1332,7 +1338,7 @@ export class InspectionService {
                 : null,
             alwaysPageBreak: sec.alwaysPageBreak === true,
             items: sec.items.map((item: SchemaItem) => {
-                const res = resultData[item.id] || {};
+                const res = resultData[findingKey(DEFAULT_UNIT, sec.id, item.id)] || resultData[item.id] || {};
                 const ratingId = res.rating ?? null;
                 const bucket = getRatingBucket(ratingId, levels);
                 const level = levels.find((l: RatingLevel) => l.id === ratingId);
@@ -1566,10 +1572,11 @@ export class InspectionService {
             const rawData = typeof resultsRow.data === 'string'
                 ? JSON.parse(resultsRow.data) as Record<string, unknown>
                 : resultsRow.data as Record<string, unknown>;
-            for (const itemId of Object.keys(rawData)) {
-                const entry = rawData[itemId] as { customComments?: { defects?: CustomDefect[] } } | null;
+            for (const key of Object.keys(rawData)) {
+                const parsedKey = parseFindingKey(key);
+                const entry = rawData[key] as { customComments?: { defects?: CustomDefect[] } } | null;
                 const customDefects = entry?.customComments?.defects ?? [];
-                if (customDefects.length > 0) customByItem.set(itemId, customDefects);
+                if (customDefects.length > 0) customByItem.set(parsedKey.itemId, customDefects);
             }
         }
 
@@ -1997,8 +2004,8 @@ export class InspectionService {
                 const data: Record<string, { customComments?: { defects?: CustomDefect[] } }> = typeof resultsRow.data === 'string'
                     ? JSON.parse(resultsRow.data)
                     : resultsRow.data as Record<string, { customComments?: { defects?: CustomDefect[] } }>;
-                for (const itemId of Object.keys(data)) {
-                    const customDefects = data[itemId]?.customComments?.defects ?? [];
+                for (const key of Object.keys(data)) {
+                    const customDefects = data[key]?.customComments?.defects ?? [];
                     for (const d of customDefects) {
                         if (d.included === false) continue;
                         const cat = (d.category ?? 'maintenance');
