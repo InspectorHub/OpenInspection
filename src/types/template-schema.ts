@@ -124,6 +124,11 @@ export interface TemplateItem {
     source?: ItemSource | null;
 }
 
+export interface SectionApplicability {
+    propertyTypes?: ('single-family' | 'multi-unit' | 'commercial')[];
+    commercialSubtypes?: string[];
+}
+
 export interface TemplateSection {
     id: string;
     title: string;
@@ -133,6 +138,12 @@ export interface TemplateSection {
     disclaimerText?: string | null;
     alwaysPageBreak?: boolean;
     source?: ItemSource | null;
+    defaultScope?: 'common' | 'unit';
+    applicableTo?: SectionApplicability;
+    sharedComments?: {
+        information?: CannedInfoComment[];
+        defects?: CannedDefect[];
+    };
 }
 
 export interface RatingLevel {
@@ -153,10 +164,45 @@ export interface RatingSystem {
     levels: RatingLevel[];
 }
 
+export interface TemplateUnit {
+    id: string;
+    name: string;
+    type: 'unit' | 'common';
+}
+
+export interface TemplateBuilding {
+    id: string;
+    name: string;
+    units: TemplateUnit[];
+}
+
+export interface TemplateStructure {
+    buildings: TemplateBuilding[];
+}
+
 export interface TemplateSchemaV2 {
     schemaVersion: 2;
     sections: TemplateSection[];
     ratingSystem?: RatingSystem;
+    propertyType?: 'single-family' | 'multi-unit' | 'commercial';
+    commercialSubtype?: string;
+    structure?: TemplateStructure;
+    sectionAssignments?: {
+        common: string[];
+        unit: string[];
+    };
+    itemAssignments?: Record<string, string[]>;
+    propertyMetadataFields?: PropertyMetaField[];
+}
+
+export interface PropertyMetaField {
+    id: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'boolean' | 'date';
+    group?: string;
+    required?: boolean;
+    unit?: string;
+    options?: string[];
 }
 
 /**
