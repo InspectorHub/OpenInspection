@@ -16,7 +16,7 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
 
     return (
         <MainLayout title={`${siteName} | Team`} branding={branding}>
-            <div class="space-y-6 animate-fade-in">
+            <div class="space-y-[18px] animate-fade-in">
                 {seatUsage !== undefined && billingPortalUrl !== undefined ? (
                     <SeatBanner usage={seatUsage} billingPortalUrl={billingPortalUrl} />
                 ) : null}
@@ -63,15 +63,15 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                             <table class="w-full text-left">
                                 <thead class="bg-slate-50/50 dark:bg-slate-700/50">
                                     <tr>
-                                        <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Name</th>
-                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Role</th>
-                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Onboarding Date</th>
+                                        <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Name</th>
+                                        <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Role</th>
+                                        <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Onboarding Date</th>
                                     </tr>
                                 </thead>
                                 <tbody id="membersList" class="divide-y divide-slate-100/50">
-                                    <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={3} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
+                                    <tr aria-busy="true"><td colspan={3} class="px-4 py-3"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={3} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={3} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -89,13 +89,13 @@ export const TeamPage = ({ branding, seatUsage, billingPortalUrl }: TeamPageProp
                             <table class="w-full text-left">
                                 <thead class="bg-slate-50/20">
                                     <tr>
-                                        <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Target Email</th>
-                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Assigned Role</th>
-                                        <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</th>
+                                        <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Target Email</th>
+                                        <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Assigned Role</th>
+                                        <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="invitesList" class="divide-y divide-slate-100/50">
-                                    <tr><td colspan={3} class="px-10 py-6 text-sm font-bold text-center text-slate-400">No pending deployments found.</td></tr>
+                                    <tr><td colspan={3} class="px-4 py-3 text-sm font-bold text-center text-slate-400">No pending deployments found.</td></tr>
                                 </tbody>
                             </table>
                         </div>

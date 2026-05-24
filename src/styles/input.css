@@ -74,6 +74,9 @@
     --ih-ease: cubic-bezier(0.4, 0, 0.2, 1);
     --ih-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ih-dur-fast: 150ms; --ih-dur: 200ms; --ih-dur-slow: 300ms;
+    /* Sidebar */
+    --ih-sidebar-w: 240px;
+    --ih-sidebar-collapsed-w: 56px;
     /* Status: info (sky) */
     --ih-status-info:    #0284c7;
     --ih-status-info-bg: #eff6ff;
@@ -323,6 +326,13 @@ textarea {
         letter-spacing: var(--ih-letter-eyebrow);
         color: var(--ih-fg-4);
     }
+
+    .ih-sidebar {
+        width: var(--ih-sidebar-w);
+        flex-shrink: 0;
+        transition: width var(--ih-dur-slow) var(--ih-ease-out);
+    }
+    .ih-sidebar.is-collapsed { width: var(--ih-sidebar-collapsed-w); }
 
     .ih-btn {
         display: inline-flex;
@@ -843,33 +853,33 @@ html[data-color-scheme="dark"] .signature-pad-wrap {
 html[data-color-scheme="dark"] .bg-slate-900\/50 { background-color: rgba(0,0,0,0.6) !important; }
 
 /* ── Sidebar / app shell ─────────────────────────────────── */
-html[data-color-scheme="dark"] aside.w-72 {
+html[data-color-scheme="dark"] aside.ih-sidebar {
     background-color: #0f172a !important;
     border-right-color: rgba(255,255,255,0.08) !important;
 }
-html[data-color-scheme="dark"] aside.w-72 .border-b { border-color: rgba(255,255,255,0.06) !important; }
-html[data-color-scheme="dark"] aside.w-72 .border-l { border-color: rgba(255,255,255,0.06) !important; }
-html[data-color-scheme="dark"] aside.w-72 .border-t { border-color: rgba(255,255,255,0.06) !important; }
-html[data-color-scheme="dark"] aside.w-72 .bg-slate-50\/50 {
+html[data-color-scheme="dark"] aside.ih-sidebar .border-b { border-color: rgba(255,255,255,0.06) !important; }
+html[data-color-scheme="dark"] aside.ih-sidebar .border-l { border-color: rgba(255,255,255,0.06) !important; }
+html[data-color-scheme="dark"] aside.ih-sidebar .border-t { border-color: rgba(255,255,255,0.06) !important; }
+html[data-color-scheme="dark"] aside.ih-sidebar .bg-slate-50\/50 {
     background-color: rgba(15,23,42,0.6) !important;
 }
-html[data-color-scheme="dark"] aside.w-72 .bg-slate-50 {
+html[data-color-scheme="dark"] aside.ih-sidebar .bg-slate-50 {
     background-color: rgba(255,255,255,0.04) !important;
 }
-html[data-color-scheme="dark"] aside.w-72 a,
-html[data-color-scheme="dark"] aside.w-72 button,
-html[data-color-scheme="dark"] aside.w-72 summary {
+html[data-color-scheme="dark"] aside.ih-sidebar a,
+html[data-color-scheme="dark"] aside.ih-sidebar button,
+html[data-color-scheme="dark"] aside.ih-sidebar summary {
     color: #94a3b8;
 }
-html[data-color-scheme="dark"] aside.w-72 a:hover,
-html[data-color-scheme="dark"] aside.w-72 button:hover,
-html[data-color-scheme="dark"] aside.w-72 summary:hover {
+html[data-color-scheme="dark"] aside.ih-sidebar a:hover,
+html[data-color-scheme="dark"] aside.ih-sidebar button:hover,
+html[data-color-scheme="dark"] aside.ih-sidebar summary:hover {
     background-color: rgba(255,255,255,0.06) !important;
     color: #818cf8 !important;
 }
-html[data-color-scheme="dark"] aside.w-72 .bg-indigo-50 { background-color: rgba(99,102,241,0.15) !important; }
-html[data-color-scheme="dark"] aside.w-72 .text-indigo-600 { color: #818cf8 !important; }
-html[data-color-scheme="dark"] aside.w-72 kbd {
+html[data-color-scheme="dark"] aside.ih-sidebar .bg-indigo-50 { background-color: rgba(99,102,241,0.15) !important; }
+html[data-color-scheme="dark"] aside.ih-sidebar .text-indigo-600 { color: #818cf8 !important; }
+html[data-color-scheme="dark"] aside.ih-sidebar kbd {
     background-color: rgba(255,255,255,0.06) !important;
     border-color: rgba(255,255,255,0.1) !important;
     color: #64748b !important;

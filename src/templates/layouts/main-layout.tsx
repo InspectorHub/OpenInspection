@@ -356,131 +356,162 @@ export const MainLayout = (props: {
 
                 <div class="flex min-h-screen">
                     {/* Sidebar / Navigation */}
-                    <aside class="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 hidden lg:flex flex-col sticky top-0 h-screen">
-                        <div class="p-8 flex items-center gap-4 border-b border-slate-100 dark:border-slate-700">
-                            <div class="w-10 h-10 flex-shrink-0">
+                    <aside class="ih-sidebar bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 hidden lg:flex flex-col sticky top-0 h-screen overflow-hidden"
+                           x-bind:class="sbc ? 'is-collapsed' : ''">
+                        <div class="px-3 pt-3 pb-2 flex items-center gap-2.5 border-b border-slate-100 dark:border-slate-700">
+                            <div class="w-7 h-7 flex-shrink-0">
                                 <img src={logoUrl || '/logo.svg'} alt={siteName} class="w-full h-full object-contain" />
                             </div>
-                            <span class="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-tight">{siteName}</span>
-                            <a href="/notifications" class="ml-auto relative flex items-center justify-center w-10 h-10 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600 transition-all" aria-label="Notifications">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                                <span id="notifyUnreadBadge" class="hidden absolute -top-0.5 -right-0.5 px-1.5 min-w-[1.25rem] h-5 text-center rounded-full bg-rose-500 text-white text-[10px] font-bold leading-5"></span>
+                            <span x-show="!sbc" class="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate">{siteName}</span>
+                            <a x-show="!sbc" href="/notifications" class="ml-auto relative flex items-center justify-center w-7 h-7 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600 transition-all" aria-label="Notifications">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                                <span id="notifyUnreadBadge" class="hidden absolute -top-0.5 -right-0.5 px-1 min-w-[1rem] h-4 text-center rounded-full bg-rose-500 text-white text-[9px] font-bold leading-4"></span>
                             </a>
                         </div>
 
-                        <nav class="flex-1 p-6 space-y-2 overflow-y-auto">
-                            {/* Search pill — opens command palette. Visible click affordance
-                                in addition to ⌘K (Mac) / Ctrl+K. Chrome on Windows captures
-                                Ctrl+K for the omnibox so this button is the primary path. */}
-                            <button
-                                type="button"
-                                id="oi-cmdk-trigger"
+                        <div class="px-2.5 pt-2.5 pb-1">
+                            <button type="button" id="oi-cmdk-trigger"
                                 x-data="{ isMac: navigator.platform?.startsWith('Mac') }"
-                                x-on:click="window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))"
-                                class="w-full flex items-center gap-3 px-5 py-3 mb-2 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all border border-slate-200/60 dark:border-slate-700/60 group"
-                                aria-label="Open command palette"
-                            >
-                                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M16.5 10.5a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
-                                <span class="text-sm font-medium">Search…</span>
-                                <kbd class="ml-auto px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-mono text-slate-500 dark:text-slate-400 group-hover:border-slate-300" x-text="isMac ? '⌘K' : 'Ctrl /'">⌘K</kbd>
+                                {...{'x-on:click': "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))"}}
+                                class="w-full flex items-center gap-2 px-2.5 py-[7px] rounded-md bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-500 transition-all border border-slate-200/60 dark:border-slate-700/60 text-[12px]"
+                                aria-label="Open command palette">
+                                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M16.5 10.5a6 6 0 11-12 0 6 6 0 0112 0z"></path></svg>
+                                <span x-show="!sbc" class="font-medium">Search…</span>
+                                <kbd x-show="!sbc" class="ml-auto px-1 py-0.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-mono text-slate-400 dark:text-slate-500" x-text="isMac ? '⌘K' : 'Ctrl /'">⌘K</kbd>
                             </button>
-                            {/* Sprint 1 Sub-spec B Task 2 — IA: 5 顶级 + Library + Settings.
-                                Order: Inspections / Calendar / Library / Contacts / Invoices / Metrics.
-                                Library group uses semantic <details> (auto-expand handled inline below).
-                                Reports merged into Inspections (Recent reports bucket on dashboard).
-                                Team relocated under Settings. */}
-                            <a href="/dashboard" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all font-semibold group relative">
-                                <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                                <span>Inspections</span>
-                            </a>
-                            <a href="/calendar" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all font-semibold group">
-                                <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                <span>Calendar</span>
-                            </a>
-                            {/* Library group — collapsible. Auto-expanded server-side
-                                via the activate-sidebar script (sets `open` when current
-                                path starts with any Library route). */}
-                            <details class="group [&>summary]:list-none" data-sidebar-library>
-                                <summary class="cursor-pointer flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all font-semibold">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                                    <span class="flex-1">Library</span>
-                                    <svg class="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                </summary>
-                                {/* Iter-2 bug #8 — canonical Library order, kept in
-                                    sync with the mobile drawer above. */}
-                                <div class="mt-1 ml-7 pl-3 border-l border-slate-100 dark:border-slate-700 space-y-0.5">
-                                    <a href="/templates" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Inspection Templates</a>
-                                    <a href="/marketplace" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Marketplace</a>
-                                    <a href="/comments" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Comments</a>
-                                    <a href="/recommendations" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Repair Items</a>
-                                    <a href="/library/tags" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Tags</a>
-                                    <a href="/agreements" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Agreements</a>
-                                    <a href="/library/rating-systems" class="block px-3 py-2 rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Rating Systems</a>
+                        </div>
+
+                        <nav class="flex-1 px-2.5 py-1 overflow-y-auto space-y-3">
+                            <div>
+                                <div x-show="!sbc" class="ih-eyebrow px-2.5 pt-2 pb-1.5">Workspace</div>
+                                <div class="flex flex-col gap-0.5">
+                                    <a href="/dashboard" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Inspections">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                                        <span x-show="!sbc">Inspections</span>
+                                        <span x-show="!sbc" id="msgUnreadBadgeDesktop" class="hidden ml-auto px-1.5 min-w-[1rem] text-center rounded-full bg-rose-500 text-white text-[9px] font-bold leading-4"></span>
+                                    </a>
+                                    <a href="/calendar" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Calendar">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                        <span x-show="!sbc">Calendar</span>
+                                    </a>
+                                    <a href="/contacts" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Contacts">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                        <span x-show="!sbc">Contacts</span>
+                                    </a>
+                                    <a href="/invoices" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Invoices">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                                        <span x-show="!sbc">Invoices</span>
+                                    </a>
+                                    <a href="/metrics" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Metrics">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                        <span x-show="!sbc">Metrics</span>
+                                    </a>
                                 </div>
-                            </details>
-                            <a href="/contacts" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all font-semibold group">
-                                <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                <span>Contacts</span>
-                            </a>
-                            <a href="/invoices" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all font-semibold group">
-                                <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                                <span>Invoices</span>
-                            </a>
-                            <a href="/metrics" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all font-semibold group">
-                                <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                <span>Metrics</span>
-                            </a>
+                            </div>
+
+                            <div>
+                                <div x-show="!sbc" class="ih-eyebrow px-2.5 pt-1 pb-1.5">Library</div>
+                                <div class="flex flex-col gap-0.5">
+                                    <a href="/templates" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Inspection Templates">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        <span x-show="!sbc">Templates</span>
+                                    </a>
+                                    <a href="/marketplace" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Marketplace">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"></path></svg>
+                                        <span x-show="!sbc">Marketplace</span>
+                                    </a>
+                                    <a href="/comments" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Comments">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                        <span x-show="!sbc">Comments</span>
+                                    </a>
+                                    <a href="/recommendations" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Repair Items">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        <span x-show="!sbc">Repair Items</span>
+                                    </a>
+                                    <a href="/library/tags" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Tags">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                                        <span x-show="!sbc">Tags</span>
+                                    </a>
+                                    <a href="/agreements" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Agreements">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        <span x-show="!sbc">Agreements</span>
+                                    </a>
+                                    <a href="/library/rating-systems" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Rating Systems">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                                        <span x-show="!sbc">Rating Systems</span>
+                                    </a>
+                                </div>
+                            </div>
                         </nav>
 
-                        <div class="p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                             <a href="/settings" class="flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all font-semibold group">
-                                <svg class="w-5 h-5 group-hover:rotate-45 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                <span>Settings</span>
+                        <div class="mt-auto px-2.5 py-2.5 border-t border-slate-100 dark:border-slate-700">
+                            <a href="/settings" class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Settings">
+                                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <span x-show="!sbc">Settings</span>
                             </a>
-                            {/* Shared-SaaS only — mirrors the mobile drawer entry. */}
+
                             {branding?.isSharedSaas && branding?.portalBaseUrl && (
                                 <a href={`${branding.portalBaseUrl}/workspace/switch?chooser=1`}
-                                   class="flex items-center gap-3 px-5 py-4 mt-2 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all font-semibold group">
-                                    <svg class="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                                    <span class="flex-1">Switch workspace</span>
-                                    <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                   class="flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" title="Switch workspace">
+                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                    <span x-show="!sbc">Switch workspace</span>
                                 </a>
                             )}
-                            <div x-data="themeMenu()" class="relative mt-2" {...{'x-on:click.outside': 'open = false'}}>
-                                <button type="button" x-on:click="open = !open" class="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm transition-all font-semibold group" aria-label="Color scheme">
-                                    <svg id="themeMoonIcon" class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-                                    <svg id="themeSunIcon" class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                                    <svg id="themeAutoIcon" class="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                    <span id="themeToggleLabel" class="flex-1 text-left text-sm">Auto</span>
-                                    <svg class="w-3.5 h-3.5 flex-shrink-0 transition-transform" x-bind:class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+
+                            <button type="button" {...{'x-on:click': "sbc = !sbc; localStorage.setItem('oi-sidebar-collapsed', sbc ? '1' : '0')"}}
+                                class="flex items-center gap-2 px-2.5 py-[6px] mt-1 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-[11px] font-bold transition-all" title="Toggle sidebar">
+                                <svg x-show="!sbc" class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"/><line x1="15" y1="3" x2="15" y2="21" stroke-width="2"/><polyline points="10 9 7 12 10 15" stroke-width="2"/></svg>
+                                <span x-show="!sbc">Collapse</span>
+                                <svg x-show="sbc" x-cloak class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"/><line x1="15" y1="3" x2="15" y2="21" stroke-width="2"/><polyline points="7 9 10 12 7 15" stroke-width="2"/></svg>
+                            </button>
+
+                            {/* User avatar */}
+                            <div class="flex items-center gap-2.5 px-2 py-1.5 mt-1 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all cursor-default">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-[12px] font-bold flex-shrink-0"
+                                     x-text="(document.querySelector('meta[name=user-initials]')?.content) || 'OI'"></div>
+                                <div x-show="!sbc" class="flex-1 min-w-0">
+                                    <div class="text-[12px] font-bold text-slate-900 dark:text-slate-100 truncate"
+                                         x-text="(document.querySelector('meta[name=user-name]')?.content) || 'Inspector'"></div>
+                                    <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">{branding?.tenantSubdomain ? `${branding.tenantSubdomain}.inspectorhub.io` : 'openinspection.dev'}</div>
+                                </div>
+                            </div>
+
+                            <div x-data="themeMenu()" class="relative mt-1" {...{'x-on:click.outside': 'open = false'}}>
+                                <button type="button" {...{'x-on:click': 'open = !open'}} class="w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all" aria-label="Color scheme" title="Color scheme">
+                                    <svg id="themeMoonIcon" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                                    <svg id="themeSunIcon" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                    <svg id="themeAutoIcon" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                    <span x-show="!sbc" id="themeToggleLabel" class="flex-1 text-left">Auto</span>
+                                    <svg x-show="!sbc" class="w-3 h-3 flex-shrink-0 transition-transform" x-bind:class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                 </button>
-                                <div style="display:none" x-show="open" class="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 py-1 overflow-hidden">
-                                    <button type="button" x-on:click="set('auto')" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                <div style="display:none" x-show="open" class="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 py-1 overflow-hidden">
+                                    <button type="button" {...{'x-on:click': "set('auto')"}} class="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                         <span class="flex-1 text-left">Auto</span>
-                                        <svg x-show="mode === 'auto'" class="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        <svg x-show="mode === 'auto'" class="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                     </button>
-                                    <button type="button" x-on:click="set('dark')" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                                    <button type="button" {...{'x-on:click': "set('dark')"}} class="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                                         <span class="flex-1 text-left">Dark</span>
-                                        <svg x-show="mode === 'dark'" class="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        <svg x-show="mode === 'dark'" class="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                     </button>
-                                    <button type="button" x-on:click="set('light')" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
-                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                    <button type="button" {...{'x-on:click': "set('light')"}} class="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                                         <span class="flex-1 text-left">Light</span>
-                                        <svg x-show="mode === 'light'" class="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        <svg x-show="mode === 'light'" class="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                     </button>
                                 </div>
                             </div>
-                            <button id="logoutBtn" class="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all font-semibold group mt-2">
-                                <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                                <span>Sign Out</span>
+
+                            <button id="logoutBtn" class="w-full flex items-center gap-2.5 px-2.5 py-[7px] mt-1 rounded-md text-[13px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all" title="Sign Out">
+                                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                <span x-show="!sbc">Sign Out</span>
                             </button>
                         </div>
                     </aside>
 
                     <main class="md:flex-1 w-full bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto">
-                        <div class="max-w-7xl mx-auto py-10 px-6 sm:px-8 lg:px-12">
+                        <div class="pt-5 pb-9 px-6">
                             {children}
                         </div>
                     </main>
@@ -501,7 +532,7 @@ export const MainLayout = (props: {
                                     } else {
                                         a.classList.add('bg-indigo-50', 'text-indigo-600');
                                     }
-                                    a.classList.remove('text-slate-600');
+                                    a.classList.remove('text-slate-600', 'text-slate-300');
                                     if (!firstActive) firstActive = a;
                                 }
                             });
@@ -511,11 +542,6 @@ export const MainLayout = (props: {
                             document.documentElement,
                             { attributes: true, attributeFilter: ['data-color-scheme'] }
                         );
-                        var libraryRoutes = ['/templates', '/comments', '/recommendations', '/agreements', '/marketplace', '/library/'];
-                        var inLibrary = libraryRoutes.some(function(r) { return p.indexOf(r) === 0; });
-                        if (inLibrary) {
-                            document.querySelectorAll('details[data-sidebar-library]').forEach(function(d) { d.open = true; });
-                        }
                         if (firstActive && typeof firstActive.scrollIntoView === 'function') {
                             try {
                                 firstActive.scrollIntoView({ block: 'nearest', behavior: 'instant' });
@@ -572,15 +598,14 @@ export const MainLayout = (props: {
                                 const r = await authFetch('/api/messages/unread-count');
                                 if (!r.ok) return;
                                 const d = await r.json();
-                                const badge = document.getElementById('msgUnreadBadge');
-                                if (!badge) return;
                                 const count = d.data?.count || 0;
-                                if (count > 0) {
-                                    badge.textContent = count > 99 ? '99+' : String(count);
-                                    badge.classList.remove('hidden');
-                                } else {
-                                    badge.classList.add('hidden');
-                                }
+                                const display = count > 99 ? '99+' : String(count);
+                                ['msgUnreadBadge', 'msgUnreadBadgeDesktop'].forEach(function(id) {
+                                    const el = document.getElementById(id);
+                                    if (!el) return;
+                                    if (count > 0) { el.textContent = display; el.classList.remove('hidden'); }
+                                    else { el.classList.add('hidden'); }
+                                });
                             } catch {}
                         }
                         if (typeof authFetch !== 'undefined') {

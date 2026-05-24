@@ -8,7 +8,7 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
 
     return (
         <MainLayout title={`${siteName} | Agreements`} branding={branding}>
-            <div class="animate-slide-in flex flex-col space-y-6" style="min-height: calc(100vh - 5rem);">
+            <div class="animate-slide-in flex flex-col space-y-[18px]" style="min-height: calc(100vh - 5rem);">
                 <div x-data="agreementsMeta">
                     <PageHeader
                         eyebrow="LIBRARY · AGREEMENTS"
@@ -43,10 +43,10 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                             <table class="min-w-full h-full">
                                 <thead>
                                     <tr class="bg-slate-50/50 dark:bg-slate-700/50">
-                                        <th scope="col" class="py-6 pl-10 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Agreement Name</th>
-                                        <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Version</th>
-                                        <th scope="col" class="px-6 py-6 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Effective Date</th>
-                                        <th scope="col" class="relative py-6 pl-3 pr-10"><span class="sr-only">Actions</span></th>
+                                        <th scope="col" class="py-3 pl-4 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Agreement Name</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Version</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Effective Date</th>
+                                        <th scope="col" class="relative py-3 pl-3 pr-4"><span class="sr-only">Actions</span></th>
                                     </tr>
                                 </thead>
                                 <tbody id="agreementsList" class="divide-y divide-slate-100 dark:divide-slate-700">
@@ -78,8 +78,8 @@ export const AgreementsPage = ({ branding }: { branding?: BrandingConfig | undef
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-                                    <tr aria-busy="true"><td colspan={6} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
-                                    <tr aria-busy="true"><td colspan={6} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                                    <tr aria-busy="true"><td colspan={6} class="px-4 py-3"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                                    <tr aria-busy="true"><td colspan={6} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
                                     <tr x-show="!reqLoading && requests.length === 0"><td colspan={6} class="py-16 text-center text-sm text-slate-400 italic">No signing requests yet. Use a template's "Send" action.</td></tr>
                                     <template x-for="r in requests" x-bind:key="r.id">
                                         <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/50">

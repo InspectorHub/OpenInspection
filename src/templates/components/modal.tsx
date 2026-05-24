@@ -117,7 +117,7 @@ export const Modal = ({
             {...alpineAttrs}
         >
             <div
-                class={`bg-white dark:bg-slate-800 rounded-md shadow-xl w-full ${SIZE_CLASS[size]} p-6 max-h-[90vh] overflow-y-auto`}
+                class={`bg-white dark:bg-slate-800 rounded-md shadow-xl w-full ${SIZE_CLASS[size]} p-4 max-h-[90vh] overflow-y-auto`}
                 {...(name ? { 'x-on:click.stop': '' } : { onclick: 'event.stopPropagation()' })}
             >
                 {!hideHeader && (
@@ -149,7 +149,7 @@ export const Modal = ({
                     </header>
                 )}
                 <div>{children}</div>
-                {footer ? <div class="mt-6 flex gap-3 justify-end">{footer}</div> : null}
+                {footer ? <div class="mt-4 flex gap-3 justify-end">{footer}</div> : null}
             </div>
         </div>
     );

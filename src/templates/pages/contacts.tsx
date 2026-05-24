@@ -7,7 +7,7 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Contacts`} branding={branding}>
-            <div class="space-y-6 animate-fade-in">
+            <div class="space-y-[18px] animate-fade-in">
                 <div x-data="contactsMeta">
                     <PageHeader
                         eyebrow="CONTACTS"
@@ -80,19 +80,19 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     <table class="w-full text-left">
                         <thead class="bg-slate-50/40">
                             <tr>
-                                <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Name</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Type</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Email</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Phone</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Agency</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Inspections</th>
-                                <th class="relative py-6 pl-3 pr-10 text-right"><span class="sr-only">Actions</span></th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Name</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Type</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Email</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Phone</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Agency</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Inspections</th>
+                                <th class="relative py-3 pl-3 pr-4 text-right"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody id="contactsBody">
-                            <tr aria-busy="true"><td colspan={7} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={7} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={7} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={7} class="px-4 py-3"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={7} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={7} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -108,16 +108,16 @@ export const ContactsPage = ({ branding }: { branding?: BrandingConfig | undefin
                     <table class="w-full text-left">
                         <thead class="bg-slate-50/40">
                             <tr>
-                                <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Agent</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Linked</th>
-                                <th class="relative py-6 pl-3 pr-10 text-right"><span class="sr-only">Actions</span></th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Agent</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Linked</th>
+                                <th class="relative py-3 pl-3 pr-4 text-right"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody id="agentLinksBody">
-                            <tr aria-busy="true"><td colspan={4} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={4} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={4} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={4} class="px-4 py-3"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={4} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={4} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                         </tbody>
                     </table>
                 </div>

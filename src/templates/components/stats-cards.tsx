@@ -17,21 +17,21 @@ export function StatsCards({ alpine = false }: StatsCardsProps): JSX.Element {
 
   return (
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <div class="theme-card p-4 border-l-4 border-gray-300">
+      <div class="theme-card p-[14px] border-l-4 border-gray-300">
         <div class="text-[10px] font-semibold tracking-wider theme-text-muted">TOTAL ITEMS</div>
-        <div class="text-3xl font-bold mt-1 theme-font-display" id="stat-total">--</div>
+        <div class="text-xl font-bold mt-1 theme-font-display" id="stat-total">--</div>
       </div>
-      <div class="theme-card p-4 border-l-4 border-green-400">
+      <div class="theme-card p-[14px] border-l-4 border-green-400">
         <div class="text-[10px] font-semibold tracking-wider text-green-600">SATISFACTORY</div>
-        <div class="text-3xl font-bold mt-1 theme-font-display" id="stat-satisfactory">--</div>
+        <div class="text-xl font-bold mt-1 theme-font-display" id="stat-satisfactory">--</div>
       </div>
-      <div class="theme-card p-4 border-l-4 border-amber-400">
+      <div class="theme-card p-[14px] border-l-4 border-amber-400">
         <div class="text-[10px] font-semibold tracking-wider text-amber-600">MONITOR</div>
-        <div class="text-3xl font-bold mt-1 theme-font-display" id="stat-monitor">--</div>
+        <div class="text-xl font-bold mt-1 theme-font-display" id="stat-monitor">--</div>
       </div>
-      <div class="theme-card p-4 border-l-4 border-rose-400">
+      <div class="theme-card p-[14px] border-l-4 border-rose-400">
         <div class="text-[10px] font-semibold tracking-wider text-rose-600">DEFECTS</div>
-        <div class="text-3xl font-bold mt-1 theme-font-display" id="stat-defect">--</div>
+        <div class="text-xl font-bold mt-1 theme-font-display" id="stat-defect">--</div>
       </div>
     </div>
   );
@@ -43,9 +43,9 @@ function StatCard({ label, valueExpr, borderClass }: { label: string; valueExpr:
     label === 'DEFECTS' ? 'text-rose-600' : 'theme-text-muted';
 
   return (
-    <div class={`theme-card p-4 border-l-4 ${borderClass}`}>
+    <div class={`theme-card p-[14px] border-l-4 ${borderClass}`}>
       <div class={`text-[10px] font-semibold tracking-wider ${colorClass}`}>{label}</div>
-      <div class="text-3xl font-bold mt-1 theme-font-display" x-text={valueExpr}>--</div>
+      <div class="text-xl font-bold mt-1 theme-font-display" x-text={valueExpr}>--</div>
     </div>
   );
 }

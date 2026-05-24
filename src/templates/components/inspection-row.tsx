@@ -23,7 +23,7 @@ import { RowStatusIcons } from './row-status-icons';
  * the matching DOM nodes without re-rendering the whole list.
  */
 export const InspectionRow = (): JSX.Element => (
-    <div class="px-5 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-3 flex-wrap sm:flex-nowrap" data-test="inspection-row">
+    <div class="px-5 py-[13px] border-t border-slate-100 dark:border-slate-700 flex items-center gap-3 flex-wrap sm:flex-nowrap" data-test="inspection-row">
         {/* Property address — always rendered. Click target for the row. */}
         <a x-bind:href="'/inspections/' + i.id + '/edit'" class="flex-1 min-w-0">
             <p

@@ -7,7 +7,7 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
     const siteName = branding?.siteName || 'OpenInspection';
     return (
         <MainLayout title={`${siteName} | Invoices`} branding={branding}>
-            <div class="space-y-6 animate-fade-in">
+            <div class="space-y-[18px] animate-fade-in">
                 <div x-data="invoicesMeta">
                     <PageHeader
                         eyebrow="INVOICES"
@@ -28,19 +28,19 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
 
                 {/* Stats */}
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="glass-panel rounded-lg p-6">
+                    <div class="glass-panel rounded-lg p-4">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Total</p>
                         <p id="statTotal" class="text-xl font-bold text-slate-900">—</p>
                     </div>
-                    <div class="glass-panel rounded-lg p-6">
+                    <div class="glass-panel rounded-lg p-4">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Unpaid</p>
                         <p id="statUnpaid" class="text-xl font-bold text-amber-600">—</p>
                     </div>
-                    <div class="glass-panel rounded-lg p-6">
+                    <div class="glass-panel rounded-lg p-4">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Paid</p>
                         <p id="statPaid" class="text-xl font-bold text-emerald-600">—</p>
                     </div>
-                    <div class="glass-panel rounded-lg p-6">
+                    <div class="glass-panel rounded-lg p-4">
                         <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Revenue</p>
                         <p id="statRevenue" class="text-xl font-bold text-indigo-600">—</p>
                     </div>
@@ -50,17 +50,17 @@ export const InvoicesPage = ({ branding }: { branding?: BrandingConfig | undefin
                     <table class="w-full text-left">
                         <thead class="bg-slate-50/40">
                             <tr>
-                                <th class="py-6 px-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Client</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Amount</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Due Date</th>
-                                <th class="py-6 px-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</th>
-                                <th class="relative py-6 pl-3 pr-10 text-right"><span class="sr-only">Actions</span></th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Client</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Amount</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Due Date</th>
+                                <th class="py-3 px-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</th>
+                                <th class="relative py-3 pl-3 pr-4 text-right"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody id="invoicesBody">
-                            <tr aria-busy="true"><td colspan={5} class="px-10 py-4"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={5} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
-                            <tr aria-busy="true"><td colspan={5} class="px-10 py-4"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={5} class="px-4 py-3"><span class="sr-only">Loading…</span><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 80%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={5} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 65%; margin: 0 auto;"></div></td></tr>
+                            <tr aria-busy="true"><td colspan={5} class="px-4 py-3"><div class="ih-skeleton ih-skeleton--text" style="height: 1rem; width: 90%; margin: 0 auto;"></div></td></tr>
                         </tbody>
                     </table>
                 </div>

@@ -23,7 +23,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
 
     return (
         <MainLayout title={`${siteName} | Dashboard`} branding={branding}>
-            <div class="space-y-6 animate-fade-in">
+            <div class="space-y-[18px] animate-fade-in">
 
                 {seatUsage !== undefined && billingPortalUrl !== undefined ? (
                     <SeatBanner usage={seatUsage} billingPortalUrl={billingPortalUrl} />
@@ -135,7 +135,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     defectStats chips beneath the count when the bucket has any
                     open defects. The Alpine binding is local: `dashboardCards`
                     factory pulls defectAggregate from /api/inspections/dashboard. */}
-                <div x-data="dashboardCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div x-data="dashboardCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {[
                         { label: 'Upcoming',        id: 'statUpcoming',   target: 'later',          icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'indigo' },
                         { label: 'In Progress',     id: 'statInProgress', target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
@@ -146,7 +146,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                             key={stat.id}
                             type="button"
                             x-on:click={`sections['${stat.target}']=true; $nextTick(()=>{ const el=document.getElementById('bucket-${stat.target}'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); })`}
-                            class="group p-4 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 animate-fade-in text-left hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            class="group p-[14px] rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 animate-fade-in text-left hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                             style={`animation-delay: ${0.1 + i * 0.05}s`}
                             title={`Jump to ${stat.label}`}
                         >
@@ -156,7 +156,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                                 </div>
                                 <span class="sr-only">Live</span>
                             </div>
-                            <h3 class="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight tabular-nums mb-1" id={stat.id}>0</h3>
+                            <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight tabular-nums mb-1" id={stat.id}>0</h3>
                             <p class="text-[12px] font-bold text-slate-500 uppercase tracking-[0.15em]">{stat.label}</p>
                             {/* Agent Accounts A3 — UPCOMING substate. Per
                                 directive we do NOT add a 5th stat card; the
@@ -202,7 +202,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                 </div>
 
                 {/* Collapsible Inspection Sections */}
-                <div x-data="dashboard()" x-init="init()" class="space-y-4 mt-8">
+                <div x-data="dashboard()" x-init="init()" class="space-y-3 mt-[18px]">
 
                     {/* Design System 0520 subsystem E P3.2 — Filters modal mount.
                     Listens for `open-filters` (no detail) and broadcasts
@@ -245,7 +245,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                         {...{ 'x-cloak': true }}
                         role="tablist"
                         aria-label="Inspection time filter"
-                        class="flex flex-wrap items-center gap-1.5 -mt-1"
+                        class="flex flex-wrap items-center border-b border-slate-200 dark:border-slate-700 -mt-1"
                         data-test="inspection-filter-tabs"
                     >
                         <template x-for="opt in filterOptions" {...{ 'x-bind:key': 'opt.id' }}>
@@ -256,14 +256,14 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                                 x-bind:data-active={`activeFilter === opt.id ? '1' : '0'`}
                                 x-on:click="setFilter(opt.id)"
                                 x-bind:class={`activeFilter === opt.id
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-slate-200'`}
-                                class="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                                    : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'`}
+                                class="inline-flex items-center gap-1.5 px-3.5 py-2.5 border-b-2 text-[13px] font-bold transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                             >
                                 <span x-text="opt.label"></span>
                                 <span
                                     x-show="opt.id !== 'all' && filterCounts[opt.id] > 0"
-                                    x-bind:class={`activeFilter === opt.id ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'`}
+                                    x-bind:class={`activeFilter === opt.id ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'`}
                                     class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] tabular-nums"
                                     x-text="filterCounts[opt.id]"
                                 ></span>
@@ -280,7 +280,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                                 x-model="activeTagFilter"
                                 x-on:change="onTagFilterChange()"
                                 aria-label="Filter by tag"
-                                class="h-7 px-2 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] outline-none focus:ring-2 focus:ring-indigo-500/30 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                                class="h-7 px-2 rounded-md border text-[11px] font-bold uppercase tracking-[0.08em] outline-none focus:ring-2 focus:ring-indigo-500/30 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
                                 data-testid="dashboard-tag-filter"
                             >
                                 <option value="">Any tag</option>
@@ -337,7 +337,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     {/* Section: Needs Attention */}
                     <section id="bucket-needsAttention" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.needsAttention.length > 0" {...{ 'x-cloak': true }} class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.needsAttention = !sections.needsAttention"
-                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                                class="w-full flex items-center justify-between px-5 py-3 text-left">
                             <div class="flex items-center gap-3">
                                 <span class="text-amber-600">&#9888;</span>
                                 <span class="font-bold text-slate-900">Needs attention</span>
@@ -355,7 +355,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     {/* Section: Today */}
                     <section id="bucket-today" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.today.length > 0" {...{ 'x-cloak': true }} class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.today = !sections.today"
-                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                                class="w-full flex items-center justify-between px-5 py-3 text-left">
                             <div class="flex items-center gap-3">
                                 <span class="text-blue-600">&#128197;</span>
                                 <span class="font-bold text-slate-900">Today</span>
@@ -373,7 +373,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     {/* Section: Today's events (Spec 4D.T10) */}
                     <section x-show="!loading && activeFilter === 'all' && !tagFilterIds && todayEvents.length > 0" {...{ 'x-cloak': true }} class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
                         <button type="button" x-on:click="sections.todayEvents = !sections.todayEvents"
-                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                                class="w-full flex items-center justify-between px-5 py-3 text-left">
                             <div class="flex items-center gap-3">
                                 <span class="text-purple-600">&#128203;</span>
                                 <span class="font-bold text-slate-900">Today's events</span>
@@ -396,7 +396,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     {/* Section: This Week */}
                     <section id="bucket-thisWeek" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.thisWeek.length > 0" {...{ 'x-cloak': true }} class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.thisWeek = !sections.thisWeek"
-                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                                class="w-full flex items-center justify-between px-5 py-3 text-left">
                             <div class="flex items-center gap-3">
                                 <span class="text-slate-500">&#128197;</span>
                                 <span class="font-bold text-slate-900">This week</span>
@@ -414,7 +414,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     {/* Section: Later */}
                     <section x-show="!loading && activeFilter === 'all' && !tagFilterIds && (buckets.later.length > 0 || buckets.laterTotal > 0)" {...{ 'x-cloak': true }} class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
                         <button type="button" x-on:click="sections.later = !sections.later"
-                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                                class="w-full flex items-center justify-between px-5 py-3 text-left">
                             <div class="flex items-center gap-3">
                                 <span class="text-slate-500">&#128197;</span>
                                 <span class="font-bold text-slate-900">Later</span>
@@ -437,7 +437,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     {/* Section: Recent Reports */}
                     <section id="bucket-recentReports" x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.recentReports.length > 0" {...{ 'x-cloak': true }} class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md scroll-mt-20">
                         <button type="button" x-on:click="sections.recentReports = !sections.recentReports"
-                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                                class="w-full flex items-center justify-between px-5 py-3 text-left">
                             <div class="flex items-center gap-3">
                                 <span class="text-emerald-600">&#10003;</span>
                                 <span class="font-bold text-slate-900">Recent reports</span>
@@ -455,7 +455,7 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     {/* Section: Cancelled */}
                     <section x-show="!loading && activeFilter === 'all' && !tagFilterIds && buckets.cancelled.length > 0" {...{ 'x-cloak': true }} class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
                         <button type="button" x-on:click="sections.cancelled = !sections.cancelled"
-                                class="w-full flex items-center justify-between px-5 py-4 text-left">
+                                class="w-full flex items-center justify-between px-5 py-3 text-left">
                             <div class="flex items-center gap-3">
                                 <span class="text-rose-600">&#128683;</span>
                                 <span class="font-bold text-slate-900">Cancelled</span>
