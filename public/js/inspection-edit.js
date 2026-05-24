@@ -1,6 +1,11 @@
 // public/js/inspection-edit.js
 // Requires auth.js to be loaded first (provides authFetch)
 
+// F6 — composite finding key: _default:sectionId:itemId
+// Server-side now uses composite keys. Until multi-unit support ships,
+// unitId is always '_default'.
+function fKey(sectionId, itemId) { return '_default:' + sectionId + ':' + itemId; }
+
 // Older templates were saved before rating-level descriptions were a field.
 // Backfill on the client by matching id+label against known presets so the
 // onboarding cards (T6) and rating-button tooltips (T5) show usable copy
@@ -483,7 +488,7 @@ function inspectionEditor(inspectionId) {
           var prior = null;
           for (var pi = activeIdx - 1; pi >= 0; pi--) {
             var candidate = sectionItems[pi];
-            var res = this.results?.[candidate.id];
+            var res = this._getResult(candidate.id);
             if (res && res.ratingLevelId) { prior = { id: candidate.id, res: res }; break; }
           }
           if (!prior) {
@@ -493,7 +498,9 @@ function inspectionEditor(inspectionId) {
           // Copy rating + canned/custom comment payload to the active item.
           // Existing comments on the active item are replaced — `R` is the
           // explicit "clone above" gesture, not an accumulator.
-          this.results[this.activeItem.id] = JSON.parse(JSON.stringify(prior.res));
+          var cloneCk = this._fk(this.activeItem.id);
+          this.results[cloneCk] = JSON.parse(JSON.stringify(prior.res));
+          this.results[this.activeItem.id] = this.results[cloneCk]; // backward-compat alias
           this.debounceSave();
           if (typeof showToast === 'function') showToast('Cloned rating + notes from previous item');
           return;
@@ -563,7 +570,7 @@ function inspectionEditor(inspectionId) {
       window.addEventListener('photo:annotated', (e) => {
         const { itemId, photoIndex, annotatedKey } = e.detail || {};
         if (!itemId || annotatedKey == null) return;
-        const photos = this.results[itemId]?.photos;
+        const photos = this._getResult(itemId)?.photos;
         if (photos && photos[photoIndex]) {
           photos[photoIndex] = Object.assign({}, photos[photoIndex], { annotatedKey });
         }
@@ -636,12 +643,20 @@ function inspectionEditor(inspectionId) {
           // Pre-fill results stubs BEFORE assigning sections so Alpine
           // x-model bindings (e.g. results[item.id].notes) don't read
           // undefined while /results is still being fetched.
+          // F6 — write stubs under composite keys; keep bare-itemId alias
+          // so legacy x-model bindings in templates still resolve until
+          // templates are migrated to composite keys.
           for (var s = 0; s < newSections.length; s++) {
             var sec = newSections[s];
             for (var i = 0; i < sec.items.length; i++) {
               var item = sec.items[i];
+              var ck = fKey(sec.id, item.id);
+              if (!this.results[ck]) {
+                this.results[ck] = { rating: null, notes: '', photos: [] };
+              }
+              // Backward-compat alias so existing x-model="results[item.id].notes" works
               if (!this.results[item.id]) {
-                this.results[item.id] = { rating: null, notes: '', photos: [] };
+                this.results[item.id] = this.results[ck];
               }
             }
           }
@@ -653,6 +668,9 @@ function inspectionEditor(inspectionId) {
 
         // Load existing results — merge into stubs so we preserve any
         // entries the stub-fill seeded above.
+        // F6 — server may return composite keys (_default:sectionId:itemId)
+        // or legacy bare itemId keys. Either way, ensure both aliases exist
+        // so read paths resolve regardless of format.
         var resultsRes = await authFetch('/api/inspections/' + this.inspectionId + '/results');
         if (resultsRes.ok) {
           var rJson = await resultsRes.json();
@@ -660,6 +678,12 @@ function inspectionEditor(inspectionId) {
           for (var k in loaded) {
             if (Object.prototype.hasOwnProperty.call(loaded, k)) {
               this.results[k] = loaded[k];
+              // If key is composite (_default:secId:itemId), also alias bare itemId
+              if (k.indexOf(':') !== -1) {
+                var parts = k.split(':');
+                var bareId = parts[parts.length - 1];
+                this.results[bareId] = loaded[k];
+              }
             }
           }
         }
@@ -721,10 +745,11 @@ function inspectionEditor(inspectionId) {
     get completionPercent() {
       var total = 0, completed = 0;
       for (var s = 0; s < this.sections.length; s++) {
+        var secId = this.sections[s].id;
         var items = this.sections[s].items;
         for (var i = 0; i < items.length; i++) {
           total++;
-          var r = this.results[items[i].id];
+          var r = this._getResult(items[i].id, secId);
           if (!r) continue;
           // rich items count when a rating is picked; non-rich item types
           // (boolean / number / text / textarea / date / select /
@@ -759,10 +784,11 @@ function inspectionEditor(inspectionId) {
       var monitor      = 0;
       var defect       = 0;
       for (var s = 0; s < this.sections.length; s++) {
+        var secId = this.sections[s].id;
         var items = this.sections[s].items || [];
         total += items.length;
         for (var i = 0; i < items.length; i++) {
-          var ratingId = this.results[items[i].id]?.rating;
+          var ratingId = this._getResult(items[i].id, secId)?.rating;
           if (!ratingId) continue;
           rated++;
           var bucket = this._bucketForRatingId(ratingId);
@@ -827,7 +853,7 @@ function inspectionEditor(inspectionId) {
       if (!sec) return 0;
       var count = 0;
       for (var i = 0; i < sec.items.length; i++) {
-        var rating = this.results[sec.items[i].id]?.rating;
+        var rating = this._getResult(sec.items[i].id, sectionId)?.rating;
         if (!rating) continue;
         var level = null;
         for (var l = 0; l < this.ratingLevels.length; l++) {
@@ -855,7 +881,7 @@ function inspectionEditor(inspectionId) {
       if (total === 0) return { rated: 0, total: 0, percent: 0 };
       var rated = 0;
       for (var i = 0; i < total; i++) {
-        if (this.results[sec.items[i].id]?.rating != null) rated++;
+        if (this._getResult(sec.items[i].id, sectionId)?.rating != null) rated++;
       }
       return { rated: rated, total: total, percent: Math.round((rated / total) * 100) };
     },
@@ -869,7 +895,7 @@ function inspectionEditor(inspectionId) {
     itemPassesFilter(item) {
       var f = this.itemFilter || 'all';
       if (f === 'all') return true;
-      var r = this.results[item.id];
+      var r = this._getResult(item.id);
       if (f === 'unrated') return !r || r.rating == null;
       if (f === 'issues') {
         if (!r || !r.rating) return false;
@@ -905,11 +931,13 @@ function inspectionEditor(inspectionId) {
     },
 
     getItemRating(itemId) {
-      return this.results[itemId]?.rating || null;
+      var r = this._getResult(itemId);
+      return r?.rating || null;
     },
 
     getItemNotes(itemId) {
-      return this.results[itemId]?.notes || '';
+      var r = this._getResult(itemId);
+      return r?.notes || '';
     },
 
     // ===== Editor full-text search (App.E.3) =================================
@@ -930,7 +958,7 @@ function inspectionEditor(inspectionId) {
     },
 
     _searchResultMatches(itemId, needle) {
-      var r = this.results[itemId];
+      var r = this._getResult(itemId);
       if (!r) return false;
       if (this._searchContains(r.notes, needle)) return true;
       if (this._searchContains(r.recommendation, needle)) return true;
@@ -1033,7 +1061,8 @@ function inspectionEditor(inspectionId) {
     },
 
     getPhotoCount(itemId) {
-      return (this.results[itemId]?.photos || []).length;
+      var r = this._getResult(itemId);
+      return (r?.photos || []).length;
     },
 
     getRatingColor(ratingId) {
@@ -1085,8 +1114,10 @@ function inspectionEditor(inspectionId) {
     },
 
     setRating(itemId, levelId) {
-      if (!this.results[itemId]) this.results[itemId] = { rating: null, notes: '', photos: [] };
-      this.results[itemId].rating = levelId;
+      var ck = this._fk(itemId);
+      if (!this.results[ck]) this.results[ck] = { rating: null, notes: '', photos: [] };
+      this.results[ck].rating = levelId;
+      this.results[itemId] = this.results[ck]; // backward-compat alias
       this._stampUnitId(itemId);
       this.debounceSave();
     },
@@ -1095,8 +1126,10 @@ function inspectionEditor(inspectionId) {
     // store their captured value here. Rich items continue to use `rating`
     // exclusively. Same debounced PATCH path as setRating.
     setItemValue(itemId, value) {
-      if (!this.results[itemId]) this.results[itemId] = { rating: null, notes: '', photos: [] };
-      this.results[itemId].value = value;
+      var ck = this._fk(itemId);
+      if (!this.results[ck]) this.results[ck] = { rating: null, notes: '', photos: [] };
+      this.results[ck].value = value;
+      this.results[itemId] = this.results[ck]; // backward-compat alias
       this._stampUnitId(itemId);
       this.debounceSave();
     },
@@ -1106,14 +1139,15 @@ function inspectionEditor(inspectionId) {
     // moving a unit doesn't silently reattribute past findings; the
     // explicit unit-tree drag/move flow handles re-parenting deliberately.
     _stampUnitId(itemId) {
-      if (this.selectedUnitId && !this.results[itemId].unitId) {
-        this.results[itemId].unitId = this.selectedUnitId;
+      var ck = this._fk(itemId);
+      var r = this.results[ck] || this.results[itemId];
+      if (r && this.selectedUnitId && !r.unitId) {
+        r.unitId = this.selectedUnitId;
       }
     },
     getItemValue(itemId) {
-      return this.results[itemId] && 'value' in this.results[itemId]
-        ? this.results[itemId].value
-        : '';
+      var r = this._getResult(itemId);
+      return r && 'value' in r ? r.value : '';
     },
     // multi_select helper — toggles `choice` in the value array.
     toggleMultiValue(itemId, choice, checked) {
@@ -1127,7 +1161,7 @@ function inspectionEditor(inspectionId) {
     },
     // photo_only helper — reads the photos array from the per-item result.
     getItemPhotos(itemId) {
-      const r = this.results[itemId];
+      var r = this._getResult(itemId);
       return r && Array.isArray(r.photos) ? r.photos : [];
     },
 
@@ -1138,13 +1172,15 @@ function inspectionEditor(inspectionId) {
     // only) { category, location, photos }. We lazy-init missing nodes on
     // each toggle so Alpine reactivity stays clean.
     _ensureItemState(itemId) {
-      if (!this.results[itemId]) this.results[itemId] = { rating: null, notes: '', photos: [] };
-      if (!this.results[itemId].tabs) this.results[itemId].tabs = { information: [], limitations: [], defects: [] };
-      var t = this.results[itemId].tabs;
+      var ck = this._fk(itemId);
+      if (!this.results[ck]) this.results[ck] = { rating: null, notes: '', photos: [] };
+      if (!this.results[ck].tabs) this.results[ck].tabs = { information: [], limitations: [], defects: [] };
+      var t = this.results[ck].tabs;
       if (!Array.isArray(t.information)) t.information = [];
       if (!Array.isArray(t.limitations)) t.limitations = [];
       if (!Array.isArray(t.defects))     t.defects     = [];
-      return this.results[itemId];
+      this.results[itemId] = this.results[ck]; // backward-compat alias
+      return this.results[ck];
     },
 
     // Returns the merged view for one tab: each canned entry from the
@@ -1154,7 +1190,8 @@ function inspectionEditor(inspectionId) {
       var item = this._findItemById(itemId);
       if (!item || !item.tabs) return [];
       var canned = (item.tabs[tabName] || []).slice();
-      var state = (this.results[itemId] && this.results[itemId].tabs && this.results[itemId].tabs[tabName]) || [];
+      var _r = this._getResult(itemId);
+      var state = (_r && _r.tabs && _r.tabs[tabName]) || [];
       var stateMap = {};
       for (var i = 0; i < state.length; i++) stateMap[state[i].cannedId] = state[i];
       return canned.map(function (c) {
@@ -1189,6 +1226,36 @@ function inspectionEditor(inspectionId) {
         }
       }
       return null;
+    },
+
+    // F6 — resolve the sectionId that owns `itemId` by scanning sections.
+    _sectionIdForItem(itemId) {
+      for (var s = 0; s < this.sections.length; s++) {
+        var items = this.sections[s].items || [];
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].id === itemId) return this.sections[s].id;
+        }
+      }
+      return null;
+    },
+
+    // F6 — build a composite key for the given itemId, looking up sectionId
+    // from this.sections. Returns fKey(sectionId, itemId) when found, else
+    // falls back to bare itemId so legacy data still resolves.
+    _fk(itemId) {
+      var sid = this._sectionIdForItem(itemId);
+      return sid ? fKey(sid, itemId) : itemId;
+    },
+
+    // F6 — read a result entry with composite-key-first fallback.
+    // Tries composite key, then bare itemId for backward compat.
+    _getResult(itemId, sectionId) {
+      var sid = sectionId || this._sectionIdForItem(itemId);
+      if (sid) {
+        var ck = fKey(sid, itemId);
+        if (this.results[ck] !== undefined) return this.results[ck];
+      }
+      return this.results[itemId];
     },
 
     _findStateEntry(itemId, tabName, cannedId) {
@@ -1501,8 +1568,7 @@ function inspectionEditor(inspectionId) {
     // category + location. The id is generated client-side and prefixed
     // with 'cu_' so we can distinguish them from template canned IDs.
     _ensureCustomState(itemId) {
-      this._ensureItemState(itemId);
-      var st = this.results[itemId];
+      var st = this._ensureItemState(itemId);
       if (!st.customComments) st.customComments = { information: [], limitations: [], defects: [] };
       var c = st.customComments;
       if (!Array.isArray(c.information)) c.information = [];
@@ -1642,10 +1708,12 @@ function inspectionEditor(inspectionId) {
     setQuickRating(levelId) {
       if (!this.quickRatingItemId) { this.showQuickRating = false; return; }
       if (levelId === null) {
-        if (!this.results[this.quickRatingItemId]) {
-          this.results[this.quickRatingItemId] = { rating: null, notes: '', photos: [] };
+        var ck = this._fk(this.quickRatingItemId);
+        if (!this.results[ck]) {
+          this.results[ck] = { rating: null, notes: '', photos: [] };
         }
-        this.results[this.quickRatingItemId].rating = null;
+        this.results[ck].rating = null;
+        this.results[this.quickRatingItemId] = this.results[ck]; // backward-compat alias
         this.debounceSave();
       } else {
         this.setRating(this.quickRatingItemId, levelId);
@@ -1892,7 +1960,7 @@ function inspectionEditor(inspectionId) {
       if (initialFilter === 'my-snippets') {
         this.commentLibraryFilter = 'my-snippets';
       } else {
-        var r = this.results[this.activeItemId]?.rating;
+        var r = this._getResult(this.activeItemId)?.rating;
         this.commentLibraryFilter = this._bucketForRatingId(r);
       }
       this.showCommentLibrary = true;
@@ -1905,12 +1973,14 @@ function inspectionEditor(inspectionId) {
 
     insertComment(text, withExtraNewline) {
       if (!this.activeItemId) return;
-      if (!this.results[this.activeItemId]) {
-        this.results[this.activeItemId] = { rating: null, notes: '', photos: [] };
+      var ck = this._fk(this.activeItemId);
+      if (!this.results[ck]) {
+        this.results[ck] = { rating: null, notes: '', photos: [] };
       }
-      var existing = this.results[this.activeItemId].notes || '';
+      this.results[this.activeItemId] = this.results[ck]; // backward-compat alias
+      var existing = this.results[ck].notes || '';
       var sep = withExtraNewline ? '\n\n' : '\n';
-      this.results[this.activeItemId].notes = existing
+      this.results[ck].notes = existing
         ? (existing.trimEnd() + sep + text)
         : text;
       this.expanded[this.activeItemId] = true;
@@ -1934,12 +2004,13 @@ function inspectionEditor(inspectionId) {
         var se = ae.selectionEnd;
         if (ss !== se) selectedText = (ae.value || '').substring(ss, se).trim();
       }
-      var notes = selectedText || (this.results[this.activeItemId]?.notes || '').trim();
+      var _activeR = this._getResult(this.activeItemId);
+      var notes = selectedText || (_activeR?.notes || '').trim();
       if (!notes) {
         if (typeof showToast === 'function') showToast('No notes to save');
         return;
       }
-      var bucket = this._bucketForRatingId(this.results[this.activeItemId]?.rating);
+      var bucket = this._bucketForRatingId(_activeR?.rating);
       var section = (this.currentSection && this.currentSection.title) || '';
       var self = this;
 
@@ -2091,7 +2162,7 @@ function inspectionEditor(inspectionId) {
       var activeItem = null;
       var section = '';
       if (this.activeItemId) {
-        var r = this.results[this.activeItemId]?.rating;
+        var r = this._getResult(this.activeItemId)?.rating;
         bucket = this._bucketForRatingId(r);
         activeItem = this._findItemById(this.activeItemId);
         section = (this.currentSection && this.currentSection.title) || '';
@@ -2262,9 +2333,11 @@ function inspectionEditor(inspectionId) {
         });
         if (res.ok) {
           var json = await res.json();
-          if (!this.results[itemId]) this.results[itemId] = {};
-          if (!this.results[itemId].photos) this.results[itemId].photos = [];
-          this.results[itemId].photos.push({ key: json.data.key });
+          var ck = this._fk(itemId);
+          if (!this.results[ck]) this.results[ck] = {};
+          if (!this.results[ck].photos) this.results[ck].photos = [];
+          this.results[ck].photos.push({ key: json.data.key });
+          this.results[itemId] = this.results[ck]; // backward-compat alias
           this.debounceSave();
         } else {
           if (typeof showToast === 'function') showToast('Photo upload failed.', true);
@@ -2312,8 +2385,7 @@ function inspectionEditor(inspectionId) {
           return;
         }
         var json = await res.json();
-        this._ensureCustomState(itemId);
-        var st = this.results[itemId];
+        var st = this._ensureCustomState(itemId);
         var arr = (st.customComments && st.customComments.defects) || [];
         for (var i = 0; i < arr.length; i++) {
           if (arr[i].id === customId) {
@@ -2512,7 +2584,7 @@ function inspectionEditor(inspectionId) {
             sectionName: sec.title || sec.name || '',
             sectionIdx: s,
             itemIdx: i,
-            rating: (this.results[items[i].id] && this.results[items[i].id].rating) || null,
+            rating: (this._getResult(items[i].id, sec.id) || {}).rating || null,
           });
         }
       }
@@ -2555,7 +2627,7 @@ function inspectionEditor(inspectionId) {
       if (!this._speedItems) return 0;
       var c = 0;
       for (var i = 0; i < this._speedItems.length; i++) {
-        if ((this.results[this._speedItems[i].id] || {}).rating) c++;
+        if ((this._getResult(this._speedItems[i].id) || {}).rating) c++;
       }
       return c;
     },
@@ -2679,8 +2751,10 @@ function inspectionEditor(inspectionId) {
           this._trackVersion(itemId, field, data.newVersion);
         }
         // Mirror into local results so UI reflects without a re-fetch.
-        if (!this.results[itemId]) this.results[itemId] = { rating: null, notes: '', photos: [] };
-        this.results[itemId][field] = value;
+        var ck = this._fk(itemId);
+        if (!this.results[ck]) this.results[ck] = { rating: null, notes: '', photos: [] };
+        this.results[ck][field] = value;
+        this.results[itemId] = this.results[ck]; // backward-compat alias
         return { ok: true, newVersion: data.newVersion };
       } catch (err) {
         // Offline / fetch error — enqueue.

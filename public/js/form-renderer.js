@@ -1,3 +1,6 @@
+// F6 — composite finding key: _default:sectionId:itemId
+function fKey(sectionId, itemId) { return '_default:' + sectionId + ':' + itemId; }
+
 // B4 — Offline photo queue is now backed by the unified Dexie syncQueue store.
 // `pendingPhotoDb` retains the Phase O shape so call sites elsewhere in this
 // file don't need to change; under the hood it writes `photo.upload` rows
@@ -51,6 +54,30 @@ document.addEventListener('alpine:init', () => {
     scrolled: false,
     _lastSyncedAt: 0,
 
+    // F6 — resolve sectionId for an itemId by scanning the template schema.
+    _sectionIdForItem(itemId) {
+      var secs = this.templateSchema?.sections || [];
+      for (var s = 0; s < secs.length; s++) {
+        var items = secs[s].items || [];
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].id === itemId) return secs[s].id;
+        }
+      }
+      return null;
+    },
+    _fk(itemId) {
+      var sid = this._sectionIdForItem(itemId);
+      return sid ? fKey(sid, itemId) : itemId;
+    },
+    _getResult(itemId) {
+      var sid = this._sectionIdForItem(itemId);
+      if (sid) {
+        var ck = fKey(sid, itemId);
+        if (this.results[ck] !== undefined) return this.results[ck];
+      }
+      return this.results[itemId];
+    },
+
     // Annotation State
     showAnnotationModal: false,
     annotationTarget: null,
@@ -89,7 +116,9 @@ document.addEventListener('alpine:init', () => {
 
         this.templateSchema.sections.forEach(s => {
           s.items.forEach(i => {
-            this.results[i.id] = { status: null, notes: '', photos: [], recommendations: [] };
+            var ck = fKey(s.id, i.id);
+            this.results[ck] = { status: null, notes: '', photos: [], recommendations: [] };
+            this.results[i.id] = this.results[ck]; // backward-compat alias
             this.uploading[i.id] = false;
           });
         });
@@ -125,14 +154,19 @@ document.addEventListener('alpine:init', () => {
     },
 
     setItemStatus(itemId, status) {
-      this.results[itemId].status = status;
-      this.results[itemId].updatedAt = Date.now();
+      var ck = this._fk(itemId);
+      var r = this.results[ck] || this.results[itemId];
+      r.status = status;
+      r.updatedAt = Date.now();
+      this.results[ck] = r;
+      this.results[itemId] = r; // backward-compat alias
       this._markDirty(itemId, 'status');
       this.saveLocally();
     },
 
     noteChanged(itemId) {
-      if (this.results[itemId]) this.results[itemId].updatedAt = Date.now();
+      var r = this._getResult(itemId);
+      if (r) r.updatedAt = Date.now();
       this._markDirty(itemId, 'notes');
       this.saveLocally();
     },
@@ -153,7 +187,8 @@ document.addEventListener('alpine:init', () => {
     async handleFileUpload(itemId, event) {
       const file = event.target.files[0];
       if (!file) return;
-      if (!this.results[itemId].photos) this.results[itemId].photos = [];
+      var _r = this._getResult(itemId);
+      if (!_r.photos) _r.photos = [];
 
       // B4 — resize before storing in IndexedDB or uploading. Caps on iOS Safari are
       // the chokepoint; 2048-px / q=0.85 brings 4-12 MB iPhone photos to ~250-500 KB.
@@ -171,8 +206,8 @@ document.addEventListener('alpine:init', () => {
         const localId = 'pending:' + crypto.randomUUID();
         const dataUrl = await fileToDataUrl(uploadFile);
         await pendingPhotoDb.add({ id: localId, inspectionId: this.inspectionId, itemId, blob: uploadFile, type: 'upload' });
-        this.results[itemId].photos.push({ key: localId, pending: true, dataUrl });
-        this.results[itemId].updatedAt = Date.now();
+        _r.photos.push({ key: localId, pending: true, dataUrl });
+        _r.updatedAt = Date.now();
         this._markDirty(itemId, 'photos');
         this.saveLocally();
         event.target.value = '';
@@ -187,8 +222,8 @@ document.addEventListener('alpine:init', () => {
         const res = await fetch(`/api/inspections/${this.inspectionId}/upload`, { method: 'POST', body: formData });
         if (res.ok) {
           const { key } = await res.json();
-          this.results[itemId].photos.push({ key });
-          this.results[itemId].updatedAt = Date.now();
+          _r.photos.push({ key });
+          _r.updatedAt = Date.now();
           this._markDirty(itemId, 'photos');
           this.saveLocally();
         } else {
@@ -203,8 +238,9 @@ document.addEventListener('alpine:init', () => {
     },
 
     async removePhoto(itemId, index) {
-      this.results[itemId].photos.splice(index, 1);
-      this.results[itemId].updatedAt = Date.now();
+      var _r = this._getResult(itemId);
+      _r.photos.splice(index, 1);
+      _r.updatedAt = Date.now();
       this._markDirty(itemId, 'photos');
       // B4 trigger Task 2 — enqueue a photo.delete op so the sync engine hits
       // DELETE /api/inspections/:id/items/:itemId/photos/:photoIndex once online.
@@ -224,7 +260,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     recommendationsList(itemId) {
-      const arr = this.results[itemId]?.recommendations;
+      const arr = this._getResult(itemId)?.recommendations;
       return Array.isArray(arr) ? arr : [];
     },
 
@@ -253,21 +289,24 @@ document.addEventListener('alpine:init', () => {
     },
 
     attachRecommendation(itemId, snapshot) {
-      if (!this.results[itemId]) this.results[itemId] = { status: '', notes: '', photos: [], recommendations: [] };
-      if (!Array.isArray(this.results[itemId].recommendations)) {
-        this.results[itemId].recommendations = [];
+      var ck = this._fk(itemId);
+      if (!this.results[ck]) this.results[ck] = { status: '', notes: '', photos: [], recommendations: [] };
+      if (!Array.isArray(this.results[ck].recommendations)) {
+        this.results[ck].recommendations = [];
       }
-      this.results[itemId].recommendations.push(snapshot);
-      this.results[itemId].updatedAt = Date.now();
+      this.results[ck].recommendations.push(snapshot);
+      this.results[ck].updatedAt = Date.now();
+      this.results[itemId] = this.results[ck]; // backward-compat alias
       this._markDirty(itemId, 'recommendations');
       this.saveLocally();
     },
 
     removeRecommendation(itemId, ridx) {
-      const arr = this.results[itemId]?.recommendations;
+      var _r = this._getResult(itemId);
+      const arr = _r?.recommendations;
       if (!Array.isArray(arr)) return;
       arr.splice(ridx, 1);
-      this.results[itemId].updatedAt = Date.now();
+      _r.updatedAt = Date.now();
       this._markDirty(itemId, 'recommendations');
       this.saveLocally();
     },
@@ -385,8 +424,9 @@ document.addEventListener('alpine:init', () => {
             blob: file,
             type: 'annotation',
           });
-          this.results[this.annotationTarget.itemId].photos[this.annotationTarget.index] = { key: localId, pending: true, dataUrl };
-          this.results[this.annotationTarget.itemId].updatedAt = Date.now();
+          var _annotR = this._getResult(this.annotationTarget.itemId);
+          _annotR.photos[this.annotationTarget.index] = { key: localId, pending: true, dataUrl };
+          _annotR.updatedAt = Date.now();
           this.saveLocally();
           this.showAnnotationModal = false;
           return;
@@ -398,8 +438,9 @@ document.addEventListener('alpine:init', () => {
         const res = await fetch(`/api/inspections/${this.inspectionId}/upload`, { method: 'POST', body: formData });
         if (res.ok) {
           const { key } = await res.json();
-          this.results[this.annotationTarget.itemId].photos[this.annotationTarget.index].key = key;
-          this.results[this.annotationTarget.itemId].updatedAt = Date.now();
+          var _annotR2 = this._getResult(this.annotationTarget.itemId);
+          _annotR2.photos[this.annotationTarget.index].key = key;
+          _annotR2.updatedAt = Date.now();
           this.saveLocally();
           this.showAnnotationModal = false;
         } else {
@@ -443,7 +484,8 @@ document.addEventListener('alpine:init', () => {
       const items = [];
       this.templateSchema.sections.forEach(s => items.push(...s.items));
       if (items.length === 0) return 0;
-      const filled = items.filter(i => this.results[i.id]?.status).length;
+      var self = this;
+      const filled = items.filter(i => self._getResult(i.id)?.status).length;
       return Math.round((filled / items.length) * 100);
     },
 
@@ -533,7 +575,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     async assistComment(itemId, label) {
-      const currentText = this.results[itemId]?.notes;
+      var _r = this._getResult(itemId);
+      const currentText = _r?.notes;
       if (!currentText || currentText.length < 3) return;
       try {
         const res = await fetch('/api/ai/comment-assist', {
@@ -543,8 +586,10 @@ document.addEventListener('alpine:init', () => {
         });
         const data = await res.json();
         if (data.text) {
-          this.results[itemId].notes = data.text;
-          this.results[itemId].updatedAt = Date.now();
+          var ck = this._fk(itemId);
+          var _rw = this.results[ck] || this.results[itemId];
+          _rw.notes = data.text;
+          _rw.updatedAt = Date.now();
           this.saveLocally();
         }
       } catch (e) {

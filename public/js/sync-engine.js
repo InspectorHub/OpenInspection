@@ -2,6 +2,12 @@
  * B4 — Sync engine state machine + queue drain + quota monitor.
  * Loaded on every authenticated page; consumes Dexie syncQueue, calls server
  * sync endpoints, applies results to local stores or moves to conflicts.
+ *
+ * F6 — composite finding keys (_default:sectionId:itemId).
+ * The sync engine is key-agnostic: it forwards the full results object (ours/base)
+ * and stores whatever the server returns (merged). Conflict rows carry the
+ * server's itemId verbatim — which may be a composite key once the server
+ * migrates. No structural changes needed here beyond this note.
  */
 import { db, openDb } from './db.js';
 import { estimateQuota, detectTier } from './device-tier.js';
