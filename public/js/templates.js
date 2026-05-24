@@ -105,6 +105,7 @@ function renderTemplates() {
               </div>
             </td>
           </tr>`;
+        renderCardGrid();
         return;
     }
     tbody.innerHTML = allTemplates.map(t => {
@@ -126,7 +127,7 @@ function renderTemplates() {
               </div>
             </td>
             <td class="px-6 py-6">
-              <span class="inline-flex items-center rounded-lg border border-indigo-100 dark:border-indigo-800 px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">v${t.version}.0</span>
+              <button onclick="openHistoryModal('${t.id}', '${t.name.replace(/'/g, "\\'")}')" class="inline-flex items-center rounded-lg border border-indigo-100 dark:border-indigo-800 px-3 py-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer" title="View edit history">v${t.version}.0</button>
             </td>
             <td class="px-6 py-6 text-sm text-slate-500 font-bold">${itemCount} items</td>
             <td class="py-6 pl-3 pr-10 text-right">
@@ -143,6 +144,94 @@ function renderTemplates() {
             </td>
           </tr>`;
     }).join('');
+    renderCardGrid();
+}
+
+// ─── Card grid view ────────────────────────────────────────────────────────────
+function renderCardGrid() {
+    const grid = document.getElementById('templatesCardGrid');
+    if (!grid) return;
+
+    if (allTemplates.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full py-32 text-center">
+            <div class="flex flex-col items-center gap-6">
+              <div class="w-20 h-20 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center">
+                <svg class="w-10 h-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              </div>
+              <div>
+                <p class="text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight">No templates yet</p>
+                <p class="text-sm text-slate-400 font-medium mt-1">Create a checklist template for your inspections.</p>
+              </div>
+              <button onclick="showCreateModal()" class="px-6 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-slate-900 transition-all active:scale-95">New Template</button>
+            </div>
+          </div>`;
+        return;
+    }
+
+    grid.innerHTML = allTemplates.map(t => {
+        const itemCount = t.itemCount ?? countSchemaItems(t.schema);
+        const desc = t.description ? `<p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">${t.description}</p>` : '';
+        const usedCount = t.usageCount ?? 0;
+        return `
+          <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 flex flex-col gap-2 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+            <div>
+              <a href="/templates/${t.id}/edit" class="text-[14px] font-bold text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">${t.name}</a>
+              ${desc}
+            </div>
+            <div class="flex items-center gap-2 text-[10px] font-mono text-slate-400 dark:text-slate-500">
+              <button onclick="openHistoryModal('${t.id}', '${t.name.replace(/'/g, "\\'")}')" class="inline-flex items-center rounded border border-indigo-100 dark:border-indigo-800 px-1.5 py-0.5 bg-indigo-50/50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer" title="View edit history">v${t.version}.0</button>
+              <span>${itemCount} items</span>
+              <span>used ${usedCount}&times;</span>
+            </div>
+            <div class="flex items-center gap-3 pt-1 border-t border-slate-100 dark:border-slate-700 mt-auto">
+              <a href="/templates/${t.id}/edit" class="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Edit</a>
+              <button onclick="duplicateTemplate('${t.id}')" class="text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Duplicate</button>
+              <button onclick="deleteTemplate('${t.id}')" class="text-[11px] font-bold text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors ml-auto">Disable</button>
+            </div>
+          </div>`;
+    }).join('');
+}
+
+// ─── History modal helper ──────────────────────────────────────────────────────
+function openHistoryModal(templateId, templateName) {
+    const el = document.querySelector('.animate-slide-in');
+    if (el && window.Alpine) {
+        const data = window.Alpine.$data(el);
+        if (data) {
+            data.showHistoryId = templateId;
+            data.showHistoryName = templateName;
+        }
+    }
+}
+
+// ─── Duplicate template ────────────────────────────────────────────────────────
+async function duplicateTemplate(id) {
+    const t = allTemplates.find(x => x.id === id);
+    if (!t) return;
+    const newName = (t.name || 'Template') + ' (Copy)';
+    try {
+        const res = await authFetch('/api/inspections/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName, schema: t.schema || { schemaVersion: 2, sections: [] } })
+        });
+        if (res.ok) {
+            const result = await res.json();
+            const newId = result?.data?.template?.id;
+            if (newId) {
+                window.location.href = '/templates/' + newId + '/edit';
+            } else {
+                loadTemplates();
+            }
+        } else {
+            const err = await res.json().catch(() => ({}));
+            const msg = err?.error?.message || err?.error || err?.message || 'Failed to duplicate';
+            modalAlert('Error: ' + msg, 'Error');
+        }
+    } catch (e) {
+        modalAlert('Connection error: ' + e.message, 'Error');
+    }
 }
 
 async function deleteTemplate(id) {

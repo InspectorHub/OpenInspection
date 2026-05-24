@@ -9,7 +9,7 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
 
     return (
         <MainLayout title={`${siteName} | Templates`} branding={branding}>
-            <div class="animate-slide-in space-y-[18px]">
+            <div class="animate-slide-in space-y-[18px]" x-data="{ view: 'list', showHistoryId: null, showHistoryName: '' }">
                 <div x-data="templatesMeta">
                     <PageHeader
                         eyebrow="LIBRARY · TEMPLATES"
@@ -18,6 +18,21 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                         meta={<span x-text="metaText"></span>}
                         actions={
                             <div class="flex items-center gap-2">
+                                {/* View toggle: Cards / List */}
+                                <div class="bg-slate-100 dark:bg-slate-700 rounded-md p-0.5 inline-flex">
+                                    <button
+                                        type="button"
+                                        x-on:click="view = 'card'"
+                                        x-bind:class="view === 'card' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500'"
+                                        class="px-2.5 py-1 rounded text-[12px] font-bold transition-all"
+                                    >Cards</button>
+                                    <button
+                                        type="button"
+                                        x-on:click="view = 'list'"
+                                        x-bind:class="view === 'list' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500'"
+                                        class="px-2.5 py-1 rounded text-[12px] font-bold transition-all"
+                                    >List</button>
+                                </div>
                                 <button
                                     type="button"
                                     onclick="showImportSpectoraModal()"
@@ -44,8 +59,8 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                     has been imported more than once (Sprint 1 B-8). */}
                 <MarketplaceDuplicateBanner />
 
-                {/* Templates List */}
-                <div class="glass-panel rounded-xl overflow-hidden shadow-md/5">
+                {/* Templates List (table view) */}
+                <div x-show="view === 'list'" class="glass-panel rounded-xl overflow-hidden shadow-md/5">
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead>
@@ -67,6 +82,56 @@ export const TemplatesPage = ({ branding }: { branding?: BrandingConfig | undefi
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                {/* Templates Card Grid view */}
+                <div x-show="view === 'card'" x-cloak id="templatesCardGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {/* Cards rendered by templates.js renderCardGrid() */}
+                </div>
+
+                {/* Template History Modal */}
+                <div
+                    x-show="showHistoryId"
+                    x-cloak
+                    {...{
+                        'x-transition:enter':       'transition ease-out duration-200',
+                        'x-transition:enter-start': 'opacity-0',
+                        'x-transition:enter-end':   'opacity-100',
+                        'x-transition:leave':       'transition ease-in duration-150',
+                        'x-transition:leave-start': 'opacity-100',
+                        'x-transition:leave-end':   'opacity-0',
+                        'x-on:keydown.escape.window': 'showHistoryId = null',
+                    }}
+                    x-on:click="if ($event.target === $el) showHistoryId = null"
+                    class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto"
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <div class="bg-white dark:bg-slate-800 rounded-md shadow-xl w-full max-w-md p-4 max-h-[90vh] overflow-y-auto" {...{'x-on:click.stop': ''}}>
+                        <header class="flex items-start justify-between gap-3 mb-4">
+                            <div class="min-w-0 flex-1">
+                                <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100 truncate">Edit history</h2>
+                                <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5 truncate" x-text="showHistoryName"></p>
+                            </div>
+                            <button
+                                type="button"
+                                aria-label="Close dialog"
+                                class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center text-slate-500 dark:text-slate-400 flex-shrink-0"
+                                x-on:click="showHistoryId = null"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </header>
+                        <div class="py-8 text-center">
+                            <div class="w-12 h-12 mx-auto mb-3 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-slate-300 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <p class="text-sm font-bold text-slate-400 dark:text-slate-500">No version history yet.</p>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Version history will appear here as edits are made.</p>
+                        </div>
                     </div>
                 </div>
 
