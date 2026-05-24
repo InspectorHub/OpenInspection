@@ -21,16 +21,38 @@ export function FooterBar(): JSX.Element {
             role="contentinfo"
             aria-label="Editor shortcuts and sync status"
         >
-            {/* Keyboard hint cluster — same shortcuts as the editor's
-                hotkey handler in public/js/inspection-edit.js. Hidden on
-                narrow widths so the sync chip always has room. */}
-            <span class="whitespace-nowrap"><kbd class="ih-kbd">1</kbd>-<kbd class="ih-kbd">5</kbd> rate + advance</span>
-            <span class="hidden sm:inline whitespace-nowrap"><kbd class="ih-kbd">J</kbd><kbd class="ih-kbd">K</kbd> nav</span>
-            <span class="hidden md:inline whitespace-nowrap"><kbd class="ih-kbd">/</kbd> snippet</span>
-            <span class="hidden md:inline whitespace-nowrap"><kbd class="ih-kbd">P</kbd> photo</span>
-            <span class="hidden lg:inline whitespace-nowrap"><kbd class="ih-kbd">V</kbd> voice</span>
-            <span class="hidden lg:inline whitespace-nowrap"><kbd class="ih-kbd">Z</kbd> speed</span>
-            <span class="hidden xl:inline whitespace-nowrap"><kbd class="ih-kbd">?</kbd> all shortcuts</span>
+            {/* Gap 9 — ? Shortcuts popover replaces inline hints. */}
+            <div x-data="{ shortcutsOpen: false }" class="relative">
+                <button
+                    type="button"
+                    {...{ 'x-on:click': 'shortcutsOpen = !shortcutsOpen' }}
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-bold text-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                    <kbd class="ih-kbd">?</kbd> Shortcuts
+                </button>
+                <div
+                    x-show="shortcutsOpen"
+                    x-cloak
+                    {...{ 'x-on:click.outside': 'shortcutsOpen = false', 'x-on:keydown.escape.window': 'shortcutsOpen = false' }}
+                    class="absolute bottom-full left-0 mb-2 w-[320px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 p-3"
+                >
+                    <h4 class="ih-eyebrow mb-2">Keyboard shortcuts</h4>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">1</kbd>-<kbd class="ih-kbd">5</kbd> <span class="text-slate-600 dark:text-slate-300">Rate item</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">J</kbd> / <kbd class="ih-kbd">K</kbd> <span class="text-slate-600 dark:text-slate-300">Next / Prev</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">/</kbd> <span class="text-slate-600 dark:text-slate-300">Open library</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">P</kbd> <span class="text-slate-600 dark:text-slate-300">Capture photo</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">V</kbd> <span class="text-slate-600 dark:text-slate-300">Voice note</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">R</kbd> <span class="text-slate-600 dark:text-slate-300">Repeat rating</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">Z</kbd> <span class="text-slate-600 dark:text-slate-300">Speed mode</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">G</kbd><kbd class="ih-kbd">D</kbd> <span class="text-slate-600 dark:text-slate-300">Next defect</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">Tab</kbd> <span class="text-slate-600 dark:text-slate-300">Next [FIELD]</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">⇧Tab</kbd> <span class="text-slate-600 dark:text-slate-300">Prev [FIELD]</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">Esc</kbd> <span class="text-slate-600 dark:text-slate-300">Cancel action</span></div>
+                        <div class="flex items-center gap-2"><kbd class="ih-kbd">⌘\</kbd> <span class="text-slate-600 dark:text-slate-300">Toggle sidebar</span></div>
+                    </div>
+                </div>
+            </div>
 
             {/* Spacer pushes the live state to the right edge. */}
             <span class="flex-1"></span>
