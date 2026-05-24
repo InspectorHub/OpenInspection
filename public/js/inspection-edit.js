@@ -2258,7 +2258,22 @@ function inspectionEditor(inspectionId) {
     },
 
     toggleBatchSelect(itemId) {
-      this.batchSelected[itemId] = !this.batchSelected[itemId];
+      if (window.event?.shiftKey && this._lastBatchClicked) {
+        // Range select: find indices of _lastBatchClicked and itemId in currentSectionItems
+        var items = this.currentSectionItems;
+        var startIdx = items.findIndex(function(i) { return i.id === this._lastBatchClicked; }.bind(this));
+        var endIdx = items.findIndex(function(i) { return i.id === itemId; });
+        if (startIdx >= 0 && endIdx >= 0) {
+          var lo = startIdx < endIdx ? startIdx : endIdx;
+          var hi = startIdx < endIdx ? endIdx : startIdx;
+          for (var i = lo; i <= hi; i++) {
+            this.batchSelected[items[i].id] = true;
+          }
+        }
+      } else {
+        this.batchSelected[itemId] = !this.batchSelected[itemId];
+      }
+      this._lastBatchClicked = itemId;
     },
 
     batchSelectAll() {
@@ -2269,14 +2284,35 @@ function inspectionEditor(inspectionId) {
     },
 
     batchSetRating(levelId) {
+      var self = this;
       var items = this.currentSectionItems;
+      var priorRatings = {};
+      var count = 0;
       for (var i = 0; i < items.length; i++) {
         if (this.batchSelected[items[i].id]) {
+          var r = this._getResult(items[i].id);
+          priorRatings[items[i].id] = r ? r.rating : null;
           this.setRating(items[i].id, levelId);
+          count++;
         }
       }
       this.batchMode = false;
       this.batchSelected = {};
+      if (count > 0 && typeof showToast === 'function') {
+        var prev = Object.assign({}, priorRatings);
+        showToast('Rated ' + count + ' items as ' + levelId, false, {
+          undoLabel: 'Undo',
+          undoFn: function() {
+            for (var id in prev) {
+              var fk = self._fk(id);
+              if (self.results[fk]) self.results[fk].rating = prev[id];
+              if (self.results[id]) self.results[id].rating = prev[id];
+            }
+            self.debounceSave();
+            showToast('Undone');
+          }
+        });
+      }
     },
 
     debounceSave() {
