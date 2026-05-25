@@ -1,33 +1,33 @@
 import { useState } from "react";
 import { useLoaderData } from "react-router";
-import type { Route } from "./+types/comments";
+import type { Route } from "./+types/recommendations";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
 
 export function meta() {
-  return [{ title: "Comments Library - OpenInspection" }];
+  return [{ title: "Repair Items - OpenInspection" }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
-    const res = await apiFetch("/api/admin/comments", { token });
+    const res = await apiFetch("/api/recommendations", { token });
     const data = res.ok ? await res.json() : {};
-    return { comments: (data as any)?.data || [] };
+    return { items: (data as any)?.data || [] };
   } catch {
-    return { comments: [] };
+    return { items: [] };
   }
 }
 
-export default function CommentsPage() {
-  const { comments } = useLoaderData<typeof loader>();
+export default function RecommendationsPage() {
+  const { items } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState("all");
 
   const tabs = [
     { id: "all", label: "All" },
-    { id: "satisfactory", label: "Satisfactory" },
-    { id: "monitor", label: "Monitor" },
-    { id: "defect", label: "Defect" },
+    { id: "safety", label: "Safety" },
+    { id: "repair", label: "Repair" },
+    { id: "maintenance", label: "Maintenance" },
   ];
 
   return (
@@ -36,17 +36,17 @@ export default function CommentsPage() {
         <div>
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-[0.2em] bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">
             <span className="w-1 h-1 rounded-full bg-current opacity-60" />
-            Library · Comments
+            Library · Repair Items
           </span>
-          <h1 className="text-[26px] font-bold tracking-tight mt-1">Comments Library</h1>
-          <p className="text-[13px] text-slate-500 mt-1">{comments.length} in library</p>
+          <h1 className="text-[26px] font-bold tracking-tight mt-1">Repair Items</h1>
+          <p className="text-[13px] text-slate-500 mt-1">{items.length} in library</p>
         </div>
         <button className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 inline-flex items-center gap-2">
-          + Add comment
+          + Add item
         </button>
       </div>
 
-      {/* Underline tabs (NOT pills — fixes audit LM3) */}
+      {/* Underline tabs (TabStrip pattern — NOT pills) */}
       <div className="flex items-center border-b border-slate-200 dark:border-slate-700">
         {tabs.map((tab) => (
           <button
@@ -63,27 +63,25 @@ export default function CommentsPage() {
         ))}
       </div>
 
-      {comments.length === 0 ? (
+      {items.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-          <p className="font-semibold text-slate-700 dark:text-slate-200">No comments yet</p>
-          <p className="text-sm text-slate-500 mt-1">Click "+ Add comment" above to create your first comment snippet.</p>
+          <p className="font-semibold text-slate-700 dark:text-slate-200">No repair items yet</p>
+          <p className="text-sm text-slate-500 mt-1">Click "+ Add item" above to create your first repair recommendation.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {comments.map((c: any) => (
-            <div key={c.id} className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-              <p className="text-[13px] text-slate-700 dark:text-slate-300 line-clamp-3">{c.text}</p>
+          {items.map((item: any) => (
+            <div key={item.id} className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+              <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">{item.title || item.name}</p>
+              {item.description && (
+                <p className="text-[13px] text-slate-500 mt-1 line-clamp-2">{item.description}</p>
+              )}
               <div className="flex items-center gap-2 mt-2">
-                {c.ratingBucket && (
-                  <span className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] ${
-                    c.ratingBucket === "satisfactory" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400" :
-                    c.ratingBucket === "monitor" ? "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" :
-                    "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400"
-                  }`}>
-                    {c.ratingBucket}
+                {item.category && (
+                  <span className="inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                    {item.category}
                   </span>
                 )}
-                {c.section && <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{c.section}</span>}
               </div>
             </div>
           ))}

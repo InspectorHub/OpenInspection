@@ -26,5 +26,10 @@ export default [
       route("settings/advanced", "routes/settings-advanced.tsx"),
     ]),
     route("comments", "routes/comments.tsx"),
+    route("recommendations", "routes/recommendations.tsx"),
+    route("library/tags", "routes/library/tags.tsx"),
+    route("agreements", "routes/agreements.tsx"),
+    route("library/rating-systems", "routes/library/rating-systems.tsx"),
+    route("marketplace", "routes/marketplace.tsx"),
   ]),
 ] satisfies RouteConfig;
