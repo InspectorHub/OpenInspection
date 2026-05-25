@@ -23,10 +23,47 @@ export default [
     route("r/:id/invoice", "routes/public/invoice.tsx"),
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("observe/inspections/:id", "routes/public/observe.tsx"),
+    route(
+      "concierge/book/:tenant/:slug",
+      "routes/public/concierge-book.tsx",
+    ),
+    route("concierge/confirm", "routes/public/concierge-confirm.tsx"),
+    route("concierge/expired", "routes/public/concierge-expired.tsx"),
+    route(
+      "inspector/:tenant/:slug",
+      "routes/public/inspector-profile.tsx",
+    ),
+    route("inspector-not-found", "routes/public/inspector-not-found.tsx"),
+    route(
+      "report-gate/:tenant/:id",
+      "routes/public/report-gate.tsx",
+    ),
+    route(
+      "report-view/:tenant/:id",
+      "routes/public/report-card-stack.tsx",
+    ),
+    route("messages/:token", "routes/public/messages.tsx"),
+    route("r/:id/repair-request", "routes/public/repair-request.tsx"),
+    route(
+      "agreements/print/:token",
+      "routes/public/agreement-printable.tsx",
+    ),
   ]),
   // Standalone pages (own chrome, no sidebar)
   route("setup", "routes/setup.tsx"),
   route("inspections/:id/form", "routes/form-renderer.tsx"),
+  route("join/:token", "routes/join.tsx"),
+  route("guest-join/:token", "routes/guest-join.tsx"),
+  route("conflict-resolver/:id", "routes/conflict-resolver.tsx"),
+  route("version-diff/:id", "routes/version-diff.tsx"),
+  // Standalone public — no layout (iframe-friendly)
+  route(
+    "embed/:tenant/:slug",
+    "routes/public/booking-embed.tsx",
+  ),
+  // Standalone agent pages — no agent-layout chrome
+  route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
+  route("agent-invite-expired", "routes/agent/invite-expired.tsx"),
   // Error / utility pages (bare, outside auth)
   route("not-found", "routes/not-found.tsx"),
   route("feature-disabled", "routes/feature-disabled.tsx"),
@@ -59,6 +96,7 @@ export default [
       route("settings/catalog/booking", "routes/settings-catalog-booking.tsx"),
       route("settings/billing", "routes/settings-billing.tsx"),
       route("settings/security", "routes/settings-security.tsx"),
+      route("settings/analytics", "routes/settings-analytics.tsx"),
     ]),
     route("comments", "routes/comments.tsx"),
     route("recommendations", "routes/recommendations.tsx"),
@@ -72,5 +110,6 @@ export default [
     route("agent-settings/profile", "routes/agent/settings-profile.tsx"),
     route("agent-inspectors", "routes/agent/inspectors.tsx"),
     route("agent-recommendations", "routes/agent/recommendations.tsx"),
+    route("agent-signup", "routes/agent/signup.tsx"),
   ]),
 ] satisfies RouteConfig;

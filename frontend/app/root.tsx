@@ -20,19 +20,41 @@ export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
 ];
 
+const FOUC_SCRIPT = `(function(){
+var d=document.documentElement;
+if(d.hasAttribute('data-theme')){d.setAttribute('data-color-scheme','light');return;}
+try{var L=localStorage.getItem('ih-color-scheme');
+if(L&&!localStorage.getItem('oi-color-scheme'))localStorage.setItem('oi-color-scheme',L);
+if(L)localStorage.removeItem('ih-color-scheme');}catch(e){}
+var s=localStorage.getItem('oi-color-scheme');
+var p=window.matchMedia('(prefers-color-scheme: dark)').matches;
+var scheme=s==='dark'||(s===null&&p)?'dark':'light';
+d.setAttribute('data-color-scheme',scheme);
+if(scheme==='dark')d.classList.add('dark');
+})();
+(function(){try{if(localStorage.getItem('oi-sidebar-collapsed')==='1')document.documentElement.setAttribute('data-sidebar-collapsed','1');}catch(e){}})();`;
+
+const SW_SCRIPT = `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(e){console.warn('[sw] registration failed',e);});});}`;
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="scroll-smooth">
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script dangerouslySetInnerHTML={{ __html: FOUC_SCRIPT }} />
         <Meta />
         <Links />
+        <style dangerouslySetInnerHTML={{ __html: `
+          :root { --primary-color: #6366f1; --primary-glow: #6366f140; }
+          body { font-family: 'Inter', sans-serif; }
+        ` }} />
       </head>
       <body className="bg-[#f8fafc] dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased min-h-screen">
         {children}
         <ScrollRestoration />
         <Scripts />
+        <script dangerouslySetInnerHTML={{ __html: SW_SCRIPT }} />
       </body>
     </html>
   );

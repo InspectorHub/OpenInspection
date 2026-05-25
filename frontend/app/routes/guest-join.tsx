@@ -1,5 +1,7 @@
 import { Form, useActionData, useLoaderData, redirect } from "react-router";
 import type { Route } from "./+types/guest-join";
+import { apiFetch } from "~/lib/api.server";
+import { createSessionWithToken } from "~/lib/session.server";
 
 export function meta() {
   return [{ title: "Join as Guest - OpenInspection" }];
@@ -14,7 +16,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   try {
-    const { apiFetch } = await import("~/lib/api.server");
+
     const res = await apiFetch(`/api/auth/guest/validate?token=${encodeURIComponent(token)}`);
     if (!res.ok) {
       return { valid: false, error: "Invalid or expired guest link", invite: null };
@@ -36,7 +38,7 @@ export async function action({ request }: Route.ActionArgs) {
   const name = String(formData.get("name") || "");
 
   try {
-    const { apiFetch } = await import("~/lib/api.server");
+
     const res = await apiFetch("/api/auth/guest/accept", {
       method: "POST",
       body: JSON.stringify({ token, name }),
@@ -59,7 +61,8 @@ export async function action({ request }: Route.ActionArgs) {
     const jwt = tokenMatch?.[1];
 
     if (jwt) {
-      const { createSessionWithToken } = await import("~/lib/session.server");
+
+
       return createSessionWithToken(jwt, "/dashboard");
     }
 
