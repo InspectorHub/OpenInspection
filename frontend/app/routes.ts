@@ -33,6 +33,10 @@ export default [
     route("invoices", "routes/invoices.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("templates", "routes/templates.tsx"),
+    route("team", "routes/team.tsx"),
+    route("metrics", "routes/metrics.tsx"),
+    route("apprentice-review", "routes/apprentice-review.tsx"),
+    route("reports", "routes/reports.tsx"),
     layout("routes/settings-layout.tsx", [
       route("settings", "routes/settings-hub.tsx"),
       route("settings/profile", "routes/settings-profile.tsx"),
@@ -48,5 +52,11 @@ export default [
     route("agreements", "routes/agreements.tsx"),
     route("library/rating-systems", "routes/library/rating-systems.tsx"),
     route("marketplace", "routes/marketplace.tsx"),
+  ]),
+  layout("routes/agent-layout.tsx", [
+    route("agent-dashboard", "routes/agent/dashboard.tsx"),
+    route("agent-settings/profile", "routes/agent/settings-profile.tsx"),
+    route("agent-inspectors", "routes/agent/inspectors.tsx"),
+    route("agent-recommendations", "routes/agent/recommendations.tsx"),
   ]),
 ] satisfies RouteConfig;
