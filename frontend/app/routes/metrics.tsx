@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/metrics";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
@@ -20,12 +20,14 @@ interface MetricsData {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
+  const url = new URL(request.url);
+  const period = url.searchParams.get("period") || "6m";
   try {
-    const res = await apiFetch("/api/metrics?period=6m", { token });
+    const res = await apiFetch(`/api/metrics?period=${encodeURIComponent(period)}`, { token });
     const json = res.ok ? await res.json() : {};
-    return { data: ((json as any)?.data || null) as MetricsData | null };
+    return { data: ((json as any)?.data || null) as MetricsData | null, period };
   } catch {
-    return { data: null };
+    return { data: null, period };
   }
 }
 
@@ -36,8 +38,14 @@ function fmt(n: number): string {
 }
 
 export default function MetricsPage() {
-  const { data } = useLoaderData<typeof loader>();
-  const [period, setPeriod] = useState<string>("6m");
+  const { data, period: initialPeriod } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
+  const [period, setPeriod] = useState<string>(initialPeriod || "6m");
+
+  const changePeriod = (p: string) => {
+    setPeriod(p);
+    navigate(`/metrics?period=${p}`, { replace: true });
+  };
 
   const kpis = [
     { label: "Total Revenue", value: data ? fmt(data.totalRevenue) : "—" },
@@ -57,7 +65,7 @@ export default function MetricsPage() {
             {PERIODS.map((p) => (
               <button
                 key={p}
-                onClick={() => setPeriod(p)}
+                onClick={() => changePeriod(p)}
                 className={`h-6 px-3 rounded text-[12px] font-bold transition-all ${
                   period === p
                     ? "bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white"
@@ -103,6 +111,31 @@ export default function MetricsPage() {
           </div>
         ) : (
           <p className="text-[13px] text-slate-500 text-center py-8">No data available for this period.</p>
+        )}
+      </div>
+
+      {/* Revenue per month bar chart */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4">Revenue per Month</p>
+        {data && data.months.length > 0 ? (
+          <div className="flex items-end gap-2 h-40">
+            {data.months.map((m) => {
+              const maxRev = Math.max(...data.months.map((x) => x.revenue), 1);
+              const pct = (m.revenue / maxRev) * 100;
+              return (
+                <div key={m.ym + "-rev"} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-bold text-slate-500">{fmt(m.revenue)}</span>
+                  <div
+                    className="w-full bg-emerald-500 dark:bg-emerald-400 rounded-t"
+                    style={{ height: `${Math.max(pct, 4)}%` }}
+                  />
+                  <span className="text-[10px] text-slate-400">{m.ym.slice(5)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[13px] text-slate-500 text-center py-8">No revenue data available for this period.</p>
         )}
       </div>
 

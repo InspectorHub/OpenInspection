@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
@@ -130,11 +130,17 @@ const RATING_IDS = ["SAT", "MON", "DEF", "NI", "NP"];
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/*  Save status type                                                   */
+/* ------------------------------------------------------------------ */
+type SaveStatus = "idle" | "saving" | "saved";
+
 export default function InspectionEditPage() {
   const { inspection, schema, results: initialResults } =
     useLoaderData<typeof loader>();
 
   const fetcher = useFetcher();
+  const navigate = useNavigate();
 
   const [results, setResults] = useState(initialResults);
   const [activeSection, setActiveSection] = useState(
@@ -142,6 +148,29 @@ export default function InspectionEditPage() {
   );
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [speedMode, setSpeedMode] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Track fetcher state for save indicator */
+  useEffect(() => {
+    if (fetcher.state === "submitting") {
+      setSaveStatus("saving");
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    } else if (fetcher.state === "idle" && saveStatus === "saving") {
+      setSaveStatus("saved");
+      saveTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    }
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [fetcher.state]);
+
+  /* Helper: count photos for an item result */
+  const getPhotoCount = (itemId: string): number => {
+    const r = getResult(itemId);
+    const photos = r.photos as unknown[] | undefined;
+    return Array.isArray(photos) ? photos.length : 0;
+  };
 
   const currentSection = schema.sections?.find(
     (s: SchemaSection) => s.id === activeSection,
@@ -372,9 +401,43 @@ export default function InspectionEditPage() {
             </span>
           </div>
 
+          {/* Save status indicator */}
+          {saveStatus !== "idle" && (
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
+              saveStatus === "saving"
+                ? "text-amber-500"
+                : "text-emerald-500"
+            }`}>
+              {saveStatus === "saving" ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Saved
+                </>
+              )}
+            </span>
+          )}
+
           <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 inline-flex items-center">
             {(inspection as Record<string, unknown>).status as string}
           </span>
+
+          {/* Publish button */}
+          <button
+            onClick={() => navigate(`/inspections/${(inspection as Record<string, unknown>).id}/edit?publish=1`)}
+            className="h-9 px-4 rounded-md bg-emerald-600 text-white font-bold text-[12px] hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Publish
+          </button>
         </div>
       </div>
 

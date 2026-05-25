@@ -27,9 +27,13 @@ export function SectionRail({ sections, activeSection, onSelect, results }: Sect
                   : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50"
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1">
                 <span className="truncate">{section.title}</span>
-                <span className="text-[10px] text-slate-400 font-mono ml-1">{rated}/{total}</span>
+                <span className={`text-[10px] font-mono ml-1 shrink-0 px-1.5 py-0.5 rounded ${
+                  rated === total && total > 0
+                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400"
+                    : "bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500"
+                }`}>{rated}/{total}</span>
               </div>
             </button>
           );

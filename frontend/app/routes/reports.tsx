@@ -102,49 +102,75 @@ export default function ReportsPage() {
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Property</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Client</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Date</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Payment</th>
-                <th className="py-3 px-4" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                  <td className="py-3 px-4 text-[13px] font-medium text-slate-900 dark:text-slate-100 max-w-[240px] truncate">
-                    {r.address || "No address"}
-                  </td>
-                  <td className="py-3 px-4 text-[13px] text-slate-600 dark:text-slate-400">
-                    {r.clientName || "No client"}
-                  </td>
-                  <td className="py-3 px-4 text-[13px] text-slate-500 dark:text-slate-400">
-                    {r.date || "—"}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] ${STATUS_STYLES[r.status] || "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"}`}>
-                      {statusLabel(r.status)}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-[13px] text-slate-500 dark:text-slate-400">
-                    {r.paymentStatus || "—"}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <Link
-                      to={`/inspections/${r.id}/edit`}
-                      className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
-                    >
-                      View
-                    </Link>
-                  </td>
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Property</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Client</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Date</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Payment</th>
+                  <th className="py-3 px-4" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((r) => (
+                  <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                    <td className="py-3 px-4 text-[13px] font-medium text-slate-900 dark:text-slate-100 max-w-[240px] truncate">
+                      {r.address || "No address"}
+                    </td>
+                    <td className="py-3 px-4 text-[13px] text-slate-600 dark:text-slate-400">
+                      {r.clientName || "No client"}
+                    </td>
+                    <td className="py-3 px-4 text-[13px] text-slate-500 dark:text-slate-400">
+                      {r.date || "—"}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] ${STATUS_STYLES[r.status] || "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"}`}>
+                        {statusLabel(r.status)}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-[13px] text-slate-500 dark:text-slate-400">
+                      {r.paymentStatus || "—"}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <Link
+                        to={`/inspections/${r.id}/edit`}
+                        className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile card view */}
+          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-700">
+            {filtered.map((r) => (
+              <Link
+                key={r.id}
+                to={`/inspections/${r.id}/edit`}
+                className="block px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[13px] font-medium text-slate-900 dark:text-slate-100 truncate">
+                    {r.address || "No address"}
+                  </p>
+                  <span className={`inline-flex items-center h-5 px-1.5 rounded text-[10px] font-bold uppercase tracking-[0.04em] ml-2 shrink-0 ${STATUS_STYLES[r.status] || "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"}`}>
+                    {statusLabel(r.status)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {r.clientName || "No client"} {r.date && <>&middot; {r.date}</>}
+                </p>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>

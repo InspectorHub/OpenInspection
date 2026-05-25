@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLoaderData, Link } from "react-router";
+import { useState, useCallback } from "react";
+import { useLoaderData, Link, useNavigate } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
@@ -156,6 +156,32 @@ export default function DashboardPage() {
       return next;
     });
 
+  /* ---- CSV export ---- */
+  const exportCsv = useCallback(() => {
+    const rows = Object.values(filteredBuckets).flat();
+    if (rows.length === 0) return;
+    const header = ["Address", "Client", "Date", "Status", "Price"];
+    const csvRows = [
+      header.join(","),
+      ...rows.map((i) =>
+        [
+          `"${(i.address || "").replace(/"/g, '""')}"`,
+          `"${(i.clientName || "").replace(/"/g, '""')}"`,
+          i.date || "",
+          i.status,
+          i.price != null ? String(i.price) : "",
+        ].join(","),
+      ),
+    ];
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inspections-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filteredBuckets]);
+
   /* ---- Stat cards ---- */
   const statCards = [
     { label: "Upcoming", count: counts.upcoming, color: "indigo" as const, icon: CalendarIcon },
@@ -207,7 +233,7 @@ export default function DashboardPage() {
             <ColumnsIcon />
             Columns
           </button>
-          <button className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
+          <button onClick={exportCsv} className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
             <ExportIcon />
             Export
           </button>
@@ -305,7 +331,7 @@ export default function DashboardPage() {
                     {items.map((insp) => (
                       <Link
                         key={insp.id}
-                        to={`/inspections/${insp.id}`}
+                        to={`/inspections/${insp.id}/edit`}
                         className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
                       >
                         <div className="min-w-0">
@@ -428,6 +454,15 @@ function FilterIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+    </svg>
+  );
+}
+
+function ColumnsIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   );
 }

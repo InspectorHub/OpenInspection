@@ -28,6 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const workspaceName = String(formData.get("workspaceName") || "");
+  const adminName = String(formData.get("adminName") || "");
   const email = String(formData.get("email") || "");
   const password = String(formData.get("password") || "");
   const setupCode = String(formData.get("setupCode") || "");
@@ -35,7 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     const res = await apiFetch("/api/auth/setup", {
       method: "POST",
-      body: JSON.stringify({ workspaceName, email, password, setupCode }),
+      body: JSON.stringify({ workspaceName, adminName, email, password, setupCode }),
       csrf: true,
     });
 
@@ -102,6 +103,22 @@ export default function SetupPage() {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+              Your name
+            </label>
+            <input
+              name="adminName"
+              type="text"
+              required
+              autoComplete="name"
+              placeholder="Mike Reynolds"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
+            />
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Shown on your public booking link, signed agreements, and invoices.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
               Admin email
             </label>
             <input
@@ -131,9 +148,12 @@ export default function SetupPage() {
               name="setupCode"
               type="text"
               required
-              placeholder="From your server admin"
+              placeholder="000000"
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
             />
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Find the 6-digit code in your Cloudflare deployment logs, or check the <code className="px-1 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-300 font-mono text-[10px]">setup_verification_code</code> key in KV namespace.
+            </p>
           </div>
 
           {actionData?.error && (

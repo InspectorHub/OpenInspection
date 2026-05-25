@@ -24,6 +24,9 @@ export default [
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("observe/inspections/:id", "routes/public/observe.tsx"),
   ]),
+  // Standalone pages (own chrome, no sidebar)
+  route("setup", "routes/setup.tsx"),
+  route("inspections/:id/form", "routes/form-renderer.tsx"),
   // Error / utility pages (bare, outside auth)
   route("not-found", "routes/not-found.tsx"),
   route("feature-disabled", "routes/feature-disabled.tsx"),

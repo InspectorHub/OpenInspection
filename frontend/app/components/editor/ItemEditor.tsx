@@ -156,11 +156,20 @@ export function ItemEditor({ item, sectionTitle, result, onRating, onNotes, onNo
         </div>
       )}
 
-      {/* Notes textarea */}
+      {/* Notes textarea with character count */}
       <div>
-        <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-          Notes
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            Notes
+          </label>
+          <span className={`text-[10px] font-mono tabular-nums ${
+            ((result.notes as string) || "").length > 2000
+              ? "text-rose-500"
+              : "text-slate-400"
+          }`}>
+            {((result.notes as string) || "").length} chars
+          </span>
+        </div>
         <textarea
           value={(result.notes as string) || ""}
           onChange={(e) => onNotes(e.target.value)}
@@ -253,18 +262,32 @@ export function ItemEditor({ item, sectionTitle, result, onRating, onNotes, onNo
         </div>
       )}
 
-      {/* Photo strip placeholder */}
+      {/* Photo strip with count badge */}
       <div>
-        <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-          Photos
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            Photos
+          </label>
+          {((result.photos as unknown[]) || []).length > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              </svg>
+              {((result.photos as unknown[]) || []).length}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
-          <span className="text-[11px] text-slate-400">{((result.photos as unknown[]) || []).length} photos</span>
+          <span className="text-[11px] text-slate-400">
+            {((result.photos as unknown[]) || []).length === 0
+              ? "No photos yet"
+              : `${((result.photos as unknown[]) || []).length} photo${((result.photos as unknown[]) || []).length === 1 ? "" : "s"}`}
+          </span>
         </div>
       </div>
     </div>

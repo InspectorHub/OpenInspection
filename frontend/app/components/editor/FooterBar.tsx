@@ -50,10 +50,10 @@ export function FooterBar() {
 
       <span className="flex-1" />
 
-      {/* Sync status */}
+      {/* Sync status — reads from the inspection-edit page state */}
       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-bold text-[10px]">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-        Synced
+        Connected
       </span>
     </div>
   );
