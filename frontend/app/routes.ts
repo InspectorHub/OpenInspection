@@ -9,6 +9,8 @@ export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
+  // Full-screen editor (own chrome, no sidebar)
+  route("inspections/:id/edit", "routes/inspection-edit.tsx"),
   layout("routes/auth-layout.tsx", [
     route("dashboard", "routes/dashboard.tsx"),
     route("calendar", "routes/calendar.tsx"),
