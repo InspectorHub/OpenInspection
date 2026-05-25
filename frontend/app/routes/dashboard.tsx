@@ -52,7 +52,14 @@ interface DashboardData {
 /*  Column registry                                                    */
 /* ------------------------------------------------------------------ */
 
-const COLUMN_REGISTRY = [
+interface ColumnDef {
+  id: string;
+  label: string;
+  defaultOn: boolean;
+  alwaysOn?: boolean;
+}
+
+const COLUMN_REGISTRY: ColumnDef[] = [
   { id: "propertyAddress", label: "Property Address", defaultOn: true, alwaysOn: true },
   { id: "clientName", label: "Client Name", defaultOn: true },
   { id: "date", label: "Inspection Date", defaultOn: true },
@@ -65,7 +72,7 @@ const COLUMN_REGISTRY = [
   { id: "orderId", label: "Order ID", defaultOn: false },
   { id: "referralSource", label: "Referral Source", defaultOn: false },
   { id: "propertyFacts", label: "Property Facts", defaultOn: false },
-] as const;
+];
 
 const DEFAULT_COLUMNS = COLUMN_REGISTRY.filter((c) => c.defaultOn).map((c) => c.id);
 const ALWAYS_ON = new Set(COLUMN_REGISTRY.filter((c) => c.alwaysOn).map((c) => c.id));
@@ -295,7 +302,7 @@ export default function DashboardPage() {
 
   /* ---- Columns (persisted in localStorage) ---- */
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    if (typeof window === "undefined") return DEFAULT_COLUMNS as unknown as string[];
+    if (typeof window === "undefined") return DEFAULT_COLUMNS;
     try {
       const raw = localStorage.getItem("oi.dashboard.columns");
       if (raw) {
@@ -303,7 +310,7 @@ export default function DashboardPage() {
         if (Array.isArray(parsed)) return parsed;
       }
     } catch { /* fallback */ }
-    return DEFAULT_COLUMNS as unknown as string[];
+    return DEFAULT_COLUMNS;
   });
 
   const isColumnVisible = useCallback(
@@ -321,7 +328,7 @@ export default function DashboardPage() {
   }, []);
 
   const resetColumns = useCallback(() => {
-    const def = DEFAULT_COLUMNS as unknown as string[];
+    const def = DEFAULT_COLUMNS;
     setVisibleColumns(def);
     try { localStorage.setItem("oi.dashboard.columns", JSON.stringify(def)); } catch { /* ignore */ }
   }, []);

@@ -349,7 +349,7 @@ export default function TemplateEditPage() {
   }
 
   /* ---- Save ---- */
-  function toV2Payload(): TemplateSchema {
+  function toV2Payload(): Record<string, unknown> {
     return {
       schemaVersion: 2,
       sections: sections.map((s) => ({
@@ -402,7 +402,7 @@ export default function TemplateEditPage() {
           if (typeof l.isDefect === "boolean") lv.isDefect = l.isDefect;
           if (typeof l.default === "boolean") lv.default = l.default;
           if (l.description) lv.description = l.description;
-          return lv as RatingLevel;
+          return lv as unknown as RatingLevel;
         }),
       } : undefined,
     };

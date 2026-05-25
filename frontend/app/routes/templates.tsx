@@ -461,7 +461,7 @@ export default function TemplatesPage() {
               </button>
             </div>
             {fetcherData?.error && (
-              <p className="mt-3 text-[12px] text-red-500 font-medium">{fetcherData.error as string}</p>
+              <p className="mt-3 text-[12px] text-red-500 font-medium">{String(fetcherData.error)}</p>
             )}
           </div>
         </div>

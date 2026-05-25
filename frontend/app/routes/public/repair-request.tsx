@@ -129,7 +129,7 @@ export default function CustomerRepairRequestPage() {
   const grouped = groupBySection(data.defects);
 
   async function sendEmail() {
-    if (!email || sending) return;
+    if (!email || sending || !data) return;
     setSending(true);
     setToast(null);
     try {
