@@ -11,6 +11,21 @@ export default [
   route("logout", "routes/logout.tsx"),
   // Full-screen editor (own chrome, no sidebar)
   route("inspections/:id/edit", "routes/inspection-edit.tsx"),
+  // Public pages — no auth, minimal layout, SSR for SEO
+  layout("routes/public-layout.tsx", [
+    route("book/:tenant/:slug", "routes/public/booking.tsx"),
+    route("report/:tenant/:id", "routes/public/report.tsx"),
+    route(
+      "agreements/sign/:tenant/:token",
+      "routes/public/agreement-sign.tsx",
+    ),
+    route("r/:id/invoice", "routes/public/invoice.tsx"),
+    route("verify/:envelopeId", "routes/public/verify.tsx"),
+    route("observe/inspections/:id", "routes/public/observe.tsx"),
+  ]),
+  // Error / utility pages (bare, outside auth)
+  route("not-found", "routes/not-found.tsx"),
+  route("feature-disabled", "routes/feature-disabled.tsx"),
   layout("routes/auth-layout.tsx", [
     route("dashboard", "routes/dashboard.tsx"),
     route("calendar", "routes/calendar.tsx"),
