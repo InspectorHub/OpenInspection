@@ -1,16 +1,50 @@
 /**
  * Server-side API client for calling the Hono API from Remix loaders/actions.
  *
- * Uses plain `fetch` rather than hono/client because the API routes use
- * OpenAPI-style `createRoute()` which doesn't produce the chained type
- * signature that `hc<T>()` needs.
+ * Two clients are available:
+ *
+ * 1. `createApi(token?)` — typed RPC client via `hc<CoreApiType>()`. Provides
+ *    full autocompletion for every chained `.route()` endpoint. Preferred for
+ *    new code.
+ *
+ * 2. `apiFetch(path, init?)` — low-level fetch wrapper. Kept as a fallback
+ *    for routes not yet captured by the hc<> type (inline `app.get('/api/...')`
+ *    handlers) and for CSRF double-submit flows.
  */
+
+import { hc } from "hono/client";
+import type { CoreApiType } from "../../../packages/api-types";
 
 function getApiUrl(): string {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const fromEnv =
     typeof process !== "undefined" ? process.env?.API_URL : undefined;
   return fromEnv || "http://localhost:8788";
+}
+
+/**
+ * Typed RPC client for the Hono API. Routes registered via chained `.route()`
+ * calls in `api/src/index.ts` are captured in `CoreApiType` — e.g.:
+ *
+ * ```ts
+ * const api = createApi(token);
+ * const res = await api.api.inspections.$get();
+ * ```
+ *
+ * Known limitation: the deeply nested `MergeSchemaPath<>` intersection in
+ * `CoreApiType` exceeds TypeScript's structural check depth for `hc<T>`'s
+ * `T extends Hono<any,any,any>` constraint. The cast bridges this gap.
+ * Once sub-routers also chain their `.openapi()` calls (instead of void),
+ * the type will carry full request/response shapes.
+ */
+export function createApi(token?: string) {
+  // @ts-expect-error — CoreApiType's 43-deep MergeSchemaPath intersection
+  // exceeds TS's structural check depth for hc<T>'s `T extends Hono<any,any,any>`.
+  // The returned client is still typed at call-sites once sub-routers chain
+  // their .openapi() calls.
+  return hc<CoreApiType>(getApiUrl(), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
 }
 
 /**

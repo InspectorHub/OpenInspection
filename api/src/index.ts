@@ -450,22 +450,92 @@ app.use('/api/*', touchLastActiveMiddleware);
 // API Routes
 app.use('/api/*', requireActiveSubscription);
 
-// Module Routes
-// Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
-app.route('/api/auth', coreAuthRoutes);
-app.route('/', coreAuthRoutes);
-// Design System 0520 subsystem C — guest + billing.
-app.route('/api/guest', guestRoutes);
-app.route('/api/billing', billingRoutes);
-// Design System 0520 subsystem E — identity / integrations / analytics.
-app.route('/api/identities', identityRoutes);
-app.route('/api/integrations', integrationsApiRoutes);
-app.route('/api/analytics', analyticsRoutes);
-app.route('/api/inspections', inspectionsRoutes);
-// Design System 0520 subsystem B phase 2 — tenant-level presence channel
-// (one WS per dashboard tab). Per-inspection presence is mounted inline on
-// inspectionsRoutes above as /api/inspections/:id/presence/ws.
-app.route('/api/tenant', tenantPresenceRoutes);
+// Module Routes — chained so that `typeof routes` accumulates every sub-router's
+// path schema, enabling typed `hc<CoreApiType>()` API calls in the future.
+//
+// Currently the sub-routers themselves use void `.openapi()` calls, so the
+// merged schema carries only path shapes (not request/response types). Once
+// sub-routers are also refactored to chain their `.openapi()` calls, the full
+// endpoint types will propagate automatically through this chain.
+//
+// Middleware `.use()` and inline `.get()` handlers are kept as separate `app.*`
+// statements (above and below) since they don't affect the route type signature.
+const routes = app
+  // Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
+  .route('/api/auth', coreAuthRoutes)
+  .route('/', coreAuthRoutes)
+  // Design System 0520 subsystem C — guest + billing.
+  .route('/api/guest', guestRoutes)
+  .route('/api/billing', billingRoutes)
+  // Design System 0520 subsystem E — identity / integrations / analytics.
+  .route('/api/identities', identityRoutes)
+  .route('/api/integrations', integrationsApiRoutes)
+  .route('/api/analytics', analyticsRoutes)
+  .route('/api/inspections', inspectionsRoutes)
+  // Design System 0520 subsystem B phase 2 — tenant-level presence channel
+  // (one WS per dashboard tab). Per-inspection presence is mounted inline on
+  // inspectionsRoutes above as /api/inspections/:id/presence/ws.
+  .route('/api/tenant', tenantPresenceRoutes)
+  .route('/api/inspections', inspectionSyncRoutes)
+  // Sprint 3 S3-3 — tag link/unlink endpoints share the /api/inspections root
+  // so the URL carries inspection id + item id directly. Mounted before the
+  // generic inspection routes finish registering so OpenAPI catches both.
+  .route('/api/inspections', inspectionTagRoutes)
+  .route('/api/tags', tagsRoutes)
+  .route('/api/inspection-requests', inspectionRequestsRoutes)
+  .route('/api/ai', aiRoutes)
+  .route('/api/public', bookingsRoutes)
+  .route('/api/public/widget', widgetRoutes)
+  // Booking #7 Sprint A — slug availability check; lives under /api/public so
+  // the slug input on /settings/profile (and any future un-authed pages) can
+  // hit it without a JWT.
+  .route('/api/public', publicSlugRoutes)
+  // Booking #7 Sprint A — authenticated profile endpoints (slug write).
+  .route('/api/profile', profileRoutes)
+  // Sprint 3 Track B (S3-2) — Customer-driven Repair Request export.
+  // Public, token-gated like /report/:id; the email endpoint validates the
+  // per-tenant enable_customer_repair_export flag + payment + agreement gates
+  // before sending.
+  .route('/api/public', repairRequestRoutes)
+  // UC-C-7 — public share-token mint (customer Forward report flow).
+  .route('/api/public', publicShareRoutes)
+  .route('/api/admin', adminRoutes)
+  .route('/api/agent', agentRoutes)
+  // Agent Accounts A1 — invite + accept endpoints
+  .route('/api/agents', agentsRoutes)
+  // Agent Accounts A1 — self-serve signup
+  .route('/api/agent-signup', agentSignupRoutes)
+  // Agent Accounts A3 — concierge magic-link confirmation (public, no JWT)
+  .route('/api/concierge', conciergeRoutes)
+  .route('/api/places', placesRoutes)
+  .route('/api/availability', availabilityRoutes)
+  // Mount /api/calendar/events BEFORE /api/calendar so the more-specific path takes precedence.
+  .route('/api/calendar/events', calendarEventsRoutes)
+  .route('/api/calendar', calendarRoutes)
+  .route('/api/team', teamRoutes)
+  .route('/api/contacts', contactRoutes)
+  .route('/api/recommendations', recommendationsRoutes)
+  .route('/api/rating-systems', ratingSystemsRoutes)
+  .route('/api', eventsRoutes)
+  .route('/api/invoices', invoiceRoutes)
+  .route('/api/services', servicesRoutes)
+  .route('/api/automations', automationsRoutes)
+  .route('/api/metrics', metricsRoutes)
+  .route('/api/templates/marketplace', marketplaceRoutes)
+  // Sprint 2 S2-6 — migrate inspections from one template to another.
+  // Mounted at /api/templates so the path is /api/templates/:oldId/migrate-to/:newId.
+  .route('/api/templates', templateMigrationRoutes)
+  .route('/api/data', dataRoutes)
+  .route('/api/integration', integrationRoutes)
+  .route('/api/ics', icsRoutes)
+  .route('/api/users', userRoutes)
+  .route('/api/messages', messageRoutes)
+  .route('/api/notifications', notificationsRoutes)
+  .route('/settings/integrations/qbo', qboRoutes)
+  .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
+  // Profile-gated setup wizard — 404s in saas modes (see features/setup-wizard).
+  .route('/setup', setupWizardRoutes())
+;
 
 // Design System 0520 subsystem D phase 4/5 — anonymous observer claim.
 // Public route — exchanges a one-time token for a __Host-observer_session
@@ -497,63 +567,6 @@ app.get('/observe/:token', async (c) => {
     });
     return c.redirect(`/observe/inspections/${out.inspectionId}`);
 });
-app.route('/api/inspections', inspectionSyncRoutes);
-// Sprint 3 S3-3 — tag link/unlink endpoints share the /api/inspections root
-// so the URL carries inspection id + item id directly. Mounted before the
-// generic inspection routes finish registering so OpenAPI catches both.
-app.route('/api/inspections', inspectionTagRoutes);
-app.route('/api/tags', tagsRoutes);
-app.route('/api/inspection-requests', inspectionRequestsRoutes);
-app.route('/api/ai', aiRoutes);
-app.route('/api/public', bookingsRoutes);
-app.route('/api/public/widget', widgetRoutes);
-// Booking #7 Sprint A — slug availability check; lives under /api/public so
-// the slug input on /settings/profile (and any future un-authed pages) can
-// hit it without a JWT.
-app.route('/api/public', publicSlugRoutes);
-// Booking #7 Sprint A — authenticated profile endpoints (slug write).
-app.route('/api/profile', profileRoutes);
-// Sprint 3 Track B (S3-2) — Customer-driven Repair Request export.
-// Public, token-gated like /report/:id; the email endpoint validates the
-// per-tenant enable_customer_repair_export flag + payment + agreement gates
-// before sending.
-app.route('/api/public', repairRequestRoutes);
-// UC-C-7 — public share-token mint (customer Forward report flow).
-app.route('/api/public', publicShareRoutes);
-app.route('/api/admin', adminRoutes);
-app.route('/api/agent', agentRoutes);
-// Agent Accounts A1 — invite + accept endpoints
-app.route('/api/agents', agentsRoutes);
-// Agent Accounts A1 — self-serve signup
-app.route('/api/agent-signup', agentSignupRoutes);
-// Agent Accounts A3 — concierge magic-link confirmation (public, no JWT)
-app.route('/api/concierge', conciergeRoutes);
-app.route('/api/places', placesRoutes);
-app.route('/api/availability', availabilityRoutes);
-// Mount /api/calendar/events BEFORE /api/calendar so the more-specific path takes precedence.
-app.route('/api/calendar/events', calendarEventsRoutes);
-app.route('/api/calendar', calendarRoutes);
-app.route('/api/team', teamRoutes);
-app.route('/api/contacts', contactRoutes);
-app.route('/api/recommendations', recommendationsRoutes);
-app.route('/api/rating-systems', ratingSystemsRoutes);
-app.route('/api', eventsRoutes);
-app.route('/api/invoices', invoiceRoutes);
-app.route('/api/services', servicesRoutes);
-app.route('/api/automations', automationsRoutes);
-app.route('/api/metrics', metricsRoutes);
-app.route('/api/templates/marketplace', marketplaceRoutes);
-// Sprint 2 S2-6 — migrate inspections from one template to another.
-// Mounted at /api/templates so the path is /api/templates/:oldId/migrate-to/:newId.
-app.route('/api/templates', templateMigrationRoutes);
-app.route('/api/data', dataRoutes);
-app.route('/api/integration', integrationRoutes);
-app.route('/api/ics', icsRoutes);
-app.route('/api/users', userRoutes);
-app.route('/api/messages', messageRoutes);
-app.route('/api/notifications', notificationsRoutes);
-app.route('/settings/integrations/qbo', qboRoutes);
-app.route('/api/integrations/qbo/webhook', qboWebhookRoutes);
 
 // OpenAPI Documentation
 app.doc('/doc', {
@@ -708,9 +721,6 @@ app.get('/guest-join', (c) => {
     const token = c.req.query('token') ?? '';
     return c.html(GuestJoinPage({ token, ...(branding ? { branding } : {}) }));
 });
-
-// Profile-gated setup wizard — 404s in saas modes (see features/setup-wizard).
-app.route('/setup', setupWizardRoutes());
 
 // Agent Accounts A1 — public invite acceptance landing.
 // Lifecycle: missing/unknown/expired/used token -> friendly recovery page (410).
@@ -2600,4 +2610,13 @@ export { TenantPresenceDO     } from './durable-objects/tenant-presence';
 export { app };
 
 // Remix migration — typed RPC client for the frontend Remix app.
-export type CoreApiType = typeof app;
+// `routes` carries the accumulated path schemas from all chained `.route()`
+// calls. Currently the sub-routers use void `.openapi()` calls (not chained),
+// so request/response types are blank. Once sub-routers also chain their
+// `.openapi()` calls, `hc<CoreApiType>()` will provide full type inference.
+//
+// Known limitation: TypeScript can't verify that the deeply nested
+// `OpenAPIHono<E, S_merged, B>` satisfies `Hono<any,any,any>` when S_merged
+// has 40+ intersected MergeSchemaPath entries. The frontend uses `as any` to
+// bridge this constraint until sub-router types are individually chained.
+export type CoreApiType = typeof routes;
