@@ -3,6 +3,9 @@ import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { SectionRail } from "~/components/editor/SectionRail";
+import { ItemList } from "~/components/editor/ItemList";
+import { ItemEditor } from "~/components/editor/ItemEditor";
 
 export function meta() {
   return [{ title: "Edit Inspection - OpenInspection" }];
@@ -97,46 +100,6 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Rating button config                                               */
-/* ------------------------------------------------------------------ */
-
-const RATINGS = [
-  {
-    id: "SAT",
-    label: "Sat",
-    active: "bg-emerald-100 text-emerald-700 ring-2 ring-emerald-400 dark:bg-emerald-900/30 dark:text-emerald-400",
-  },
-  {
-    id: "MON",
-    label: "Mon",
-    active: "bg-amber-100 text-amber-700 ring-2 ring-amber-400 dark:bg-amber-900/30 dark:text-amber-400",
-  },
-  {
-    id: "DEF",
-    label: "Def",
-    active: "bg-rose-100 text-rose-700 ring-2 ring-rose-400 dark:bg-rose-900/30 dark:text-rose-400",
-  },
-  {
-    id: "NI",
-    label: "N/I",
-    active: "bg-slate-200 text-slate-700 ring-2 ring-slate-400 dark:bg-slate-600/30 dark:text-slate-300",
-  },
-  {
-    id: "NP",
-    label: "N/P",
-    active: "bg-slate-200 text-slate-700 ring-2 ring-slate-400 dark:bg-slate-600/30 dark:text-slate-300",
-  },
-] as const;
-
-/** Map rating to dot color for the item list */
-function ratingDotClass(rating: string): string {
-  if (rating === "Satisfactory" || rating === "SAT") return "bg-emerald-500";
-  if (rating === "Monitor" || rating === "MON") return "bg-amber-500";
-  if (rating === "Defect" || rating === "DEF") return "bg-rose-500";
-  return "bg-slate-300";
-}
-
-/* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -225,59 +188,24 @@ export default function InspectionEditPage() {
       {/* ------------------------------------------------------------ */}
       <div className="flex flex-1 pt-14">
         {/* Column 1: Section Rail (200px) */}
-        <aside className="w-[200px] flex-shrink-0 border-r border-slate-200 dark:border-slate-700 overflow-y-auto bg-slate-50 dark:bg-slate-800/50">
-          <nav className="p-2 space-y-0.5">
-            {schema.sections?.map((section: SchemaSection) => (
-              <button
-                key={section.id}
-                onClick={() => {
-                  setActiveSection(section.id);
-                  setActiveItemId(null);
-                }}
-                className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all ${
-                  activeSection === section.id
-                    ? "bg-indigo-50 text-indigo-600 font-bold border-l-2 border-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50"
-                }`}
-              >
-                {section.title}
-                <span className="ml-1 text-[10px] text-slate-400">
-                  {section.items?.length || 0}
-                </span>
-              </button>
-            ))}
-          </nav>
-        </aside>
+        <SectionRail
+          sections={schema.sections || []}
+          activeSection={activeSection}
+          onSelect={(id) => {
+            setActiveSection(id);
+            setActiveItemId(null);
+          }}
+          results={results}
+        />
 
         {/* Column 2: Item List (280px) */}
-        <div className="w-[280px] flex-shrink-0 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
-          <div className="p-2 space-y-0.5">
-            {currentItems.map((item: SchemaItem, idx: number) => {
-              const result = getResult(item.id);
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveItemId(item.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all flex items-center gap-2 ${
-                    activeItemId === item.id
-                      ? "bg-white dark:bg-slate-800 shadow-sm border-l-[3px] border-indigo-600 font-medium"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                  }`}
-                >
-                  <span className="text-[10px] text-slate-400 font-mono w-5">
-                    {String(idx + 1).padStart(2, "0")}
-                  </span>
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {result.rating && (
-                    <span
-                      className={`w-2 h-2 rounded-full ${ratingDotClass(result.rating as string)}`}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <ItemList
+          items={currentItems}
+          sectionId={activeSection}
+          activeItemId={activeItemId}
+          onSelect={(id) => setActiveItemId(id)}
+          results={results}
+        />
 
         {/* Column 3: Item Editor (flex-1, focal) */}
         <main className="flex-1 overflow-y-auto border-t-2 border-indigo-600 p-6">
@@ -337,68 +265,3 @@ export default function InspectionEditPage() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  ItemEditor sub-component                                           */
-/* ------------------------------------------------------------------ */
-
-function ItemEditor({
-  item,
-  sectionTitle,
-  result,
-  onRating,
-  onNotes,
-  onNotesBlur,
-}: {
-  item: SchemaItem | undefined;
-  sectionTitle: string | undefined;
-  result: Record<string, unknown>;
-  onRating: (rating: string) => void;
-  onNotes: (notes: string) => void;
-  onNotesBlur: (notes: string) => void;
-}) {
-  if (!item) return null;
-
-  return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <div className="text-[11px] text-indigo-600 font-bold uppercase tracking-wide">
-          {sectionTitle}
-        </div>
-        <h2 className="text-[19px] font-bold mt-1">{item.label}</h2>
-      </div>
-
-      {/* Rating buttons */}
-      {item.type === "rich" && (
-        <div className="flex gap-2">
-          {RATINGS.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => onRating(r.id)}
-              className={`flex-1 h-[52px] rounded-lg text-[13px] font-bold transition-all ${
-                result.rating === r.id
-                  ? r.active
-                  : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Notes textarea */}
-      <div>
-        <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-          Notes
-        </label>
-        <textarea
-          value={(result.notes as string) || ""}
-          onChange={(e) => onNotes(e.target.value)}
-          onBlur={(e) => onNotesBlur(e.target.value)}
-          placeholder="Add notes — type / for snippets"
-          className="w-full h-28 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[13px] resize-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
-        />
-      </div>
-    </div>
-  );
-}
