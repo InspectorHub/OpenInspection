@@ -1,0 +1,798 @@
+{
+  "id": "seed_mold_inspection_v1",
+  "name": "Mold Inspection",
+  "description": "Visual mold inspection with moisture mapping and air-quality sampling guidance.",
+  "version": 2,
+  "featured": true,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "visible-mold",
+        "title": "Visible Mold",
+        "items": [
+          {
+            "id": "basement-mold",
+            "label": "Basement Visible Mold",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_basement_mold_ok",
+                  "title": "Condition",
+                  "comment": "Basement Visible Mold was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_basement_mold_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_basement_mold_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Basement Visible Mold requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_basement_mold_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Basement Visible Mold presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "attic-mold",
+            "label": "Attic Visible Mold",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_attic_mold_ok",
+                  "title": "Condition",
+                  "comment": "Attic Visible Mold was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_attic_mold_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_attic_mold_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Attic Visible Mold requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_attic_mold_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Attic Visible Mold presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "crawlspace",
+            "label": "Crawl Space Visible Mold",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_crawlspace_ok",
+                  "title": "Condition",
+                  "comment": "Crawl Space Visible Mold was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_crawlspace_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_crawlspace_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Crawl Space Visible Mold requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_crawlspace_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Crawl Space Visible Mold presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "living",
+            "label": "Living Areas Visible Mold",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_living_ok",
+                  "title": "Condition",
+                  "comment": "Living Areas Visible Mold was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_living_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_living_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Living Areas Visible Mold requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_living_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Living Areas Visible Mold presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "moisture-sources",
+        "title": "Moisture Sources",
+        "items": [
+          {
+            "id": "roof-leak",
+            "label": "Roof / Attic Leak Indicators",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_leak_ok",
+                  "title": "Condition",
+                  "comment": "Roof / Attic Leak Indicators was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_leak_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_leak_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Roof / Attic Leak Indicators requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_leak_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Roof / Attic Leak Indicators presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "plumb-leak",
+            "label": "Plumbing Leak Indicators",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_plumb_leak_ok",
+                  "title": "Condition",
+                  "comment": "Plumbing Leak Indicators was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_plumb_leak_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_plumb_leak_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Plumbing Leak Indicators requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_plumb_leak_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Plumbing Leak Indicators presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "grading",
+            "label": "Exterior Grading / Drainage",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_grading_ok",
+                  "title": "Condition",
+                  "comment": "Exterior Grading / Drainage was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_grading_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_grading_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Exterior Grading / Drainage requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_grading_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Exterior Grading / Drainage presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "hvac",
+        "title": "HVAC",
+        "items": [
+          {
+            "id": "coil",
+            "label": "Evaporator Coil Condition",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_coil_ok",
+                  "title": "Condition",
+                  "comment": "Evaporator Coil Condition was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_coil_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_coil_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Evaporator Coil Condition requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_coil_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Evaporator Coil Condition presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "drain-pan",
+            "label": "Condensate Drain Pan",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_drain_pan_ok",
+                  "title": "Condition",
+                  "comment": "Condensate Drain Pan was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_drain_pan_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_drain_pan_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Condensate Drain Pan requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_drain_pan_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Condensate Drain Pan presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "ductwork",
+            "label": "Ductwork Visible Mold",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ductwork_ok",
+                  "title": "Condition",
+                  "comment": "Ductwork Visible Mold was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ductwork_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ductwork_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Ductwork Visible Mold requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_ductwork_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Ductwork Visible Mold presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "basement",
+        "title": "Basement",
+        "items": [
+          {
+            "id": "b-efflorescence",
+            "label": "Efflorescence on Walls",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_b_efflorescence_ok",
+                  "title": "Condition",
+                  "comment": "Efflorescence on Walls was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_b_efflorescence_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_b_efflorescence_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Efflorescence on Walls requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_b_efflorescence_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Efflorescence on Walls presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "b-humidity",
+            "label": "Relative Humidity (% reading)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_b_humidity_ok",
+                  "title": "Condition",
+                  "comment": "Relative Humidity (% reading) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_b_humidity_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_b_humidity_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Relative Humidity (% reading) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_b_humidity_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Relative Humidity (% reading) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "kitchen",
+        "title": "Kitchen",
+        "items": [
+          {
+            "id": "k-under-sink",
+            "label": "Under-Sink Cabinet Moisture",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_k_under_sink_ok",
+                  "title": "Condition",
+                  "comment": "Under-Sink Cabinet Moisture was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_k_under_sink_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_k_under_sink_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Under-Sink Cabinet Moisture requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_k_under_sink_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Under-Sink Cabinet Moisture presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "bathrooms",
+        "title": "Bath",
+        "items": [
+          {
+            "id": "bath-caulk",
+            "label": "Caulking & Grout Condition",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_bath_caulk_ok",
+                  "title": "Condition",
+                  "comment": "Caulking & Grout Condition was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_bath_caulk_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_bath_caulk_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Caulking & Grout Condition requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_bath_caulk_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Caulking & Grout Condition presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "bath-vent",
+            "label": "Exhaust Fan Operation",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_bath_vent_ok",
+                  "title": "Condition",
+                  "comment": "Exhaust Fan Operation was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_bath_vent_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_bath_vent_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Exhaust Fan Operation requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_bath_vent_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Exhaust Fan Operation presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

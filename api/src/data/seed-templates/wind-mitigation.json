@@ -1,0 +1,953 @@
+{
+  "id": "seed_wind_mitigation_v1",
+  "name": "Wind Mitigation Survey",
+  "description": "Florida-style Uniform Mitigation Verification (OIR-B1-1802) survey — captures features that may qualify the property for hurricane wind insurance discounts.",
+  "version": 2,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "building-code",
+        "title": "Building Code & Year Built",
+        "items": [
+          {
+            "id": "year-built",
+            "label": "Year Built / Permit Date",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_year_built_ok",
+                  "title": "Condition",
+                  "comment": "Year Built / Permit Date was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_year_built_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_year_built_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Year Built / Permit Date requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_year_built_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Year Built / Permit Date presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "fbc-compliance",
+            "label": "FBC / IRC Compliance Evidence",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fbc_compliance_ok",
+                  "title": "Condition",
+                  "comment": "FBC / IRC Compliance Evidence was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fbc_compliance_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fbc_compliance_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "FBC / IRC Compliance Evidence requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fbc_compliance_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "FBC / IRC Compliance Evidence presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "roof-covering",
+        "title": "Roof Covering",
+        "items": [
+          {
+            "id": "roof-material",
+            "label": "Roof Covering Type & Permit",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_material_ok",
+                  "title": "Condition",
+                  "comment": "Roof Covering Type & Permit was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_material_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_material_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Roof Covering Type & Permit requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_material_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Roof Covering Type & Permit presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "roof-install-year",
+            "label": "Roof Covering Installation Year",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_install_year_ok",
+                  "title": "Condition",
+                  "comment": "Roof Covering Installation Year was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_install_year_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_install_year_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Roof Covering Installation Year requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_install_year_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Roof Covering Installation Year presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "meets-fbc-2001",
+            "label": "Meets FBC 2001+ Compliance",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_meets_fbc_2001_ok",
+                  "title": "Condition",
+                  "comment": "Meets FBC 2001+ Compliance was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_meets_fbc_2001_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_meets_fbc_2001_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Meets FBC 2001+ Compliance requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_meets_fbc_2001_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Meets FBC 2001+ Compliance presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "roof-deck",
+        "title": "Roof Deck Attachment",
+        "items": [
+          {
+            "id": "deck-type",
+            "label": "Deck Type (Plywood/OSB/Other)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_deck_type_ok",
+                  "title": "Condition",
+                  "comment": "Deck Type (Plywood/OSB/Other) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_deck_type_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_deck_type_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Deck Type (Plywood/OSB/Other) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_deck_type_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Deck Type (Plywood/OSB/Other) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "nail-size",
+            "label": "Nail Size (6d / 8d / Larger)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_nail_size_ok",
+                  "title": "Condition",
+                  "comment": "Nail Size (6d / 8d / Larger) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_nail_size_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_nail_size_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Nail Size (6d / 8d / Larger) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_nail_size_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Nail Size (6d / 8d / Larger) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "nail-spacing",
+            "label": "Nail Spacing (Edge / Field)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_nail_spacing_ok",
+                  "title": "Condition",
+                  "comment": "Nail Spacing (Edge / Field) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_nail_spacing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_nail_spacing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Nail Spacing (Edge / Field) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_nail_spacing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Nail Spacing (Edge / Field) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "roof-to-wall",
+        "title": "Roof-to-Wall Attachment",
+        "items": [
+          {
+            "id": "attachment-type",
+            "label": "Toe Nails / Clips / Single Wrap / Double Wrap",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_attachment_type_ok",
+                  "title": "Condition",
+                  "comment": "Toe Nails / Clips / Single Wrap / Double Wrap was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_attachment_type_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_attachment_type_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Toe Nails / Clips / Single Wrap / Double Wrap requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_attachment_type_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Toe Nails / Clips / Single Wrap / Double Wrap presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "min-3-nails",
+            "label": "Minimum 3 Nails per Connector",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_min_3_nails_ok",
+                  "title": "Condition",
+                  "comment": "Minimum 3 Nails per Connector was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_min_3_nails_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_min_3_nails_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Minimum 3 Nails per Connector requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_min_3_nails_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Minimum 3 Nails per Connector presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "roof-geometry",
+        "title": "Roof Geometry",
+        "items": [
+          {
+            "id": "geometry",
+            "label": "Hip / Non-Hip / Other Geometry",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_geometry_ok",
+                  "title": "Condition",
+                  "comment": "Hip / Non-Hip / Other Geometry was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_geometry_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_geometry_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Hip / Non-Hip / Other Geometry requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_geometry_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Hip / Non-Hip / Other Geometry presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "hip-percentage",
+            "label": "Total Hip Roof Perimeter %",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_hip_percentage_ok",
+                  "title": "Condition",
+                  "comment": "Total Hip Roof Perimeter % was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_hip_percentage_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_hip_percentage_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Total Hip Roof Perimeter % requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_hip_percentage_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Total Hip Roof Perimeter % presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "secondary-water-resistance",
+        "title": "Secondary Water Resistance (SWR)",
+        "items": [
+          {
+            "id": "swr-present",
+            "label": "SWR Barrier Present",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_swr_present_ok",
+                  "title": "Condition",
+                  "comment": "SWR Barrier Present was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_swr_present_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_swr_present_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "SWR Barrier Present requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_swr_present_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "SWR Barrier Present presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "swr-meets-code",
+            "label": "SWR Meets Code Requirements",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_swr_meets_code_ok",
+                  "title": "Condition",
+                  "comment": "SWR Meets Code Requirements was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_swr_meets_code_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_swr_meets_code_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "SWR Meets Code Requirements requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_swr_meets_code_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "SWR Meets Code Requirements presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "opening-protection",
+        "title": "Opening Protection",
+        "items": [
+          {
+            "id": "windows-protect",
+            "label": "All Glazed Openings Protected",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_windows_protect_ok",
+                  "title": "Condition",
+                  "comment": "All Glazed Openings Protected was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_windows_protect_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_windows_protect_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "All Glazed Openings Protected requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_windows_protect_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "All Glazed Openings Protected presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "doors-protect",
+            "label": "All Exterior Doors Protected",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_doors_protect_ok",
+                  "title": "Condition",
+                  "comment": "All Exterior Doors Protected was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_doors_protect_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_doors_protect_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "All Exterior Doors Protected requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_doors_protect_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "All Exterior Doors Protected presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "garage-protect",
+            "label": "Garage Door Wind-Rated",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_garage_protect_ok",
+                  "title": "Condition",
+                  "comment": "Garage Door Wind-Rated was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_garage_protect_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_garage_protect_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Garage Door Wind-Rated requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_garage_protect_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Garage Door Wind-Rated presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "protection-class",
+            "label": "Protection Class (Impact-Rated A / Other B-C-N)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_protection_class_ok",
+                  "title": "Condition",
+                  "comment": "Protection Class (Impact-Rated A / Other B-C-N) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_protection_class_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_protection_class_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Protection Class (Impact-Rated A / Other B-C-N) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_protection_class_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Protection Class (Impact-Rated A / Other B-C-N) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,1454 @@
+{
+  "id": "seed_new_construction_v1",
+  "name": "New Construction Pre-Drywall Inspection",
+  "description": "Pre-drywall (mid-build) inspection template — captures framing, rough plumbing, rough electrical, and waterproofing before walls are closed up.",
+  "version": 2,
+  "featured": true,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "site",
+        "title": "Site & Foundation",
+        "items": [
+          {
+            "id": "lot-grading",
+            "label": "Lot Grading & Drainage",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_lot_grading_ok",
+                  "title": "Condition",
+                  "comment": "Lot Grading & Drainage was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_lot_grading_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_lot_grading_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Lot Grading & Drainage requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_lot_grading_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Lot Grading & Drainage presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "foundation-walls",
+            "label": "Foundation Walls (visible)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_foundation_walls_ok",
+                  "title": "Condition",
+                  "comment": "Foundation Walls (visible) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_foundation_walls_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_foundation_walls_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Foundation Walls (visible) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_foundation_walls_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Foundation Walls (visible) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "waterproofing",
+            "label": "Foundation Waterproofing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_waterproofing_ok",
+                  "title": "Condition",
+                  "comment": "Foundation Waterproofing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_waterproofing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_waterproofing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Foundation Waterproofing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_waterproofing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Foundation Waterproofing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "anchor-bolts",
+            "label": "Anchor Bolts / Hold-downs",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_anchor_bolts_ok",
+                  "title": "Condition",
+                  "comment": "Anchor Bolts / Hold-downs was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_anchor_bolts_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_anchor_bolts_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Anchor Bolts / Hold-downs requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_anchor_bolts_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Anchor Bolts / Hold-downs presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "framing",
+        "title": "Framing",
+        "items": [
+          {
+            "id": "floor-joists",
+            "label": "Floor Joists & Subfloor",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_floor_joists_ok",
+                  "title": "Condition",
+                  "comment": "Floor Joists & Subfloor was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_floor_joists_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_floor_joists_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Floor Joists & Subfloor requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_floor_joists_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Floor Joists & Subfloor presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "wall-framing",
+            "label": "Wall Studs & Plates",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_wall_framing_ok",
+                  "title": "Condition",
+                  "comment": "Wall Studs & Plates was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_wall_framing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_wall_framing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Wall Studs & Plates requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_wall_framing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Wall Studs & Plates presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "headers",
+            "label": "Headers & Lintels",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_headers_ok",
+                  "title": "Condition",
+                  "comment": "Headers & Lintels was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_headers_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_headers_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Headers & Lintels requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_headers_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Headers & Lintels presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "roof-framing",
+            "label": "Roof Trusses / Rafters",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_framing_ok",
+                  "title": "Condition",
+                  "comment": "Roof Trusses / Rafters was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_framing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_framing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Roof Trusses / Rafters requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_framing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Roof Trusses / Rafters presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "sheathing",
+            "label": "Wall & Roof Sheathing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_sheathing_ok",
+                  "title": "Condition",
+                  "comment": "Wall & Roof Sheathing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_sheathing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_sheathing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Wall & Roof Sheathing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_sheathing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Wall & Roof Sheathing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "fasteners",
+            "label": "Nail Patterns & Fasteners",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fasteners_ok",
+                  "title": "Condition",
+                  "comment": "Nail Patterns & Fasteners was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fasteners_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fasteners_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Nail Patterns & Fasteners requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fasteners_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Nail Patterns & Fasteners presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "building-envelope",
+        "title": "Building Envelope",
+        "items": [
+          {
+            "id": "house-wrap",
+            "label": "House Wrap / Weather Barrier",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_house_wrap_ok",
+                  "title": "Condition",
+                  "comment": "House Wrap / Weather Barrier was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_house_wrap_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_house_wrap_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "House Wrap / Weather Barrier requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_house_wrap_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "House Wrap / Weather Barrier presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "window-flashing",
+            "label": "Window Rough Openings & Flashing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_window_flashing_ok",
+                  "title": "Condition",
+                  "comment": "Window Rough Openings & Flashing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_window_flashing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_window_flashing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Window Rough Openings & Flashing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_window_flashing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Window Rough Openings & Flashing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "door-flashing",
+            "label": "Door Rough Openings & Flashing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_door_flashing_ok",
+                  "title": "Condition",
+                  "comment": "Door Rough Openings & Flashing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_door_flashing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_door_flashing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Door Rough Openings & Flashing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_door_flashing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Door Rough Openings & Flashing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "roof-underlay",
+            "label": "Roof Underlayment / Ice & Water",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_underlay_ok",
+                  "title": "Condition",
+                  "comment": "Roof Underlayment / Ice & Water was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_underlay_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_underlay_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Roof Underlayment / Ice & Water requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_underlay_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Roof Underlayment / Ice & Water presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "rough-plumbing",
+        "title": "Rough Plumbing",
+        "items": [
+          {
+            "id": "supply-lines",
+            "label": "Supply Line Materials & Routing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_supply_lines_ok",
+                  "title": "Condition",
+                  "comment": "Supply Line Materials & Routing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_supply_lines_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_supply_lines_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Supply Line Materials & Routing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_supply_lines_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Supply Line Materials & Routing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "dwv",
+            "label": "Drain / Waste / Vent (DWV)",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_dwv_ok",
+                  "title": "Condition",
+                  "comment": "Drain / Waste / Vent (DWV) was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_dwv_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_dwv_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Drain / Waste / Vent (DWV) requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_dwv_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Drain / Waste / Vent (DWV) presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "pressure-test",
+            "label": "Pressure Test Verification",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_pressure_test_ok",
+                  "title": "Condition",
+                  "comment": "Pressure Test Verification was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_pressure_test_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_pressure_test_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Pressure Test Verification requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_pressure_test_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Pressure Test Verification presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "shut-offs",
+            "label": "Shut-off Valve Locations",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_shut_offs_ok",
+                  "title": "Condition",
+                  "comment": "Shut-off Valve Locations was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_shut_offs_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_shut_offs_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Shut-off Valve Locations requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_shut_offs_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Shut-off Valve Locations presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "rough-electrical",
+        "title": "Rough Electrical",
+        "items": [
+          {
+            "id": "panel-location",
+            "label": "Service Panel Location & Size",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_panel_location_ok",
+                  "title": "Condition",
+                  "comment": "Service Panel Location & Size was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_panel_location_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_panel_location_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Service Panel Location & Size requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_panel_location_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Service Panel Location & Size presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "wire-routing",
+            "label": "Wire Routing & Stapling",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_wire_routing_ok",
+                  "title": "Condition",
+                  "comment": "Wire Routing & Stapling was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_wire_routing_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_wire_routing_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Wire Routing & Stapling requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_wire_routing_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Wire Routing & Stapling presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "box-install",
+            "label": "Receptacle / Switch Box Install",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_box_install_ok",
+                  "title": "Condition",
+                  "comment": "Receptacle / Switch Box Install was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_box_install_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_box_install_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Receptacle / Switch Box Install requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_box_install_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Receptacle / Switch Box Install presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "grounding",
+            "label": "Grounding & Bonding",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_grounding_ok",
+                  "title": "Condition",
+                  "comment": "Grounding & Bonding was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_grounding_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_grounding_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Grounding & Bonding requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_grounding_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Grounding & Bonding presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "hvac-rough",
+        "title": "HVAC Rough-In",
+        "items": [
+          {
+            "id": "duct-install",
+            "label": "Ductwork Installation & Sealing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_duct_install_ok",
+                  "title": "Condition",
+                  "comment": "Ductwork Installation & Sealing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_duct_install_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_duct_install_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Ductwork Installation & Sealing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_duct_install_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Ductwork Installation & Sealing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "register-loc",
+            "label": "Register / Return Locations",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_register_loc_ok",
+                  "title": "Condition",
+                  "comment": "Register / Return Locations was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_register_loc_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_register_loc_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Register / Return Locations requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_register_loc_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Register / Return Locations presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "equip-pad",
+            "label": "Equipment Pad / Platform",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_equip_pad_ok",
+                  "title": "Condition",
+                  "comment": "Equipment Pad / Platform was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_equip_pad_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_equip_pad_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Equipment Pad / Platform requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_equip_pad_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Equipment Pad / Platform presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "insulation-readiness",
+        "title": "Insulation Readiness",
+        "items": [
+          {
+            "id": "air-seal",
+            "label": "Air Sealing at Penetrations",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_air_seal_ok",
+                  "title": "Condition",
+                  "comment": "Air Sealing at Penetrations was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_air_seal_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_air_seal_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Air Sealing at Penetrations requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_air_seal_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Air Sealing at Penetrations presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "fire-caulk",
+            "label": "Fire Caulk at Plates / Penetrations",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fire_caulk_ok",
+                  "title": "Condition",
+                  "comment": "Fire Caulk at Plates / Penetrations was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fire_caulk_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fire_caulk_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Fire Caulk at Plates / Penetrations requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fire_caulk_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Fire Caulk at Plates / Penetrations presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "blocking",
+            "label": "Blocking for Fixtures",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_blocking_ok",
+                  "title": "Condition",
+                  "comment": "Blocking for Fixtures was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_blocking_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_blocking_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Blocking for Fixtures requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_blocking_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Blocking for Fixtures presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
