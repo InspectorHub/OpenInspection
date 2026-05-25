@@ -340,11 +340,31 @@ const forgotPasswordRoute = createRoute(withMcpMetadata({
                 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') }
             },
             description: 'Reset email sent (if user exists)'
+        },
+        410: {
+            content: {
+                'application/json': { schema: z.object({ success: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }) }
+            },
+            description: 'Password reset disabled — shared-SaaS tenants must use the workspace portal'
         }
     }
 }, { scopes: [], tier: 'excluded' }));
 
 coreAuthRoutes.openapi(forgotPasswordRoute, async (c) => {
+    // Shared-SaaS deploys disable the local password form — see the matching
+    // guard on POST /api/auth/login. Password resets must go through the
+    // workspace portal which owns the identity layer for shared tenants.
+    const profile = c.var.profile;
+    if (profile?.mode === 'saas' && profile?.saasTopology === 'shared') {
+        return c.json({
+            success: false as const,
+            error: {
+                code: 'PASSWORD_RESET_MOVED_TO_PORTAL',
+                message: 'Use the workspace portal to reset your password.',
+            },
+        }, 410);
+    }
+
     await checkRateLimit(c, 'forgot');
 
     const body = c.req.valid('json');

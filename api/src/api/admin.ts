@@ -6,6 +6,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { safeISODate } from '../lib/date';
 import { getBaseUrl, getBookingHost } from '../lib/url';
+import { escapeLikePattern } from '../lib/db/like-escape';
 import { agreementSignUrl } from '../lib/public-urls';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
@@ -1120,7 +1121,7 @@ adminRoutes.openapi(listCommentsRoute, async (c) => {
     if (rating) conditions.push(eq(comments.ratingBucket, rating));
     if (section) conditions.push(eq(comments.section, section));
     if (sectionId) {
-        conditions.push(like(comments.sectionIds, `%"${sectionId}"%`));
+        conditions.push(like(comments.sectionIds, `%"${escapeLikePattern(sectionId)}"%`));
     }
     if (triggerCode) {
         conditions.push(eq(comments.triggerCode, triggerCode));

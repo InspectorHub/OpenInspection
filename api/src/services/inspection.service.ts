@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../lib/validations/inspection.schema';
 
 import { ScopedDB } from '../lib/db/scoped';
+import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate, safeTimestamp } from '../lib/date';
 import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
@@ -154,7 +155,7 @@ export class InspectionService {
         if (params.dateTo) conditions.push(lte(inspections.date, params.dateTo));
         
         if (params.search) {
-            const term = `%${params.search}%`;
+            const term = `%${escapeLikePattern(params.search)}%`;
             conditions.push(or(
                 sql`lower(${inspections.propertyAddress}) like lower(${term})`,
                 sql`lower(${inspections.clientName}) like lower(${term})`

@@ -3,6 +3,7 @@ import { eq, and, like, sql } from 'drizzle-orm';
 import { contacts } from '../lib/db/schema/contact';
 import { inspections } from '../lib/db/schema/inspection';
 import { Errors } from '../lib/errors';
+import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
 
 export class ContactService {
@@ -15,7 +16,7 @@ export class ContactService {
         const db = this.getDrizzle();
         const conditions = [eq(contacts.tenantId, tenantId)];
         if (opts.type) conditions.push(eq(contacts.type, opts.type));
-        if (opts.search) conditions.push(like(contacts.name, `%${opts.search}%`));
+        if (opts.search) conditions.push(like(contacts.name, `%${escapeLikePattern(opts.search)}%`));
 
         const rows = await db.select().from(contacts).where(and(...conditions)).limit(opts.limit).offset(opts.offset).all();
 

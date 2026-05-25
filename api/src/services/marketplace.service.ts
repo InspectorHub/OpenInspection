@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, like, and, desc, sql } from 'drizzle-orm';
+import { escapeLikePattern } from '../lib/db/like-escape';
 import {
     marketplaceTemplates,
     tenantMarketplaceImports,
@@ -53,7 +54,7 @@ export class MarketplaceService {
 
     const conditions = [];
     if (category) conditions.push(eq(marketplaceTemplates.category, category));
-    if (search)   conditions.push(like(marketplaceTemplates.name, `%${search}%`));
+    if (search)   conditions.push(like(marketplaceTemplates.name, `%${escapeLikePattern(search)}%`));
 
     // Spec 4F — featured templates always sort first; within tier, sort by download count.
     const rows = await this.db
