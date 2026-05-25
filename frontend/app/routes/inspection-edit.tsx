@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
@@ -6,6 +6,10 @@ import { apiFetch } from "~/lib/api.server";
 import { SectionRail } from "~/components/editor/SectionRail";
 import { ItemList } from "~/components/editor/ItemList";
 import { ItemEditor } from "~/components/editor/ItemEditor";
+import { SideRail } from "~/components/editor/SideRail";
+import { SpeedMode } from "~/components/editor/SpeedMode";
+import { FooterBar } from "~/components/editor/FooterBar";
+import { useKeyboard } from "~/hooks/useKeyboard";
 
 export function meta() {
   return [{ title: "Edit Inspection - OpenInspection" }];
@@ -96,8 +100,31 @@ export async function action({ request, params }: Route.ActionArgs) {
     });
   }
 
+  if (intent === "toggle-canned") {
+    const itemId = String(formData.get("itemId"));
+    const sectionId = String(formData.get("sectionId"));
+    const tabName = String(formData.get("tabName"));
+    const cannedId = String(formData.get("cannedId"));
+    const included = formData.get("included") === "true";
+    await apiFetch(`/api/inspections/${params.id}/items/${itemId}/field`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({
+        field: "cannedToggle",
+        value: { tabName, cannedId, included },
+        sectionId,
+      }),
+    });
+  }
+
   return { ok: true };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+const RATING_IDS = ["SAT", "MON", "DEF", "NI", "NP"];
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -114,6 +141,7 @@ export default function InspectionEditPage() {
     schema.sections?.[0]?.id || "",
   );
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [speedMode, setSpeedMode] = useState(false);
 
   const currentSection = schema.sections?.find(
     (s: SchemaSection) => s.id === activeSection,
@@ -134,7 +162,7 @@ export default function InspectionEditPage() {
   const updateResult = (
     itemId: string,
     field: string,
-    value: string,
+    value: unknown,
   ) => {
     const key = `_default:${activeSection}:${itemId}`;
     setResults((prev) => ({
@@ -143,50 +171,217 @@ export default function InspectionEditPage() {
     }));
   };
 
+  /* Navigation helpers */
+  const navigateToItem = useCallback((direction: "next" | "prev") => {
+    if (!activeItemId || currentItems.length === 0) {
+      if (direction === "next" && currentItems.length > 0) {
+        setActiveItemId(currentItems[0].id);
+      }
+      return;
+    }
+    const currentIdx = currentItems.findIndex((i: SchemaItem) => i.id === activeItemId);
+    if (direction === "next" && currentIdx < currentItems.length - 1) {
+      setActiveItemId(currentItems[currentIdx + 1].id);
+    } else if (direction === "prev" && currentIdx > 0) {
+      setActiveItemId(currentItems[currentIdx - 1].id);
+    }
+  }, [activeItemId, currentItems]);
+
+  /* Auto-advance to next unrated item */
+  const advanceToNextUnrated = useCallback(() => {
+    if (!activeItemId) return;
+    const currentIdx = currentItems.findIndex((i: SchemaItem) => i.id === activeItemId);
+    for (let i = currentIdx + 1; i < currentItems.length; i++) {
+      const key = `_default:${activeSection}:${currentItems[i].id}`;
+      const r = (results[key] as Record<string, unknown>) ||
+                (results[currentItems[i].id] as Record<string, unknown>) ||
+                {};
+      if (!r.rating) {
+        setActiveItemId(currentItems[i].id);
+        return;
+      }
+    }
+    // If no unrated items ahead, just advance to next
+    if (currentIdx < currentItems.length - 1) {
+      setActiveItemId(currentItems[currentIdx + 1].id);
+    }
+  }, [activeItemId, activeSection, currentItems, results]);
+
+  /* Rating handler with auto-advance */
+  const handleRating = useCallback((rating: string) => {
+    if (!activeItemId) return;
+    updateResult(activeItemId, "rating", rating);
+    fetcher.submit(
+      { intent: "rate", itemId: activeItemId, sectionId: activeSection, rating },
+      { method: "POST" },
+    );
+    // Auto-advance after a short delay so the user sees the selection
+    setTimeout(() => advanceToNextUnrated(), 150);
+  }, [activeItemId, activeSection, fetcher, advanceToNextUnrated]);
+
+  /* Canned comment toggle handler */
+  const handleToggleCanned = useCallback((tabName: string, cannedId: string, included: boolean) => {
+    if (!activeItemId) return;
+    const key = `_default:${activeSection}:${activeItemId}`;
+    setResults((prev) => {
+      const existing = (prev[key] as Record<string, unknown>) || {};
+      const existingTabs = (existing.tabs as Record<string, Array<{ cannedId: string; included: boolean }>>) || {};
+      const tabEntries = [...(existingTabs[tabName] || [])];
+      const idx = tabEntries.findIndex(e => e.cannedId === cannedId);
+      if (idx >= 0) {
+        tabEntries[idx] = { ...tabEntries[idx], included };
+      } else {
+        tabEntries.push({ cannedId, included });
+      }
+      return {
+        ...prev,
+        [key]: {
+          ...existing,
+          tabs: { ...existingTabs, [tabName]: tabEntries },
+        },
+      };
+    });
+    fetcher.submit(
+      {
+        intent: "toggle-canned",
+        itemId: activeItemId,
+        sectionId: activeSection,
+        tabName,
+        cannedId,
+        included: String(included),
+      },
+      { method: "POST" },
+    );
+  }, [activeItemId, activeSection, fetcher]);
+
+  /* Completion progress */
+  const progress = useMemo(() => {
+    const allSections = schema.sections || [];
+    let total = 0;
+    let rated = 0;
+    for (const section of allSections) {
+      for (const item of section.items || []) {
+        if (item.type === "rich") {
+          total++;
+          const key = `_default:${section.id}:${item.id}`;
+          const r = (results[key] as Record<string, unknown>) ||
+                    (results[item.id] as Record<string, unknown>) ||
+                    {};
+          if (r.rating) rated++;
+        }
+      }
+    }
+    return { total, rated, pct: total > 0 ? Math.round((rated / total) * 100) : 0 };
+  }, [schema.sections, results]);
+
+  /* Speed mode item index */
+  const speedModeIndex = currentItems.findIndex((i: SchemaItem) => i.id === activeItemId);
+
+  /* Keyboard shortcuts */
+  const keyboardHandlers = useMemo(() => ({
+    onRate: (level: number) => {
+      if (level >= 1 && level <= 5 && activeItemId) {
+        const ratingId = RATING_IDS[level - 1];
+        handleRating(ratingId);
+      }
+    },
+    onNextItem: () => navigateToItem("next"),
+    onPrevItem: () => navigateToItem("prev"),
+    onToggleSpeed: () => setSpeedMode((prev) => !prev),
+    onOpenLibrary: () => {
+      // Library tab toggle is handled via SideRail; for now focus the notes field
+    },
+    onPhoto: () => {
+      // Photo capture — placeholder for future implementation
+    },
+  }), [activeItemId, handleRating, navigateToItem]);
+
+  useKeyboard(keyboardHandlers, true);
+
   return (
     <div className="flex h-screen bg-white dark:bg-slate-900">
       {/* ------------------------------------------------------------ */}
-      {/*  PageChrome - fixed top header                                */}
+      {/*  SpeedMode overlay                                            */}
       {/* ------------------------------------------------------------ */}
-      <div className="fixed top-0 left-0 right-0 z-50 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center px-4 gap-3">
-        <a
-          href="/dashboard"
-          className="w-9 h-9 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      {speedMode && (
+        <SpeedMode
+          item={activeItemId ? currentItems.find((i: SchemaItem) => i.id === activeItemId) || null : null}
+          sectionTitle={currentSection?.title || ""}
+          result={activeItemId ? getResult(activeItemId) : {}}
+          onRating={(rating) => {
+            if (!activeItemId) return;
+            updateResult(activeItemId, "rating", rating);
+            fetcher.submit(
+              { intent: "rate", itemId: activeItemId, sectionId: activeSection, rating },
+              { method: "POST" },
+            );
+          }}
+          onPrev={() => navigateToItem("prev")}
+          onNext={() => navigateToItem("next")}
+          onExit={() => setSpeedMode(false)}
+          currentIndex={speedModeIndex >= 0 ? speedModeIndex : 0}
+          totalCount={currentItems.length}
+        />
+      )}
+
+      {/* ------------------------------------------------------------ */}
+      {/*  PageChrome - fixed top header with progress bar              */}
+      {/* ------------------------------------------------------------ */}
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <div className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center px-4 gap-3">
+          <a
+            href="/dashboard"
+            className="w-9 h-9 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 12H5M12 19l-7-7 7-7"
-            />
-          </svg>
-        </a>
-        <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-bold truncate">
-            {(inspection as Record<string, unknown>).propertyAddress as string ||
-              "Inspection"}
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 12H5M12 19l-7-7 7-7"
+              />
+            </svg>
+          </a>
+          <div className="flex-1 min-w-0">
+            <div className="text-[14px] font-bold truncate">
+              {(inspection as Record<string, unknown>).propertyAddress as string ||
+                "Inspection"}
+            </div>
+            <div className="text-[11px] text-slate-500 truncate">
+              #{String((inspection as Record<string, unknown>).id)
+                .slice(0, 8)
+                .toUpperCase()}
+            </div>
           </div>
-          <div className="text-[11px] text-slate-500 truncate">
-            #{String((inspection as Record<string, unknown>).id)
-              .slice(0, 8)
-              .toUpperCase()}
+
+          {/* Completion progress */}
+          <div className="flex items-center gap-2">
+            <div className="w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-600 dark:bg-indigo-500 rounded-full transition-all duration-300"
+                style={{ width: `${progress.pct}%` }}
+              />
+            </div>
+            <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">
+              {progress.rated}/{progress.total}
+            </span>
           </div>
+
+          <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 inline-flex items-center">
+            {(inspection as Record<string, unknown>).status as string}
+          </span>
         </div>
-        <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 inline-flex items-center">
-          {(inspection as Record<string, unknown>).status as string}
-        </span>
       </div>
 
       {/* ------------------------------------------------------------ */}
-      {/*  4-column layout below header                                 */}
+      {/*  4-column layout below header (with bottom padding for footer) */}
       {/* ------------------------------------------------------------ */}
-      <div className="flex flex-1 pt-14">
+      <div className="flex flex-1 pt-14 pb-9">
         {/* Column 1: Section Rail (200px) */}
         <SectionRail
           sections={schema.sections || []}
@@ -214,13 +409,7 @@ export default function InspectionEditPage() {
               item={currentItems.find((i: SchemaItem) => i.id === activeItemId)}
               sectionTitle={currentSection?.title}
               result={getResult(activeItemId)}
-              onRating={(rating) => {
-                updateResult(activeItemId, "rating", rating);
-                fetcher.submit(
-                  { intent: "rate", itemId: activeItemId, sectionId: activeSection, rating },
-                  { method: "POST" },
-                );
-              }}
+              onRating={handleRating}
               onNotes={(notes) => {
                 updateResult(activeItemId, "notes", notes);
               }}
@@ -230,6 +419,7 @@ export default function InspectionEditPage() {
                   { method: "POST" },
                 );
               }}
+              onToggleCanned={handleToggleCanned}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-slate-400">
@@ -240,28 +430,20 @@ export default function InspectionEditPage() {
           )}
         </main>
 
-        {/* Column 4: SideRail placeholder (44px tab strip) */}
-        <aside className="w-11 flex-shrink-0 bg-slate-50 dark:bg-slate-800/50 border-l border-slate-200 dark:border-slate-700 flex flex-col items-center py-2 gap-1">
-          {["Preview", "Library", "Recall"].map((tab) => (
-            <button
-              key={tab}
-              className="w-10 flex flex-col items-center gap-0.5 py-2.5 rounded-r-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              title={tab}
-            >
-              <span
-                className="text-[8px] font-bold uppercase tracking-[0.1em]"
-                style={{
-                  writingMode: "vertical-rl",
-                  transform: "rotate(180deg)",
-                }}
-              >
-                {tab}
-              </span>
-            </button>
-          ))}
-        </aside>
+        {/* Column 4: SideRail */}
+        <SideRail
+          activeItem={
+            activeItemId
+              ? currentItems.find((i: SchemaItem) => i.id === activeItemId) || null
+              : null
+          }
+        />
       </div>
+
+      {/* ------------------------------------------------------------ */}
+      {/*  Footer Bar                                                    */}
+      {/* ------------------------------------------------------------ */}
+      <FooterBar />
     </div>
   );
 }
-

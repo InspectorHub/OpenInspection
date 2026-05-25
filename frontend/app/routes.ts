@@ -11,6 +11,7 @@ export default [
   route("logout", "routes/logout.tsx"),
   // Full-screen editor (own chrome, no sidebar)
   route("inspections/:id/edit", "routes/inspection-edit.tsx"),
+  route("templates/:id/edit", "routes/template-edit.tsx"),
   // Public pages — no auth, minimal layout, SSR for SEO
   layout("routes/public-layout.tsx", [
     route("book/:tenant/:slug", "routes/public/booking.tsx"),

@@ -3,6 +3,8 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { NewInspectionWizard } from "~/components/NewInspectionWizard";
+import { CommandPalette } from "~/components/CommandPalette";
 
 export function meta() {
   return [{ title: "Dashboard - OpenInspection" }];
@@ -132,6 +134,9 @@ export default function DashboardPage() {
   const { buckets, conciergePending, greeting } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
 
   const allInspections = Object.values(buckets).flat();
   const counts = {
@@ -194,20 +199,24 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
+          <button onClick={() => setFiltersOpen(true)} className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
             <FilterIcon />
             Filters
+          </button>
+          <button onClick={() => setColumnsOpen(true)} className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
+            <ColumnsIcon />
+            Columns
           </button>
           <button className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
             <ExportIcon />
             Export
           </button>
-          <Link
-            to="/inspections/new"
+          <button
+            onClick={() => setWizardOpen(true)}
             className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 inline-flex items-center gap-1.5 transition-colors"
           >
             + New Inspection
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -341,6 +350,38 @@ export default function DashboardPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Wizard modal */}
+      <NewInspectionWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
+
+      {/* Command Palette */}
+      <CommandPalette onNewInspection={() => setWizardOpen(true)} />
+
+      {/* Filters modal (placeholder) */}
+      {filtersOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setFiltersOpen(false)}>
+          <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[16px] font-bold">Filters</h2>
+              <button onClick={() => setFiltersOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">&times;</button>
+            </div>
+            <p className="text-[13px] text-slate-500">Filter options will appear here. (Coming soon)</p>
+          </div>
+        </div>
+      )}
+
+      {/* Columns modal (placeholder) */}
+      {columnsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setColumnsOpen(false)}>
+          <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[16px] font-bold">Columns</h2>
+              <button onClick={() => setColumnsOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">&times;</button>
+            </div>
+            <p className="text-[13px] text-slate-500">Column visibility settings will appear here. (Coming soon)</p>
+          </div>
         </div>
       )}
     </div>
