@@ -1,5 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Context } from 'hono';
+import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/cloudflare-workers';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { signObserverCookie } from './lib/observer-cookie';
@@ -147,6 +148,17 @@ import { SettingsCatalogBookingPage } from './templates/pages/settings-catalog-b
 import { getSeatUsage } from './features/seat-quota';
 
 const app = new OpenAPIHono<HonoConfig>();
+
+// CORS — allows Remix frontend (separate origin in dev) to call API endpoints.
+// In production both share the same origin; this is primarily for local dev
+// where Vite runs on :5173 and the API Worker runs on :8787.
+app.use('/api/*', cors({
+    origin: (origin) => origin,
+    credentials: true,
+    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposeHeaders: ['Set-Cookie'],
+}));
 
 // Global request logger
 app.use('*', async (c, next) => {
