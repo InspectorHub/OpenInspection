@@ -53,6 +53,8 @@ export default [
       route("settings/event-types", "routes/settings-event-types.tsx"),
       route("settings/inspection-types", "routes/settings-inspection-types.tsx"),
       route("settings/catalog/booking", "routes/settings-catalog-booking.tsx"),
+      route("settings/billing", "routes/settings-billing.tsx"),
+      route("settings/security", "routes/settings-security.tsx"),
     ]),
     route("comments", "routes/comments.tsx"),
     route("recommendations", "routes/recommendations.tsx"),
