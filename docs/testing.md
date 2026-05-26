@@ -13,7 +13,7 @@ End-to-end tests use [Playwright](https://playwright.dev/). Tests run against a 
 npm run dev          # http://localhost:8788
 
 # Terminal 2
-npm run test:e2e
+npx playwright test --config api/playwright.config.ts
 ```
 
 ### Frontend Tests
@@ -33,11 +33,7 @@ cd frontend && npm run test
 
 ## Test Results
 
-| Tests | Pass | Skip | Fail |
-|---|---|---|---|
-| 128 | 128 | 0 | 0 |
-
-All 128 tests pass on a **fresh database**. Tests that require known credentials skip gracefully when run against a pre-existing database.
+Tests pass on a **fresh database**. Tests that require known credentials skip gracefully when run against a pre-existing database.
 
 ## Fresh DB vs Pre-existing DB
 
@@ -62,7 +58,7 @@ npx playwright test
 | Section | What it covers |
 |---|---|
 | API Health | `GET /status` |
-| Public Pages | Homepage, booking page, demo report |
+| Public API | Booking profile, availability, demo report endpoints |
 | Login Page | HTML render, field validation, credential check, cookie set |
 | Dashboard Auth Guard | Unauthenticated access redirects to `/login` |
 | Bot Protection | Turnstile script present; dev-tenant bypass documented |
@@ -159,24 +155,14 @@ test.describe('agreement CRUD (authenticated)', () => {
 
 ## Playwright Config
 
-```typescript
-export default defineConfig({
-  testDir: './tests',
-  timeout: 15000,
-  use: { headless: true },
-});
-```
-
-Tests run serially (1 worker) — some describe blocks have stateful dependencies (create → update → delete).
+Config lives at `api/playwright.config.ts`. Tests run serially (1 worker) — some describe blocks have stateful dependencies (create → update → delete).
 
 ## Useful Commands
 
 ```bash
-npx playwright test --grep "availability"          # run one section
-npx playwright test --grep "agent referral"
-npx playwright test --grep "agreement CRUD"
-npx playwright test --reporter=list                # verbose output
-npx playwright test --reporter=html && open playwright-report/index.html
+npx playwright test --config api/playwright.config.ts --grep "availability"
+npx playwright test --config api/playwright.config.ts --grep "agent referral"
+npx playwright test --config api/playwright.config.ts --reporter=list
 ```
 
 ## CI Notes
