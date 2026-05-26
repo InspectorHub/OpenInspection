@@ -2,6 +2,7 @@ import { Form, useActionData, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/setup";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Setup - OpenInspection" }];
@@ -15,8 +16,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Check if workspace is already set up
   try {
     const res = await apiFetch("/api/auth/setup-status");
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-    if ((body.data as Record<string, unknown>)?.isSetUp) {
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
+    if (d?.isSetUp) {
       return redirect("/login");
     }
   } catch {

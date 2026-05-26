@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Agent Settings - OpenInspection" }];
@@ -21,9 +22,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/agent/profile", { token });
-    const data = res.ok ? await res.json() : {};
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
     return {
-      agent: ((data as any)?.data || {
+      agent: (Object.keys(d).length > 0 ? d : {
         name: null, email: "", slug: null,
         notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
       }) as AgentProfile,

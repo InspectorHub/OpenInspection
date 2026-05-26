@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-sign";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
  return [{ title: "Sign Agreement - OpenInspection" }];
@@ -20,9 +21,10 @@ export async function loader({ params }: Route.LoaderArgs) {
  const res = await apiFetch(
  `/api/public/agreements/sign/${params.tenant}/${params.token}`,
  );
- const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+ const body = res.ok ? await res.json() : {};
+ const d = extractObject(body);
  return {
- agreement: (json.data as AgreementData) ?? null,
+ agreement: (Object.keys(d).length > 0 ? d : null) as AgreementData | null,
  error: res.ok ? null : "Agreement not found",
  token: params.token,
  tenant: params.tenant,

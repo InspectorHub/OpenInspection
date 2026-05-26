@@ -3,6 +3,7 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/reports";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 import { PageHeader, TabStrip, Card, Pill, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -22,8 +23,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/inspections?status=completed,delivered", { token });
-    const data = res.ok ? await res.json() : {};
-    return { reports: ((data as any)?.data || []) as Report[] };
+    const body = res.ok ? await res.json() : {};
+    return { reports: extractArray(body, "inspections", "reports") as Report[] };
   } catch {
     return { reports: [] as Report[] };
   }

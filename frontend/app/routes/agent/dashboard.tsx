@@ -2,6 +2,7 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray, extractObject } from "~/lib/api-helpers";
 
 export function meta() {
  return [{ title: "Agent Dashboard - OpenInspection" }];
@@ -21,10 +22,11 @@ export async function loader({ request }: Route.LoaderArgs) {
  const token = await requireToken(request);
  try {
  const res = await apiFetch("/api/agent/referrals", { token });
- const data = res.ok ? await res.json() : {};
+ const body = res.ok ? await res.json() : {};
+ const d = extractObject(body);
  return {
- referrals: ((data as any)?.data?.referrals || []) as Referral[],
- unreadReports: ((data as any)?.data?.unreadReports || 0) as number,
+ referrals: extractArray(body, "referrals") as Referral[],
+ unreadReports: (typeof d?.unreadReports === "number" ? d.unreadReports : 0) as number,
  };
  } catch {
  return { referrals: [] as Referral[], unreadReports: 0 };

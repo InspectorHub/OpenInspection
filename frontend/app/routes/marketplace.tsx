@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -13,8 +14,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/marketplace/templates", { token });
-    const data = res.ok ? await res.json() : {};
-    return { templates: (data as any)?.data || [] };
+    const body = res.ok ? await res.json() : {};
+    return { templates: extractArray(body, "templates") };
   } catch {
     return { templates: [] };
   }

@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/conflict-resolver";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Resolve Conflicts - OpenInspection" }];
@@ -43,9 +44,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     if (!res.ok) {
       return { conflicts: [] as Conflict[], inspectionId, error: "No conflicts found" };
     }
-    const json = (await res.json()) as Record<string, unknown>;
+    const body = await res.json();
     return {
-      conflicts: ((json.data as Record<string, unknown>)?.conflicts as Conflict[]) ?? [],
+      conflicts: extractArray(body, "conflicts") as Conflict[],
       inspectionId,
       error: null,
     };

@@ -3,6 +3,7 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/settings-catalog-booking";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 interface BookingConfig {
   enabled: boolean;
@@ -31,8 +32,9 @@ export async function loader({ request }: Route.LoaderArgs) {
           availabilityEnd: "17:00",
         },
       };
-    const json = (await res.json()) as { data?: BookingConfig };
-    return { config: json.data ?? null };
+    const body = await res.json();
+    const d = extractObject(body);
+    return { config: (Object.keys(d).length > 0 ? d : null) as BookingConfig | null };
   } catch {
     return {
       config: {

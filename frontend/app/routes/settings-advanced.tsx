@@ -3,6 +3,7 @@ import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-advanced";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -27,8 +28,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const stripeRes = await apiFetch("/api/admin/payments/status", { token });
     if (stripeRes.ok) {
-      const d = (await stripeRes.json()) as Record<string, unknown>;
-      const data = d.data as Record<string, unknown> | undefined;
+      const body = await stripeRes.json();
+      const data = extractObject(body);
       stripeConnected = Boolean(data?.connected);
       stripeAccountId = (data?.accountId as string) || null;
     }
@@ -39,8 +40,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const aiRes = await apiFetch("/api/admin/ai/status", { token });
     if (aiRes.ok) {
-      const d = (await aiRes.json()) as Record<string, unknown>;
-      geminiConfigured = Boolean((d.data as Record<string, unknown>)?.configured);
+      const body = await aiRes.json();
+      const data = extractObject(body);
+      geminiConfigured = Boolean(data?.configured);
     }
   } catch { /* no-op */ }
 

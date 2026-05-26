@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/apprentice-review";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 import { PageHeader } from "@core/shared-ui";
 
 export function meta() {
@@ -25,8 +26,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/team/apprentice-reviews", { token });
-    const data = res.ok ? await res.json() : {};
-    return { items: ((data as any)?.data || []) as ReviewItem[] };
+    const body = res.ok ? await res.json() : {};
+    return { items: extractArray(body, "reviews") as ReviewItem[] };
   } catch {
     return { items: [] as ReviewItem[] };
   }

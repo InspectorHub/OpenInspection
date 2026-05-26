@@ -1,6 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/verify";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Verify Signature - OpenInspection" }];
@@ -20,9 +21,10 @@ export async function loader({ params }: Route.LoaderArgs) {
     const res = await apiFetch(
       `/api/public/verify/${params.envelopeId}`,
     );
-    const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
     return {
-      result: (json.data as VerifyData) ?? null,
+      result: (Object.keys(d).length > 0 ? d : null) as VerifyData | null,
       error: res.ok ? null : "Verification failed",
     };
   } catch {

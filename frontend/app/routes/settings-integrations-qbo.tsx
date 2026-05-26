@@ -3,6 +3,7 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 interface QboStatus {
   connected: boolean;
@@ -22,8 +23,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const res = await apiFetch("/api/qbo/status", { token });
     if (!res.ok) return { status: null };
-    const json = (await res.json()) as { data?: QboStatus };
-    return { status: json.data ?? null };
+    const body = await res.json();
+    const d = extractObject(body);
+    return { status: (Object.keys(d).length > 0 ? d : null) as QboStatus | null };
   } catch {
     return { status: null };
   }

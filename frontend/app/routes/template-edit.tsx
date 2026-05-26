@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Edit Template - OpenInspection" }];
@@ -137,8 +138,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const token = await requireToken(request);
   const id = params.id;
   const res = await apiFetch(`/api/inspections/templates/${id}`, { token });
-  const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-  const raw = json?.data as Record<string, unknown> | undefined;
+  const body = res.ok ? await res.json() : {};
+  const raw = extractObject(body) as Record<string, unknown>;
   const tpl = raw?.template ? (raw.template as Record<string, unknown>) : raw;
   const name = (tpl?.name as string) || "Untitled Template";
   const version = (tpl?.version as number) || 1;

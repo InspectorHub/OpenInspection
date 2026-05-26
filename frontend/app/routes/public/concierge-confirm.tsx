@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/concierge-confirm";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Confirm your inspection - OpenInspection" }];
@@ -41,12 +42,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     const res = await apiFetch(
       `/api/concierge/confirm-info?token=${encodeURIComponent(token)}`,
     );
-    const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const body = res.ok ? await res.json() : {};
     if (!res.ok) {
       return { data: null, error: "expired" as const };
     }
-    const d = json.data as ConfirmData | undefined;
-    return { data: d ? { ...d, token } : null, error: null };
+    const d = extractObject(body) as unknown as ConfirmData | undefined;
+    return { data: d && Object.keys(d).length > 0 ? { ...d, token } : null, error: null };
   } catch {
     return { data: null, error: "unknown" as const };
   }

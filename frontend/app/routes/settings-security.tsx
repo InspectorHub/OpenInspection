@@ -3,6 +3,7 @@ import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -20,8 +21,8 @@ interface AuthMe {
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   const res = await apiFetch("/api/auth/me", { token });
-  const json = res.ok ? await res.json() : {};
-  return { user: ((json as Record<string, unknown>)?.data || {}) as AuthMe };
+  const body = res.ok ? await res.json() : {};
+  return { user: extractObject(body) as AuthMe };
 }
 
 /* ------------------------------------------------------------------ */

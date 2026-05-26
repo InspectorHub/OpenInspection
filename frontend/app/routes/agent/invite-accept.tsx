@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/invite-accept";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "You're invited - OpenInspection" }];
@@ -30,13 +31,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
   try {
     const res = await apiFetch(`/api/agents/invite-info?token=${encodeURIComponent(token)}`);
-    const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const body = res.ok ? await res.json() : {};
     if (!res.ok) {
       return { invite: null, error: "expired" as const };
     }
-    const data = json.data as InviteData | undefined;
+    const data = extractObject(body) as unknown as InviteData | undefined;
     return {
-      invite: data ? { ...data, token } : null,
+      invite: data && Object.keys(data).length > 0 ? { ...data, token } : null,
       error: null,
     };
   } catch {

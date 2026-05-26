@@ -1,6 +1,7 @@
 import { Form, useActionData, useLoaderData, redirect } from "react-router";
 import type { Route } from "./+types/join";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 import { createSessionWithToken } from "~/lib/session.server";
 
 export function meta() {
@@ -20,11 +21,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     if (!res.ok) {
       return { valid: false, error: "Invalid or expired invite link", invite: null };
     }
-    const body = (await res.json()) as Record<string, unknown>;
+    const body = await res.json();
+    const d = extractObject(body);
     return {
       valid: true,
       error: null,
-      invite: (body.data as { email: string; workspaceName: string }) ?? null,
+      invite: (Object.keys(d).length > 0 ? d : null) as { email: string; workspaceName: string } | null,
     };
   } catch {
     return { valid: false, error: "Service unavailable", invite: null };

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/concierge-book";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 import { requireToken } from "~/lib/session.server";
 
 export function meta() {
@@ -31,8 +32,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch(`/api/concierge/book-info`, { token });
-    const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-    return { data: (json.data as ConciergeBookData) ?? null, error: res.ok ? null : "Not found" };
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
+    return { data: (Object.keys(d).length > 0 ? d : null) as ConciergeBookData | null, error: res.ok ? null : "Not found" };
   } catch {
     return { data: null, error: "Service unavailable" };
   }

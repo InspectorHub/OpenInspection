@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/repair-request";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Repair Request - OpenInspection" }];
@@ -42,9 +43,10 @@ interface RepairRequestData {
 export async function loader({ params }: Route.LoaderArgs) {
   try {
     const res = await apiFetch(`/api/public/repair-request/${params.id}`);
-    const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
     return {
-      data: (json.data as RepairRequestData) ?? null,
+      data: (Object.keys(d).length > 0 ? d : null) as RepairRequestData | null,
       error: res.ok ? null : "Not found",
     };
   } catch {

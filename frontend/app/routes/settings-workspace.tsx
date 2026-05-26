@@ -3,6 +3,7 @@ import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-workspace";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -26,8 +27,8 @@ const THEMES = ["modern", "classic", "minimal"] as const;
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   const res = await apiFetch("/api/admin/branding", { token });
-  const json = res.ok ? await res.json() : {};
-  return { branding: ((json as Record<string, unknown>)?.data || {}) as Branding };
+  const body = res.ok ? await res.json() : {};
+  return { branding: extractObject(body) as Branding };
 }
 
 /* ------------------------------------------------------------------ */

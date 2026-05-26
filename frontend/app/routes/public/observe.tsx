@@ -1,6 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/observe";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Observe Inspection - OpenInspection" }];
@@ -19,9 +20,10 @@ export async function loader({ params }: Route.LoaderArgs) {
     const res = await apiFetch(
       `/api/public/observe/inspections/${params.id}`,
     );
-    const json = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
     return {
-      inspection: (json.data as ObserveData) ?? null,
+      inspection: (Object.keys(d).length > 0 ? d : null) as ObserveData | null,
       error: res.ok ? null : "Inspection not found",
     };
   } catch {

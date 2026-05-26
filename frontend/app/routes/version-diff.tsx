@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/version-diff";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 
 export function meta() {
  return [{ title: "Version Diff - OpenInspection" }];
@@ -35,11 +36,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  if (!res.ok) {
  return { inspectionId: id, version: n, diffs: [] as DiffEntry[], error: "Version not found" };
  }
- const json = (await res.json()) as Record<string, unknown>;
+ const body = await res.json();
  return {
  inspectionId: id,
  version: n,
- diffs: ((json.data as Record<string, unknown>)?.diffs as DiffEntry[]) ?? [],
+ diffs: extractArray(body, "diffs") as DiffEntry[],
  error: null,
  };
  } catch {

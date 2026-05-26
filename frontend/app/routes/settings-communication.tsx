@@ -2,6 +2,7 @@ import { Link, useLoaderData, Form } from "react-router";
 import type { Route } from "./+types/settings-communication";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Communication - Settings - OpenInspection" }];
@@ -24,15 +25,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/admin/communication", { token });
-    const json = res.ok ? await res.json() : {};
-    const d = (json as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
     return {
       config: {
         senderEmail: (d?.senderEmail as string) || null,
         replyTo: (d?.replyTo as string) || null,
         resendConfigured: Boolean(d?.resendConfigured),
       } as CommConfig,
-      templates: (d?.templates || []) as EmailTemplate[],
+      templates: (Array.isArray(d?.templates) ? d.templates : []) as EmailTemplate[],
       icsUrl: (d?.icsUrl as string) || null,
       googleCalendarConnected: Boolean(d?.googleCalendarConnected),
     };

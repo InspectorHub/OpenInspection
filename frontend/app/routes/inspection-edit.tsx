@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 import { useInspectionState } from "~/hooks/useInspection";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { useFindings } from "~/hooks/useFindings";
@@ -40,17 +41,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  apiFetch(`/api/inspections/${id}/report-data`, { token }),
  ]);
 
- const inspData = inspRes.ok
- ? ((await inspRes.json()) as Record<string, unknown>)
- : {};
- const resultsData = resultsRes.ok
- ? ((await resultsRes.json()) as Record<string, unknown>)
- : {};
- const reportData = reportRes.ok
- ? ((await reportRes.json()) as Record<string, unknown>)
- : {};
+ const inspBody = inspRes.ok ? await inspRes.json() : {};
+ const resultsBody = resultsRes.ok ? await resultsRes.json() : {};
+ const reportBody = reportRes.ok ? await reportRes.json() : {};
 
- const data = inspData?.data as Record<string, unknown> | undefined;
+ const data = extractObject(inspBody) as Record<string, unknown> | undefined;
  const inspection = (data?.inspection as Record<string, unknown>) || {
  id,
  propertyAddress: "Loading...",
@@ -62,7 +57,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  }) || { sections: [] };
 
  // Normalize sections from report-data (which has rating levels + section data)
- const rdData = reportData?.data as Record<string, unknown> | undefined;
+ const rdData = extractObject(reportBody) as Record<string, unknown> | undefined;
  const reportSections = (rdData?.sections || []) as Array<Record<string, unknown>>;
  if (reportSections.length > 0) {
  schema.sections = reportSections.map((sec: Record<string, unknown>) => {
@@ -80,8 +75,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  }
 
  const ratingLevels = ((rdData?.ratingLevels || []) as RatingLevel[]);
- const results = ((resultsData?.data as Record<string, Record<string, unknown>>)?.data ||
- (resultsData?.data as Record<string, Record<string, unknown>>) ||
+ const resultsObj = extractObject(resultsBody);
+ const results = ((resultsObj as Record<string, Record<string, unknown>>)?.data ||
+ resultsObj ||
  {}) as ResultMap;
 
  return { inspection, schema, results, ratingLevels, token };

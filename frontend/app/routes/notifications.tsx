@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/notifications";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 import { PageHeader, Card, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -12,9 +13,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/notifications", { token });
-    const data = res.ok ? await res.json() : {};
+    const body = res.ok ? await res.json() : {};
     return {
-      notifications: (data as Record<string, unknown[]>)?.data || [],
+      notifications: extractArray(body, "notifications"),
     };
   } catch {
     return { notifications: [] };

@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/inspectors";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Your Inspectors - OpenInspection" }];
@@ -19,8 +20,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/agent/inspectors", { token });
-    const data = res.ok ? await res.json() : {};
-    return { inspectors: ((data as any)?.data || []) as Inspector[] };
+    const body = res.ok ? await res.json() : {};
+    return { inspectors: extractArray(body, "inspectors") as Inspector[] };
   } catch {
     return { inspectors: [] as Inspector[] };
   }

@@ -3,6 +3,7 @@ import { Link, useLoaderData, Form } from "react-router";
 import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Services & Catalog - Settings - OpenInspection" }];
@@ -28,11 +29,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/admin/services", { token });
-    const json = res.ok ? await res.json() : {};
-    const d = json as Record<string, unknown>;
+    const body = res.ok ? await res.json() : {};
+    const d = extractObject(body);
     return {
-      services: ((d.data as Record<string, unknown>)?.services || []) as Service[],
-      discounts: ((d.data as Record<string, unknown>)?.discounts || []) as Discount[],
+      services: (Array.isArray(d?.services) ? d.services : []) as Service[],
+      discounts: (Array.isArray(d?.discounts) ? d.discounts : []) as Discount[],
     };
   } catch {
     return { services: [] as Service[], discounts: [] as Discount[] };

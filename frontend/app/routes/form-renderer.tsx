@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/form-renderer";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
  return [{ title: "Inspection Form - OpenInspection" }];
@@ -73,8 +74,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  apiFetch(`/api/inspections/${id}`, { token }),
  apiFetch(`/api/inspections/${id}/results`, { token }).catch(() => null),
  ]);
- const json = inspRes.ok ? ((await inspRes.json()) as Record<string, unknown>) : {};
- const data = json.data as Record<string, unknown> | undefined;
+ const inspBody = inspRes.ok ? await inspRes.json() : {};
+ const data = extractObject(inspBody) as Record<string, unknown> | undefined;
 
  // Template schema from snapshot or direct
  let schema: { sections: TemplateSection[] } | null = null;
@@ -110,7 +111,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  let existingResults: Record<string, ItemResult> = {};
  if (resultsRes && resultsRes.ok) {
  const rj = await resultsRes.json();
- existingResults = ((rj as Record<string, unknown>)?.data as Record<string, ItemResult>) || {};
+ existingResults = extractObject(rj) as Record<string, ItemResult>;
  }
 
  return {

@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/tags";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { extractArray } from "~/lib/api-helpers";
 import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -12,8 +13,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/tags", { token });
-    const data = res.ok ? await res.json() : {};
-    return { tags: (data as any)?.data || [] };
+    const body = res.ok ? await res.json() : {};
+    return { tags: extractArray(body, "tags") };
   } catch {
     return { tags: [] };
   }
