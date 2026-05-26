@@ -34,27 +34,20 @@ if(scheme==='dark')d.classList.add('dark');
 })();
 (function(){try{if(localStorage.getItem('oi-sidebar-collapsed')==='1')document.documentElement.setAttribute('data-sidebar-collapsed','1');}catch(e){}})();`;
 
-const SW_SCRIPT = `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(e){console.warn('[sw] registration failed',e);});});}`;
-
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <script dangerouslySetInnerHTML={{ __html: FOUC_SCRIPT }} />
         <Meta />
         <Links />
-        <style dangerouslySetInnerHTML={{ __html: `
-          :root { --primary-color: #6366f1; --primary-glow: #6366f140; }
-          body { font-family: 'Inter', sans-serif; }
-        ` }} />
       </head>
-      <body className="bg-ih-bg-app text-ih-fg-1 antialiased min-h-screen">
+      <body className="bg-ih-bg-app text-ih-fg-1 antialiased min-h-screen" suppressHydrationWarning>
         {children}
         <ScrollRestoration />
         <Scripts />
-        <script dangerouslySetInnerHTML={{ __html: SW_SCRIPT }} />
       </body>
     </html>
   );
@@ -70,7 +63,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold">{error.status}</h1>
-          <p className="text-slate-500 mt-2">{error.statusText}</p>
+          <p className="text-ih-fg-3 mt-2">{error.statusText}</p>
         </div>
       </div>
     );
@@ -79,7 +72,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-4xl font-bold">Error</h1>
-        <p className="text-slate-500 mt-2">Something went wrong</p>
+        <p className="text-ih-fg-3 mt-2">Something went wrong</p>
       </div>
     </div>
   );

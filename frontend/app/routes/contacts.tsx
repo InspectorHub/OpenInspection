@@ -20,9 +20,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     ]);
     const contactsData = contactsRes.ok ? await contactsRes.json() : {};
     const agentsData = agentsRes.ok ? await agentsRes.json() : {};
+    const cData = (contactsData as Record<string, unknown>)?.data as Record<string, unknown> | unknown[];
+    const aData = (agentsData as Record<string, unknown>)?.data as Record<string, unknown> | unknown[];
     return {
-      contacts: ((contactsData as Record<string, unknown>)?.data as unknown[]) || [],
-      agents: ((agentsData as Record<string, unknown>)?.data as unknown[]) || [],
+      contacts: (Array.isArray(cData) ? cData : (cData as Record<string, unknown>)?.contacts as unknown[] ?? []),
+      agents: (Array.isArray(aData) ? aData : (aData as Record<string, unknown>)?.data as unknown[] ?? []),
       filterType,
     };
   } catch {
