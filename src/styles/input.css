@@ -48,14 +48,14 @@
     --ih-font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
     /* Type size additions */
     --ih-text-meta:    12px;
-    --ih-text-eyebrow: 10px;
+    --ih-text-eyebrow: 9px;
     /* Line heights */
     --ih-leading-hero: 1.1; --ih-leading-section: 1.25;
     --ih-leading-tight: 1.35; --ih-leading-body: 1.55;
     /* Font weights additions */
     --ih-weight-medium: 500; --ih-weight-semi: 600; --ih-weight-black: 800;
     /* Letter spacing */
-    --ih-letter-eyebrow: 0.2em;
+    --ih-letter-eyebrow: 0.18em;
     /* Spacing scale additions */
     --ih-space-1: 4px; --ih-space-2: 8px; --ih-space-3: 12px; --ih-space-4: 16px;
     --ih-space-5: 20px; --ih-space-6: 24px; --ih-space-8: 32px; --ih-space-10: 40px;
@@ -75,7 +75,7 @@
     --ih-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ih-dur-fast: 150ms; --ih-dur: 200ms; --ih-dur-slow: 300ms;
     /* Sidebar */
-    --ih-sidebar-w: 240px;
+    --ih-sidebar-w: 200px;
     --ih-sidebar-collapsed-w: 56px;
     /* Status: info (sky) */
     --ih-status-info:    #0284c7;
@@ -321,7 +321,7 @@ textarea {
     }
     .ih-eyebrow {
         font-size: var(--ih-text-eyebrow);
-        font-weight: var(--ih-weight-semi);
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: var(--ih-letter-eyebrow);
         color: var(--ih-fg-4);

@@ -120,64 +120,8 @@ export const DashboardPage = ({ branding, seatUsage, billingPortalUrl }: Dashboa
                     defectStats chips beneath the count when the bucket has any
                     open defects. The Alpine binding is local: `dashboardCards`
                     factory pulls defectAggregate from /api/inspections/dashboard. */}
-                <div x-data="dashboardCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {[
-                        { label: 'Upcoming',        id: 'statUpcoming',   target: 'later',          icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'indigo' },
-                        { label: 'In Progress',     id: 'statInProgress', target: 'thisWeek',       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'blue' },
-                        { label: 'Needs Attention', id: 'statNeedsAttn',  target: 'needsAttention', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', color: 'amber' },
-                        { label: 'Recent Reports',  id: 'statRecentRpt',  target: 'recentReports',  icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', color: 'emerald' }
-                    ].map((stat, i) => (
-                        <button
-                            key={stat.id}
-                            type="button"
-                            x-on:click={`sections['${stat.target}']=true; $nextTick(()=>{ const el=document.getElementById('bucket-${stat.target}'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); })`}
-                            class="group p-[14px] rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 animate-fade-in text-left hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                            style={`animation-delay: ${0.1 + i * 0.05}s`}
-                            title={`Jump to ${stat.label}`}
-                        >
-                            <div class="flex items-center justify-between mb-4">
-                                <div class={`w-10 h-10 rounded-md bg-${stat.color}-600/10 text-${stat.color}-600 flex items-center justify-center group-hover:scale-105 transition-all duration-200`}>
-                                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={stat.icon}></path></svg>
-                                </div>
-                                <span class="sr-only">Live</span>
-                            </div>
-                            <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight tabular-nums mb-1" id={stat.id}>0</h3>
-                            <p class="text-[12px] font-bold text-slate-500 uppercase tracking-[0.15em]">{stat.label}</p>
-                            {/* Agent Accounts A3 — UPCOMING substate. Per
-                                directive we do NOT add a 5th stat card; the
-                                concierge-pending count renders as a 12px slate
-                                line under the UPCOMING number when the dashboard
-                                JS finds at least one inspection with
-                                concierge_status='awaiting_inspector'. The element
-                                is always present in the DOM (hidden by default)
-                                so dashboard.js can populate without re-rendering. */}
-                            {stat.id === 'statUpcoming' ? (
-                                <p
-                                    id="statUpcomingConciergeSub"
-                                    class="mt-1 text-[12px] text-slate-500"
-                                    data-testid="upcoming-concierge-substate"
-                                    style="display: none;"
-                                ></p>
-                            ) : null}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Earnings Panel — only visible when there's revenue activity */}
-                <div x-data="dashboardEarnings()" x-init="loadEarnings()" x-show="earnings.paid > 0 || earnings.pending > 0" class="bg-white dark:bg-slate-800 rounded-md shadow-sm border border-slate-100 dark:border-slate-700 p-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" style="display: none;">
-                    <div>
-                        <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paid this period</div>
-                        <div class="mt-1 text-xl font-bold text-emerald-600" x-text="formatCurrency(earnings.paid)"></div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pending</div>
-                        <div class="mt-1 text-xl font-bold text-amber-600" x-text="formatCurrency(earnings.pending)"></div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Paid invoices</div>
-                        <div class="mt-1 text-xl font-bold text-slate-900" x-text="earnings.count"></div>
-                    </div>
-                </div>
+                {/* Design System 0523 §3.11: stat cards removed — too noisy.
+                   Bucket headers + filter tabs already surface the same info. */}
 
                 {/* Collapsible Inspection Sections */}
                 <div x-data="dashboard()" x-init="init()" class="space-y-3 mt-[18px]">

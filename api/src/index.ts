@@ -155,7 +155,7 @@ const app = new OpenAPIHono<HonoConfig>();
 app.use('/api/*', cors({
     origin: (origin) => origin,
     credentials: true,
-    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Token-Relay'],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     exposeHeaders: ['Set-Cookie'],
 }));

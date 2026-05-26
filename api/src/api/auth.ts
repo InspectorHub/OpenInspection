@@ -148,12 +148,16 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
 
     setCookie(c, '__Host-inspector_token', token, authCookieOptions());
 
-    // Intentionally do NOT return the token in the body. Browser clients authenticate via the
-    // HttpOnly cookie. Exposing the raw JWT in JSON invites clients to persist it in localStorage
-    // or a JS-readable cookie, which defeats HttpOnly and widens the XSS blast radius.
+    // Token Relay BFF: when the Remix SSR frontend (server-to-server) calls
+    // this endpoint, Workers fetch() may strip Set-Cookie. The BFF signals
+    // itself via X-Token-Relay header; we return the JWT in the body so the
+    // BFF can store it in its own session cookie. The browser never sees this
+    // header because the BFF is the only caller — browsers use the HttpOnly
+    // cookie path exclusively.
+    const isBff = c.req.header('x-token-relay') === '1';
     return c.json({
         success: true,
-        data: { redirect: '/dashboard' }
+        data: { redirect: '/dashboard', ...(isBff ? { token } : {}) }
     }, 200);
 });
 

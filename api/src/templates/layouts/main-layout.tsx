@@ -511,7 +511,7 @@ export const MainLayout = (props: {
                     </aside>
 
                     <main class="md:flex-1 w-full bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto">
-                        <div class="pt-5 pb-9 px-6">
+                        <div class="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9">
                             {children}
                         </div>
                     </main>

@@ -1,22 +1,15 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 
-// On Cloudflare Workers, process.env is available at build time via Vite but
-// not at request time.  For cookie-based sessions the secret only needs to
-// be a stable string — it never leaves the worker.  We fall back to a dev
-// secret so local `npm run dev` works out of the box.
-const SESSION_SECRET =
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  (typeof process !== "undefined" && process.env?.SESSION_SECRET) ||
-  "dev-secret-change-in-production";
+const SESSION_SECRET = "standalone-demo-session-secret-change-me";
 
 const sessionStorage = createCookieSessionStorage({
   cookie: {
     name: "__session",
     httpOnly: true,
-    secure: false, // false for local dev; production proxy terminates TLS
+    secure: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 1 week
+    maxAge: 60 * 60 * 24 * 7,
     secrets: [SESSION_SECRET],
   },
 });

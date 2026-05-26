@@ -23,40 +23,29 @@ export async function action({ request }: Route.ActionArgs) {
       method: "POST",
       body: JSON.stringify({ email, password }),
       csrf: true,
+      headers: { "x-token-relay": "1" },
     });
 
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
+      const text = await res.text().catch(() => "");
+      console.error("[login] API error:", res.status, res.statusText, text.slice(0, 500));
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(text); } catch {}
       return {
         error:
-          (body as Record<string, unknown>)?.error
-            ? ((body as Record<string, Record<string, string>>).error.message ??
-              "Invalid email or password")
-            : "Invalid email or password",
+          (parsed?.error as Record<string, string>)?.message ??
+          `Login failed (${res.status})`,
       };
     }
 
-    const body = (await res.json().catch(() => ({}))) as Record<
-      string,
-      Record<string, unknown>
-    >;
-
-    // The API sets the JWT as an HttpOnly Set-Cookie (__Host-inspector_token).
-    // Since this is a server-to-server fetch, we read it from the response
-    // header and store it in our own Remix session cookie.
-    const setCookieHeader = res.headers.get("set-cookie") || "";
-    const tokenMatch = setCookieHeader.match(
-      /(?:inspector_token|__Host-inspector_token)=([^;]+)/,
-    );
-    const jwt = tokenMatch?.[1];
+    const body = (await res.json().catch(() => ({}))) as Record<string, Record<string, unknown>>;
+    const jwt = body?.data?.token as string | undefined;
 
     if (jwt) {
       return createSessionWithToken(jwt, "/dashboard");
     }
 
-    // 2FA flow: the API returns a challenge token instead of setting a cookie.
     if (body?.data?.requires2fa) {
-      // TODO: Task 4+ — implement 2FA challenge page
       return { error: "2FA is not yet supported in the new frontend." };
     }
 
