@@ -1,61 +1,36 @@
 # Getting Started
 
-A quick walkthrough of the OpenInspection workflow — from setup to published report.
+A quick walkthrough of OpenInspection — for inspectors using the product and developers extending it.
 
 ## Setup
 
 After deploying (see [`developers/02_deploy.md`](developers/02_deploy.md)), visit `/setup` to create your admin account. A 6-digit verification code is logged on first boot.
 
-## Core Workflow
+---
 
-### 1. Create an Inspection
+## For Inspectors
 
-**Dashboard** (`/dashboard`) → **+ New Inspection**
+### Core Workflow
 
-Enter the property address, client name/email, select a template, assign an inspector, and pick a date. The inspection starts in `draft` status.
+**1. Create an Inspection** — Dashboard (`/dashboard`) → **+ New Inspection**. Enter address, client info, select template, assign inspector, pick a date.
 
-### 2. Field Collection
+**2. Field Collection** — Open inspection → Field Form (`/inspections/:id/form`).
+- Rate items 1-5 via keyboard, `/` for canned comment picker (250+ pre-written)
+- Photos upload to R2 and attach to items
+- Works offline — IndexedDB sync on reconnect
 
-Open the inspection → **Field Form** (`/inspections/:id/form`).
+**3. Publish** — Click Publish to create a versioned report snapshot. Client receives an email with report link (`/report/:id`).
 
-- Template sections appear as a scrollable checklist
-- Rate items 1-5 via keyboard, or use the rating picker
-- Type `/` to open the canned comment snippet picker (250+ pre-written comments)
-- Take photos directly — they upload to R2 and attach to the item
-- **Works offline** — data saves to IndexedDB and syncs when connectivity returns
+**4. Booking (Optional)** — Enable public booking at Settings → Services + Availability. Share `/book/:tenant/:slug`. Embeddable widget at `/embed/:tenant/:slug`.
 
-### 3. Publish the Report
+### Templates
 
-When field work is complete, click **Publish**. This:
-- Creates a versioned report snapshot
-- Emails the client a link to the report viewer
-- Report is accessible at `/report/:id` (branded, print-friendly)
+- 9 item types: rich (rated), boolean, text, number, select, date, photo-only, etc.
+- Configurable rating systems (3-level, 5-level, TREC)
+- Import from Spectora: paste JSON → one-click import
+- Community templates in Marketplace (`/marketplace`)
 
-Clients can sign agreements and pay via Stripe if configured.
-
-### 4. Booking (Optional)
-
-Enable public booking so clients can self-schedule:
-- **Settings → Services** — define inspection types with pricing
-- **Settings → Availability** — set weekly schedule + date overrides
-- Share your booking link: `/book/:tenant/:inspector-slug`
-- Turnstile bot protection included
-
-An embeddable iframe widget is also available at `/embed/:tenant/:slug`.
-
-## Templates
-
-Templates define the inspection checklist structure. Manage them at **Templates** (`/templates`).
-
-- 9 item types: rich (rated), boolean, text, number, select, date, photo-only, and more
-- Configurable rating systems (e.g., 3-level, 5-level, TREC)
-- **Import from Spectora**: paste your Spectora export JSON → one-click import
-
-Community templates are available in the **Marketplace** (`/marketplace`).
-
-## Team
-
-**Settings → Team** to invite inspectors. Roles:
+### Team Roles
 
 | Role | Access |
 |---|---|
@@ -63,6 +38,86 @@ Community templates are available in the **Marketplace** (`/marketplace`).
 | Admin | Full access except billing |
 | Inspector | Own inspections + field form + reports |
 | Agent | Referral tracking + assigned inspection reports |
+
+---
+
+## For Developers
+
+### Project Structure
+
+```
+api/                  Hono API Worker (business logic, D1, R2)
+frontend/             Remix Frontend Worker (React SSR on CF Workers)
+packages/shared-ui/   Design System 0523 components (Button, Card, Pill, etc.)
+packages/api-types/   Hono app type re-export for end-to-end type safety
+docs/developers/      Architecture, deploy, API ref, testing
+scripts/              Setup, seed, backup, key rotation utilities
+```
+
+### Local Development
+
+```bash
+# Terminal 1: API Worker
+npm install
+npm run db:migrate
+npm run dev                    # http://localhost:8788
+
+# Terminal 2: Frontend
+cd frontend && npm install
+npm run dev                    # http://localhost:5173 (proxies API)
+```
+
+### Key Commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start API Worker (port 8788) |
+| `cd frontend && npm run dev` | Start Remix dev server (port 5173) |
+| `npm run db:migrate` | Apply D1 migrations locally |
+| `npm run deploy` | Deploy API Worker to Cloudflare |
+| `cd frontend && bash scripts/deploy.sh` | Deploy Frontend Worker |
+| `npm run test:unit` | API unit tests (Vitest) |
+| `npm run lint` | ESLint across all workspaces |
+
+### Architecture
+
+Two independent Cloudflare Workers connected via Service Binding:
+
+```
+Browser → Frontend Worker (Remix SSR) → Service Binding → API Worker (Hono + D1)
+```
+
+- **Frontend** holds the session cookie, relays JWT to API (Token Relay BFF pattern)
+- **API** handles all business logic, auth, database access
+- Zero network hop between Workers in production
+
+### Adding a New Page
+
+1. Create route file in `frontend/app/routes/my-page.tsx`
+2. Register in `frontend/app/routes.ts`
+3. Loader calls `apiFetch("/api/...")` with token from session
+4. Use `packages/shared-ui` components + Design System tokens (`bg-ih-primary`, `text-ih-fg-1`)
+
+### Adding a New API Endpoint
+
+1. Create or extend a route file in `api/src/api/`
+2. Define Zod schema in `api/src/lib/validations/`
+3. Business logic in `api/src/services/`
+4. Register route in `api/src/index.ts`
+5. Follow route metadata conventions (`docs/developers/07_route_metadata.md`)
+
+### Further Reading
+
+| Doc | Topic |
+|---|---|
+| [`01_architecture.md`](developers/01_architecture.md) | Dual Worker architecture, request flow |
+| [`02_deploy.md`](developers/02_deploy.md) | Production deployment on Cloudflare |
+| [`03_api_reference.md`](developers/03_api_reference.md) | API endpoints and auth patterns |
+| [`04_database_schema.md`](developers/04_database_schema.md) | D1 schema overview (54 tables) |
+| [`05_testing.md`](developers/05_testing.md) | E2E and unit test guide |
+| [`06_inspection_workflow.md`](developers/06_inspection_workflow.md) | Inspection engine internals |
+
+---
 
 ## Key Pages
 
