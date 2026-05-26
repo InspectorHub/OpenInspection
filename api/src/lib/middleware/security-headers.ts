@@ -25,14 +25,11 @@ export const securityHeaders: MiddlewareHandler<HonoConfig> = async (c, next) =>
         (c.req.path === '/book' && c.req.query('embed') === '1') ||
         c.req.path.startsWith('/embed/');
 
-    // NOTE: 'unsafe-inline' is needed for inline scripts in templates. 'unsafe-eval' is required
-    // by Alpine.js which uses `new Function()` to evaluate x-data/x-show/x-text expressions.
-    // To drop 'unsafe-eval', switch to Alpine's CSP build (alpinejs/csp).
     c.header(
         'Content-Security-Policy',
         [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+            "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
             "style-src 'self' 'unsafe-inline'",
             "font-src 'self' data:",
             "img-src 'self' data: blob:",

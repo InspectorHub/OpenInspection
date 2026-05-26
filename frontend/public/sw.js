@@ -1,7 +1,7 @@
 // OpenInspection Service Worker
 // Strategy:
 //   - Static assets (CSS/JS/images/manifest): cache-first, update in background
-//   - CDN assets (Alpine.js, fonts): cache-first on first fetch
+//   - CDN assets (fonts): cache-first on first fetch
 //   - HTML navigation: network-first, fall back to cache for offline shell
 //   - /api/* requests: network-only (offline handled by IndexedDB in the app)
 
