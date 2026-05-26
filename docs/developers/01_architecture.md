@@ -14,7 +14,7 @@ OpenInspection is a multi-tenant home inspection app deployed as two independent
 | KV cache | Cloudflare Workers KV (tenant config, signed tokens, rate-limit counters) |
 | Background jobs | Cloudflare Workflow (onboarding) + Cron Triggers (automation sweeps) |
 | Styling | Tailwind CSS v4 + Design System 0523 tokens |
-| Shared components | `packages/shared-ui/` — 11 token-based React components |
+| Shared components | `packages/shared-ui/` — 12 token-based React components |
 | AI | Google Gemini API (optional) |
 | Email | Resend |
 | Payments | Stripe Connect (optional) |
@@ -52,9 +52,13 @@ OpenInspection runs as two independent Cloudflare Workers:
 
 The frontend uses a **Token Relay BFF** pattern: the Remix server holds the JWT cookie and forwards it to the API Worker on every request, so the browser never sees the token directly.
 
-### Legacy Hono SSR
+### Why Remix (React Router v7)
 
-The API Worker still serves legacy Hono/JSX SSR templates (`api/src/templates/`) and Alpine.js interactivity (`public/js/`) for backward compatibility. These are kept for old-system consumers and will be removed after all dependents migrate to the Remix frontend.
+- **SPA navigation**: page transitions without full reload — inspectors switch between editor/dashboard/templates frequently
+- **React 18**: future React Native app can reuse hooks and state logic (useInspection, useFindings, useSync)
+- **SSR on Workers**: full server rendering at the edge, same latency as static HTML
+- **hono/client**: Hono exports `AppType`, Remix uses `hono/client` for compile-time type-safe API calls — zero handwritten API client
+- **CF Free Tier safe**: Remix SSR adds ~1-3ms CPU per request, well within 10ms limit
 
 ## Module map
 
@@ -79,10 +83,6 @@ apps/core/
 │   │   │   ├── errors.ts          # AppError + ErrorCode + Errors factory
 │   │   │   ├── logger.ts          # Structured JSON logger (use this, not console)
 │   │   │   └── ics.ts             # iCalendar string builder
-│   │   ├── templates/             # Legacy hono/jsx templates (server-rendered)
-│   │   │   ├── layouts/           # MainLayout (auth) + BareLayout (public)
-│   │   │   ├── components/        # Reusable UI: PageHeader, Modal, etc.
-│   │   │   └── pages/             # One file per page (dashboard.tsx, ...)
 │   │   └── workflows/             # Cloudflare Workflow durable steps
 │   ├── migrations/                # D1 SQL migrations (00xx_<name>.sql)
 │   └── tests/                     # API unit + integration + E2E tests
@@ -92,18 +92,15 @@ apps/core/
 │   │   ├── routes.ts              # Route configuration
 │   │   ├── entry.server.tsx       # Remix CF Workers entry
 │   │   ├── routes/                # 75 route files (loader + action + component)
-│   │   ├── components/            # 59 React components
-│   │   ├── hooks/                 # 8 React hooks
+│   │   ├── components/            # 61 React components
+│   │   ├── hooks/                 # 9 React hooks
 │   │   ├── lib/                   # API client (hono/client), session, helpers
 │   │   └── styles/tailwind.css    # Design System 0523 token layer
 │   └── tests/                     # Frontend E2E + unit tests
 ├── packages/
 │   ├── shared-ui/src/             # 11 shared React components
 │   └── api-types/                 # CoreApiType for hono/client
-├── public/                        # Static assets for legacy Hono SSR
-│   ├── js/                        # Alpine handlers (one file per page typically)
-│   └── fonts/                     # Self-hosted fonts (Inter, JetBrains Mono)
-├── scripts/                       # Setup, seed, codemod, deploy helpers
+├── scripts/                       # Setup, seed, backup, deploy helpers
 └── wrangler.toml                  # API Worker config + bindings (local dev)
 ```
 
@@ -196,14 +193,16 @@ The DI proxy in `api/src/lib/middleware/di.ts` lazy-instantiates each service on
 
 - **Remix SSR**: Routes in `frontend/app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
 - **React components**: 59 components in `frontend/app/components/`, organized by domain (inspection, template, booking, etc.).
-- **Hooks**: 8 custom hooks handle complex state — `useInspection` (866 LOC), `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `useOfflineQueue`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`.
+- **Hooks**: 9 custom hooks handle complex state — `useInspection` (866 LOC), `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `useOfflineQueue`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`.
 - **Design tokens**: Tailwind v4 with Design System 0523 tokens in `frontend/app/styles/tailwind.css`.
-- **Shared UI**: `packages/shared-ui/` provides 11 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
+- **Shared UI**: `packages/shared-ui/` provides 12 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 
-### Legacy frontend (Hono SSR)
+### Future app path
 
-The legacy frontend still exists in `api/src/templates/` (hono/jsx) and `public/js/` (Alpine.js). It is kept for backward compatibility with the old system. New feature development targets the Remix frontend exclusively.
+1. **PWA** (current) — installable, offline-capable via Service Worker
+2. **Capacitor** (short-term) — native shell for camera, push notifications, App Store
+3. **React Native** (long-term) — reuse React hooks/state logic, rewrite UI components
 
 ## Storage
 
@@ -230,6 +229,13 @@ The legacy frontend still exists in `api/src/templates/` (hono/jsx) and `public/
 
 A solo inspector doing 50 inspections/month uses approximately 1-2% of Free tier limits. Browser Rendering (server-side PDF generation) requires Workers Paid ($5/mo); the default report PDF uses browser `window.print()` which is free and produces near-identical output via the `@media print` stylesheet.
 
-## Extending OpenInspection
+## CF Workers constraints
 
-See [`docs/extending.md`](extending.md) for cookbook recipes: new templates, payment providers, automation rules, comment libraries, SSO providers, languages, report themes, server-side PDFs, webhook receivers, and individual page overrides.
+| Resource | Free limit | Worker bundle max |
+|---|---|---|
+| CPU time | 10ms/request | — |
+| Worker bundle | — | 3 MB gzip |
+| D1 reads | 5M/day | — |
+| R2 storage | 10 GB | — |
+
+Remix SSR adds ~1-3ms CPU per request. The API Worker bundle is ~250KB gzip, well within limits. Browser Rendering (server-side PDF) requires Workers Paid ($5/mo); the default uses `window.print()` which is free.
