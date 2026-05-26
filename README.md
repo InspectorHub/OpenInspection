@@ -13,16 +13,6 @@
 
 ---
 
-<!-- Screenshots are committed after the trial workspace ships. Captured at 1440x900. -->
-
-> **Screenshot gallery — to be captured:**
-> - `screenshots/dashboard.png` — Portfolio view with defect distribution + attention thresholds
-> - `screenshots/inspection-edit.png` — 3-pane editor with section nav, item editor, canned comments + photos
-> - `screenshots/report-viewer.png` — Left sidebar with defect badges, top tabs (Full / Summary / Safety), Share + PDF dropdowns
-> - `screenshots/marketplace.png` — Community templates and comment libraries with one-click import
-
----
-
 ## What it is
 
 A complete home inspection software stack: inspector dashboard, public booking widget, mobile field form, professional HTML reports with e-signatures, AI assistance, multi-tenant routing, and PWA offline support — all running on Cloudflare's edge.
