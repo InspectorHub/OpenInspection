@@ -152,13 +152,9 @@ app.onError((err: unknown, c: Context<HonoConfig>) => {
 // Static assets
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const staticOpts = (opts: Record<string, string>): any => opts;
-app.get('/static/*', serveStatic(staticOpts({ root: './' })));
 app.get('/favicon.svg', serveStatic(staticOpts({ path: './favicon.svg' })));
 app.get('/logo.svg', serveStatic(staticOpts({ path: './logo.svg' })));
 app.get('/styles.css', serveStatic(staticOpts({ path: './styles.css' })));
-app.get('/manifest.json', serveStatic(staticOpts({ path: './manifest.json' })));
-app.get('/sw.js', serveStatic(staticOpts({ path: './sw.js' })));
-app.get('/css/*', serveStatic(staticOpts({ root: './' })));
 app.get('/vendor/*', serveStatic(staticOpts({ root: './' })));
 app.get('/fonts.css', serveStatic(staticOpts({ path: './fonts.css' })));
 app.get('/fonts/*', serveStatic(staticOpts({ root: './' })));
@@ -206,7 +202,7 @@ app.use('*', async (c, next) => {
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
     const isConciergePublic = path.startsWith('/confirm/') || path === '/api/concierge/confirm';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/widget.js' || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook';
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook';
 
     // Design System 0520 subsystem D P5 — observer surfaces are gated by
     // the dedicated observer-cookie middleware, not JWT.

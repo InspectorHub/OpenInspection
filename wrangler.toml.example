@@ -1,5 +1,5 @@
 name = "openinspection-standalone"
-main = "src/index.ts"
+main = "api/src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
@@ -9,7 +9,7 @@ preview_urls = true
 crons = ["* * * * *", "0 2 * * *", "0 * * * *"]
 
 [assets]
-directory = "./public"
+directory = "./api/public"
 
 [vars]
 ENVIRONMENT = "production"
