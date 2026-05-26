@@ -36,16 +36,16 @@ export function SideRail({ activeItem }: SideRailProps) {
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             {activeTab === "preview" && (
-              <p className="text-[11px] text-slate-400">Live preview of the active item's report rendering.</p>
+              <p className="text-[13px] text-ih-fg-3 text-center py-8">Live preview of the active item's report rendering.</p>
             )}
             {activeTab === "library" && (
               <div>
                 <input type="text" placeholder="Search comments..." className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2" />
-                <p className="text-[11px] text-slate-400 text-center py-4">Type <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">/</kbd> in the note field to search.</p>
+                <p className="text-[13px] text-ih-fg-3 text-center py-8">Type <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">/</kbd> in the note field to search.</p>
               </div>
             )}
             {activeTab === "recall" && (
-              <p className="text-[11px] text-slate-400">Prior inspections' notes for similar items.</p>
+              <p className="text-[13px] text-ih-fg-3 text-center py-8">Prior inspections' notes for similar items.</p>
             )}
           </div>
         </div>

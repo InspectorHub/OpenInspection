@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-router";
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
@@ -59,7 +59,7 @@ function formatTime(d: Date) {
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-ih-bg-muted",
-  scheduled: "bg-blue-500",
+  scheduled: "bg-ih-primary-600",
   confirmed: "bg-ih-primary",
   in_progress: "bg-amber-500",
   delivered: "bg-emerald-500",
@@ -121,6 +121,8 @@ export default function CalendarPage() {
   const { events } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
+  const navigation = useNavigation();
+  const isLoading = navigation.state === "loading";
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("month");
@@ -257,8 +259,30 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* Loading skeleton */}
+      {isLoading && (
+        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
+          <div className="grid grid-cols-7">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wide text-ih-fg-4 border-b border-ih-border">
+                {d}
+              </div>
+            ))}
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div key={i} className="min-h-[90px] p-1.5 border-b border-r border-ih-border">
+                <div className="w-6 h-6 rounded-full bg-ih-bg-muted animate-pulse" />
+                <div className="mt-2 space-y-1">
+                  {i % 3 === 0 && <div className="h-4 w-full rounded bg-ih-bg-muted animate-pulse" />}
+                  {i % 5 === 0 && <div className="h-4 w-3/4 rounded bg-ih-bg-muted animate-pulse" />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Month grid */}
-      {viewMode === "month" && (
+      {!isLoading && viewMode === "month" && (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="grid grid-cols-7">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
@@ -315,7 +339,7 @@ export default function CalendarPage() {
       )}
 
       {/* Week view */}
-      {viewMode === "week" && (
+      {!isLoading && viewMode === "week" && (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           {/* Day headers */}
           <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border">
@@ -377,7 +401,7 @@ export default function CalendarPage() {
       )}
 
       {/* Day view */}
-      {viewMode === "day" && (
+      {!isLoading && viewMode === "day" && (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="max-h-[600px] overflow-y-auto">
             {hours.map((h) => {

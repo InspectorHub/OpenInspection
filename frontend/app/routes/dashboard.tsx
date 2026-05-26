@@ -690,8 +690,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Upcoming", value: counts.upcoming, icon: "calendar" as const, color: "text-ih-primary bg-ih-primary-tint" },
-          { label: "In Progress", value: counts.inProgress, icon: "edit" as const, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-900/20" },
-          { label: "Needs Attention", value: counts.needsAttention, icon: "zap" as const, color: "text-ih-watch-fg bg-ih-watch-bg" },
+          { label: "In Progress", value: counts.inProgress, icon: "edit" as const, color: "text-ih-watch-fg bg-ih-watch-bg" },
+          { label: "Needs Attention", value: counts.needsAttention, icon: "zap" as const, color: "text-ih-bad-fg bg-ih-bad-bg" },
           { label: "Recent Reports", value: counts.recent, icon: "check" as const, color: "text-ih-ok-fg bg-ih-ok-bg" },
         ].map((stat) => (
           <Card key={stat.label} className="p-[14px] cursor-pointer hover:shadow-md transition-all">
@@ -706,7 +706,7 @@ export default function DashboardPage() {
 
       {/* Workflow tabs */}
       <TabStrip
-        tabs={TABS.map((t) => ({ id: t.key, label: t.label, count: tabCounts[t.key] ?? 0 }))}
+        tabs={TABS.map((t) => ({ id: t.key, label: t.label, count: t.key === "all" ? undefined : (tabCounts[t.key] ?? 0) }))}
         activeId={activeTab}
         onChange={(id) => setActiveTab(id as TabKey)}
       />
@@ -761,7 +761,7 @@ export default function DashboardPage() {
           <EmptyState
             icon={<Icon name="check" size={32} />}
             title="No inspections yet"
-            description="Create one above to get started."
+            description="Click + New Inspection above to get started."
           />
         </Card>
       ) : filteredBuckets ? (

@@ -34,14 +34,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  owner: "bg-ih-primary-tint text-ih-primary",
-  admin: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400",
-  inspector: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
-  lead: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
-  specialist: "bg-ih-ok-bg text-ih-ok-fg",
-  apprentice: "bg-ih-watch-bg text-ih-watch-fg",
-  office: "bg-ih-bg-muted text-ih-fg-3",
+const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {
+  owner: "primary",
+  admin: "info",
+  inspector: "neutral",
+  lead: "info",
+  specialist: "sat",
+  apprentice: "monitor",
+  agent: "warning",
+  office: "gen",
 };
 
 const TABS = [
@@ -112,9 +113,7 @@ export default function TeamPage() {
                     <p className="text-[11px] text-ih-fg-3">{m.email}</p>
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] ${ROLE_COLORS[m.role] || ROLE_COLORS.office}`}>
-                      {m.role}
-                    </span>
+                    <Pill tone={ROLE_TONES[m.role] || "gen"}>{m.role}</Pill>
                   </td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${

@@ -265,19 +265,21 @@ export default function SettingsCatalogBooking() {
       </div>
 
       {/* Save */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        {saved && (
-          <span className="text-[13px] text-ih-ok-fg font-bold">
-            Saved.
-          </span>
-        )}
+      <div className="flex justify-end pt-2 border-t border-ih-border">
+        <div className="flex items-center gap-3">
+          {saved && (
+            <span className="text-[13px] text-ih-ok-fg font-bold">
+              Saved.
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+        </div>
       </div>
     </div>
   );

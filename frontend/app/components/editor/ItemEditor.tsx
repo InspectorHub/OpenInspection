@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { TabStrip } from "@core/shared-ui";
 
 const RATINGS = [
  {
@@ -125,6 +126,13 @@ export function ItemEditor({ item, sectionTitle, result, onRating, onNotes, onNo
  return getIncludedSet(tabName).size;
  };
 
+ // Build visible tabs for shared TabStrip (only tabs with entries)
+ const visibleTabs = useMemo(() =>
+ CANNED_TABS
+  .filter((tab) => ((tabs[tab.id] || []) as unknown[]).length > 0)
+  .map((tab) => ({ id: tab.id, label: tab.label, count: countIncluded(tab.id) || undefined })),
+ [tabs, result]);
+
  return (
  <div className="max-w-2xl space-y-6">
  {/* Eyebrow + title */}
@@ -182,37 +190,19 @@ export function ItemEditor({ item, sectionTitle, result, onRating, onNotes, onNo
  {/* Canned comments tabs */}
  {hasTabs && (
  <div>
- {/* Tab strip */}
- <div className="flex border-b border-ih-border mb-3">
- {CANNED_TABS.map((tab) => {
- const entries = (tabs[tab.id] || []) as unknown[];
- if (entries.length === 0) return null;
- const count = countIncluded(tab.id);
- return (
- <button
- key={tab.id}
- onClick={() => setActiveTab(tab.id)}
- className={`relative px-3 py-2 text-[12px] font-bold transition-colors ${
- activeTab === tab.id
- ? "text-ih-primary border-b-2 border-indigo-600 dark:border-indigo-400 -mb-px"
- : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
- }`}
- >
- {tab.label}
- {count > 0 && (
- <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-ih-primary text-[9px] font-mono">
- {count}
- </span>
- )}
- </button>
- );
- })}
+ {/* Tab strip (shared Design System component) */}
+ <div className="mb-3">
+ <TabStrip
+  tabs={visibleTabs}
+  activeId={activeTab}
+  onChange={(id) => setActiveTab(id as CannedTabId)}
+ />
  </div>
 
  {/* Tab content: list of canned comments with toggles */}
  <div className="space-y-1.5">
  {currentTabEntries.length === 0 ? (
- <p className="text-[12px] text-slate-400 py-3 text-center">No pre-built comments for this tab.</p>
+ <p className="text-[13px] text-ih-fg-3 text-center py-8">No pre-built comments for this tab.</p>
  ) : (
  currentTabEntries.map((entry) => {
  const isIncluded = includedSet.has(entry.id);

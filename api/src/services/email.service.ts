@@ -9,6 +9,10 @@ import { inspectorSignature, type SignatureUser } from '../lib/inspector-signatu
  * so customers can rebook with that specific inspector by clicking the link.
  * Legacy callers that omit the args get the unmodified body (no signature).
  */
+function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function appendSignature(html: string, inspector?: SignatureUser, host?: string): string {
     if (!inspector || !host) return html;
     const sig = inspectorSignature(inspector, host);
@@ -104,7 +108,7 @@ export class EmailService {
         to: string,
         params: { token: string; inspectorName: string; tenantName: string; acceptUrl: string },
     ) {
-        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escape = escapeHtml;
         const inspector = escape(params.inspectorName);
         const tenant = escape(params.tenantName);
         const url = params.acceptUrl;
@@ -238,12 +242,12 @@ export class EmailService {
      * `inspector` + `host`.
      */
     async sendAgreementRequest(to: string, clientName: string | null, agreementName: string, signUrl: string, inspector?: SignatureUser, host?: string) {
-        const name = clientName || 'Client';
+        const name = escapeHtml(clientName || 'Client');
         const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
                 <h2 style="color: #4f46e5;">Document Ready to Sign</h2>
                 <p>Hi ${name},</p>
                 <p>You have been asked to review and sign the following agreement:</p>
-                <p style="font-weight: bold; color: #1e293b;">${agreementName}</p>
+                <p style="font-weight: bold; color: #1e293b;">${escapeHtml(agreementName)}</p>
                 <div style="margin: 32px 0;">
                     <a href="${signUrl}" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Review &amp; Sign Agreement</a>
                 </div>
@@ -301,7 +305,7 @@ export class EmailService {
         }
         if (!to) return;
 
-        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escape = escapeHtml;
         const fromName = (message.fromName ?? (recipient === 'client' ? 'your inspector' : (insp.clientName ?? 'your client'))).toString();
         const snippet = message.body.length > 200 ? message.body.slice(0, 197) + '...' : message.body;
         const html = `
@@ -340,7 +344,7 @@ export class EmailService {
         inspector?:       SignatureUser,
         host?:            string,
     ) {
-        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escape = escapeHtml;
         const html = `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;color:#0f172a;">
@@ -550,7 +554,7 @@ export class EmailService {
             inspectorName: string;
         },
     ) {
-        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escape = escapeHtml;
         const inspector = escape(params.inspectorName);
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
@@ -598,7 +602,7 @@ export class EmailService {
             reviewUrl: string;
         },
     ) {
-        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escape = escapeHtml;
         const client = escape(params.clientName);
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
@@ -635,7 +639,7 @@ export class EmailService {
         to: string,
         params: { propertyAddress: string; date: string; clientName: string },
     ) {
-        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escape = escapeHtml;
         const client = escape(params.clientName);
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
@@ -663,7 +667,7 @@ export class EmailService {
         to: string,
         params: { propertyAddress: string; date: string; reason?: string },
     ) {
-        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escape = escapeHtml;
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
         const reason = params.reason ? `<p style="font-size:14px;line-height:1.5;color:#334155;">Reason: ${escape(params.reason)}</p>` : '';

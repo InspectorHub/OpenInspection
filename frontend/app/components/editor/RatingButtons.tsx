@@ -6,9 +6,9 @@ export interface RatingLevel {
 }
 
 const DEFAULT_LEVELS: RatingLevel[] = [
-  { id: "Satisfactory",   label: "Satisfactory",   abbreviation: "SAT", color: "#22c55e" },
-  { id: "Monitor",        label: "Monitor",        abbreviation: "MON", color: "#f59e0b" },
-  { id: "Defect",         label: "Defect",         abbreviation: "DEF", color: "#f43f5e" },
+  { id: "Satisfactory",   label: "Satisfactory",   abbreviation: "SAT", color: "var(--ih-status-ok, #10b981)" },
+  { id: "Monitor",        label: "Monitor",        abbreviation: "MON", color: "var(--ih-status-watch, #f59e0b)" },
+  { id: "Defect",         label: "Defect",         abbreviation: "DEF", color: "var(--ih-status-bad, #ef4444)" },
   { id: "Not Inspected",  label: "Not Inspected",  abbreviation: "N/I", color: "#3b82f6" },
 ];
 

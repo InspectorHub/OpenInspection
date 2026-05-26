@@ -344,15 +344,15 @@ export function useInspectionState(opts: UseInspectionOptions) {
 
   const getRatingColor = useCallback(
     (ratingId: string | null | undefined): string => {
-      if (!ratingId) return "#d4d4d8";
+      if (!ratingId) return "var(--ih-fg-5, #d4d4d8)";
       const lvl = ratingLevels.find((l) => l.id === ratingId);
       if (lvl?.color) return lvl.color;
       const legacy: Record<string, string> = {
-        Satisfactory: "#22c55e",
-        Monitor: "#f59e0b",
-        Defect: "#f43f5e",
+        Satisfactory: "var(--ih-status-ok, #10b981)",
+        Monitor: "var(--ih-status-watch, #f59e0b)",
+        Defect: "var(--ih-status-bad, #ef4444)",
       };
-      return legacy[ratingId] || "#d4d4d8";
+      return legacy[ratingId] || "var(--ih-fg-5, #d4d4d8)";
     },
     [ratingLevels],
   );

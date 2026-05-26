@@ -85,7 +85,7 @@ export default function SettingsProfilePage() {
         </div>
       )}
 
-      <Form method="post" className="space-y-6">
+      <Form method="post" className="space-y-5">
         {/* Identity fields */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

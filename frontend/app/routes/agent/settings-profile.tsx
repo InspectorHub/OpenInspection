@@ -50,7 +50,7 @@ export default function AgentSettingsProfilePage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white">Settings</h1>
+        <h1 className="text-[19px] font-bold tracking-tight text-slate-900 dark:text-white">Settings</h1>
         <p className="text-[14px] text-ih-fg-3 mt-1">
           Your public referral slug and the emails we send you.
         </p>

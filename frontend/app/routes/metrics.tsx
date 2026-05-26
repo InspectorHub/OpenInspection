@@ -148,10 +148,10 @@ export default function MetricsPage() {
             <table className="w-full text-left">
               <thead>
                 <tr>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Section</th>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-ok-fg text-center">Satisfactory</th>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-watch-fg text-center">Monitor</th>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-bad-fg text-center">Defect</th>
+                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-fg-4">Section</th>
+                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-ok-fg text-center">Satisfactory</th>
+                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-watch-fg text-center">Monitor</th>
+                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-bad-fg text-center">Defect</th>
                 </tr>
               </thead>
               <tbody>

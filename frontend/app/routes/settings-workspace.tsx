@@ -97,7 +97,7 @@ export default function SettingsWorkspacePage() {
         </div>
       )}
 
-      <Form method="post" className="space-y-6">
+      <Form method="post" className="space-y-5">
         {/* Branding */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Branding</h3>

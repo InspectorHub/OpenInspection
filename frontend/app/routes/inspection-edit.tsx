@@ -738,7 +738,7 @@ export default function InspectionEditPage() {
  </button>
  ))}
  {commentLibraryItems.length === 0 && (
- <p className="text-[12px] text-slate-400 text-center py-8">
+ <p className="text-[13px] text-ih-fg-3 text-center py-8">
  No comments match the current filter.
  </p>
  )}
