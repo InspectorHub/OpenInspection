@@ -738,7 +738,7 @@ async function initRemix() {
 app.get('/', async (c) => {
     await initRemix();
     if (remixHandler) return remixHandler(c.req.raw, { cloudflare: { env: c.env, ctx: c.executionCtx } });
-    return c.redirect('/dashboard');
+    return c.redirect('/login');
 });
 
 // Global catch-all. API routes get JSON 404; all other routes try Remix SSR.
