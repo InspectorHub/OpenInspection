@@ -1,7 +1,6 @@
 import { Form, useActionData, useLoaderData, redirect } from "react-router";
 import type { Route } from "./+types/join";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 import { createSessionWithToken } from "~/lib/session.server";
 
 export function meta() {
@@ -22,7 +21,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return { valid: false, error: "Invalid or expired invite link", invite: null };
     }
     const body = await res.json();
-    const d = extractObject(body);
+    const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     return {
       valid: true,
       error: null,

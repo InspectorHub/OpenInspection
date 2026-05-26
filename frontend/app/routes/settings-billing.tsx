@@ -2,7 +2,6 @@ import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-billing";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -26,8 +25,8 @@ interface BillingSummary {
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   const res = await apiFetch("/api/billing/summary", { token });
-  const body = res.ok ? await res.json() : {};
-  return { billing: extractObject(body) as BillingSummary };
+  const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+  return { billing: (body.data ?? {}) as BillingSummary };
 }
 
 /* ------------------------------------------------------------------ */

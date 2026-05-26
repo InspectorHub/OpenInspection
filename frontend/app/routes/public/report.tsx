@@ -1,7 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
  return [{ title: "Inspection Report - OpenInspection" }];
@@ -28,8 +27,8 @@ export async function loader({ params }: Route.LoaderArgs) {
  const res = await apiFetch(
  `/api/public/report/${params.tenant}/${params.id}`,
  );
- const body = res.ok ? await res.json() : {};
- const d = extractObject(body);
+ const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+ const d = (body.data ?? {}) as Record<string, unknown>;
  return {
  report: (Object.keys(d).length > 0 ? d : null) as ReportData | null,
  error: res.ok ? null : "Report not found",

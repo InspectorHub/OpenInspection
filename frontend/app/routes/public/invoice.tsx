@@ -1,7 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/invoice";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
  return [{ title: "Invoice - OpenInspection" }];
@@ -22,7 +21,7 @@ export async function loader({ params }: Route.LoaderArgs) {
  try {
  const res = await apiFetch(`/api/public/r/${params.id}/invoice`);
  const body = res.ok ? await res.json() : {};
- const d = extractObject(body);
+ const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
  return {
  invoice: (Object.keys(d).length > 0 ? d : null) as InvoiceData | null,
  error: res.ok ? null : "Invoice not found",

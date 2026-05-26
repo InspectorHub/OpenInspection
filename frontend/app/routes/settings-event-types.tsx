@@ -3,7 +3,6 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/settings-event-types";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray } from "~/lib/api-helpers";
 
 interface EventType {
   id: string;
@@ -26,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     const res = await apiFetch("/api/admin/event-types", { token });
     if (!res.ok) return { types: [] };
     const body = await res.json();
-    return { types: extractArray(body, "eventTypes", "event_types") as EventType[] };
+    return { types: ((body as Record<string, unknown>).data ?? []) as EventType[] };
   } catch {
     return { types: [] };
   }

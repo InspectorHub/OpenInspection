@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-sign";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
  return [{ title: "Sign Agreement - OpenInspection" }];
@@ -22,7 +21,7 @@ export async function loader({ params }: Route.LoaderArgs) {
  `/api/public/agreements/sign/${params.tenant}/${params.token}`,
  );
  const body = res.ok ? await res.json() : {};
- const d = extractObject(body);
+ const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
  return {
  agreement: (Object.keys(d).length > 0 ? d : null) as AgreementData | null,
  error: res.ok ? null : "Agreement not found",

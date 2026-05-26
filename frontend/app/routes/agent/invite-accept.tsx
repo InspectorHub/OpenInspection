@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Form, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/invite-accept";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "You're invited - OpenInspection" }];
@@ -35,7 +34,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     if (!res.ok) {
       return { invite: null, error: "expired" as const };
     }
-    const data = extractObject(body) as unknown as InviteData | undefined;
+    const data = ((body as Record<string, unknown>).data ?? {}) as unknown as InviteData | undefined;
     return {
       invite: data && Object.keys(data).length > 0 ? { ...data, token } : null,
       error: null,

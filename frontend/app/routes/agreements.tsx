@@ -3,7 +3,6 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreements";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray } from "~/lib/api-helpers";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -14,8 +13,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/admin/agreements", { token });
-    const body = res.ok ? await res.json() : {};
-    return { agreements: extractArray(body, "agreements") };
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    return { agreements: (body.data ?? []) as unknown[] };
   } catch {
     return { agreements: [] };
   }

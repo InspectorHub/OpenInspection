@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking-embed";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Book inspection" }];
@@ -33,7 +32,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       `/api/public/embed/${params.tenant}/${params.slug}`,
     );
     const body = res.ok ? await res.json() : {};
-    const d = extractObject(body) as Partial<EmbedData> | undefined;
+    const d = ((body as Record<string, unknown>).data ?? {}) as Partial<EmbedData> | undefined;
     return {
       data: d
         ? ({

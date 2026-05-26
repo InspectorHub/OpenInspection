@@ -1,7 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-gate";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Report access - OpenInspection" }];
@@ -36,8 +35,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     const res = await apiFetch(
       `/api/public/report-gate/${params.tenant}/${params.id}`,
     );
-    const body = res.ok ? await res.json() : {};
-    const d = extractObject(body);
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const d = (body.data ?? {}) as Record<string, unknown>;
     return { gate: (Object.keys(d).length > 0 ? d : null) as GateData | null, error: res.ok ? null : "Not found" };
   } catch {
     return { gate: null, error: "Service unavailable" };

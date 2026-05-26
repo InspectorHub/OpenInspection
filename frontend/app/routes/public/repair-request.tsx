@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/repair-request";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Repair Request - OpenInspection" }];
@@ -44,7 +43,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   try {
     const res = await apiFetch(`/api/public/repair-request/${params.id}`);
     const body = res.ok ? await res.json() : {};
-    const d = extractObject(body);
+    const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     return {
       data: (Object.keys(d).length > 0 ? d : null) as RepairRequestData | null,
       error: res.ok ? null : "Not found",

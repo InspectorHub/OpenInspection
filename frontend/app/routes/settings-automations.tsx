@@ -2,7 +2,6 @@ import { Link, useLoaderData, Form } from "react-router";
 import type { Route } from "./+types/settings-automations";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Automations - Settings - OpenInspection" }];
@@ -39,8 +38,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/admin/automations", { token });
-    const body = res.ok ? await res.json() : {};
-    return { rules: extractArray(body, "rules") as AutomationRule[] };
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    return { rules: (body.data ?? []) as AutomationRule[] };
   } catch {
     return { rules: [] as AutomationRule[] };
   }

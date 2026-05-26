@@ -1,7 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-printable";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Signed Agreement - OpenInspection" }];
@@ -31,7 +30,7 @@ export async function loader({ params }: Route.LoaderArgs) {
       `/api/internal/agreement-render/${params.token}`,
     );
     const body = res.ok ? await res.json() : {};
-    const d = extractObject(body);
+    const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     return {
       agreement: (Object.keys(d).length > 0 ? d : null) as AgreementData | null,
       error: res.ok ? null : "Not found",

@@ -3,7 +3,6 @@ import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-widget";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Embed Widget - Settings - OpenInspection" }];
@@ -20,8 +19,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/admin/widget", { token });
-    const body = res.ok ? await res.json() : {};
-    const d = extractObject(body) as Record<string, unknown> | undefined;
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const d = (body.data ?? {}) as Record<string, unknown> | undefined;
     return {
       config: {
         origins: (d?.origins || []) as string[],

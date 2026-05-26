@@ -1,4 +1,10 @@
 /**
+ * Legacy API response helpers — kept as a fallback utility but no longer used
+ * by standard route loaders. All routes now use the standardized API response
+ * format directly: `{ success: true, data: [...] }` or `{ success: true, data: {...} }`.
+ */
+
+/**
  * Safely extract an array from an API response body.
  * Handles: { data: [...] }, { data: { items: [...] } }, { data: { contacts: [...] } }, etc.
  * Falls back to empty array if the response doesn't contain array data.

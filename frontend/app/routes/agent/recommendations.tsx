@@ -2,7 +2,6 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/recommendations";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Recommendations - OpenInspection" }];
@@ -27,8 +26,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/agent/my-recommendations", { token });
-    const body = res.ok ? await res.json() : {};
-    const d = extractObject(body);
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const d = (body.data ?? {}) as Record<string, unknown>;
     return {
       groups: {
         safety: Array.isArray(d?.safety) ? d.safety : [],

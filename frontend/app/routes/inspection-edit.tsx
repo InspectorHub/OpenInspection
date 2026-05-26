@@ -3,7 +3,6 @@ import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 import { useInspectionState } from "~/hooks/useInspection";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { useFindings } from "~/hooks/useFindings";
@@ -45,7 +44,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  const resultsBody = resultsRes.ok ? await resultsRes.json() : {};
  const reportBody = reportRes.ok ? await reportRes.json() : {};
 
- const data = extractObject(inspBody) as Record<string, unknown> | undefined;
+ const data = ((inspBody as Record<string, unknown>).data ?? {}) as Record<string, unknown> | undefined;
  const inspection = (data?.inspection as Record<string, unknown>) || {
  id,
  propertyAddress: "Loading...",
@@ -57,7 +56,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  }) || { sections: [] };
 
  // Normalize sections from report-data (which has rating levels + section data)
- const rdData = extractObject(reportBody) as Record<string, unknown> | undefined;
+ const rdData = ((reportBody as Record<string, unknown>).data ?? {}) as Record<string, unknown> | undefined;
  const reportSections = (rdData?.sections || []) as Array<Record<string, unknown>>;
  if (reportSections.length > 0) {
  schema.sections = reportSections.map((sec: Record<string, unknown>) => {
@@ -75,7 +74,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
  }
 
  const ratingLevels = ((rdData?.ratingLevels || []) as RatingLevel[]);
- const resultsObj = extractObject(resultsBody);
+ const resultsObj = ((resultsBody as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
  const results = ((resultsObj as Record<string, Record<string, unknown>>)?.data ||
  resultsObj ||
  {}) as ResultMap;

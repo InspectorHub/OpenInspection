@@ -3,7 +3,6 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray, extractObject } from "~/lib/api-helpers";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -23,10 +22,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/team", { token });
-    const body = res.ok ? await res.json() : {};
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
     return {
-      members: extractArray(body, "members") as Member[],
-      settings: extractObject(body, "settings"),
+      members: (body.data ?? []) as Member[],
+      settings: {} as Record<string, unknown>,
     };
   } catch {
     return { members: [] as Member[], settings: {} };

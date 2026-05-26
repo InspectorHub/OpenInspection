@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Book an Inspection - OpenInspection" }];
@@ -21,7 +20,7 @@ export async function loader({ params }: Route.LoaderArgs) {
       `/api/public/book/${params.tenant}/${params.slug}`,
     );
     const body = res.ok ? await res.json() : {};
-    const d = extractObject(body);
+    const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     return {
       profile: (Object.keys(d).length > 0 ? d : null) as InspectorProfile | null,
       error: res.ok ? null : "Inspector not found",

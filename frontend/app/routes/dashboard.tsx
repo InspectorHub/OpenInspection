@@ -3,7 +3,6 @@ import { useLoaderData, Link, useNavigate, useFetcher, useSearchParams } from "r
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray, extractObject } from "~/lib/api-helpers";
 import { NewInspectionWizard } from "~/components/NewInspectionWizard";
 import { CommandPalette } from "~/components/CommandPalette";
 import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
@@ -178,12 +177,12 @@ export async function loader({ request }: Route.LoaderArgs) {
       apiFetch("/api/inspections/dashboard", { token }),
       apiFetch("/api/tags", { token }).catch(() => null),
     ]);
-    const json = dashRes.ok ? await dashRes.json() : {};
-    const d = extractObject(json) as unknown as DashboardData | undefined;
+    const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
+    const d = (json.data ?? {}) as unknown as DashboardData | undefined;
     let tags: Tag[] = [];
     if (tagsRes && tagsRes.ok) {
-      const tj = await tagsRes.json();
-      tags = extractArray(tj, "tags") as Tag[];
+      const tj = (await tagsRes.json()) as Record<string, unknown>;
+      tags = (tj.data ?? []) as Tag[];
     }
     return {
       buckets: {

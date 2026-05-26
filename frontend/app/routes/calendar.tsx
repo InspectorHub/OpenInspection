@@ -3,7 +3,6 @@ import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Calendar - OpenInspection" }];
@@ -85,8 +84,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const end = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
   try {
     const res = await apiFetch(`/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, { token });
-    const body = res.ok ? await res.json() : {};
-    const events = extractArray(body, "events") as CalendarEvent[];
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    const events = (body.data ?? []) as CalendarEvent[];
     return { events };
   } catch {
     return { events: [] as CalendarEvent[] };

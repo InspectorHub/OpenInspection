@@ -3,7 +3,6 @@ import { useLoaderData, useFetcher, useNavigate, Link } from "react-router";
 import type { Route } from "./+types/templates";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Templates - OpenInspection" }];
@@ -39,8 +38,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/inspections/templates", { token });
-    const body = res.ok ? await res.json() : {};
-    const templates = extractArray(body, "templates") as Template[];
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    const templates = (body.data ?? []) as Template[];
     return { templates, token };
   } catch {
     return { templates: [] as Template[], token: "" };

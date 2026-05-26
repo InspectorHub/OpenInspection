@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta({ data }: Route.MetaArgs) {
  const d = data as LoaderResult | undefined;
@@ -65,7 +64,7 @@ export async function loader({ params }: Route.LoaderArgs) {
  `/api/public/report/${params.tenant}/${params.id}`,
  );
  const body = res.ok ? await res.json() : {};
- const d = extractObject(body) as unknown as LoaderResult | undefined;
+ const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;
  return {
  inspectionId: d?.inspectionId ?? params.id ?? "",
  address: d?.address ?? "",

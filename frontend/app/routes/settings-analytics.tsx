@@ -3,7 +3,6 @@ import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-analytics";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Analytics & Metrics - Settings - OpenInspection" }];
@@ -36,8 +35,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/analytics/dashboard", { token });
-    const body = res.ok ? await res.json() : {};
-    const d = extractObject(body) as unknown as AnalyticsData | undefined;
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+    const d = (body.data ?? {}) as unknown as AnalyticsData | undefined;
     return {
       chartPlaceholder: d?.chartPlaceholder ?? "No data yet",
       defects: d?.defects ?? [],

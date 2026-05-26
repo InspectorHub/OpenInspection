@@ -1,7 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/inspector-profile";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta({ data }: Route.MetaArgs) {
   const d = data as LoaderResult | undefined;
@@ -50,7 +49,7 @@ export async function loader({ params }: Route.LoaderArgs) {
       `/api/public/inspector/${params.tenant}/${params.slug}`,
     );
     const body = res.ok ? await res.json() : {};
-    const data = extractObject(body) as { profile?: InspectorData; services?: ServiceItem[] };
+    const data = ((body as Record<string, unknown>).data ?? {}) as { profile?: InspectorData; services?: ServiceItem[] };
     return {
       profile: data?.profile ?? null,
       services: Array.isArray(data?.services) ? data.services : [],

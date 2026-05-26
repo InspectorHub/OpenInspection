@@ -3,7 +3,6 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/recommendations";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { extractArray } from "~/lib/api-helpers";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -14,8 +13,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
   try {
     const res = await apiFetch("/api/recommendations", { token });
-    const body = res.ok ? await res.json() : {};
-    return { items: extractArray(body, "recommendations") };
+    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    return { items: (body.data ?? []) as unknown[] };
   } catch {
     return { items: [] };
   }

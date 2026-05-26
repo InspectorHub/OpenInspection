@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Form, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/concierge-confirm";
 import { apiFetch } from "~/lib/api.server";
-import { extractObject } from "~/lib/api-helpers";
 
 export function meta() {
   return [{ title: "Confirm your inspection - OpenInspection" }];
@@ -46,7 +45,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     if (!res.ok) {
       return { data: null, error: "expired" as const };
     }
-    const d = extractObject(body) as unknown as ConfirmData | undefined;
+    const d = ((body as Record<string, unknown>).data ?? {}) as unknown as ConfirmData | undefined;
     return { data: d && Object.keys(d).length > 0 ? { ...d, token } : null, error: null };
   } catch {
     return { data: null, error: "unknown" as const };
