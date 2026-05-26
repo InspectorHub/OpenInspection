@@ -1,8 +1,12 @@
 # Testing — apps/core
 
-End-to-end tests use [Playwright](https://playwright.dev/). Tests run against a live local dev server — no mocking, no test database. Hits real Worker endpoints backed by Wrangler's local D1 and R2 emulation.
+Tests cover both the API Worker and the Remix Frontend Worker.
 
 ## Quick Start
+
+### API E2E Tests
+
+End-to-end tests use [Playwright](https://playwright.dev/). Tests run against a live local dev server — no mocking, no test database. Hits real Worker endpoints backed by Wrangler's local D1 and R2 emulation.
 
 ```bash
 # Terminal 1
@@ -10,6 +14,21 @@ npm run dev          # http://localhost:8788
 
 # Terminal 2
 npm run test:e2e
+```
+
+### Frontend Tests
+
+Frontend E2E and unit tests live in `frontend/tests/`. They test the Remix React UI against the running API Worker.
+
+```bash
+# Terminal 1: Start API Worker
+npm run dev
+
+# Terminal 2: Start Frontend dev server
+cd frontend && npm run dev
+
+# Terminal 3: Run frontend tests
+cd frontend && npm run test
 ```
 
 ## Test Results
@@ -168,3 +187,21 @@ npx playwright test --reporter=html && open playwright-report/index.html
 - Real API keys (Resend, Stripe, Gemini) are not required. Calls are skipped or use mock fallbacks when keys are absent.
 - **Turnstile is required** — `TURNSTILE_SECRET_KEY` must be set even for local dev and CI. Use Cloudflare's always-pass test secret (`1x0000000000000000000000000000000AA`). If absent, `POST /api/book` throws a 500 error.
 - The Cloudflare Turnstile test keys in `.dev.vars.example` always pass validation — safe for CI.
+
+## Frontend Tests
+
+Frontend tests live in `frontend/tests/` and cover the Remix React UI.
+
+### Running
+
+```bash
+cd frontend
+npm run test              # run all frontend tests
+npm run test -- --grep "dashboard"   # filter by name
+```
+
+### Requirements
+
+- Both the API Worker (`npm run dev` in root, port 8788) and the Frontend dev server (`npm run dev` in `frontend/`, port 5173) must be running.
+- The API Worker must have a seeded database (run `npm run db:migrate` first).
+- Same `.dev.vars` / Turnstile key requirements as the API E2E tests.

@@ -26,6 +26,12 @@ test-results/
 wrangler.toml
 wrangler.*.toml
 
+# Frontend build output
+frontend/build/
+
+# Deploy toml variants
+*.wrangler-deploy.toml
+
 # Qwen config
 .qwen/
 .worktrees/

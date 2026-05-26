@@ -1,37 +1,71 @@
 # CLAUDE.md — OpenInspection (Open Source Edition)
 
-The open-source inspection engine. A standalone Cloudflare Worker designed for simplicity and extensibility.
+The open-source inspection engine. Dual-deploy architecture: a Hono API Worker + a Remix frontend Worker, both on Cloudflare.
 
 **Docs**: `docs/architecture.md` · `docs/developers/` · `docs/inspectors/` · `docs/testing.md`
 
 ## Commands
 
 ```bash
+# API Worker (root package.json)
 npm install
-npm run dev          # Start local development server (port 8788)
-npm run css:watch    # Watch and compile Tailwind CSS
+npm run dev          # Start API Worker local dev server (port 8788)
+npm run css:watch    # Watch and compile Tailwind CSS (legacy Hono SSR)
 npm run db:migrate   # Apply D1 migrations locally
 npm run type-check   # Run TypeScript type checks
 npm run lint         # Lint the codebase
 npm run test:unit    # Run unit tests via Vitest
-npm run deploy       # Deploy to Cloudflare Workers
+npm run deploy       # Deploy API Worker to Cloudflare Workers
+
+# Frontend Worker (frontend/)
+cd frontend
+npm run dev          # Start Remix dev server (port 5173, proxies API to 8788)
+npm run build        # Build Remix frontend for production
+npm run deploy       # Deploy Frontend Worker to Cloudflare Workers
+npm run typecheck    # Frontend TypeScript checks
+
+# E2E Tests
+npm run test:e2e              # API E2E tests (Playwright, api/tests/)
+cd frontend && npm run test   # Frontend E2E tests (frontend/tests/)
 ```
 
 ## Key Files & Directories
 
 | File/Dir | Purpose |
 |---|---|
-| `src/index.ts` | Hono app entry point and route configuration |
-| `src/api/` | API route handlers (Auth, Inspections, Bookings, etc.) |
-| `src/lib/db/` | Drizzle ORM schema and database utilities |
-| `src/lib/middleware/` | Hono middleware (Authentification, RBAC, etc.) |
-| `public/` | Static assets and compiled CSS |
-| `migrations/` | D1 database migration SQL files |
+| `api/src/index.ts` | Hono API Worker entry point and route configuration |
+| `api/src/api/` | API route handlers (Auth, Inspections, Bookings, etc.) |
+| `api/src/lib/db/` | Drizzle ORM schema and database utilities |
+| `api/src/lib/middleware/` | Hono middleware (Authentication, RBAC, etc.) |
+| `api/src/lib/validations/` | Zod schemas per module |
+| `api/src/services/` | Business logic, DB queries (Drizzle) |
+| `api/src/templates/` | Legacy Hono SSR templates (kept for old system compat) |
+| `api/migrations/` | D1 database migration SQL files |
+| `api/tests/` | API unit + integration + E2E tests |
+| `frontend/app/routes/` | 75 Remix React route files |
+| `frontend/app/components/` | 59 React components |
+| `frontend/app/hooks/` | 8 React hooks (useInspection, useFindings, useKeyboard, etc.) |
+| `frontend/app/lib/` | API client (hono/client), session management, helpers |
+| `frontend/app/styles/tailwind.css` | Design System token layer (Tailwind v4) |
+| `frontend/tests/` | Frontend E2E + unit tests |
+| `packages/shared-ui/src/` | 11 shared React components (Button, Pill, Card, etc.) |
+| `packages/api-types/` | CoreApiType re-export for hono/client |
+| `public/` | Static assets for legacy Hono SSR (compiled CSS, fonts, JS) |
 
 ## Core Architecture
 
+### Dual-Deploy Architecture
+OpenInspection runs as two independent Cloudflare Workers:
+
+- **API Worker** (`api/`) — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
+- **Frontend Worker** (`frontend/`) — Remix + React 18 + Tailwind v4. Server-side renders the React UI on Cloudflare Workers. Calls the API Worker via Service Binding (zero-latency, no network hop).
+- **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components shared between frontend and any future consumers.
+- **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the frontend's `hono/client` gets full end-to-end type safety.
+
+The frontend uses a **Token Relay BFF** pattern: the Remix server holds the JWT cookie and forwards it to the API Worker on every request, so the browser never sees the token.
+
 ### Authentication
-- JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `src/lib/jwt-keyring.ts`.
+- JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `api/src/lib/jwt-keyring.ts`.
 - Supports both Cookie (for dashboard) and Bearer Header (for API) token delivery.
 - PBKDF2-SHA256 password hashing (100k iterations, 16-byte salt). Legacy SHA-256 hashes auto-rehashed on login.
 - **Shared-SaaS login is portal-only.** When `APP_MODE=saas` + `SAAS_TOPOLOGY=shared`, `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: a single core D1 holds users for many tenants and `users.email` is now unique per-`(tenant_id, email)` (migration 0072), so a local form cannot disambiguate which tenant the user means. Entry into core in this mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone and silo deploys are unchanged — the local form still works because their email-to-tenant mapping is unambiguous.
@@ -43,11 +77,22 @@ npm run deploy       # Deploy to Cloudflare Workers
 - Stable API surface designed to be extended by SaaS overlay branches (e.g., `saas` branch).
 
 ### Inspection Engine
-- JSON-schema based inspection templates (`src/types/template-schema.ts`, single canonical v2 — see `src/lib/validations/template.schema.ts`).
+- JSON-schema based inspection templates (`api/src/types/template-schema.ts`, single canonical v2 — see `api/src/lib/validations/template.schema.ts`).
 - 9 item types: `rich` (rating + 3 canned-comment tabs) plus `boolean / text / textarea / number / select / multi_select / date / photo_only` for non-rated data points. Inspection side stores rating on `result.rating` and non-rich values on `result.value`.
 - Spectora import path: `POST /api/inspections/templates/import-spectora` accepts a raw Spectora export + a name, runs `lib/spectora-import.ts` (4-bucket → 3-tab mapping, identifier preservation via `source`), creates a template in one shot. UI entry point: "Import Spectora" button on `/templates`.
 - Support for field results, e-signatures, and report generation.
 - Integrated public booking system with Turnstile bot protection.
+
+## Frontend Architecture
+
+- **Framework**: Remix (React Router v7) on Cloudflare Workers with Vite.
+- **Rendering**: Full SSR — Remix server renders on the edge, hydrates on the client.
+- **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`frontend/app/styles/tailwind.css`).
+- **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. The Remix loader/action functions call the API Worker through a Service Binding (in production) or HTTP proxy (in dev).
+- **State management**: React hooks — `useInspection` (866 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
+- **Component library**: `packages/shared-ui/` provides 11 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
+- **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
+- **Offline**: Service Worker + `useOfflineQueue` hook for photo upload queue and field sync.
 
 ## Environment Variables
 
@@ -75,20 +120,21 @@ npm run deploy       # Deploy to Cloudflare Workers
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook HMAC verification |
 | `GA_MEASUREMENT_ID` | No | Google Analytics tracking ID |
 | `GOOGLE_PLACES_API_KEY` | No | Google Places API key powering address autocomplete on the dashboard new-inspection wizard and the public `/book` page (proxied via `/api/places/*` and `/api/public/geocode`). When unset, both endpoints return `{ data: [], reason: 'NO_API_KEY' }` and the address inputs degrade gracefully to plain text — the customer can still type a free-form address and submit. |
-| `ESTATED_API_KEY` | No | Sprint 3 S3-1 — Estated.io public-records key for the `POST /api/inspections/:id/property-facts/autofill` endpoint. Resolves year built / sqft / foundation / lot size / bedrooms / bathrooms by address. When unset, the endpoint returns `{ data: null, reason: 'NO_API_KEY' }` and the Property Facts card displays a polite "auto-fill not configured" hint while still accepting manual entry. Same graceful-degrade pattern as `GOOGLE_PLACES_API_KEY`. |
+| `ESTATED_API_KEY` | No | Estated.io public-records key for the `POST /api/inspections/:id/property-facts/autofill` endpoint. Resolves year built / sqft / foundation / lot size / bedrooms / bathrooms by address. When unset, the endpoint returns `{ data: null, reason: 'NO_API_KEY' }` and the Property Facts card displays a polite "auto-fill not configured" hint while still accepting manual entry. Same graceful-degrade pattern as `GOOGLE_PLACES_API_KEY`. |
 
 ---
 
-- **Framework**: [Hono](https://hono.dev/) with Zod OpenAPI.
+- **API Framework**: [Hono](https://hono.dev/) with Zod OpenAPI.
+- **Frontend Framework**: [Remix](https://remix.run/) (React Router v7) + React 18.
 - **ORM**: [Drizzle ORM](https://orm.drizzle.team/) with D1.
-- **CSS**: [Tailwind CSS](https://tailwindcss.com/).
+- **CSS**: [Tailwind CSS v4](https://tailwindcss.com/) with Design System 0523 tokens.
 - **Testing**: Vitest for unit tests; Playwright for E2E.
 
 ## JWT & Auth Security Rules
 
 These rules are **mandatory** for any code that touches authentication. Violations reintroduce critical vulnerabilities.
 
-- **ES256 keyring**: All JWT signing and verification MUST go through `src/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `diMiddleware` and exposed as `await c.var.keyringPromise`.
+- **ES256 keyring**: All JWT signing and verification MUST go through `api/src/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `diMiddleware` and exposed as `await c.var.keyringPromise`.
 - **kid required**: Every JWT MUST carry a `kid` header. `signJwt()` sets it from `JWT_CURRENT_KID`; `verifyJwt()` rejects tokens with no kid, or with a kid that is not in the keyring.
 - **iat claim**: `signJwt()` auto-injects `iat: Math.floor(Date.now() / 1000)` when the caller omits it. Without `iat`, KV session invalidation (`pwchanged:{userId}`) cannot work.
 - **No HS256 fallback**: There is NO legacy HS256 path. Pre-launch architectural choice — see rotation scripts and docs. The remaining `JWT_SECRET` env binding is now used only as KDF input for `config-crypto`, `qbo-crypto`, audit signing-key encryption, and M2M Bearer auth — never for JWT signing.
@@ -99,14 +145,14 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 - **deleteCookie secure**: Every `deleteCookie()` MUST include `{ path: '/', secure: true }`. Omitting `secure` on `__Host-` cookies throws a runtime exception.
 - **No localStorage tokens**: Frontend JS MUST NOT store tokens in `localStorage` or `document.cookie`. Same-origin `fetch()` sends the HttpOnly cookie automatically.
 - **KV invalidation**: On password change/reset/delete, write `pwchanged:{userId}` to KV. Auth middleware rejects tokens with `iat < changedAt`.
-- **D1 date safety**: Always use `safeISODate()` / `safeTimestamp()` from `src/lib/date.ts` when serializing DB date values. D1 returns mixed formats (Date, int, string).
+- **D1 date safety**: Always use `safeISODate()` / `safeTimestamp()` from `api/src/lib/date.ts` when serializing DB date values. D1 returns mixed formats (Date, int, string).
 
 ## Input Validation Rules
 
 - **Zod required**: Every API endpoint that accepts user input (body, query, params) MUST validate using a Zod schema. No manual `if (!field)` or TypeScript generics-only validation.
 - **OpenAPIHono routes**: Use `createRoute()` with `request.body/query/params` schemas and access validated data via `c.req.valid('json')`, `c.req.valid('query')`, `c.req.valid('param')`.
 - **Non-OpenAPIHono routes**: Use `schema.safeParse(await c.req.json())` and return 400 on failure. This applies to workaround routes that cannot use `createRoute()`.
-- **Schema location**: All Zod schemas live in `src/lib/validations/*.schema.ts`. Do not define schemas inline in route handlers.
+- **Schema location**: All Zod schemas live in `api/src/lib/validations/*.schema.ts`. Do not define schemas inline in route handlers.
 - **No raw c.req.json()**: Never use `c.req.json<T>()` with only TypeScript generics — generics provide zero runtime protection.
 
 ## Language Rules
@@ -117,7 +163,7 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 
 - **No raw console**: Server-side code MUST use `import { logger } from '../lib/logger'` instead of `console.log/error/warn/info`. The `Logger` class outputs structured JSON for log aggregators.
 - **Exception**: Client-side JS inside `<script>` tags or inline template scripts (runs in browser) MAY use `console.*`.
-- **Exception**: `src/lib/logger.ts` itself uses `console.info` internally — that is correct and must not be changed.
+- **Exception**: `api/src/lib/logger.ts` itself uses `console.info` internally — that is correct and must not be changed.
 - **Error signature**: `logger.error(message, data?, error?)` — second arg is `Record<string, unknown>`, third is optional `Error`. Do NOT pass raw Error as second arg.
 - **No sensitive data in logs**: Never log JWT tokens, passwords, API keys, or full request bodies. Log only error messages, status codes, and non-sensitive identifiers.
 

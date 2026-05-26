@@ -27,6 +27,13 @@
 
 A complete home inspection software stack: inspector dashboard, public booking widget, mobile field form, professional HTML reports with e-signatures, AI assistance, multi-tenant routing, and PWA offline support — all running on Cloudflare's edge.
 
+### Architecture
+
+- **API Worker** (`api/`) — Hono + Drizzle + D1, handles all business logic
+- **Frontend Worker** (`frontend/`) — Remix + React 18 + Tailwind v4, SSR on CF Workers
+- **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based components
+- Both deploy as independent CF Workers; frontend calls API via Service Binding
+
 ### Inspector workflow
 - 3-pane editor with 248 canned comments, slash-trigger snippet picker, AI rewrite
 - Keyboard-driven: 1-5 ratings, ⌘K palette, `/` snippet picker, `?` HUD
@@ -54,7 +61,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 - **Yours**: fork it, change templates, add integrations. No vendor lock-in.
 - **Fast**: edge-deployed, < 100 ms response times globally
 - **Compliant**: PBKDF2-SHA256 password hashing, Ed25519 audit chain on e-signatures, multi-tenant data isolation
-- **Modern**: Hono + JSX + Drizzle + Tailwind — small surface, easy to read
+- **Modern**: Remix + React 18 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
 
 ## Quick start
 
@@ -100,12 +107,13 @@ Detailed setup: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`doc
 
 ## Tech stack
 
-- **Cloudflare Workers**: edge runtime
-- **Hono** with hono/jsx: routing + server-rendered HTML
+- **Cloudflare Workers**: edge runtime (dual Worker deploy)
+- **Remix** + React 18: frontend SSR on Workers
+- **Hono** + Zod OpenAPI: typed API layer
 - **Drizzle ORM** + Cloudflare D1: SQLite at the edge
 - **Cloudflare R2 / KV**: object storage and config cache
-- **Alpine.js** + Tailwind CSS: client-side interactivity and styling
-- **Optional**: Gemini AI, Stripe Connect, Resend email, Mapbox geocoding
+- **Tailwind CSS v4**: design system tokens + utility CSS
+- **Optional**: Gemini AI, Stripe Connect, Resend email, Google Places
 
 ## Community
 
