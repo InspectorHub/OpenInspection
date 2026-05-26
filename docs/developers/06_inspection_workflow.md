@@ -1,4 +1,4 @@
-# Core Inspection Workflow
+# OpenInspection Workflow
 
 ## 1. Data Model — Template-Driven JSON Schema
 

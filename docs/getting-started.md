@@ -1,6 +1,6 @@
 # Getting Started
 
-A quick walkthrough of the core inspection workflow — from setup to published report.
+A quick walkthrough of the OpenInspection workflow — from setup to published report.
 
 ## Setup
 
