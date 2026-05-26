@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking";
 import { apiFetch } from "~/lib/api.server";
@@ -8,9 +8,11 @@ export function meta() {
 }
 
 interface InspectorProfile {
+  inspectorId: string;
   name: string;
   company?: string;
   avatar?: string;
+  turnstileSiteKey?: string | null;
   services: { id: string; name: string; price: number; duration: number }[];
 }
 
@@ -68,6 +70,35 @@ export default function BookingPage() {
   const [clientEmail, setClientEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<HTMLDivElement>(null);
+
+  // Load Turnstile widget
+  useEffect(() => {
+    const siteKey = profile?.turnstileSiteKey;
+    if (!siteKey || typeof window === "undefined") return;
+    const existing = document.querySelector('script[src*="turnstile"]');
+    if (!existing) {
+      const s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
+      s.async = true;
+      document.head.appendChild(s);
+    }
+    (window as any).onTurnstileLoad = () => {
+      if (turnstileRef.current && (window as any).turnstile) {
+        (window as any).turnstile.render(turnstileRef.current, {
+          sitekey: siteKey,
+          callback: (token: string) => setTurnstileToken(token),
+        });
+      }
+    };
+    if ((window as any).turnstile && turnstileRef.current) {
+      (window as any).turnstile.render(turnstileRef.current, {
+        sitekey: siteKey,
+        callback: (token: string) => setTurnstileToken(token),
+      });
+    }
+  }, [profile?.turnstileSiteKey, step]);
 
   const toggleService = (id: string) =>
     setSelectedServices((prev) => {
@@ -83,11 +114,12 @@ export default function BookingPage() {
       .reduce((sum, s) => sum + s.price / 100, 0);
   }, [selectedServices, profile]);
 
+  const needsTurnstile = !!profile?.turnstileSiteKey;
   const canNext =
     step === 0 ? address.length > 2 :
     step === 1 ? selectedServices.size > 0 :
     step === 2 ? inspectionDate.length > 0 && clientName.length > 0 && clientEmail.length > 0 :
-    true;
+    needsTurnstile ? !!turnstileToken : true;
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -99,11 +131,13 @@ export default function BookingPage() {
         body: JSON.stringify({
           address,
           date: inspectionDate,
-          timeSlot: timeWindow === "custom" ? customTime : timeWindow,
-          ...(timeWindow === "custom" ? { customTime: customTime } : {}),
+          timeSlot: timeWindow === "custom" ? "custom" : timeWindow,
+          ...(timeWindow === "custom" ? { customTime } : {}),
+          inspectorId: profile?.inspectorId,
           services: [...selectedServices].map(id => ({ serviceId: id })),
           clientName,
           clientEmail,
+          ...(turnstileToken ? { turnstileToken } : {}),
           ...(agentRefSlug ? { agentRefSlug } : {}),
         }),
       });
@@ -390,6 +424,13 @@ export default function BookingPage() {
             </section>
           )}
 
+          {/* Turnstile — shown on confirm step */}
+          {step === 3 && needsTurnstile && (
+            <div className="mt-6 flex justify-center">
+              <div ref={turnstileRef} />
+            </div>
+          )}
+
           {/* Message display */}
           {message && !message.ok && (
             <div className="mt-6 p-3 rounded-md bg-ih-bad-bg text-center text-[13px] font-semibold text-ih-bad-fg">
@@ -418,7 +459,7 @@ export default function BookingPage() {
               ) : (
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || (needsTurnstile && !turnstileToken)}
                   className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? "Submitting..." : "Request Inspection"}

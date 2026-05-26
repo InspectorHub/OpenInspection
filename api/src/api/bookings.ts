@@ -189,9 +189,11 @@ bookingsRoutes.get('/book/:tenant/:slug', async (c) => {
     return c.json({
         success: true,
         data: {
+            inspectorId: inspector.id,
             name: inspector.name,
             company: tenantRow.name,
             avatar: inspector.photoUrl,
+            turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
             services: svcRows.map(s => ({
                 id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
             })),
