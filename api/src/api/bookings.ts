@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, inArray } from 'drizzle-orm';
-import { users, inspections, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
+import { users, inspections, services as servicesTable, agentTenantLinks, tenants } from '../lib/db/schema';
 import { isNull } from 'drizzle-orm';
 import { createCalendarEvent } from './calendar';
 import { HonoConfig } from '../types/hono';
@@ -159,6 +159,44 @@ bookingsRoutes.openapi(getAvailabilityRoute, async (c) => {
     const service = c.var.services.booking;
     const result = await service.getAvailability(tenantId, inspectorId, startDate, endDate);
     return c.json({ success: true, data: result }, 200);
+});
+
+/**
+ * GET /api/public/book/:tenant/:slug — public booking profile
+ * Returns inspector name, services, and availability for the booking page.
+ */
+bookingsRoutes.get('/book/:tenant/:slug', async (c) => {
+    const { tenant, slug } = c.req.param();
+    const db = drizzle(c.env.DB);
+
+    // Resolve tenant by subdomain
+    const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
+        .from(tenants).where(eq(tenants.subdomain, tenant)).get();
+    if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
+
+    // Find inspector by slug within tenant
+    const inspector = await db.select({
+        id: users.id, name: users.name, slug: users.slug, photoUrl: users.photoUrl,
+    }).from(users).where(and(eq(users.tenantId, tenantRow.id), eq(users.slug, slug))).get();
+    if (!inspector) return c.json({ success: false, error: { code: 'not_found', message: 'Inspector not found' } }, 404);
+
+    // Get active services
+    const svcRows = await db.select({
+        id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
+        durationMinutes: servicesTable.durationMinutes,
+    }).from(servicesTable).where(and(eq(servicesTable.tenantId, tenantRow.id), eq(servicesTable.active, true))).all();
+
+    return c.json({
+        success: true,
+        data: {
+            name: inspector.name,
+            company: tenantRow.name,
+            avatar: inspector.photoUrl,
+            services: svcRows.map(s => ({
+                id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
+            })),
+        },
+    });
 });
 
 /**

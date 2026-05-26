@@ -80,7 +80,7 @@ export default function BookingPage() {
     if (!profile) return 0;
     return profile.services
       .filter((s) => selectedServices.has(s.id))
-      .reduce((sum, s) => sum + s.price, 0);
+      .reduce((sum, s) => sum + s.price / 100, 0);
   }, [selectedServices, profile]);
 
   const canNext =
@@ -93,14 +93,15 @@ export default function BookingPage() {
     setSubmitting(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/public/book/${tenant}/${slug}`, {
+      const res = await fetch(`/api/public/book`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           address,
-          serviceIds: [...selectedServices],
-          inspectionDate,
+          date: inspectionDate,
           timeSlot: timeWindow === "custom" ? customTime : timeWindow,
+          ...(timeWindow === "custom" ? { customTime: customTime } : {}),
+          services: [...selectedServices].map(id => ({ serviceId: id })),
           clientName,
           clientEmail,
           ...(agentRefSlug ? { agentRefSlug } : {}),
@@ -229,7 +230,7 @@ export default function BookingPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm font-semibold text-ih-fg-1">${svc.price}</span>
+                          <span className="text-sm font-semibold text-ih-fg-1">${(svc.price / 100).toFixed(2)}</span>
                           {selected && (
                             <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
