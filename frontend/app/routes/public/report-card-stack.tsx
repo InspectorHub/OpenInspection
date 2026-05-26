@@ -52,6 +52,7 @@ interface LoaderResult {
  messageToken: string | null;
  isDelivered: boolean;
  error: string | null;
+ reportTheme?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -78,6 +79,7 @@ export async function loader({ params }: Route.LoaderArgs) {
  messageToken: d?.messageToken ?? null,
  isDelivered: d?.isDelivered ?? false,
  error: res.ok ? null : "Report not found",
+ reportTheme: (d as Record<string, unknown>)?.reportTheme as string | undefined,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -168,7 +170,7 @@ export default function ReportCardStackPage() {
  : data.sections;
 
  return (
- <div className="min-h-screen bg-ih-bg-card">
+ <div className="min-h-screen bg-ih-bg-card" data-theme={data.reportTheme || undefined}>
  {/* Download PDF FAB */}
  <button
  type="button"

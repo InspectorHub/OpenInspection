@@ -5,6 +5,8 @@ import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
 import { NewInspectionWizard } from "~/components/NewInspectionWizard";
 import { CommandPalette } from "~/components/CommandPalette";
+import { SeatBanner } from "~/components/SeatBanner";
+import { useSessionContext } from "~/hooks/useSessionContext";
 import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
 
 export function meta() {
@@ -282,6 +284,7 @@ const PAGE_SIZE = 25;
 
 export default function DashboardPage() {
   const { buckets, conciergePending, greeting, tags } = useLoaderData<typeof loader>();
+  const sessionCtx = useSessionContext();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const fetcher = useFetcher();
@@ -623,6 +626,11 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
+      {/* F3 — Seat quota banner */}
+      {sessionCtx?.seatUsage && (
+        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={sessionCtx.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined} />
+      )}
+
       {/* PageHeader */}
       <PageHeader
         eyebrow="DASHBOARD"

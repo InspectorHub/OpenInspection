@@ -1,8 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-    globalSetup: './tests/global-setup.ts',
-    testDir: './tests',
+    globalSetup: './api/tests/global-setup.ts',
+    testDir: './api/tests',
     testIgnore: ['**/*.integration.spec.ts', '**/unit/**', 'cloud-e2e.spec.ts'],
     timeout: 30000,
     use: {

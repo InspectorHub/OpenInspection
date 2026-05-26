@@ -14,7 +14,15 @@ interface InspectorProfile {
   services: { id: string; name: string; price: number; duration: number }[];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
+  // F7 — capture agent referral slug from ?ref= query parameter
+  const url = new URL(request.url);
+  const refRaw = url.searchParams.get("ref");
+  const agentRefSlug =
+    refRaw && /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(refRaw)
+      ? refRaw
+      : null;
+
   try {
     const res = await apiFetch(
       `/api/public/book/${params.tenant}/${params.slug}`,
@@ -26,9 +34,10 @@ export async function loader({ params }: Route.LoaderArgs) {
       error: res.ok ? null : "Inspector not found",
       tenant: params.tenant,
       slug: params.slug,
+      agentRefSlug,
     };
   } catch {
-    return { profile: null, error: "Service unavailable", tenant: "", slug: "" };
+    return { profile: null, error: "Service unavailable", tenant: "", slug: "", agentRefSlug: null };
   }
 }
 
@@ -46,7 +55,7 @@ const TIME_WINDOWS = [
 ] as const;
 
 export default function BookingPage() {
-  const { profile, error, tenant, slug } = useLoaderData<typeof loader>();
+  const { profile, error, tenant, slug, agentRefSlug } = useLoaderData<typeof loader>();
   const [step, setStep] = useState(0);
 
   // Form state
@@ -94,6 +103,7 @@ export default function BookingPage() {
           timeSlot: timeWindow === "custom" ? customTime : timeWindow,
           clientName,
           clientEmail,
+          ...(agentRefSlug ? { agentRefSlug } : {}),
         }),
       });
       if (res.ok) {

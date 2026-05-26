@@ -139,6 +139,7 @@ import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
 import profileRoutes from './api/profile';
 import conciergeRoutes from './api/concierge';
+import sessionContextRoutes from './api/session-context';
 import qboRoutes from './api/qbo';
 import qboWebhookRoutes from './api/qbo-webhook';
 import { ConciergeConfirmPage } from './templates/pages/concierge-confirm';
@@ -507,6 +508,8 @@ const routes = app
   .route('/api/agent-signup', agentSignupRoutes)
   // Agent Accounts A3 — concierge magic-link confirmation (public, no JWT)
   .route('/api/concierge', conciergeRoutes)
+  // Remix frontend session context (branding + user + deployment info)
+  .route('/api/session', sessionContextRoutes)
   .route('/api/places', placesRoutes)
   .route('/api/availability', availabilityRoutes)
   // Mount /api/calendar/events BEFORE /api/calendar so the more-specific path takes precedence.

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
+import { useSessionContext } from "~/hooks/useSessionContext";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -131,6 +132,29 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
   const [loadedRecents, setLoadedRecents] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const sessionCtx = useSessionContext();
+
+  // F6 — Build booking link action dynamically from session context
+  const bookingActions = useMemo(() => {
+    const actions: PaletteItem[] = [];
+    const slug = sessionCtx?.branding?.currentUserSlug;
+    const host = sessionCtx?.branding?.bookingHost;
+    const tenant = sessionCtx?.branding?.tenantSubdomain;
+    if (slug && host && tenant) {
+      const bookingUrl = `https://${host}/book/${tenant}/${slug}`;
+      actions.push({
+        id: "qa-copy-booking-link",
+        label: "Copy my booking link",
+        group: "Quick Actions",
+        icon: "clip",
+        hint: bookingUrl,
+        onSelect: () => {
+          navigator.clipboard.writeText(bookingUrl).catch(() => {});
+        },
+      });
+    }
+    return actions;
+  }, [sessionCtx]);
 
   // Keyboard shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -184,13 +208,15 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     const isPeople = query.startsWith("@");
     const q = query.replace(/^[>@]\s*/, "");
 
+    const dynamicQuickActions = [...QUICK_ACTIONS, ...bookingActions];
+
     let sources: PaletteItem[];
     if (isActions) {
-      sources = QUICK_ACTIONS;
+      sources = dynamicQuickActions;
     } else if (isPeople) {
       sources = []; // contacts would need a search endpoint
     } else {
-      sources = [...PAGES, ...recentInspections, ...SETTINGS, ...QUICK_ACTIONS];
+      sources = [...PAGES, ...recentInspections, ...SETTINGS, ...dynamicQuickActions];
     }
 
     if (!q) return sources;

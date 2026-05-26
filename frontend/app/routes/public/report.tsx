@@ -20,6 +20,7 @@ interface ReportData {
  clientName: string | null;
  sections: ReportSection[];
  defectSummary: { safety: number; recommendation: number; maintenance: number };
+ reportTheme?: string;
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -55,7 +56,7 @@ export default function ReportPage() {
  const { defectSummary: ds } = report;
 
  return (
- <div className="max-w-3xl mx-auto p-6">
+ <div className="max-w-3xl mx-auto p-6" data-theme={report.reportTheme || undefined}>
  {/* Header */}
  <div className="mb-8">
  <h1 className="text-2xl font-bold">{report.address}</h1>

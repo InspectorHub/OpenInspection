@@ -3,6 +3,8 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { SeatBanner } from "~/components/SeatBanner";
+import { useSessionContext } from "~/hooks/useSessionContext";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -51,6 +53,7 @@ const TABS = [
 
 export default function TeamPage() {
   const { members } = useLoaderData<typeof loader>();
+  const sessionCtx = useSessionContext();
   const [activeTab, setActiveTab] = useState("active");
 
   const filtered = members.filter((m) => {
@@ -63,6 +66,11 @@ export default function TeamPage() {
 
   return (
     <div className="space-y-[18px]">
+      {/* F3 — Seat quota banner */}
+      {sessionCtx?.seatUsage && (
+        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={sessionCtx.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined} />
+      )}
+
       <PageHeader
         eyebrow="SETTINGS &middot; TEAM"
         eyebrowColor="slate"

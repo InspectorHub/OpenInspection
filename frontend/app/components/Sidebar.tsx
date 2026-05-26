@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink } from "react-router";
 import { useTheme } from "~/hooks/useTheme";
+import { useSessionContext } from "~/hooks/useSessionContext";
 
 const STORAGE_KEY = "oi-sidebar-collapsed";
 
@@ -131,6 +132,11 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
 
 function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { scheme, setColorScheme } = useTheme();
+  const ctx = useSessionContext();
+
+  const siteName = ctx?.branding?.siteName || "OpenInspection";
+  const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
+  const showSwitchWorkspace = ctx?.branding?.isSharedSaas && ctx?.branding?.portalBaseUrl;
 
   if (!open) return null;
   return (
@@ -139,8 +145,8 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       <div className="relative w-80 max-w-[85vw] h-full bg-ih-bg-card shadow-ih-popover flex flex-col">
         <div className="p-4 flex items-center justify-between border-b border-ih-border">
           <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="" className="w-7 h-7 shrink-0" />
-            <span className="text-sm font-bold text-ih-fg-1 tracking-tight">OpenInspection</span>
+            <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" />
+            <span className="text-sm font-bold text-ih-fg-1 tracking-tight">{siteName}</span>
           </div>
           <button onClick={onClose} className="p-2 rounded-[6px] text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-fg-2 transition-colors" aria-label="Close menu">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -174,6 +180,12 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
               <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               <span>Settings</span>
             </NavLink>
+            {showSwitchWorkspace && ctx?.branding?.portalBaseUrl && (
+              <a href={`${ctx.branding.portalBaseUrl}/workspace/switch`} onClick={onClose} className="flex items-center gap-3 px-3 py-2 rounded-[6px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary transition-all">
+                <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                <span>Switch workspace</span>
+              </a>
+            )}
           </div>
         </nav>
         <div className="p-3 border-t border-ih-border bg-ih-bg-muted/50 space-y-1">
@@ -196,12 +208,17 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
 
 export function MobileHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const ctx = useSessionContext();
+
+  const siteName = ctx?.branding?.siteName || "OpenInspection";
+  const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
+
   return (
     <>
       <div className="lg:hidden sticky top-0 z-40 bg-ih-bg-card border-b border-ih-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/logo.svg" alt="" className="w-8 h-8 shrink-0" />
-          <span className="text-lg font-extrabold text-ih-fg-1 tracking-tight">OpenInspection</span>
+          <img src={logoUrl} alt="" className="w-8 h-8 shrink-0" />
+          <span className="text-lg font-extrabold text-ih-fg-1 tracking-tight">{siteName}</span>
         </div>
         <div className="flex items-center gap-1">
           <NavLink to="/notifications" className="relative flex items-center justify-center w-10 h-10 rounded-[6px] text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-primary transition-all" aria-label="Notifications">
@@ -219,6 +236,14 @@ export function MobileHeader() {
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const ctx = useSessionContext();
+
+  const siteName = ctx?.branding?.siteName || "OpenInspection";
+  const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
+  const userName = ctx?.user?.name || "Inspector";
+  const userSubline = ctx?.branding?.tenantSubdomain || "openinspection.dev";
+  const userInitials = ctx?.user?.initials || "OI";
+  const showSwitchWorkspace = ctx?.branding?.isSharedSaas && ctx?.branding?.portalBaseUrl;
 
   useEffect(() => {
     setCollapsed(getInitialCollapsed());
@@ -241,10 +266,10 @@ export function Sidebar() {
     <aside className="ih-sidebar bg-ih-bg-card border-r border-ih-border hidden lg:flex flex-col sticky top-0 h-screen overflow-hidden">
       {/* Logo + notifications */}
       <div className={`px-2 pt-1 pb-[14px] flex items-center gap-2.5 border-b border-ih-border shrink-0 ${collapsed ? "justify-center" : ""}`}>
-        <img src="/logo.svg" alt="" className="w-7 h-7 shrink-0" />
+        <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" />
         {!collapsed && (
           <>
-            <span className="text-[14px] font-bold text-ih-fg-1 tracking-tight leading-tight truncate">OpenInspection</span>
+            <span className="text-[14px] font-bold text-ih-fg-1 tracking-tight leading-tight truncate">{siteName}</span>
             <NavLink to="/notifications" className="ml-auto relative flex items-center justify-center w-7 h-7 rounded-[6px] text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-primary transition-all" aria-label="Notifications">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
             </NavLink>
@@ -309,15 +334,27 @@ export function Sidebar() {
         {/* User avatar */}
         <div className={`flex items-center gap-2.5 px-2 py-1.5 mt-1 rounded-[6px] hover:bg-ih-bg-muted transition-all cursor-default ${collapsed ? "justify-center" : ""}`}>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-ih-primary to-ih-primary-700 flex items-center justify-center text-ih-fg-inverse text-[12px] font-bold shrink-0">
-            OI
+            {userInitials}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] font-bold text-ih-fg-1 truncate">Inspector</div>
-              <div className="text-[10px] text-ih-fg-4 font-[var(--font-ih-mono)] truncate">openinspection.dev</div>
+              <div className="text-[12px] font-bold text-ih-fg-1 truncate">{userName}</div>
+              <div className="text-[10px] text-ih-fg-4 font-[var(--font-ih-mono)] truncate">{userSubline}</div>
             </div>
           )}
         </div>
+
+        {/* Switch workspace — shared SaaS only */}
+        {showSwitchWorkspace && ctx?.branding?.portalBaseUrl && (
+          <a
+            href={`${ctx.branding.portalBaseUrl}/workspace/switch`}
+            className={`flex items-center gap-2.5 px-[10px] py-[7px] rounded-[6px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary transition-all ${collapsed ? "justify-center" : ""}`}
+            title={collapsed ? "Switch workspace" : undefined}
+          >
+            <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+            {!collapsed && <span>Switch workspace</span>}
+          </a>
+        )}
 
         <a
           href="/logout"
