@@ -6,6 +6,7 @@ set -e
 
 echo "Building Remix frontend..."
 npx react-router build
+rm -f build/client/wrangler.json
 
 echo "Creating SSR worker entry..."
 cat > build/worker-entry.js << 'EOF'
@@ -15,6 +16,8 @@ const handler = createRequestHandler(serverBuild, "production");
 export default {
   async fetch(request, env, ctx) {
     if (env.API_WORKER) globalThis.__API_WORKER = env.API_WORKER;
+    if (env.API_URL) globalThis.__API_URL = env.API_URL;
+    if (env.SESSION_SECRET) globalThis.__SESSION_SECRET = env.SESSION_SECRET;
     const url = new URL(request.url);
     if (env.ASSETS) {
       if (url.pathname.startsWith("/assets/") || url.pathname === "/favicon.svg" || url.pathname === "/logo.svg" || url.pathname === "/manifest.json" || url.pathname.endsWith(".css") || url.pathname.endsWith(".js") || url.pathname.endsWith(".svg") || url.pathname.endsWith(".woff2")) {

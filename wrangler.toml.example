@@ -41,7 +41,7 @@ binding = "DB"
 database_name = "openinspection-saas-db"
 # Placeholder — create a separate D1 for the SaaS multi-tenant deployment
 database_id = "00000000-0000-0000-0000-000000000000"
-migrations_dir = "migrations"
+migrations_dir = "api/migrations"
 [[env.saas.kv_namespaces]]
 binding = "TENANT_CACHE"
 id = "00000000000000000000000000000000"
@@ -100,7 +100,7 @@ binding = "DB"
 database_name = "openinspection-standalone-db"
 # Placeholder — `npm run setup:cloudflare` substitutes your real D1 ID
 database_id = "00000000-0000-0000-0000-000000000000"
-migrations_dir = "migrations"
+migrations_dir = "api/migrations"
 
 [[kv_namespaces]]
 binding = "TENANT_CACHE"

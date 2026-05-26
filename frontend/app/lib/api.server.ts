@@ -1,15 +1,17 @@
 import { hc } from "hono/client";
 import type { CoreApiType } from "../../../packages/api-types";
 
-const API_URL_DEFAULT = "https://openinspection-standalone.important-new.workers.dev";
-
 function getApiUrl(): string {
+  // Pages deploy: _worker.js sets globalThis.__API_URL from env.API_URL
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g.__API_URL === "string" && g.__API_URL) return g.__API_URL;
+  // Dev / CI: process.env is available
   try {
     if (typeof process !== "undefined" && process?.env?.API_URL) {
       return process.env.API_URL;
     }
   } catch {}
-  return API_URL_DEFAULT;
+  return "http://localhost:8788";
 }
 
 export function createApi(token?: string) {

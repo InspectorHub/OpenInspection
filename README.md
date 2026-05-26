@@ -32,7 +32,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 - **API Worker** (`api/`) — Hono + Drizzle + D1, handles all business logic
 - **Frontend Worker** (`frontend/`) — Remix + React 18 + Tailwind v4, SSR on CF Workers
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based components
-- Both deploy as independent CF Workers; frontend calls API via Service Binding
+- Both deploy as independent CF Workers; frontend calls API via Service Binding (zero-latency)
 
 ### Inspector workflow
 - 3-pane editor with 248 canned comments, slash-trigger snippet picker, AI rewrite
@@ -69,13 +69,19 @@ A complete home inspection software stack: inspector dashboard, public booking w
 
 Not ready to commit to running infrastructure? Spin up a managed workspace at [**inspectorhub.io/register**](https://inspectorhub.io/register) — 30-day free trial, no card. Useful for evaluating the editor, report viewer, and booking flow before you decide to self-host. You can export your data and move to a self-hosted deploy at any time.
 
-### Option 1: Zero-Setup (Web-First)
-1. Click the **Deploy to Cloudflare** button above
-2. Follow the dashboard prompts to create your D1 database, R2 bucket, and KV namespace
-3. Visit your Worker URL (e.g., `https://openinspection.workers.dev/setup`)
-4. A 6-digit setup code is generated and logged. Enter it to initialize your admin account.
+### Option 1: One-Click Deploy
 
-> If you don't see the setup code in your deployment logs, run `npm run setup:cloudflare -- --refresh-setup-code` to generate a new one.
+1. Click the **Deploy to Cloudflare** button above — this deploys the API Worker
+2. Follow the dashboard prompts to create your D1 database, R2 bucket, and KV namespace
+3. Deploy the frontend Worker:
+   ```bash
+   cd frontend
+   npm install && npm run deploy
+   ```
+4. Visit your API Worker URL → `/setup` (e.g., `https://openinspection.your-account.workers.dev/setup`)
+5. A 6-digit setup code is generated and logged on first boot. Enter it to initialize your admin account.
+
+> The frontend connects to the API via a [Service Binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/) (zero-latency, no network hop). Both workers are configured in their respective `wrangler.toml` files.
 
 ### Option 2: CLI-First
 ```bash
@@ -107,7 +113,7 @@ Detailed setup: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`doc
 
 ## Tech stack
 
-- **Cloudflare Workers**: edge runtime (dual Worker deploy)
+- **Cloudflare Workers**: edge runtime (dual Worker deploy — API + Frontend)
 - **Remix** + React 18: frontend SSR on Workers
 - **Hono** + Zod OpenAPI: typed API layer
 - **Drizzle ORM** + Cloudflare D1: SQLite at the edge
