@@ -53,7 +53,7 @@ function inspectionEventsSection(inspectionId) {
                 const res = await authFetch('/api/inspections/inspectors');
                 if (!res.ok) return;
                 const json = await res.json();
-                this.inspectors = json.data?.inspectors || json.inspectors || [];
+                this.inspectors = json.data || [];
             } catch (_) { /* non-fatal */ }
         },
 

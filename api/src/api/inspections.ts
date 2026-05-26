@@ -209,7 +209,7 @@ const listTemplatesRoute = createRoute(withMcpMetadata({
 inspectionsRoutes.openapi(listTemplatesRoute, async (c) => {
     const service = c.var.services.template;
     const templates = await service.listTemplates(c.get('tenantId'));
-    return c.json({ success: true, data: { templates } }, 200);
+    return c.json({ success: true, data: templates }, 200);
 });
 
 /**
@@ -462,7 +462,7 @@ inspectionsRoutes.openapi(deleteTemplateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const service = c.var.services.template;
     await service.deleteTemplate(id, c.get('tenantId'));
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 /**
@@ -500,7 +500,7 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
 inspectionsRoutes.openapi(listInspectorsRoute, async (c) => {
     const service = c.var.services.admin;
     const { members } = await service.getMembers(c.get('tenantId'));
-    return c.json({ success: true, data: { inspectors: members } }, 200);
+    return c.json({ success: true, data: members }, 200);
 });
 
 /**
@@ -670,7 +670,7 @@ inspectionsRoutes.openapi(deleteInspectionRoute, async (c) => {
         entityId: id,
         metadata: { propertyAddress: inspection.propertyAddress },
     });
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 /**
@@ -723,7 +723,7 @@ inspectionsRoutes.openapi(updateInspectionRoute, async (c) => {
             metadata: { from: inspection.status, to: body.status },
         });
     }
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 /**
@@ -881,7 +881,7 @@ inspectionsRoutes.openapi(getResultsRoute, async (c) => {
     const db = drizzle(c.env.DB);
     await c.var.services.inspection.getInspection(id, c.get('tenantId'));
     const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
-    return c.json({ success: true, data: { data: (results?.data || {}) } }, 200);
+    return c.json({ success: true, data: { results: (results?.data || {}) } }, 200);
 });
 
 /**
@@ -922,7 +922,7 @@ inspectionsRoutes.openapi(updateResultsRoute, async (c) => {
     const { data } = c.req.valid('json');
     const service = c.var.services.inspection;
     await service.updateResults(id, c.get('tenantId'), data);
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 /**
@@ -962,7 +962,7 @@ inspectionsRoutes.openapi(updateTemplateSnapshotRoute, async (c) => {
         entityId: id,
         metadata: { sectionCount: snapshot.sections?.length ?? 0 },
     });
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 /**
@@ -1230,7 +1230,7 @@ inspectionsRoutes.openapi(uploadPhotoRoute, async (c) => {
 
     const service = c.var.services.inspection;
     const key = await service.uploadPhoto(id, c.get('tenantId'), itemId, file);
-    return c.json({ success: true, data: { key, success: true, targetType, itemId, customId } }, 200);
+    return c.json({ success: true, data: { key, targetType, itemId, customId } }, 200);
 });
 
 /* ── Round-2 backlog #9 (Spectora §E.3) — Media Center ─────────────────────
@@ -1590,7 +1590,7 @@ inspectionsRoutes.get('/:id/full', requireRole(['owner', 'admin', 'inspector']),
         return c.json({ success: true, data: { inspection, template: template || null, results: results || null, base: null } });
     } catch (err) {
         if (err instanceof Error && err.message.includes('not found')) {
-            return c.json({ success: false, error: 'Inspection not found' }, 404);
+            return c.json({ success: false, error: { code: 'not_found', message: 'Inspection not found' } }, 404);
         }
         throw err;
     }
@@ -1707,7 +1707,7 @@ inspectionsRoutes.openapi(completeInspectionRoute, async (c) => {
     // Idempotency: if already completed, short-circuit to prevent accidental
     // email storms when the client retries on network errors or double-clicks.
     if (inspection.status === 'completed' || inspection.status === 'delivered') {
-        return c.json({ success: true, data: { success: true } }, 200);
+        return c.json({ success: true }, 200);
     }
 
     const db = drizzle(c.env.DB);
@@ -1755,7 +1755,7 @@ inspectionsRoutes.openapi(completeInspectionRoute, async (c) => {
         entityId: id,
         metadata: { propertyAddress: inspection.propertyAddress },
     });
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
@@ -2418,7 +2418,7 @@ inspectionsRoutes.openapi(approveConciergeRoute, async (c) => {
     const { id } = c.req.valid('param');
     const tenantId = c.get('tenantId');
     await c.var.services.concierge.approveByInspector(id, tenantId);
-    return c.json({ success: true as const, data: { success: true as const } }, 200);
+    return c.json({ success: true as const }, 200);
 });
 
 // -----------------------------------------------------------------------------

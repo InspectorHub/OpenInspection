@@ -26,7 +26,7 @@ document.addEventListener('alpine:init', () => {
                 const res = await window.authFetch('/api/inspections/' + this.inspectionId + '/agreements');
                 if (!res.ok) return;
                 const j = await res.json();
-                const list = (j.data && j.data.requests) || j.data || [];
+                const list = j.data || [];
                 const envelopes = await Promise.all(list.map(async (env) => {
                     let events = [];
                     if (env.id) {

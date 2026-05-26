@@ -23,7 +23,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
 
 invoiceRoutes.openapi(listInvoicesRoute, async (c) => {
     const rows = await c.var.services.invoice.listInvoices(c.get('tenantId'));
-    return c.json({ success: true as const, data: { invoices: rows } }, 200);
+    return c.json({ success: true as const, data: rows }, 200);
 });
 
 const createInvoiceRoute = createRoute(withMcpMetadata({

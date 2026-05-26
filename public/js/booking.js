@@ -163,7 +163,7 @@ document.addEventListener('alpine:init', () => {
         async fetchInspectors() {
             const res = await fetch('/api/public/inspectors');
             const response = await res.json();
-            this.inspectors = (response.data && response.data.inspectors) || response.inspectors || [];
+            this.inspectors = response.data || [];
             if (this.inspectors.length > 0) this.selectInspector(this.inspectors[0]);
         },
         selectInspector(inspector) { this.selectedInspector = inspector; this.selectedDate = null; this.selectedTime = null; this.availableSlots = []; },

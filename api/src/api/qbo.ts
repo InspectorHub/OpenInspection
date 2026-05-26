@@ -13,13 +13,13 @@ const api = new Hono<HonoConfig>();
 // fetch caller sees a structured failure.
 api.use('*', async (c, next) => {
     const token = getCookie(c, '__Host-inspector_token') ?? getCookie(c, 'inspector_token');
-    if (!token) return c.json({ success: false, error: 'Unauthorized' }, 401);
+    if (!token) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
     try {
         const keyring = await c.var.keyringPromise!;
         await verifyJwt(token, keyring);
         return next();
     } catch {
-        return c.json({ success: false, error: 'Unauthorized' }, 401);
+        return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
     }
 });
 
@@ -117,8 +117,8 @@ api.post('/disconnect', async (c) => {
 
 api.post('/pause', async (c) => {
     const result = await c.var.services.qbo.setSyncEnabled(c.get('tenantId'));
-    if (result === null) return c.json({ success: false, error: 'Not connected' }, 404);
-    return c.json({ success: true, syncEnabled: result });
+    if (result === null) return c.json({ success: false, error: { code: 'not_connected', message: 'Not connected' } }, 404);
+    return c.json({ success: true, data: { syncEnabled: result } });
 });
 
 api.post('/sync', async (c) => {
@@ -132,7 +132,7 @@ api.post('/sync', async (c) => {
             (invoiceId, _balance, tid) => invoiceSvc.markPartial(invoiceId, tid, 'qbo'),
         ),
     );
-    return c.json({ success: true, message: 'Sync started' });
+    return c.json({ success: true, data: { message: 'Sync started' } });
 });
 
 api.post('/errors/:id/retry', async (c) => {
@@ -142,7 +142,7 @@ api.post('/errors/:id/retry', async (c) => {
 
 api.post('/contacts/:contactId/link', async (c) => {
     const parsed = QBOLinkCustomerBodySchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ success: false, error: 'Invalid body' }, 400);
+    if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid body' } }, 400);
     await c.var.services.qbo.linkExistingCustomer(c.get('tenantId'), c.req.param('contactId'), parsed.data.qboCustomerId);
     return c.json({ success: true });
 });

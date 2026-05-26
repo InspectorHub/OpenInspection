@@ -194,10 +194,7 @@ coreAuthRoutes.openapi(changePasswordRoute, async (c) => {
     const body = c.req.valid('json');
     await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
 
-    return c.json({
-        success: true,
-        data: { success: true }
-    }, 200);
+    return c.json({ success: true }, 200);
 });
 
 const joinTeamRoute = createRoute(withMcpMetadata({
@@ -374,7 +371,7 @@ coreAuthRoutes.openapi(forgotPasswordRoute, async (c) => {
     const body = c.req.valid('json');
     const resetToken = await c.var.services.auth.createPasswordResetToken(body.email);
     
-    if (!resetToken) return c.json({ success: true, data: { success: true } }, 200);
+    if (!resetToken) return c.json({ success: true }, 200);
 
     const baseUrl = getBaseUrl(c);
     const resetLink = `${baseUrl}/login?reset_token=${resetToken}`;
@@ -382,7 +379,7 @@ coreAuthRoutes.openapi(forgotPasswordRoute, async (c) => {
     await c.var.services.email.sendPasswordReset(body.email, resetLink)
         .catch(() => { /* email delivery is best-effort */ });
 
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 const resetPasswordRoute = createRoute(withMcpMetadata({
@@ -412,7 +409,7 @@ const resetPasswordRoute = createRoute(withMcpMetadata({
 coreAuthRoutes.openapi(resetPasswordRoute, async (c) => {
     const body = c.req.valid('json');
     await c.var.services.auth.resetPassword(body.token, body.newPassword);
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 const setupRoute = createRoute(withMcpMetadata({
@@ -447,7 +444,7 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
     const db = drizzle(c.env.DB);
     const existingTenantUser = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
     if (existingTenantUser) {
-        return c.json({ success: false, message: 'System already initialized' }, 409);
+        return c.json({ success: false, error: { code: 'already_initialized', message: 'System already initialized' } }, 409);
     }
 
 
@@ -456,7 +453,7 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
     // 2. Verification Code Check
     const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE?.get('setup_verification_code');
     if (storedCode && body.verificationCode !== storedCode) {
-        return c.json({ success: false, message: 'Invalid verification code' }, 400);
+        return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
     }
 
 
@@ -718,7 +715,7 @@ coreAuthRoutes.openapi(logoutRoute, async (c) => {
         sameSite: 'Strict',
     });
 
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 // ─── Spec 4A — TOTP 2FA endpoints ──────────────────────────────────────────
@@ -806,7 +803,7 @@ coreAuthRoutes.openapi(totpVerifyRoute, async (c) => {
         totpVerifiedAt: new Date(),
     }).where(eq(users.id, me.id));
 
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 const totpDisableRoute = createRoute(withMcpMetadata({
@@ -854,7 +851,7 @@ coreAuthRoutes.openapi(totpDisableRoute, async (c) => {
 
     // updatedHashes intentionally discarded — we are wiping all 2FA state anyway.
     void updatedHashes;
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 const totpRegenRoute = createRoute(withMcpMetadata({

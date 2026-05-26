@@ -10,7 +10,7 @@ api.post('/', async (c) => {
     const headerSig = c.req.header('intuit-signature');
     if (!headerSig) {
         logger.info('QBO webhook: missing intuit-signature header');
-        return c.json({ error: 'Missing signature' }, 401);
+        return c.json({ success: false, error: { message: 'Missing signature' } }, 401);
     }
 
     // Read raw body before any parsing — HMAC must use the exact bytes Intuit signed.
@@ -32,7 +32,7 @@ api.post('/', async (c) => {
         }),
     );
 
-    return c.json({ ok: true });
+    return c.json({ success: true });
 });
 
 export default api;

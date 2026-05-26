@@ -23,8 +23,8 @@ function messagesInspector(inspectionId) {
                 const r = await authFetch('/api/messages/inspections/' + encodeURIComponent(this.inspectionId));
                 if (!r.ok) return;
                 const d = await r.json();
-                this.messages = d.data?.messages || [];
-                this.token = d.data?.token || '';
+                this.messages = d.data || [];
+                this.token = d.meta?.token || '';
             } catch { /* silent */ }
         },
 

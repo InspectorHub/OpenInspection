@@ -589,7 +589,7 @@ function inspectionEditor(inspectionId) {
         var res = await authFetch('/api/admin/comments');
         if (!res.ok) return;
         var json = await res.json();
-        var rows = (json.data && json.data.comments) || [];
+        var rows = json.data || [];
         // Map server schema to the in-memory snippet shape consumed by
         // _commentLibraryPool / commentLibraryItems. Use 'all' for the
         // null-bucket case so the seeded "All" filter still surfaces them.
@@ -675,7 +675,7 @@ function inspectionEditor(inspectionId) {
         var resultsRes = await authFetch('/api/inspections/' + this.inspectionId + '/results');
         if (resultsRes.ok) {
           var rJson = await resultsRes.json();
-          var loaded = rJson.data?.data || {};
+          var loaded = rJson.data?.results || {};
           for (var k in loaded) {
             if (Object.prototype.hasOwnProperty.call(loaded, k)) {
               this.results[k] = loaded[k];

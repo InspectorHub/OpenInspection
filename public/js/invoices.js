@@ -20,7 +20,7 @@ function invoicesMeta() {
                 const r = await authFetch('/api/invoices');
                 if (!r.ok) return;
                 const j = await r.json();
-                const list = j.data?.invoices || [];
+                const list = j.data || [];
                 const now = Date.now();
                 this.paid    = list.filter(i => i.status === 'paid').length;
                 this.pending = list.filter(i => i.status !== 'paid' && (!i.dueDate || new Date(i.dueDate).getTime() >= now)).length;
@@ -38,7 +38,7 @@ async function loadInvoices() {
     var res = await authFetch('/api/invoices');
     if (!res.ok) return;
     var data = await res.json();
-    allInvoices = data.data?.invoices || [];
+    allInvoices = data.data || [];
     renderInvoices(allInvoices);
     updateStats(allInvoices);
 }

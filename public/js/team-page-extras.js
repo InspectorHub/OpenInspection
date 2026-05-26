@@ -66,7 +66,7 @@
             async init() {
                 try {
                     const r = await fetch('/api/team/apprentices', { credentials: 'same-origin' });
-                    if (r.ok) this.items = (await r.json())?.data?.items ?? [];
+                    if (r.ok) this.items = (await r.json())?.data ?? [];
                 } finally {
                     this.loading = false;
                 }
@@ -82,7 +82,7 @@
                 try {
                     const r = await fetch('/api/team/guests', { credentials: 'same-origin' });
                     if (r.ok) {
-                        const rows = (await r.json())?.data?.items ?? [];
+                        const rows = (await r.json())?.data ?? [];
                         this.items = rows.map(g => ({ ...g, expiresRel: relExpiry(g.expiresAt) }));
                     }
                 } finally {

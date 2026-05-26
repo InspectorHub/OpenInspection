@@ -73,7 +73,7 @@ placesRoutes.openapi(autocompleteRoute, async (c) => {
             results: Array<{ placeId: string; description: string; mainText: string; secondaryText: string }>
         } | null;
         if (cached) {
-            return c.json({ results: cached.results, cached: true }, 200);
+            return c.json({ success: true, data: cached.results, meta: { cached: true } }, 200);
         }
     }
 
@@ -114,7 +114,7 @@ placesRoutes.openapi(autocompleteRoute, async (c) => {
         await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify({ results }), { expirationTtl: 60 * 60 });
     }
 
-    return c.json({ results, cached: false }, 200);
+    return c.json({ success: true, data: results, meta: { cached: false } }, 200);
 });
 
 // ── GET /api/places/details ────────────────────────────────────────────────
@@ -165,7 +165,7 @@ placesRoutes.openapi(detailsRoute, async (c) => {
             lat: number; lng: number;
         } | null;
         if (cached) {
-            return c.json({ ...cached, cached: true }, 200);
+            return c.json({ success: true, data: cached, meta: { cached: true } }, 200);
         }
     }
 
@@ -222,7 +222,7 @@ placesRoutes.openapi(detailsRoute, async (c) => {
         await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(payload), { expirationTtl: 60 * 24 * 60 * 60 });
     }
 
-    return c.json({ ...payload, cached: false }, 200);
+    return c.json({ success: true, data: payload, meta: { cached: false } }, 200);
 });
 
 export default placesRoutes;

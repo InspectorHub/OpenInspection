@@ -63,7 +63,7 @@ async function refreshAccessToken(clientId: string, clientSecret: string, refres
  */
 calendarRoutes.get('/connect', async (c) => {
     if (!c.env.GOOGLE_CLIENT_ID) {
-        return c.json({ error: 'Google Calendar integration is not configured' }, 501);
+        return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 501);
     }
 
     const user = c.get('user');
@@ -92,7 +92,7 @@ calendarRoutes.get('/connect', async (c) => {
 calendarRoutes.get('/callback', async (c) => {
     const parsed = CalendarCallbackQuerySchema.safeParse(c.req.query());
     if (!parsed.success) {
-        return c.json({ error: 'Invalid query parameters' }, 400);
+        return c.json({ success: false, error: { message: 'Invalid query parameters' } }, 400);
     }
     const { code, state, error } = parsed.data;
 
@@ -100,7 +100,7 @@ calendarRoutes.get('/callback', async (c) => {
         const escapeHtml = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         return c.html(`<p>Google Calendar authorization denied: ${escapeHtml(error)}. <a href="/dashboard">Back</a></p>`, 400);
     }
-    if (!code || !state) return c.json({ error: 'Missing code or state' }, 400);
+    if (!code || !state) return c.json({ success: false, error: { message: 'Missing code or state' } }, 400);
 
     const baseUrl = getBaseUrl(c);
 
@@ -119,7 +119,7 @@ calendarRoutes.get('/callback', async (c) => {
     const tokenData = await tokenRes.json() as GoogleTokenResponse;
     if (!tokenRes.ok) {
         logger.error('[calendar] Token exchange failed', { tokenData: String(tokenData) });
-        return c.json({ error: 'Failed to exchange authorization code' }, 500);
+        return c.json({ success: false, error: { message: 'Failed to exchange authorization code' } }, 500);
     }
 
     const { refresh_token, access_token } = tokenData;
@@ -135,7 +135,7 @@ calendarRoutes.get('/callback', async (c) => {
     const user = c.get('user');
     if (!user) return c.redirect('/login');
     if (user.sub !== state) {
-        return c.json({ error: 'OAuth state mismatch' }, 403);
+        return c.json({ success: false, error: { message: 'OAuth state mismatch' } }, 403);
     }
 
     const db = drizzle(c.env.DB);
@@ -174,7 +174,7 @@ const disconnectRoute = createRoute(withMcpMetadata({
 
 calendarRoutes.openapi(disconnectRoute, async (c) => {
     const user = c.get('user');
-    if (!user) return c.json({ error: 'Not authenticated' }, 401);
+    if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
 
     const db = drizzle(c.env.DB);
     const tenantId = c.get('tenantId') as string;
@@ -182,7 +182,7 @@ calendarRoutes.openapi(disconnectRoute, async (c) => {
         .set({ googleRefreshToken: null, googleCalendarId: null })
         .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)));
 
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 /**
@@ -214,13 +214,13 @@ const syncRoute = createRoute(withMcpMetadata({
 
 calendarRoutes.openapi(syncRoute, async (c) => {
     const jwtUser = c.get('user');
-    if (!jwtUser) return c.json({ error: 'Not authenticated' }, 401);
+    if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
 
     const db = drizzle(c.env.DB);
     const userResult = await db.select().from(users).where(eq(users.id, jwtUser.sub)).limit(1);
     const dbUser = userResult[0];
     if (!dbUser?.googleRefreshToken) {
-        return c.json({ error: 'Google Calendar not connected' }, 400);
+        return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
     }
 
     const accessToken = await refreshAccessToken(
@@ -239,7 +239,7 @@ calendarRoutes.openapi(syncRoute, async (c) => {
 
     if (!eventsRes.ok) {
         const err = await eventsRes.json() as { error?: { message?: string } };
-        return c.json({ error: 'Failed to fetch Google Calendar events', details: err.error?.message }, 500);
+        return c.json({ success: false, error: { message: 'Failed to fetch Google Calendar events' } }, 500);
     }
 
     const eventsData = await eventsRes.json() as { items?: GoogleEvent[] };
@@ -450,13 +450,13 @@ export async function syncEventsToGcal(
  */
 calendarRoutes.post('/sync-events', async (c) => {
     const jwtUser = c.get('user');
-    if (!jwtUser) return c.json({ error: 'Not authenticated' }, 401);
+    if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
 
     const db = drizzle(c.env.DB);
     const userResult = await db.select().from(users).where(eq(users.id, jwtUser.sub)).limit(1);
     const dbUser = userResult[0];
     if (!dbUser?.googleRefreshToken) {
-        return c.json({ error: 'Google Calendar not connected' }, 400);
+        return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
     }
 
     const result = await syncEventsToGcal(

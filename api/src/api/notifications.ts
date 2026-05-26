@@ -75,7 +75,8 @@ notificationsRoutes.openapi(listRoute, async (c) => {
     const result = await c.var.services.notification.list(tenantId, userId, opts);
     return c.json({
         success: true as const,
-        data: { items: result.items.map(dto), nextCursor: result.nextCursor },
+        data: result.items.map(dto),
+        meta: { nextCursor: result.nextCursor },
     }, 200);
 });
 

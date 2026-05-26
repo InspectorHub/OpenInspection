@@ -24,8 +24,8 @@ function notificationsApp() {
                 if (r.status === 401) { window.location.href = '/login'; return; }
                 if (!r.ok) return;
                 const d = await r.json();
-                this.items = reset ? (d.data?.items || []) : this.items.concat(d.data?.items || []);
-                this.nextCursor = d.data?.nextCursor || null;
+                this.items = reset ? (d.data || []) : this.items.concat(d.data || []);
+                this.nextCursor = d.meta?.nextCursor || null;
             } finally { this.loading = false; }
         },
 

@@ -18,8 +18,8 @@ function messagesPublic(token) {
                 const r = await fetch('/api/messages/public/' + encodeURIComponent(this.token));
                 if (!r.ok) return;
                 const d = await r.json();
-                this.messages = d.data?.messages || [];
-                this.inspection = d.data?.inspection || null;
+                this.messages = d.data || [];
+                this.inspection = d.meta?.inspection || null;
             } catch { /* silent */ }
         },
 

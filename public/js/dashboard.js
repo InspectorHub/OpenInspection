@@ -367,7 +367,7 @@ async function fetchPrerequisites() {
 
         if (templatesRes.ok) {
             const tplData = await templatesRes.json();
-            allTemplates = tplData.data?.templates || tplData.templates || [];
+            allTemplates = tplData.data || [];
             const select = document.getElementById('templateId');
             const noTplHint = document.getElementById('noTemplateHint');
             if (select) {
@@ -385,7 +385,7 @@ async function fetchPrerequisites() {
 
         if (inspectorsRes.ok) {
             const insData = await inspectorsRes.json();
-            allInspectors = insData.data?.inspectors || insData.inspectors || [];
+            allInspectors = insData.data || [];
 
             const select = document.getElementById('inspectorId');
             if (select) {
@@ -435,7 +435,7 @@ async function populateAgents() {
     const res = await authFetch('/api/contacts?type=agent&limit=100');
     if (!res.ok) return;
     const data = await res.json();
-    const agents = data.data?.contacts || [];
+    const agents = data.data || [];
     // R7-09: same agent list populates Listing Agent + Buyer's Agent dropdowns.
     const targets = [document.getElementById('agentId'), document.getElementById('buyerAgentId')];
     if (agents.length === 0) return;

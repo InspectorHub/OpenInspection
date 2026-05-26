@@ -65,7 +65,7 @@ availabilityRoutes.openapi(listAvailabilityRoute, async (c) => {
         createdAt: safeISODate(s.createdAt)
     }));
 
-    return c.json({ success: true, data: { availability: formattedAvailability } }, 200);
+    return c.json({ success: true, data: formattedAvailability }, 200);
 });
 
 /**
@@ -164,7 +164,7 @@ availabilityRoutes.openapi(listOverridesRoute, async (c) => {
         createdAt: safeISODate(o.createdAt)
     }));
 
-    return c.json({ success: true, data: { overrides: formattedOverrides } }, 200);
+    return c.json({ success: true, data: formattedOverrides }, 200);
 });
 
 /**
@@ -255,7 +255,7 @@ availabilityRoutes.openapi(deleteOverrideRoute, async (c) => {
     const { id } = c.req.valid('param');
     const service = c.var.services.availability;
     await service.deleteOverride(tenantId, id);
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 export default availabilityRoutes;

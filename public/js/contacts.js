@@ -34,7 +34,7 @@ function contactsMeta() {
                 const r = await authFetch('/api/contacts?limit=500');
                 if (!r.ok) return;
                 const j = await r.json();
-                this.recount(j.data?.contacts || []);
+                this.recount(j.data || []);
             } catch {}
         },
     };

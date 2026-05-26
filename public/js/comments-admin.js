@@ -51,7 +51,7 @@ function commentsAdminFactory() {
                 const url = '/api/admin/comments' + (qs.toString() ? '?' + qs.toString() : '');
                 const res = await authFetch(url);
                 const json = await res.json();
-                const all = json.data?.comments || [];
+                const all = json.data || [];
                 // Preserve the full set for the category/section autocompletes,
                 // even though the visible list is filtered.
                 if (!this.bucket && !this.sectionFilter) {
@@ -75,7 +75,7 @@ function commentsAdminFactory() {
             try {
                 const res = await authFetch('/api/admin/comments');
                 const json = await res.json();
-                this._allItems = json.data?.comments || [];
+                this._allItems = json.data || [];
             } catch { /* non-fatal — autocompletes just stay empty */ }
         },
 

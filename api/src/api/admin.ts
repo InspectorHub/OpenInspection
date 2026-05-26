@@ -319,7 +319,7 @@ const listAgreementsRoute = createRoute(withMcpMetadata({
 adminRoutes.openapi(listAgreementsRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const agreementService = c.var.services.agreement;
-    return c.json({ success: true, data: { agreements: await agreementService.listAgreements(tenantId) } }, 200);
+    return c.json({ success: true, data: await agreementService.listAgreements(tenantId) }, 200);
 });
 
 const createAgreementRoute = createRoute(withMcpMetadata({
@@ -426,7 +426,7 @@ adminRoutes.openapi(deleteAgreementRoute, async (c) => {
     const { id } = c.req.valid('param');
     const agreementService = c.var.services.agreement;
     await agreementService.deleteAgreement(id, tenantId);
-    return c.json({ success: true, data: { success: true } }, 200);
+    return c.json({ success: true }, 200);
 });
 
 /**
@@ -714,7 +714,7 @@ adminRoutes.openapi(uploadLogoRoute, async (c) => {
 
     const brandingService = c.var.services.branding;
     const logoUrl = await brandingService.uploadLogo(c.get('tenantId'), file);
-    return c.json({ success: true, logoUrl }, 200);
+    return c.json({ success: true, data: { logoUrl } }, 200);
 });
 
 // ─── Integration Config & Secrets ────────────────────────────────────────────
@@ -950,7 +950,7 @@ adminRoutes.openapi(listSigningRequestsRoute, async (c) => {
         .where(eqDz(agreementRequestsTable.tenantId, tenantId))
         .orderBy(descDz(agreementRequestsTable.createdAt))
         .limit(200);
-    return c.json({ success: true as const, data: { requests: rows } }, 200);
+    return c.json({ success: true as const, data: rows }, 200);
 });
 
 const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
@@ -1131,7 +1131,7 @@ adminRoutes.openapi(listCommentsRoute, async (c) => {
         const needle = search.trim().toLowerCase();
         rows = rows.filter(r => r.text.toLowerCase().includes(needle));
     }
-    return c.json({ success: true as const, data: { comments: rows.map(commentRowToResponse) } }, 200);
+    return c.json({ success: true as const, data: rows.map(commentRowToResponse) }, 200);
 });
 
 const createCommentRoute = createRoute(withMcpMetadata({
@@ -1512,7 +1512,7 @@ adminRoutes.openapi(withMcpMetadata({
     const totalSeeded = results.reduce((sum, r) => sum + r.seeded, 0);
     const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
     logger.info('Backfill complete', { tenantCount: results.length, totalSeeded, totalSkipped });
-    return c.json({ success: true as const, data: { success: true } }, 200);
+    return c.json({ success: true as const }, 200);
 });
 
 // --- Attention Thresholds (handoff-decisions §1) ---
@@ -1741,7 +1741,7 @@ adminRoutes.openapi(withMcpMetadata({
     } catch { /* cache miss is fine — read-through repopulates */ }
 
     logger.info('sync-quota applied', { tenantId, maxUsers });
-    return c.json({ success: true as const, data: { success: true } }, 200);
+    return c.json({ success: true as const }, 200);
 });
 
 /**

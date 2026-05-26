@@ -22,12 +22,12 @@ async function verifyPortalSignature(c: Context<HonoConfig>, next: () => Promise
         || Object.keys(env).some(k => /^PORTAL_M2M_SECRET_V\d+$/.test(k) && env[k]);
     if (!hasAnySecret) {
         logger.error('No PORTAL_M2M_SECRET[_V<N>] configured');
-        return c.json({ error: 'Integration not configured' }, 501);
+        return c.json({ success: false, error: { message: 'Integration not configured' } }, 501);
     }
 
     const signature = c.req.header('x-portal-signature');
     if (!signature) {
-        return c.json({ error: 'Missing signature' }, 401);
+        return c.json({ success: false, error: { message: 'Missing signature' } }, 401);
     }
 
     const rawBody = await c.req.raw.clone().text();
@@ -41,7 +41,7 @@ async function verifyPortalSignature(c: Context<HonoConfig>, next: () => Promise
 
     const isValid = await verifyM2mSignature(signature, body, env);
     if (!isValid) {
-        return c.json({ error: 'Invalid signature' }, 401);
+        return c.json({ success: false, error: { message: 'Invalid signature' } }, 401);
     }
 
     return next();
@@ -55,7 +55,7 @@ api.patch('/tenants/:subdomain', verifyPortalSignature, async (c) => {
     const subdomain = c.req.param('subdomain');
     const parsed = TenantStatusBodySchema.safeParse(await c.req.json());
     if (!parsed.success) {
-        return c.json({ error: 'Invalid input', details: parsed.error.flatten().fieldErrors }, 400);
+        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
     }
 
     const adminService = c.var.services.admin;
@@ -69,7 +69,7 @@ api.patch('/tenants/:subdomain', verifyPortalSignature, async (c) => {
         return c.json({ success: true });
     } catch (error: unknown) {
         logger.error('Failed to handle tenant update', {}, error instanceof Error ? error : undefined);
-        return c.json({ error: 'Internal server error' }, 500);
+        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
     }
 });
 
@@ -81,7 +81,7 @@ api.post('/tenants/:subdomain/stripe-connect', verifyPortalSignature, async (c) 
     const subdomain = c.req.param('subdomain');
     const parsed = StripeConnectBodySchema.safeParse(await c.req.json());
     if (!parsed.success) {
-        return c.json({ error: 'Invalid input', details: parsed.error.flatten().fieldErrors }, 400);
+        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
     }
 
     const adminService = c.var.services.admin;
@@ -91,7 +91,7 @@ api.post('/tenants/:subdomain/stripe-connect', verifyPortalSignature, async (c) 
         return c.json({ success: true });
     } catch (error: unknown) {
         logger.error('Failed to handle stripe connect', {}, error instanceof Error ? error : undefined);
-        return c.json({ error: 'Internal server error' }, 500);
+        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
     }
 });
 
@@ -106,7 +106,7 @@ api.post('/tenants/:subdomain/data-export', verifyPortalSignature, async (c) => 
     const { tenants } = await import('../lib/db/schema');
     const d = drizzle(c.env.DB);
     const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.subdomain, subdomain as string)).get();
-    if (!t) return c.json({ error: 'Tenant not found' }, 404);
+    if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
 
     const { DataExportService } = await import('../services/data-export.service');
     const svc = new DataExportService(c.env.DB, c.env.PHOTOS);
@@ -123,7 +123,7 @@ api.post('/tenants/:subdomain/data-export', verifyPortalSignature, async (c) => 
         });
     } catch (error: unknown) {
         logger.error('Data export failed', { subdomain }, error instanceof Error ? error : undefined);
-        return c.json({ error: 'Export failed' }, 500);
+        return c.json({ success: false, error: { message: 'Export failed' } }, 500);
     }
 });
 
@@ -138,7 +138,7 @@ api.post('/tenants/:subdomain/purge', verifyPortalSignature, async (c) => {
     const { tenants } = await import('../lib/db/schema');
     const d = drizzle(c.env.DB);
     const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.subdomain, subdomain as string)).get();
-    if (!t) return c.json({ error: 'Tenant not found' }, 404);
+    if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
 
     const { TenantPurgeService } = await import('../services/tenant-purge.service');
     const svc = new TenantPurgeService(c.env.DB, c.env.PHOTOS, c.env.TENANT_CACHE);
@@ -147,7 +147,7 @@ api.post('/tenants/:subdomain/purge', verifyPortalSignature, async (c) => {
         return c.json({ success: true, data: result });
     } catch (error: unknown) {
         logger.error('Tenant purge failed', { subdomain }, error instanceof Error ? error : undefined);
-        return c.json({ error: 'Purge failed' }, 500);
+        return c.json({ success: false, error: { message: 'Purge failed' } }, 500);
     }
 });
 
@@ -172,7 +172,7 @@ api.post('/sso-handoff', verifyPortalSignature, async (c) => {
         ttlSeconds?: number;
     };
     if (!body.tenantId || !body.email) {
-        return c.json({ error: 'tenantId and email required' }, 400);
+        return c.json({ success: false, error: { message: 'tenantId and email required' } }, 400);
     }
     const ttl = Math.min(Math.max(body.ttlSeconds ?? 60, 5), 300);
 
@@ -184,10 +184,10 @@ api.post('/sso-handoff', verifyPortalSignature, async (c) => {
         .from(users)
         .where(and(eq(users.tenantId, body.tenantId), eq(users.email, body.email)))
         .get();
-    if (!user) return c.json({ error: 'No user for that tenant + email' }, 404);
+    if (!user) return c.json({ success: false, error: { message: 'No user for that tenant + email' } }, 404);
 
     if (!c.env.TENANT_CACHE) {
-        return c.json({ error: 'KV unavailable' }, 503);
+        return c.json({ success: false, error: { message: 'KV unavailable' } }, 503);
     }
     const code = crypto.randomUUID();
     await c.env.TENANT_CACHE.put(
@@ -195,7 +195,7 @@ api.post('/sso-handoff', verifyPortalSignature, async (c) => {
         JSON.stringify({ userId: user.id, tenantId: body.tenantId }),
         { expirationTtl: ttl },
     );
-    return c.json({ success: true, code, expiresIn: ttl });
+    return c.json({ success: true, data: { code, expiresIn: ttl } });
 });
 
 export default api;

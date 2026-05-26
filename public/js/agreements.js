@@ -18,7 +18,7 @@ function agreementsMeta() {
                 const r = await authFetch('/api/admin/agreements/requests');
                 if (!r.ok) return;
                 const j = await r.json();
-                const reqs = j.data?.requests || [];
+                const reqs = j.data || [];
                 this.signed  = reqs.filter(r => r.status === 'signed').length;
                 this.pending = reqs.filter(r => r.status !== 'signed' && r.status !== 'expired').length;
             } catch {}
@@ -100,7 +100,7 @@ async function loadAgreements() {
         if (res.status === 401) { window.location.href = '/login'; return; }
         const response = await res.json();
 
-        const agreements = response.data?.agreements || [];
+        const agreements = response.data || [];
         allAgreements = agreements;
 
         if (agreements && agreements.length > 0) {

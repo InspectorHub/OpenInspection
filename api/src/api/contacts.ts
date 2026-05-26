@@ -32,7 +32,7 @@ contactRoutes.openapi(listContactsRoute, async (c) => {
     if (q.type) opts.type = q.type;
     if (q.search) opts.search = q.search;
     const rows = await c.var.services.contact.listContacts(tenantId, opts);
-    return c.json({ success: true as const, data: { contacts: rows, total: rows.length } }, 200);
+    return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
 });
 
 const createContactRoute = createRoute(withMcpMetadata({

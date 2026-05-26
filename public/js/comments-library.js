@@ -6,7 +6,7 @@ async function loadCommentsLibrary() {
     var res = await authFetch('/api/admin/comments');
     if (!res.ok) return;
     var data = await res.json();
-    _allComments = data.data?.comments || [];
+    _allComments = data.data || [];
 }
 
 function openCommentPicker(btn) {

@@ -56,7 +56,7 @@ dataRoutes.post('/import/contacts', requireRole(['owner', 'admin']), async (c) =
 
     const svc = new DataService(c.env.DB);
     const result = await svc.importContactsCSV(tenantId, csvText, { dryRun });
-    return c.json({ success: true, data: result, dryRun }, 200);
+    return c.json({ success: true, data: result, meta: { dryRun } }, 200);
 });
 
 export default dataRoutes;

@@ -47,7 +47,7 @@ bookingsRoutes.openapi(listInspectorsRoute, async (c) => {
 
     const service = c.var.services.booking;
     const inspectors = await service.listInspectors(tenantId);
-    return c.json({ success: true, data: { inspectors } }, 200);
+    return c.json({ success: true, data: inspectors }, 200);
 });
 
 /**
@@ -813,11 +813,11 @@ bookingsRoutes.openapi(publicGeocodeRoute, async (c) => {
     await checkRateLimit(c, 'book');
     const { q } = c.req.valid('query');
     if (q.length < 3) {
-        return c.json({ data: [] }, 200);
+        return c.json({ success: true, data: [] }, 200);
     }
     const apiKey = c.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
-        return c.json({ data: [], reason: 'NO_API_KEY' as const }, 200);
+        return c.json({ success: true, data: [], meta: { reason: 'NO_API_KEY' as const } }, 200);
     }
 
     try {
@@ -829,7 +829,7 @@ bookingsRoutes.openapi(publicGeocodeRoute, async (c) => {
         const res = await fetch(url.toString());
         if (!res.ok) {
             logger.warn('[public.geocode] upstream error', { status: res.status });
-            return c.json({ data: [], reason: 'UPSTREAM_ERROR' as const }, 200);
+            return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
         }
         const j = await res.json() as {
             status: string;
@@ -842,7 +842,7 @@ bookingsRoutes.openapi(publicGeocodeRoute, async (c) => {
         };
         if (j.status !== 'OK' && j.status !== 'ZERO_RESULTS') {
             logger.warn('[public.geocode] upstream status', { status: j.status });
-            return c.json({ data: [], reason: 'UPSTREAM_ERROR' as const }, 200);
+            return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
         }
         // Best-effort split of secondary_text into city / state / zip — Google
         // Places returns "City, ST 12345" for US addresses. We do a lenient
@@ -860,10 +860,10 @@ bookingsRoutes.openapi(publicGeocodeRoute, async (c) => {
                 placeId: p.place_id,
             };
         });
-        return c.json({ data }, 200);
+        return c.json({ success: true, data }, 200);
     } catch (e) {
         logger.error('[public.geocode] exception', {}, e instanceof Error ? e : undefined);
-        return c.json({ data: [], reason: 'UPSTREAM_ERROR' as const }, 200);
+        return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
     }
 });
 

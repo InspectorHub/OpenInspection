@@ -141,7 +141,7 @@ document.addEventListener('alpine:init', () => {
 
                 if (tplRes && tplRes.ok) {
                     const tplJson = await tplRes.json();
-                    this.templates = (tplJson.data && (tplJson.data.templates || tplJson.data)) || [];
+                    this.templates = tplJson.data || [];
                     this.currentTemplate = this.templates.find(t => t.id === this.form.templateId) || null;
                 }
                 if (teamRes && teamRes.ok) {

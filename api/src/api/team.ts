@@ -186,7 +186,7 @@ teamRoutes.openapi(listApprenticeReviewsRoute, async (c) => {
 
     const rows = await c.var.services.apprentice.listPendingForMentor(tenantId, user.sub);
     if (rows.length === 0) {
-        return c.json({ success: true as const, data: { items: [] } }, 200);
+        return c.json({ success: true as const, data: [] }, 200);
     }
 
     // UI enrichment — the /apprentice-review page needs the apprentice's
@@ -217,7 +217,7 @@ teamRoutes.openapi(listApprenticeReviewsRoute, async (c) => {
         inspectionAddress: inspectionAddrById[r.inspectionId] ?? r.inspectionId,
     }));
 
-    return c.json({ success: true as const, data: { items } }, 200);
+    return c.json({ success: true as const, data: items }, 200);
 });
 
 const decideApprenticeReviewRoute = createRoute(withMcpMetadata({
@@ -427,7 +427,7 @@ teamRoutes.openapi(withMcpMetadata({
         };
     }));
 
-    return c.json({ success: true as const, data: { items } }, 200);
+    return c.json({ success: true as const, data: items }, 200);
 });
 
 /** GET /api/team/guests — list active (non-expired) guest users. */
@@ -462,7 +462,7 @@ teamRoutes.openapi(withMcpMetadata({
             expiresAt: u.expiresAt,
         }));
 
-    return c.json({ success: true as const, data: { items: guests } }, 200);
+    return c.json({ success: true as const, data: guests }, 200);
 });
 
 /**

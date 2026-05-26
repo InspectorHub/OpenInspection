@@ -46,7 +46,7 @@ messageRoutes.openapi(listRoute, async (c) => {
     ]);
     // Mark all client messages read on inspector view.
     await svc.markAllReadForRole(inspectionId, tenantId, 'client');
-    return c.json({ success: true, data: { messages, token } }, 200);
+    return c.json({ success: true, data: messages, meta: { token } }, 200);
 });
 
 // POST /api/messages/inspections/{inspectionId} — send message as inspector
@@ -144,7 +144,7 @@ messageRoutes.openapi(publicListRoute, async (c) => {
     const messages = await svc.listForInspection(insp.id, insp.tenantId);
     // Mark all inspector messages read on client view.
     await svc.markAllReadForRole(insp.id, insp.tenantId, 'inspector');
-    return c.json({ success: true, data: { messages, inspection: {
+    return c.json({ success: true, data: messages, meta: { inspection: {
         id: insp.id, propertyAddress: insp.propertyAddress, clientName: insp.clientName, date: insp.date,
     } } }, 200);
 });

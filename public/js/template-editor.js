@@ -248,7 +248,7 @@ function templateEditor() {
                 const res = await authFetch('/api/admin/comments');
                 if (!res.ok) return;
                 const data = await res.json();
-                this.cannedComments = data.data?.comments || [];
+                this.cannedComments = data.data || [];
             } catch (e) {
                 console.error('Failed to load comments:', e);
             }

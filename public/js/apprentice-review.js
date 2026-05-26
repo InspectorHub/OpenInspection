@@ -143,7 +143,7 @@
                     const r = await fetch('/api/team/apprentice-reviews', { credentials: 'same-origin' });
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     const body = await r.json();
-                    this.allItems = (body?.data?.items || []).map(function (it) {
+                    this.allItems = (body?.data || []).map(function (it) {
                         // Normalise the server's snake/camel shape and stash a
                         // null decision tag the queue list watches for the
                         // "Approved/Rejected/Edited" pill.

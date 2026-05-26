@@ -52,7 +52,7 @@ inspectionRequestsRoutes.openapi(listRoute, async (c) => {
     if (q.from)   filter.from   = q.from;
     if (q.to)     filter.to     = q.to;
     const rows = await c.var.services.inspectionRequest.list(tenantId, filter);
-    return c.json({ success: true, data: { requests: rows, total: rows.length } }, 200);
+    return c.json({ success: true, data: rows, meta: { total: rows.length } }, 200);
 });
 
 const detailRoute = createRoute(withMcpMetadata({
