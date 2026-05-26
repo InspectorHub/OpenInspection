@@ -708,48 +708,14 @@ app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
     return c.body(JSON.stringify(payload, null, 2));
 });
 
-// Standalone mode: Remix SSR for non-API routes.
-// The SSR bundle is copied to api/src/remix-ssr-bundle.js by build-standalone.sh.
-// When running dual-Worker mode, this file doesn't exist and SSR is a no-op.
-let remixHandler: ((req: Request, ctx: any) => Promise<Response>) | null = null;
-let remixInitPromise: Promise<void> | null = null;
+app.get('/', (c) => c.redirect('/dashboard'));
 
-async function initRemix() {
-    if (remixHandler) return;
-    if (remixInitPromise) return remixInitPromise;
-    remixInitPromise = (async () => {
-        try {
-            const [{ createRequestHandler }, serverBuild] = await Promise.all([
-                import('react-router'),
-                import('./remix-ssr-bundle.js'),
-            ]);
-            remixHandler = createRequestHandler(serverBuild, 'production');
-            // Expose Hono app for Remix SSR's apiFetch (single-Worker mode).
-            // In this mode there's no Service Binding — Remix calls API via
-            // globalThis.__API_WORKER which dispatches to the Hono app directly.
-            (globalThis as any).__API_WORKER = { fetch: app.fetch.bind(app) };
-        } catch {
-            // SSR bundle not present — running in dual-Worker mode
-        }
-    })();
-    return remixInitPromise;
-}
-
-app.get('/', async (c) => {
-    await initRemix();
-    if (remixHandler) return remixHandler(c.req.raw, { cloudflare: { env: c.env, ctx: c.executionCtx } });
-    return c.redirect('/login');
-});
-
-// Global catch-all. API routes get JSON 404; all other routes try Remix SSR.
-app.notFound(async (c) => {
+// Global catch-all 404. API requests get JSON; everything else gets plain text
+// (the Remix frontend handles HTML 404 rendering).
+app.notFound((c) => {
     const url = new URL(c.req.url);
     if (url.pathname.startsWith('/api/')) {
         return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404);
-    }
-    await initRemix();
-    if (remixHandler) {
-        return remixHandler(c.req.raw, { cloudflare: { env: c.env, ctx: c.executionCtx } });
     }
     return c.text('Not found', 404);
 });
