@@ -2,7 +2,7 @@
 
 The open-source inspection engine. Dual-deploy architecture: a Hono API Worker + a Remix frontend Worker, both on Cloudflare.
 
-**Docs**: `docs/developers/` (architecture, deploy, testing, API ref) · `docs/inspectors/` (user guides)
+**Docs**: `docs/developers/` (architecture, deploy, testing, API ref) · `docs/getting-started.md` (user guide)
 
 ## Commands
 
