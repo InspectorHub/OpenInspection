@@ -94,7 +94,7 @@ export default function MetricsPage() {
       {/* Inspections per month chart placeholder */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">Inspections per Month</p>
-        {data && data.months.length > 0 ? (
+        {data && data.months?.length > 0 ? (
           <div className="flex items-end gap-2 h-40">
             {data.months.map((m) => {
               const max = Math.max(...data.months.map((x) => x.count), 1);
@@ -119,7 +119,7 @@ export default function MetricsPage() {
       {/* Revenue per month bar chart */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">Revenue per Month</p>
-        {data && data.months.length > 0 ? (
+        {data && data.months?.length > 0 ? (
           <div className="flex items-end gap-2 h-40">
             {data.months.map((m) => {
               const maxRev = Math.max(...data.months.map((x) => x.revenue), 1);
@@ -144,7 +144,7 @@ export default function MetricsPage() {
       {/* Findings heatmap */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">Findings Heatmap</p>
-        {data && data.heatmap.length > 0 ? (
+        {data && data.heatmap?.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -175,7 +175,7 @@ export default function MetricsPage() {
       {/* Top agents */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-3">Top Referring Agents</p>
-        {data && data.topAgents.length > 0 ? (
+        {data && data.topAgents?.length > 0 ? (
           <div className="space-y-2">
             {data.topAgents.slice(0, 5).map((agent, i) => (
               <div key={i} className="flex items-center justify-between text-[13px]">
