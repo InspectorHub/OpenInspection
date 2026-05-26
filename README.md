@@ -91,12 +91,12 @@ npm run setup:cloudflare -- --local    # provisions a local dev environment
 npm run dev
 ```
 
-Detailed setup: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`docs/architecture.md`](docs/architecture.md).
+Detailed setup: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Architecture overview: [`docs/developers/01_architecture.md`](docs/developers/01_architecture.md).
 
 ## Documentation
 
-- [Deploy](docs/deploy.md) — first-time setup on Cloudflare
-- [Architecture](docs/architecture.md) — module map, request flow, cost model
+- [Deploy](docs/developers/02_deploy.md) — first-time setup on Cloudflare
+- [Architecture](docs/developers/01_architecture.md) — module map, request flow, cost model
 - [Contributing](CONTRIBUTING.md) — code conventions and PR process
 - [Community](docs/community.md) — Discussions categories and where to talk
 
