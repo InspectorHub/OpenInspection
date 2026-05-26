@@ -12,7 +12,7 @@
     "url": "https://github.com/InspectorHub/OpenInspection/issues"
   },
   "scripts": {
-    "dev": "concurrently --kill-others \"wrangler dev --port 8788\" \"npx tailwindcss -i ./src/styles/input.css -o ./public/styles.css --watch\"",
+    "dev": "concurrently --kill-others \"wrangler dev --port 8788\" \"npx tailwindcss -c api/tailwind.config.js -i api/src/styles/input.css -o api/public/styles.css --watch\"",
     "vendor:copy": "node scripts/vendor-copy.js",
     "build": "npm run vendor:copy && npm run css:build && tsc",
     "gen-version": "node scripts/gen-version.js",
@@ -26,11 +26,11 @@
     "restore": "node scripts/restore.js",
     "rotate:jwt": "node scripts/rotate-jwt-keys.js",
     "rotate:m2m": "node scripts/rotate-m2m-secret.js",
-    "css:build": "npx tailwindcss -i ./src/styles/input.css -o ./public/styles.css --minify",
-    "css:watch": "npx tailwindcss -i ./src/styles/input.css -o ./public/styles.css --watch",
+    "css:build": "npx tailwindcss -c api/tailwind.config.js -i api/src/styles/input.css -o api/public/styles.css --minify",
+    "css:watch": "npx tailwindcss -c api/tailwind.config.js -i api/src/styles/input.css -o api/public/styles.css --watch",
     "db:migrate": "npx wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "npx wrangler d1 migrations apply DB --remote",
-    "test:unit": "vitest run --config vitest.config.ts",
+    "test:unit": "vitest run --config api/vitest.config.ts",
     "type-check": "npx -p typescript tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

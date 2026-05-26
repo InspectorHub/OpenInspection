@@ -1,29 +1,19 @@
 {
-    "compilerOptions": {
-        "target": "ES2022",
-        "lib": ["ES2022"],
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "noEmit": true,
-        "sourceMap": true,
-        "strict": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "noImplicitReturns": true,
-        "noFallthroughCasesInSwitch": true,
-        "exactOptionalPropertyTypes": true,
-        "jsx": "react-jsx",
-        "jsxImportSource": "hono/jsx",
-        "resolveJsonModule": true,
-        "allowSyntheticDefaultImports": true,
-        "esModuleInterop": true,
-        "forceConsistentCasingInFileNames": true,
-        "types": ["@types/node", "@cloudflare/vitest-pool-workers"],
-        "skipLibCheck": true,
-        "incremental": true,
-        "tsBuildInfoFile": "./.tsbuildinfo",
-        "paths": {}
-    },
-    "include": ["src/**/*", "tests/**/*", "scripts/**/*", "playwright.config.ts", "playwright.config.integration.ts", "playwright.config.remote.ts", "worker-configuration.d.ts", "vitest.config.ts"],
-    "exclude": ["node_modules", "dist"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  },
+  "references": [
+    { "path": "api" },
+    { "path": "frontend" }
+  ],
+  "include": ["scripts/**/*"],
+  "exclude": ["node_modules"]
 }
