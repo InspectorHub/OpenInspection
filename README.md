@@ -91,13 +91,12 @@ npm run setup:cloudflare -- --local    # provisions a local dev environment
 npm run dev
 ```
 
-Detailed setup: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`docs/architecture.md`](docs/architecture.md). Extension cookbook: [`docs/extending.md`](docs/extending.md).
+Detailed setup: [`docs/deploy.md`](docs/deploy.md). Architecture overview: [`docs/architecture.md`](docs/architecture.md).
 
 ## Documentation
 
 - [Deploy](docs/deploy.md) — first-time setup on Cloudflare
 - [Architecture](docs/architecture.md) — module map, request flow, cost model
-- [Extending](docs/extending.md) — recipes for templates, payments, automation, themes
 - [Contributing](CONTRIBUTING.md) — code conventions and PR process
 - [Community](docs/community.md) — Discussions categories and where to talk
 
