@@ -10,6 +10,8 @@ import { useKeyboard } from "~/hooks/useKeyboard";
 import { useCannedComments } from "~/hooks/useCannedComments";
 import { useOfflineQueue } from "~/hooks/useOfflineQueue";
 import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
+import { usePresence } from "~/hooks/usePresence";
+import { useTheme } from "~/hooks/useTheme";
 import { SectionRail } from "~/components/editor/SectionRail";
 import { ItemList } from "~/components/editor/ItemList";
 import { ItemEditor } from "~/components/editor/ItemEditor";
@@ -19,6 +21,7 @@ import { FooterBar } from "~/components/editor/FooterBar";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
+import { PhotoStudio } from "~/components/editor/PhotoStudio";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 
@@ -141,6 +144,13 @@ export async function action({ request, params }: Route.ActionArgs) {
  }
  }
 
+ if (intent === "publish") {
+ await apiFetch(`/api/inspections/${params.id}/publish`, {
+ method: "POST",
+ token,
+ });
+ }
+
  return { ok: true };
 }
 
@@ -153,6 +163,7 @@ export default function InspectionEditPage() {
  const fetcher = useFetcher();
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
+ const { scheme, setColorScheme } = useTheme();
 
  /* ---------------------------------------------------------------- */
  /* Core state (useInspection) */
@@ -196,6 +207,66 @@ export default function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  const { blocker, confirmLeave, cancelLeave } = useUnsavedChanges(state.dirty);
+
+ /* ---------------------------------------------------------------- */
+ /* Presence roster (multi-inspector collaboration) */
+ /* ---------------------------------------------------------------- */
+
+ const presence = usePresence({
+  inspectionId: String(state.inspection.id),
+  userId: "current-user", // will be replaced with real user ID later
+  userName: "Inspector",
+  enabled: true,
+ });
+
+ useEffect(() => {
+  presence.setFocus(state.activeItemId);
+ }, [state.activeItemId]);
+
+ /* ---------------------------------------------------------------- */
+ /* Tag picker */
+ /* ---------------------------------------------------------------- */
+
+ const [tagPickerOpen, setTagPickerOpen] = useState(false);
+
+ /* Photo studio state */
+ const [photoStudioOpen, setPhotoStudioOpen] = useState(false);
+ const [photoStudioUrl, setPhotoStudioUrl] = useState<string | null>(null);
+ const [photoStudioIndex, setPhotoStudioIndex] = useState(0);
+ const [photoStudioTotal, setPhotoStudioTotal] = useState(0);
+
+ const PRESET_TAGS = useMemo(() => [
+  { id: "follow-up", name: "Follow Up", color: "#ef4444" },
+  { id: "urgent", name: "Urgent", color: "#f97316" },
+  { id: "photo-needed", name: "Photo Needed", color: "#eab308" },
+  { id: "re-inspect", name: "Re-inspect", color: "#3b82f6" },
+  { id: "client-question", name: "Client Question", color: "#a855f7" },
+ ], []);
+
+ const toggleTag = useCallback((tag: { id: string; name: string; color: string }) => {
+  if (!state.activeItemId) return;
+  const current = state.tagsByItem[state.activeItemId] || [];
+  const exists = current.some(t => t.id === tag.id);
+  const updated = exists
+   ? current.filter(t => t.id !== tag.id)
+   : [...current, tag];
+  state.setTagsByItem(prev => ({
+   ...prev,
+   [state.activeItemId!]: updated,
+  }));
+ }, [state.activeItemId, state.tagsByItem, state.setTagsByItem]);
+
+ useEffect(() => {
+  if (!tagPickerOpen) return;
+  const handler = (e: KeyboardEvent) => {
+   if (e.key === "Escape") {
+    e.preventDefault();
+    setTagPickerOpen(false);
+   }
+  };
+  window.addEventListener("keydown", handler);
+  return () => window.removeEventListener("keydown", handler);
+ }, [tagPickerOpen]);
 
  /* ---------------------------------------------------------------- */
  /* Track fetcher state for save indicator */
@@ -506,7 +577,8 @@ export default function InspectionEditPage() {
  },
  onOpenSectionPicker: () => state.openSectionPicker(),
  onOpenTagPicker: () => {
- // Tag picker not yet wired in Remix — placeholder
+ if (!state.activeItemId) return;
+ setTagPickerOpen(true);
  },
  onSetViewMode: (mode: "split" | "focus" | "preview") => {
  if (mode === "preview") {
@@ -604,6 +676,19 @@ export default function InspectionEditPage() {
  onCommit={handleBurstCommit}
  />
 
+ {/* Photo studio overlay */}
+ <PhotoStudio
+ open={photoStudioOpen}
+ photoUrl={photoStudioUrl}
+ photoIndex={photoStudioIndex}
+ totalPhotos={photoStudioTotal}
+ sectionName={state.currentSection?.title || state.currentSection?.name || ""}
+ onSave={() => {
+  setPhotoStudioOpen(false);
+ }}
+ onClose={() => setPhotoStudioOpen(false)}
+ />
+
  {/* Inspection settings sheet */}
  <InspectionSettingsSheet
  open={state.settingsOpen}
@@ -638,6 +723,39 @@ export default function InspectionEditPage() {
  >
  Leave
  </button>
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* Publish confirmation modal */}
+ {state.showPublishModal && (
+ <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+ <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => state.setShowPublishModal(false)} />
+ <div className="relative bg-ih-bg-card rounded-xl shadow-2xl p-6 max-w-md w-full border border-ih-border">
+ <h3 className="text-[16px] font-bold text-ih-fg-1">Publish Report</h3>
+ <p className="text-[13px] text-ih-fg-3 mt-2">
+ Publishing will finalize this inspection and make the report available to clients.
+ {state.progress.pct < 100 && (
+ <span className="block mt-2 text-ih-watch font-medium">
+ Warning: Only {state.progress.rated} of {state.progress.total} items have been rated ({state.progress.pct}% complete).
+ </span>
+ )}
+ </p>
+ <div className="mt-4 p-3 rounded-lg bg-ih-bg-muted text-[12px] space-y-1">
+ <div className="flex justify-between"><span className="text-ih-fg-3">Items rated</span><span className="font-bold">{state.progress.rated}/{state.progress.total}</span></div>
+ <div className="flex justify-between"><span className="text-ih-fg-3">Completion</span><span className="font-bold">{state.progress.pct}%</span></div>
+ <div className="flex justify-between"><span className="text-ih-fg-3">Status</span><span className="font-bold uppercase">{state.inspection.status as string}</span></div>
+ </div>
+ <div className="flex justify-end gap-2 mt-5">
+ <button onClick={() => state.setShowPublishModal(false)} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md">Cancel</button>
+ <button
+ onClick={() => {
+ fetcher.submit({ intent: "publish" }, { method: "post" });
+ state.setShowPublishModal(false);
+ }}
+ className="px-4 py-2 text-[13px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md"
+ >Publish Now</button>
  </div>
  </div>
  </div>
@@ -747,6 +865,103 @@ export default function InspectionEditPage() {
  </div>
  )}
 
+ {/* Section picker modal */}
+ {state.sectionPickerOpen && (
+ <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[20vh]">
+ <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => state.closeSectionPicker()} />
+ <div className="relative w-full max-w-md bg-ih-bg-card rounded-xl shadow-2xl border border-ih-border overflow-hidden">
+ <div className="px-4 py-3 border-b border-ih-border">
+ <input
+ id="section-picker-input"
+ type="text"
+ placeholder="Jump to section..."
+ value={state.sectionPickerQuery}
+ onChange={(e) => state.setSectionPickerQuery(e.target.value)}
+ className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px]"
+ autoFocus
+ />
+ </div>
+ <div className="max-h-60 overflow-y-auto">
+ {state.filteredSectionsForPicker.map((sec) => (
+ <button
+ key={sec.idx}
+ onClick={() => state.pickSection(sec.idx)}
+ className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-ih-bg-muted flex items-center justify-between"
+ >
+ <span className="font-medium text-ih-fg-1">{sec.title}</span>
+ <span className="text-[11px] text-ih-fg-3">{state.sections[sec.idx]?.items?.length || 0} items</span>
+ </button>
+ ))}
+ {state.filteredSectionsForPicker.length === 0 && (
+ <p className="text-center text-[13px] text-ih-fg-3 py-6">No sections match</p>
+ )}
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* Tag picker modal */}
+ {tagPickerOpen && state.activeItemId && (
+ <div className="fixed inset-0 z-[95] flex items-start justify-center pt-[20vh]">
+  <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setTagPickerOpen(false)} />
+  <div className="relative w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl border border-ih-border overflow-hidden">
+  <div className="px-4 py-3 border-b border-ih-border flex items-center justify-between">
+   <h3 className="text-[14px] font-bold text-ih-fg-1">Tags</h3>
+   <button
+   onClick={() => setTagPickerOpen(false)}
+   className="text-slate-400 hover:text-slate-600 text-lg"
+   >
+   &#x2715;
+   </button>
+  </div>
+  <div className="p-3 space-y-1.5">
+   {PRESET_TAGS.map((tag) => {
+   const currentTags = state.tagsByItem[state.activeItemId!] || [];
+   const isActive = currentTags.some(t => t.id === tag.id);
+   return (
+    <button
+    key={tag.id}
+    onClick={() => toggleTag(tag)}
+    className={`w-full text-left px-3 py-2.5 rounded-lg text-[13px] font-medium flex items-center gap-3 transition-colors ${
+     isActive
+     ? "bg-ih-bg-muted ring-1 ring-inset"
+     : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
+    }`}
+    style={isActive ? { "--tw-ring-color": tag.color } as React.CSSProperties : undefined}
+    >
+    <span
+     className="w-3 h-3 rounded-full flex-shrink-0"
+     style={{ backgroundColor: tag.color }}
+    />
+    <span className="flex-1 text-ih-fg-1">{tag.name}</span>
+    {isActive && (
+     <svg className="w-4 h-4 text-ih-ok" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+     </svg>
+    )}
+    </button>
+   );
+   })}
+  </div>
+  {(state.tagsByItem[state.activeItemId!] || []).length > 0 && (
+   <div className="px-4 py-2 border-t border-ih-border">
+   <div className="flex flex-wrap gap-1.5">
+    {(state.tagsByItem[state.activeItemId!] || []).map(tag => (
+    <span
+     key={tag.id}
+     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
+     style={{ backgroundColor: tag.color || '#6b7280' }}
+    >
+     {tag.name}
+    </span>
+    ))}
+   </div>
+   </div>
+  )}
+  </div>
+ </div>
+ )}
+
  {/* ------------------------------------------------------------ */}
  {/* Fixed top header with progress bar */}
  {/* ------------------------------------------------------------ */}
@@ -792,6 +1007,42 @@ export default function InspectionEditPage() {
  className="w-44 h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
  />
  </div>
+
+ {/* View mode */}
+ <div className="hidden lg:flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
+ <button
+ onClick={() => state.setViewMode("split")}
+ className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "split" ? "bg-white dark:bg-slate-700 text-ih-fg-1 shadow-sm" : "text-ih-fg-3"}`}
+ title="Split view (Cmd+1)"
+ >Split</button>
+ <button
+ onClick={() => state.setViewMode("focus")}
+ className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "focus" ? "bg-white dark:bg-slate-700 text-ih-fg-1 shadow-sm" : "text-ih-fg-3"}`}
+ title="Focus view (Cmd+2)"
+ >Focus</button>
+ </div>
+
+ {/* Batch mode toggle */}
+ <button
+ onClick={() => {
+  if (state.batchMode) {
+  state.setBatchMode(false);
+  state.setBatchSelected({});
+  } else {
+  state.setBatchMode(true);
+  }
+ }}
+ className={`hidden lg:flex w-9 h-9 rounded-md items-center justify-center ${
+  state.batchMode
+  ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+  : "text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+ }`}
+ title={state.batchMode ? "Exit batch mode" : "Batch mode (B)"}
+ >
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+ </svg>
+ </button>
 
  {/* Completion progress */}
  <div className="flex items-center gap-2">
@@ -852,6 +1103,21 @@ export default function InspectionEditPage() {
  <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 inline-flex items-center">
  {state.inspection.status as string}
  </span>
+
+ {/* Dark mode toggle */}
+ <button
+ onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'auto' : 'light')}
+ className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+ title={`Theme: ${scheme}`}
+ >
+ {scheme === 'dark' ? (
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+ ) : scheme === 'light' ? (
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+ ) : (
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+ )}
+ </button>
 
  {/* Settings button */}
  <button
@@ -915,11 +1181,25 @@ export default function InspectionEditPage() {
  state.selectSectionById(id);
  }}
  results={state.results}
+ sectionProgress={state.sectionProgress}
+ sectionDefectCount={state.sectionDefectCount}
  />
 
  {/* Column 2: Item List (280px) OR Property Info */}
+ <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
+ {/* View toggle (Items / Property) */}
+ <div className="flex items-center border-b border-ih-border">
+ <button
+ onClick={() => state.setActiveView("items")}
+ className={`flex-1 py-2 text-[11px] font-bold text-center ${state.activeView === "items" ? "text-ih-primary border-b-2 border-ih-primary" : "text-ih-fg-3"}`}
+ >Items</button>
+ <button
+ onClick={() => state.setActiveView("property")}
+ className={`flex-1 py-2 text-[11px] font-bold text-center ${state.activeView === "property" ? "text-ih-primary border-b-2 border-ih-primary" : "text-ih-fg-3"}`}
+ >Property</button>
+ </div>
  {state.activeView === "property" ? (
- <div className="w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto">
+ <div className="flex-1 overflow-y-auto">
  <PropertyInfoForm
  inspection={state.inspection}
  onSave={(fieldId, value) => {
@@ -931,14 +1211,80 @@ export default function InspectionEditPage() {
  />
  </div>
  ) : (
+ <>
+ {/* Item filter tabs */}
+ <div className="flex items-center gap-1 px-3 py-1.5 border-b border-ih-border">
+ {(["all", "unrated", "issues", "flagged"] as const).map((f) => (
+ <button
+ key={f}
+ onClick={() => state.setItemFilter(f)}
+ className={`px-2 py-0.5 rounded text-[11px] font-bold capitalize ${
+ state.itemFilter === f
+ ? "bg-ih-primary-tint text-ih-primary"
+ : "text-ih-fg-3 hover:text-ih-fg-2"
+ }`}
+ >
+ {f === "all" ? "All" : f === "unrated" ? "Unrated" : f === "issues" ? "Issues" : "Flagged"}
+ {f !== "all" && (
+ <span className="ml-1 text-[10px]">
+ {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
+ </span>
+ )}
+ </button>
+ ))}
+ </div>
+ {state.batchMode && (
+ <div className="flex items-center gap-1 px-3 py-1 border-b border-ih-border">
+  <button
+  onClick={() => state.batchSelectAll()}
+  className="px-2 py-0.5 rounded text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+  >
+  Select All
+  </button>
+  <button
+  onClick={() => state.setBatchSelected({})}
+  className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-fg-3 hover:text-ih-fg-2"
+  >
+  Clear
+  </button>
+ </div>
+ )}
  <ItemList
  items={visibleItems}
  sectionId={state.currentSection?.id || ""}
  activeItemId={state.activeItemId}
  onSelect={(id) => state.setActiveItemId(id)}
  results={state.results}
+ batchMode={state.batchMode}
+ batchSelected={state.batchSelected}
+ onBatchToggle={(id) => state.toggleBatchSelect(id)}
  />
+ {state.batchMode && state.selectedBatchCount > 0 && (
+ <div className="absolute bottom-0 left-0 right-0 bg-ih-bg-card border-t border-ih-border p-2 flex items-center gap-2">
+  <span className="text-[11px] font-bold text-ih-fg-2">{state.selectedBatchCount} selected</span>
+  <div className="flex gap-1 ml-auto">
+  {state.ratingLevels.slice(0, 5).map((level, idx) => (
+   <button
+   key={level.id}
+   onClick={() => findings.batchSetRating(state.currentSection?.id || "", state.currentSectionItems, state.batchSelected, level.id)}
+   className="w-7 h-7 rounded text-[10px] font-bold"
+   style={{ background: state.getRatingColor(level.id), color: "white" }}
+   >
+   {idx + 1}
+   </button>
+  ))}
+  </div>
+  <button
+  onClick={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
+  className="text-[11px] text-ih-fg-3 hover:text-ih-fg-1"
+  >
+  Cancel
+  </button>
+ </div>
  )}
+ </>
+ )}
+ </div>
 
  {/* Column 3: Item Editor (flex-1, focal) */}
  <main className="flex-1 overflow-y-auto border-t-2 border-indigo-600 p-6">
@@ -1001,14 +1347,19 @@ export default function InspectionEditPage() {
 
  {/* Column 4: SideRail */}
  <SideRail
- activeItem={state.activeItem}
+ activeItem={state.activeItem ? { id: state.activeItem.id, label: (state.activeItem.label || state.activeItem.name || "") as string } : null}
+ activeResult={state.activeItemId ? state.getResult(state.activeItemId) : null}
+ ratingLevels={state.ratingLevels}
+ getRatingColor={state.getRatingColor}
+ getRatingLabel={state.getRatingLabel}
+ inspectionId={String(state.inspection.id)}
  />
  </div>
 
  {/* ------------------------------------------------------------ */}
  {/* Footer Bar */}
  {/* ------------------------------------------------------------ */}
- <FooterBar />
+ <FooterBar connected={presence.connected} roster={presence.roster} />
 
  {/* ------------------------------------------------------------ */}
  {/* Inspector Tools Dock (FAB) */}
@@ -1020,7 +1371,19 @@ export default function InspectionEditPage() {
  state.setBurstCameraOpen(true);
  }}
  onPhotoStudio={() => {
- // Photo studio not yet in Remix — placeholder
+ if (!state.activeItemId) return;
+ const result = state.getResult(state.activeItemId);
+ const photos = (result?.photos as string[]) || [];
+ if (photos.length > 0) {
+  setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photos/${photos[0]}`);
+  setPhotoStudioIndex(1);
+  setPhotoStudioTotal(photos.length);
+ } else {
+  setPhotoStudioUrl(null);
+  setPhotoStudioIndex(0);
+  setPhotoStudioTotal(0);
+ }
+ setPhotoStudioOpen(true);
  }}
  onToggleCheatsheet={() =>
  state.setShowCheatsheet(!state.showCheatsheet)

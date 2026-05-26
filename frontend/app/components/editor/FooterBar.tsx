@@ -1,4 +1,10 @@
 import { useState } from "react";
+import type { PresenceUser } from "~/hooks/usePresence";
+
+interface FooterBarProps {
+  connected?: boolean;
+  roster?: PresenceUser[];
+}
 
 const SHORTCUTS = [
   { keys: ["1", "-", "5"], desc: "Rate item" },
@@ -15,7 +21,7 @@ const SHORTCUTS = [
   { keys: ["?"], desc: "This help" },
 ];
 
-export function FooterBar() {
+export function FooterBar({ connected = false, roster = [] }: FooterBarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
@@ -50,10 +56,28 @@ export function FooterBar() {
 
       <span className="flex-1" />
 
-      {/* Sync status — reads from the inspection-edit page state */}
+      {/* Presence roster */}
+      {roster.length > 0 && (
+        <div className="flex items-center gap-1 mr-2">
+          {roster.slice(0, 5).map((user) => (
+            <div
+              key={user.userId}
+              className="w-6 h-6 rounded-full bg-ih-primary text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-ih-bg-card"
+              title={`${user.name}${user.focusItemId ? ` — editing ${user.focusItemId.slice(0, 8)}` : ''}`}
+            >
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+          ))}
+          {roster.length > 5 && (
+            <span className="text-[10px] text-ih-fg-3 ml-1">+{roster.length - 5}</span>
+          )}
+        </div>
+      )}
+
+      {/* Sync status */}
       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-ih-border font-bold text-[10px]">
-        <span className="w-1.5 h-1.5 rounded-full bg-ih-ok-bg0" />
-        Connected
+        <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-ih-ok-bg0' : 'bg-ih-fg-4'}`} />
+        {connected ? 'Connected' : 'Disconnected'}
       </span>
     </div>
   );

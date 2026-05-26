@@ -3,9 +3,11 @@ interface SectionRailProps {
  activeSection: string;
  onSelect: (id: string) => void;
  results: Record<string, any>;
+ sectionProgress?: (sectionId: string) => { total: number; rated: number; percent: number };
+ sectionDefectCount?: (sectionId: string) => number;
 }
 
-export function SectionRail({ sections, activeSection, onSelect, results }: SectionRailProps) {
+export function SectionRail({ sections, activeSection, onSelect, results, sectionProgress, sectionDefectCount }: SectionRailProps) {
  return (
  <aside className="w-[200px] flex-shrink-0 border-r border-ih-border overflow-y-auto bg-ih-bg-app/50">
  <nav className="p-2 space-y-0.5">
@@ -17,10 +19,17 @@ export function SectionRail({ sections, activeSection, onSelect, results }: Sect
  return r?.rating;
  }).length || 0;
 
+ const defects = sectionDefectCount?.(section.id) ?? 0;
+ const unrated = total - rated;
+ const tipParts = [`${rated} of ${total} rated`];
+ if (unrated > 0) tipParts.push(`${unrated} unrated`);
+ if (defects > 0) tipParts.push(`${defects} defect${defects > 1 ? 's' : ''}`);
+
  return (
  <button
  key={section.id}
  onClick={() => onSelect(section.id)}
+ title={`${section.title}: ${tipParts.join(', ')}`}
  className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all ${
  activeSection === section.id
  ? "bg-indigo-50 text-indigo-600 font-bold border-l-2 border-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-400"

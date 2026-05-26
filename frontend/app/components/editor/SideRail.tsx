@@ -1,7 +1,12 @@
 import { useState } from "react";
 
 interface SideRailProps {
-  activeItem?: { id: string; label: string } | null;
+  activeItem?: { id: string; label: string; type?: string } | null;
+  activeResult?: Record<string, any> | null;
+  ratingLevels?: Array<{ id: string; name?: string; label?: string; abbreviation?: string; color?: string }>;
+  getRatingColor?: (id: string) => string;
+  getRatingLabel?: (id: string) => string;
+  inspectionId?: string;
 }
 
 type TabId = "preview" | "library" | "recall";
@@ -12,7 +17,7 @@ const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "recall", label: "Recall", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
 ];
 
-export function SideRail({ activeItem }: SideRailProps) {
+export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColor, getRatingLabel, inspectionId }: SideRailProps) {
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(false);
 
@@ -36,7 +41,67 @@ export function SideRail({ activeItem }: SideRailProps) {
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             {activeTab === "preview" && (
-              <p className="text-[13px] text-ih-fg-3 text-center py-8">Live preview of the active item's report rendering.</p>
+              activeItem && activeResult ? (
+                <div className="space-y-3">
+                  {/* Item label */}
+                  <h4 className="text-[13px] font-bold text-ih-fg-1">{activeItem.label}</h4>
+
+                  {/* Rating badge */}
+                  {activeResult.rating && (
+                    <div>
+                      <span
+                        className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
+                        style={{ backgroundColor: getRatingColor?.(activeResult.rating as string) || '#6b7280' }}
+                      >
+                        {getRatingLabel?.(activeResult.rating as string) || activeResult.rating}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {activeResult.notes && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Notes</span>
+                      <p className="text-[12px] text-ih-fg-2 mt-1 whitespace-pre-wrap leading-relaxed">{activeResult.notes as string}</p>
+                    </div>
+                  )}
+
+                  {/* Canned comments */}
+                  {activeResult.tabs && Array.isArray(activeResult.tabs) && (() => {
+                    const included = (activeResult.tabs as Array<{ name?: string; comments?: Array<{ id: string; text: string; included?: boolean }> }>)
+                      .flatMap(tab => (tab.comments || []).filter(c => c.included).map(c => ({ ...c, tabName: tab.name })));
+                    return included.length > 0 ? (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Comments</span>
+                        <ul className="mt-1 space-y-1">
+                          {included.map((c, i) => (
+                            <li key={i} className="text-[11px] text-ih-fg-2 pl-2 border-l-2 border-ih-border">{c.text}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Photos */}
+                  {activeResult.photos && Array.isArray(activeResult.photos) && (activeResult.photos as string[]).length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Photos</span>
+                      <div className="mt-1 grid grid-cols-3 gap-1">
+                        {(activeResult.photos as string[]).map((key, i) => (
+                          <img
+                            key={i}
+                            src={`/api/inspections/${inspectionId}/photos/${key}`}
+                            alt={`Photo ${i + 1}`}
+                            className="w-full aspect-square object-cover rounded border border-ih-border"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[13px] text-ih-fg-3 text-center py-8">Select an item to see a live preview.</p>
+              )
             )}
             {activeTab === "library" && (
               <div>
