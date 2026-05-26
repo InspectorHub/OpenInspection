@@ -196,7 +196,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         cancelled: d?.cancelled ?? [],
       } satisfies Record<string, Inspection[]>,
       conciergePending: d?.conciergePending ?? 0,
-      greeting: getGreeting(),
+      greeting: "Good morning",
       tags,
     };
   } catch {
@@ -210,13 +210,14 @@ export async function loader({ request }: Route.LoaderArgs) {
         cancelled: [] as Inspection[],
       },
       conciergePending: 0,
-      greeting: getGreeting(),
+      greeting: "Good morning",
       tags: [] as Tag[],
     };
   }
 }
 
 function getGreeting() {
+  if (typeof window === "undefined") return "Good morning";
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
@@ -283,8 +284,10 @@ const BUCKET_META: Record<string, { label: string; hint: string }> = {
 const PAGE_SIZE = 25;
 
 export default function DashboardPage() {
-  const { buckets, conciergePending, greeting, tags } = useLoaderData<typeof loader>();
+  const { buckets, conciergePending, greeting: _ssrGreeting, tags } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
+  const [greeting, setGreeting] = useState(_ssrGreeting);
+  useEffect(() => { setGreeting(getGreeting()); }, []);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const fetcher = useFetcher();
