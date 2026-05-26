@@ -1,0 +1,11 @@
+{
+  "api/src/**/*.{ts,tsx}": [
+    "eslint --fix"
+  ],
+  "frontend/app/**/*.{ts,tsx}": [
+    "eslint --fix"
+  ],
+  "packages/**/*.{ts,tsx}": [
+    "eslint --fix"
+  ]
+}

@@ -1,0 +1,51 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/h"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+FAILED=0
+
+pass() { echo "  ✓  $1"; }
+fail() { echo "  ✗  $1"; FAILED=1; }
+step() { echo "\n  →  $1"; }
+
+echo "${BOLD}── OpenInspection (Pre-commit Checks) ───────────────────────────${NC}"
+
+# 1. Type check
+step "Type check"
+if npm run type-check > /dev/null 2>&1; then
+    pass "Type check passed"
+else
+    fail "Type check failed  →  npm run type-check"
+fi
+
+# 2. Lint & Fix
+step "Lint & Fix"
+if npx lint-staged; then
+    pass "Lint & Fix passed"
+else
+    fail "Lint failed  →  npx lint-staged"
+fi
+
+# 3. Bundle size check
+step "Bundle size check"
+if node scripts/check-bundle-size.js; then
+    # Handled by Node script gracefully
+    :
+else
+    # FAILED if node script fails
+    FAILED=1
+fi
+
+if [ "$FAILED" -eq 1 ]; then
+    echo "\n${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"
+    exit 1
+fi
+
+echo "\n${GREEN}All pre-commit checks passed.${NC}"
+exit 0

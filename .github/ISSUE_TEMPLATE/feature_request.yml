@@ -1,0 +1,59 @@
+name: Feature request
+description: Suggest a new capability, integration, or improvement for OpenInspection.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For free-form ideation or a vote-based discussion, please open a thread in
+        [Ideas Discussions](https://github.com/InspectorHub/OpenInspection/discussions/categories/ideas) instead — issues are best for *concrete* asks the maintainers can scope.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user pain are you trying to solve? Concrete scenarios beat abstract wishes.
+      placeholder: "When I import a Spectora report, the section ordering is alphabetical instead of matching the original."
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to see happen? It is OK to leave this fuzzy if you are not sure.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, similar features in other tools, or reasons NOT to do this.
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who would benefit?
+      multiple: true
+      options:
+        - Solo inspector
+        - Multi-inspector firm
+        - Realtor / Buyer's agent
+        - Self-hoster / IT admin
+        - Marketplace partner / Recommender
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      description: Help us route the feature.
+      options:
+        - label: This belongs in the open-source `apps/core` engine.
+        - label: This is SaaS-only (InspectorHub portal) — please move to that tracker.
+        - label: I am unsure where it fits and want maintainer input.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of conduct
+      options:
+        - label: I have read and agree to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md).
+          required: true

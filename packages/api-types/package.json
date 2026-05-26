@@ -1,0 +1,6 @@
+{
+  "name": "@core/api-types",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts"
+}

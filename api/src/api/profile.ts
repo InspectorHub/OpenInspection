@@ -1,0 +1,352 @@
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { drizzle } from 'drizzle-orm/d1';
+import { and, eq } from 'drizzle-orm';
+import type { HonoConfig } from '../types/hono';
+import { ErrorCode, Errors } from '../lib/errors';
+import { SetSlugRequestSchema } from '../lib/validations/profile.schema';
+import { createApiResponseSchema } from '../lib/validations/shared.schema';
+import { users } from '../lib/db/schema/tenant';
+import { logger } from '../lib/logger';
+import { withMcpMetadata } from '../lib/route-metadata-standards';
+
+/**
+ * Booking #7 Sprint A — authenticated profile endpoint mounted at
+ * `/api/profile/*`. JWT middleware populates tenantId/userId; availability
+ * is re-checked inside the handler to close the optimistic-UI race.
+ */
+const app = new OpenAPIHono<HonoConfig>();
+
+const getProfileRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/',
+    operationId: 'getMyProfile',
+    tags: ['profile'],
+    summary: 'Get current user profile',
+    description: 'Returns the authenticated user\'s editable profile fields (name, phone, license, slug, bio, photo URL, service areas).',
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({
+                        name: z.string().nullable(),
+                        email: z.string(),
+                        phone: z.string().nullable(),
+                        licenseNumber: z.string().nullable(),
+                        slug: z.string().nullable(),
+                        bio: z.string().nullable(),
+                        photoUrl: z.string().nullable(),
+                        serviceAreas: z.any().nullable(),
+                    })),
+                },
+            },
+            description: 'Profile data',
+        },
+    },
+}, { scopes: ['read'], tier: 'primary' }));
+
+app.openapi(getProfileRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
+
+    const row = await drizzle(c.env.DB as any).select({
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        licenseNumber: users.licenseNumber,
+        slug: users.slug,
+        bio: users.bio,
+        photoUrl: users.photoUrl,
+        serviceAreas: users.serviceAreas,
+    }).from(users)
+      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
+      .get();
+
+    if (!row) throw Errors.NotFound('User not found');
+
+    let parsedAreas = null;
+    if (row.serviceAreas) {
+        try { parsedAreas = JSON.parse(row.serviceAreas); } catch {}
+    }
+
+    return c.json({
+        success: true as const,
+        data: { ...row, serviceAreas: parsedAreas },
+    }, 200);
+});
+
+const SlugConflictResponseSchema = z.object({
+    success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'),
+    error: z.object({
+        message: z.string().describe('TODO describe message field for the OpenInspection MCP integration'),
+        code: z.string().describe('TODO describe code field for the OpenInspection MCP integration'),
+        details: z.object({ suggestions: z.array(z.string()).optional().describe('TODO describe suggestions field for the OpenInspection MCP integration') }).optional().describe('TODO describe details field for the OpenInspection MCP integration'),
+    }),
+});
+
+const PatchProfileSchema = z.object({
+    name: z.string().max(100).optional(),
+    phone: z.string().max(30).optional(),
+    licenseNumber: z.string().max(50).optional(),
+    slug: z.string().min(3).max(32).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).optional(),
+    bio: z.string().max(600).nullable().optional(),
+});
+
+const patchProfileRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/',
+    operationId: 'patchMyProfile',
+    tags: ['profile'],
+    summary: 'Update current user profile',
+    description: 'Partially updates the authenticated user\'s profile. Slug uniqueness is validated; other fields are written directly.',
+    request: {
+        body: {
+            content: {
+                'application/json': { schema: PatchProfileSchema },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ ok: z.literal(true) })),
+                },
+            },
+            description: 'Saved',
+        },
+        409: {
+            content: {
+                'application/json': { schema: SlugConflictResponseSchema },
+            },
+            description: 'Slug conflict',
+        },
+    },
+}, { scopes: ['write'], tier: 'primary' }));
+
+app.openapi(patchProfileRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
+
+    const body = c.req.valid('json');
+    const updates: Record<string, unknown> = {};
+
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.phone !== undefined) updates.phone = body.phone;
+    if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
+    if (body.bio !== undefined) updates.bio = body.bio;
+
+    if (body.slug !== undefined) {
+        const userService = c.var.services.user;
+        const check = await userService.checkSlug(tenantId, body.slug, userId);
+        if (!check.available) {
+            return c.json({
+                success: false as const,
+                error: {
+                    message: check.reason === 'reserved'
+                        ? 'That slug is reserved. Please choose another.'
+                        : 'That slug is already taken.',
+                    code: ErrorCode.CONFLICT,
+                    details: { suggestions: check.suggestions ?? [] },
+                },
+            }, 409);
+        }
+        updates.slug = body.slug;
+    }
+
+    if (Object.keys(updates).length > 0) {
+        await drizzle(c.env.DB as any).update(users)
+            .set(updates)
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+    }
+
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+
+const setSlugRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/slug',
+    operationId: 'setMyBookingSlug',
+    tags: ['profile'],
+    summary: 'Set the current user booking slug',
+    description: 'Saves the caller\'s public booking-page slug used in /book/<slug> URLs. Validates availability and returns 409 with suggestions when the slug is taken or reserved.',
+    request: {
+        body: {
+            content: {
+                'application/json': { schema: SetSlugRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ slug: z.string().describe('TODO describe slug field for the OpenInspection MCP integration') })),
+                },
+            },
+            description: 'Slug saved',
+        },
+        409: {
+            content: {
+                'application/json': { schema: SlugConflictResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') },
+            },
+            description: 'Slug conflict',
+        },
+    },
+}, { scopes: ['write'], tier: 'extended' }));
+
+app.openapi(setSlugRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
+
+    const { slug } = c.req.valid('json');
+    const userService = c.var.services.user;
+    const check = await userService.checkSlug(tenantId, slug, userId);
+    if (!check.available) {
+        const message = check.reason === 'reserved'
+            ? 'That slug is reserved. Please choose another.'
+            : 'That slug is already taken.';
+        return c.json(
+            {
+                success: false as const,
+                error: {
+                    message,
+                    code: ErrorCode.CONFLICT,
+                    details: { suggestions: check.suggestions ?? [] },
+                },
+            },
+            409,
+        );
+    }
+    await userService.setSlug(userId, tenantId, slug);
+    return c.json({ success: true as const, data: { slug } }, 200);
+});
+
+// ── Sprint C-1 — profile photo upload + bio/service-areas details ──────────────
+
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+const MAX_PHOTO_BYTES = 2_000_000;
+
+const photoUploadRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/photo',
+    operationId: 'uploadMyProfilePhoto',
+    tags: ['profile'],
+    summary: 'Upload inspector profile photo',
+    description: 'Accepts a jpg/png/webp photo (max 2 MB) as multipart form data, stores it in R2 under a tenant-scoped key, and saves the public photoUrl on the user record.',
+    request: {
+        body: {
+            content: {
+                'multipart/form-data': { schema: z.object({ photo: z.any().describe('Profile photo file — jpg, png, or webp; max 2 MB.') }).describe('TODO describe schema field for the OpenInspection MCP integration') },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ photoUrl: z.string().describe('TODO describe photoUrl field for the OpenInspection MCP integration') })),
+                },
+            },
+            description: 'Uploaded',
+        },
+    },
+}, { scopes: ['write'], tier: 'extended' }));
+
+app.openapi(photoUploadRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
+
+    if (!c.env.PHOTOS) throw Errors.BadRequest('Photo storage not available');
+
+    const fd = await c.req.parseBody();
+    const file = fd['photo'];
+    if (!(file instanceof File)) throw Errors.BadRequest('photo missing');
+    if (file.size > MAX_PHOTO_BYTES) {
+        throw Errors.BadRequest(`photo > ${Math.round(MAX_PHOTO_BYTES / 1_000_000)}MB`);
+    }
+    if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type)) {
+        throw Errors.BadRequest('photo must be jpg, png, or webp');
+    }
+
+    const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+    // Tenant-prefixed key keeps cross-tenant photos isolated even though the
+    // serving route at /photos/:key is public — keys are unguessable + scoped.
+    const key = `tenants/${tenantId}/inspector-photos/${userId}.${ext}`;
+    const buf = new Uint8Array(await file.arrayBuffer());
+    await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: file.type } });
+
+    const host = (c.env.APP_BASE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '')) || c.req.header('host') || '';
+    const proto = c.env.APP_BASE_URL?.startsWith('http://') ? 'http' : 'https';
+    const photoUrl = `${proto}://${host}/photos/${key}`;
+    await drizzle(c.env.DB).update(users)
+        .set({ photoUrl })
+        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+
+    logger.info('profile.photo.upload', { userId, tenantId, size: file.size, type: file.type });
+    return c.json({ success: true as const, data: { photoUrl } }, 200);
+});
+
+const ProfileDetailsSchema = z.object({
+    bio: z.string().max(600).nullable().optional().describe('Free-form inspector biography shown on the public booking page; null clears it.'),
+    serviceAreas: z.array(z.object({
+        city: z.string().min(1).max(80).describe('City name within the inspector\'s service coverage.'),
+        state: z.string().min(1).max(40).describe('State or province for the service area.'),
+        zip: z.string().min(1).max(20).describe('ZIP or postal code for the service area.'),
+    })).max(20).optional().describe('List of geographic service areas (up to 20) shown on the public profile page.'),
+});
+
+const detailsRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/details',
+    operationId: 'updateMyProfileDetails',
+    tags: ['profile'],
+    summary: 'Update inspector bio and service areas',
+    description: 'Updates the inspector\'s public-facing bio and service-area list. Both fields are optional; missing keys leave existing values unchanged.',
+    request: {
+        body: {
+            content: { 'application/json': { schema: ProfileDetailsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({}).passthrough()),
+                },
+            },
+            description: 'Saved',
+        },
+    },
+}, { scopes: ['write'], tier: 'extended' }));
+
+app.openapi(detailsRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
+
+    const body = c.req.valid('json');
+    const updates: { bio?: string | null; serviceAreas?: string } = {};
+    if (body.bio !== undefined) updates.bio = body.bio;
+    if (body.serviceAreas !== undefined) {
+        updates.serviceAreas = JSON.stringify(body.serviceAreas);
+    }
+    if (Object.keys(updates).length === 0) {
+        return c.json({ success: true as const, data: {} }, 200);
+    }
+    await drizzle(c.env.DB).update(users)
+        .set(updates)
+        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+
+    logger.info('profile.details.update', {
+        userId,
+        tenantId,
+        fields: Object.keys(updates).join(','),
+    });
+    return c.json({ success: true as const, data: {} }, 200);
+});
+
+export default app;

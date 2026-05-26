@@ -1,0 +1,48 @@
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+OpenInspection
+Copyright (C) 2024-present InspectorHub Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+The full license text is available at:
+https://www.gnu.org/licenses/agpl-3.0.html
+
+-------------------------------------------------------------------------------
+
+ADDITIONAL PERMISSION FOR SINGLE-TENANT SELF-HOSTED DEPLOYMENTS
+(pursuant to GNU AGPL v3, Section 7)
+
+As an additional permission under Section 7 of the GNU Affero General
+Public License version 3, operators who deploy this software on their own
+Cloudflare account solely to serve their own home or commercial inspection
+business ("single-tenant self-hosted deployments") are granted permission
+to operate modified versions of this Program — including allowing their
+clients to interact with the Program through a network interface — without
+being required to make the source code of those modifications available to
+those clients, provided that:
+
+  (a) The deployment serves only the operator's own inspection business
+      (i.e., one legal entity's inspectors and their clients).
+
+  (b) The operator does not offer the Program, or any modified version of
+      it, as a hosted or managed service to third parties (i.e., does not
+      provision separate workspaces, accounts, or instances of the Program
+      for multiple independent businesses or individuals for a fee or
+      otherwise).
+
+If condition (b) is not met — that is, if you offer this software as a
+managed or hosted service to multiple independent tenants — the standard
+terms of the GNU Affero General Public License v3 apply in full, including
+the network interaction requirement of Section 13.
+
+This additional permission may be removed by a downstream licensee at
+their option.

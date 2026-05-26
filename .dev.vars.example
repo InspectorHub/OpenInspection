@@ -1,0 +1,46 @@
+# Copy this file to .dev.vars for local development
+# .dev.vars is gitignored and must never be committed
+
+# Required: JWT signing secret (use a long random string in production)
+JWT_SECRET=your-jwt-secret-here
+
+# Optional: Resend API key for sending report emails to clients
+RESEND_API_KEY=re_your_api_key_here
+
+# Optional: The "from" address for outgoing report emails
+# Must be a verified sender domain in your Resend account
+SENDER_EMAIL=Your Business <reports@yourdomain.com>
+
+# Optional: Google Gemini API key for AI-assisted report writing
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Optional: Stripe keys for real payment checkout on inspection reports
+# Leave blank or use the placeholder value to use the mock checkout in local dev
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_stripe_webhook_secret_here
+
+# Optional: Cloudflare Turnstile bot protection on the public booking form
+# Get your keys at dash.cloudflare.com → Turnstile
+# The values below are Cloudflare's official test keys (always pass in local dev)
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+
+# Optional: Google Calendar OAuth — lets inspectors sync availability from Google Calendar
+# Create credentials at console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client
+# Authorized redirect URI: https://your-core-domain.workers.dev/api/calendar/callback
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+
+# Optional: Public base URL for this worker (used to build OAuth redirect URIs)
+APP_BASE_URL=http://localhost:8788
+
+# Optional: Cloudflare account credentials — required for silo mode (per-tenant D1 databases)
+# Create an API token at dash.cloudflare.com → My Profile → API Tokens with D1:Edit permission
+CF_ACCOUNT_ID=your_cloudflare_account_id_here
+CF_API_TOKEN=your_cloudflare_api_token_here
+
+# Integration tests only: a pre-obtained Google OAuth refresh token for a test Google account.
+# Used by npm run test:integration to seed the DB and test POST /api/calendar/sync end-to-end.
+# Obtain by completing the Google OAuth flow (/api/calendar/connect) and noting the refresh_token
+# stored in the users table (wrangler d1 execute openinspection-db --local --command "SELECT google_refresh_token FROM users LIMIT 1").
+INTEGRATION_GOOGLE_REFRESH_TOKEN=your_test_google_refresh_token_here

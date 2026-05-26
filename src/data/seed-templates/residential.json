@@ -1,0 +1,2073 @@
+{
+  "id": "seed_residential_v1",
+  "name": "Standard Residential Inspection",
+  "description": "InterNACHI-aligned residential inspection template covering all major home systems. Each item ships with pre-built Information / Limitations / Defects canned comments — toggle, edit, or add your own.",
+  "version": 2,
+  "featured": true,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "roof",
+        "title": "Roof",
+        "items": [
+          {
+            "id": "roof-cover",
+            "label": "Roof Covering",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_cover_type",
+                  "title": "Material",
+                  "comment": "Asphalt composition shingles observed.",
+                  "default": true
+                },
+                {
+                  "id": "ri_cover_condition",
+                  "title": "Condition",
+                  "comment": "Roof covering appears serviceable with no visible defects at the time of inspection.",
+                  "default": true
+                },
+                {
+                  "id": "ri_cover_life",
+                  "title": "Service Life",
+                  "comment": "Estimated remaining service life of approximately 10 years based on visible weathering.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_cover_ground",
+                  "title": "Ground-only",
+                  "comment": "Roof was inspected from ground level / accessible eaves only; areas not safely accessible were not inspected.",
+                  "default": true
+                },
+                {
+                  "id": "rl_cover_weather",
+                  "title": "Weather",
+                  "comment": "Areas covered by snow, vegetation, or stored items were not inspected.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_cover_missing",
+                  "title": "Missing/Damaged Shingles",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Multiple shingles are missing, broken, or lifted; recommend repair by a qualified roofing contractor.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_cover_leak",
+                  "title": "Active Leak",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Active roof leak observed; recommend immediate professional repair to prevent further water damage.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_cover_eol",
+                  "title": "End of Life",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Roof appears near end of expected service life; recommend planning for replacement within 1-3 years.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_cover_layers",
+                  "title": "Multiple Layers",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Multiple layers of roofing observed; full tear-off recommended at next replacement to verify deck condition.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "roof-flashing",
+            "label": "Flashing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_flash_ok",
+                  "title": "Penetrations",
+                  "comment": "Roof flashing at penetrations and chimney appears properly installed and sealed.",
+                  "default": true
+                },
+                {
+                  "id": "ri_flash_valley",
+                  "title": "Valleys",
+                  "comment": "Roof valleys and rake edges are properly flashed and sealed.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_flash_visual",
+                  "title": "Visual only",
+                  "comment": "Concealed flashing under roof covering not directly inspected.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_flash_chimney",
+                  "title": "Improper at chimney",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Improper or missing flashing observed at chimney/wall intersection; recommend correction to prevent leakage.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_flash_vent",
+                  "title": "Plumbing vent flash",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Plumbing vent flashing shows separation from roof surface; recommend re-sealing.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_flash_seal",
+                  "title": "Cracked sealant",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Sealant at roof penetrations shows minor cracking; recommend renewal within 12 months.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "gutters",
+            "label": "Gutters & Downspouts",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_gut_ok",
+                  "title": "Condition",
+                  "comment": "Gutters and downspouts are securely attached and free of significant debris.",
+                  "default": true
+                },
+                {
+                  "id": "ri_gut_clean",
+                  "title": "Cleaning",
+                  "comment": "Recommend annual gutter cleaning to maintain proper drainage.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_gut_storm",
+                  "title": "Storm response",
+                  "comment": "Gutter performance during heavy rain not directly observed.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_gut_loose",
+                  "title": "Loose / sagging",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Gutters exhibit minor sagging at one or more attachment points; secure or replace damaged sections.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_gut_detach",
+                  "title": "Detached / broken",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Gutters are detached or severely damaged; replacement recommended.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_gut_dis",
+                  "title": "Discharge at foundation",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Downspouts discharge directly against the foundation; extend at least 4-6 feet away to prevent foundation moisture issues.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "chimney",
+            "label": "Chimney",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_chim_ok",
+                  "title": "Condition",
+                  "comment": "Chimney appears in serviceable condition from accessible vantage points.",
+                  "default": true
+                },
+                {
+                  "id": "ri_chim_cap",
+                  "title": "Cap / Spark Arrestor",
+                  "comment": "Chimney cap with spark arrestor present.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_chim_internal",
+                  "title": "Internal flue",
+                  "comment": "Internal flue condition requires Level II inspection by certified chimney sweep.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_chim_crown",
+                  "title": "Crown cracked",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Chimney crown shows significant cracking; recommend repair or replacement.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_chim_lean",
+                  "title": "Leaning",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Chimney shows visible lean or separation from structure; recommend evaluation by a structural professional.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "exterior",
+        "title": "Exterior",
+        "items": [
+          {
+            "id": "siding",
+            "label": "Siding / Cladding",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_sid_ok",
+                  "title": "Condition",
+                  "comment": "Siding and trim appear in serviceable condition with no significant defects observed.",
+                  "default": true
+                },
+                {
+                  "id": "ri_sid_paint",
+                  "title": "Paint",
+                  "comment": "Exterior paint and finishes are intact with no widespread peeling or weathering.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_sid_veg",
+                  "title": "Vegetation",
+                  "comment": "Areas concealed by stored items or vegetation were not fully inspected.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_sid_loose",
+                  "title": "Loose panels",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Multiple loose siding panels observed; reattach to prevent moisture intrusion and wind damage.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_sid_rot",
+                  "title": "Wood rot",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Significant wood rot observed at trim and siding; replace damaged sections and identify moisture source.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_sid_caulk",
+                  "title": "Caulking",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Caulking at penetrations shows minor cracking; renew when accessible.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "windows",
+            "label": "Windows & Doors",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_win_ok",
+                  "title": "Operation",
+                  "comment": "Window frames and exterior doors operate properly and show no significant damage.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_win_rep",
+                  "title": "Representative",
+                  "comment": "A representative sample of windows and doors was operated; not every unit was tested.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_win_seal",
+                  "title": "Failed seals",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Failed dual-pane window seals observed (condensation between panes); recommend insulated glass replacement.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_win_glass",
+                  "title": "Cracked glass",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Window glass is cracked or broken in one or more locations; recommend replacement.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "driveway",
+            "label": "Driveway & Walkways",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_dw_ok",
+                  "title": "Condition",
+                  "comment": "Driveway and walkways show no significant cracks or trip hazards.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_dw_snow",
+                  "title": "Snow / debris",
+                  "comment": "Surfaces covered by snow or debris not fully inspected.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_dw_crack",
+                  "title": "Significant cracks",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Concrete walkway shows significant cracking; monitor for displacement and seal larger cracks.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_dw_trip",
+                  "title": "Trip hazard",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Driveway/walkway exhibits significant displacement creating trip hazard; recommend repair or replacement.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "grading",
+            "label": "Grading & Drainage",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_gr_ok",
+                  "title": "Slope",
+                  "comment": "Grading slopes away from foundation, providing positive drainage.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_gr_dry",
+                  "title": "Dry conditions",
+                  "comment": "Drainage performance evaluated under dry conditions; behavior during heavy rain not directly observed.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_gr_neg",
+                  "title": "Negative grading",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Negative grading observed against foundation; regrade to slope away from house at minimum 6 inches over the first 10 feet.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "structure",
+        "title": "Structure",
+        "items": [
+          {
+            "id": "foundation",
+            "label": "Foundation",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fnd_ok",
+                  "title": "Condition",
+                  "comment": "Foundation walls appear sound with no significant cracks, settling, or moisture intrusion observed.",
+                  "default": true
+                },
+                {
+                  "id": "ri_fnd_dry",
+                  "title": "No water",
+                  "comment": "No evidence of past or present water intrusion observed in basement.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fnd_hidden",
+                  "title": "Hidden behind finishes",
+                  "comment": "Hidden defects in foundation walls behind finished surfaces are beyond the scope of a visual inspection.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fnd_horiz",
+                  "title": "Horizontal/step crack",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Horizontal or step-cracking observed in foundation walls indicating possible structural movement; evaluation by a structural engineer recommended.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fnd_water",
+                  "title": "Active water",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Active water intrusion observed in basement/crawl space; recommend identifying source and waterproofing as needed.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fnd_settle",
+                  "title": "Settlement",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Significant foundation settlement observed; structural evaluation by a qualified professional recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "framing",
+            "label": "Framing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fr_ok",
+                  "title": "Condition",
+                  "comment": "Visible structural framing appears intact and properly supported.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fr_concealed",
+                  "title": "Concealed",
+                  "comment": "Framing concealed by finishes was not directly inspected.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fr_wdo",
+                  "title": "WDO damage",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Wood-destroying organism damage observed in framing members; recommend treatment and repair by qualified specialist.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fr_sag",
+                  "title": "Sagging",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Floor joists or beams show significant sagging, splitting, or notching; structural evaluation recommended.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "basement",
+            "label": "Basement / Crawlspace",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_bsmt_ok",
+                  "title": "Condition",
+                  "comment": "Crawl space appears dry with adequate ventilation and no visible structural concerns.",
+                  "default": true
+                },
+                {
+                  "id": "ri_bsmt_sump",
+                  "title": "Sump pump",
+                  "comment": "Sump pump operates correctly and discharges away from foundation.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_bsmt_access",
+                  "title": "Limited access",
+                  "comment": "Crawl space inspected to extent safely accessible; areas with limited clearance not fully evaluated.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_bsmt_water",
+                  "title": "Standing water",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Standing water observed in crawl space; recommend drainage correction and moisture barrier installation.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_bsmt_vapor",
+                  "title": "Missing vapor barrier",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Exposed soil in crawl space without vapor barrier; recommend installation of 6-mil polyethylene barrier per code.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "hvac",
+        "title": "HVAC",
+        "items": [
+          {
+            "id": "furnace",
+            "label": "Heating System",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_heat_ok",
+                  "title": "Operation",
+                  "comment": "Heating system operated normally during inspection with appropriate temperature rise.",
+                  "default": true
+                },
+                {
+                  "id": "ri_heat_air",
+                  "title": "Combustion air",
+                  "comment": "Combustion air supply and venting appear properly configured for fuel-burning equipment.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_heat_amb",
+                  "title": "Ambient conditions",
+                  "comment": "HVAC inspection performed at ambient conditions; full performance evaluation requires technician with specialized equipment.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_heat_no",
+                  "title": "No response",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Heating system did not respond to thermostat call; recommend evaluation by a licensed HVAC professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_heat_hex",
+                  "title": "Heat exchanger",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Heat exchanger condition is unknown and beyond visual inspection; recommend evaluation by a qualified HVAC technician.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_heat_flue",
+                  "title": "Flue / vent",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Flue/vent connector shows corrosion, improper slope, or disconnection; recommend immediate evaluation for CO safety.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "ac",
+            "label": "Cooling System",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ac_ok",
+                  "title": "Operation",
+                  "comment": "Cooling system operated normally with appropriate temperature differential at registers.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ac_cold",
+                  "title": "Cold weather",
+                  "comment": "Cooling not tested due to outdoor temperature below 65°F; manufacturer guidance prevents testing in cold conditions.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ac_dt",
+                  "title": "Inadequate ΔT",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Cooling system showed inadequate temperature differential; recommend evaluation for refrigerant charge or compressor performance.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_ac_eol",
+                  "title": "End of life",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Cooling system appears to be approaching end of typical useful life (15-20 years); recommend planning for replacement.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "ductwork",
+            "label": "Ductwork & Venting",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_duct_ok",
+                  "title": "Condition",
+                  "comment": "Ductwork visible in attic/crawl space appears properly insulated and sealed.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_duct_wall",
+                  "title": "Concealed runs",
+                  "comment": "Ductwork concealed within walls and ceilings was not directly inspected.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_duct_dis",
+                  "title": "Disconnect",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Ductwork shows disconnection at one or more joints; recommend re-sealing with mastic or UL-listed tape.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "filter",
+            "label": "Air Filter",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_filt_ok",
+                  "title": "Clean",
+                  "comment": "Air filter is clean and recently replaced.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_filt_size",
+                  "title": "Size verification",
+                  "comment": "Filter size and MERV rating verification deferred to homeowner.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_filt_dirty",
+                  "title": "Dirty filter",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Air filter shows moderate dust accumulation; recommend replacement.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_filt_none",
+                  "title": "No filter",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "No air filter installed at return; recommend immediate installation to protect equipment.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "plumbing",
+        "title": "Plumbing",
+        "items": [
+          {
+            "id": "supply",
+            "label": "Supply Lines",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_sup_ok",
+                  "title": "Condition",
+                  "comment": "Visible plumbing supply lines appear functional with no active leaks observed.",
+                  "default": true
+                },
+                {
+                  "id": "ri_sup_press",
+                  "title": "Pressure",
+                  "comment": "Water pressure tested at representative fixtures appears adequate (40-80 psi range).",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_sup_concealed",
+                  "title": "Concealed",
+                  "comment": "Plumbing within walls, ceilings, and below grade not directly inspected; only visible portions evaluated.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_sup_poly",
+                  "title": "Polybutylene",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Polybutylene supply piping observed; known for premature failure, recommend evaluation for replacement.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_sup_galv",
+                  "title": "Galvanized",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Galvanized supply piping observed showing corrosion/restriction; recommend replacement to restore water pressure.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "drain",
+            "label": "Drain / Waste / Vent",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_drain_ok",
+                  "title": "Operation",
+                  "comment": "Drains throughout home flow freely with no visible blockages.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_drain_sewer",
+                  "title": "Main sewer",
+                  "comment": "Sewer line condition unknown without video scope inspection.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_drain_slow",
+                  "title": "Slow drain",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Slow drain observed at one or more fixtures; recommend cleaning to prevent backup.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_drain_imp",
+                  "title": "Improper mods",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Improper plumbing modifications observed (incorrect slope, missing trap, improper venting); recommend correction by a licensed plumber.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "wh",
+            "label": "Water Heater",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_wh_ok",
+                  "title": "Operation",
+                  "comment": "Water heater operating normally with no visible leaks or corrosion at fittings.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_wh_age",
+                  "title": "Age estimate",
+                  "comment": "Manufacture date estimated from data plate; tank interior not inspectable.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_wh_eol",
+                  "title": "End of life",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Water heater nearing end of typical useful life (10-12 years); recommend planning for replacement.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_wh_tp",
+                  "title": "T&P discharge",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Water heater T&P relief valve discharge pipe is missing, improperly terminated, or undersized; recommend correction per code.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_wh_corr",
+                  "title": "Corrosion",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Water heater shows signs of corrosion or improper installation; recommend correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "fixtures",
+            "label": "Fixtures",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fix_ok",
+                  "title": "Operation",
+                  "comment": "Plumbing fixtures operate properly with no leaks observed.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fix_rep",
+                  "title": "Representative",
+                  "comment": "A representative sample of fixtures was operated.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fix_drip",
+                  "title": "Drip / leak",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Faucet shows minor drip when off; recommend washer or cartridge replacement.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fix_caulk",
+                  "title": "Caulk failed",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Caulking at tub/shower perimeter shows minor cracking; renew to prevent moisture intrusion.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "electrical",
+        "title": "Electrical",
+        "items": [
+          {
+            "id": "panel",
+            "label": "Service Panel",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_pan_ok",
+                  "title": "Condition",
+                  "comment": "Electrical panel appears properly installed with adequate amperage and labeled circuits.",
+                  "default": true
+                },
+                {
+                  "id": "ri_pan_label",
+                  "title": "Labeling",
+                  "comment": "Main panel labeling is clear and accurate.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_pan_load",
+                  "title": "Load test",
+                  "comment": "Panel was not load-tested; only visual inspection performed.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_pan_fpe",
+                  "title": "FPE Stab-Lok",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Federal Pacific Electric (FPE) Stab-Lok panel observed; known fire safety concerns, recommend evaluation/replacement by a licensed electrician.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_pan_zinsco",
+                  "title": "Zinsco / Sylvania",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Zinsco/Sylvania panel observed; known reliability issues, recommend evaluation by a licensed electrician.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_pan_double",
+                  "title": "Double-tap",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Double-tapped breakers observed (two wires on a breaker designed for one); recommend correction by a licensed electrician.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "wiring",
+            "label": "Visible Wiring",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_wire_ok",
+                  "title": "Methods",
+                  "comment": "Visible wiring methods appear appropriate for application and properly secured.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_wire_concealed",
+                  "title": "Concealed wiring",
+                  "comment": "Concealed wiring not evaluated; only readily accessible components inspected.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_wire_alum",
+                  "title": "Aluminum branch",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Aluminum branch wiring observed; recommend evaluation by a qualified electrician for COPALUM/AlumiConn pigtailing.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_wire_kt",
+                  "title": "Knob & tube",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Knob-and-tube wiring observed; recommend evaluation by an electrician — insurance and capacity concerns common.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_wire_open",
+                  "title": "Open splice",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Open electrical splices observed without junction box; recommend immediate correction for fire safety.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "outlets",
+            "label": "Outlets & Switches",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_out_ok",
+                  "title": "Polarity / ground",
+                  "comment": "Tested receptacles operate properly with correct polarity and grounding.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_out_rep",
+                  "title": "Representative",
+                  "comment": "A representative sample of receptacles was tested; not every outlet was checked.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_out_rev",
+                  "title": "Reverse polarity",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Reverse polarity observed at one or more outlets; recommend correction by a licensed electrician.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_out_open",
+                  "title": "Open ground",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Open ground observed at one or more three-prong outlets; recommend correction or update to GFCI with grounding label.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "gfci",
+            "label": "GFCI / AFCI Protection",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_gfci_ok",
+                  "title": "Where present",
+                  "comment": "GFCI protection present in required wet/outdoor locations.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_gfci_old",
+                  "title": "Older homes",
+                  "comment": "Pre-1973 wiring may not support GFCI/AFCI updates without rewiring.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_gfci_miss",
+                  "title": "GFCI missing",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "GFCI protection missing at kitchen, bathroom, garage, exterior, or other required wet locations; recommend installation per current code.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_afci_miss",
+                  "title": "AFCI missing",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "AFCI protection missing at bedroom circuits where required by current code; recommend update.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "smoke",
+            "label": "Smoke & CO Detectors",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_smk_ok",
+                  "title": "Present",
+                  "comment": "Smoke detectors present and tested in main living areas; CO detectors observed where required.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_smk_age",
+                  "title": "Age unknown",
+                  "comment": "Manufacture date inside detectors not always visible; replace per manufacturer schedule (10 years typical).",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_smk_miss",
+                  "title": "Smoke missing",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Smoke detectors absent in bedrooms or hallways; recommend installation per current code.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_co_miss",
+                  "title": "CO missing",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Carbon monoxide detectors absent in homes with attached garage or fuel-burning appliances; recommend installation.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "interior",
+        "title": "Interior",
+        "items": [
+          {
+            "id": "ceilings",
+            "label": "Ceilings & Walls",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_cw_ok",
+                  "title": "Condition",
+                  "comment": "Interior walls and ceilings appear in serviceable condition with no significant defects observed.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_cw_furn",
+                  "title": "Furniture",
+                  "comment": "Areas concealed by furniture or stored items not fully inspected.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_cw_stain",
+                  "title": "Active staining",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Active water staining observed on ceiling/walls indicating ongoing moisture intrusion; recommend identifying source.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_cw_mold",
+                  "title": "Mold-like growth",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Mold-like growth observed on interior surfaces; recommend evaluation by a qualified mold specialist.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "floors",
+            "label": "Floors",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fl_ok",
+                  "title": "Condition",
+                  "comment": "Floor coverings appear in good condition with no significant trip hazards.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fl_under",
+                  "title": "Subfloor",
+                  "comment": "Subfloor below floor coverings was not inspected.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fl_defl",
+                  "title": "Significant deflection",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Floor shows significant deflection or unevenness; recommend structural evaluation.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "stairs",
+            "label": "Stairways",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_st_ok",
+                  "title": "Code-conforming",
+                  "comment": "Stair handrails and guardrails meet code height and have appropriate baluster spacing.",
+                  "default": true
+                }
+              ],
+              "limitations": [],
+              "defects": [
+                {
+                  "id": "rd_st_rail",
+                  "title": "Rail issue",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Stair handrails or guardrails are missing, loose, or below code height; recommend correction for safety.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "fireplace",
+            "label": "Fireplace",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fp_ok",
+                  "title": "Visible condition",
+                  "comment": "Fireplace and visible firebox components appear serviceable.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fp_chim",
+                  "title": "Chimney internals",
+                  "comment": "Internal flue condition requires Level II chimney inspection by a certified sweep.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fp_damper",
+                  "title": "Damper",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Damper missing, stuck, or improperly seated; recommend repair before use.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "kitchen",
+        "title": "Kitchen",
+        "items": [
+          {
+            "id": "appliances",
+            "label": "Appliances",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_app_ok",
+                  "title": "Operation",
+                  "comment": "Kitchen appliances operated normally during inspection.",
+                  "default": true
+                },
+                {
+                  "id": "ri_app_at",
+                  "title": "Anti-tip",
+                  "comment": "Range/oven anti-tip bracket installed.",
+                  "default": false
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_app_cycle",
+                  "title": "Full cycle",
+                  "comment": "Built-in appliances operated through normal cycles; long-term performance not guaranteed.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_app_at",
+                  "title": "Anti-tip missing",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Range/oven anti-tip bracket missing; recommend installation for safety per manufacturer.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_app_dish",
+                  "title": "Dishwasher drain",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Improper dishwasher drain (no high loop or air gap) observed; recommend correction to prevent backflow.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "cabinets",
+            "label": "Cabinets & Countertops",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_cab_ok",
+                  "title": "Condition",
+                  "comment": "Cabinets and countertops appear in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_cab_cosm",
+                  "title": "Cosmetic",
+                  "comment": "Cosmetic conditions noted at the inspector's discretion.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_cab_loose",
+                  "title": "Loose hardware",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Loose hinges or pulls observed on one or more cabinets; recommend tightening.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "sink-k",
+            "label": "Sink & Faucet",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_sk_ok",
+                  "title": "Operation",
+                  "comment": "Kitchen plumbing fixtures operate properly with no leaks observed under sink.",
+                  "default": true
+                }
+              ],
+              "limitations": [],
+              "defects": [
+                {
+                  "id": "rd_sk_caulk",
+                  "title": "Caulking",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Caulking at sink rim shows wear; recommend renewal to prevent under-counter moisture.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "bathrooms",
+        "title": "Bathrooms",
+        "items": [
+          {
+            "id": "toilet",
+            "label": "Toilet",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_to_ok",
+                  "title": "Operation",
+                  "comment": "Toilets flush and refill properly with no visible leaks at base or supply lines.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_to_under",
+                  "title": "Subfloor",
+                  "comment": "Subfloor condition under toilet not directly inspectable without removal.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_to_rock",
+                  "title": "Rocks at base",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Toilet rocks at base or shows water stain on floor; recommend re-setting and inspection of subfloor.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_to_run",
+                  "title": "Running",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Toilet shows minor running between flushes; recommend flapper/fill valve replacement.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "tub",
+            "label": "Tub / Shower",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_tub_ok",
+                  "title": "Operation",
+                  "comment": "Tub and shower drain freely; no visible defects.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_tub_concealed",
+                  "title": "Behind walls",
+                  "comment": "Areas behind tub/shower walls not visible; concealed leakage cannot be ruled out.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_tub_caulk",
+                  "title": "Caulking",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Caulking at tub/shower perimeter shows minor cracking; renew to prevent moisture intrusion.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_tub_mem",
+                  "title": "Failed membrane",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Failed waterproof membrane suspected at shower; recommend evaluation by a qualified contractor.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "sink-b",
+            "label": "Sink & Vanity",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_sb_ok",
+                  "title": "Operation",
+                  "comment": "Bathroom sink and vanity operate properly with no active leaks.",
+                  "default": true
+                }
+              ],
+              "limitations": [],
+              "defects": [
+                {
+                  "id": "rd_sb_leak",
+                  "title": "Active leak",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Active leak observed under sink; recommend immediate repair.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "exhaust",
+            "label": "Exhaust Fan",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ex_ok",
+                  "title": "Vents to exterior",
+                  "comment": "Exhaust fan operates and vents to exterior.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ex_route",
+                  "title": "Concealed run",
+                  "comment": "Exhaust duct routing concealed within ceiling cavity not directly traced.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ex_attic",
+                  "title": "Vents to attic",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Exhaust fan does not vent to exterior or vents into attic; recommend correction to prevent moisture issues.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "attic",
+        "title": "Attic",
+        "items": [
+          {
+            "id": "insulation",
+            "label": "Insulation",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ins_ok",
+                  "title": "Type / depth",
+                  "comment": "Attic insulation appears appropriate type and depth for the climate zone.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ins_conceal",
+                  "title": "Concealment",
+                  "comment": "Insulation may conceal underlying defects in framing or wiring.",
+                  "default": true
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ins_low",
+                  "title": "Low R-value",
+                  "category": "maintenance",
+                  "location": "",
+                  "comment": "Insulation depth significantly below recommended R-value for climate zone; recommend supplemental insulation.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "ventilation",
+            "label": "Ventilation",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_vt_ok",
+                  "title": "Adequate",
+                  "comment": "Attic ventilation appears adequate with soffit and ridge venting present.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_vt_blocked",
+                  "title": "Blocked vents",
+                  "comment": "Some soffit vents may be blocked by insulation; baffles not always installed.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_vt_low",
+                  "title": "Insufficient",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Insufficient attic ventilation observed; recommend additional venting to prevent moisture and ice damming.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_vt_attic",
+                  "title": "Bath fan to attic",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Bath/kitchen exhaust fan vents directly into attic; recommend correction to prevent moisture damage.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "garage",
+        "title": "Garage",
+        "items": [
+          {
+            "id": "door",
+            "label": "Garage Door & Opener",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_dr_ok",
+                  "title": "Operation",
+                  "comment": "Garage door operates properly with functional safety reverse mechanism.",
+                  "default": true
+                }
+              ],
+              "limitations": [],
+              "defects": [
+                {
+                  "id": "rd_dr_rev",
+                  "title": "Reverse failed",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Garage door opener safety reverse mechanism failed test; recommend immediate adjustment or replacement.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "firewall",
+            "label": "Firewall",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fw_ok",
+                  "title": "Intact",
+                  "comment": "Fire-rated separation between garage and dwelling appears intact.",
+                  "default": true
+                }
+              ],
+              "limitations": [],
+              "defects": [
+                {
+                  "id": "rd_fw_door",
+                  "title": "Self-close door",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Door from garage to dwelling is not self-closing or lacks proper fire rating; recommend correction for safety.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fw_pen",
+                  "title": "Penetrations",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Penetrations in fire-rated wall between garage and dwelling not properly sealed; recommend correction with fire-rated sealant.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary",
+        "title": "Summary",
+        "items": [
+          {
+            "id": "overall",
+            "label": "Overall Condition Notes",
+            "type": "text"
+          }
+        ]
+      }
+    ]
+  }
+}

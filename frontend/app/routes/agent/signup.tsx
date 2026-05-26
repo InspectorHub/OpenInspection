@@ -1,0 +1,208 @@
+import { useState } from "react";
+import { Form, Link, useActionData } from "react-router";
+import type { Route } from "./+types/signup";
+import { apiFetch } from "~/lib/api.server";
+
+export function meta() {
+  return [{ title: "Become a partner agent - OpenInspection" }];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Action                                                             */
+/* ------------------------------------------------------------------ */
+
+export async function action({ request }: Route.ActionArgs) {
+  const fd = await request.formData();
+  const body = {
+    name: fd.get("name"),
+    email: fd.get("email"),
+    password: fd.get("password"),
+    turnstileToken: fd.get("cf-turnstile-response") || undefined,
+  };
+
+  const res = await apiFetch("/api/agent-signup", {
+    method: "POST",
+    body: JSON.stringify(body),
+    csrf: true,
+  });
+
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || !(json as Record<string, unknown>).success) {
+    const err = json.error as Record<string, string> | undefined;
+    if (err?.code === "conflict") {
+      return { error: "That email is already registered. Sign in instead.", redirect: null };
+    }
+    return { error: err?.message || "Could not create account", redirect: null };
+  }
+
+  const data = json.data as Record<string, string> | undefined;
+  return { error: null, redirect: data?.redirect || "/agent-dashboard" };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Value proposition items                                            */
+/* ------------------------------------------------------------------ */
+
+const VALUE_PROPS = [
+  {
+    num: "1",
+    bold: "See every referred inspection.",
+    text: "One dashboard, every inspector you work with.",
+  },
+  {
+    num: "2",
+    bold: "Subscribe to availability.",
+    text: "Calendar feeds keep the dates your inspectors are open in your own calendar app.",
+  },
+  {
+    num: "3",
+    bold: "Free forever.",
+    text: "No fees, no card on file. Your inspectors pay for the platform.",
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
+
+export default function AgentSignupPage() {
+  const actionData = useActionData<typeof action>();
+  const [submitting, setSubmitting] = useState(false);
+
+  // Client-side redirect after successful action
+  if (typeof window !== "undefined" && actionData?.redirect) {
+    window.location.href = actionData.redirect;
+  }
+
+  return (
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
+      {/* Left: editorial value-prop */}
+      <aside className="relative flex flex-col justify-center px-8 py-12 lg:px-12 bg-slate-900 text-white overflow-hidden">
+        <div className="absolute w-[480px] h-[480px] -right-[120px] -top-[160px] bg-ih-primary blur-[140px] opacity-35 pointer-events-none" />
+        <div className="relative z-10 max-w-[460px] mx-auto">
+          <div className="flex items-center gap-3 mb-12">
+            <img src="/logo.svg" alt="" className="w-8 h-8" />
+            <span className="font-serif font-bold text-lg tracking-tight">
+              OpenInspection
+            </span>
+          </div>
+          <h1 className="font-serif font-bold text-[2.75rem] leading-[1.05] tracking-tight mb-5">
+            Become a partner agent
+          </h1>
+          <p className="text-base leading-relaxed text-stone-300 mb-8">
+            The free way for real-estate agents to track every inspection
+            their inspectors completed for clients they referred.
+          </p>
+          <ul className="space-y-0">
+            {VALUE_PROPS.map((v) => (
+              <li
+                key={v.num}
+                className="flex gap-3.5 py-4 border-t border-white/[0.08] last:border-b"
+              >
+                <span className="w-7 h-7 rounded-full bg-ih-primary text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  {v.num}
+                </span>
+                <span className="text-[15px] leading-relaxed text-stone-200">
+                  <strong className="text-white font-semibold">{v.bold}</strong>{" "}
+                  {v.text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+
+      {/* Right: form */}
+      <section className="flex flex-col justify-center px-8 py-12 lg:px-12 bg-ih-bg-card">
+        <div className="max-w-[420px] w-full mx-auto">
+          <h2 className="text-2xl font-bold tracking-tight mb-2 text-ih-fg-1">
+            Create your free account
+          </h2>
+          <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-8">
+            Takes about a minute. Already invited? Use the link in your email
+            instead -- it pre-fills the right tenant.
+          </p>
+
+          <Form method="post" autoComplete="off" onSubmit={() => setSubmitting(true)}>
+            <div className="space-y-5">
+              <div>
+                <label
+                  htmlFor="name"
+                  className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
+                >
+                  Full name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  placeholder="Jane Smith"
+                  required
+                  minLength={2}
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
+                >
+                  Work email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  placeholder="jane@realty.com"
+                  required
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
+                >
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  placeholder="At least 12 characters"
+                  required
+                  minLength={12}
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            >
+              {submitting ? "Creating account..." : "Create account"}
+            </button>
+
+            {actionData?.error && (
+              <div className="mt-4 px-4 py-3 rounded-lg bg-ih-bad-bg border border-ih-bad text-[14px] text-ih-bad-fg">
+                {actionData.error}
+              </div>
+            )}
+          </Form>
+
+          <p className="mt-6 text-[14px] text-ih-fg-3 text-center">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-ih-primary font-medium hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}

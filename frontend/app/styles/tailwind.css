@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Design System 0523 — Token Layer
+   Single source of truth for all colors, spacing, type, shadows.
+   Components use `bg-ih-primary`, `text-ih-fg-1`, etc.
+   Dark mode: CSS var swap on html[data-color-scheme="dark"].
+   ============================================================ */
+
+@theme {
+  /* ── Primary palette ── */
+  --color-ih-primary: var(--ih-primary);
+  --color-ih-primary-600: var(--ih-primary-600);
+  --color-ih-primary-700: var(--ih-primary-700);
+  --color-ih-primary-tint: var(--ih-primary-tint);
+  --color-ih-primary-glow: var(--ih-primary-glow);
+
+  /* ── Foreground / text ── */
+  --color-ih-fg-1: var(--ih-fg-1);
+  --color-ih-fg-2: var(--ih-fg-2);
+  --color-ih-fg-3: var(--ih-fg-3);
+  --color-ih-fg-4: var(--ih-fg-4);
+  --color-ih-fg-5: var(--ih-fg-5);
+  --color-ih-fg-inverse: var(--ih-fg-inverse);
+
+  /* ── Background / surface ── */
+  --color-ih-bg-app: var(--ih-bg-app);
+  --color-ih-bg-card: var(--ih-bg-card);
+  --color-ih-bg-muted: var(--ih-bg-muted);
+  --color-ih-bg-inverse: var(--ih-bg-inverse);
+
+  /* ── Status / semantic ── */
+  --color-ih-ok: var(--ih-status-ok);
+  --color-ih-ok-bg: var(--ih-status-ok-bg);
+  --color-ih-ok-fg: var(--ih-status-ok-fg);
+  --color-ih-watch: var(--ih-status-watch);
+  --color-ih-watch-bg: var(--ih-status-watch-bg);
+  --color-ih-watch-fg: var(--ih-status-watch-fg);
+  --color-ih-bad: var(--ih-status-bad);
+  --color-ih-bad-bg: var(--ih-status-bad-bg);
+  --color-ih-bad-fg: var(--ih-status-bad-fg);
+
+  /* ── Borders / shadows ── */
+  --color-ih-border: var(--ih-border-color, #e2e8f0);
+  --color-ih-border-strong: var(--ih-border-strong-color, #cbd5e1);
+
+  /* ── Layout ── */
+  --width-sidebar: 200px;
+  --width-sidebar-collapsed: 56px;
+
+  /* ── Shadows ── */
+  --shadow-ih-card: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-ih-popover: 0 8px 32px rgba(15, 23, 42, 0.12);
+  --shadow-ih-focus: 0 0 0 3px var(--ih-primary-glow);
+
+  /* ── Font families ── */
+  --font-ih-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
+  --font-ih-body: "Inter", system-ui, sans-serif;
+  --font-ih-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* ── CSS custom properties: light mode (default) ── */
+:root {
+  --ih-primary: #6366f1;
+  --ih-primary-600: #4f46e5;
+  --ih-primary-700: #4338ca;
+  --ih-primary-tint: rgba(99, 102, 241, 0.10);
+  --ih-primary-glow: rgba(99, 102, 241, 0.25);
+
+  --ih-fg-1: #0f172a;
+  --ih-fg-2: #475569;
+  --ih-fg-3: #64748b;
+  --ih-fg-4: #94a3b8;
+  --ih-fg-5: #cbd5e1;
+  --ih-fg-inverse: #fff;
+
+  --ih-bg-app: #f8fafc;
+  --ih-bg-card: #fff;
+  --ih-bg-muted: #f1f5f9;
+  --ih-bg-inverse: #0f172a;
+
+  --ih-status-ok: #10b981;
+  --ih-status-ok-bg: #ecfdf5;
+  --ih-status-ok-fg: #047857;
+  --ih-status-watch: #f59e0b;
+  --ih-status-watch-bg: #fffbeb;
+  --ih-status-watch-fg: #b45309;
+  --ih-status-bad: #ef4444;
+  --ih-status-bad-bg: #fef2f2;
+  --ih-status-bad-fg: #be123c;
+
+  --ih-border-color: #e2e8f0;
+  --ih-border-strong-color: #cbd5e1;
+}
+
+/* ── Dark mode ── */
+html[data-color-scheme="dark"], .dark {
+  --ih-primary: #818cf8;
+  --ih-primary-600: #6366f1;
+  --ih-primary-700: #4f46e5;
+  --ih-primary-tint: rgba(129, 140, 248, 0.10);
+  --ih-primary-glow: rgba(129, 140, 248, 0.25);
+
+  --ih-fg-1: #f1f5f9;
+  --ih-fg-2: #cbd5e1;
+  --ih-fg-3: #94a3b8;
+  --ih-fg-4: #64748b;
+  --ih-fg-5: #334155;
+  --ih-fg-inverse: #0f172a;
+
+  --ih-bg-app: #0f172a;
+  --ih-bg-card: #1e293b;
+  --ih-bg-muted: #1e293b;
+  --ih-bg-inverse: #f8fafc;
+
+  --ih-status-ok-bg: rgba(16, 185, 129, 0.10);
+  --ih-status-ok-fg: #34d399;
+  --ih-status-watch-bg: rgba(245, 158, 11, 0.10);
+  --ih-status-watch-fg: #fbbf24;
+  --ih-status-bad-bg: rgba(239, 68, 68, 0.10);
+  --ih-status-bad-fg: #f87171;
+
+  --ih-border-color: #334155;
+  --ih-border-strong-color: #475569;
+}
+
+/* ── Utility classes from Design System §1.6 ── */
+.ih-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ih-fg-4);
+}
+
+.ih-input {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--ih-border-color);
+  background: var(--ih-bg-card);
+  color: var(--ih-fg-1);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.ih-input:focus {
+  border-color: var(--ih-primary);
+  box-shadow: var(--shadow-ih-focus);
+}
+
+.ih-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--ih-bg-muted);
+  border: 1px solid var(--ih-border-color);
+  font-family: var(--font-ih-mono);
+  font-size: 11px;
+  color: var(--ih-fg-3);
+}
+
+.ih-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ih-pill--sat { background: var(--ih-status-ok-bg); color: var(--ih-status-ok-fg); }
+.ih-pill--monitor { background: var(--ih-status-watch-bg); color: var(--ih-status-watch-fg); }
+.ih-pill--defect { background: var(--ih-status-bad-bg); color: var(--ih-status-bad-fg); }
+.ih-pill--ni { background: var(--ih-bg-muted); color: var(--ih-fg-3); }
+
+/* ── Row hover-reveal pattern §3.6 ── */
+.ih-row .ih-row__hover { opacity: 0; transition: opacity 140ms; }
+.ih-row:hover .ih-row__hover,
+.ih-row.is-active .ih-row__hover { opacity: 1; }
+
+/* ── Sidebar layout ── */
+.ih-sidebar {
+  width: var(--width-sidebar);
+  flex-shrink: 0;
+  transition: width 200ms ease-out;
+}
+html[data-sidebar-collapsed="1"] .ih-sidebar { width: var(--width-sidebar-collapsed); }
