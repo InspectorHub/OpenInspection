@@ -31,7 +31,7 @@
     "db:migrate": "npx wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "npx wrangler d1 migrations apply DB --remote",
     "test:unit": "vitest run --config api/vitest.config.ts",
-    "type-check": "npx -p typescript tsc --noEmit",
+    "type-check": "npx -p typescript tsc --noEmit -p api/tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "security-scan": "npm audit --audit-level=high",

@@ -1,8 +1,11 @@
 {
-  "src/**/*.{ts,tsx}": [
+  "api/src/**/*.{ts,tsx}": [
     "eslint --fix"
   ],
-  "src/**/*.css": [
-    "prettier --write"
+  "frontend/app/**/*.{ts,tsx}": [
+    "eslint --fix"
+  ],
+  "packages/**/*.{ts,tsx}": [
+    "eslint --fix"
   ]
 }
