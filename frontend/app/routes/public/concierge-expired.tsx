@@ -37,15 +37,15 @@ export default function ConciergeExpiredPage() {
         : "It looks like the link is incomplete. Use the original email and try again, or contact your agent.";
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-slate-900">
-      <main className="max-w-[480px] w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-9">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-card">
+      <main className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-9">
         <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 text-[#F55A1A] flex items-center justify-center text-2xl font-bold mb-4">
           !
         </div>
-        <h1 className="font-serif text-2xl font-bold leading-tight mb-2.5 text-slate-900 dark:text-slate-100">
+        <h1 className="font-serif text-2xl font-bold leading-tight mb-2.5 text-ih-fg-1">
           {headline}
         </h1>
-        <p className="text-[15px] text-slate-500 dark:text-slate-400 leading-relaxed">
+        <p className="text-[15px] text-ih-fg-3 leading-relaxed">
           {body}
         </p>
       </main>

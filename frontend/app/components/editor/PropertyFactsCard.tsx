@@ -96,27 +96,27 @@ export function PropertyFactsCard({ inspectionId, initialFacts, onSaved }: Prope
     }
   }
 
-  const inputClass = "mt-1 w-full h-10 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-[14px] font-medium tabular-nums focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 text-slate-900 dark:text-slate-100";
-  const labelClass = "text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400";
+  const inputClass = "mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[14px] font-medium tabular-nums focus:border-indigo-500 focus:shadow-ih-focus outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 text-ih-fg-1";
+  const labelClass = "text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3";
 
   return (
     <fieldset className="space-y-4" data-testid="property-facts-card">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <legend className="text-[16px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">Property facts</legend>
-          <p className="text-[12px] text-slate-500 dark:text-slate-400">Surfaced as a banner on the published report. Leave blank for fields you didn't capture.</p>
+          <legend className="text-[16px] font-semibold tracking-tight text-ih-fg-1">Property facts</legend>
+          <p className="text-[12px] text-ih-fg-3">Surfaced as a banner on the published report. Leave blank for fields you didn't capture.</p>
         </div>
-        <button type="button" onClick={autofillFromAddress} disabled={autofillState === "pending"} className="h-8 px-3 rounded-md bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[12px] font-bold ring-1 ring-inset ring-indigo-200 dark:ring-indigo-800 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-wait inline-flex items-center gap-1.5" data-testid="property-facts-autofill">
+        <button type="button" onClick={autofillFromAddress} disabled={autofillState === "pending"} className="h-8 px-3 rounded-md bg-ih-primary-tint text-ih-primary text-[12px] font-bold ring-1 ring-inset ring-ih-primary-tint hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-wait inline-flex items-center gap-1.5" data-testid="property-facts-autofill">
           {autofillState === "pending" ? "Fetching..." : "Auto-fill from address"}
         </button>
       </div>
 
       {autofillMessage && (
         <p className={`text-[12px] px-3 py-2 rounded-md ring-1 ring-inset ${
-          autofillState === "success" ? "text-emerald-700 bg-emerald-50 ring-emerald-200" :
+          autofillState === "success" ? "text-ih-ok-fg bg-ih-ok-bg ring-emerald-200" :
           autofillState === "no_key" ? "text-slate-700 bg-slate-50 ring-slate-200" :
-          autofillState === "not_found" ? "text-amber-700 bg-amber-50 ring-amber-200" :
-          "text-rose-700 bg-rose-50 ring-rose-200"
+          autofillState === "not_found" ? "text-ih-watch-fg bg-ih-watch-bg ring-amber-200" :
+          "text-ih-bad-fg bg-ih-bad-bg ring-rose-200"
         }`} data-testid="property-facts-autofill-message">{autofillMessage}</p>
       )}
 
@@ -150,9 +150,9 @@ export function PropertyFactsCard({ inspectionId, initialFacts, onSaved }: Prope
       </div>
 
       <div className="text-[12px]" aria-live="polite">
-        {saveState === "saving" && <span className="text-amber-600 font-bold">Saving...</span>}
-        {saveState === "saved" && <span className="text-emerald-600 font-bold">Saved</span>}
-        {saveState === "error" && <span className="text-rose-600 font-bold">Couldn't save -- try again</span>}
+        {saveState === "saving" && <span className="text-ih-watch-fg font-bold">Saving...</span>}
+        {saveState === "saved" && <span className="text-ih-ok-fg font-bold">Saved</span>}
+        {saveState === "error" && <span className="text-ih-bad-fg font-bold">Couldn't save -- try again</span>}
       </div>
     </fieldset>
   );

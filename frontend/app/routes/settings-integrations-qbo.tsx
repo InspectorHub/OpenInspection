@@ -76,33 +76,33 @@ export default function SettingsIntegrationsQbo() {
 
   return (
     <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
         <Link
           to="/settings"
-          className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          className="hover:text-ih-primary transition-colors"
         >
           Settings
         </Link>
         <span>&rsaquo;</span>
         <Link
           to="/settings/integrations"
-          className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          className="hover:text-ih-primary transition-colors"
         >
           Integrations
         </Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">
+        <span className="text-ih-fg-1">
           QuickBooks Online
         </span>
       </div>
 
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">
+      <h2 className="text-[19px] font-bold text-ih-fg-1">
         QuickBooks Online
       </h2>
 
       {/* Expiry warning */}
       {connected && expiryWarning && (
-        <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 text-[13px]">
+        <div className="flex items-start gap-3 p-4 bg-ih-watch-bg border border-ih-watch-fg/20 rounded-lg text-ih-watch-fg text-[13px]">
           <svg
             className="w-5 h-5 flex-shrink-0 mt-0.5"
             fill="none"
@@ -127,14 +127,14 @@ export default function SettingsIntegrationsQbo() {
 
       {/* Not connected */}
       {!connected && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-8 text-center">
+        <div className="bg-ih-bg-card border border-ih-border rounded-lg p-8 text-center">
           <div className="w-16 h-16 bg-[#2CA01C]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-[#2CA01C] text-2xl font-extrabold">QB</span>
           </div>
-          <h3 className="text-[16px] font-bold text-slate-900 dark:text-slate-100 mb-2">
+          <h3 className="text-[16px] font-bold text-ih-fg-1 mb-2">
             Connect QuickBooks Online
           </h3>
-          <ul className="text-[13px] text-slate-600 dark:text-slate-400 text-left max-w-xs mx-auto mb-6 space-y-2">
+          <ul className="text-[13px] text-ih-fg-3 text-left max-w-xs mx-auto mb-6 space-y-2">
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">&#x2713;</span> Real-time
               invoice sync
@@ -165,29 +165,29 @@ export default function SettingsIntegrationsQbo() {
       {connected && (
         <div className="space-y-4">
           {/* Status card */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+          <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="font-bold text-[14px] text-slate-900 dark:text-slate-100">
+                <p className="font-bold text-[14px] text-ih-fg-1">
                   {status.companyName ?? "Connected"}
                 </p>
-                <p className="text-[12px] text-slate-500 mt-0.5">
+                <p className="text-[12px] text-ih-fg-3 mt-0.5">
                   Last synced: {timeSince(status.lastSyncAt)}
                 </p>
               </div>
               <span
                 className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                  status.syncEnabled
-                    ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
-                }`}
+ status.syncEnabled
+ ? "bg-ih-ok-bg text-ih-ok-fg"
+ : "bg-ih-bg-muted text-ih-fg-3"
+ }`}
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
-                    status.syncEnabled
-                      ? "bg-emerald-500"
-                      : "bg-slate-400"
-                  }`}
+ status.syncEnabled
+ ? "bg-emerald-500"
+ : "bg-slate-400"
+ }`}
                 />
                 {status.syncEnabled ? "Active" : "Paused"}
               </span>
@@ -196,19 +196,19 @@ export default function SettingsIntegrationsQbo() {
               <button
                 onClick={triggerSync}
                 disabled={syncing}
-                className="px-4 py-2 text-[12px] font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50"
               >
                 {syncing ? "Syncing..." : "Sync Now"}
               </button>
               <button
                 onClick={togglePause}
-                className="px-4 py-2 text-[12px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                className="px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors"
               >
                 {status.syncEnabled ? "Pause Sync" : "Resume Sync"}
               </button>
               <button
                 onClick={disconnect}
-                className="px-4 py-2 text-[12px] font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                className="px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors"
               >
                 Disconnect
               </button>
@@ -217,10 +217,10 @@ export default function SettingsIntegrationsQbo() {
 
           {/* Sync errors */}
           {(status.openErrors ?? 0) > 0 && (
-            <div className="bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 rounded-lg p-6">
-              <h3 className="font-bold text-[14px] text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
+            <div className="bg-ih-bg-card border border-ih-bad rounded-lg p-6">
+              <h3 className="font-bold text-[14px] text-ih-fg-1 mb-2 flex items-center gap-2">
                 <svg
-                  className="w-4 h-4 text-red-500"
+                  className="w-4 h-4 text-ih-bad-fg"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -234,7 +234,7 @@ export default function SettingsIntegrationsQbo() {
                 </svg>
                 Sync Errors ({status.openErrors})
               </h3>
-              <p className="text-[12px] text-slate-500">
+              <p className="text-[12px] text-ih-fg-3">
                 Check the sync error log for details. Errors will retry
                 automatically on the next sync.
               </p>

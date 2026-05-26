@@ -82,7 +82,7 @@ export default function ReportGatePage() {
   if (error || !gate) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-slate-500">Report not found.</p>
+        <p className="text-ih-fg-3">Report not found.</p>
       </div>
     );
   }
@@ -103,37 +103,37 @@ export default function ReportGatePage() {
   const hasContact = !!(gate.inspectorEmail || gate.inspectorPhone || gate.inspectorLicense);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900">
-      <div className="max-w-[480px] w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-8 shadow-sm">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-app">
+      <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-8 shadow-sm">
         {/* Pill */}
-        <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-semibold tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 mb-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+        <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-semibold tracking-wide bg-ih-watch-bg text-ih-watch-fg mb-4">
+          <span className="w-1.5 h-1.5 rounded-full bg-ih-watch-bg0 animate-pulse" />
           {title}
         </span>
 
-        <h1 className="font-serif text-[26px] font-semibold tracking-tight leading-tight mb-2 text-slate-900 dark:text-slate-100">
+        <h1 className="font-serif text-[26px] font-semibold tracking-tight leading-tight mb-2 text-ih-fg-1">
           Your report is almost ready.
         </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+        <p className="text-sm text-ih-fg-3 leading-relaxed mb-6">
           {message}
         </p>
 
         {/* Meta card */}
         {(formattedAmount || gate.propertyAddress || gate.inspectorName || formattedDate || hasContact) && (
-          <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4 mb-6 text-[13px] text-slate-500 dark:text-slate-400">
+          <div className="bg-slate-50 dark:bg-slate-700/50 border border-ih-border rounded-lg p-4 mb-6 text-[13px] text-ih-fg-3">
             {formattedAmount && (
-              <div className="flex justify-between items-baseline pb-3 mb-3 border-b border-slate-200 dark:border-slate-600">
-                <span className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              <div className="flex justify-between items-baseline pb-3 mb-3 border-b border-ih-border">
+                <span className="text-[11px] uppercase tracking-wide text-ih-fg-4">
                   Amount due
                 </span>
-                <span className="font-serif text-[22px] font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+                <span className="font-serif text-[22px] font-semibold text-ih-fg-1 tracking-tight">
                   {formattedAmount}
                 </span>
               </div>
             )}
             {gate.propertyAddress && (
               <MetaRow label="Property">
-                <strong className="text-slate-900 dark:text-slate-100 font-semibold">
+                <strong className="text-ih-fg-1 font-semibold">
                   {gate.propertyAddress}
                 </strong>
               </MetaRow>
@@ -141,13 +141,13 @@ export default function ReportGatePage() {
             {formattedDate && <MetaRow label="Scheduled">{formattedDate}</MetaRow>}
             {gate.inspectorName && <MetaRow label="Inspector">{gate.inspectorName}</MetaRow>}
             {hasContact && (gate.propertyAddress || gate.inspectorName || formattedDate) && (
-              <div className="h-px bg-slate-200 dark:bg-slate-600 my-3" />
+              <div className="h-px bg-ih-bg-muted my-3" />
             )}
             {gate.inspectorEmail && (
               <MetaRow label="Email">
                 <a
                   href={`mailto:${gate.inspectorEmail}`}
-                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-ih-primary hover:underline"
                 >
                   {gate.inspectorEmail}
                 </a>
@@ -157,7 +157,7 @@ export default function ReportGatePage() {
               <MetaRow label="Phone">
                 <a
                   href={`tel:${gate.inspectorPhone}`}
-                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-ih-primary hover:underline"
                 >
                   {gate.inspectorPhone}
                 </a>
@@ -180,7 +180,7 @@ export default function ReportGatePage() {
 
         {/* Trust footer */}
         {gate.reason === "payment" ? (
-          <div className="flex items-center justify-center gap-1.5 mt-5 text-[11px] text-slate-400 dark:text-slate-500">
+          <div className="flex items-center justify-center gap-1.5 mt-5 text-[11px] text-ih-fg-4">
             <svg
               className="w-3 h-3"
               viewBox="0 0 16 16"
@@ -194,7 +194,7 @@ export default function ReportGatePage() {
             Secured by Stripe &middot; {gate.companyName}
           </div>
         ) : (
-          <div className="mt-5 text-center text-[11px] text-slate-400 dark:text-slate-500">
+          <div className="mt-5 text-center text-[11px] text-ih-fg-4">
             {gate.companyName}
           </div>
         )}
@@ -216,10 +216,10 @@ function MetaRow({
 }) {
   return (
     <div className="flex gap-2 items-baseline mt-1.5 first:mt-0">
-      <span className="flex-none w-[80px] text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+      <span className="flex-none w-[80px] text-[11px] uppercase tracking-wide text-ih-fg-4">
         {label}
       </span>
-      <span className="text-slate-900 dark:text-slate-100">{children}</span>
+      <span className="text-ih-fg-1">{children}</span>
     </div>
   );
 }

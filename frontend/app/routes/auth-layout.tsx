@@ -14,8 +14,8 @@ export default function AuthLayout() {
       <MobileHeader />
       <div className="flex min-h-screen">
         <Sidebar />
-        <main className="flex-1 w-full bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto">
-          <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-6 sm:px-9">
+        <main className="flex-1 w-full bg-ih-bg-app overflow-y-auto">
+          <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9">
             <Outlet />
           </div>
         </main>

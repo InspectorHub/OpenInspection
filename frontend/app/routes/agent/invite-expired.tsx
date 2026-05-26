@@ -85,31 +85,31 @@ export default function AgentInviteExpiredPage() {
   const inspector = inviterName || "the inspector who invited you";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900 p-6">
-      <div className="max-w-[480px] w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-10 text-center">
-        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded-full text-xs font-semibold uppercase tracking-wide mb-5">
+    <div className="min-h-screen flex items-center justify-center bg-ih-bg-card p-6">
+      <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-2xl p-10 text-center">
+        <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-ih-watch-bg text-ih-watch-fg rounded-full text-xs font-semibold uppercase tracking-wide mb-5">
           Invite needs a refresh
         </span>
 
-        <h1 className="font-serif font-bold text-[1.75rem] leading-tight tracking-tight mb-3 text-slate-900 dark:text-slate-100">
+        <h1 className="font-serif font-bold text-[1.75rem] leading-tight tracking-tight mb-3 text-ih-fg-1">
           {getHeadline(reason)}
         </h1>
 
-        <p className="text-[15px] text-slate-500 dark:text-slate-400 leading-relaxed mb-7">
+        <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-7">
           {getExplainer(reason)}
         </p>
 
         {mailto ? (
           <a
             href={mailto}
-            className="inline-block px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl text-[15px] hover:opacity-90 transition-opacity"
+            className="inline-block px-6 py-3 bg-ih-primary text-white font-semibold rounded-xl text-[15px] hover:opacity-90 transition-opacity"
           >
             Ask {inspector} for a new invite
           </a>
         ) : (
           <Link
             to="/agent-signup"
-            className="inline-block px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl text-[15px] hover:opacity-90 transition-opacity"
+            className="inline-block px-6 py-3 bg-ih-primary text-white font-semibold rounded-xl text-[15px] hover:opacity-90 transition-opacity"
           >
             Sign up directly instead
           </Link>
@@ -117,7 +117,7 @@ export default function AgentInviteExpiredPage() {
 
         <Link
           to="/agent-signup"
-          className="block mt-5 text-[14px] text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          className="block mt-5 text-[14px] text-ih-fg-4 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
         >
           Or sign up directly without an invite
         </Link>

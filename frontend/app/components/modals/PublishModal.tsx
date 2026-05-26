@@ -89,18 +89,18 @@ export function PublishModal({ open, onClose, inspectionId, onPublished }: Publi
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Publish Report</h2>
+      <div className="max-w-md w-full bg-ih-bg-card rounded-xl shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-ih-border">
+          <h2 className="text-xl font-bold text-ih-fg-1">Publish Report</h2>
         </div>
 
         <div className="p-6 space-y-4">
-          {loading && <div className="text-center py-8 text-sm text-slate-500" data-test="publish-loading">Loading recipients...</div>}
+          {loading && <div className="text-center py-8 text-sm text-ih-fg-3" data-test="publish-loading">Loading recipients...</div>}
 
           {!loading && recipients.length === 0 && (
             <div className="text-center py-8" data-test="publish-empty-state">
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">There aren't any contacts to publish to.</p>
-              <p className="text-xs text-slate-500 mt-2">Add a client email/phone or link an agent under Settings to enable publish.</p>
+              <p className="text-sm font-semibold text-ih-fg-3">There aren't any contacts to publish to.</p>
+              <p className="text-xs text-ih-fg-3 mt-2">Add a client email/phone or link an agent under Settings to enable publish.</p>
             </div>
           )}
 
@@ -108,18 +108,18 @@ export function PublishModal({ open, onClose, inspectionId, onPublished }: Publi
             <>
               {publishedVersion > 0 && (
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 block">What changed in v{publishedVersion + 1}?</label>
-                  <textarea rows={3} maxLength={500} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Optional — visible to the customer" className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100" />
+                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 block">What changed in v{publishedVersion + 1}?</label>
+                  <textarea rows={3} maxLength={500} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Optional — visible to the customer" className="w-full rounded-xl border border-ih-border bg-ih-bg-card px-3 py-2 text-sm text-ih-fg-1" />
                 </div>
               )}
 
               <div className="space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Send a copy of</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Send a copy of</div>
                 <div className="flex gap-2" data-test="publish-payload-radio">
                   {(["report", "agreement"] as const).map((opt) => (
                     <label key={opt} className="flex-1 cursor-pointer">
                       <input type="radio" value={opt} checked={payload === opt} onChange={() => setPayload(opt)} className="peer sr-only" />
-                      <div className={`px-3 py-2 rounded-xl border text-sm font-semibold text-center transition-all ${payload === opt ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-600" : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>
+                      <div className={`px-3 py-2 rounded-xl border text-sm font-semibold text-center transition-all ${payload === opt ? "bg-ih-primary-tint text-ih-primary border-ih-primary-tint" : "border-ih-border text-ih-fg-3"}`}>
                         The {opt}
                       </div>
                     </label>
@@ -128,23 +128,23 @@ export function PublishModal({ open, onClose, inspectionId, onPublished }: Publi
               </div>
 
               <div className="space-y-2" data-test="publish-recipient-list">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-1 text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">
                   <span>Recipient</span>
                   <span className="w-12 text-center">Email</span>
                   <span className="w-12 text-center">Text</span>
                 </div>
                 {recipients.map((r, idx) => (
-                  <div key={`${r.contactId}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/40">
+                  <div key={`${r.contactId}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center px-3 py-2 rounded-xl border border-ih-border bg-slate-50 dark:bg-slate-700/40">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold truncate text-slate-900 dark:text-slate-100">{r.name}</span>
+                        <span className="text-sm font-semibold truncate text-ih-fg-1">{r.name}</span>
                         {ROLE_CHIP[r.role] && (
                           <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full whitespace-nowrap" style={{ background: ROLE_CHIP[r.role].bg, color: ROLE_CHIP[r.role].fg }}>
                             {ROLE_CHIP[r.role].label}
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] mt-0.5 truncate text-slate-500 dark:text-slate-400">
+                      <div className="text-[11px] mt-0.5 truncate text-ih-fg-3">
                         {r.email}{r.email && r.phone ? " · " : ""}{r.phone}
                       </div>
                     </div>
@@ -161,10 +161,10 @@ export function PublishModal({ open, onClose, inspectionId, onPublished }: Publi
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex gap-2">
-          <button onClick={onClose} className="flex-1 h-10 px-4 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600">Cancel</button>
+        <div className="px-6 py-4 border-t border-ih-border flex gap-2">
+          <button onClick={onClose} className="flex-1 h-10 px-4 text-sm font-semibold rounded-xl border border-ih-border bg-ih-bg-card text-ih-fg-3 hover:bg-ih-bg-muted">Cancel</button>
           {recipients.length > 0 && (
-            <button onClick={handlePublish} disabled={publishing || selectedCount === 0} className="flex-1 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40" data-test="publish-send-all">
+            <button onClick={handlePublish} disabled={publishing || selectedCount === 0} className="flex-1 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-ih-primary hover:bg-ih-primary-600 disabled:opacity-40" data-test="publish-send-all">
               {publishing ? "Sending..." : "Send All"}
             </button>
           )}

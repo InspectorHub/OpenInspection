@@ -36,8 +36,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 const GROUP_META = [
-  { key: "safety" as const, label: "Safety", color: "text-red-700 dark:text-red-400" },
-  { key: "recommendation" as const, label: "Recommendation", color: "text-amber-700 dark:text-amber-400" },
+  { key: "safety" as const, label: "Safety", color: "text-ih-bad-fg" },
+  { key: "recommendation" as const, label: "Recommendation", color: "text-ih-watch-fg" },
   { key: "maintenance" as const, label: "Maintenance", color: "text-blue-700 dark:text-blue-400" },
 ];
 
@@ -50,14 +50,14 @@ export default function AgentRecommendationsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white">Recommendations</h1>
-          <p className="text-[14px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[14px] text-ih-fg-3 mt-1">
             Every defect flagged in delivered inspection reports, grouped by category.
             {total > 0 && ` ${total} total items.`}
           </p>
         </div>
         <button
           onClick={() => window.print()}
-          className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors shrink-0"
+          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors shrink-0"
         >
           Print as PDF
         </button>
@@ -66,7 +66,7 @@ export default function AgentRecommendationsPage() {
       {GROUP_META.map(({ key, label, color }) => {
         const items = groups[key];
         return (
-          <section key={key} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
+          <section key={key} className="bg-ih-bg-card border border-ih-border rounded-xl p-5">
             <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-700">
               <h2 className={`text-lg font-bold ${color}`}>{label}</h2>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
@@ -80,16 +80,16 @@ export default function AgentRecommendationsPage() {
             ) : (
               <div className="space-y-3">
                 {items.map((r, i) => (
-                  <div key={`${r.inspectionId}-${r.defectTitle}-${i}`} className="p-4 border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-900/30">
+                  <div key={`${r.inspectionId}-${r.defectTitle}-${i}`} className="p-4 border border-ih-border rounded-md bg-ih-bg-app/30">
                     <p className="text-[11px] font-mono text-slate-400 mb-1">
                       {r.propertyAddress || "No address"} &middot; {r.sectionTitle}
                     </p>
-                    <p className="text-[14px] font-semibold text-slate-900 dark:text-slate-100">{r.defectTitle}</p>
+                    <p className="text-[14px] font-semibold text-ih-fg-1">{r.defectTitle}</p>
                     {r.location && (
-                      <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">{r.location}</p>
+                      <p className="text-[13px] text-ih-fg-3 mt-0.5">{r.location}</p>
                     )}
                     {r.comment && (
-                      <p className="text-[13px] text-slate-700 dark:text-slate-300 mt-2 leading-relaxed">{r.comment}</p>
+                      <p className="text-[13px] text-ih-fg-3 mt-2 leading-relaxed">{r.comment}</p>
                     )}
                   </div>
                 ))}

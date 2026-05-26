@@ -65,7 +65,7 @@ export function KeyboardHud() {
         <header className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">Keyboard shortcuts</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono">?</kbd> to toggle, <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono">Esc</kbd> to close</p>
+            <p className="text-xs text-ih-fg-3 mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono">?</kbd> to toggle, <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono">Esc</kbd> to close</p>
           </div>
           <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Close">&times;</button>
         </header>

@@ -18,7 +18,7 @@ export function ReportTabBar({ defectCounts, onTabChange }: ReportTabBarProps) {
 
   const tabBase = "px-4 py-3 text-[13px] font-bold transition-colors focus:outline-none focus:bg-slate-50 border-b-2";
   const active = "border-indigo-500 text-slate-900";
-  const inactive = "border-transparent text-slate-500 hover:text-slate-900";
+  const inactive = "border-transparent text-ih-fg-3 hover:text-slate-900";
 
   return (
     <div className="flex items-center gap-1 border-b border-slate-200 bg-white sticky top-0 z-20 print:hidden" role="tablist" aria-label="Report view">

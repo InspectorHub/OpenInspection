@@ -10,9 +10,9 @@ interface ItemListProps {
 
 /** Map rating to dot color for the item list */
 function ratingDotClass(rating: string): string {
-  if (rating === "Satisfactory" || rating === "SAT") return "bg-emerald-500";
-  if (rating === "Monitor" || rating === "MON") return "bg-amber-500";
-  if (rating === "Defect" || rating === "DEF") return "bg-rose-500";
+  if (rating === "Satisfactory" || rating === "SAT") return "bg-ih-ok-bg0";
+  if (rating === "Monitor" || rating === "MON") return "bg-ih-watch-bg0";
+  if (rating === "Defect" || rating === "DEF") return "bg-ih-bad-bg0";
   return "bg-slate-300";
 }
 
@@ -35,9 +35,9 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results }: 
   });
 
   return (
-    <div className="w-[280px] flex-shrink-0 border-r border-slate-200 dark:border-slate-700 overflow-y-auto flex flex-col">
+    <div className="w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col">
       {/* Filter chips */}
-      <div className="px-2 py-1.5 flex gap-1 border-b border-slate-200 dark:border-slate-700">
+      <div className="px-2 py-1.5 flex gap-1 border-b border-ih-border">
         {filters.map((f) => (
           <button
             key={f.id}
@@ -63,8 +63,8 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results }: 
               onClick={() => onSelect(item.id)}
               className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all flex items-center gap-2 ${
                 activeItemId === item.id
-                  ? "bg-white dark:bg-slate-800 shadow-sm border-l-[3px] border-indigo-600 font-medium"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  ? "bg-ih-bg-card shadow-sm border-l-[3px] border-indigo-600 font-medium"
+                  : "text-ih-fg-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
               }`}
             >
               <span className="text-[10px] text-slate-400 font-mono w-5">

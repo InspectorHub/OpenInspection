@@ -52,16 +52,16 @@ export function IdentitySwitcher() {
           onClick={() => switchTo(id.linkedUserId)}
           disabled={submitting}
         >
-          <div className="w-7 h-7 rounded-full bg-slate-300 dark:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200">
+          <div className="w-7 h-7 rounded-full bg-ih-bg-muted flex items-center justify-center text-xs font-bold text-ih-fg-2">
             {(id.linkedDisplayName || "?").slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate">{id.linkedDisplayName}</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">{id.linkedRole}</div>
+            <div className="text-xs text-ih-fg-3">{id.linkedRole}</div>
           </div>
         </button>
       ))}
-      {error && <p className="text-[11px] text-rose-600 px-3">{error}</p>}
+      {error && <p className="text-[11px] text-ih-bad-fg px-3">{error}</p>}
     </div>
   );
 }

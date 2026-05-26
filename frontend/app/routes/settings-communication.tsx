@@ -71,49 +71,49 @@ export default function SettingsCommunication() {
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
-        <Link to="/settings" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Settings</Link>
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
+        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Communication</span>
+        <span className="text-ih-fg-1">Communication</span>
       </div>
 
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">Communication</h2>
-      <p className="text-[13px] text-slate-500 dark:text-slate-400">
+      <h2 className="text-[19px] font-bold text-ih-fg-1">Communication</h2>
+      <p className="text-[13px] text-ih-fg-3">
         Configure email delivery, templates, and calendar sync.
       </p>
 
       {/* Email delivery config */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 space-y-4">
-        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Email delivery</h3>
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email delivery</h3>
         <Form method="post" className="space-y-4">
           <input type="hidden" name="intent" value="save-email" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-1">Sender email</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Sender email</label>
               <input
                 type="email" name="senderEmail"
                 defaultValue={config.senderEmail || ""}
                 placeholder="reports@yourdomain.com"
-                className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Used as the "From" address. Domain must be verified in Resend.</p>
+              <p className="text-[11px] text-ih-fg-4 mt-1">Used as the "From" address. Domain must be verified in Resend.</p>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-1">Reply-to</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Reply-to</label>
               <input
                 type="email" name="replyTo"
                 defaultValue={config.replyTo || ""}
                 placeholder="hello@yourdomain.com"
-                className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Replies go to this address.</p>
+              <p className="text-[11px] text-ih-fg-4 mt-1">Replies go to this address.</p>
             </div>
           </div>
-          <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700">
-            <span className={`text-[11px] font-bold ${config.resendConfigured ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+          <div className="flex items-center justify-between pt-3 border-t border-ih-border">
+            <span className={`text-[11px] font-bold ${config.resendConfigured ? "text-ih-ok-fg" : "text-ih-watch-fg"}`}>
               {config.resendConfigured ? "Resend API key configured" : "Resend API key not set"}
             </span>
-            <button type="submit" className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors">
+            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
               Save
             </button>
           </div>
@@ -121,27 +121,27 @@ export default function SettingsCommunication() {
       </section>
 
       {/* Email templates */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Email templates</h3>
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-ih-border">
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email templates</h3>
         </div>
         {templates.length === 0 ? (
-          <div className="py-8 text-center text-[13px] text-slate-500 dark:text-slate-400">
+          <div className="py-8 text-center text-[13px] text-ih-fg-3">
             No email templates configured. Default system emails are used.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+          <div className="divide-y divide-ih-border">
             {templates.map((tpl) => (
-              <div key={tpl.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+              <div key={tpl.id} className="flex items-center justify-between px-5 py-3 hover:bg-ih-bg-muted transition-colors">
                 <div>
-                  <p className="text-[13px] font-medium text-slate-900 dark:text-slate-100">{tpl.name}</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Trigger: {tpl.trigger}</p>
+                  <p className="text-[13px] font-medium text-ih-fg-1">{tpl.name}</p>
+                  <p className="text-[11px] text-ih-fg-3 mt-0.5">Trigger: {tpl.trigger}</p>
                 </div>
                 <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                  tpl.active
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-                    : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
-                }`}>
+ tpl.active
+ ? "bg-ih-ok-bg text-ih-ok-fg"
+ : "bg-ih-bg-muted text-ih-fg-3"
+ }`}>
                   {tpl.active ? "Active" : "Disabled"}
                 </span>
               </div>
@@ -151,56 +151,56 @@ export default function SettingsCommunication() {
       </section>
 
       {/* Calendar sync */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 space-y-4">
-        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Calendar sync</h3>
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Calendar sync</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Google Calendar */}
-          <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+          <div className="p-4 border border-ih-border rounded-lg">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-                <CalendarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <div className="w-8 h-8 rounded-lg bg-ih-primary-tint flex items-center justify-center">
+                <CalendarIcon className="w-4 h-4 text-ih-primary" />
               </div>
               <div>
-                <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">Google Calendar</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Two-way sync via OAuth</p>
+                <p className="text-[13px] font-bold text-ih-fg-1">Google Calendar</p>
+                <p className="text-[11px] text-ih-fg-3">Two-way sync via OAuth</p>
               </div>
             </div>
             {googleCalendarConnected ? (
-              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Connected</span>
+              <span className="text-[11px] font-bold text-ih-ok-fg">Connected</span>
             ) : (
-              <button className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+              <button className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
                 Connect Google Calendar
               </button>
             )}
           </div>
 
           {/* Apple Calendar (ICS) */}
-          <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+          <div className="p-4 border border-ih-border rounded-lg">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                <CalendarIcon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+              <div className="w-8 h-8 rounded-lg bg-ih-bg-muted flex items-center justify-center">
+                <CalendarIcon className="w-4 h-4 text-ih-fg-3" />
               </div>
               <div>
-                <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">Apple Calendar</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Read-only ICS feed</p>
+                <p className="text-[13px] font-bold text-ih-fg-1">Apple Calendar</p>
+                <p className="text-[11px] text-ih-fg-3">Read-only ICS feed</p>
               </div>
             </div>
             {icsUrl ? (
               <div className="flex items-center gap-2">
                 <input
                   type="text" readOnly value={icsUrl}
-                  className="flex-1 h-8 px-2 rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-[11px] font-mono text-slate-600 dark:text-slate-400 outline-none"
+                  className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-3 outline-none"
                 />
                 <button
                   onClick={() => { void navigator.clipboard.writeText(icsUrl); }}
-                  className="h-8 px-3 rounded-md bg-indigo-600 text-white font-bold text-[12px] hover:bg-indigo-700 transition-colors shrink-0"
+                  className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
                 >
                   Copy
                 </button>
               </div>
             ) : (
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">ICS feed URL will appear once calendar sync is configured.</p>
+              <p className="text-[11px] text-ih-fg-3">ICS feed URL will appear once calendar sync is configured.</p>
             )}
           </div>
         </div>

@@ -113,74 +113,74 @@ export default function SettingsEventTypes() {
 
   return (
     <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
         <Link
           to="/settings"
-          className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          className="hover:text-ih-primary transition-colors"
         >
           Settings
         </Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Event types</span>
+        <span className="text-ih-fg-1">Event types</span>
       </div>
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">
+          <h2 className="text-[19px] font-bold text-ih-fg-1">
             Event types
           </h2>
-          <p className="text-[13px] text-slate-500 mt-1">
+          <p className="text-[13px] text-ih-fg-3 mt-1">
             Define ancillary inspection events that can be attached to an
             inspection.
           </p>
         </div>
         <button
           onClick={openCreate}
-          className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors"
+          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
         >
           + Add type
         </button>
       </div>
 
       {types.length === 0 ? (
-        <div className="text-center py-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-          <p className="font-bold text-[14px] text-slate-700 dark:text-slate-300">
+        <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
+          <p className="font-bold text-[14px] text-ih-fg-2">
             No event types yet.
           </p>
-          <p className="text-[12px] text-slate-500 mt-2">
+          <p className="text-[12px] text-ih-fg-3 mt-2">
             Click &ldquo;+ Add type&rdquo; to define your first event type.
           </p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <tr className="border-b border-ih-border">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                   Name
                 </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                   Slug
                 </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                   Duration
                 </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                   Price
                 </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                   Color
                 </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 text-right">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+            <tbody className="divide-y divide-ih-border">
               {types.map((t) => (
                 <tr
                   key={t.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                  className="hover:bg-ih-bg-muted/50"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -188,38 +188,38 @@ export default function SettingsEventTypes() {
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: t.color ?? "#4a72ff" }}
                       />
-                      <span className="font-bold text-[13px] text-slate-900 dark:text-slate-100">
+                      <span className="font-bold text-[13px] text-ih-fg-1">
                         {t.name}
                       </span>
                       {!t.active && (
-                        <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">
+                        <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3">
                           Inactive
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-[12px] text-slate-500">
+                  <td className="px-4 py-3 font-mono text-[12px] text-ih-fg-3">
                     {t.slug}
                   </td>
-                  <td className="px-4 py-3 text-[13px] text-slate-700 dark:text-slate-300">
+                  <td className="px-4 py-3 text-[13px] text-ih-fg-2">
                     {t.defaultDurationMin ?? 0} min
                   </td>
-                  <td className="px-4 py-3 text-[13px] text-slate-700 dark:text-slate-300">
+                  <td className="px-4 py-3 text-[13px] text-ih-fg-2">
                     ${((t.defaultPriceCents ?? 0) / 100).toFixed(2)}
                   </td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
+                  <td className="px-4 py-3 font-mono text-[11px] text-ih-fg-3">
                     {t.color}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => openEdit(t)}
-                      className="text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline mr-3 font-bold"
+                      className="text-[12px] text-ih-primary hover:underline mr-3 font-bold"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => confirmDelete(t)}
-                      className="text-[12px] text-red-600 hover:underline font-bold"
+                      className="text-[12px] text-ih-bad-fg hover:underline font-bold"
                     >
                       Delete
                     </button>
@@ -238,13 +238,13 @@ export default function SettingsEventTypes() {
             className="absolute inset-0 bg-black/40"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
-            <h3 className="text-[16px] font-bold text-slate-900 dark:text-slate-100">
+          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+            <h3 className="text-[16px] font-bold text-ih-fg-1">
               {editingId ? "Edit event type" : "New event type"}
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   Name
                 </label>
                 <input
@@ -254,11 +254,11 @@ export default function SettingsEventTypes() {
                     setForm((f) => ({ ...f, name: e.target.value }))
                   }
                   placeholder="e.g., Radon Test - Pickup"
-                  className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   Slug
                 </label>
                 <input
@@ -268,12 +268,12 @@ export default function SettingsEventTypes() {
                     setForm((f) => ({ ...f, slug: e.target.value }))
                   }
                   placeholder="radon_pickup"
-                  className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 font-mono focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                     Duration (min)
                   </label>
                   <input
@@ -286,11 +286,11 @@ export default function SettingsEventTypes() {
                       }))
                     }
                     min={1}
-                    className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                     Price ($)
                   </label>
                   <input
@@ -304,13 +304,13 @@ export default function SettingsEventTypes() {
                     }
                     min={0}
                     step={0.01}
-                    className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                     Color
                   </label>
                   <div className="flex items-center gap-2">
@@ -320,7 +320,7 @@ export default function SettingsEventTypes() {
                       onChange={(e) =>
                         setForm((f) => ({ ...f, color: e.target.value }))
                       }
-                      className="w-10 h-10 rounded-md border border-slate-200 dark:border-slate-600 cursor-pointer"
+                      className="w-10 h-10 rounded-md border border-ih-border cursor-pointer"
                     />
                     <input
                       type="text"
@@ -328,12 +328,12 @@ export default function SettingsEventTypes() {
                       onChange={(e) =>
                         setForm((f) => ({ ...f, color: e.target.value }))
                       }
-                      className="flex-1 px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      className="flex-1 px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 font-mono focus:border-ih-primary focus:shadow-ih-focus outline-none"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                     Sort order
                   </label>
                   <input
@@ -346,7 +346,7 @@ export default function SettingsEventTypes() {
                       }))
                     }
                     min={0}
-                    className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                   />
                 </div>
               </div>
@@ -354,14 +354,14 @@ export default function SettingsEventTypes() {
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setModalOpen(false)}
-                className="px-4 py-2 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={save}
                 disabled={saving}
-                className="px-4 py-2 rounded-md bg-indigo-600 text-white text-[13px] font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save"}
               </button>

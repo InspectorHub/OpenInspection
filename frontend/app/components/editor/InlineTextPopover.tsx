@@ -47,15 +47,15 @@ export function InlineTextPopover({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="oi-prompt-title">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700" style={{ boxShadow: "0 12px 32px rgba(15,23,42,0.12)" }}>
+      <div className="relative w-full max-w-md rounded-lg bg-ih-bg-card border border-ih-border" style={{ boxShadow: "0 12px 32px rgba(15,23,42,0.12)" }}>
         <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-          <h3 id="oi-prompt-title" className="text-[15px] font-semibold text-slate-900 dark:text-slate-100 tracking-tight">{title}</h3>
+          <h3 id="oi-prompt-title" className="text-[15px] font-semibold text-ih-fg-1 tracking-tight">{title}</h3>
         </div>
         <div className="p-5 space-y-3">
           {templates.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
               {templates.map((t) => (
-                <button key={t} type="button" onClick={() => setValue(t)} className="inline-flex items-center h-6 px-2.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                <button key={t} type="button" onClick={() => setValue(t)} className="inline-flex items-center h-6 px-2.5 rounded-full bg-ih-primary-tint text-ih-primary text-[11px] font-bold hover:bg-ih-primary-tint active:scale-95 transition-all focus:outline-none focus:shadow-ih-focus">
                   {t}
                 </button>
               ))}
@@ -69,17 +69,17 @@ export function InlineTextPopover({
             placeholder={placeholder}
             rows={3}
             aria-label="Edit text"
-            className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[13px] font-medium resize-none transition-colors bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+            className="w-full px-3 py-2 rounded-md border border-ih-border focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[13px] font-medium resize-none transition-colors bg-ih-bg-card text-ih-fg-1"
           />
           <p className="text-[11px] text-slate-400 font-medium">
-            <kbd className="inline-flex items-center px-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px]">&#8984; &crarr;</kbd> apply &middot; <kbd className="inline-flex items-center px-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px]">Esc</kbd> cancel
+            <kbd className="inline-flex items-center px-1 rounded bg-ih-bg-muted text-ih-fg-3 text-[10px]">&#8984; &crarr;</kbd> apply &middot; <kbd className="inline-flex items-center px-1 rounded bg-ih-bg-muted text-ih-fg-3 text-[10px]">Esc</kbd> cancel
           </p>
         </div>
         <div className="px-5 py-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-white/[0.02] rounded-b-lg">
-          <button type="button" onClick={onClose} className="h-8 px-4 rounded-md text-[13px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400/30">
+          <button type="button" onClick={onClose} className="h-8 px-4 rounded-md text-[13px] font-bold text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400/30">
             Cancel
           </button>
-          <button type="button" onClick={apply} disabled={!value.trim()} className="h-8 px-4 rounded-md bg-indigo-600 text-white text-[13px] font-bold hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+          <button type="button" onClick={apply} disabled={!value.trim()} className="h-8 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors focus:outline-none focus:shadow-ih-focus">
             Apply
           </button>
         </div>

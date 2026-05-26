@@ -38,7 +38,7 @@ export function LiveConflictModal({ conflict, open, onResolve }: LiveConflictMod
         </header>
 
         <div className="grid grid-cols-2 gap-0 border-b border-slate-200">
-          <div className="p-4 border-r border-slate-200 bg-amber-50">
+          <div className="p-4 border-r border-slate-200 bg-ih-watch-bg">
             <div className="ih-eyebrow mb-2 text-amber-800">Yours</div>
             <pre className="text-sm whitespace-pre-wrap">{String(conflict.yours.value ?? "")}</pre>
           </div>

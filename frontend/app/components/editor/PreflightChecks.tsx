@@ -16,7 +16,7 @@ interface PreflightChecksProps {
 function CheckRow({ check }: { check: PreflightCheck }) {
   return (
     <li className="flex items-center gap-2">
-      <span className={`font-bold w-4 text-center ${check.passed ? "text-emerald-600" : "text-rose-600"}`}>
+      <span className={`font-bold w-4 text-center ${check.passed ? "text-ih-ok-fg" : "text-ih-bad-fg"}`}>
         {check.passed ? "✓" : "✗"}
       </span>
       <span>
@@ -54,7 +54,7 @@ export function PreflightChecks({ checks, loading, error }: PreflightChecksProps
           <span className="sr-only">Loading...</span>
         </span>
       )}
-      {error && <p className="text-xs text-rose-600 mt-3">{error}</p>}
+      {error && <p className="text-xs text-ih-bad-fg mt-3">{error}</p>}
     </div>
   );
 }

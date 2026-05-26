@@ -5,6 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
 import { NewInspectionWizard } from "~/components/NewInspectionWizard";
 import { CommandPalette } from "~/components/CommandPalette";
+import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Dashboard - OpenInspection" }];
@@ -519,35 +520,31 @@ export default function DashboardPage() {
     fetcher.submit({ intent: "status", id, status }, { method: "post" });
   };
 
-  /* ---- Stat cards ---- */
-  const statCards = [
-    { label: "Upcoming", count: counts.upcoming, color: "indigo" as const, icon: CalendarIcon },
-    { label: "In Progress", count: counts.inProgress, color: "blue" as const, icon: ClockIcon },
-    { label: "Needs Attention", count: counts.needsAttention, color: "amber" as const, icon: AlertIcon },
-    { label: "Recent Reports", count: counts.recent, color: "emerald" as const, icon: FileIcon },
-  ];
-
-  const colorMap = {
-    indigo: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400",
-    blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
-    amber: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400",
-    emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400",
-  };
-
   const totalFiltered = filteredBuckets
     ? Object.values(filteredBuckets).flat().length
     : filteredInspections.length;
+
+  /* ---- Status → Pill tone mapping ---- */
+  const statusTone: Record<string, "ni" | "info" | "monitor" | "sat" | "gen"> = {
+    draft: "ni",
+    scheduled: "info",
+    confirmed: "info",
+    in_progress: "monitor",
+    delivered: "sat",
+    published: "sat",
+    cancelled: "gen",
+  };
 
   /* ---- Render inspection row ---- */
   function InspectionRow({ insp }: { insp: Inspection }) {
     const isSelected = selectedIds.has(insp.id);
     return (
-      <div className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
+      <div className="flex items-center gap-2 px-4 py-3 hover:bg-ih-bg-muted transition-colors group">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={() => toggleSelect(insp.id)}
-          className="accent-indigo-600 shrink-0"
+          className="accent-ih-primary shrink-0"
         />
         <Link
           to={`/inspections/${insp.id}/edit`}
@@ -555,23 +552,23 @@ export default function DashboardPage() {
         >
           <div className="min-w-0">
             {isColumnVisible("propertyAddress") && (
-              <p className="text-[13px] font-medium text-slate-900 dark:text-slate-100 truncate">
+              <p className="text-[13px] font-medium text-ih-fg-1 truncate">
                 {insp.address || insp.propertyAddress || "No address"}
               </p>
             )}
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {isColumnVisible("clientName") && (
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] text-ih-fg-3">
                   {insp.clientName || "No client"}
                 </span>
               )}
               {isColumnVisible("date") && insp.date && (
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] text-ih-fg-3">
                   &middot; {insp.date}
                 </span>
               )}
               {isColumnVisible("agent") && insp.agentName && (
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] text-ih-fg-3">
                   &middot; {insp.agentName}
                 </span>
               )}
@@ -579,29 +576,25 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-4">
             {isColumnVisible("statusIcons") && (
-              <StatusChip status={insp.status} />
+              <Pill tone={statusTone[insp.status] ?? "gen"}>
+                {insp.status.replace(/_/g, " ")}
+              </Pill>
             )}
             {isColumnVisible("defectChips") && insp.defectStats && (
               <div className="flex gap-1">
                 {insp.defectStats.safety > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                    {insp.defectStats.safety}S
-                  </span>
+                  <Pill tone="defect">{insp.defectStats.safety}S</Pill>
                 )}
                 {insp.defectStats.recommendation > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
-                    {insp.defectStats.recommendation}R
-                  </span>
+                  <Pill tone="monitor">{insp.defectStats.recommendation}R</Pill>
                 )}
                 {insp.defectStats.maintenance > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
-                    {insp.defectStats.maintenance}M
-                  </span>
+                  <Pill tone="info">{insp.defectStats.maintenance}M</Pill>
                 )}
               </div>
             )}
             {isColumnVisible("price") && insp.price != null && (
-              <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-medium text-ih-fg-3">
                 ${insp.price}
               </span>
             )}
@@ -613,7 +606,7 @@ export default function DashboardPage() {
             value={insp.status}
             onChange={(e) => transitionStatus(insp.id, e.target.value)}
             onClick={(e) => e.stopPropagation()}
-            className="h-6 px-1 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 border-0 outline-none cursor-pointer"
+            className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none cursor-pointer"
           >
             <option value="draft">Draft</option>
             <option value="scheduled">Scheduled</option>
@@ -629,16 +622,14 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-[18px]">
+    <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
       {/* PageHeader */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-[0.2em] bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
-            <span className="w-1 h-1 rounded-full bg-current opacity-60" />
-            Dashboard
-          </span>
-          <h1 className="text-[26px] font-bold tracking-tight mt-1">{greeting}</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">
+      <PageHeader
+        eyebrow="DASHBOARD"
+        eyebrowColor="indigo"
+        title={greeting}
+        meta={
+          <>
             {counts.upcoming} upcoming{" "}
             {counts.upcoming === 1 ? "inspection" : "inspections"}
             {counts.needsAttention > 0 && (
@@ -653,97 +644,72 @@ export default function DashboardPage() {
                 {conciergePending === 1 ? "booking" : "bookings"}
               </span>
             )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search..."
-              className="h-8 w-40 pl-8 pr-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-[13px] text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none placeholder:text-slate-400"
-            />
-            <SearchSmIcon />
-          </div>
-          <button onClick={() => setFiltersOpen(true)} className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
-            <FilterIcon />
-            Filters
-          </button>
-          <button onClick={() => setColumnsOpen(true)} className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
-            <ColumnsIcon />
-            Columns
-          </button>
-          <button onClick={exportCsv} className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-1.5">
-            <ExportIcon />
-            Export
-          </button>
-          <button
-            onClick={() => setWizardOpen(true)}
-            className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 inline-flex items-center gap-1.5 transition-colors"
-          >
-            + New Inspection
-          </button>
-        </div>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className="p-[14px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${colorMap[card.color]}`}>
-                <card.icon />
-              </div>
-              <div>
-                <p className="text-[22px] font-bold leading-tight text-slate-900 dark:text-white">
-                  {card.count}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">{card.label}</p>
-              </div>
+          </>
+        }
+        actions={
+          <>
+            {/* Search */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search..."
+                className="h-8 w-40 pl-8 pr-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-2 focus:ring-2 focus:ring-ih-primary/30 focus:border-ih-primary outline-none placeholder:text-ih-fg-4"
+              />
+              <Icon name="search" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ih-fg-4" />
             </div>
-          </div>
+            <Button variant="secondary" size="sm" icon={<Icon name="filter" size={14} />} onClick={() => setFiltersOpen(true)}>
+              Filters
+            </Button>
+            <Button variant="secondary" size="sm" icon={<Icon name="panel" size={14} />} onClick={() => setColumnsOpen(true)}>
+              Columns
+            </Button>
+            <Button variant="secondary" size="sm" onClick={exportCsv}>
+              Export
+            </Button>
+            <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={() => setWizardOpen(true)}>
+              New Inspection
+            </Button>
+          </>
+        }
+      />
+
+      {/* Stat cards — quick-jump to buckets */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: "Upcoming", value: counts.upcoming, icon: "calendar" as const, color: "text-ih-primary bg-ih-primary-tint" },
+          { label: "In Progress", value: counts.inProgress, icon: "edit" as const, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-900/20" },
+          { label: "Needs Attention", value: counts.needsAttention, icon: "zap" as const, color: "text-ih-watch-fg bg-ih-watch-bg" },
+          { label: "Recent Reports", value: counts.recent, icon: "check" as const, color: "text-ih-ok-fg bg-ih-ok-bg" },
+        ].map((stat) => (
+          <Card key={stat.label} className="p-[14px] cursor-pointer hover:shadow-md transition-all">
+            <div className={`w-10 h-10 rounded-md flex items-center justify-center mb-3 ${stat.color}`}>
+              <Icon name={stat.icon} size={20} />
+            </div>
+            <div className="text-xl font-bold text-ih-fg-1 tabular-nums">{stat.value}</div>
+            <div className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-[0.15em]">{stat.label}</div>
+          </Card>
         ))}
       </div>
 
       {/* Workflow tabs */}
-      <div className="flex items-center border-b border-slate-200 dark:border-slate-700">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 border-b-2 text-[13px] font-bold transition-all ${
-              activeTab === tab.key
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
-                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
-            }`}
-          >
-            {tab.label}
-            <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold tabular-nums ${
-              activeTab === tab.key
-                ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400"
-                : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-            }`}>
-              {tabCounts[tab.key] ?? 0}
-            </span>
-          </button>
-        ))}
-      </div>
+      <TabStrip
+        tabs={TABS.map((t) => ({ id: t.key, label: t.label, count: tabCounts[t.key] ?? 0 }))}
+        activeId={activeTab}
+        onChange={(id) => setActiveTab(id as TabKey)}
+      />
 
-      {/* Time filter strip */}
-      <div className="flex items-center gap-1 flex-wrap">
+      {/* Time filter strip — underline style */}
+      <div className="flex items-center gap-0 flex-wrap border-b border-ih-border">
         {INSPECTION_FILTERS.map((f) => (
           <button
             key={f.id}
             onClick={() => setActiveFilter(f.id)}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+            className={`px-3 py-2 border-b-2 text-[11px] font-bold transition-colors ${
               activeFilter === f.id
-                ? "bg-indigo-600 text-white"
-                : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
+                ? "border-ih-primary text-ih-primary"
+                : "border-transparent text-ih-fg-3 hover:text-ih-fg-1"
             }`}
           >
             {f.label}
@@ -755,7 +721,7 @@ export default function DashboardPage() {
           <select
             value={activeTagFilter}
             onChange={(e) => setActiveTagFilter(e.target.value)}
-            className="h-7 px-2 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 border-0 outline-none ml-2"
+            className="h-7 px-2 rounded-md text-[11px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none ml-2"
           >
             <option value="">All tags</option>
             {tags.map((t) => (
@@ -767,38 +733,26 @@ export default function DashboardPage() {
 
       {/* Batch actions bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
-          <span className="text-[13px] font-bold text-indigo-600 dark:text-indigo-400">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-ih-primary-tint rounded-lg border border-ih-border">
+          <span className="text-[13px] font-bold text-ih-primary">
             {selectedIds.size} selected
           </span>
-          <button onClick={batchArchive} className="text-[12px] font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 transition-colors">
-            Archive
-          </button>
-          <button onClick={batchDelete} className="text-[12px] font-bold text-red-500 hover:text-red-600 transition-colors">
-            Delete
-          </button>
-          <button onClick={selectAll} className="text-[12px] font-bold text-slate-500 hover:text-slate-700 transition-colors ml-auto">
-            Select all
-          </button>
-          <button onClick={clearSelection} className="text-[12px] font-bold text-slate-500 hover:text-slate-700 transition-colors">
-            Clear
-          </button>
+          <Button variant="ghost" size="sm" onClick={batchArchive}>Archive</Button>
+          <Button variant="danger" size="sm" onClick={batchDelete}>Delete</Button>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>Select all</Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection}>Clear</Button>
         </div>
       )}
 
       {/* Inspection list */}
       {totalFiltered === 0 ? (
-        <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center">
-            <ClipboardIcon />
-          </div>
-          <p className="font-semibold text-slate-700 dark:text-slate-200">
-            No inspections yet
-          </p>
-          <p className="text-[13px] text-slate-500 mt-1">
-            Create one above to get started.
-          </p>
-        </div>
+        <Card>
+          <EmptyState
+            icon={<Icon name="check" size={32} />}
+            title="No inspections yet"
+            description="Create one above to get started."
+          />
+        </Card>
       ) : filteredBuckets ? (
         /* Grouped bucket view */
         <div className="space-y-3">
@@ -807,54 +761,53 @@ export default function DashboardPage() {
             const meta = BUCKET_META[key] ?? { label: key, hint: "" };
             const collapsed = collapsedBuckets.has(key);
             return (
-              <div
-                key={key}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden"
-              >
+              <Card key={key} className="overflow-hidden">
                 <button
                   onClick={() => toggleBucket(key)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-ih-bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500">
+                    <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4">
                       {meta.label}
                     </span>
-                    <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                    <span className="text-[11px] text-ih-fg-4">
                       {meta.hint}
                     </span>
-                    <span className="text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 dark:text-slate-400 px-1.5 py-0.5 rounded">
-                      {items.length}
-                    </span>
+                    <Pill tone="gen">{items.length}</Pill>
                   </div>
-                  <ChevronIcon collapsed={collapsed} />
+                  <Icon
+                    name="chevD"
+                    size={16}
+                    className={`text-ih-fg-4 transition-transform ${collapsed ? "" : "rotate-180"}`}
+                  />
                 </button>
                 {!collapsed && (
-                  <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                  <div className="divide-y divide-ih-border">
                     {items.map((insp) => (
                       <InspectionRow key={insp.id} insp={insp} />
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
             );
           })}
         </div>
       ) : (
         /* Flat filtered view */
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-          <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700">
-            <span className="text-[11px] font-bold text-slate-400">
+        <Card className="overflow-hidden">
+          <div className="px-4 py-2 border-b border-ih-border">
+            <span className="text-[11px] font-bold text-ih-fg-4">
               {filteredInspections.length} result{filteredInspections.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+          <div className="divide-y divide-ih-border">
             {paginatedList.map((insp) => (
               <InspectionRow key={insp.id} insp={insp} />
             ))}
           </div>
           {/* Infinite scroll sentinel */}
           {hasMore && <div ref={sentinelRef} className="h-8" />}
-        </div>
+        </Card>
       )}
 
       {/* Wizard modal */}
@@ -866,32 +819,32 @@ export default function DashboardPage() {
       {/* Filters modal */}
       {filtersOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setFiltersOpen(false)}>
-          <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold text-slate-900 dark:text-slate-100">Filters</h2>
-              <button onClick={() => setFiltersOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">&times;</button>
+              <h2 className="text-[16px] font-bold text-ih-fg-1">Filters</h2>
+              <button onClick={() => setFiltersOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-[12px] font-bold text-slate-500 mb-1">Date from</label>
-                <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[13px] outline-none" />
+                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Date from</label>
+                <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
               </div>
               <div>
-                <label className="block text-[12px] font-bold text-slate-500 mb-1">Date to</label>
-                <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[13px] outline-none" />
+                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Date to</label>
+                <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
               </div>
               <div>
-                <label className="block text-[12px] font-bold text-slate-500 mb-1">Agent ID</label>
-                <input type="text" value={filterAgentId} onChange={(e) => setFilterAgentId(e.target.value)} placeholder="Agent ID" className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[13px] outline-none" />
+                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Agent ID</label>
+                <input type="text" value={filterAgentId} onChange={(e) => setFilterAgentId(e.target.value)} placeholder="Agent ID" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
               </div>
             </div>
             <div className="flex items-center justify-between mt-6">
-              <button onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterAgentId(""); }} className="text-[12px] font-bold text-slate-500 hover:text-slate-700">
+              <Button variant="ghost" size="sm" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterAgentId(""); }}>
                 Reset
-              </button>
-              <button onClick={() => setFiltersOpen(false)} className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700">
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setFiltersOpen(false)}>
                 Apply
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -900,10 +853,10 @@ export default function DashboardPage() {
       {/* Columns modal */}
       {columnsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setColumnsOpen(false)}>
-          <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold text-slate-900 dark:text-slate-100">Customize Columns</h2>
-              <button onClick={() => setColumnsOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">&times;</button>
+              <h2 className="text-[16px] font-bold text-ih-fg-1">Customize Columns</h2>
+              <button onClick={() => setColumnsOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
             </div>
             <div className="space-y-2">
               {COLUMN_REGISTRY.map((col) => (
@@ -913,22 +866,22 @@ export default function DashboardPage() {
                     checked={isColumnVisible(col.id)}
                     disabled={ALWAYS_ON.has(col.id)}
                     onChange={() => toggleColumn(col.id)}
-                    className="accent-indigo-600"
+                    className="accent-ih-primary"
                   />
-                  <span className="text-[13px] text-slate-700 dark:text-slate-300">
+                  <span className="text-[13px] text-ih-fg-2">
                     {col.label}
-                    {ALWAYS_ON.has(col.id) && <span className="ml-1 text-[10px] text-slate-400">(required)</span>}
+                    {ALWAYS_ON.has(col.id) && <span className="ml-1 text-[10px] text-ih-fg-4">(required)</span>}
                   </span>
                 </label>
               ))}
             </div>
             <div className="flex items-center justify-between mt-6">
-              <button onClick={resetColumns} className="text-[12px] font-bold text-slate-500 hover:text-slate-700">
+              <Button variant="ghost" size="sm" onClick={resetColumns}>
                 Reset to defaults
-              </button>
-              <button onClick={() => setColumnsOpen(false)} className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700">
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setColumnsOpen(false)}>
                 Done
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -937,113 +890,3 @@ export default function DashboardPage() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Small components                                                   */
-/* ------------------------------------------------------------------ */
-
-function StatusChip({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    draft: "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400",
-    scheduled: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
-    confirmed: "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400",
-    in_progress: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400",
-    delivered: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400",
-    published: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400",
-    cancelled: "bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400",
-  };
-  return (
-    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${map[status] || "bg-slate-100 text-slate-500"}`}>
-      {status.replace(/_/g, " ")}
-    </span>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Inline SVG icons                                                   */
-/* ------------------------------------------------------------------ */
-
-function SearchSmIcon() {
-  return (
-    <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86l-8.6 14.86A1 1 0 002.56 20h18.88a1 1 0 00.87-1.28l-8.6-14.86a1 1 0 00-1.72 0z" />
-    </svg>
-  );
-}
-
-function FileIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  );
-}
-
-function FilterIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-    </svg>
-  );
-}
-
-function ColumnsIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
-}
-
-function ExportIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-    </svg>
-  );
-}
-
-function ClipboardIcon() {
-  return (
-    <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-    </svg>
-  );
-}
-
-function ChevronIcon({ collapsed }: { collapsed: boolean }) {
-  return (
-    <svg
-      className={`w-4 h-4 text-slate-400 transition-transform ${collapsed ? "" : "rotate-180"}`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-}

@@ -78,31 +78,31 @@ export default function JoinPage() {
 
   if (!valid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
         <div className="text-center p-8">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+          <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
             Invalid Invite
           </h1>
-          <p className="text-sm text-slate-500">{loaderError}</p>
+          <p className="text-sm text-ih-fg-3">{loaderError}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
       <div className="w-full max-w-md p-8">
         <div className="flex items-center gap-3 mb-8">
           <img src="/logo.svg" alt="" className="w-8 h-8" />
-          <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
+          <span className="text-lg font-bold text-ih-fg-1">
             OpenInspection
           </span>
         </div>
 
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
           Join {invite?.workspaceName ?? "the team"}
         </h1>
-        <p className="text-sm text-slate-500 mb-6">
+        <p className="text-sm text-ih-fg-3 mb-6">
           You have been invited{invite?.email ? ` as ${invite.email}` : ""}. Set
           your name and password to get started.
         </p>
@@ -110,7 +110,7 @@ export default function JoinPage() {
         <Form method="post" className="space-y-4">
           <input type="hidden" name="token" value={new URL(typeof window !== "undefined" ? window.location.href : "http://localhost").searchParams.get("token") || ""} />
           <div>
-            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-ih-fg-3 mb-1">
               Full name
             </label>
             <input
@@ -118,11 +118,11 @@ export default function JoinPage() {
               type="text"
               required
               autoFocus
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-ih-fg-3 mb-1">
               Password
             </label>
             <input
@@ -130,19 +130,19 @@ export default function JoinPage() {
               type="password"
               required
               minLength={8}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
             />
           </div>
 
           {actionData?.error && (
-            <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+            <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
               {actionData.error}
             </div>
           )}
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-lg bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors"
+            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors"
           >
             Accept Invite
           </button>

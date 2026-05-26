@@ -111,10 +111,10 @@ export default function BookingPage() {
 
   if (error || !profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
         <div className="text-center p-8">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Not Available</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">
+          <h1 className="text-2xl font-bold text-ih-fg-1">Not Available</h1>
+          <p className="text-ih-fg-3 mt-2">
             {error ?? "This booking page is not available."}
           </p>
         </div>
@@ -123,27 +123,27 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-12 px-4">
+    <div className="min-h-screen bg-ih-bg-app py-12 px-4">
       <div className="max-w-2xl mx-auto">
         {/* Inspector header */}
         <nav className="mb-8 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-lg font-bold">
+          <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-ih-primary text-lg font-bold">
             {profile.name.charAt(0)}
           </div>
           <div>
-            <p className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">{profile.name}</p>
+            <p className="text-[15px] font-semibold text-ih-fg-1">{profile.name}</p>
             {profile.company && (
-              <p className="text-[12px] text-slate-500 dark:text-slate-400">{profile.company}</p>
+              <p className="text-[12px] text-ih-fg-3">{profile.company}</p>
             )}
           </div>
         </nav>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-10">
+        <div className="bg-ih-bg-card rounded-lg shadow-sm border border-ih-border p-6 md:p-10">
           <div className="mb-8 space-y-2">
-            <h1 className="text-[28px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 leading-tight">
+            <h1 className="text-[28px] font-semibold tracking-tight text-ih-fg-1 leading-tight">
               Schedule an inspection
             </h1>
-            <p className="text-[14px] text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-[14px] text-ih-fg-3 leading-relaxed">
               Tell us about the property and pick a time that works.
             </p>
           </div>
@@ -154,14 +154,14 @@ export default function BookingPage() {
               <div key={s} className="flex items-center gap-1 flex-1">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
                   i <= step
-                    ? "bg-indigo-600 text-white"
+                    ? "bg-ih-primary text-white"
                     : "bg-slate-200 dark:bg-slate-700 text-slate-400"
                 }`}>{i + 1}</div>
                 <span className={`text-[11px] font-medium hidden sm:inline ${
-                  i <= step ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"
+                  i <= step ? "text-ih-primary" : "text-slate-400"
                 }`}>{s}</span>
                 {i < STEPS.length - 1 && (
-                  <div className={`flex-1 h-px mx-1 ${i < step ? "bg-indigo-600" : "bg-slate-200 dark:bg-slate-700"}`} />
+                  <div className={`flex-1 h-px mx-1 ${i < step ? "bg-ih-primary" : "bg-slate-200 dark:bg-slate-700"}`} />
                 )}
               </div>
             ))}
@@ -171,18 +171,18 @@ export default function BookingPage() {
           {step === 0 && (
             <section className="space-y-5">
               <div className="space-y-1">
-                <h2 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">Property</h2>
-                <p className="text-[13px] text-slate-500 dark:text-slate-400">Where is the inspection?</p>
+                <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Property</h2>
+                <p className="text-[13px] text-ih-fg-3">Where is the inspection?</p>
               </div>
               <label className="block">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Property address</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Property address</span>
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="123 Main St, City, State ZIP"
                   autoFocus
-                  className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[14px] font-medium transition-colors"
+                  className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
                 />
               </label>
             </section>
@@ -192,8 +192,8 @@ export default function BookingPage() {
           {step === 1 && (
             <section className="space-y-5">
               <div className="space-y-1">
-                <h2 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">Services</h2>
-                <p className="text-[13px] text-slate-500 dark:text-slate-400">Choose one or more inspections for this visit.</p>
+                <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Services</h2>
+                <p className="text-[13px] text-ih-fg-3">Choose one or more inspections for this visit.</p>
               </div>
               <div className="space-y-2">
                 {profile.services.map((svc) => {
@@ -208,17 +208,17 @@ export default function BookingPage() {
                       />
                       <div className={`px-4 py-3 rounded-md border transition-all flex items-center justify-between gap-3 ${
                         selected
-                          ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/10"
-                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600"
+                          ? "border-indigo-500 bg-ih-primary-tint ring-2 ring-indigo-500/10"
+                          : "border-ih-border bg-ih-bg-card hover:border-slate-300 dark:hover:border-slate-600"
                       }`}>
                         <div className="min-w-0">
-                          <div className="text-[13px] font-bold text-slate-900 dark:text-slate-100 truncate">{svc.name}</div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          <div className="text-[13px] font-bold text-ih-fg-1 truncate">{svc.name}</div>
+                          <div className="text-[11px] text-ih-fg-3 mt-0.5">
                             ~{svc.duration} min
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">${svc.price}</span>
+                          <span className="text-sm font-semibold text-ih-fg-1">${svc.price}</span>
                           {selected && (
                             <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -232,10 +232,10 @@ export default function BookingPage() {
               </div>
               {selectedServices.size > 0 && (
                 <div className="px-4 py-2 rounded-md bg-slate-50 dark:bg-slate-700/50 flex items-center justify-between">
-                  <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300">
+                  <span className="text-[12px] font-bold text-ih-fg-3">
                     {selectedServices.size} {selectedServices.size === 1 ? "inspection" : "inspections"}
                   </span>
-                  <span className="text-[15px] font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  <span className="text-[15px] font-bold text-ih-fg-1 tabular-nums">
                     ${totalPrice.toFixed(2)}
                   </span>
                 </div>
@@ -248,31 +248,31 @@ export default function BookingPage() {
             <section className="space-y-8">
               <div className="space-y-5">
                 <div className="space-y-1">
-                  <h2 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">Schedule</h2>
-                  <p className="text-[13px] text-slate-500 dark:text-slate-400">Pick a date and time window that works.</p>
+                  <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Schedule</h2>
+                  <p className="text-[13px] text-ih-fg-3">Pick a date and time window that works.</p>
                 </div>
                 <label className="block">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Inspection date</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Inspection date</span>
                   <input
                     type="date"
                     value={inspectionDate}
                     onChange={(e) => setInspectionDate(e.target.value)}
-                    className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[14px] font-medium tabular-nums transition-colors"
+                    className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[14px] font-medium tabular-nums transition-colors"
                   />
                 </label>
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Time window</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Time window</span>
                   <div className="grid grid-cols-2 gap-2 mt-1">
                     {TIME_WINDOWS.map((w) => (
                       <label key={w.id} className="cursor-pointer">
                         <input type="radio" name="timeSlot" value={w.id} checked={timeWindow === w.id} onChange={() => setTimeWindow(w.id)} className="sr-only" />
                         <div className={`px-3 py-2.5 rounded-md border transition-all ${
                           timeWindow === w.id
-                            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/10"
-                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                            ? "border-indigo-500 bg-ih-primary-tint ring-2 ring-indigo-500/10"
+                            : "border-ih-border bg-ih-bg-card"
                         }`}>
-                          <div className="text-[13px] font-bold text-slate-900 dark:text-slate-100">{w.label}</div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{w.detail}</div>
+                          <div className="text-[13px] font-bold text-ih-fg-1">{w.label}</div>
+                          <div className="text-[11px] text-ih-fg-3 mt-0.5">{w.detail}</div>
                         </div>
                       </label>
                     ))}
@@ -283,7 +283,7 @@ export default function BookingPage() {
                         type="time"
                         value={customTime}
                         onChange={(e) => setCustomTime(e.target.value)}
-                        className="h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[13px] font-medium tabular-nums"
+                        className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[13px] font-medium tabular-nums"
                       />
                       <span className="text-[11px] text-slate-400">on selected date</span>
                     </div>
@@ -293,28 +293,28 @@ export default function BookingPage() {
 
               <div className="space-y-5">
                 <div className="space-y-1">
-                  <h2 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">Your info</h2>
-                  <p className="text-[13px] text-slate-500 dark:text-slate-400">How do we reach you with the report?</p>
+                  <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Your info</h2>
+                  <p className="text-[13px] text-ih-fg-3">How do we reach you with the report?</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Full name</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Full name</span>
                     <input
                       type="text"
                       value={clientName}
                       onChange={(e) => setClientName(e.target.value)}
                       placeholder="Jane Doe"
-                      className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[14px] font-medium transition-colors"
+                      className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Email</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Email</span>
                     <input
                       type="email"
                       value={clientEmail}
                       onChange={(e) => setClientEmail(e.target.value)}
                       placeholder="jane@example.com"
-                      className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[14px] font-medium transition-colors"
+                      className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
                     />
                   </label>
                 </div>
@@ -327,50 +327,50 @@ export default function BookingPage() {
             <section className="space-y-5">
               {message?.ok ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-16 h-16 rounded-full bg-ih-ok-bg flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-ih-ok-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Request Submitted</h2>
-                  <p className="text-[14px] text-slate-500 dark:text-slate-400">{message.text}</p>
+                  <h2 className="text-xl font-bold text-ih-fg-1 mb-2">Request Submitted</h2>
+                  <p className="text-[14px] text-ih-fg-3">{message.text}</p>
                 </div>
               ) : (
                 <>
                   <div className="space-y-1">
-                    <h2 className="text-[18px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">Confirm details</h2>
-                    <p className="text-[13px] text-slate-500 dark:text-slate-400">Review your booking before submitting.</p>
+                    <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Confirm details</h2>
+                    <p className="text-[13px] text-ih-fg-3">Review your booking before submitting.</p>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-700/50 rounded-md p-4 space-y-3 text-[13px]">
                     <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Address</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{address}</span>
+                      <span className="text-ih-fg-3">Address</span>
+                      <span className="font-medium text-ih-fg-1">{address}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Date</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{inspectionDate}</span>
+                      <span className="text-ih-fg-3">Date</span>
+                      <span className="font-medium text-ih-fg-1">{inspectionDate}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Time</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                      <span className="text-ih-fg-3">Time</span>
+                      <span className="font-medium text-ih-fg-1">
                         {timeWindow === "custom" ? customTime : TIME_WINDOWS.find((w) => w.id === timeWindow)?.label}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Services</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{selectedServices.size} selected</span>
+                      <span className="text-ih-fg-3">Services</span>
+                      <span className="font-medium text-ih-fg-1">{selectedServices.size} selected</span>
                     </div>
-                    <div className="flex justify-between border-t border-slate-200 dark:border-slate-600 pt-3">
-                      <span className="font-bold text-slate-700 dark:text-slate-200">Total</span>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">${totalPrice.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Name</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{clientName}</span>
+                    <div className="flex justify-between border-t border-ih-border pt-3">
+                      <span className="font-bold text-ih-fg-2">Total</span>
+                      <span className="font-bold text-ih-fg-1">${totalPrice.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">Email</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{clientEmail}</span>
+                      <span className="text-ih-fg-3">Name</span>
+                      <span className="font-medium text-ih-fg-1">{clientName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-ih-fg-3">Email</span>
+                      <span className="font-medium text-ih-fg-1">{clientEmail}</span>
                     </div>
                   </div>
                 </>
@@ -380,18 +380,18 @@ export default function BookingPage() {
 
           {/* Message display */}
           {message && !message.ok && (
-            <div className="mt-6 p-3 rounded-md bg-rose-50 dark:bg-rose-900/20 text-center text-[13px] font-semibold text-rose-700 dark:text-rose-300">
+            <div className="mt-6 p-3 rounded-md bg-ih-bad-bg text-center text-[13px] font-semibold text-ih-bad-fg">
               {message.text}
             </div>
           )}
 
           {/* Navigation footer */}
           {!(step === 3 && message?.ok) && (
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-ih-border">
               <button
                 onClick={() => step > 0 ? setStep(step - 1) : undefined}
                 disabled={step === 0}
-                className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-700 text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 Back
               </button>
@@ -399,7 +399,7 @@ export default function BookingPage() {
                 <button
                   onClick={() => setStep(step + 1)}
                   disabled={!canNext}
-                  className="h-9 px-5 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Continue
                 </button>
@@ -407,7 +407,7 @@ export default function BookingPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="h-9 px-5 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? "Submitting..." : "Request Inspection"}
                 </button>
@@ -416,7 +416,7 @@ export default function BookingPage() {
           )}
         </div>
 
-        <p className="text-center text-[11px] text-slate-400 dark:text-slate-500 mt-6">
+        <p className="text-center text-[11px] text-ih-fg-4 mt-6">
           Powered by OpenInspection
         </p>
       </div>

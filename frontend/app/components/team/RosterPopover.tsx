@@ -40,10 +40,10 @@ export function RosterPopover({ open, roster, onClose, onInvitePermanent, onInvi
           {roster.map((u) => (
             <li key={u.userId} className="flex items-center gap-3">
               <div className="relative">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${u.role === "observer" ? "bg-amber-100 text-amber-700" : "bg-slate-300 text-slate-700"}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${u.role === "observer" ? "bg-amber-100 text-ih-watch-fg" : "bg-slate-300 text-slate-700"}`}>
                   {u.role === "observer" ? "👁" : (u.name || u.userId || "?").slice(0, 2).toUpperCase()}
                 </div>
-                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white ${u.role === "observer" ? "bg-amber-400" : "bg-emerald-500"}`} aria-hidden="true" />
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white ${u.role === "observer" ? "bg-amber-400" : "bg-ih-ok-bg0"}`} aria-hidden="true" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{u.name || u.userId}</div>

@@ -29,8 +29,8 @@ export function SideRail({ activeItem }: SideRailProps) {
     <div className="flex h-full">
       {/* Content panel (256px, left of tab strip) */}
       {open && (
-        <div className="w-64 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-slate-700">
+        <div className="w-64 border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-ih-border">
             <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400 capitalize">{activeTab}</span>
             <button onClick={() => setOpen(false)} className="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-600">&#x2715;</button>
           </div>
@@ -40,8 +40,8 @@ export function SideRail({ activeItem }: SideRailProps) {
             )}
             {activeTab === "library" && (
               <div>
-                <input type="text" placeholder="Search comments..." className="w-full px-2 py-1.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[12px] mb-2" />
-                <p className="text-[11px] text-slate-400 text-center py-4">Type <kbd className="px-1 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-mono border">/</kbd> in the note field to search.</p>
+                <input type="text" placeholder="Search comments..." className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2" />
+                <p className="text-[11px] text-slate-400 text-center py-4">Type <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">/</kbd> in the note field to search.</p>
               </div>
             )}
             {activeTab === "recall" && (
@@ -52,15 +52,15 @@ export function SideRail({ activeItem }: SideRailProps) {
       )}
 
       {/* 44px vertical tab strip */}
-      <div className="w-11 flex-shrink-0 bg-slate-50 dark:bg-slate-800/50 border-l border-slate-200 dark:border-slate-700 flex flex-col items-center py-2 gap-1">
+      <div className="w-11 flex-shrink-0 bg-ih-bg-app/50 border-l border-ih-border flex flex-col items-center py-2 gap-1">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => toggle(tab.id)}
             className={`relative w-10 flex flex-col items-center gap-0.5 py-2.5 rounded-r-md transition-all ${
               activeTab === tab.id && open
-                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border-l-2 border-indigo-600 dark:border-indigo-400 -ml-px"
-                : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                ? "bg-ih-bg-card text-ih-primary shadow-sm border-l-2 border-indigo-600 dark:border-indigo-400 -ml-px"
+                : "text-ih-fg-4 hover:text-slate-600 dark:hover:text-slate-400"
             }`}
             title={tab.label}
           >

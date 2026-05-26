@@ -78,7 +78,7 @@ export default function AgentSignupPage() {
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
       {/* Left: editorial value-prop */}
       <aside className="relative flex flex-col justify-center px-8 py-12 lg:px-12 bg-slate-900 text-white overflow-hidden">
-        <div className="absolute w-[480px] h-[480px] -right-[120px] -top-[160px] bg-indigo-600 blur-[140px] opacity-35 pointer-events-none" />
+        <div className="absolute w-[480px] h-[480px] -right-[120px] -top-[160px] bg-ih-primary blur-[140px] opacity-35 pointer-events-none" />
         <div className="relative z-10 max-w-[460px] mx-auto">
           <div className="flex items-center gap-3 mb-12">
             <img src="/logo.svg" alt="" className="w-8 h-8" />
@@ -99,7 +99,7 @@ export default function AgentSignupPage() {
                 key={v.num}
                 className="flex gap-3.5 py-4 border-t border-white/[0.08] last:border-b"
               >
-                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                <span className="w-7 h-7 rounded-full bg-ih-primary text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                   {v.num}
                 </span>
                 <span className="text-[15px] leading-relaxed text-stone-200">
@@ -113,12 +113,12 @@ export default function AgentSignupPage() {
       </aside>
 
       {/* Right: form */}
-      <section className="flex flex-col justify-center px-8 py-12 lg:px-12 bg-white dark:bg-slate-900">
+      <section className="flex flex-col justify-center px-8 py-12 lg:px-12 bg-ih-bg-card">
         <div className="max-w-[420px] w-full mx-auto">
-          <h2 className="text-2xl font-bold tracking-tight mb-2 text-slate-900 dark:text-slate-100">
+          <h2 className="text-2xl font-bold tracking-tight mb-2 text-ih-fg-1">
             Create your free account
           </h2>
-          <p className="text-[15px] text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
+          <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-8">
             Takes about a minute. Already invited? Use the link in your email
             instead -- it pre-fills the right tenant.
           </p>
@@ -128,7 +128,7 @@ export default function AgentSignupPage() {
               <div>
                 <label
                   htmlFor="name"
-                  className="block text-[13px] font-semibold text-slate-600 dark:text-slate-400 mb-2"
+                  className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
                 >
                   Full name
                 </label>
@@ -139,13 +139,13 @@ export default function AgentSignupPage() {
                   placeholder="Jane Smith"
                   required
                   minLength={2}
-                  className="w-full px-4 py-3 text-[15px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-slate-900 dark:text-slate-100"
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
               </div>
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-[13px] font-semibold text-slate-600 dark:text-slate-400 mb-2"
+                  className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
                 >
                   Work email
                 </label>
@@ -155,13 +155,13 @@ export default function AgentSignupPage() {
                   name="email"
                   placeholder="jane@realty.com"
                   required
-                  className="w-full px-4 py-3 text-[15px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-slate-900 dark:text-slate-100"
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
               </div>
               <div>
                 <label
                   htmlFor="password"
-                  className="block text-[13px] font-semibold text-slate-600 dark:text-slate-400 mb-2"
+                  className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
                 >
                   Password
                 </label>
@@ -172,7 +172,7 @@ export default function AgentSignupPage() {
                   placeholder="At least 12 characters"
                   required
                   minLength={12}
-                  className="w-full px-4 py-3 text-[15px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-slate-900 dark:text-slate-100"
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
               </div>
             </div>
@@ -180,23 +180,23 @@ export default function AgentSignupPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-indigo-600 rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
               {submitting ? "Creating account..." : "Create account"}
             </button>
 
             {actionData?.error && (
-              <div className="mt-4 px-4 py-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-[14px] text-rose-700 dark:text-rose-300">
+              <div className="mt-4 px-4 py-3 rounded-lg bg-ih-bad-bg border border-ih-bad text-[14px] text-ih-bad-fg">
                 {actionData.error}
               </div>
             )}
           </Form>
 
-          <p className="mt-6 text-[14px] text-slate-500 dark:text-slate-400 text-center">
+          <p className="mt-6 text-[14px] text-ih-fg-3 text-center">
             Already have an account?{" "}
             <Link
               to="/login"
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-ih-primary font-medium hover:underline"
             >
               Sign in
             </Link>

@@ -8,41 +8,41 @@ export default function SettingsData() {
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
-        <Link to="/settings" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Settings</Link>
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
+        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Data</span>
+        <span className="text-ih-fg-1">Data</span>
       </div>
 
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">Data import / export</h2>
-      <p className="text-[13px] text-slate-500 dark:text-slate-400">
+      <h2 className="text-[19px] font-bold text-ih-fg-1">Data import / export</h2>
+      <p className="text-[13px] text-ih-fg-3">
         Download your data or import contacts from other platforms.
       </p>
 
       {/* Export section */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 space-y-4">
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <div>
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Export</h3>
-          <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Download your data as CSV or JSON. All historical records are included.</p>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Export</h3>
+          <p className="text-[12px] text-ih-fg-3 mt-1">Download your data as CSV or JSON. All historical records are included.</p>
         </div>
         <div className="flex gap-3 flex-wrap">
           <a
             href="/api/admin/export?format=csv&type=inspections"
-            className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors inline-flex items-center gap-2"
+            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors inline-flex items-center gap-2"
           >
             <DownloadIcon />
             Inspections CSV
           </a>
           <a
             href="/api/admin/export?format=csv&type=contacts"
-            className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2"
+            className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2"
           >
             <DownloadIcon />
             Contacts CSV
           </a>
           <a
             href="/api/admin/export?format=json"
-            className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2"
+            className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2"
           >
             <DownloadIcon />
             Full JSON
@@ -51,36 +51,36 @@ export default function SettingsData() {
       </section>
 
       {/* Import section */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 space-y-4">
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <div>
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Import contacts</h3>
-          <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Import contacts</h3>
+          <p className="text-[12px] text-ih-fg-3 mt-1">
             Supports Spectora and Inspector Toolbelt export formats. Duplicates (same email) are skipped.
           </p>
         </div>
         <label className="block cursor-pointer">
           <div className="inline-flex items-center gap-3">
-            <span className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center gap-2">
+            <span className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-2">
               <UploadIcon />
               Choose CSV file
             </span>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">Max 5 MB, UTF-8 encoded</span>
+            <span className="text-[11px] text-ih-fg-3">Max 5 MB, UTF-8 encoded</span>
           </div>
           <input type="file" accept=".csv,text/csv" className="hidden" />
         </label>
       </section>
 
       {/* Data cleanup */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 space-y-4">
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <div>
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Data cleanup</h3>
-          <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Remove test data or request a full GDPR data export.</p>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Data cleanup</h3>
+          <p className="text-[12px] text-ih-fg-3 mt-1">Remove test data or request a full GDPR data export.</p>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <button className="h-9 px-4 rounded-md border border-rose-200 dark:border-rose-800 text-[13px] font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
+          <button className="h-9 px-4 rounded-md border border-ih-bad text-[13px] font-medium text-ih-bad-fg hover:bg-ih-bad-bg transition-colors">
             Delete test data
           </button>
-          <button className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+          <button className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
             Request GDPR export
           </button>
         </div>

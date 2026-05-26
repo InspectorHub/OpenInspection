@@ -36,7 +36,7 @@ export default function ObservePage() {
     return (
       <div className="p-8 text-center">
         <h1 className="text-2xl font-bold">Inspection Not Found</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">
+        <p className="text-ih-fg-3 mt-2">
           {error ?? "This observation link is invalid or expired."}
         </p>
       </div>
@@ -52,14 +52,14 @@ export default function ObservePage() {
             {inspection.status}
           </span>
         </div>
-        <p className="text-[13px] text-slate-500 dark:text-slate-400">
+        <p className="text-[13px] text-ih-fg-3">
           Inspector: {inspection.inspectorName}
           {inspection.date && <span> &middot; {inspection.date}</span>}
         </p>
       </div>
 
       {/* Read-only section progress */}
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ih-fg-3 mb-3">
         Progress
       </h2>
       <div className="space-y-2">
@@ -73,15 +73,15 @@ export default function ObservePage() {
           return (
             <div
               key={i}
-              className="p-4 rounded-lg border border-slate-200 dark:border-slate-700"
+              className="p-4 rounded-lg border border-ih-border"
             >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[13px] font-medium">{section.name}</p>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] text-ih-fg-3">
                   {section.completedItems}/{section.totalItems}
                 </span>
               </div>
-              <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-ih-bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full bg-indigo-500 transition-all"
                   style={{ width: `${pct}%` }}

@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/invoices";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Invoices - OpenInspection" }];
@@ -29,24 +30,15 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-[18px]">
-      {/* PageHeader */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-[0.2em] bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
-            <span className="w-1 h-1 rounded-full bg-current opacity-60" />
-            Invoices
-          </span>
-          <h1 className="text-[26px] font-bold tracking-tight mt-1">
-            Invoices
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-1">
-            {invoiceList.length} invoices
-          </p>
-        </div>
-        <button className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 inline-flex items-center gap-2 transition-colors">
-          + New Invoice
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Invoices"
+        eyebrowColor="emerald"
+        title="Invoices"
+        meta={`${invoiceList.length} invoices`}
+        actions={
+          <Button variant="primary">+ New Invoice</Button>
+        }
+      />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -56,37 +48,34 @@ export default function InvoicesPage() {
           { label: "PAID", value: statData.paid || 0, isCurrency: false },
           { label: "REVENUE", value: statData.revenue || 0, isCurrency: true },
         ].map((s) => (
-          <div
-            key={s.label}
-            className="p-[14px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
-          >
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          <Card key={s.label} className="p-[14px]">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">
               {s.label}
             </div>
-            <div className="text-xl font-bold mt-1 text-slate-900 dark:text-slate-100">
+            <div className="text-xl font-bold mt-1 text-ih-fg-1">
               {s.isCurrency
                 ? `$${(s.value / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}`
                 : s.value}
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+      <Card className="overflow-hidden">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <tr className="border-b border-ih-border">
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                 Client
               </th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                 Amount
               </th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                 Due Date
               </th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                 Status
               </th>
             </tr>
@@ -94,11 +83,8 @@ export default function InvoicesPage() {
           <tbody>
             {invoiceList.length === 0 ? (
               <tr>
-                <td
-                  colSpan={4}
-                  className="py-12 text-center text-[13px] text-slate-500"
-                >
-                  No invoices yet
+                <td colSpan={4}>
+                  <EmptyState title="No invoices yet" />
                 </td>
               </tr>
             ) : (
@@ -107,21 +93,21 @@ export default function InvoicesPage() {
                 return (
                   <tr
                     key={invoice.id as string}
-                    className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30"
+                    className="border-b border-ih-border hover:bg-ih-bg-muted/50"
                   >
-                    <td className="py-3 px-4 text-[13px] font-medium text-slate-900 dark:text-slate-100">
+                    <td className="py-3 px-4 text-[13px] font-medium text-ih-fg-1">
                       {invoice.clientName as string}
                     </td>
-                    <td className="py-3 px-4 text-[13px] font-mono text-slate-900 dark:text-slate-100">
+                    <td className="py-3 px-4 text-[13px] font-mono text-ih-fg-1">
                       $
                       {(
                         ((invoice.amount as number) || 0) / 100
                       ).toFixed(2)}
                     </td>
-                    <td className="py-3 px-4 text-[13px] text-slate-500">
+                    <td className="py-3 px-4 text-[13px] text-ih-fg-3">
                       {(invoice.dueDate as string) || "—"}
                     </td>
-                    <td className="py-3 px-4 text-[13px] text-slate-600 dark:text-slate-400">
+                    <td className="py-3 px-4 text-[13px] text-ih-fg-3">
                       {invoice.status as string}
                     </td>
                   </tr>
@@ -130,7 +116,7 @@ export default function InvoicesPage() {
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   );
 }

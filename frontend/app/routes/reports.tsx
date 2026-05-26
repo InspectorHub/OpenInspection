@@ -3,7 +3,7 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/reports";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { PageHeader, TabStrip, EmptyState } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Pill, EmptyState } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Reports - OpenInspection" }];
@@ -36,10 +36,10 @@ const TABS = [
   { id: "signed", label: "Signed" },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  completed: "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400",
-  delivered: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400",
-  signed: "bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400",
+const STATUS_TONE: Record<string, "monitor" | "sat" | "info"> = {
+  completed: "monitor",
+  delivered: "sat",
+  signed: "info",
 };
 
 function statusLabel(s: string): string {
@@ -86,7 +86,7 @@ export default function ReportsPage() {
             placeholder="Search address, client..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-64 px-3 rounded-md border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all text-[13px] font-medium placeholder:text-slate-400"
+            className="h-8 w-64 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none transition-all text-[13px] font-medium placeholder:text-ih-fg-4"
           />
         }
       />
@@ -94,51 +94,49 @@ export default function ReportsPage() {
       <TabStrip tabs={tabsWithCount} activeId={activeTab} onChange={setActiveTab} />
 
       {filtered.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+        <Card>
           <EmptyState
             title="No reports found"
             description={search ? "Try a different search term." : "Published inspection reports will appear here."}
           />
-        </div>
+        </Card>
       ) : (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+        <Card className="overflow-hidden">
           {/* Desktop table */}
           <div className="hidden md:block">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Property</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Client</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Date</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Payment</th>
+                <tr className="border-b border-ih-border">
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Property</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Client</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Date</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Status</th>
+                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Payment</th>
                   <th className="py-3 px-4" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                    <td className="py-3 px-4 text-[13px] font-medium text-slate-900 dark:text-slate-100 max-w-[240px] truncate">
+                  <tr key={r.id} className="border-b border-ih-border hover:bg-ih-bg-muted/50">
+                    <td className="py-3 px-4 text-[13px] font-medium text-ih-fg-1 max-w-[240px] truncate">
                       {r.address || "No address"}
                     </td>
-                    <td className="py-3 px-4 text-[13px] text-slate-600 dark:text-slate-400">
+                    <td className="py-3 px-4 text-[13px] text-ih-fg-3">
                       {r.clientName || "No client"}
                     </td>
-                    <td className="py-3 px-4 text-[13px] text-slate-500 dark:text-slate-400">
+                    <td className="py-3 px-4 text-[13px] text-ih-fg-3">
                       {r.date || "—"}
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] ${STATUS_STYLES[r.status] || "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"}`}>
-                        {statusLabel(r.status)}
-                      </span>
+                      <Pill tone={STATUS_TONE[r.status] || "gen"}>{statusLabel(r.status)}</Pill>
                     </td>
-                    <td className="py-3 px-4 text-[13px] text-slate-500 dark:text-slate-400">
+                    <td className="py-3 px-4 text-[13px] text-ih-fg-3">
                       {r.paymentStatus || "—"}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <Link
                         to={`/inspections/${r.id}/edit`}
-                        className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                        className="text-[12px] font-semibold text-ih-primary hover:opacity-80"
                       >
                         View
                       </Link>
@@ -150,28 +148,28 @@ export default function ReportsPage() {
           </div>
 
           {/* Mobile card view */}
-          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-700">
+          <div className="md:hidden divide-y divide-ih-border">
             {filtered.map((r) => (
               <Link
                 key={r.id}
                 to={`/inspections/${r.id}/edit`}
-                className="block px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                className="block px-4 py-3 hover:bg-ih-bg-muted/50 transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-medium text-slate-900 dark:text-slate-100 truncate">
+                  <p className="text-[13px] font-medium text-ih-fg-1 truncate">
                     {r.address || "No address"}
                   </p>
-                  <span className={`inline-flex items-center h-5 px-1.5 rounded text-[10px] font-bold uppercase tracking-[0.04em] ml-2 shrink-0 ${STATUS_STYLES[r.status] || "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"}`}>
+                  <Pill tone={STATUS_TONE[r.status] || "gen"} className="ml-2 shrink-0">
                     {statusLabel(r.status)}
-                  </span>
+                  </Pill>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-[11px] text-ih-fg-3 mt-0.5">
                   {r.clientName || "No client"} {r.date && <>&middot; {r.date}</>}
                 </p>
               </Link>
             ))}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

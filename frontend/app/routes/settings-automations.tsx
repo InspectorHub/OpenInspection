@@ -70,48 +70,48 @@ export default function SettingsAutomations() {
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
-        <Link to="/settings" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Settings</Link>
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
+        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Automations</span>
+        <span className="text-ih-fg-1">Automations</span>
       </div>
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">Automations</h2>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+          <h2 className="text-[19px] font-bold text-ih-fg-1">Automations</h2>
+          <p className="text-[13px] text-ih-fg-3 mt-0.5">
             Emails sent automatically when inspection events occur.
           </p>
         </div>
-        <button className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors">
+        <button className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
           + Add automation
         </button>
       </div>
 
       {/* Rules table */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+      <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
         {rules.length === 0 ? (
           <div className="py-10 text-center">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-ih-primary-tint flex items-center justify-center">
               <BoltIcon />
             </div>
-            <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">No automations yet</p>
-            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Add an automation rule to send emails on inspection events.</p>
+            <p className="text-[13px] font-semibold text-ih-fg-2">No automations yet</p>
+            <p className="text-[12px] text-ih-fg-3 mt-1">Add an automation rule to send emails on inspection events.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+          <div className="divide-y divide-ih-border">
             {rules.map((rule) => (
-              <div key={rule.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+              <div key={rule.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-ih-bg-muted transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">{rule.name}</p>
+                    <p className="text-[13px] font-bold text-ih-fg-1">{rule.name}</p>
                     {rule.isDefault && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded uppercase tracking-widest">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase tracking-widest">
                         Default
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-ih-fg-3 mt-0.5">
                     <span>{TRIGGER_LABELS[rule.trigger] || rule.trigger}</span>
                     <span className="mx-1.5">&rarr;</span>
                     <span>{ACTION_LABELS[rule.action] || rule.action}</span>
@@ -124,13 +124,13 @@ export default function SettingsAutomations() {
                   <button
                     type="submit"
                     className={`w-10 h-6 rounded-full relative transition-colors ${
-                      rule.active ? "bg-indigo-500" : "bg-slate-200 dark:bg-slate-600"
-                    }`}
+ rule.active ? "bg-ih-primary" : "bg-slate-200 dark:bg-slate-600"
+ }`}
                     aria-label={rule.active ? "Disable automation" : "Enable automation"}
                   >
                     <span className={`absolute w-4 h-4 bg-white rounded-full top-1 transition-all ${
-                      rule.active ? "right-1" : "left-1"
-                    }`} />
+ rule.active ? "right-1" : "left-1"
+ }`} />
                   </button>
                 </Form>
               </div>
@@ -144,7 +144,7 @@ export default function SettingsAutomations() {
 
 function BoltIcon() {
   return (
-    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-5 h-5 text-ih-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
     </svg>
   );

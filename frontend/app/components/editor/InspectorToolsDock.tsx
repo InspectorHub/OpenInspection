@@ -46,7 +46,7 @@ export function InspectorToolsDock({
     <div className="fixed bottom-6 right-6 z-40">
       {dockOpen && <div className="fixed inset-0 z-[-1]" onClick={() => setDockOpen(false)} aria-hidden="true" />}
       {dockOpen && (
-        <div className="absolute bottom-16 right-0 mb-2 ih-card p-2 min-w-[200px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg" role="menu" aria-label="Inspector tools">
+        <div className="absolute bottom-16 right-0 mb-2 ih-card p-2 min-w-[200px] bg-ih-bg-card border border-ih-border rounded-lg shadow-lg" role="menu" aria-label="Inspector tools">
           {TILES.map((t) => (
             <button
               key={t.id}
@@ -55,11 +55,11 @@ export function InspectorToolsDock({
               onClick={handlers[t.id]}
               role="menuitem"
             >
-              <svg aria-hidden="true" className="w-5 h-5 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <svg aria-hidden="true" className="w-5 h-5 text-ih-fg-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                 <path d={t.iconPath} />
               </svg>
               <span className="flex-1 text-left text-sm">{t.label}</span>
-              {t.hotkey && <span className="ih-kbd text-[11px] text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded font-mono">{t.hotkey}</span>}
+              {t.hotkey && <span className="ih-kbd text-[11px] text-slate-400 bg-ih-bg-muted px-1.5 py-0.5 rounded font-mono">{t.hotkey}</span>}
             </button>
           ))}
         </div>

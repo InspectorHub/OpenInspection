@@ -91,10 +91,10 @@ export default function InspectorProfilePage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center">
-          <h1 className="font-serif text-[32px] font-semibold mb-4 text-slate-900 dark:text-slate-100">
+          <h1 className="font-serif text-[32px] font-semibold mb-4 text-ih-fg-1">
             Inspector not found
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-[15px]">
+          <p className="text-ih-fg-3 text-[15px]">
             Double-check the link or contact whoever shared it.
           </p>
         </div>
@@ -116,11 +116,11 @@ export default function InspectorProfilePage() {
       {/* Hero */}
       <header className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end max-w-[1200px] mx-auto px-6 lg:px-16 pt-24 pb-12">
         <div>
-          <h1 className="font-serif text-[96px] lg:text-[96px] text-[56px] font-semibold tracking-tight leading-[0.95] -translate-x-3 text-slate-900 dark:text-slate-100">
+          <h1 className="font-serif text-[96px] lg:text-[96px] text-[56px] font-semibold tracking-tight leading-[0.95] -translate-x-3 text-ih-fg-1">
             {displayName}
           </h1>
           {profile.licenseNumber && (
-            <div className="mt-4 font-mono text-xs tracking-wide uppercase text-slate-400 dark:text-slate-500">
+            <div className="mt-4 font-mono text-xs tracking-wide uppercase text-ih-fg-4">
               License {profile.licenseNumber}
             </div>
           )}
@@ -129,7 +129,7 @@ export default function InspectorProfilePage() {
               {profile.serviceAreas.slice(0, 5).map((a) => (
                 <span
                   key={`${a.city}-${a.state}`}
-                  className="inline-block px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs"
+                  className="inline-block px-2.5 py-1 rounded-full bg-ih-bg-muted text-ih-fg-3 text-xs"
                 >
                   {a.city}, {a.state}
                 </span>
@@ -145,7 +145,7 @@ export default function InspectorProfilePage() {
               className="w-full max-w-[360px] aspect-square rounded-full object-cover translate-y-12"
             />
           ) : (
-            <div className="w-full max-w-[360px] aspect-square rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center font-serif text-[96px] font-semibold">
+            <div className="w-full max-w-[360px] aspect-square rounded-full bg-ih-bg-muted text-ih-fg-4 flex items-center justify-center font-serif text-[96px] font-semibold">
               {initials || "I"}
             </div>
           )}
@@ -154,7 +154,7 @@ export default function InspectorProfilePage() {
 
       {/* Bio */}
       {profile.bio && (
-        <section className="max-w-[640px] mx-auto px-6 lg:px-16 py-6 text-lg leading-relaxed text-slate-600 dark:text-slate-400">
+        <section className="max-w-[640px] mx-auto px-6 lg:px-16 py-6 text-lg leading-relaxed text-ih-fg-3">
           {profile.bio}
         </section>
       )}
@@ -165,15 +165,15 @@ export default function InspectorProfilePage() {
           {services.slice(0, 6).map((s) => (
             <article
               key={s.name}
-              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6"
+              className="bg-ih-bg-card border border-ih-border rounded-xl p-6"
             >
-              <div className="font-mono text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+              <div className="font-mono text-xs text-ih-fg-4 uppercase tracking-wide">
                 {fmtDuration(s.durationMinutes)}
               </div>
-              <div className="font-serif text-[32px] font-semibold mt-2 mb-2 text-slate-900 dark:text-slate-100">
+              <div className="font-serif text-[32px] font-semibold mt-2 mb-2 text-ih-fg-1">
                 {fmtPrice(s.price)}
               </div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="text-sm text-ih-fg-3">
                 {s.name}
               </div>
             </article>
@@ -198,7 +198,7 @@ export default function InspectorProfilePage() {
         {profile.slug && (
           <a
             href={`/book/${tenantSlug}/${profile.slug}`}
-            className="inline-block bg-indigo-600 text-white px-8 py-4 rounded-lg font-bold text-base hover:opacity-90 transition-opacity"
+            className="inline-block bg-ih-primary text-white px-8 py-4 rounded-lg font-bold text-base hover:opacity-90 transition-opacity"
           >
             Book an inspection
           </a>
@@ -206,7 +206,7 @@ export default function InspectorProfilePage() {
       </section>
 
       {/* Contact footer */}
-      <footer className="text-center py-8 px-6 border-t border-slate-200 dark:border-slate-700 text-[13px] text-slate-400 dark:text-slate-500">
+      <footer className="text-center py-8 px-6 border-t border-ih-border text-[13px] text-ih-fg-4">
         {profile.email && (
           <a href={`mailto:${profile.email}`} className="hover:underline">
             Contact via email

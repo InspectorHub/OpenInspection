@@ -37,7 +37,7 @@ export default function VerifyPage() {
     return (
       <div className="p-8 text-center">
         <h1 className="text-2xl font-bold">Verification Failed</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">
+        <p className="text-ih-fg-3 mt-2">
           {error ?? "Unable to verify this signature."}
         </p>
       </div>
@@ -50,8 +50,8 @@ export default function VerifyPage() {
       <div
         className={`p-4 rounded-lg text-center mb-6 ${
           result.valid
-            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
-            : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+            ? "bg-ih-ok-bg text-ih-ok-fg"
+            : "bg-ih-bad-bg text-ih-bad-fg"
         }`}
       >
         <p className="text-lg font-bold">
@@ -64,19 +64,19 @@ export default function VerifyPage() {
       </div>
 
       {/* Audit trail */}
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ih-fg-3 mb-3">
         Audit Trail
       </h2>
       <div className="space-y-2">
         {result.auditTrail.map((entry, i) => (
           <div
             key={i}
-            className="flex items-start gap-3 text-[13px] p-3 rounded-lg border border-slate-200 dark:border-slate-700"
+            className="flex items-start gap-3 text-[13px] p-3 rounded-lg border border-ih-border"
           >
             <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 mt-1.5" />
             <div>
               <p className="font-medium">{entry.action}</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-ih-fg-3">
                 {entry.actor} &middot; {entry.timestamp}
               </p>
             </div>

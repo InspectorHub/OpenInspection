@@ -95,7 +95,7 @@ export default function ConciergeBookPage() {
   if (loaderError || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-slate-500">Could not load booking information.</p>
+        <p className="text-ih-fg-3">Could not load booking information.</p>
       </div>
     );
   }
@@ -105,7 +105,7 @@ export default function ConciergeBookPage() {
   const submitted = actionData?.success === true;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900">
+    <div className="min-h-screen bg-ih-bg-card">
       {/* Mode bar */}
       <div className="sticky top-0 z-50 bg-orange-50 dark:bg-orange-900/30 border-b border-orange-200 dark:border-orange-800/40 px-6 py-3 flex items-center justify-between text-sm font-semibold text-orange-800 dark:text-orange-300">
         <span className="flex items-center gap-2">
@@ -118,10 +118,10 @@ export default function ConciergeBookPage() {
       </div>
 
       <main className="max-w-[720px] mx-auto px-5 py-10">
-        <h1 className="font-serif text-[1.75rem] font-bold leading-tight mb-1 text-slate-900 dark:text-slate-100">
-          Book for <span className="text-slate-500 dark:text-slate-400">{inspectorName}</span>
+        <h1 className="font-serif text-[1.75rem] font-bold leading-tight mb-1 text-ih-fg-1">
+          Book for <span className="text-ih-fg-3">{inspectorName}</span>
         </h1>
-        <p className="text-[15px] text-slate-500 dark:text-slate-400 leading-relaxed mb-7">
+        <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-7">
           Fill in your client's details and pick a date. They'll get an email to
           confirm and review the inspection agreement before anything is finalized.
         </p>
@@ -131,14 +131,14 @@ export default function ConciergeBookPage() {
             method="post"
             autoComplete="off"
             onSubmit={() => setSubmitting(true)}
-            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-7 space-y-4"
+            className="bg-ih-bg-card border border-ih-border rounded-xl p-7 space-y-4"
           >
             <input type="hidden" name="tenantId" value={data.tenantId} />
             <input type="hidden" name="inspectorContactId" value={data.inspector.contactId} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="space-y-1.5">
-                <span className="block text-[13px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
                   Client name
                 </span>
                 <input
@@ -147,11 +147,11 @@ export default function ConciergeBookPage() {
                   required
                   maxLength={200}
                   placeholder="Sarah Buyer"
-                  className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-base text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
                 />
               </label>
               <label className="space-y-1.5">
-                <span className="block text-[13px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
                   Client email
                 </span>
                 <input
@@ -160,15 +160,15 @@ export default function ConciergeBookPage() {
                   required
                   maxLength={200}
                   placeholder="sarah@example.com"
-                  className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-base text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
                 />
               </label>
             </div>
 
             <label className="space-y-1.5 block">
-              <span className="block text-[13px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+              <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
                 Client phone{" "}
-                <span className="text-slate-400 dark:text-slate-500 font-medium normal-case tracking-normal">
+                <span className="text-ih-fg-4 font-medium normal-case tracking-normal">
                   (optional)
                 </span>
               </span>
@@ -177,12 +177,12 @@ export default function ConciergeBookPage() {
                 name="clientPhone"
                 maxLength={40}
                 placeholder="(555) 123-4567"
-                className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-base text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
               />
             </label>
 
             <label className="space-y-1.5 block">
-              <span className="block text-[13px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+              <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
                 Property address
               </span>
               <input
@@ -191,30 +191,30 @@ export default function ConciergeBookPage() {
                 required
                 maxLength={500}
                 placeholder="1 Main St, Springfield"
-                className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-base text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
               />
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="space-y-1.5">
-                <span className="block text-[13px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
                   Date
                 </span>
                 <input
                   type="date"
                   name="date"
                   required
-                  className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-base text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
                 />
               </label>
               <label className="space-y-1.5">
-                <span className="block text-[13px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
                   Time slot
                 </span>
                 <select
                   name="timeSlot"
                   required
-                  className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-base text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
                 >
                   <option value="">Select a slot</option>
                   <option value="08:00">8:00 AM</option>
@@ -229,11 +229,11 @@ export default function ConciergeBookPage() {
             </div>
 
             <div className="space-y-2.5">
-              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg text-[14px] text-slate-600 dark:text-slate-400 font-medium">
+              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-ih-border rounded-lg text-[14px] text-ih-fg-3 font-medium">
                 <input type="checkbox" name="agreementRequired" defaultChecked />
                 Inspector requires the client to e-sign an inspection agreement
               </label>
-              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg text-[14px] text-slate-600 dark:text-slate-400 font-medium">
+              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-ih-border rounded-lg text-[14px] text-ih-fg-3 font-medium">
                 <input type="checkbox" name="paymentRequired" />
                 Inspector requires payment before the inspection
               </label>
@@ -249,7 +249,7 @@ export default function ConciergeBookPage() {
               </button>
 
               {actionData?.error && (
-                <div className="mt-3 px-4 py-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-[14px] text-rose-700 dark:text-rose-300">
+                <div className="mt-3 px-4 py-3 bg-ih-bad-bg border border-ih-bad rounded-lg text-[14px] text-ih-bad-fg">
                   {actionData.error}
                 </div>
               )}
@@ -257,7 +257,7 @@ export default function ConciergeBookPage() {
           </Form>
         ) : (
           /* Post-submit timeline */
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-7 space-y-3.5 mt-5">
+          <div className="bg-ih-bg-card border border-ih-border rounded-xl p-7 space-y-3.5 mt-5">
             {TIMELINE_STEPS.map((step, idx) => (
               <div key={step.label} className="flex items-center gap-3 py-2.5">
                 <span
@@ -266,16 +266,16 @@ export default function ConciergeBookPage() {
                       ? "bg-green-500 text-white"
                       : step.active
                         ? "bg-[#F55A1A] text-white animate-pulse"
-                        : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
+                        : "bg-ih-bg-muted text-ih-fg-3"
                   }`}
                 >
                   {step.done ? "✓" : idx + 1}
                 </span>
                 <div>
-                  <div className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">
+                  <div className="text-[15px] font-semibold text-ih-fg-1">
                     {step.label}
                   </div>
-                  <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <div className="text-[13px] text-ih-fg-3 mt-0.5">
                     {step.sub}
                   </div>
                 </div>

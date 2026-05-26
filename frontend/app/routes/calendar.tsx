@@ -58,9 +58,9 @@ function formatTime(d: Date) {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-slate-300 dark:bg-slate-600",
+  draft: "bg-ih-bg-muted",
   scheduled: "bg-blue-500",
-  confirmed: "bg-indigo-500",
+  confirmed: "bg-ih-primary",
   in_progress: "bg-amber-500",
   delivered: "bg-emerald-500",
   published: "bg-emerald-600",
@@ -70,7 +70,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 function eventColor(ev: CalendarEvent): string {
   if (ev.source === "google" || ev.extendedProps?.source === "google") return STATUS_COLORS.google;
-  return STATUS_COLORS[ev.status || ""] || ev.backgroundColor || "bg-indigo-500";
+  return STATUS_COLORS[ev.status || ""] || ev.backgroundColor || "bg-ih-primary";
 }
 
 /* ------------------------------------------------------------------ */
@@ -215,12 +215,12 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-[0.2em] bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-[0.2em] bg-ih-primary-tint text-ih-primary">
             <span className="w-1 h-1 rounded-full bg-current opacity-60" />
             Calendar
           </span>
           <h1 className="text-[26px] font-bold tracking-tight mt-1">Calendar</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[13px] text-ih-fg-3 mt-1">
             {thisWeekEvents.length === 0
               ? "No inspections scheduled this week"
               : drafts.length > 0
@@ -233,23 +233,23 @@ export default function CalendarPage() {
       {/* Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button onClick={prev} className="h-9 w-9 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-lg">
+          <button onClick={prev} className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted text-lg">
             &lsaquo;
           </button>
-          <button onClick={next} className="h-9 w-9 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-lg">
+          <button onClick={next} className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted text-lg">
             &rsaquo;
           </button>
-          <button onClick={goToday} className="h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">
+          <button onClick={goToday} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
             Today
           </button>
         </div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{headerTitle}</h2>
+        <h2 className="text-xl font-bold text-ih-fg-1">{headerTitle}</h2>
         <div className="flex items-center gap-1">
           {(["month", "week", "day"] as const).map((v) => (
             <button
               key={v}
               onClick={() => setViewMode(v)}
-              className={`h-9 px-3 rounded-md text-[13px] font-bold capitalize border transition-colors ${viewMode === v ? "border-indigo-600 text-indigo-600 bg-indigo-50 dark:border-indigo-400 dark:text-indigo-400 dark:bg-indigo-900/20" : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
+              className={`h-9 px-3 rounded-md text-[13px] font-bold capitalize border transition-colors ${viewMode === v ? "border-ih-primary text-ih-primary bg-ih-primary-tint" : "border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"}`}
             >
               {v}
             </button>
@@ -259,15 +259,15 @@ export default function CalendarPage() {
 
       {/* Month grid */}
       {viewMode === "month" && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="grid grid-cols-7">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} className="py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-200 dark:border-slate-700">
+              <div key={d} className="py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wide text-ih-fg-4 border-b border-ih-border">
                 {d}
               </div>
             ))}
             {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="min-h-[90px] border-b border-r border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50" />
+              <div key={`empty-${i}`} className="min-h-[90px] border-b border-r border-ih-border bg-ih-bg-muted" />
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
@@ -277,7 +277,7 @@ export default function CalendarPage() {
               return (
                 <div
                   key={day}
-                  className={`min-h-[90px] p-1.5 border-b border-r border-slate-100 dark:border-slate-700 cursor-pointer hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 transition-colors ${isToday(day) ? "bg-indigo-50/50 dark:bg-indigo-900/10" : ""}`}
+                  className={`min-h-[90px] p-1.5 border-b border-r border-ih-border cursor-pointer hover:bg-ih-primary-tint transition-colors ${isToday(day) ? "bg-ih-primary-tint" : ""}`}
                   onClick={() => handleDayClick(`${dateStr}T09:00`)}
                   onDragOver={(e) => { e.preventDefault(); setDragTarget(dateStr); }}
                   onDragLeave={() => setDragTarget(null)}
@@ -288,7 +288,7 @@ export default function CalendarPage() {
                     setDragTarget(null);
                   }}
                 >
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-medium ${isToday(day) ? "bg-indigo-600 text-white" : "text-slate-700 dark:text-slate-300"}`}>
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-medium ${isToday(day) ? "bg-ih-primary text-white" : "text-ih-fg-2"}`}>
                     {day}
                   </span>
                   <div className="mt-0.5 space-y-0.5">
@@ -304,7 +304,7 @@ export default function CalendarPage() {
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-slate-400 font-bold">+{dayEvents.length - 3} more</span>
+                      <span className="text-[10px] text-ih-fg-4 font-bold">+{dayEvents.length - 3} more</span>
                     )}
                   </div>
                 </div>
@@ -316,16 +316,16 @@ export default function CalendarPage() {
 
       {/* Week view */}
       {viewMode === "week" && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           {/* Day headers */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-200 dark:border-slate-700">
+          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border">
             <div className="py-2 px-1" />
             {weekDays.map((d) => (
-              <div key={d.toISOString()} className={`py-2 px-2 text-center border-l border-slate-200 dark:border-slate-700 ${isSameDay(d, today) ? "bg-indigo-50 dark:bg-indigo-900/10" : ""}`}>
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">
+              <div key={d.toISOString()} className={`py-2 px-2 text-center border-l border-ih-border ${isSameDay(d, today) ? "bg-ih-primary-tint" : ""}`}>
+                <span className="text-[10px] font-bold uppercase text-ih-fg-4 block">
                   {d.toLocaleDateString("en-US", { weekday: "short" })}
                 </span>
-                <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-indigo-600 dark:text-indigo-400" : "text-slate-700 dark:text-slate-300"}`}>
+                <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary" : "text-ih-fg-2"}`}>
                   {d.getDate()}
                 </span>
               </div>
@@ -334,8 +334,8 @@ export default function CalendarPage() {
           {/* Time slots */}
           <div className="max-h-[500px] overflow-y-auto">
             {hours.map((h) => (
-              <div key={h} className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-100 dark:border-slate-700 min-h-[48px]">
-                <div className="text-[10px] font-bold text-slate-400 text-right pr-2 pt-1">
+              <div key={h} className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border min-h-[48px]">
+                <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-1">
                   {h > 12 ? h - 12 : h}{h >= 12 ? "pm" : "am"}
                 </div>
                 {weekDays.map((d) => {
@@ -347,7 +347,7 @@ export default function CalendarPage() {
                   return (
                     <div
                       key={d.toISOString() + h}
-                      className="border-l border-slate-100 dark:border-slate-700 p-0.5 cursor-pointer hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10"
+                      className="border-l border-ih-border p-0.5 cursor-pointer hover:bg-ih-primary-tint"
                       onClick={() => handleDayClick(`${dateStr}T${String(h).padStart(2, "0")}:00`)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => {
@@ -378,7 +378,7 @@ export default function CalendarPage() {
 
       {/* Day view */}
       {viewMode === "day" && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="max-h-[600px] overflow-y-auto">
             {hours.map((h) => {
               const dayEvents = getEventsForDate(currentDate).filter((ev) => {
@@ -387,12 +387,12 @@ export default function CalendarPage() {
               });
               const dateStr = currentDate.toISOString().slice(0, 10);
               return (
-                <div key={h} className="flex border-b border-slate-100 dark:border-slate-700 min-h-[56px]">
-                  <div className="w-16 text-[11px] font-bold text-slate-400 text-right pr-3 pt-2 shrink-0">
+                <div key={h} className="flex border-b border-ih-border min-h-[56px]">
+                  <div className="w-16 text-[11px] font-bold text-ih-fg-4 text-right pr-3 pt-2 shrink-0">
                     {h > 12 ? h - 12 : h}:00 {h >= 12 ? "PM" : "AM"}
                   </div>
                   <div
-                    className="flex-1 p-1 cursor-pointer hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 border-l border-slate-100 dark:border-slate-700"
+                    className="flex-1 p-1 cursor-pointer hover:bg-ih-primary-tint border-l border-ih-border"
                     onClick={() => handleDayClick(`${dateStr}T${String(h).padStart(2, "0")}:00`)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
@@ -424,31 +424,31 @@ export default function CalendarPage() {
       {/* Event detail modal */}
       {eventModalOpen && selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEventModalOpen(false)}>
-          <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[16px] font-bold text-slate-900 dark:text-slate-100">{selectedEvent.title}</h2>
-              <button onClick={() => setEventModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">&times;</button>
+              <h2 className="text-[16px] font-bold text-ih-fg-1">{selectedEvent.title}</h2>
+              <button onClick={() => setEventModalOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
             </div>
-            <div className="space-y-2 text-[13px] text-slate-600 dark:text-slate-300">
+            <div className="space-y-2 text-[13px] text-ih-fg-3">
               <p>
-                <span className="font-bold text-slate-500 text-[11px] uppercase">Date:</span>{" "}
+                <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Date:</span>{" "}
                 {selectedEvent.start ? new Date(selectedEvent.start).toLocaleString() : "N/A"}
               </p>
               {selectedEvent.status && (
                 <p>
-                  <span className="font-bold text-slate-500 text-[11px] uppercase">Status:</span>{" "}
+                  <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Status:</span>{" "}
                   {selectedEvent.status.replace(/_/g, " ")}
                 </p>
               )}
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setEventModalOpen(false)} className="h-8 px-4 rounded-md border border-slate-200 dark:border-slate-700 text-[13px] font-medium text-slate-600">
+              <button onClick={() => setEventModalOpen(false)} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3">
                 Close
               </button>
               {selectedEvent.url && (
                 <button
                   onClick={() => { navigate(selectedEvent.url || `/inspections/${selectedEvent.id}/edit`); setEventModalOpen(false); }}
-                  className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700"
+                  className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
                 >
                   Open Inspection
                 </button>
@@ -456,7 +456,7 @@ export default function CalendarPage() {
               {!selectedEvent.url && (
                 <button
                   onClick={() => { navigate(`/inspections/${selectedEvent.id}/edit`); setEventModalOpen(false); }}
-                  className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700"
+                  className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
                 >
                   Open Inspection
                 </button>

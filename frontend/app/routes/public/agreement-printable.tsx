@@ -59,7 +59,7 @@ export default function AgreementPrintablePage() {
   if (error || !agreement) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-slate-500">Agreement not found.</p>
+        <p className="text-ih-fg-3">Agreement not found.</p>
       </div>
     );
   }
@@ -71,7 +71,7 @@ export default function AgreementPrintablePage() {
       <h1 className="text-[22px] font-bold tracking-tight mb-1 text-slate-900">
         {agreement.agreementName}
       </h1>
-      <div className="text-[10px] text-slate-500 font-mono mb-6">
+      <div className="text-[10px] text-ih-fg-3 font-mono mb-6">
         Envelope ID: {agreement.envelopeId}
       </div>
 
@@ -83,7 +83,7 @@ export default function AgreementPrintablePage() {
 
       {/* Signature block */}
       <div className="mt-12 pt-6 border-t border-slate-200">
-        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-3">
+        <div className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-3 mb-3">
           Signed by
         </div>
         <div className="flex items-end gap-8">
@@ -100,12 +100,12 @@ export default function AgreementPrintablePage() {
             <div className="text-[13px] font-semibold text-slate-900">
               {agreement.clientName ?? agreement.clientEmail}
             </div>
-            <div className="text-[10px] text-slate-500 font-mono">
+            <div className="text-[10px] text-ih-fg-3 font-mono">
               {agreement.clientEmail}
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
               Date signed (UTC)
             </div>
             <div className="text-[13px] font-semibold text-slate-900">

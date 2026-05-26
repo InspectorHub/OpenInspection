@@ -38,7 +38,7 @@ export function SpeedMode({ item, sectionTitle, result, onRating, onPrev, onNext
       {/* Top bar */}
       <div className="h-12 flex items-center justify-between px-4 border-b border-slate-700">
         <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wide">{sectionTitle}</span>
-        <span className="text-[12px] text-slate-500 font-mono">{currentIndex + 1} / {totalCount}</span>
+        <span className="text-[12px] text-ih-fg-3 font-mono">{currentIndex + 1} / {totalCount}</span>
         <button onClick={onExit} className="text-[12px] text-slate-400 hover:text-white">Exit Speed Mode</button>
       </div>
 
@@ -68,7 +68,7 @@ export function SpeedMode({ item, sectionTitle, result, onRating, onPrev, onNext
       </div>
 
       {/* Footer */}
-      <div className="h-10 flex items-center justify-center text-[11px] text-slate-500 border-t border-slate-700">
+      <div className="h-10 flex items-center justify-center text-[11px] text-ih-fg-3 border-t border-slate-700">
         Press <kbd className="mx-1 px-1.5 py-0.5 bg-slate-800 rounded text-[10px] font-mono border border-slate-700">Z</kbd> or <kbd className="mx-1 px-1.5 py-0.5 bg-slate-800 rounded text-[10px] font-mono border border-slate-700">Esc</kbd> to exit
       </div>
     </div>

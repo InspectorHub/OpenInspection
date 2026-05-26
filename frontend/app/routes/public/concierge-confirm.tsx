@@ -118,14 +118,14 @@ export default function ConciergeConfirmPage() {
           : "The link may have been mistyped, or the booking was cancelled. Get in touch with your agent.";
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-[480px] w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-9">
+        <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-9">
           <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center text-2xl font-bold mb-4">
             !
           </div>
-          <h1 className="font-serif text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">
+          <h1 className="font-serif text-2xl font-bold mb-2 text-ih-fg-1">
             {headline}
           </h1>
-          <p className="text-[15px] text-slate-500 dark:text-slate-400 leading-relaxed">
+          <p className="text-[15px] text-ih-fg-3 leading-relaxed">
             {body}
           </p>
         </div>
@@ -136,22 +136,22 @@ export default function ConciergeConfirmPage() {
   const inspectorName = data.inspector.name || data.inspector.email || "your inspector";
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900">
+    <div className="min-h-screen bg-ih-bg-card">
       <main className="max-w-[640px] mx-auto px-5 py-10">
         {/* Brand */}
-        <div className="flex items-center gap-2.5 font-serif text-lg font-bold mb-10 text-slate-900 dark:text-slate-100">
+        <div className="flex items-center gap-2.5 font-serif text-lg font-bold mb-10 text-ih-fg-1">
           <span className="w-8 h-8 rounded-lg bg-[#F55A1A] text-white flex items-center justify-center font-bold text-sm">
             O
           </span>
           <span>OpenInspection</span>
         </div>
 
-        <h1 className="font-serif text-[2rem] font-bold leading-tight mb-2 text-slate-900 dark:text-slate-100">
+        <h1 className="font-serif text-[2rem] font-bold leading-tight mb-2 text-ih-fg-1">
           Confirm your inspection
         </h1>
-        <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
+        <p className="text-base text-ih-fg-3 leading-relaxed mb-8">
           {data.inspector.name ? (
-            <strong className="text-slate-900 dark:text-slate-100">
+            <strong className="text-ih-fg-1">
               {data.inspector.name}
             </strong>
           ) : (
@@ -162,8 +162,8 @@ export default function ConciergeConfirmPage() {
         </p>
 
         {/* Summary card */}
-        <article className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden mb-6">
-          <div className="flex items-center gap-4 p-7 border-b border-slate-200 dark:border-slate-700">
+        <article className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden mb-6">
+          <div className="flex items-center gap-4 p-7 border-b border-ih-border">
             {data.inspector.photoUrl ? (
               <span className="w-[72px] h-[72px] rounded-full overflow-hidden shrink-0 bg-orange-50 dark:bg-orange-900/20">
                 <img
@@ -178,37 +178,37 @@ export default function ConciergeConfirmPage() {
               </span>
             )}
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500 mb-1">
+              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4 mb-1">
                 Your inspector
               </div>
-              <div className="font-serif text-2xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+              <div className="font-serif text-2xl font-bold text-ih-fg-1 leading-tight">
                 {inspectorName}
               </div>
             </div>
           </div>
           <div className="p-6 space-y-3.5">
             <div>
-              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4">
                 Property
               </span>
-              <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              <span className="text-base font-semibold text-ih-fg-1">
                 {data.inspection.propertyAddress}
               </span>
             </div>
             <div>
-              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4">
                 Date
               </span>
-              <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              <span className="text-base font-semibold text-ih-fg-1">
                 {data.inspection.date}
               </span>
             </div>
             {data.inspection.clientName && (
               <div>
-                <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+                <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4">
                   Client
                 </span>
-                <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                <span className="text-base font-semibold text-ih-fg-1">
                   {data.inspection.clientName}
                 </span>
               </div>
@@ -218,24 +218,24 @@ export default function ConciergeConfirmPage() {
 
         {/* Agreement preview */}
         {data.inspection.agreementRequired && data.agreementSnippet && (
-          <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 mb-6">
-            <h3 className="font-serif text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+          <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6 mb-6">
+            <h3 className="font-serif text-lg font-bold text-ih-fg-1 mb-2">
               Inspection agreement (preview)
             </h3>
-            <p className="text-[15px] italic text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-[15px] italic text-ih-fg-3 leading-relaxed">
               {data.agreementSnippet}
             </p>
-            <p className="mt-3.5 text-[13px] text-slate-400 dark:text-slate-500">
+            <p className="mt-3.5 text-[13px] text-ih-fg-4">
               After confirming you'll be taken to the full agreement to read and e-sign.
             </p>
           </section>
         )}
         {data.inspection.agreementRequired && !data.agreementSnippet && (
-          <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 mb-6">
-            <h3 className="font-serif text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+          <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6 mb-6">
+            <h3 className="font-serif text-lg font-bold text-ih-fg-1 mb-2">
               Inspection agreement
             </h3>
-            <p className="text-[15px] italic text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="text-[15px] italic text-ih-fg-3 leading-relaxed">
               After confirming you'll be taken to the full inspection agreement to read and e-sign.
             </p>
           </section>
@@ -252,7 +252,7 @@ export default function ConciergeConfirmPage() {
             {submitting ? "Confirming..." : "Confirm and continue"}
           </button>
           {actionData?.error && (
-            <div className="mt-3 px-4 py-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-[14px] text-rose-700 dark:text-rose-300">
+            <div className="mt-3 px-4 py-3 bg-ih-bad-bg border border-ih-bad rounded-lg text-[14px] text-ih-bad-fg">
               {actionData.error}
             </div>
           )}

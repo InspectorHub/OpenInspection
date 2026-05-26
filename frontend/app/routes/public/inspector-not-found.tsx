@@ -24,14 +24,14 @@ export default function InspectorNotFoundPage() {
   const { slug, companyName } = useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-card">
       <div className="max-w-[420px] text-center">
-        <h1 className="font-serif text-[32px] font-semibold mb-4 text-slate-900 dark:text-slate-100">
+        <h1 className="font-serif text-[32px] font-semibold mb-4 text-ih-fg-1">
           Inspector not found
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed">
+        <p className="text-ih-fg-3 text-[15px] leading-relaxed">
           We couldn't find an inspector with the link{" "}
-          <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[13px] font-mono">
+          <code className="bg-ih-bg-muted px-1.5 py-0.5 rounded text-[13px] font-mono">
             /inspector/{slug}
           </code>
           {companyName ? ` at ${companyName}` : ""}. Double-check with whoever

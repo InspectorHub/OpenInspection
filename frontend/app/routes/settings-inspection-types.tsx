@@ -83,30 +83,30 @@ export default function SettingsInspectionTypes() {
 
   return (
     <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
         <Link
           to="/settings"
-          className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          className="hover:text-ih-primary transition-colors"
         >
           Settings
         </Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">
+        <span className="text-ih-fg-1">
           Inspection types
         </span>
       </div>
 
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">
+      <h2 className="text-[19px] font-bold text-ih-fg-1">
         Inspection types
       </h2>
 
       {/* Platform subtypes */}
       <section className="space-y-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
             Platform
           </p>
-          <p className="text-[12px] text-slate-500 mt-0.5">
+          <p className="text-[12px] text-ih-fg-3 mt-0.5">
             Standard types that ship with the platform.
           </p>
         </div>
@@ -114,24 +114,24 @@ export default function SettingsInspectionTypes() {
           {platformSubtypes.map((pt) => (
             <div
               key={pt.slug}
-              className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+              className="p-4 bg-ih-bg-card border border-ih-border rounded-lg"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[13px] text-slate-900 dark:text-slate-100">
+                  <p className="font-bold text-[13px] text-ih-fg-1">
                     {pt.name}
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-ih-fg-3 mt-1">
                     {pt.templateCount} templates &middot; {pt.inspectionCount}{" "}
                     inspections
                   </p>
                 </div>
                 <span
                   className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${
-                    pt.enabled
-                      ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                      : "border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-500"
-                  }`}
+ pt.enabled
+ ? "border-ih-ok-fg/20 bg-emerald-50 dark:bg-emerald-900/30 text-ih-ok-fg"
+ : "border-ih-border bg-ih-bg-muted text-ih-fg-3"
+ }`}
                 >
                   {pt.enabled ? "Enabled" : "Disabled"}
                 </span>
@@ -145,24 +145,24 @@ export default function SettingsInspectionTypes() {
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
               Your organization
             </p>
-            <p className="text-[12px] text-slate-500 mt-0.5">
+            <p className="text-[12px] text-ih-fg-3 mt-0.5">
               Custom types based on platform types.
             </p>
           </div>
           <button
             onClick={openAdd}
-            className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors"
+            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
           >
             + Add custom subtype
           </button>
         </div>
 
         {orgSubtypes.length === 0 ? (
-          <div className="text-center py-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-            <p className="font-bold text-[14px] text-slate-600 dark:text-slate-400">
+          <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
+            <p className="font-bold text-[14px] text-ih-fg-3">
               No custom subtypes yet.
             </p>
           </div>
@@ -171,14 +171,14 @@ export default function SettingsInspectionTypes() {
             {orgSubtypes.map((ot) => (
               <div
                 key={ot.id}
-                className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                className="p-4 bg-ih-bg-card border border-ih-border rounded-lg"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[13px] text-slate-900 dark:text-slate-100">
+                    <p className="font-bold text-[13px] text-ih-fg-1">
                       {ot.name}
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-1">
+                    <p className="text-[11px] text-ih-fg-3 mt-1">
                       {ot.templateCount} templates &middot;{" "}
                       {ot.inspectionCount} inspections
                     </p>
@@ -186,17 +186,17 @@ export default function SettingsInspectionTypes() {
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => openEdit(ot)}
-                      className="text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+                      className="text-[12px] text-ih-primary hover:underline font-bold"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => toggleOrg(ot)}
                       className={`text-[12px] font-bold hover:underline ${
-                        ot.enabled
-                          ? "text-slate-500"
-                          : "text-emerald-700 dark:text-emerald-400"
-                      }`}
+ ot.enabled
+ ? "text-ih-fg-3"
+ : "text-ih-ok-fg"
+ }`}
                     >
                       {ot.enabled ? "Disable" : "Enable"}
                     </button>
@@ -215,13 +215,13 @@ export default function SettingsInspectionTypes() {
             className="absolute inset-0 bg-black/40"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
-            <h3 className="text-[16px] font-bold text-slate-900 dark:text-slate-100">
+          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+            <h3 className="text-[16px] font-bold text-ih-fg-1">
               {editingId ? "Edit custom subtype" : "Add custom subtype"}
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   Name
                 </label>
                 <input
@@ -231,11 +231,11 @@ export default function SettingsInspectionTypes() {
                     setForm((f) => ({ ...f, name: e.target.value }))
                   }
                   placeholder="e.g., Medical Office"
-                  className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   Based on
                 </label>
                 <select
@@ -243,7 +243,7 @@ export default function SettingsInspectionTypes() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, basedOn: e.target.value }))
                   }
-                  className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 >
                   <option value="">Select a platform type...</option>
                   {platformSubtypes.map((pt) => (
@@ -254,7 +254,7 @@ export default function SettingsInspectionTypes() {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   Description
                 </label>
                 <textarea
@@ -264,21 +264,21 @@ export default function SettingsInspectionTypes() {
                   }
                   rows={2}
                   placeholder="Optional details..."
-                  className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setModalOpen(false)}
-                className="px-4 py-2 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={save}
                 disabled={saving}
-                className="px-4 py-2 rounded-md bg-indigo-600 text-white text-[13px] font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save"}
               </button>

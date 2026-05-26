@@ -146,7 +146,7 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
             {captures.map((c) => (
               <div key={c.id} className="relative flex-shrink-0">
                 <img src={c.url} className="w-16 h-16 object-cover rounded-md border-2 border-white/30" alt="Captured frame" />
-                <button type="button" onClick={() => discardOne(c.id)} className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center hover:bg-rose-600" aria-label="Discard this frame">x</button>
+                <button type="button" onClick={() => discardOne(c.id)} className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-ih-bad-bg0 text-white text-xs font-bold flex items-center justify-center hover:bg-rose-600" aria-label="Discard this frame">x</button>
               </div>
             ))}
           </div>
@@ -172,14 +172,14 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
           data-testid="burst-shutter"
         >
           {burstActive ? (
-            <span className="text-rose-600 text-xs font-bold animate-pulse">{burstCount} / 30</span>
+            <span className="text-ih-bad-fg text-xs font-bold animate-pulse">{burstCount} / 30</span>
           ) : (
             <span className="text-slate-700 text-[10px] font-bold tracking-widest uppercase">Shoot</span>
           )}
         </button>
 
         {captures.length > 0 ? (
-          <button type="button" onClick={commit} className="px-5 py-2.5 rounded-full bg-indigo-500 text-white text-sm font-bold shadow-lg hover:bg-indigo-600" data-testid="burst-done">
+          <button type="button" onClick={commit} className="px-5 py-2.5 rounded-full bg-indigo-500 text-white text-sm font-bold shadow-lg hover:bg-ih-primary" data-testid="burst-done">
             {uploading ? "Uploading..." : "Done"}
           </button>
         ) : <div className="w-20" />}

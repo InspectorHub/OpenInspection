@@ -90,7 +90,7 @@ export function AddressAutocomplete({
   return (
     <div className="relative">
       <label className="block">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Site address</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Site address</span>
         <input
           ref={inputRef}
           type="text"
@@ -105,12 +105,12 @@ export function AddressAutocomplete({
           aria-autocomplete="list"
           aria-controls="address-listbox"
           aria-expanded={results.length > 0}
-          className="mt-1 w-full h-10 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none text-[14px] font-medium text-slate-900 dark:text-slate-100 transition-colors"
+          className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[14px] font-medium text-ih-fg-1 transition-colors"
         />
       </label>
 
       {results.length > 0 && (
-        <ul id="address-listbox" role="listbox" className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg">
+        <ul id="address-listbox" role="listbox" className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-md bg-ih-bg-card border border-ih-border shadow-lg">
           {results.map((r, idx) => (
             <li
               key={`${r.placeId}-${idx}`}
@@ -118,7 +118,7 @@ export function AddressAutocomplete({
               aria-selected={idx === focusIdx}
               onClick={() => handleSelect(r)}
               onMouseEnter={() => setFocusIdx(idx)}
-              className={`px-3 py-2 text-[13px] cursor-pointer transition-colors ${idx === focusIdx ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-200" : "text-slate-700 dark:text-slate-300"}`}
+              className={`px-3 py-2 text-[13px] cursor-pointer transition-colors ${idx === focusIdx ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3"}`}
             >
               {r.label}
             </li>

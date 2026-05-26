@@ -19,8 +19,8 @@ export function StatsCards({ total, satisfactory, monitor, defects }: StatsCards
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <StatCard label="TOTAL ITEMS" value={total} borderClass="border-gray-300" textClass="theme-text-muted" />
       <StatCard label="SATISFACTORY" value={satisfactory} borderClass="border-green-400" textClass="text-green-600" />
-      <StatCard label="MONITOR" value={monitor} borderClass="border-amber-400" textClass="text-amber-600" />
-      <StatCard label="DEFECTS" value={defects} borderClass="border-rose-400" textClass="text-rose-600" />
+      <StatCard label="MONITOR" value={monitor} borderClass="border-amber-400" textClass="text-ih-watch-fg" />
+      <StatCard label="DEFECTS" value={defects} borderClass="border-rose-400" textClass="text-ih-bad-fg" />
     </div>
   );
 }

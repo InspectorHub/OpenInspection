@@ -50,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           body { font-family: 'Inter', sans-serif; }
         ` }} />
       </head>
-      <body className="bg-[#f8fafc] dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased min-h-screen">
+      <body className="bg-ih-bg-app text-ih-fg-1 antialiased min-h-screen">
         {children}
         <ScrollRestoration />
         <Scripts />

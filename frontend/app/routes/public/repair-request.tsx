@@ -61,21 +61,21 @@ const CATEGORY_TONE: Record<
   { bg: string; text: string; ring: string; label: string }
 > = {
   safety: {
-    bg: "bg-rose-50 dark:bg-rose-900/20",
-    text: "text-rose-700 dark:text-rose-300",
+    bg: "bg-ih-bad-bg",
+    text: "text-ih-bad-fg",
     ring: "ring-rose-200 dark:ring-rose-800",
     label: "Safety",
   },
   recommendation: {
-    bg: "bg-amber-50 dark:bg-amber-900/20",
-    text: "text-amber-700 dark:text-amber-300",
+    bg: "bg-ih-watch-bg",
+    text: "text-ih-watch-fg",
     ring: "ring-amber-200 dark:ring-amber-800",
     label: "Recommend",
   },
   maintenance: {
     bg: "bg-slate-50 dark:bg-slate-700/50",
-    text: "text-slate-700 dark:text-slate-300",
-    ring: "ring-slate-200 dark:ring-slate-600",
+    text: "text-ih-fg-3",
+    ring: "ring-ih-border",
     label: "Maintain",
   },
 };
@@ -121,7 +121,7 @@ export default function CustomerRepairRequestPage() {
   if (error || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-slate-500">Repair request not found.</p>
+        <p className="text-ih-fg-3">Repair request not found.</p>
       </div>
     );
   }
@@ -161,19 +161,19 @@ export default function CustomerRepairRequestPage() {
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">
           Repair Request
         </p>
-        <h1 className="text-[24px] sm:text-[28px] font-semibold tracking-tight text-slate-900 dark:text-slate-100 leading-tight">
+        <h1 className="text-[24px] sm:text-[28px] font-semibold tracking-tight text-ih-fg-1 leading-tight">
           {data.propertyAddress}
         </h1>
-        <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2">
+        <p className="text-[13px] text-ih-fg-3 mt-2">
           Generated from your inspection report. Review the items below, add any
           comments for your contractor, then print this list or email a copy to yourself.
         </p>
         {(data.inspectionDate || data.inspectorName) && (
-          <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[12px] text-ih-fg-3 mt-1">
             {data.inspectionDate && (
               <span>
                 Inspected{" "}
-                <strong className="text-slate-700 dark:text-slate-300">
+                <strong className="text-ih-fg-3">
                   {data.inspectionDate}
                 </strong>
               </span>
@@ -182,7 +182,7 @@ export default function CustomerRepairRequestPage() {
               <span>
                 {" "}
                 &middot; By{" "}
-                <strong className="text-slate-700 dark:text-slate-300">
+                <strong className="text-ih-fg-3">
                   {data.inspectorName}
                 </strong>
               </span>
@@ -214,7 +214,7 @@ export default function CustomerRepairRequestPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="flex-1 h-9 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] text-slate-900 dark:text-slate-100 placeholder-slate-400 bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="flex-1 h-9 px-3 rounded-md border border-ih-border text-[13px] text-ih-fg-1 placeholder-slate-400 bg-ih-bg-card focus:outline-none focus:ring-2 focus:ring-slate-300"
           />
           <button
             type="button"
@@ -232,8 +232,8 @@ export default function CustomerRepairRequestPage() {
         <div
           className={`print:hidden mb-4 px-4 py-2 rounded-md text-[13px] font-semibold ${
             toast.error
-              ? "bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-              : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+              ? "bg-ih-bad-bg text-ih-bad-fg border border-ih-bad"
+              : "bg-ih-ok-bg text-ih-ok-fg border border-ih-ok"
           }`}
         >
           {toast.text}
@@ -242,11 +242,11 @@ export default function CustomerRepairRequestPage() {
 
       {/* Empty state */}
       {data.defects.length === 0 && (
-        <div className="text-center py-12 px-6 rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-          <p className="text-[14px] text-emerald-700 dark:text-emerald-300 font-semibold">
+        <div className="text-center py-12 px-6 rounded-md bg-ih-ok-bg border border-ih-ok">
+          <p className="text-[14px] text-ih-ok-fg font-semibold">
             Good news! No defects were flagged on your inspection.
           </p>
-          <p className="text-[12px] text-emerald-600 dark:text-emerald-400 mt-1">
+          <p className="text-[12px] text-ih-ok-fg mt-1">
             There is nothing to request a repair for.
           </p>
         </div>
@@ -255,11 +255,11 @@ export default function CustomerRepairRequestPage() {
       {/* Defects grouped by section */}
       {grouped.map((group) => (
         <section key={group.sectionId} className="space-y-3 mb-8">
-          <header className="flex items-baseline justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-            <h2 className="text-[14px] font-bold text-slate-900 dark:text-slate-100">
+          <header className="flex items-baseline justify-between border-b border-ih-border pb-2">
+            <h2 className="text-[14px] font-bold text-ih-fg-1">
               {group.sectionTitle}
             </h2>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+            <span className="text-[11px] text-ih-fg-4 font-mono">
               {group.items.length} item{group.items.length === 1 ? "" : "s"}
             </span>
           </header>
@@ -272,7 +272,7 @@ export default function CustomerRepairRequestPage() {
               return (
                 <li
                   key={d.itemId}
-                  className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-4"
+                  className="rounded-md border border-ih-border bg-ih-bg-card px-5 py-4"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex-1 min-w-0">
@@ -282,15 +282,15 @@ export default function CustomerRepairRequestPage() {
                         >
                           {tone.label}
                         </span>
-                        <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                        <span className="text-[11px] font-mono text-ih-fg-4">
                           {group.sectionTitle} &rsaquo; {d.itemLabel}
                         </span>
                       </div>
-                      <p className="text-[14px] font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                      <p className="text-[14px] font-semibold text-ih-fg-1 leading-snug">
                         {d.itemLabel}
                       </p>
                       {d.location && (
-                        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        <p className="text-[12px] text-ih-fg-3 mt-0.5">
                           Location: {d.location}
                         </p>
                       )}
@@ -303,13 +303,13 @@ export default function CustomerRepairRequestPage() {
                   </div>
 
                   {d.comment && (
-                    <p className="text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                    <p className="text-[13px] text-ih-fg-3 leading-relaxed whitespace-pre-line">
                       {d.comment}
                     </p>
                   )}
 
                   {showEstimateBadge && (
-                    <div className="mt-3 inline-flex items-center px-2 py-1 rounded-md text-[12px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 tabular-nums">
+                    <div className="mt-3 inline-flex items-center px-2 py-1 rounded-md text-[12px] font-semibold bg-ih-ok-bg text-ih-ok-fg tabular-nums">
                       Estimated cost: {lo || "$?"} - {hi || "$?"}
                     </div>
                   )}
@@ -321,7 +321,7 @@ export default function CustomerRepairRequestPage() {
                           key={p.key}
                           src={p.url}
                           alt={`${d.itemLabel} photo ${pi + 1}`}
-                          className="w-full h-24 object-cover rounded border border-slate-200 dark:border-slate-700"
+                          className="w-full h-24 object-cover rounded border border-ih-border"
                           loading="lazy"
                         />
                       ))}
@@ -339,7 +339,7 @@ export default function CustomerRepairRequestPage() {
                     <textarea
                       id={`crr-note-${d.itemId}-${idx}`}
                       rows={2}
-                      className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] text-slate-900 dark:text-slate-100 placeholder-slate-400 bg-slate-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                      className="w-full px-3 py-2 rounded-md border border-ih-border text-[13px] text-ih-fg-1 placeholder-slate-400 bg-slate-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
                       placeholder="Optional comment (e.g. preferred quote scope, timing, access details)"
                       onChange={(e) =>
                         setItemNotes((prev) => ({
@@ -356,8 +356,8 @@ export default function CustomerRepairRequestPage() {
         </section>
       ))}
 
-      <footer className="print:hidden mt-12 pt-6 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 dark:text-slate-500 text-center">
-        Generated by <strong className="text-slate-600 dark:text-slate-400">OpenInspection</strong>.
+      <footer className="print:hidden mt-12 pt-6 border-t border-ih-border text-[11px] text-ih-fg-4 text-center">
+        Generated by <strong className="text-ih-fg-3">OpenInspection</strong>.
         This list reflects items flagged in your inspection report and does not constitute a
         legally binding contract or repair scope.
       </footer>

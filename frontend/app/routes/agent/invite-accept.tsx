@@ -100,17 +100,17 @@ export default function AgentInviteAcceptPage() {
   // Invite expired / missing -- redirect to expired page
   if (loaderError || !invite) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900 p-6">
+      <div className="min-h-screen flex items-center justify-center bg-ih-bg-card p-6">
         <div className="max-w-md text-center">
-          <h1 className="font-serif text-2xl font-bold mb-3 text-slate-900 dark:text-slate-100">
+          <h1 className="font-serif text-2xl font-bold mb-3 text-ih-fg-1">
             Invite unavailable
           </h1>
-          <p className="text-[15px] text-slate-500 dark:text-slate-400 mb-6">
+          <p className="text-[15px] text-ih-fg-3 mb-6">
             This invite link is expired, already used, or invalid.
           </p>
           <a
             href="/agent-signup"
-            className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
+            className="inline-block px-6 py-3 bg-ih-primary text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
           >
             Sign up directly instead
           </a>
@@ -120,25 +120,25 @@ export default function AgentInviteAcceptPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900">
+    <div className="min-h-screen bg-ih-bg-card">
       <div className="max-w-[540px] mx-auto px-6 py-14">
         {/* Brand */}
         <div className="flex items-center gap-3 mb-10">
           <img src="/logo.svg" alt="" className="w-8 h-8" />
-          <span className="font-serif font-bold text-lg tracking-tight text-slate-900 dark:text-slate-100">
+          <span className="font-serif font-bold text-lg tracking-tight text-ih-fg-1">
             OpenInspection
           </span>
         </div>
 
-        <h1 className="font-serif font-bold text-4xl leading-tight tracking-tight mb-3 text-slate-900 dark:text-slate-100">
+        <h1 className="font-serif font-bold text-4xl leading-tight tracking-tight mb-3 text-ih-fg-1">
           You're invited
         </h1>
-        <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed mb-9">
-          <strong className="text-slate-900 dark:text-slate-100">
+        <p className="text-base text-ih-fg-3 leading-relaxed mb-9">
+          <strong className="text-ih-fg-1">
             {invite.inspector.name}
           </strong>{" "}
           at{" "}
-          <strong className="text-slate-900 dark:text-slate-100">
+          <strong className="text-ih-fg-1">
             {invite.tenantName}
           </strong>{" "}
           has invited you to be a partner agent. See every inspection your
@@ -146,8 +146,8 @@ export default function AgentInviteAcceptPage() {
         </p>
 
         {/* Inspector hero band */}
-        <div className="flex items-center gap-4 p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl mb-8">
-          <div className="w-14 h-14 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-serif font-bold text-xl shrink-0 overflow-hidden">
+        <div className="flex items-center gap-4 p-5 bg-ih-bg-card border border-ih-border rounded-2xl mb-8">
+          <div className="w-14 h-14 rounded-full bg-ih-primary-tint text-ih-primary flex items-center justify-center font-serif font-bold text-xl shrink-0 overflow-hidden">
             {invite.inspector.photoUrl ? (
               <img
                 src={invite.inspector.photoUrl}
@@ -159,10 +159,10 @@ export default function AgentInviteAcceptPage() {
             )}
           </div>
           <div>
-            <div className="font-semibold text-base text-slate-900 dark:text-slate-100">
+            <div className="font-semibold text-base text-ih-fg-1">
               {invite.inspector.name}
             </div>
-            <div className="text-[14px] text-slate-500 dark:text-slate-400 mt-0.5">
+            <div className="text-[14px] text-ih-fg-3 mt-0.5">
               {invite.tenantName}
             </div>
           </div>
@@ -177,13 +177,13 @@ export default function AgentInviteAcceptPage() {
           ].map((v) => (
             <div
               key={v.title}
-              className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center"
+              className="p-4 bg-ih-bg-card border border-ih-border rounded-xl text-center"
             >
               <div className="text-2xl mb-2">{v.icon}</div>
-              <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+              <div className="text-[13px] font-semibold text-ih-fg-1 leading-snug">
                 {v.title}
               </div>
-              <div className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+              <div className="text-[12px] text-ih-fg-3 mt-1">
                 {v.sub}
               </div>
             </div>
@@ -198,7 +198,7 @@ export default function AgentInviteAcceptPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-[13px] font-semibold text-slate-600 dark:text-slate-400 mb-2"
+                className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
               >
                 Email
               </label>
@@ -208,13 +208,13 @@ export default function AgentInviteAcceptPage() {
                 name="email"
                 value={invite.inviteEmail}
                 readOnly
-                className="w-full px-4 py-3 text-[15px] bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                className="w-full px-4 py-3 text-[15px] bg-ih-bg-muted border border-ih-border rounded-xl text-ih-fg-3 cursor-not-allowed"
               />
             </div>
             <div>
               <label
                 htmlFor="name"
-                className="block text-[13px] font-semibold text-slate-600 dark:text-slate-400 mb-2"
+                className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
               >
                 Your full name
               </label>
@@ -225,13 +225,13 @@ export default function AgentInviteAcceptPage() {
                 placeholder="Jane Smith"
                 required
                 minLength={2}
-                className="w-full px-4 py-3 text-[15px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-slate-900 dark:text-slate-100"
+                className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
               />
             </div>
             <div>
               <label
                 htmlFor="password"
-                className="block text-[13px] font-semibold text-slate-600 dark:text-slate-400 mb-2"
+                className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
               >
                 Create a password
               </label>
@@ -242,7 +242,7 @@ export default function AgentInviteAcceptPage() {
                 placeholder="At least 12 characters"
                 required
                 minLength={12}
-                className="w-full px-4 py-3 text-[15px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-slate-900 dark:text-slate-100"
+                className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
               />
             </div>
           </div>
@@ -250,19 +250,19 @@ export default function AgentInviteAcceptPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-indigo-600 rounded-xl hover:opacity-90 active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-ih-primary rounded-xl hover:opacity-90 active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {submitting ? "Setting up your account..." : "Accept invitation"}
           </button>
 
           {actionData?.error && (
-            <div className="mt-4 px-4 py-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-[14px] text-rose-700 dark:text-rose-300">
+            <div className="mt-4 px-4 py-3 rounded-lg bg-ih-bad-bg border border-ih-bad text-[14px] text-ih-bad-fg">
               {actionData.error}
             </div>
           )}
         </Form>
 
-        <p className="mt-10 text-xs text-slate-400 dark:text-slate-500 text-center leading-relaxed">
+        <p className="mt-10 text-xs text-ih-fg-4 text-center leading-relaxed">
           By accepting you agree to receive notifications when your referrals
           are inspected. You can unsubscribe at any time.
         </p>

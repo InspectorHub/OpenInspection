@@ -20,7 +20,7 @@ export function TeamCredit({ team, nachi }: TeamCreditProps) {
               {(m.name || "?").slice(0, 2).toUpperCase()}
             </div>
             <span className="font-medium">{m.name}</span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ih-fg-3">
               {m.role}
               {m.reviewedBy ? ` · reviewed by ${m.reviewedBy}` : ""}
             </span>
@@ -29,8 +29,8 @@ export function TeamCredit({ team, nachi }: TeamCreditProps) {
       </ul>
 
       {nachi && (
-        <div className="mt-6 flex items-center gap-2 text-xs text-slate-500">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 font-bold">
+        <div className="mt-6 flex items-center gap-2 text-xs text-ih-fg-3">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-ih-watch-bg border border-ih-watch text-amber-800 font-bold">
             InterNACHI #<span className="font-mono">{nachi}</span>
           </span>
           <span>Signed with Ed25519 audit chain</span>

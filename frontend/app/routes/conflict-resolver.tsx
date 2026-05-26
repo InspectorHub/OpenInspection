@@ -98,10 +98,10 @@ export default function ConflictResolverPage() {
   if (error) {
     return (
       <div className="max-w-3xl mx-auto p-8 text-center">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+        <h1 className="text-2xl font-bold text-ih-fg-1">
           Conflict Resolver
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">{error}</p>
+        <p className="text-ih-fg-3 mt-2">{error}</p>
       </div>
     );
   }
@@ -111,10 +111,10 @@ export default function ConflictResolverPage() {
   return (
     <div className="max-w-6xl mx-auto py-8 px-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+        <h1 className="text-2xl font-bold text-ih-fg-1">
           Resolve Conflicts
         </h1>
-        <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-[13px] text-ih-fg-3 mt-1">
           {conflicts.length} conflict{conflicts.length !== 1 ? "s" : ""} detected — choose which version to keep for each field.
         </p>
       </div>
@@ -131,11 +131,11 @@ export default function ConflictResolverPage() {
             return (
               <div
                 key={c.id}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden"
+                className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden"
               >
                 {/* Field label */}
-                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700">
-                  <p className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                <div className="px-5 py-3 bg-ih-bg-app/30 border-b border-ih-border">
+                  <p className="text-[13px] font-semibold text-ih-fg-1">
                     {c.item}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
@@ -151,14 +151,14 @@ export default function ConflictResolverPage() {
                     onClick={() => setResolved((p) => ({ ...p, [c.id]: "base" }))}
                     className={`p-4 text-left transition-colors ${
                       choice === "base"
-                        ? "bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-inset ring-indigo-500"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-700/30"
+                        ? "bg-ih-primary-tint ring-2 ring-inset ring-indigo-500"
+                        : "hover:bg-ih-bg-muted/30"
                     }`}
                   >
                     <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
                       Base
                     </p>
-                    <p className="text-[13px] text-slate-700 dark:text-slate-300">
+                    <p className="text-[13px] text-ih-fg-3">
                       {c.base ?? <span className="italic text-slate-400">empty</span>}
                     </p>
                   </button>
@@ -169,14 +169,14 @@ export default function ConflictResolverPage() {
                     onClick={() => setResolved((p) => ({ ...p, [c.id]: "yours" }))}
                     className={`p-4 text-left transition-colors ${
                       choice === "yours"
-                        ? "bg-emerald-50 dark:bg-emerald-900/20 ring-2 ring-inset ring-emerald-500"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-700/30"
+                        ? "bg-ih-ok-bg ring-2 ring-inset ring-emerald-500"
+                        : "hover:bg-ih-bg-muted/30"
                     }`}
                   >
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-ih-ok-fg mb-2">
                       Yours
                     </p>
-                    <p className="text-[13px] text-slate-700 dark:text-slate-300">
+                    <p className="text-[13px] text-ih-fg-3">
                       {c.yours ?? <span className="italic text-slate-400">empty</span>}
                     </p>
                   </button>
@@ -187,14 +187,14 @@ export default function ConflictResolverPage() {
                     onClick={() => setResolved((p) => ({ ...p, [c.id]: "theirs" }))}
                     className={`p-4 text-left transition-colors ${
                       choice === "theirs"
-                        ? "bg-amber-50 dark:bg-amber-900/20 ring-2 ring-inset ring-amber-500"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-700/30"
+                        ? "bg-ih-watch-bg ring-2 ring-inset ring-amber-500"
+                        : "hover:bg-ih-bg-muted/30"
                     }`}
                   >
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-ih-watch-fg mb-2">
                       Theirs
                     </p>
-                    <p className="text-[13px] text-slate-700 dark:text-slate-300">
+                    <p className="text-[13px] text-ih-fg-3">
                       {c.theirs ?? <span className="italic text-slate-400">empty</span>}
                     </p>
                   </button>
@@ -215,13 +215,13 @@ export default function ConflictResolverPage() {
 
         {conflicts.length > 0 && (
           <div className="mt-6 flex items-center justify-between">
-            <p className="text-[13px] text-slate-500">
+            <p className="text-[13px] text-ih-fg-3">
               {Object.keys(resolved).length} of {conflicts.length} resolved
             </p>
             <button
               type="submit"
               disabled={!allResolved}
-              className="h-10 px-6 rounded-lg bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-10 px-6 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Apply Resolutions
             </button>

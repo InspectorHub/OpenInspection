@@ -64,67 +64,67 @@ export default function SettingsAnalyticsPage() {
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
         <Link
           to="/settings"
-          className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          className="hover:text-ih-primary transition-colors"
         >
           Settings
         </Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">
+        <span className="text-ih-fg-1">
           Analytics & Metrics
         </span>
       </div>
 
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">
+      <h2 className="text-[19px] font-bold text-ih-fg-1">
         Analytics & Metrics
       </h2>
-      <p className="text-[13px] text-slate-500">
+      <p className="text-[13px] text-ih-fg-3">
         Inspection volume, recurring defects, and team growth.
       </p>
 
       {error && (
-        <div className="px-4 py-2.5 rounded-md bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-[13px] text-rose-700 dark:text-rose-300">
+        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">
           {error}
         </div>
       )}
 
       {/* Inspections per month */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
+        <h3 className="text-sm font-bold text-ih-fg-1 mb-1">
           Inspections per month
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+        <p className="text-xs text-ih-fg-3 mb-4">
           12-month rolling trend. Chart renders when data is available.
         </p>
-        <div className="h-48 flex items-center justify-center border border-dashed border-slate-200 dark:border-slate-600 rounded-md">
-          <span className="text-xs text-slate-400 dark:text-slate-500">
+        <div className="h-48 flex items-center justify-center border border-dashed border-ih-border rounded-md">
+          <span className="text-xs text-ih-fg-4">
             {chartPlaceholder}
           </span>
         </div>
       </section>
 
       {/* Recurring defects */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
+        <h3 className="text-sm font-bold text-ih-fg-1 mb-1">
           Recurring defects
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+        <p className="text-xs text-ih-fg-3 mb-4">
           Most frequently flagged items across all inspections.
         </p>
         {defects.length === 0 ? (
-          <div className="text-xs text-slate-400 dark:text-slate-500 py-4 text-center">
+          <div className="text-xs text-ih-fg-4 py-4 text-center">
             No defect data yet
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-700 text-left">
-                <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+              <tr className="border-b border-ih-border text-left">
+                <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
                   Item
                 </th>
-                <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 text-right">
+                <th className="py-2 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 text-right">
                   Occurrences
                 </th>
               </tr>
@@ -133,12 +133,12 @@ export default function SettingsAnalyticsPage() {
               {defects.map((d) => (
                 <tr
                   key={d.name}
-                  className="border-b border-slate-50 dark:border-slate-700/50"
+                  className="border-b border-ih-border"
                 >
-                  <td className="py-2 text-slate-700 dark:text-slate-300">
+                  <td className="py-2 text-ih-fg-2">
                     {d.name}
                   </td>
-                  <td className="py-2 text-right font-mono text-slate-900 dark:text-slate-100">
+                  <td className="py-2 text-right font-mono text-ih-fg-1">
                     {d.count}
                   </td>
                 </tr>
@@ -149,11 +149,11 @@ export default function SettingsAnalyticsPage() {
       </section>
 
       {/* Team growth */}
-      <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
+        <h3 className="text-sm font-bold text-ih-fg-1 mb-1">
           Team growth
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+        <p className="text-xs text-ih-fg-3 mb-4">
           Active inspectors, specialists, and apprentices over time.
         </p>
         <div className="grid grid-cols-3 gap-4">
@@ -163,10 +163,10 @@ export default function SettingsAnalyticsPage() {
             { label: "Apprentices", value: teamCounts.apprentices },
           ].map((t) => (
             <div key={t.label} className="text-center">
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+              <div className="text-2xl font-bold text-ih-fg-1 tabular-nums">
                 {t.value}
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mt-1">
                 {t.label}
               </div>
             </div>

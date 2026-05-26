@@ -102,7 +102,7 @@ export function AgentCommandPalette({ inspectors, agentSlug, bookingHost }: Agen
       {open && (
         <div className="fixed inset-0 z-[10000] flex items-start justify-center pt-[12vh] px-4" role="dialog" aria-modal="true" aria-label="Agent command palette" data-testid="agent-command-palette">
           <div className="absolute inset-0 bg-stone-900/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-[36rem] bg-white dark:bg-slate-800 border border-stone-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[70vh]">
+          <div className="relative w-full max-w-[36rem] bg-ih-bg-card border border-stone-200 dark:border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[70vh]">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-stone-100 dark:border-white/5">
               <span className="font-bold text-lg tracking-tight text-stone-900 dark:text-slate-100 mr-auto" style={{ fontFamily: "'Fraunces', serif" }}>Quick search</span>
               <span className="text-[11px] text-stone-500 dark:text-slate-400 px-2 py-1 border border-stone-200 dark:border-white/10 rounded-md font-mono">Esc to close</span>
@@ -118,7 +118,7 @@ export function AgentCommandPalette({ inspectors, agentSlug, bookingHost }: Agen
                 autoComplete="off"
                 spellCheck={false}
                 placeholder="Jump to a page or run a quick action..."
-                className="flex-1 border-0 outline-0 bg-transparent text-[15px] text-stone-900 dark:text-slate-100 placeholder:text-stone-400 dark:placeholder:text-slate-500 py-1"
+                className="flex-1 border-0 outline-0 bg-transparent text-[15px] text-stone-900 dark:text-slate-100 placeholder:text-stone-400 dark:placeholder:text-ih-fg-3 py-1"
               />
             </div>
             <div className="flex-1 overflow-y-auto pb-2">
@@ -132,7 +132,7 @@ export function AgentCommandPalette({ inspectors, agentSlug, bookingHost }: Agen
                       <button
                         key={item.id}
                         type="button"
-                        className={`flex items-center gap-3 w-full px-5 py-2.5 text-left text-[15px] cursor-pointer transition-colors ${highlighted === vi ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-stone-900 dark:text-slate-200"}`}
+                        className={`flex items-center gap-3 w-full px-5 py-2.5 text-left text-[15px] cursor-pointer transition-colors ${highlighted === vi ? "bg-indigo-500/10 text-ih-primary" : "text-stone-900 dark:text-slate-200"}`}
                         onMouseEnter={() => setHighlighted(vi)}
                         onClick={() => activate(item)}
                         data-testid={`agent-cmdk-item-${item.id}`}
@@ -153,7 +153,7 @@ export function AgentCommandPalette({ inspectors, agentSlug, bookingHost }: Agen
                       <button
                         key={item.id}
                         type="button"
-                        className={`flex items-center gap-3 w-full px-5 py-2.5 text-left text-[15px] cursor-pointer transition-colors ${highlighted === vi ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-stone-900 dark:text-slate-200"}`}
+                        className={`flex items-center gap-3 w-full px-5 py-2.5 text-left text-[15px] cursor-pointer transition-colors ${highlighted === vi ? "bg-indigo-500/10 text-ih-primary" : "text-stone-900 dark:text-slate-200"}`}
                         onMouseEnter={() => setHighlighted(vi)}
                         onClick={() => activate(item)}
                         data-testid={`agent-cmdk-item-${item.id}`}
@@ -167,7 +167,7 @@ export function AgentCommandPalette({ inspectors, agentSlug, bookingHost }: Agen
               )}
             </div>
             <div className="flex items-center justify-between px-5 py-2.5 border-t border-stone-100 dark:border-white/5 bg-stone-50 dark:bg-white/[0.02] text-[11px] text-stone-500 dark:text-slate-400 tracking-wide">
-              <span><kbd className="bg-white dark:bg-slate-700 border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&uarr;</kbd><kbd className="bg-white dark:bg-slate-700 border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&darr;</kbd> navigate &middot; <kbd className="bg-white dark:bg-slate-700 border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&crarr;</kbd> open &middot; <kbd className="bg-white dark:bg-slate-700 border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&amp;#8984;K</kbd> toggle</span>
+              <span><kbd className="bg-ih-bg-card border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&uarr;</kbd><kbd className="bg-ih-bg-card border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&darr;</kbd> navigate &middot; <kbd className="bg-ih-bg-card border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&crarr;</kbd> open &middot; <kbd className="bg-ih-bg-card border border-stone-200 dark:border-white/10 rounded px-1.5 py-0.5 font-mono text-[10px] text-stone-900 dark:text-slate-200 mx-0.5">&amp;#8984;K</kbd> toggle</span>
               <span>{inspectors.length} {inspectors.length === 1 ? "inspector" : "inspectors"}</span>
             </div>
           </div>

@@ -25,16 +25,16 @@ export function ReportSidebar({ sections, role, inspectionId, brandLogo, siteNam
         {brandLogo
           ? <img src={brandLogo} alt={siteName} className="h-7 brightness-0 invert opacity-90" />
           : <div className="text-[15px] font-bold tracking-tight text-white">{siteName}</div>}
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mt-2">Inspection Report</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mt-2">Inspection Report</p>
       </div>
 
       {role === "inspector" && (
         <div className="px-5 py-3 border-b border-slate-800 space-y-2">
-          <a href={`/inspections/${inspectionId}/edit`} className="block w-full h-9 px-3 rounded-md bg-indigo-600 text-white text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30">
+          <a href={`/inspections/${inspectionId}/edit`} className="block w-full h-9 px-3 rounded-md bg-ih-primary text-white text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-ih-primary-600 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
             Edit Report
           </a>
-          <button type="button" onClick={onPublish} className="block w-full h-9 px-3 rounded-md bg-amber-500 text-amber-950 text-[12px] font-bold hover:bg-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30">
+          <button type="button" onClick={onPublish} className="block w-full h-9 px-3 rounded-md bg-ih-watch-bg0 text-amber-950 text-[12px] font-bold hover:bg-amber-400 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30">
             Publish
           </button>
         </div>
@@ -51,14 +51,14 @@ export function ReportSidebar({ sections, role, inspectionId, brandLogo, siteNam
               )}
               <span className="flex-1 truncate">{s.title}</span>
               {total > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold tabular-nums" title={`${total} issue${total === 1 ? "" : "s"} in this section`} aria-label={`${total} issues`}>{total}</span>
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-ih-bad-bg0 text-white text-[10px] font-bold tabular-nums" title={`${total} issue${total === 1 ? "" : "s"} in this section`} aria-label={`${total} issues`}>{total}</span>
               )}
             </a>
           );
         })}
       </nav>
 
-      <div className="px-5 py-3 border-t border-slate-800 text-[11px] text-slate-500 space-y-1">
+      <div className="px-5 py-3 border-t border-slate-800 text-[11px] text-ih-fg-3 space-y-1">
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
           <span>Live</span>

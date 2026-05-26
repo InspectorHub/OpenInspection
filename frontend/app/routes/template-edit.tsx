@@ -428,58 +428,58 @@ export default function TemplateEditPage() {
   }, [editingItem]);
 
   return (
-    <div className="flex flex-col h-screen bg-[#f8fafc] dark:bg-slate-900">
+    <div className="flex flex-col h-screen bg-[#f8fafc] dark:bg-[#0f172a]">
       {/* Toolbar */}
-      <header className="flex items-center justify-between h-12 px-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
+      <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/templates" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-[13px]">&larr; Templates</Link>
+          <Link to="/templates" className="text-ih-fg-4 hover:text-ih-fg-2 text-[13px]">&larr; Templates</Link>
           <input
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
-            className="text-[14px] font-bold bg-transparent border-b border-transparent focus:border-indigo-600 outline-none text-slate-900 dark:text-slate-100 w-48"
+            className="text-[14px] font-bold bg-transparent border-b border-transparent focus:border-ih-primary outline-none text-ih-fg-1 w-48"
           />
-          <span className="text-[10px] font-mono text-slate-400">v{initialVersion}</span>
+          <span className="text-[10px] font-mono text-ih-fg-4">v{initialVersion}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPreviewMode(!previewMode)}
-            className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"}`}
+            className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-3"}`}
           >
             {previewMode ? "Exit Preview" : "Preview"}
           </button>
-          <button onClick={() => setRatingModalOpen(true)} className="h-7 px-3 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[12px] font-bold">
+          <button onClick={() => setRatingModalOpen(true)} className="h-7 px-3 rounded-md bg-ih-bg-muted text-ih-fg-3 text-[12px] font-bold">
             Rating System
           </button>
-          <button onClick={handleSave} className="h-7 px-3 rounded-md bg-indigo-600 text-white font-bold text-[12px] hover:bg-indigo-700">
+          <button onClick={handleSave} className="h-7 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600">
             {fetcher.state === "submitting" ? "Saving..." : saveSuccess ? "Saved!" : "Save"}
           </button>
         </div>
       </header>
 
       {fetcherData?.error && (
-        <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[12px] font-medium">
+        <div className="px-4 py-2 bg-ih-bad-bg text-ih-bad-fg text-[12px] font-medium">
           {fetcherData.error}
         </div>
       )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Section rail */}
-        <aside className="w-[200px] shrink-0 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 overflow-y-auto">
+        <aside className="w-[200px] shrink-0 border-r border-ih-border bg-ih-bg-muted overflow-y-auto">
           <div className="p-2 space-y-0.5">
             {sections.map((s, i) => (
-              <div key={s.id} className={`group flex items-center rounded-md transition-all ${i === activeSection ? "bg-indigo-50 dark:bg-indigo-900/20" : "hover:bg-slate-100 dark:hover:bg-slate-700/50"}`}>
-                <button onClick={() => { setActiveSection(i); setEditingItem(null); }} className={`flex-1 text-left px-3 py-2 text-[13px] truncate ${i === activeSection ? "text-indigo-600 dark:text-indigo-400 font-bold" : "text-slate-600 dark:text-slate-400"}`}>
+              <div key={s.id} className={`group flex items-center rounded-md transition-all ${i === activeSection ? "bg-ih-primary-tint" : "hover:bg-ih-bg-muted"}`}>
+                <button onClick={() => { setActiveSection(i); setEditingItem(null); }} className={`flex-1 text-left px-3 py-2 text-[13px] truncate ${i === activeSection ? "text-ih-primary font-bold" : "text-ih-fg-3"}`}>
                   {s.title}
                   <span className="ml-1 text-[10px] opacity-50">{s.items.length}</span>
                 </button>
                 <div className="hidden group-hover:flex items-center gap-0.5 pr-1">
-                  <button onClick={() => moveSection(i, -1)} className="text-slate-400 hover:text-slate-600 text-[10px]">&uarr;</button>
-                  <button onClick={() => moveSection(i, 1)} className="text-slate-400 hover:text-slate-600 text-[10px]">&darr;</button>
-                  <button onClick={() => removeSection(i)} className="text-slate-400 hover:text-red-500 text-[10px]">&times;</button>
+                  <button onClick={() => moveSection(i, -1)} className="text-ih-fg-4 hover:text-ih-fg-2 text-[10px]">&uarr;</button>
+                  <button onClick={() => moveSection(i, 1)} className="text-ih-fg-4 hover:text-ih-fg-2 text-[10px]">&darr;</button>
+                  <button onClick={() => removeSection(i)} className="text-ih-fg-4 hover:text-ih-bad-fg text-[10px]">&times;</button>
                 </div>
               </div>
             ))}
-            <button onClick={addSection} className="w-full text-left px-3 py-2 text-[12px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-md">
+            <button onClick={addSection} className="w-full text-left px-3 py-2 text-[12px] font-bold text-ih-primary hover:bg-ih-primary-tint rounded-md">
               + Add Section
             </button>
           </div>
@@ -494,9 +494,9 @@ export default function TemplateEditPage() {
                 <input
                   value={section.title}
                   onChange={(e) => renameSection(activeSection, e.target.value)}
-                  className="text-[18px] font-bold bg-transparent border-b-2 border-transparent focus:border-indigo-600 outline-none flex-1 text-slate-900 dark:text-slate-100"
+                  className="text-[18px] font-bold bg-transparent border-b-2 border-transparent focus:border-ih-primary outline-none flex-1 text-ih-fg-1"
                 />
-                <span className="text-[11px] text-slate-400">{section.items.length} items</span>
+                <span className="text-[11px] text-ih-fg-4">{section.items.length} items</span>
               </div>
 
               {/* Section disclaimer */}
@@ -504,24 +504,24 @@ export default function TemplateEditPage() {
                 value={section.disclaimerText || ""}
                 onChange={(e) => updateSections((s) => { s[activeSection].disclaimerText = e.target.value; return s; })}
                 placeholder="Section disclaimer (optional)"
-                className="w-full text-[12px] text-slate-400 bg-transparent border-b border-transparent focus:border-slate-300 outline-none"
+                className="w-full text-[12px] text-ih-fg-4 bg-transparent border-b border-transparent focus:border-slate-300 outline-none"
               />
 
               {/* Items */}
               {previewMode ? (
                 <div className="space-y-2">
                   {section.items.map((item, idx) => (
-                    <div key={item.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-                      <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">
+                    <div key={item.id} className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
+                      <p className="text-[13px] font-bold text-ih-fg-1">
                         {idx + 1}. {item.label}
                       </p>
-                      {item.description && <p className="text-[11px] text-slate-400 mt-1">{item.description}</p>}
+                      {item.description && <p className="text-[11px] text-ih-fg-4 mt-1">{item.description}</p>}
                       <div className="mt-2">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">{item.type}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-3">{item.type}</span>
                         {item.type === "rich" && item.ratingOptions && (
                           <div className="flex gap-1 mt-2">
                             {item.ratingOptions.map((opt) => (
-                              <span key={opt} className="text-[10px] px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-500">{opt}</span>
+                              <span key={opt} className="text-[10px] px-2 py-0.5 rounded border border-ih-border text-ih-fg-3">{opt}</span>
                             ))}
                           </div>
                         )}
@@ -534,23 +534,23 @@ export default function TemplateEditPage() {
                   {section.items.map((item, idx) => (
                     <div
                       key={item.id}
-                      className={`bg-white dark:bg-slate-800 border rounded-lg p-3 transition-colors ${editingItem === item.id ? "border-indigo-400 dark:border-indigo-600 ring-1 ring-indigo-400/30" : "border-slate-200 dark:border-slate-700"}`}
+                      className={`bg-ih-bg-card border rounded-lg p-3 transition-colors ${editingItem === item.id ? "border-ih-primary shadow-ih-focus" : "border-ih-border"}`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="text-[10px] font-mono text-slate-400 w-5 cursor-grab" title="Drag to reorder">&#9776;</span>
-                          <span className="text-[10px] font-mono text-slate-400 w-5">{String(idx + 1).padStart(2, "0")}</span>
+                          <span className="text-[10px] font-mono text-ih-fg-4 w-5 cursor-grab" title="Drag to reorder">&#9776;</span>
+                          <span className="text-[10px] font-mono text-ih-fg-4 w-5">{String(idx + 1).padStart(2, "0")}</span>
                           {editingItem === item.id ? (
                             <input
                               value={item.label}
                               onChange={(e) => updateItem(item.id, { label: e.target.value })}
                               autoFocus
-                              className="flex-1 text-[13px] font-medium bg-transparent border-b border-indigo-600 outline-none text-slate-900 dark:text-slate-100"
+                              className="flex-1 text-[13px] font-medium bg-transparent border-b border-ih-primary outline-none text-ih-fg-1"
                             />
                           ) : (
                             <button
                               onClick={() => { setEditingItem(item.id); setRightRail("properties"); }}
-                              className="flex-1 text-left text-[13px] font-medium text-slate-900 dark:text-slate-100 truncate hover:text-indigo-600"
+                              className="flex-1 text-left text-[13px] font-medium text-ih-fg-1 truncate hover:text-ih-primary"
                             >
                               {item.label}
                             </button>
@@ -560,26 +560,26 @@ export default function TemplateEditPage() {
                           <select
                             value={item.type}
                             onChange={(e) => updateItem(item.id, { type: e.target.value })}
-                            className="h-6 px-1 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 border-0 outline-none"
+                            className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none"
                           >
                             {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                           </select>
-                          <button onClick={() => moveItem(idx, -1)} className="w-5 h-5 text-slate-400 hover:text-slate-600 text-[10px]">&uarr;</button>
-                          <button onClick={() => moveItem(idx, 1)} className="w-5 h-5 text-slate-400 hover:text-slate-600 text-[10px]">&darr;</button>
-                          <button onClick={() => removeItem(item.id)} className="w-5 h-5 text-slate-400 hover:text-red-500 text-[10px]">&times;</button>
+                          <button onClick={() => moveItem(idx, -1)} className="w-5 h-5 text-ih-fg-4 hover:text-ih-fg-2 text-[10px]">&uarr;</button>
+                          <button onClick={() => moveItem(idx, 1)} className="w-5 h-5 text-ih-fg-4 hover:text-ih-fg-2 text-[10px]">&darr;</button>
+                          <button onClick={() => removeItem(item.id)} className="w-5 h-5 text-ih-fg-4 hover:text-ih-bad-fg text-[10px]">&times;</button>
                         </div>
                       </div>
                     </div>
                   ))}
 
-                  <button onClick={addItem} className="w-full py-2 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 text-[12px] font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                  <button onClick={addItem} className="w-full py-2 rounded-lg border-2 border-dashed border-ih-border text-[12px] font-bold text-ih-fg-3 hover:border-ih-primary hover:text-ih-primary transition-colors">
                     + Add Item
                   </button>
                 </>
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-[13px] text-slate-400">
+            <div className="flex items-center justify-center h-full text-[13px] text-ih-fg-4">
               Add a section to get started
             </div>
           )}
@@ -587,14 +587,14 @@ export default function TemplateEditPage() {
 
         {/* Right rail (item properties) */}
         {selectedItem && !previewMode && (
-          <aside className="w-[280px] shrink-0 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-y-auto">
+          <aside className="w-[280px] shrink-0 border-l border-ih-border bg-ih-bg-card overflow-y-auto">
             {/* Rail tabs */}
-            <div className="flex border-b border-slate-200 dark:border-slate-700">
+            <div className="flex border-b border-ih-border">
               {(["properties", "comments", "preview"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setRightRail(tab)}
-                  className={`flex-1 py-2 text-[11px] font-bold capitalize border-b-2 transition-colors ${rightRail === tab ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"}`}
+                  className={`flex-1 py-2 text-[11px] font-bold capitalize border-b-2 transition-colors ${rightRail === tab ? "border-ih-primary text-ih-primary" : "border-transparent text-ih-fg-4 hover:text-ih-fg-2"}`}
                 >
                   {tab}
                 </button>
@@ -605,30 +605,30 @@ export default function TemplateEditPage() {
               {rightRail === "properties" && (
                 <>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Label</label>
-                    <input value={selectedItem.label} onChange={(e) => updateItem(selectedItem.id, { label: e.target.value })} className="w-full h-8 px-2 rounded border border-slate-200 dark:border-slate-700 text-[12px] bg-transparent outline-none" />
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Label</label>
+                    <input value={selectedItem.label} onChange={(e) => updateItem(selectedItem.id, { label: e.target.value })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Description</label>
-                    <textarea value={selectedItem.description || ""} onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })} rows={2} className="w-full px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-[12px] bg-transparent outline-none" />
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Description</label>
+                    <textarea value={selectedItem.description || ""} onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })} rows={2} className="w-full px-2 py-1 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Type</label>
-                    <select value={selectedItem.type} onChange={(e) => updateItem(selectedItem.id, { type: e.target.value })} className="w-full h-8 px-2 rounded border border-slate-200 dark:border-slate-700 text-[12px] bg-transparent outline-none">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Type</label>
+                    <select value={selectedItem.type} onChange={(e) => updateItem(selectedItem.id, { type: e.target.value })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none">
                       {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={!!selectedItem.required} onChange={(e) => updateItem(selectedItem.id, { required: e.target.checked })} className="accent-indigo-600" />
-                    <span className="text-[12px] text-slate-600 dark:text-slate-300">Required</span>
+                    <input type="checkbox" checked={!!selectedItem.required} onChange={(e) => updateItem(selectedItem.id, { required: e.target.checked })} className="accent-ih-primary" />
+                    <span className="text-[12px] text-ih-fg-3">Required</span>
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={!!selectedItem.isSafety} onChange={(e) => updateItem(selectedItem.id, { isSafety: e.target.checked })} className="accent-indigo-600" />
-                    <span className="text-[12px] text-slate-600 dark:text-slate-300">Safety item</span>
+                    <input type="checkbox" checked={!!selectedItem.isSafety} onChange={(e) => updateItem(selectedItem.id, { isSafety: e.target.checked })} className="accent-ih-primary" />
+                    <span className="text-[12px] text-ih-fg-3">Safety item</span>
                   </label>
                   {(selectedItem.type === "select" || selectedItem.type === "multi_select") && (
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Choices (one per line)</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Choices (one per line)</label>
                       <textarea
                         value={choicesText}
                         onChange={(e) => {
@@ -638,25 +638,25 @@ export default function TemplateEditPage() {
                           });
                         }}
                         rows={4}
-                        className="w-full px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-[12px] bg-transparent outline-none font-mono"
+                        className="w-full px-2 py-1 rounded border border-ih-border text-[12px] bg-transparent outline-none font-mono"
                       />
                     </div>
                   )}
                   {selectedItem.type === "number" && (
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Min</label>
-                        <input type="number" value={selectedItem.options?.min ?? ""} onChange={(e) => updateItem(selectedItem.id, { options: { ...selectedItem.options, min: e.target.value ? Number(e.target.value) : null } })} className="w-full h-8 px-2 rounded border border-slate-200 dark:border-slate-700 text-[12px] bg-transparent outline-none" />
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Min</label>
+                        <input type="number" value={selectedItem.options?.min ?? ""} onChange={(e) => updateItem(selectedItem.id, { options: { ...selectedItem.options, min: e.target.value ? Number(e.target.value) : null } })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Max</label>
-                        <input type="number" value={selectedItem.options?.max ?? ""} onChange={(e) => updateItem(selectedItem.id, { options: { ...selectedItem.options, max: e.target.value ? Number(e.target.value) : null } })} className="w-full h-8 px-2 rounded border border-slate-200 dark:border-slate-700 text-[12px] bg-transparent outline-none" />
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Max</label>
+                        <input type="number" value={selectedItem.options?.max ?? ""} onChange={(e) => updateItem(selectedItem.id, { options: { ...selectedItem.options, max: e.target.value ? Number(e.target.value) : null } })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
                       </div>
                     </div>
                   )}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Default recommendation</label>
-                    <input value={selectedItem.defaultRecommendation || ""} onChange={(e) => updateItem(selectedItem.id, { defaultRecommendation: e.target.value })} className="w-full h-8 px-2 rounded border border-slate-200 dark:border-slate-700 text-[12px] bg-transparent outline-none" />
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Default recommendation</label>
+                    <input value={selectedItem.defaultRecommendation || ""} onChange={(e) => updateItem(selectedItem.id, { defaultRecommendation: e.target.value })} className="w-full h-8 px-2 rounded border border-ih-border text-[12px] bg-transparent outline-none" />
                   </div>
                 </>
               )}
@@ -666,8 +666,8 @@ export default function TemplateEditPage() {
                   {(["information", "limitations", "defects"] as const).map((tab) => (
                     <div key={tab}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 capitalize">{tab}</span>
-                        <button onClick={() => addCannedToItem(tab)} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700">+ Add</button>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 capitalize">{tab}</span>
+                        <button onClick={() => addCannedToItem(tab)} className="text-[10px] font-bold text-ih-primary hover:text-ih-primary">+ Add</button>
                       </div>
                       {(selectedItem.tabs?.[tab] || []).map((c, ci) => (
                         <div key={c.id} className="flex items-start gap-1 mb-1.5">
@@ -682,7 +682,7 @@ export default function TemplateEditPage() {
                                 });
                               }}
                               placeholder="Title"
-                              className="w-full text-[11px] font-bold bg-transparent border-b border-slate-200 dark:border-slate-700 outline-none text-slate-700 dark:text-slate-300 mb-0.5"
+                              className="w-full text-[11px] font-bold bg-transparent border-b border-ih-border outline-none text-ih-fg-2 mb-0.5"
                             />
                             <textarea
                               value={c.comment}
@@ -695,10 +695,10 @@ export default function TemplateEditPage() {
                               }}
                               placeholder="Comment text..."
                               rows={2}
-                              className="w-full text-[11px] bg-transparent border border-slate-100 dark:border-slate-700 rounded px-1 py-0.5 outline-none text-slate-600 dark:text-slate-400"
+                              className="w-full text-[11px] bg-transparent border border-ih-border rounded px-1 py-0.5 outline-none text-ih-fg-3"
                             />
                           </div>
-                          <button onClick={() => removeCannedFromItem(tab, ci)} className="text-slate-300 hover:text-red-500 text-[10px] mt-1">&times;</button>
+                          <button onClick={() => removeCannedFromItem(tab, ci)} className="text-ih-fg-4 hover:text-ih-bad-fg text-[10px] mt-1">&times;</button>
                         </div>
                       ))}
                     </div>
@@ -708,13 +708,13 @@ export default function TemplateEditPage() {
 
               {rightRail === "preview" && (
                 <div className="space-y-2">
-                  <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">{selectedItem.label}</p>
-                  {selectedItem.description && <p className="text-[11px] text-slate-500">{selectedItem.description}</p>}
-                  <div className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 inline-block">{selectedItem.type}</div>
+                  <p className="text-[13px] font-bold text-ih-fg-1">{selectedItem.label}</p>
+                  {selectedItem.description && <p className="text-[11px] text-ih-fg-3">{selectedItem.description}</p>}
+                  <div className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-3 inline-block">{selectedItem.type}</div>
                   {selectedItem.type === "rich" && selectedItem.ratingOptions && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {selectedItem.ratingOptions.map((opt) => (
-                        <span key={opt} className="text-[10px] px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-slate-500">{opt}</span>
+                        <span key={opt} className="text-[10px] px-2 py-1 rounded border border-ih-border text-ih-fg-3">{opt}</span>
                       ))}
                     </div>
                   )}
@@ -725,9 +725,9 @@ export default function TemplateEditPage() {
                         if (entries.length === 0) return null;
                         return (
                           <div key={tab}>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 capitalize">{tab}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1 capitalize">{tab}</p>
                             {entries.map((c) => (
-                              <p key={c.id} className="text-[11px] text-slate-500 ml-2">- {c.title}: {c.comment}</p>
+                              <p key={c.id} className="text-[11px] text-ih-fg-3 ml-2">- {c.title}: {c.comment}</p>
                             ))}
                           </div>
                         );
@@ -744,15 +744,15 @@ export default function TemplateEditPage() {
       {/* Rating system modal */}
       {ratingModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setRatingModalOpen(false)}>
-          <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg bg-ih-bg-card rounded-xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold text-slate-900 dark:text-slate-100">Rating System</h2>
-              <button onClick={() => setRatingModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">&times;</button>
+              <h2 className="text-[16px] font-bold text-ih-fg-1">Rating System</h2>
+              <button onClick={() => setRatingModalOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
             </div>
             {/* Presets */}
             <div className="flex flex-wrap gap-2 mb-4">
               {RATING_PRESETS.map((p) => (
-                <button key={p.name} onClick={() => applyPreset(p)} className="text-[11px] font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                <button key={p.name} onClick={() => applyPreset(p)} className="text-[11px] font-bold px-2.5 py-1 rounded-md border border-ih-border text-ih-fg-3 hover:border-ih-primary hover:text-ih-primary transition-colors">
                   {p.name}
                 </button>
               ))}
@@ -760,7 +760,7 @@ export default function TemplateEditPage() {
             {/* Levels */}
             <div className="space-y-2">
               {ratingSystem.levels.map((level, li) => (
-                <div key={level.id + li} className="flex items-center gap-2 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                <div key={level.id + li} className="flex items-center gap-2 p-2 rounded-lg border border-ih-border">
                   <input
                     type="color"
                     value={level.color || "#6b7280"}
@@ -778,7 +778,7 @@ export default function TemplateEditPage() {
                       next.levels[li].label = e.target.value;
                       setRatingSystem(next);
                     }}
-                    className="flex-1 text-[12px] font-bold bg-transparent outline-none text-slate-900 dark:text-slate-100"
+                    className="flex-1 text-[12px] font-bold bg-transparent outline-none text-ih-fg-1"
                   />
                   <input
                     value={level.abbreviation || ""}
@@ -788,9 +788,9 @@ export default function TemplateEditPage() {
                       setRatingSystem(next);
                     }}
                     placeholder="Abbr"
-                    className="w-12 text-[10px] font-mono bg-transparent border-b border-slate-200 dark:border-slate-700 outline-none text-slate-500 text-center"
+                    className="w-12 text-[10px] font-mono bg-transparent border-b border-ih-border outline-none text-ih-fg-3 text-center"
                   />
-                  <label className="flex items-center gap-1 text-[10px] text-slate-500">
+                  <label className="flex items-center gap-1 text-[10px] text-ih-fg-3">
                     <input
                       type="checkbox"
                       checked={!!level.isDefect}
@@ -799,7 +799,7 @@ export default function TemplateEditPage() {
                         next.levels[li].isDefect = e.target.checked;
                         setRatingSystem(next);
                       }}
-                      className="accent-red-500"
+                      className="accent-ih-bad-fg"
                     />
                     Defect
                   </label>
@@ -809,16 +809,16 @@ export default function TemplateEditPage() {
                       next.levels.splice(li, 1);
                       setRatingSystem(next);
                     }}
-                    className="text-slate-300 hover:text-red-500 text-[10px]"
+                    className="text-ih-fg-4 hover:text-ih-bad-fg text-[10px]"
                   >&times;</button>
                 </div>
               ))}
             </div>
-            <button onClick={addRatingLevel} className="mt-3 text-[12px] font-bold text-indigo-600 hover:text-indigo-700">
+            <button onClick={addRatingLevel} className="mt-3 text-[12px] font-bold text-ih-primary hover:text-ih-primary">
               + Add level
             </button>
             <div className="flex justify-end mt-5">
-              <button onClick={() => setRatingModalOpen(false)} className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700">
+              <button onClick={() => setRatingModalOpen(false)} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600">
                 Done
               </button>
             </div>

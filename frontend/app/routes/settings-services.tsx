@@ -74,22 +74,22 @@ export default function SettingsServices() {
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
-        <Link to="/settings" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Settings</Link>
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
+        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Services &amp; catalog</span>
+        <span className="text-ih-fg-1">Services &amp; catalog</span>
       </div>
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">Services &amp; catalog</h2>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+          <h2 className="text-[19px] font-bold text-ih-fg-1">Services &amp; catalog</h2>
+          <p className="text-[13px] text-ih-fg-3 mt-0.5">
             Define the services you offer and their prices, plus discount codes.
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors"
+          className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
         >
           + Add service
         </button>
@@ -97,39 +97,39 @@ export default function SettingsServices() {
 
       {/* Inline add service form */}
       {showForm && (
-        <Form method="post" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3">
+        <Form method="post" className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-3">
           <input type="hidden" name="intent" value="create-service" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-1">Name</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Name</label>
               <input
                 type="text" name="name" required
                 placeholder="e.g., Standard Inspection"
-                className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-1">Description</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Description</label>
               <input
                 type="text" name="description"
                 placeholder="Optional details"
-                className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-1">Price ($)</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Price ($)</label>
               <input
                 type="number" name="price" min="0" step="0.01"
                 placeholder="450.00"
-                className="w-full h-9 px-3 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setShowForm(false)} className="h-8 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+            <button type="button" onClick={() => setShowForm(false)} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
               Cancel
             </button>
-            <button type="submit" className="h-8 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors">
+            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
               Save
             </button>
           </div>
@@ -137,43 +137,43 @@ export default function SettingsServices() {
       )}
 
       {/* Services table */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+      <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Name</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Duration</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Price</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+            <tr className="border-b border-ih-border">
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Name</th>
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Duration</th>
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Price</th>
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Status</th>
+              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {services.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-[13px] text-slate-500 dark:text-slate-400">
+                <td colSpan={5} className="py-10 text-center text-[13px] text-ih-fg-3">
                   No services yet. Click "Add service" to create your first.
                 </td>
               </tr>
             ) : (
               services.map((svc) => (
-                <tr key={svc.id} className="border-b border-slate-100 dark:border-slate-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                <tr key={svc.id} className="border-b border-ih-border last:border-b-0 hover:bg-ih-bg-muted transition-colors">
                   <td className="py-3 px-4">
-                    <p className="text-[13px] font-medium text-slate-900 dark:text-slate-100">{svc.name}</p>
+                    <p className="text-[13px] font-medium text-ih-fg-1">{svc.name}</p>
                     {svc.description && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">{svc.description}</p>
+                      <p className="text-[11px] text-ih-fg-3 mt-0.5 line-clamp-1">{svc.description}</p>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-[13px] text-slate-600 dark:text-slate-300">&mdash;</td>
-                  <td className="py-3 px-4 text-[13px] font-bold text-emerald-700 dark:text-emerald-400">
+                  <td className="py-3 px-4 text-[13px] text-ih-fg-3">&mdash;</td>
+                  <td className="py-3 px-4 text-[13px] font-bold text-ih-ok-fg">
                     ${((svc.price || 0) / 100).toFixed(2)}
                   </td>
                   <td className="py-3 px-4">
                     <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                      svc.active
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
-                    }`}>
+ svc.active
+ ? "bg-ih-ok-bg text-ih-ok-fg"
+ : "bg-ih-bg-muted text-ih-fg-3"
+ }`}>
                       {svc.active ? "Active" : "Inactive"}
                     </span>
                   </td>
@@ -182,7 +182,7 @@ export default function SettingsServices() {
                       <input type="hidden" name="intent" value="toggle-service" />
                       <input type="hidden" name="id" value={svc.id} />
                       <input type="hidden" name="active" value={String(svc.active)} />
-                      <button type="submit" className="text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                      <button type="submit" className="text-[12px] font-semibold text-ih-primary hover:underline">
                         {svc.active ? "Deactivate" : "Activate"}
                       </button>
                     </Form>
@@ -196,32 +196,32 @@ export default function SettingsServices() {
 
       {/* Discount codes */}
       <div className="pt-2">
-        <h3 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 mb-2">Discount codes</h3>
-        <p className="text-[13px] text-slate-500 dark:text-slate-400 mb-3">Promo codes clients can apply at booking.</p>
+        <h3 className="text-[15px] font-bold text-ih-fg-1 mb-2">Discount codes</h3>
+        <p className="text-[13px] text-ih-fg-3 mb-3">Promo codes clients can apply at booking.</p>
 
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           {discounts.length === 0 ? (
-            <div className="py-8 text-center text-[13px] text-slate-500 dark:text-slate-400">
+            <div className="py-8 text-center text-[13px] text-ih-fg-3">
               No discount codes yet.
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            <div className="divide-y divide-ih-border">
               {discounts.map((d) => (
                 <div key={d.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-4">
-                    <code className="font-mono text-[13px] font-bold text-slate-900 dark:text-slate-100">{d.code}</code>
-                    <span className="text-[12px] text-slate-500 dark:text-slate-400">
+                    <code className="font-mono text-[13px] font-bold text-ih-fg-1">{d.code}</code>
+                    <span className="text-[12px] text-ih-fg-3">
                       {d.type === "percent" ? `${d.value}% off` : `$${(d.value / 100).toFixed(2)} off`}
                     </span>
                     <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                      d.active
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
-                    }`}>
+ d.active
+ ? "bg-ih-ok-bg text-ih-ok-fg"
+ : "bg-ih-bg-muted text-ih-fg-3"
+ }`}>
                       {d.active ? "Active" : "Disabled"}
                     </span>
                   </div>
-                  <button className="text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                  <button className="text-[12px] font-semibold text-ih-primary hover:underline">
                     Edit
                   </button>
                 </div>

@@ -118,58 +118,58 @@ export default function SettingsAdvancedPage() {
   return (
     <div className="space-y-[18px] max-w-3xl">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
-        <Link to="/settings" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Settings</Link>
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
+        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Advanced</span>
+        <span className="text-ih-fg-1">Advanced</span>
       </div>
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">Advanced</h2>
-      <p className="text-[13px] text-slate-500">Stripe payments, AI features, and integrations.</p>
+      <h2 className="text-[19px] font-bold text-ih-fg-1">Advanced</h2>
+      <p className="text-[13px] text-ih-fg-3">Stripe payments, AI features, and integrations.</p>
 
       {/* Flash */}
       {actionData?.success && (
-        <div className="px-4 py-2.5 rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-[13px] text-emerald-700 dark:text-emerald-300 font-medium">
+        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Settings saved.
         </div>
       )}
       {actionData?.error && (
-        <div className="px-4 py-2.5 rounded-md bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-[13px] text-rose-700 dark:text-rose-300 font-medium">
+        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
       )}
 
       {/* Stripe Connect */}
-      <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 space-y-5">
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
         <div className="flex items-center justify-between gap-4">
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">Payments (Stripe Connect)</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Payments (Stripe Connect)</h3>
           <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
-            config.stripeConnected
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-              : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
-          }`}>
+ config.stripeConnected
+ ? "bg-ih-ok-bg text-ih-ok-fg"
+ : "bg-ih-bg-muted text-ih-fg-3"
+ }`}>
             {config.stripeConnected ? "Connected" : "Not connected"}
           </span>
         </div>
-        <p className="text-[13px] text-slate-600 dark:text-slate-400">
+        <p className="text-[13px] text-ih-fg-3">
           Accept card payments on invoices via your Stripe Express account. Create your account at{" "}
           <a href="https://dashboard.stripe.com/connect/express" target="_blank" rel="noopener noreferrer"
-            className="text-indigo-600 dark:text-indigo-400 hover:underline">
+            className="text-ih-primary hover:underline">
             dashboard.stripe.com/connect/express
           </a>, then paste the account ID below.
         </p>
 
         {config.stripeConnected ? (
           <div className="space-y-3">
-            <div className="text-[13px] text-slate-700 dark:text-slate-300">
+            <div className="text-[13px] text-ih-fg-2">
               Connected account:{" "}
-              <code className="font-mono text-[12px] px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100">
+              <code className="font-mono text-[12px] px-2 py-1 rounded bg-ih-bg-muted text-ih-fg-1">
                 {config.stripeAccountId}
               </code>
             </div>
             <Form method="post">
               <input type="hidden" name="intent" value="disconnect-stripe" />
               <button type="submit"
-                className="h-9 px-4 rounded-md border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-[13px] font-bold hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
+                className="h-9 px-4 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-colors">
                 Disconnect
               </button>
             </Form>
@@ -178,7 +178,7 @@ export default function SettingsAdvancedPage() {
           <Form method="post" className="space-y-3 max-w-md">
             <input type="hidden" name="intent" value="connect-stripe" />
             <div className="space-y-2">
-              <label htmlFor="stripeAccountId" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-[0.2em]">
+              <label htmlFor="stripeAccountId" className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
                 Stripe account ID
               </label>
               <input
@@ -186,11 +186,11 @@ export default function SettingsAdvancedPage() {
                 value={stripeInput} onChange={(e) => setStripeInput(e.target.value)}
                 placeholder="acct_1AbCdEfGhIjKlMnO"
                 autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
-                className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-mono text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-mono text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1"
               />
             </div>
             <button type="submit"
-              className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-[.98] transition-all">
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
               Connect Account
             </button>
           </Form>
@@ -198,41 +198,41 @@ export default function SettingsAdvancedPage() {
       </section>
 
       {/* AI features */}
-      <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 space-y-5">
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
         <div className="flex items-center justify-between gap-4">
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">AI features</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">AI features</h3>
           <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
-            config.geminiConfigured
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-              : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
-          }`}>
+ config.geminiConfigured
+ ? "bg-ih-ok-bg text-ih-ok-fg"
+ : "bg-ih-bg-muted text-ih-fg-3"
+ }`}>
             {config.geminiConfigured ? "Configured" : "Not configured"}
           </span>
         </div>
-        <p className="text-[13px] text-slate-600 dark:text-slate-400">
+        <p className="text-[13px] text-ih-fg-3">
           Google Gemini powers comment assist and inspection summaries. Get a key at{" "}
           <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer"
-            className="text-indigo-600 dark:text-indigo-400 hover:underline">
+            className="text-ih-primary hover:underline">
             aistudio.google.com
           </a>.
         </p>
         <Form method="post" className="space-y-3 max-w-xl">
           <input type="hidden" name="intent" value="save-ai" />
           <div className="space-y-2">
-            <label htmlFor="geminiApiKey" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-[0.2em]">
+            <label htmlFor="geminiApiKey" className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
               Gemini API Key
             </label>
             <input
               type="password" id="geminiApiKey" name="geminiApiKey"
               placeholder="AIza..."
               autoComplete="off"
-              className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-slate-900 dark:text-slate-100"
+              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1"
             />
-            <p className="text-[11px] text-slate-500">Stored encrypted. Leave blank to keep existing key.</p>
+            <p className="text-[11px] text-ih-fg-3">Stored encrypted. Leave blank to keep existing key.</p>
           </div>
-          <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"
-              className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 active:scale-[.98] transition-all">
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
               Save
             </button>
           </div>
@@ -240,14 +240,14 @@ export default function SettingsAdvancedPage() {
       </section>
 
       {/* Data import/export */}
-      <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 space-y-5">
-        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">Data management</h3>
-        <p className="text-[13px] text-slate-600 dark:text-slate-400">
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Data management</h3>
+        <p className="text-[13px] text-ih-fg-3">
           Import data from another inspection platform or export your data for backup.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link to="/settings/data"
-            className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[13px] font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors inline-flex items-center">
+            className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-2 text-[13px] font-semibold hover:bg-ih-bg-muted transition-colors inline-flex items-center">
             Import / Export data
           </Link>
         </div>

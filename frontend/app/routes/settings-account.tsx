@@ -74,62 +74,62 @@ export default function SettingsAccountPage() {
   return (
     <div className="space-y-[18px] max-w-3xl">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
-        <Link to="/settings" className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Settings</Link>
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
+        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Account</span>
+        <span className="text-ih-fg-1">Account</span>
       </div>
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">Account</h2>
-      <p className="text-[13px] text-slate-500">Account information, data export, and account deletion.</p>
+      <h2 className="text-[19px] font-bold text-ih-fg-1">Account</h2>
+      <p className="text-[13px] text-ih-fg-3">Account information, data export, and account deletion.</p>
 
       {/* Flash */}
       {actionData?.success && (
-        <div className="px-4 py-2.5 rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-[13px] text-emerald-700 dark:text-emerald-300 font-medium">
+        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           {(actionData as Record<string, unknown>).message as string || "Done."}
         </div>
       )}
       {actionData?.error && (
-        <div className="px-4 py-2.5 rounded-md bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-[13px] text-rose-700 dark:text-rose-300 font-medium">
+        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
       )}
 
       {/* Account info */}
-      <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 space-y-4">
-        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">Account details</h3>
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Account details</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Email</p>
-            <p className="text-[13px] text-slate-900 dark:text-slate-100 font-medium">{account.email || "Not set"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">Email</p>
+            <p className="text-[13px] text-ih-fg-1 font-medium">{account.email || "Not set"}</p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">Name</p>
-            <p className="text-[13px] text-slate-900 dark:text-slate-100 font-medium">{account.name || "Not set"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">Name</p>
+            <p className="text-[13px] text-ih-fg-1 font-medium">{account.name || "Not set"}</p>
           </div>
         </div>
       </section>
 
       {/* Data export */}
-      <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 space-y-4">
-        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">Data export</h3>
-        <p className="text-[13px] text-slate-600 dark:text-slate-400">
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Data export</h3>
+        <p className="text-[13px] text-ih-fg-3">
           Download a copy of all your data including inspections, reports, templates, and client information.
         </p>
         <Form method="post">
           <input type="hidden" name="intent" value="export-data" />
           <button type="submit"
-            className="h-9 px-4 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[13px] font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
+            className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-2 text-[13px] font-semibold hover:bg-ih-bg-muted transition-colors">
             Download my data
           </button>
         </Form>
       </section>
 
       {/* Danger zone */}
-      <section className="bg-white dark:bg-slate-800 rounded-lg border border-rose-200 dark:border-rose-800/50 p-6 space-y-4">
-        <h3 className="text-[11px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-[0.2em]">Danger zone</h3>
-        <div className="p-4 rounded-md bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/30">
-          <p className="text-[13px] font-bold text-rose-800 dark:text-rose-300 mb-1">Delete account</p>
-          <p className="text-[12px] text-rose-700 dark:text-rose-400 leading-relaxed">
+      <section className="bg-ih-bg-card rounded-lg border border-ih-bad p-6 space-y-4">
+        <h3 className="text-[11px] font-bold text-ih-bad-fg uppercase tracking-[0.2em]">Danger zone</h3>
+        <div className="p-4 rounded-md bg-ih-bad-bg border border-ih-bad">
+          <p className="text-[13px] font-bold text-ih-bad-fg mb-1">Delete account</p>
+          <p className="text-[12px] text-ih-bad-fg leading-relaxed">
             Permanently delete your account and all associated data including inspections,
             reports, templates, and client records. This action cannot be undone.
           </p>
@@ -139,7 +139,7 @@ export default function SettingsAccountPage() {
           <button
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
-            className="h-9 px-4 rounded-md border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-[13px] font-bold hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+            className="h-9 px-4 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-colors"
           >
             Delete my account
           </button>
@@ -147,22 +147,22 @@ export default function SettingsAccountPage() {
           <Form method="post" className="space-y-3 max-w-sm">
             <input type="hidden" name="intent" value="delete-account" />
             <div className="space-y-2">
-              <label htmlFor="deletePassword" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-[0.2em]">
+              <label htmlFor="deletePassword" className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
                 Enter your password to confirm
               </label>
               <input
                 type="password" id="deletePassword" name="password" required
                 autoComplete="current-password"
-                className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none text-[13px] text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-bad focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1"
               />
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowDeleteConfirm(false)}
-                className="h-9 px-3 rounded-md border border-slate-200 dark:border-slate-600 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
                 Cancel
               </button>
               <button type="submit"
-                className="h-9 px-4 rounded-md bg-rose-600 text-white font-bold text-[13px] hover:bg-rose-700 active:scale-[.98] transition-all">
+                className="h-9 px-4 rounded-md bg-rose-600 text-white font-bold text-[13px] hover:bg-ih-bad-fg active:scale-[.98] transition-all">
                 Permanently delete
               </button>
             </div>

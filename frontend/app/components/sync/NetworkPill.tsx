@@ -27,36 +27,36 @@ export function NetworkPill({ online, pendingItems, tier, onRetryOne, onSyncNow 
   }, []);
 
   const dotClass = online
-    ? pendingItems.length > 0 ? "bg-amber-400 animate-pulse" : "bg-emerald-500"
+    ? pendingItems.length > 0 ? "bg-amber-400 animate-pulse" : "bg-ih-ok-bg0"
     : "bg-slate-400";
   const label = !online ? "Offline" : pendingItems.length > 0 ? "Syncing" : "Online";
 
   return (
     <div className="fixed top-4 right-4 z-40" ref={ref}>
-      <button type="button" onClick={() => setPopoverOpen(!popoverOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-800 shadow-md ring-1 ring-slate-200 dark:ring-slate-600 text-xs font-bold text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700">
+      <button type="button" onClick={() => setPopoverOpen(!popoverOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ih-bg-card shadow-md ring-1 ring-ih-border text-xs font-bold text-ih-fg-2 hover:bg-ih-bg-muted">
         <span className={`w-2 h-2 rounded-full ${dotClass}`} />
         <span>{label}</span>
       </button>
 
       {popoverOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-xl ring-1 ring-slate-200 dark:ring-slate-700 p-4 text-sm">
-          <div className="font-semibold text-slate-900 dark:text-slate-100 mb-2">
+        <div className="absolute right-0 top-full mt-2 w-72 bg-ih-bg-card rounded-xl shadow-xl ring-1 ring-slate-200 dark:ring-slate-700 p-4 text-sm">
+          <div className="font-semibold text-ih-fg-1 mb-2">
             {!online ? "Working offline" : pendingItems.length > 0 ? `Syncing ${pendingItems.length} change${pendingItems.length === 1 ? "" : "s"}` : "All synced"}
           </div>
           {online && pendingItems.length === 0 && (
-            <div className="text-xs text-slate-500 dark:text-slate-400">Your work auto-saves to this device and uploads automatically.</div>
+            <div className="text-xs text-ih-fg-3">Your work auto-saves to this device and uploads automatically.</div>
           )}
           {!online && (
-            <div className="text-xs text-slate-600 dark:text-slate-400 mb-2">Your work is being saved on this device. It will upload as soon as you are back online.</div>
+            <div className="text-xs text-ih-fg-3 mb-2">Your work is being saved on this device. It will upload as soon as you are back online.</div>
           )}
           {!online && tier?.id === "C" && (
-            <div className="text-xs text-amber-700 bg-amber-50 rounded-md p-2 mb-2">On iOS Safari you can store about 75 photos per inspection while offline. For unlimited offline storage, install this app: Share &gt; Add to Home Screen.</div>
+            <div className="text-xs text-ih-watch-fg bg-ih-watch-bg rounded-md p-2 mb-2">On iOS Safari you can store about 75 photos per inspection while offline. For unlimited offline storage, install this app: Share &gt; Add to Home Screen.</div>
           )}
           {!online && tier?.id === "D" && (
-            <div className="text-xs text-amber-700 bg-amber-50 rounded-md p-2 mb-2">Your iOS version stores about 30 photos per inspection while offline. Updating iOS will lift this limit.</div>
+            <div className="text-xs text-ih-watch-fg bg-ih-watch-bg rounded-md p-2 mb-2">Your iOS version stores about 30 photos per inspection while offline. Updating iOS will lift this limit.</div>
           )}
           {online && tier?.id === "B" && (
-            <div className="text-xs text-slate-500 mb-2">Tip: install this app from your browser menu so the device keeps your data permanently.</div>
+            <div className="text-xs text-ih-fg-3 mb-2">Tip: install this app from your browser menu so the device keeps your data permanently.</div>
           )}
           {pendingItems.length > 0 && (
             <ul className="space-y-2 max-h-60 overflow-y-auto mt-2 border-t border-slate-100 dark:border-slate-700 pt-2">
@@ -69,7 +69,7 @@ export function NetworkPill({ online, pendingItems, tier, onRetryOne, onSyncNow 
             </ul>
           )}
           {pendingItems.length > 0 && (
-            <button onClick={onSyncNow} className="mt-3 w-full h-9 px-4 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-all">Sync now</button>
+            <button onClick={onSyncNow} className="mt-3 w-full h-9 px-4 rounded-lg bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary-600 transition-all">Sync now</button>
           )}
         </div>
       )}

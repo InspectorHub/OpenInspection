@@ -6,11 +6,11 @@ export function meta() {
 
 export default function FeatureDisabledPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-ih-bg-card">
       <div className="text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-ih-watch-bg flex items-center justify-center">
           <svg
-            className="w-8 h-8 text-amber-500 dark:text-amber-400"
+            className="w-8 h-8 text-ih-watch dark:text-amber-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -23,16 +23,16 @@ export default function FeatureDisabledPage() {
             />
           </svg>
         </div>
-        <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">
+        <p className="text-lg font-semibold text-ih-fg-2">
           Feature Not Available
         </p>
-        <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-2 max-w-sm mx-auto">
+        <p className="text-[13px] text-ih-fg-3 mt-2 max-w-sm mx-auto">
           This feature is not enabled for your workspace. Contact your
           administrator or upgrade your plan.
         </p>
         <Link
           to="/dashboard"
-          className="inline-flex items-center gap-1.5 mt-6 h-9 px-4 rounded-md bg-indigo-600 text-white text-[13px] font-bold hover:bg-indigo-700 transition-colors"
+          className="inline-flex items-center gap-1.5 mt-6 h-9 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors"
         >
           Back to Dashboard
         </Link>

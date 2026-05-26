@@ -33,7 +33,7 @@ export function FieldsToFill({ fields, onJumpToField }: FieldsToFillProps) {
         </button>
       ))}
 
-      <span className="ml-auto text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0">
+      <span className="ml-auto text-[10px] text-ih-fg-4 flex-shrink-0">
         <kbd className="ih-kbd">Tab</kbd> next · <kbd className="ih-kbd">Shift+Tab</kbd> prev
       </span>
     </div>

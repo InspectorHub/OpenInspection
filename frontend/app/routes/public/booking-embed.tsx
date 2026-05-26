@@ -69,14 +69,14 @@ export default function BookingEmbedPage() {
 
   if (data.style === "compact" && !showForm) {
     return (
-      <div className="p-6 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-        <p className="text-[13px] text-slate-500 mb-3">
+      <div className="p-6 text-center bg-ih-bg-card border border-ih-border rounded-xl">
+        <p className="text-[13px] text-ih-fg-3 mb-3">
           Book with {data.inspectorName}
         </p>
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
+          className="w-full px-4 py-3 bg-ih-primary text-white rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
         >
           Schedule an inspection
         </button>
@@ -86,11 +86,11 @@ export default function BookingEmbedPage() {
 
   return (
     <div className="p-4">
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
+      <div className="bg-ih-bg-card border border-ih-border rounded-xl p-5">
+        <h2 className="text-base font-bold text-ih-fg-1 mb-1">
           Book with {data.inspectorName}
         </h2>
-        <p className="text-[13px] text-slate-500 dark:text-slate-400 mb-4">
+        <p className="text-[13px] text-ih-fg-3 mb-4">
           Pick a date and we'll confirm by email.
         </p>
         <BookingForm data={data} />
@@ -153,7 +153,7 @@ function BookingForm({ data }: { data: EmbedData }) {
       <input type="hidden" name="inspectorId" value={data.inspectorId} />
 
       <div className="mb-3">
-        <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+        <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
           Property address
         </label>
         <input
@@ -161,13 +161,13 @@ function BookingForm({ data }: { data: EmbedData }) {
           name="address"
           required
           placeholder="123 Main St, Austin, TX"
-          className="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+          className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-indigo-500 focus:shadow-ih-focus"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+          <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
             Your name
           </label>
           <input
@@ -175,11 +175,11 @@ function BookingForm({ data }: { data: EmbedData }) {
             name="clientName"
             required
             placeholder="Jane Doe"
-            className="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-indigo-500 focus:shadow-ih-focus"
           />
         </div>
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+          <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
             Email
           </label>
           <input
@@ -187,32 +187,32 @@ function BookingForm({ data }: { data: EmbedData }) {
             name="clientEmail"
             required
             placeholder="jane@example.com"
-            className="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-indigo-500 focus:shadow-ih-focus"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+          <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
             Phone
           </label>
           <input
             type="tel"
             name="clientPhone"
             placeholder="(555) 555-5555"
-            className="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-indigo-500 focus:shadow-ih-focus"
           />
         </div>
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+          <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
             Preferred date
           </label>
           <input
             type="date"
             name="date"
             required
-            className="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-indigo-500 focus:shadow-ih-focus"
           />
         </div>
       </div>
@@ -220,7 +220,7 @@ function BookingForm({ data }: { data: EmbedData }) {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        className="w-full px-4 py-3 bg-ih-primary text-white rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
       >
         {submitting ? "Submitting..." : "Request booking"}
       </button>
@@ -228,7 +228,7 @@ function BookingForm({ data }: { data: EmbedData }) {
       {status && (
         <div
           className={`mt-3 text-[13px] ${
-            status.ok ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            status.ok ? "text-green-700 dark:text-green-400" : "text-ih-bad-fg"
           }`}
         >
           {status.text}

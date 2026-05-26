@@ -84,28 +84,28 @@ export default function SettingsCatalogBooking() {
 
   return (
     <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
+      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
         <Link
           to="/settings"
-          className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          className="hover:text-ih-primary transition-colors"
         >
           Settings
         </Link>
         <span>&rsaquo;</span>
-        <span className="text-slate-900 dark:text-slate-100">Booking</span>
+        <span className="text-ih-fg-1">Booking</span>
       </div>
 
-      <h2 className="text-[19px] font-bold text-slate-900 dark:text-slate-100">
+      <h2 className="text-[19px] font-bold text-ih-fg-1">
         Booking
       </h2>
 
       {/* Public booking toggle */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 space-y-5">
+      <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6 space-y-5">
         <div>
-          <h3 className="text-[15px] font-bold text-slate-900 dark:text-slate-100">
+          <h3 className="text-[15px] font-bold text-ih-fg-1">
             Public booking page
           </h3>
-          <p className="text-[12px] text-slate-500 mt-1">
+          <p className="text-[12px] text-ih-fg-3 mt-1">
             Allow clients to book inspections through your public booking page.
           </p>
         </div>
@@ -115,13 +115,13 @@ export default function SettingsCatalogBooking() {
             type="checkbox"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+            className="mt-1 h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-indigo-500"
           />
           <span>
-            <span className="block text-[13px] font-bold text-slate-900 dark:text-slate-100">
+            <span className="block text-[13px] font-bold text-ih-fg-1">
               Enable public booking
             </span>
-            <span className="block text-[12px] text-slate-500 mt-0.5">
+            <span className="block text-[12px] text-ih-fg-3 mt-0.5">
               When enabled, clients can self-schedule through your booking link.
             </span>
           </span>
@@ -129,12 +129,12 @@ export default function SettingsCatalogBooking() {
       </div>
 
       {/* Concierge review */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 space-y-5">
+      <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6 space-y-5">
         <div>
-          <h3 className="text-[15px] font-bold text-slate-900 dark:text-slate-100">
+          <h3 className="text-[15px] font-bold text-ih-fg-1">
             Concierge bookings
           </h3>
-          <p className="text-[12px] text-slate-500 mt-1">
+          <p className="text-[12px] text-ih-fg-3 mt-1">
             Partner agents can submit bookings on behalf of their clients.
           </p>
         </div>
@@ -143,44 +143,44 @@ export default function SettingsCatalogBooking() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
             className={`border rounded-lg p-4 ${
-              reviewRequired
-                ? "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50"
-                : "border-indigo-300 dark:border-indigo-700 bg-indigo-50/40 dark:bg-indigo-900/20"
-            }`}
+ reviewRequired
+ ? "border-ih-border bg-ih-bg-muted"
+ : "border-ih-primary bg-ih-primary-tint"
+ }`}
           >
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-2">
               Auto mode{!reviewRequired ? " — active" : ""}
             </div>
-            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-800 dark:text-slate-200">
-              <span className="px-2 py-1 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-ih-fg-1">
+              <span className="px-2 py-1 rounded border border-ih-border bg-ih-bg-card">
                 Agent submits
               </span>
-              <span className="text-slate-400">&rarr;</span>
-              <span className="px-2 py-1 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+              <span className="text-ih-fg-4">&rarr;</span>
+              <span className="px-2 py-1 rounded border border-ih-border bg-ih-bg-card">
                 Client confirms
               </span>
             </div>
           </div>
           <div
             className={`border rounded-lg p-4 ${
-              reviewRequired
-                ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50/40 dark:bg-indigo-900/20"
-                : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50"
-            }`}
+ reviewRequired
+ ? "border-ih-primary bg-ih-primary-tint"
+ : "border-ih-border bg-ih-bg-muted"
+ }`}
           >
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-2">
               Review mode{reviewRequired ? " — active" : ""}
             </div>
-            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-800 dark:text-slate-200">
-              <span className="px-2 py-1 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+            <div className="flex items-center gap-2 text-[11px] font-bold text-ih-fg-1">
+              <span className="px-2 py-1 rounded border border-ih-border bg-ih-bg-card">
                 Agent submits
               </span>
-              <span className="text-slate-400">&rarr;</span>
-              <span className="px-2 py-1 rounded border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30">
+              <span className="text-ih-fg-4">&rarr;</span>
+              <span className="px-2 py-1 rounded border border-ih-primary bg-ih-primary-tint">
                 You review
               </span>
-              <span className="text-slate-400">&rarr;</span>
-              <span className="px-2 py-1 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700">
+              <span className="text-ih-fg-4">&rarr;</span>
+              <span className="px-2 py-1 rounded border border-ih-border bg-ih-bg-card">
                 Client confirms
               </span>
             </div>
@@ -192,13 +192,13 @@ export default function SettingsCatalogBooking() {
             type="checkbox"
             checked={reviewRequired}
             onChange={(e) => setReviewRequired(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+            className="mt-1 h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-indigo-500"
           />
           <span>
-            <span className="block text-[13px] font-bold text-slate-900 dark:text-slate-100">
+            <span className="block text-[13px] font-bold text-ih-fg-1">
               Review concierge bookings before sending to client
             </span>
-            <span className="block text-[12px] text-slate-500 mt-0.5">
+            <span className="block text-[12px] text-ih-fg-3 mt-0.5">
               When enabled, you must approve each booking from your dashboard
               before the client receives the magic link.
             </span>
@@ -207,13 +207,13 @@ export default function SettingsCatalogBooking() {
       </div>
 
       {/* Availability */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 space-y-4">
-        <h3 className="text-[15px] font-bold text-slate-900 dark:text-slate-100">
+      <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6 space-y-4">
+        <h3 className="text-[15px] font-bold text-ih-fg-1">
           Availability
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+            <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
               Default duration (min)
             </label>
             <input
@@ -222,43 +222,43 @@ export default function SettingsCatalogBooking() {
               onChange={(e) => setDuration(Number(e.target.value))}
               min={15}
               step={15}
-              className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+            <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
               Start time
             </label>
             <input
               type="time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-widest">
+            <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
               End time
             </label>
             <input
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-[13px] text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
           </div>
         </div>
       </div>
 
       {/* Embed code */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 space-y-3">
-        <h3 className="text-[15px] font-bold text-slate-900 dark:text-slate-100">
+      <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6 space-y-3">
+        <h3 className="text-[15px] font-bold text-ih-fg-1">
           Widget embed code
         </h3>
-        <p className="text-[12px] text-slate-500">
+        <p className="text-[12px] text-ih-fg-3">
           Copy this snippet to embed the booking widget on your website.
         </p>
-        <pre className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-3 text-[12px] text-slate-700 dark:text-slate-300 font-mono overflow-x-auto">
+        <pre className="bg-ih-bg-muted border border-ih-border rounded-md p-3 text-[12px] text-ih-fg-2 font-mono overflow-x-auto">
           {embedCode}
         </pre>
       </div>
@@ -268,12 +268,12 @@ export default function SettingsCatalogBooking() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="h-9 px-4 rounded-md bg-indigo-600 text-white font-bold text-[13px] hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save changes"}
         </button>
         {saved && (
-          <span className="text-[13px] text-emerald-600 dark:text-emerald-400 font-bold">
+          <span className="text-[13px] text-ih-ok-fg font-bold">
             Saved.
           </span>
         )}

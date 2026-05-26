@@ -3,7 +3,7 @@ import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/metrics";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
-import { PageHeader } from "@core/shared-ui";
+import { PageHeader, Card } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Metrics - OpenInspection" }];
@@ -61,15 +61,15 @@ export default function MetricsPage() {
         title="Metrics"
         meta={data ? `${data.totalInspections} inspections` : "Loading..."}
         actions={
-          <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded-md p-1">
+          <div className="flex gap-1 bg-ih-bg-muted rounded-md p-1">
             {PERIODS.map((p) => (
               <button
                 key={p}
                 onClick={() => changePeriod(p)}
                 className={`h-6 px-3 rounded text-[12px] font-bold transition-all ${
                   period === p
-                    ? "bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white"
-                    : "text-slate-400 dark:text-slate-500"
+                    ? "bg-ih-bg-card shadow-sm text-ih-fg-1"
+                    : "text-ih-fg-4"
                 }`}
               >
                 {p}
@@ -82,16 +82,16 @@ export default function MetricsPage() {
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{kpi.label}</p>
-            <p className="text-xl font-bold text-slate-900 dark:text-white">{kpi.value}</p>
-          </div>
+          <Card key={kpi.label} className="p-5">
+            <p className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{kpi.label}</p>
+            <p className="text-xl font-bold text-ih-fg-1">{kpi.value}</p>
+          </Card>
         ))}
       </div>
 
       {/* Inspections per month chart placeholder */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4">Inspections per Month</p>
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-4">Inspections per Month</p>
         {data && data.months.length > 0 ? (
           <div className="flex items-end gap-2 h-40">
             {data.months.map((m) => {
@@ -99,24 +99,24 @@ export default function MetricsPage() {
               const pct = (m.count / max) * 100;
               return (
                 <div key={m.ym} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-bold text-slate-500">{m.count}</span>
+                  <span className="text-[10px] font-bold text-ih-fg-3">{m.count}</span>
                   <div
-                    className="w-full bg-indigo-500 dark:bg-indigo-400 rounded-t"
+                    className="w-full bg-ih-primary rounded-t"
                     style={{ height: `${Math.max(pct, 4)}%` }}
                   />
-                  <span className="text-[10px] text-slate-400">{m.ym.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-4">{m.ym.slice(5)}</span>
                 </div>
               );
             })}
           </div>
         ) : (
-          <p className="text-[13px] text-slate-500 text-center py-8">No data available for this period.</p>
+          <p className="text-[13px] text-ih-fg-3 text-center py-8">No data available for this period.</p>
         )}
-      </div>
+      </Card>
 
       {/* Revenue per month bar chart */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4">Revenue per Month</p>
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-4">Revenue per Month</p>
         {data && data.months.length > 0 ? (
           <div className="flex items-end gap-2 h-40">
             {data.months.map((m) => {
@@ -124,71 +124,71 @@ export default function MetricsPage() {
               const pct = (m.revenue / maxRev) * 100;
               return (
                 <div key={m.ym + "-rev"} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-bold text-slate-500">{fmt(m.revenue)}</span>
+                  <span className="text-[10px] font-bold text-ih-fg-3">{fmt(m.revenue)}</span>
                   <div
                     className="w-full bg-emerald-500 dark:bg-emerald-400 rounded-t"
                     style={{ height: `${Math.max(pct, 4)}%` }}
                   />
-                  <span className="text-[10px] text-slate-400">{m.ym.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-4">{m.ym.slice(5)}</span>
                 </div>
               );
             })}
           </div>
         ) : (
-          <p className="text-[13px] text-slate-500 text-center py-8">No revenue data available for this period.</p>
+          <p className="text-[13px] text-ih-fg-3 text-center py-8">No revenue data available for this period.</p>
         )}
-      </div>
+      </Card>
 
       {/* Findings heatmap */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4">Findings Heatmap</p>
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-4">Findings Heatmap</p>
         {data && data.heatmap.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">Section</th>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-emerald-600 text-center">Satisfactory</th>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-amber-600 text-center">Monitor</th>
-                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-rose-600 text-center">Defect</th>
+                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Section</th>
+                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-ok-fg text-center">Satisfactory</th>
+                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-watch-fg text-center">Monitor</th>
+                  <th className="py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-ih-bad-fg text-center">Defect</th>
                 </tr>
               </thead>
               <tbody>
                 {data.heatmap.map((row) => (
-                  <tr key={row.section} className="border-t border-slate-100 dark:border-slate-700">
-                    <td className="py-2 px-3 text-[13px] font-medium text-slate-700 dark:text-slate-200">{row.section}</td>
-                    <td className="py-2 px-3 text-[13px] text-center text-emerald-700 dark:text-emerald-400">{row.satisfactory}</td>
-                    <td className="py-2 px-3 text-[13px] text-center text-amber-700 dark:text-amber-400">{row.monitor}</td>
-                    <td className="py-2 px-3 text-[13px] text-center text-rose-700 dark:text-rose-400">{row.defect}</td>
+                  <tr key={row.section} className="border-t border-ih-border">
+                    <td className="py-2 px-3 text-[13px] font-medium text-ih-fg-1">{row.section}</td>
+                    <td className="py-2 px-3 text-[13px] text-center text-ih-ok-fg">{row.satisfactory}</td>
+                    <td className="py-2 px-3 text-[13px] text-center text-ih-watch-fg">{row.monitor}</td>
+                    <td className="py-2 px-3 text-[13px] text-center text-ih-bad-fg">{row.defect}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="text-[13px] text-slate-500 text-center py-8">No findings data yet.</p>
+          <p className="text-[13px] text-ih-fg-3 text-center py-8">No findings data yet.</p>
         )}
-      </div>
+      </Card>
 
       {/* Top agents */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-3">Top Referring Agents</p>
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-3">Top Referring Agents</p>
         {data && data.topAgents.length > 0 ? (
           <div className="space-y-2">
             {data.topAgents.slice(0, 5).map((agent, i) => (
               <div key={i} className="flex items-center justify-between text-[13px]">
-                <span className="font-medium text-slate-700 dark:text-slate-200">{agent.agentName}</span>
+                <span className="font-medium text-ih-fg-1">{agent.agentName}</span>
                 <div className="text-right">
-                  <span className="font-bold text-slate-900 dark:text-white">{agent.count} insp</span>
-                  <span className="text-slate-400 ml-2 text-[12px]">{fmt(agent.revenue)}</span>
+                  <span className="font-bold text-ih-fg-1">{agent.count} insp</span>
+                  <span className="text-ih-fg-4 ml-2 text-[12px]">{fmt(agent.revenue)}</span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-[13px] text-slate-500">No agent data yet.</p>
+          <p className="text-[13px] text-ih-fg-3">No agent data yet.</p>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

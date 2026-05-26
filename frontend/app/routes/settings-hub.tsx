@@ -64,10 +64,10 @@ export default function SettingsHub() {
         <Link
           key={g.to}
           to={g.to}
-          className="group p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all"
+          className="group p-4 bg-ih-bg-card border border-ih-border rounded-lg hover:shadow-md hover:border-ih-border transition-all"
         >
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-ih-primary-tint text-ih-primary flex items-center justify-center flex-shrink-0">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -83,10 +83,10 @@ export default function SettingsHub() {
               </svg>
             </div>
             <div>
-              <h3 className="font-bold text-[14px] text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+              <h3 className="font-bold text-[14px] text-ih-fg-1 group-hover:text-ih-primary">
                 {g.title}
               </h3>
-              <p className="text-[12px] text-slate-500 mt-0.5">{g.desc}</p>
+              <p className="text-[12px] text-ih-fg-3 mt-0.5">{g.desc}</p>
             </div>
           </div>
         </Link>
