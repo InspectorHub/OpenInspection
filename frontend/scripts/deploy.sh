@@ -1,14 +1,12 @@
 #!/bin/bash
 # Build + deploy Remix frontend to CF Workers
 # Usage: npm run deploy
-
 set -e
 
-echo "Building Remix frontend..."
+echo "[1/3] Building Remix frontend..."
 npx react-router build
-rm -f build/client/wrangler.json
 
-echo "Creating SSR worker entry..."
+echo "[2/3] Creating SSR worker entry..."
 cat > build/worker-entry.js << 'EOF'
 import { createRequestHandler } from "react-router";
 import * as serverBuild from "./server/index.js";
@@ -31,7 +29,18 @@ export default {
 };
 EOF
 
-echo "Deploying to Cloudflare Workers..."
-npx wrangler deploy
+# Patch generated wrangler.json: set main entry (Vite plugin leaves it empty)
+node -e "
+  const fs = require('fs');
+  const f = 'build/client/wrangler.json';
+  let raw = fs.readFileSync(f, 'utf8');
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+  const c = JSON.parse(raw);
+  c.main = '../worker-entry.js';
+  fs.writeFileSync(f, JSON.stringify(c));
+"
+
+echo "[3/3] Deploying to Cloudflare Workers..."
+npx wrangler deploy --config build/client/wrangler.json
 
 echo "Done!"

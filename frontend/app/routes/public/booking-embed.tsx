@@ -29,7 +29,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const style = url.searchParams.get("style") === "compact" ? "compact" : "full";
   try {
     const res = await apiFetch(
-      `/api/public/embed/${params.tenant}/${params.slug}`,
+      `/api/public/book/${params.tenant}/${params.slug}`,
     );
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Partial<EmbedData> | undefined;
