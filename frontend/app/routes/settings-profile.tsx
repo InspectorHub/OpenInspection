@@ -3,6 +3,7 @@ import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { useSessionContext } from "~/hooks/useSessionContext";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -61,6 +62,8 @@ export default function SettingsProfilePage() {
   const { profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [bioLen, setBioLen] = useState((profile.bio ?? "").length);
+  const ctx = useSessionContext();
+  const tenant = ctx?.branding?.tenantSubdomain;
 
   return (
     <div className="space-y-[18px]">
@@ -125,6 +128,16 @@ export default function SettingsProfilePage() {
               className="block w-full rounded-md border border-ih-border bg-ih-bg-card px-3 py-2 text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-colors text-ih-fg-1" />
             <p className="text-[11px] text-ih-fg-3">Lowercase letters, numbers, and hyphens (3-32 chars).</p>
           </div>
+          {profile.slug && tenant && (
+            <div className="flex items-center gap-3 pt-2">
+              <a href={`/inspector/${tenant}/${profile.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-ih-primary font-bold hover:underline">
+                View my public profile &rarr;
+              </a>
+              <a href={`/book/${tenant}/${profile.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-ih-primary font-bold hover:underline">
+                View my booking page &rarr;
+              </a>
+            </div>
+          )}
         </section>
 
         {/* Photo placeholder */}
@@ -146,7 +159,19 @@ export default function SettingsProfilePage() {
                 )}
               </div>
               <div className="space-y-2">
-                <input type="file" accept="image/jpeg,image/png,image/webp" className="block text-[11px] text-ih-fg-3" />
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="block text-[11px] text-ih-fg-3"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const fd = new FormData();
+                    fd.append("photo", file);
+                    const res = await fetch("/api/profile/photo", { method: "POST", credentials: "same-origin", body: fd });
+                    if (res.ok) window.location.reload();
+                  }}
+                />
                 <p className="text-[11px] text-ih-fg-3">JPG, PNG, or WebP. Max 2 MB. Square crop renders best.</p>
               </div>
             </div>
@@ -165,13 +190,6 @@ export default function SettingsProfilePage() {
             <p className="text-[11px] text-ih-fg-3">{bioLen} / 600</p>
           </div>
 
-          {/* Signature pad placeholder */}
-          <div className="space-y-2">
-            <label className="block text-[13px] font-semibold text-ih-fg-1">Signature</label>
-            <div className="h-20 rounded-md border border-dashed border-ih-border bg-ih-bg-muted flex items-center justify-center text-[11px] text-ih-fg-4">
-              Signature pad - coming soon
-            </div>
-          </div>
         </section>
 
         {/* Save */}

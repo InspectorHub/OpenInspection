@@ -21,7 +21,7 @@ export default function AgentLayout() {
       <header className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <div className="max-w-[1080px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="" className="w-7 h-7 shrink-0" />
+            <img src="/logo.svg" alt="" className="w-7 h-7 shrink-0" width={28} height={28} />
             <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
               OpenInspection
             </span>

@@ -93,6 +93,7 @@ export default [
       route("settings/integrations/qbo", "routes/settings-integrations-qbo.tsx"),
       route("settings/event-types", "routes/settings-event-types.tsx"),
       route("settings/inspection-types", "routes/settings-inspection-types.tsx"),
+      route("settings/booking", "routes/settings-booking.tsx"),
       route("settings/catalog/booking", "routes/settings-catalog-booking.tsx"),
       route("settings/billing", "routes/settings-billing.tsx"),
       route("settings/security", "routes/settings-security.tsx"),

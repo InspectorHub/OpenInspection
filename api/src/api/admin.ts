@@ -1647,6 +1647,45 @@ adminRoutes.openapi(updateDashboardColumnsRoute, async (c) => {
 });
 
 // -----------------------------------------------------------------------------
+// GET /api/admin/tenant-config — read booking-related tenant config flags
+// -----------------------------------------------------------------------------
+const TenantConfigGetResponseSchema = z.object({
+    success: z.boolean().describe('Whether the request succeeded'),
+    data: z.object({
+        conciergeReviewRequired: z.boolean().describe('Whether bookings require concierge review before confirmation'),
+        blockUnsignedAgreement: z.boolean().describe('Whether unsigned agreements block inspection start'),
+    }).describe('Current tenant configuration flags'),
+}).openapi('TenantConfigGetResponse');
+
+const tenantConfigGetRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/tenant-config',
+    tags: ["admin"],
+    summary: 'Get tenant configuration flags',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    responses: {
+        200: {
+            content: { 'application/json': { schema: TenantConfigGetResponseSchema.describe('Tenant configuration flags') } },
+            description: 'Success',
+        },
+    },
+    operationId: "getTenantConfig",
+    description: "Returns booking-related tenant configuration flags (conciergeReviewRequired, blockUnsignedAgreement)."
+}, { scopes: ['admin'], tier: 'extended' }));
+
+adminRoutes.openapi(tenantConfigGetRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const config = await c.var.services.branding.getBranding(tenantId);
+    return c.json({
+        success: true as const,
+        data: {
+            conciergeReviewRequired: config?.conciergeReviewRequired ?? false,
+            blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
+        },
+    }, 200);
+});
+
+// -----------------------------------------------------------------------------
 // Agent Accounts A3 — concierge review-mode toggle (PATCH /api/admin/tenant-config)
 // -----------------------------------------------------------------------------
 // Generic patch endpoint scoped to a small allowlist of tenant_configs columns

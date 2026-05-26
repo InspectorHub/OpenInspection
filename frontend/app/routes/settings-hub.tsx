@@ -8,6 +8,12 @@ const GROUPS = [
     icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
   },
   {
+    to: "/settings/booking",
+    title: "Online Booking",
+    desc: "Schedule, availability, booking page.",
+    icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  },
+  {
     to: "/settings/workspace",
     title: "Workspace",
     desc: "Branding, report theme, analytics.",
@@ -36,12 +42,6 @@ const GROUPS = [
     title: "Data",
     desc: "Import, export, GDPR.",
     icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
-  },
-  {
-    to: "/settings/widget",
-    title: "Embed widget",
-    desc: "Booking widget for your site.",
-    icon: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
   },
   {
     to: "/settings/account",

@@ -1,0 +1,1179 @@
+{
+  "id": "seed_commercial_v1",
+  "name": "Commercial Building Inspection",
+  "description": "ASTM E2018-aligned commercial property condition assessment template.",
+  "version": 2,
+  "schema": {
+    "schemaVersion": 2,
+    "sections": [
+      {
+        "id": "site",
+        "title": "Site",
+        "items": [
+          {
+            "id": "site-grading",
+            "label": "Grading & Drainage",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_site_grading_ok",
+                  "title": "Condition",
+                  "comment": "Grading & Drainage was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_site_grading_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_site_grading_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Grading & Drainage requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_site_grading_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Grading & Drainage presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "parking",
+            "label": "Parking & Paving",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_parking_ok",
+                  "title": "Condition",
+                  "comment": "Parking & Paving was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_parking_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_parking_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Parking & Paving requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_parking_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Parking & Paving presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "landscaping",
+            "label": "Landscaping",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_landscaping_ok",
+                  "title": "Condition",
+                  "comment": "Landscaping was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_landscaping_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_landscaping_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Landscaping requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_landscaping_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Landscaping presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "building-envelope",
+        "title": "Building Envelope",
+        "items": [
+          {
+            "id": "roof-c",
+            "label": "Roof",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_roof_c_ok",
+                  "title": "Condition",
+                  "comment": "Roof was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_roof_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_roof_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Roof requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_roof_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Roof presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "facade",
+            "label": "Facade / Cladding",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_facade_ok",
+                  "title": "Condition",
+                  "comment": "Facade / Cladding was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_facade_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_facade_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Facade / Cladding requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_facade_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Facade / Cladding presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "windows-c",
+            "label": "Windows & Glazing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_windows_c_ok",
+                  "title": "Condition",
+                  "comment": "Windows & Glazing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_windows_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_windows_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Windows & Glazing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_windows_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Windows & Glazing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "structure-commercial",
+        "title": "Structure",
+        "items": [
+          {
+            "id": "foundation-c",
+            "label": "Foundation",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_foundation_c_ok",
+                  "title": "Condition",
+                  "comment": "Foundation was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_foundation_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_foundation_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Foundation requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_foundation_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Foundation presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "frame-c",
+            "label": "Structural Frame",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_frame_c_ok",
+                  "title": "Condition",
+                  "comment": "Structural Frame was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_frame_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_frame_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Structural Frame requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_frame_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Structural Frame presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "slab",
+            "label": "Elevated Slabs/Floors",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_slab_ok",
+                  "title": "Condition",
+                  "comment": "Elevated Slabs/Floors was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_slab_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_slab_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Elevated Slabs/Floors requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_slab_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Elevated Slabs/Floors presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "mep",
+        "title": "Mechanical / Electrical / Plumbing",
+        "items": [
+          {
+            "id": "hvac-c",
+            "label": "HVAC",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_hvac_c_ok",
+                  "title": "Condition",
+                  "comment": "HVAC was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_hvac_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_hvac_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "HVAC requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_hvac_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "HVAC presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "elec-c",
+            "label": "Electrical Service",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_elec_c_ok",
+                  "title": "Condition",
+                  "comment": "Electrical Service was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_elec_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_elec_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Electrical Service requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_elec_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Electrical Service presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "plumbing-c",
+            "label": "Plumbing",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_plumbing_c_ok",
+                  "title": "Condition",
+                  "comment": "Plumbing was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_plumbing_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_plumbing_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Plumbing requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_plumbing_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Plumbing presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "fire",
+            "label": "Fire Protection",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_fire_ok",
+                  "title": "Condition",
+                  "comment": "Fire Protection was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_fire_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_fire_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Fire Protection requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_fire_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Fire Protection presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "elevator",
+            "label": "Vertical Transportation",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_elevator_ok",
+                  "title": "Condition",
+                  "comment": "Vertical Transportation was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_elevator_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_elevator_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Vertical Transportation requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_elevator_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Vertical Transportation presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "interior-commercial",
+        "title": "Interior",
+        "items": [
+          {
+            "id": "floors-c",
+            "label": "Floors",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_floors_c_ok",
+                  "title": "Condition",
+                  "comment": "Floors was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_floors_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_floors_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Floors requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_floors_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Floors presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "ceilings-c",
+            "label": "Ceilings",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ceilings_c_ok",
+                  "title": "Condition",
+                  "comment": "Ceilings was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ceilings_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ceilings_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Ceilings requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_ceilings_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Ceilings presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "walls-c",
+            "label": "Walls & Partitions",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_walls_c_ok",
+                  "title": "Condition",
+                  "comment": "Walls & Partitions was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_walls_c_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_walls_c_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Walls & Partitions requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_walls_c_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Walls & Partitions presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "restrooms",
+            "label": "Restrooms",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_restrooms_ok",
+                  "title": "Condition",
+                  "comment": "Restrooms was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_restrooms_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_restrooms_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Restrooms requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_restrooms_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Restrooms presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "accessibility",
+        "title": "Accessibility (ADA)",
+        "items": [
+          {
+            "id": "ada-parking",
+            "label": "Accessible Parking",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ada_parking_ok",
+                  "title": "Condition",
+                  "comment": "Accessible Parking was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ada_parking_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ada_parking_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Accessible Parking requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_ada_parking_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Accessible Parking presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "ada-entry",
+            "label": "Building Entry",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ada_entry_ok",
+                  "title": "Condition",
+                  "comment": "Building Entry was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ada_entry_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ada_entry_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Building Entry requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_ada_entry_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Building Entry presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "ada-rest",
+            "label": "Restrooms",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_ada_rest_ok",
+                  "title": "Condition",
+                  "comment": "Restrooms was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_ada_rest_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_ada_rest_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Restrooms requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_ada_rest_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Restrooms presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "environmental",
+        "title": "Environmental",
+        "items": [
+          {
+            "id": "asbestos",
+            "label": "Asbestos Concerns",
+            "type": "text"
+          },
+          {
+            "id": "mold",
+            "label": "Mold / Moisture",
+            "type": "rich",
+            "ratingOptions": [
+              "Inspected",
+              "Not Inspected",
+              "Not Present",
+              "Repair",
+              "Safety Hazard"
+            ],
+            "tabs": {
+              "information": [
+                {
+                  "id": "ri_mold_ok",
+                  "title": "Condition",
+                  "comment": "Mold / Moisture was inspected and appears in serviceable condition.",
+                  "default": true
+                }
+              ],
+              "limitations": [
+                {
+                  "id": "rl_mold_visual",
+                  "title": "Visual scope",
+                  "comment": "Inspection limited to visible, accessible components at the time of inspection.",
+                  "default": false
+                }
+              ],
+              "defects": [
+                {
+                  "id": "rd_mold_repair",
+                  "title": "Repair needed",
+                  "category": "recommendation",
+                  "location": "",
+                  "comment": "Mold / Moisture requires repair or further evaluation by a qualified professional.",
+                  "photos": [],
+                  "default": false
+                },
+                {
+                  "id": "rd_mold_safety",
+                  "title": "Safety concern",
+                  "category": "safety",
+                  "location": "",
+                  "comment": "Mold / Moisture presents a safety concern; recommend immediate evaluation and correction.",
+                  "photos": [],
+                  "default": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "lead",
+            "label": "Lead Paint Concerns",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "summary-commercial",
+        "title": "Summary & Recommendations",
+        "items": [
+          {
+            "id": "summary-c",
+            "label": "Overall Assessment",
+            "type": "text"
+          },
+          {
+            "id": "deferred",
+            "label": "Deferred Maintenance",
+            "type": "text"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -16,6 +16,65 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
  */
 const app = new OpenAPIHono<HonoConfig>();
 
+const getProfileRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/',
+    operationId: 'getMyProfile',
+    tags: ['profile'],
+    summary: 'Get current user profile',
+    description: 'Returns the authenticated user\'s editable profile fields (name, phone, license, slug, bio, photo URL, service areas).',
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({
+                        name: z.string().nullable(),
+                        email: z.string(),
+                        phone: z.string().nullable(),
+                        licenseNumber: z.string().nullable(),
+                        slug: z.string().nullable(),
+                        bio: z.string().nullable(),
+                        photoUrl: z.string().nullable(),
+                        serviceAreas: z.any().nullable(),
+                    })),
+                },
+            },
+            description: 'Profile data',
+        },
+    },
+}, { scopes: ['read'], tier: 'primary' }));
+
+app.openapi(getProfileRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
+
+    const row = await drizzle(c.env.DB as any).select({
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        licenseNumber: users.licenseNumber,
+        slug: users.slug,
+        bio: users.bio,
+        photoUrl: users.photoUrl,
+        serviceAreas: users.serviceAreas,
+    }).from(users)
+      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
+      .get();
+
+    if (!row) throw Errors.NotFound('User not found');
+
+    let parsedAreas = null;
+    if (row.serviceAreas) {
+        try { parsedAreas = JSON.parse(row.serviceAreas); } catch {}
+    }
+
+    return c.json({
+        success: true as const,
+        data: { ...row, serviceAreas: parsedAreas },
+    }, 200);
+});
+
 const SlugConflictResponseSchema = z.object({
     success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'),
     error: z.object({
@@ -23,6 +82,86 @@ const SlugConflictResponseSchema = z.object({
         code: z.string().describe('TODO describe code field for the OpenInspection MCP integration'),
         details: z.object({ suggestions: z.array(z.string()).optional().describe('TODO describe suggestions field for the OpenInspection MCP integration') }).optional().describe('TODO describe details field for the OpenInspection MCP integration'),
     }),
+});
+
+const PatchProfileSchema = z.object({
+    name: z.string().max(100).optional(),
+    phone: z.string().max(30).optional(),
+    licenseNumber: z.string().max(50).optional(),
+    slug: z.string().min(3).max(32).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).optional(),
+    bio: z.string().max(600).nullable().optional(),
+});
+
+const patchProfileRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/',
+    operationId: 'patchMyProfile',
+    tags: ['profile'],
+    summary: 'Update current user profile',
+    description: 'Partially updates the authenticated user\'s profile. Slug uniqueness is validated; other fields are written directly.',
+    request: {
+        body: {
+            content: {
+                'application/json': { schema: PatchProfileSchema },
+            },
+        },
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ ok: z.literal(true) })),
+                },
+            },
+            description: 'Saved',
+        },
+        409: {
+            content: {
+                'application/json': { schema: SlugConflictResponseSchema },
+            },
+            description: 'Slug conflict',
+        },
+    },
+}, { scopes: ['write'], tier: 'primary' }));
+
+app.openapi(patchProfileRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
+
+    const body = c.req.valid('json');
+    const updates: Record<string, unknown> = {};
+
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.phone !== undefined) updates.phone = body.phone;
+    if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
+    if (body.bio !== undefined) updates.bio = body.bio;
+
+    if (body.slug !== undefined) {
+        const userService = c.var.services.user;
+        const check = await userService.checkSlug(tenantId, body.slug, userId);
+        if (!check.available) {
+            return c.json({
+                success: false as const,
+                error: {
+                    message: check.reason === 'reserved'
+                        ? 'That slug is reserved. Please choose another.'
+                        : 'That slug is already taken.',
+                    code: ErrorCode.CONFLICT,
+                    details: { suggestions: check.suggestions ?? [] },
+                },
+            }, 409);
+        }
+        updates.slug = body.slug;
+    }
+
+    if (Object.keys(updates).length > 0) {
+        await drizzle(c.env.DB as any).update(users)
+            .set(updates)
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+    }
+
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
 });
 
 const setSlugRoute = createRoute(withMcpMetadata({

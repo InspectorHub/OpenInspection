@@ -145,7 +145,7 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       <div className="relative w-80 max-w-[85vw] h-full bg-ih-bg-card shadow-ih-popover flex flex-col">
         <div className="p-4 flex items-center justify-between border-b border-ih-border">
           <div className="flex items-center gap-3">
-            <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" />
+            <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" width={28} height={28} />
             <span className="text-sm font-bold text-ih-fg-1 tracking-tight">{siteName}</span>
           </div>
           <button onClick={onClose} className="p-2 rounded-[6px] text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-fg-2 transition-colors" aria-label="Close menu">
@@ -217,7 +217,7 @@ export function MobileHeader() {
     <>
       <div className="lg:hidden sticky top-0 z-40 bg-ih-bg-card border-b border-ih-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src={logoUrl} alt="" className="w-8 h-8 shrink-0" />
+          <img src={logoUrl} alt="" className="w-8 h-8 shrink-0" width={32} height={32} />
           <span className="text-lg font-extrabold text-ih-fg-1 tracking-tight">{siteName}</span>
         </div>
         <div className="flex items-center gap-1">
@@ -266,7 +266,7 @@ export function Sidebar() {
     <aside className="ih-sidebar bg-ih-bg-card border-r border-ih-border hidden lg:flex flex-col sticky top-0 h-screen overflow-hidden">
       {/* Logo + notifications */}
       <div className={`px-2 pt-1 pb-[14px] flex items-center gap-2.5 border-b border-ih-border shrink-0 ${collapsed ? "justify-center" : ""}`}>
-        <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" />
+        <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" width={28} height={28} />
         {!collapsed && (
           <>
             <span className="text-[14px] font-bold text-ih-fg-1 tracking-tight leading-tight truncate">{siteName}</span>
