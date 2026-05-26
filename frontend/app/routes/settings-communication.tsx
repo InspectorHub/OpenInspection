@@ -1,7 +1,8 @@
-import { Link, useLoaderData, Form } from "react-router";
+import { Link, useLoaderData, useActionData, Form } from "react-router";
 import type { Route } from "./+types/settings-communication";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { SecretField } from "~/components/SecretField";
 
 export function meta() {
   return [{ title: "Communication - Settings - OpenInspection" }];
@@ -22,28 +23,35 @@ interface EmailTemplate {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
-  try {
-    const res = await apiFetch("/api/admin/communication", { token });
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-    const d = (body.data ?? {}) as Record<string, unknown>;
-    return {
-      config: {
-        senderEmail: (d?.senderEmail as string) || null,
-        replyTo: (d?.replyTo as string) || null,
-        resendConfigured: Boolean(d?.resendConfigured),
-      } as CommConfig,
-      templates: (Array.isArray(d?.templates) ? d.templates : []) as EmailTemplate[],
-      icsUrl: (d?.icsUrl as string) || null,
-      googleCalendarConnected: Boolean(d?.googleCalendarConnected),
-    };
-  } catch {
-    return {
-      config: { senderEmail: null, replyTo: null, resendConfigured: false } as CommConfig,
-      templates: [] as EmailTemplate[],
-      icsUrl: null as string | null,
-      googleCalendarConnected: false,
-    };
-  }
+
+  // Fetch communication config + secrets in parallel
+  const [commRes, secretsRes] = await Promise.all([
+    apiFetch("/api/admin/communication", { token }).catch(() => null),
+    apiFetch("/api/admin/secrets", { token }).catch(() => null),
+  ]);
+
+  const commBody = commRes?.ok ? ((await commRes.json()) as Record<string, unknown>) : {};
+  const d = (commBody.data ?? {}) as Record<string, unknown>;
+
+  const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
+  const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+
+  return {
+    config: {
+      senderEmail: (d?.senderEmail as string) || null,
+      replyTo: (d?.replyTo as string) || null,
+      resendConfigured: Boolean(d?.resendConfigured),
+    } as CommConfig,
+    templates: (Array.isArray(d?.templates) ? d.templates : []) as EmailTemplate[],
+    icsUrl: (d?.icsUrl as string) || null,
+    googleCalendarConnected: Boolean(d?.googleCalendarConnected),
+    secrets: {
+      RESEND_API_KEY: secrets.RESEND_API_KEY || "",
+      SENDER_EMAIL: secrets.SENDER_EMAIL || "",
+      GOOGLE_CLIENT_ID: secrets.GOOGLE_CLIENT_ID || "",
+      GOOGLE_CLIENT_SECRET: secrets.GOOGLE_CLIENT_SECRET || "",
+    },
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -62,11 +70,52 @@ export async function action({ request }: Route.ActionArgs) {
     });
   }
 
+  if (intent === "save-email-secrets") {
+    const body: Record<string, string> = {};
+    const resendKey = form.get("RESEND_API_KEY");
+    const senderEmail = form.get("SENDER_EMAIL");
+    if (resendKey && typeof resendKey === "string" && resendKey.trim()) body.RESEND_API_KEY = resendKey;
+    if (senderEmail && typeof senderEmail === "string" && senderEmail.trim()) body.SENDER_EMAIL = senderEmail;
+
+    if (Object.keys(body).length > 0) {
+      const res = await apiFetch("/api/admin/secrets", {
+        token,
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        return { ok: false, error: "Failed to save email secrets." };
+      }
+    }
+    return { ok: true };
+  }
+
+  if (intent === "save-calendar-secrets") {
+    const body: Record<string, string> = {};
+    const clientId = form.get("GOOGLE_CLIENT_ID");
+    const clientSecret = form.get("GOOGLE_CLIENT_SECRET");
+    if (clientId && typeof clientId === "string" && clientId.trim()) body.GOOGLE_CLIENT_ID = clientId;
+    if (clientSecret && typeof clientSecret === "string" && clientSecret.trim()) body.GOOGLE_CLIENT_SECRET = clientSecret;
+
+    if (Object.keys(body).length > 0) {
+      const res = await apiFetch("/api/admin/secrets", {
+        token,
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        return { ok: false, error: "Failed to save calendar secrets." };
+      }
+    }
+    return { ok: true };
+  }
+
   return { ok: true };
 }
 
 export default function SettingsCommunication() {
-  const { config, templates, icsUrl, googleCalendarConnected } = useLoaderData<typeof loader>();
+  const { config, templates, icsUrl, googleCalendarConnected, secrets } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
 
   return (
     <div className="space-y-[18px]">
@@ -81,6 +130,13 @@ export default function SettingsCommunication() {
       <p className="text-[13px] text-ih-fg-3">
         Configure email delivery, templates, and calendar sync.
       </p>
+
+      {/* Flash */}
+      {actionData && !actionData.ok && actionData.error && (
+        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
+          {actionData.error}
+        </div>
+      )}
 
       {/* Email delivery config */}
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -120,6 +176,38 @@ export default function SettingsCommunication() {
         </Form>
       </section>
 
+      {/* Email API keys */}
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email API keys</h3>
+        <p className="text-[13px] text-ih-fg-3">
+          API keys for email delivery. Get a key at{" "}
+          <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">resend.com</a>.
+        </p>
+        <Form method="post" className="space-y-4">
+          <input type="hidden" name="intent" value="save-email-secrets" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SecretField
+              name="RESEND_API_KEY"
+              label="Resend API key"
+              value={secrets.RESEND_API_KEY}
+              hint="Stored encrypted. Leave blank to keep existing key."
+            />
+            <SecretField
+              name="SENDER_EMAIL"
+              label="Sender email (secret)"
+              value={secrets.SENDER_EMAIL}
+              type="text"
+              hint="Overrides the sender email above when set as a secret."
+            />
+          </div>
+          <div className="flex justify-end pt-3 border-t border-ih-border">
+            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+              Save API keys
+            </button>
+          </div>
+        </Form>
+      </section>
+
       {/* Email templates */}
       <section className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
         <div className="px-5 py-4 border-b border-ih-border">
@@ -148,6 +236,37 @@ export default function SettingsCommunication() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Google Calendar OAuth secrets */}
+      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Google OAuth credentials</h3>
+        <p className="text-[13px] text-ih-fg-3">
+          Required for Google Calendar two-way sync. Create credentials at{" "}
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">Google Cloud Console</a>.
+        </p>
+        <Form method="post" className="space-y-4">
+          <input type="hidden" name="intent" value="save-calendar-secrets" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SecretField
+              name="GOOGLE_CLIENT_ID"
+              label="Google Client ID"
+              value={secrets.GOOGLE_CLIENT_ID}
+              hint="OAuth 2.0 client ID from Google Cloud Console."
+            />
+            <SecretField
+              name="GOOGLE_CLIENT_SECRET"
+              label="Google Client Secret"
+              value={secrets.GOOGLE_CLIENT_SECRET}
+              hint="Stored encrypted. Leave blank to keep existing."
+            />
+          </div>
+          <div className="flex justify-end pt-3 border-t border-ih-border">
+            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
+              Save credentials
+            </button>
+          </div>
+        </Form>
       </section>
 
       {/* Calendar sync */}

@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import type { HonoConfig } from '../../types/hono';
-import { SetupPage } from '../../templates/pages/setup';
 
 /**
  * Setup-wizard feature module.
@@ -14,6 +13,10 @@ import { SetupPage } from '../../templates/pages/setup';
  * unreachable in saas mode because the tenant-routing middleware refuses to
  * resolve `/setup`-prefixed paths without a real tenant — see
  * `features/tenant-routing/index.ts`.
+ *
+ * NOTE: The setup page HTML is now served by the Remix frontend.
+ * This module only provides the profile gate so that /setup returns 404
+ * in saas modes where the wizard is not applicable.
  */
 export function setupWizardRoutes(): Hono<HonoConfig> {
     const app = new Hono<HonoConfig>();
@@ -24,8 +27,10 @@ export function setupWizardRoutes(): Hono<HonoConfig> {
         return next();
     });
 
-    // GET /setup → first-run wizard page.
-    app.get('/', (c) => c.html(SetupPage({ branding: c.get('branding') })));
+    // GET /setup — Remix frontend serves the actual page; this handler
+    // returns a minimal redirect or passthrough so Remix can pick it up.
+    // The profile gate above ensures saas deploys get 404.
+    app.get('/', (c) => c.text('Setup wizard', 200));
 
     return app;
 }

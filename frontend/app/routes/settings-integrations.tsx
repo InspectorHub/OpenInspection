@@ -1,4 +1,52 @@
-import { Link } from "react-router";
+import { Link, useLoaderData, useActionData, Form } from "react-router";
+import type { Route } from "./+types/settings-integrations";
+import { requireToken } from "~/lib/session.server";
+import { apiFetch } from "~/lib/api.server";
+import { SecretField } from "~/components/SecretField";
+
+export function meta() {
+  return [{ title: "Integrations - Settings - OpenInspection" }];
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const token = await requireToken(request);
+  const secretsRes = await apiFetch("/api/admin/secrets", { token }).catch(() => null);
+  const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
+  const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+  return {
+    secrets: {
+      STRIPE_SECRET_KEY: secrets.STRIPE_SECRET_KEY || "",
+      STRIPE_WEBHOOK_SECRET: secrets.STRIPE_WEBHOOK_SECRET || "",
+    },
+  };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const token = await requireToken(request);
+  const fd = await request.formData();
+  const intent = fd.get("intent");
+
+  if (intent === "save-stripe-secrets") {
+    const body: Record<string, string> = {};
+    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const) {
+      const val = fd.get(key);
+      if (val && typeof val === "string" && val.trim()) body[key] = val;
+    }
+    if (Object.keys(body).length > 0) {
+      const res = await apiFetch("/api/admin/secrets", {
+        token,
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        return { success: false, error: "Failed to save Stripe keys." };
+      }
+    }
+    return { success: true, error: null };
+  }
+
+  return { success: false, error: "Unknown action" };
+}
 
 const INTEGRATIONS = [
   {
@@ -61,6 +109,9 @@ const STATUS_STYLES = {
 };
 
 export default function SettingsIntegrations() {
+  const { secrets } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+
   return (
     <div className="space-y-[18px]">
       <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
@@ -82,6 +133,55 @@ export default function SettingsIntegrations() {
           Connect OpenInspection to your other business tools.
         </p>
       </div>
+
+      {/* Flash */}
+      {actionData?.success && (
+        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
+          Settings saved.
+        </div>
+      )}
+      {actionData?.error && (
+        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
+          {actionData.error}
+        </div>
+      )}
+
+      {/* Stripe API keys */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-md flex items-center justify-center text-white text-[10px] font-extrabold"
+            style={{ backgroundColor: "#635BFF" }}
+          >
+            ST
+          </div>
+          <div>
+            <h3 className="text-[13px] font-bold text-ih-fg-1">Stripe API keys</h3>
+            <p className="text-[11px] text-ih-fg-3">Required for payment processing. Get keys at dashboard.stripe.com/apikeys.</p>
+          </div>
+        </div>
+        <Form method="post" className="space-y-4 max-w-xl">
+          <input type="hidden" name="intent" value="save-stripe-secrets" />
+          <SecretField
+            name="STRIPE_SECRET_KEY"
+            label="Stripe Secret Key"
+            value={secrets.STRIPE_SECRET_KEY}
+            hint="sk_live_... or sk_test_... Stored encrypted."
+          />
+          <SecretField
+            name="STRIPE_WEBHOOK_SECRET"
+            label="Stripe Webhook Secret"
+            value={secrets.STRIPE_WEBHOOK_SECRET}
+            hint="whsec_... Used to verify Stripe webhook signatures."
+          />
+          <div className="flex justify-end pt-2 border-t border-ih-border">
+            <button type="submit"
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
+              Save Stripe keys
+            </button>
+          </div>
+        </Form>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {INTEGRATIONS.map((i) => (

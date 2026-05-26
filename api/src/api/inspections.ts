@@ -1,10 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
-import { renderProfessionalReport } from '../templates/pages/report.template';
-import type { ReportUnit } from '../templates/components/report-units-summary';
-import { ReportGatePage } from '../templates/pages/report-gate';
 import { auditFromContext } from '../lib/audit';
-import { getBaseUrl, getBookingHost } from '../lib/url';
+import { getBookingHost } from '../lib/url';
 import { reportUrl as buildReportUrl } from '../lib/public-urls';
 import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
@@ -1428,149 +1425,18 @@ inspectionsRoutes.openapi(updateMediaAnnotationsRoute, async (c) => {
 });
 
 /**
- * Report View (HTML)
+ * Report View (HTML) — REMOVED.
+ * The Remix frontend now handles report rendering via /report/:tenant/:id.
+ * Use GET /api/inspections/:id/report-data for the JSON data endpoint.
  */
 inspectionsRoutes.get('/:id/report', async (c) => {
-    const id = c.req.param('id');
-    const service = c.var.services.inspection;
-
-    // Agent view: token-based access that bypasses login and report gates
-    const viewParam  = c.req.query('view');
-    const tokenParam = c.req.query('token');
-    if (viewParam === 'agent' && tokenParam) {
-        const resolved = await service.resolveAgentViewToken(tokenParam);
-        if (!resolved || resolved.inspectionId !== id) {
-            return c.html('<html><body><p style="font-family:sans-serif;padding:2rem">Invalid or expired agent view link.</p></body></html>', 403);
-        }
-        const { inspection, template } = await service.getInspection(id!, resolved.tenantId);
-        const db = drizzle(c.env.DB);
-        const results = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, resolved.tenantId))).get();
-        const resolvedTheme = c.var.services.branding.resolveReportTheme(inspection, c.get('branding'));
-        // Feature #20 — anonymous viewer must also see the per-inspection
-        // snapshot, not the source template's schema. Same logic as the
-        // authenticated viewer below.
-        const rawSnapPublic = (inspection as unknown as { templateSnapshot?: unknown }).templateSnapshot;
-        let publicTemplate: unknown = template;
-        if (rawSnapPublic) {
-            try {
-                const snap = typeof rawSnapPublic === 'string' ? JSON.parse(rawSnapPublic as string) : rawSnapPublic;
-                if (snap && Array.isArray((snap as { sections?: unknown }).sections) && (snap as { sections: unknown[] }).sections.length > 0) {
-                    publicTemplate = { ...(template || {}), schema: snap };
-                }
-            } catch { /* malformed snapshot — fall through */ }
-        }
-        return c.html(renderProfessionalReport({
-            inspection: { ...inspection, internalNotes: null, paymentStatus: null, paymentRequired: false } as never,
-            template: publicTemplate as never,
-            results: (results || { data: {} }) as never,
-            branding: c.get('branding'),
-            isAuthenticated: false,
-            resolvedTheme,
-        }));
-    }
-
-    const { inspection, template } = await service.getInspection(id!, c.get('tenantId'));
-
-    // Report gates: payment or agreement required before viewing
-    const baseUrl = getBaseUrl(c);
-    const branding = c.get('branding');
-    const companyName = branding?.siteName || c.env.APP_NAME || 'InspectorHub';
-    const primaryColor = branding?.primaryColor || c.env.PRIMARY_COLOR || '#6366f1';
-
-    let inspectorName: string | null = null;
-    if (inspection.inspectorId) {
-        const dbForName = drizzle(c.env.DB);
-        const inspectorRow = await dbForName.select({ name: users.name })
-            .from(users)
-            .where(and(eq(users.id, inspection.inspectorId), eq(users.tenantId, c.get('tenantId'))))
-            .get();
-        inspectorName = inspectorRow?.name ?? null;
-    }
-
-    // iter-1 bug #3 — truthy coercion (see /report/:id gate in index.ts).
-    if (inspection.paymentRequired && inspection.paymentStatus !== 'paid') {
-        return c.html(ReportGatePage({
-            reason: 'payment',
-            companyName, primaryColor,
-            actionUrl: `${baseUrl}/invoices?inspection=${id}`,
-            actionLabel: 'View Invoice & Pay',
-            propertyAddress: inspection.propertyAddress ?? null,
-            inspectorName,
-            scheduledDate:   inspection.date ?? null,
-        }) as string);
-    }
-
-    if (inspection.agreementRequired) {
-        const db2 = drizzle(c.env.DB);
-        const signed = await db2.select({ id: agreementRequests.id })
-            .from(agreementRequests)
-            .where(and(
-                eq(agreementRequests.inspectionId, id as string),
-                eq(agreementRequests.status, 'signed')
-            ))
-            .limit(1);
-        if (signed.length === 0) {
-            return c.html(ReportGatePage({
-                reason: 'agreement',
-                companyName, primaryColor,
-                actionUrl: `${baseUrl}/sign/${c.get('requestedSubdomain') ?? ''}/${id}`,
-                actionLabel: 'Sign Agreement',
-                propertyAddress: inspection.propertyAddress ?? null,
-                inspectorName,
-                scheduledDate:   inspection.date ?? null,
-            }) as string);
-        }
-    }
-
-    const db = drizzle(c.env.DB);
-    const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
-
-    // Design System 0520 subsystem D P3 — load units for the report
-    // UnitTreeSummary card. Failure (e.g. legacy DB without migration
-    // 0065 yet) degrades to empty — the renderer's `units` prop is
-    // optional and the summary card is gated on length > 0.
-    let units: ReportUnit[] = [];
-    try {
-        const rows = await db.select().from(inspectionUnits)
-            .where(and(eq(inspectionUnits.inspectionId, id), eq(inspectionUnits.tenantId, c.get('tenantId'))))
-            .all();
-        units = rows.map(r => ({
-            id:           r.id,
-            parentUnitId: r.parentUnitId,
-            kind:         r.kind as ReportUnit['kind'],
-            type:         (r.type ?? 'unit') as ReportUnit['type'],
-            name:         r.name,
-            sortOrder:    r.sortOrder ?? 0,
-        }));
-    } catch { /* no units / migration not applied — degrade silently */ }
-
-    const resolvedTheme = c.var.services.branding.resolveReportTheme(inspection, c.get('branding'));
-    // Feature #20 — the report viewer reads `template.schema`. When the
-    // inspection's per-job snapshot has its own (possibly extended)
-    // structure, override the template schema with it so added sections /
-    // items / rating-system swaps are actually visible in the published
-    // view. The snapshot is the authoritative shape for THIS inspection;
-    // template.schema is the source row used for future inspections.
-    const rawSnap = (inspection as unknown as { templateSnapshot?: unknown }).templateSnapshot;
-    let viewerTemplate: unknown = template;
-    if (rawSnap) {
-        try {
-            const snap = typeof rawSnap === 'string' ? JSON.parse(rawSnap as string) : rawSnap;
-            if (snap && Array.isArray((snap as { sections?: unknown }).sections) && (snap as { sections: unknown[] }).sections.length > 0) {
-                viewerTemplate = { ...(template || {}), schema: snap };
-            }
-        } catch { /* malformed snapshot — fall back to source template */ }
-    }
-    return c.html(renderProfessionalReport({
-        inspection: { ...inspection, inspectorName } as never,
-        template: viewerTemplate as never,
-        results: (results || { data: {} }) as never,
-        branding: c.get('branding'),
-        isAuthenticated: true,
-        resolvedTheme,
-        units,
-    }));
+    return c.json({
+        success: false,
+        error: {
+            code: 'MOVED',
+            message: 'HTML report rendering has moved to the Remix frontend. Use GET /api/inspections/:id/report-data for JSON data.',
+        },
+    }, 410);
 });
 
 /**

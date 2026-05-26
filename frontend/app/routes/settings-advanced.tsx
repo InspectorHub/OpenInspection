@@ -3,6 +3,7 @@ import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-advanced";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { SecretField } from "~/components/SecretField";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -21,32 +22,40 @@ interface AdvancedConfig {
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
 
-  // Fetch Stripe connect status
+  // Fetch Stripe connect status + secrets in parallel
+  const [stripeRes, aiRes, secretsRes] = await Promise.all([
+    apiFetch("/api/admin/payments/status", { token }).catch(() => null),
+    apiFetch("/api/admin/ai/status", { token }).catch(() => null),
+    apiFetch("/api/admin/secrets", { token }).catch(() => null),
+  ]);
+
   let stripeConnected = false;
   let stripeAccountId: string | null = null;
-  try {
-    const stripeRes = await apiFetch("/api/admin/payments/status", { token });
-    if (stripeRes.ok) {
-      const body = (await stripeRes.json()) as Record<string, unknown>;
-      const data = (body.data ?? {}) as Record<string, unknown>;
-      stripeConnected = Boolean(data?.connected);
-      stripeAccountId = (data?.accountId as string) || null;
-    }
-  } catch { /* no-op */ }
+  if (stripeRes?.ok) {
+    const body = (await stripeRes.json()) as Record<string, unknown>;
+    const data = (body.data ?? {}) as Record<string, unknown>;
+    stripeConnected = Boolean(data?.connected);
+    stripeAccountId = (data?.accountId as string) || null;
+  }
 
-  // Fetch AI config status
   let geminiConfigured = false;
-  try {
-    const aiRes = await apiFetch("/api/admin/ai/status", { token });
-    if (aiRes.ok) {
-      const body = (await aiRes.json()) as Record<string, unknown>;
-      const data = (body.data ?? {}) as Record<string, unknown>;
-      geminiConfigured = Boolean(data?.configured);
-    }
-  } catch { /* no-op */ }
+  if (aiRes?.ok) {
+    const body = (await aiRes.json()) as Record<string, unknown>;
+    const data = (body.data ?? {}) as Record<string, unknown>;
+    geminiConfigured = Boolean(data?.configured);
+  }
+
+  const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
+  const secrets = (secretsBody.data ?? {}) as Record<string, string>;
 
   return {
     config: { stripeConnected, stripeAccountId, geminiConfigured } as AdvancedConfig,
+    secrets: {
+      GEMINI_API_KEY: secrets.GEMINI_API_KEY || "",
+      GOOGLE_PLACES_API_KEY: secrets.GOOGLE_PLACES_API_KEY || "",
+      ESTATED_API_KEY: secrets.ESTATED_API_KEY || "",
+      APP_BASE_URL: secrets.APP_BASE_URL || "",
+    },
   };
 }
 
@@ -88,18 +97,37 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "save-ai") {
-    const geminiApiKey = fd.get("geminiApiKey");
-    if (!geminiApiKey) {
+    const geminiApiKey = fd.get("GEMINI_API_KEY");
+    if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
       return { success: false, error: "API key is required." };
     }
     const res = await apiFetch("/api/admin/secrets", {
       token,
-      method: "POST",
-      body: JSON.stringify({ geminiApiKey }),
+      method: "PUT",
+      body: JSON.stringify({ GEMINI_API_KEY: geminiApiKey }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return { success: false, error: (err as Record<string, string>)?.message || "Failed to save AI configuration." };
+    }
+    return { success: true, error: null };
+  }
+
+  if (intent === "save-advanced-secrets") {
+    const body: Record<string, string> = {};
+    for (const key of ["GOOGLE_PLACES_API_KEY", "ESTATED_API_KEY", "APP_BASE_URL"] as const) {
+      const val = fd.get(key);
+      if (val && typeof val === "string" && val.trim()) body[key] = val;
+    }
+    if (Object.keys(body).length > 0) {
+      const res = await apiFetch("/api/admin/secrets", {
+        token,
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        return { success: false, error: "Failed to save integration keys." };
+      }
     }
     return { success: true, error: null };
   }
@@ -112,7 +140,7 @@ export async function action({ request }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsAdvancedPage() {
-  const { config } = useLoaderData<typeof loader>();
+  const { config, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [stripeInput, setStripeInput] = useState("");
 
@@ -219,18 +247,48 @@ export default function SettingsAdvancedPage() {
         </p>
         <Form method="post" className="space-y-3 max-w-xl">
           <input type="hidden" name="intent" value="save-ai" />
-          <div className="space-y-2">
-            <label htmlFor="geminiApiKey" className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
-              Gemini API Key
-            </label>
-            <input
-              type="password" id="geminiApiKey" name="geminiApiKey"
-              placeholder="AIza..."
-              autoComplete="off"
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1"
-            />
-            <p className="text-[11px] text-ih-fg-3">Stored encrypted. Leave blank to keep existing key.</p>
+          <SecretField
+            name="GEMINI_API_KEY"
+            label="Gemini API Key"
+            value={secrets.GEMINI_API_KEY}
+            hint="Stored encrypted. Leave blank to keep existing key."
+          />
+          <div className="flex justify-end pt-2 border-t border-ih-border">
+            <button type="submit"
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
+              Save
+            </button>
           </div>
+        </Form>
+      </section>
+
+      {/* Integration API keys */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Integration API keys</h3>
+        <p className="text-[13px] text-ih-fg-3">
+          API keys for address autocomplete, property data, and application configuration.
+        </p>
+        <Form method="post" className="space-y-4 max-w-xl">
+          <input type="hidden" name="intent" value="save-advanced-secrets" />
+          <SecretField
+            name="GOOGLE_PLACES_API_KEY"
+            label="Google Places API key"
+            value={secrets.GOOGLE_PLACES_API_KEY}
+            hint="Powers address autocomplete. Get a key at console.cloud.google.com."
+          />
+          <SecretField
+            name="ESTATED_API_KEY"
+            label="Estated API key"
+            value={secrets.ESTATED_API_KEY}
+            hint="Property data autofill (year built, sqft, etc.). Get a key at estated.com."
+          />
+          <SecretField
+            name="APP_BASE_URL"
+            label="Application base URL"
+            value={secrets.APP_BASE_URL}
+            type="text"
+            hint="Public URL for OAuth callbacks and link generation (e.g. https://inspect.example.com)."
+          />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"
               className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">

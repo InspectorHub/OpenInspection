@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData, useActionData, Link, Form } from "react-router";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { SecretField } from "~/components/SecretField";
 
 interface QboStatus {
   connected: boolean;
@@ -19,15 +20,57 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
-  try {
-    const res = await apiFetch("/api/qbo/status", { token });
-    if (!res.ok) return { status: null };
-    const body = await res.json();
+
+  const [qboRes, secretsRes] = await Promise.all([
+    apiFetch("/api/qbo/status", { token }).catch(() => null),
+    apiFetch("/api/admin/secrets", { token }).catch(() => null),
+  ]);
+
+  let status: QboStatus | null = null;
+  if (qboRes?.ok) {
+    const body = await qboRes.json();
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
-    return { status: (Object.keys(d).length > 0 ? d : null) as QboStatus | null };
-  } catch {
-    return { status: null };
+    status = (Object.keys(d).length > 0 ? d : null) as QboStatus | null;
   }
+
+  const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
+  const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+
+  return {
+    status,
+    secrets: {
+      QBO_CLIENT_ID: secrets.QBO_CLIENT_ID || "",
+      QBO_CLIENT_SECRET: secrets.QBO_CLIENT_SECRET || "",
+      QBO_WEBHOOK_SECRET: secrets.QBO_WEBHOOK_SECRET || "",
+    },
+  };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const token = await requireToken(request);
+  const fd = await request.formData();
+  const intent = fd.get("intent");
+
+  if (intent === "save-qbo-secrets") {
+    const body: Record<string, string> = {};
+    for (const key of ["QBO_CLIENT_ID", "QBO_CLIENT_SECRET", "QBO_WEBHOOK_SECRET"] as const) {
+      const val = fd.get(key);
+      if (val && typeof val === "string" && val.trim()) body[key] = val;
+    }
+    if (Object.keys(body).length > 0) {
+      const res = await apiFetch("/api/admin/secrets", {
+        token,
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        return { success: false, error: "Failed to save QBO keys." };
+      }
+    }
+    return { success: true, error: null };
+  }
+
+  return { success: false, error: "Unknown action" };
 }
 
 function timeSince(ts: number | null | undefined): string {
@@ -39,7 +82,8 @@ function timeSince(ts: number | null | undefined): string {
 }
 
 export default function SettingsIntegrationsQbo() {
-  const { status: initial } = useLoaderData<typeof loader>();
+  const { status: initial, secrets } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const [status, setStatus] = useState<QboStatus | null>(initial);
   const [syncing, setSyncing] = useState(false);
 
@@ -100,6 +144,58 @@ export default function SettingsIntegrationsQbo() {
       <h2 className="text-[19px] font-bold text-ih-fg-1">
         QuickBooks Online
       </h2>
+
+      {/* Flash */}
+      {actionData?.success && (
+        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
+          QBO credentials saved.
+        </div>
+      )}
+      {actionData?.error && (
+        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
+          {actionData.error}
+        </div>
+      )}
+
+      {/* QBO API credentials */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">API credentials</h3>
+        <p className="text-[13px] text-ih-fg-3">
+          OAuth credentials from your QuickBooks Developer app. Required before connecting.
+          Get them at{" "}
+          <a href="https://developer.intuit.com/app/developer/appdetail" target="_blank" rel="noopener noreferrer"
+            className="text-ih-primary hover:underline">
+            developer.intuit.com
+          </a>.
+        </p>
+        <Form method="post" className="space-y-4 max-w-xl">
+          <input type="hidden" name="intent" value="save-qbo-secrets" />
+          <SecretField
+            name="QBO_CLIENT_ID"
+            label="QBO Client ID"
+            value={secrets.QBO_CLIENT_ID}
+            hint="OAuth 2.0 client ID from your Intuit developer app."
+          />
+          <SecretField
+            name="QBO_CLIENT_SECRET"
+            label="QBO Client Secret"
+            value={secrets.QBO_CLIENT_SECRET}
+            hint="Stored encrypted. Leave blank to keep existing."
+          />
+          <SecretField
+            name="QBO_WEBHOOK_SECRET"
+            label="QBO Webhook Verifier Token"
+            value={secrets.QBO_WEBHOOK_SECRET}
+            hint="Used to verify webhook notifications from QuickBooks."
+          />
+          <div className="flex justify-end pt-2 border-t border-ih-border">
+            <button type="submit"
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
+              Save credentials
+            </button>
+          </div>
+        </Form>
+      </section>
 
       {/* Expiry warning */}
       {connected && expiryWarning && (

@@ -3,6 +3,7 @@ import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { apiFetch } from "~/lib/api.server";
+import { SecretField } from "~/components/SecretField";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -19,9 +20,22 @@ interface AuthMe {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = await requireToken(request);
-  const res = await apiFetch("/api/auth/me", { token });
-  const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-  return { user: (body.data ?? {}) as AuthMe };
+
+  const [meRes, secretsRes] = await Promise.all([
+    apiFetch("/api/auth/me", { token }),
+    apiFetch("/api/admin/secrets", { token }).catch(() => null),
+  ]);
+
+  const meBody = meRes.ok ? ((await meRes.json()) as Record<string, unknown>) : {};
+  const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
+  const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+
+  return {
+    user: (meBody.data ?? {}) as AuthMe,
+    secrets: {
+      TURNSTILE_SECRET_KEY: secrets.TURNSTILE_SECRET_KEY || "",
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,6 +70,21 @@ export async function action({ request }: Route.ActionArgs) {
     return { success: true, error: null };
   }
 
+  if (intent === "save-turnstile") {
+    const val = fd.get("TURNSTILE_SECRET_KEY");
+    if (val && typeof val === "string" && val.trim()) {
+      const res = await apiFetch("/api/admin/secrets", {
+        token,
+        method: "PUT",
+        body: JSON.stringify({ TURNSTILE_SECRET_KEY: val }),
+      });
+      if (!res.ok) {
+        return { success: false, error: "Failed to save Turnstile key." };
+      }
+    }
+    return { success: true, error: null };
+  }
+
   return { success: false, error: "Unknown action" };
 }
 
@@ -64,7 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsSecurityPage() {
-  const { user } = useLoaderData<typeof loader>();
+  const { user, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -161,6 +190,34 @@ export default function SettingsSecurityPage() {
             )}
           </div>
         </div>
+      </section>
+
+      {/* Turnstile bot protection */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Bot protection</h3>
+        <p className="text-[13px] text-ih-fg-3">
+          Cloudflare Turnstile protects public forms (booking, agent signup) from bots.
+          Get keys at{" "}
+          <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer"
+            className="text-ih-primary hover:underline">
+            Cloudflare dashboard
+          </a>.
+        </p>
+        <Form method="post" className="space-y-3 max-w-xl">
+          <input type="hidden" name="intent" value="save-turnstile" />
+          <SecretField
+            name="TURNSTILE_SECRET_KEY"
+            label="Turnstile Secret Key"
+            value={secrets.TURNSTILE_SECRET_KEY}
+            hint="Server-side verification key. Use test key 1x0000000000000000000000000000000AA for local dev."
+          />
+          <div className="flex justify-end pt-2 border-t border-ih-border">
+            <button type="submit"
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
+              Save
+            </button>
+          </div>
+        </Form>
       </section>
 
       {/* Active sessions placeholder */}

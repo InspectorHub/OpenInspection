@@ -145,6 +145,11 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     gaMeasurementId: text('ga_measurement_id'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
     secrets: text('secrets'),                      // AES-GCM encrypted JSON: {resendApiKey, turnstileSecretKey, geminiApiKey, googleClientSecret}
+    // Secret UI化 (migration 0079) — AES-256-GCM encrypted JSON holding all
+    // 14 integration API keys configurable via Settings UI. Supersedes the
+    // `secrets` column which held a smaller subset. Worker env vars still
+    // take precedence (backwards compat); DB secrets are the fallback.
+    encryptedSecrets: text('encrypted_secrets'),
     icsToken: text('ics_token'),
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
     reportTheme: text('report_theme', { enum: ['modern', 'classic', 'minimal'] }).notNull().default('modern'),

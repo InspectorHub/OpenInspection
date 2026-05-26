@@ -18,14 +18,9 @@ const vendorDir = join(pub, 'vendor');
 mkdirSync(vendorDir, { recursive: true });
 
 const jsFiles = [
-  ['alpinejs/dist/cdn.min.js', 'alpine.min.js'],
-  ['@alpinejs/collapse/dist/cdn.min.js', 'alpine-collapse.min.js'],
-  ['sortablejs/Sortable.min.js', 'sortable.min.js'],
+  // Alpine, flatpickr, chart, sortable removed — old Hono SSR templates deleted.
   ['swagger-ui-dist/swagger-ui-bundle.js', 'swagger-ui-bundle.js'],
   ['swagger-ui-dist/swagger-ui.css', 'swagger-ui.css'],
-  ['chart.js/dist/chart.umd.min.js', 'chart.min.js'],
-  ['flatpickr/dist/flatpickr.min.js', 'flatpickr.min.js'],
-  ['flatpickr/dist/flatpickr.min.css', 'flatpickr.min.css'],
 ];
 
 for (const [src, dest] of jsFiles) {
@@ -33,40 +28,14 @@ for (const [src, dest] of jsFiles) {
   console.log(`  vendor/${dest}`);
 }
 
-// ── Dexie (offline IndexedDB ORM) ──────────────────────────────────────────────
-cpSync(join(nm, 'dexie/dist/modern/dexie.mjs'), join(vendorDir, 'dexie.mjs'));
-console.log('  vendor/dexie.mjs');
+// Dexie removed — offline IndexedDB code migrated to Remix frontend.
 
 // ── node-diff3 (server-side three-way merge) ───────────────────────────────────
 // Vendored to public/ for the SW only — server uses the npm package directly.
 cpSync(join(nm, 'node-diff3/index.mjs'), join(vendorDir, 'node-diff3.mjs'));
 console.log('  vendor/node-diff3.mjs');
 
-// ── Quill ──────────────────────────────────────────────────────────────────────
-// Quill 2.x ships an unminified UMD bundle as `quill.js` (no `quill.min.js`).
-const quillDir = join(vendorDir, 'quill');
-mkdirSync(quillDir, { recursive: true });
-cpSync(join(nm, 'quill/dist/quill.js'), join(quillDir, 'quill.js'));
-cpSync(join(nm, 'quill/dist/quill.snow.css'), join(quillDir, 'quill.snow.css'));
-console.log('  vendor/quill/quill.js + quill.snow.css');
-
-// ── Konva (photo annotation, Phase T) ──────────────────────────────────────────
-const konvaDir = join(vendorDir, 'konva');
-mkdirSync(konvaDir, { recursive: true });
-cpSync(join(nm, 'konva/konva.min.js'), join(konvaDir, 'konva.min.js'));
-console.log('  vendor/konva/konva.min.js');
-
-// ── FullCalendar ────────────────────────────────────────────────────────────────
-const fcDir = join(vendorDir, 'fullcalendar');
-mkdirSync(fcDir, { recursive: true });
-const fcPackages = ['core', 'daygrid', 'timegrid', 'interaction'];
-for (const pkg of fcPackages) {
-  cpSync(
-    join(nm, `@fullcalendar/${pkg}/index.global.min.js`),
-    join(fcDir, `${pkg}.global.min.js`)
-  );
-  console.log(`  vendor/fullcalendar/${pkg}.global.min.js`);
-}
+// Quill, Konva, FullCalendar removed — old Hono SSR templates deleted.
 
 // ── Fonts ───────────────────────────────────────────────────────────────────────
 const fontsDir = join(pub, 'fonts');
