@@ -561,8 +561,8 @@ async function main() {
     lines.push('|---|---|---|---|:-:|:-:|---|---|');
     for (const a of allActions) {
         if (!a.summaryFlag && !a.descriptionFlag) continue;
-        const sCell = (a.summary || '(empty)').replace(/\|/g, '\\|').slice(0, 60);
-        const dCell = (a.description || '(empty)').replace(/\|/g, '\\|').slice(0, 80);
+        const sCell = (a.summary || '(empty)').replaceAll('|', '\\|').slice(0, 60);
+        const dCell = (a.description || '(empty)').replaceAll('|', '\\|').slice(0, 80);
         lines.push(`| ${a.file} | ${a.method} | \`${a.path}\` | \`${a.operationId}\` | ${a.summaryFlag ? '⚠' : ''} | ${a.descriptionFlag ? '⚠' : ''} | ${sCell} | ${dCell} |`);
     }
     lines.push('');

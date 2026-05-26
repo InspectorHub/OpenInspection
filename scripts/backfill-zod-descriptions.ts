@@ -180,7 +180,7 @@ function processFile(sourceFile: any, dryRun: boolean): FieldAction[] {
             if (chainHasDescription(valueText)) continue;
 
             const todoText = `TODO describe ${fieldName} field for the OpenInspection MCP integration`;
-            const escaped = todoText.replace(/'/g, "\\'");
+            const escaped = todoText.replaceAll("'", "\\'");
             const replacement = `${valueText}.describe('${escaped}')`;
 
             actions.push({
@@ -299,7 +299,7 @@ async function main() {
     lines.push('| File | Field | Chain snippet |');
     lines.push('|---|---|---|');
     for (const a of allActions) {
-        const safeSnippet = a.snippet.replace(/\|/g, '\\|');
+        const safeSnippet = a.snippet.replaceAll('|', '\\|');
         lines.push(`| ${a.file} | \`${a.fieldName}\` | \`${safeSnippet}\` |`);
     }
     fs.writeFileSync(reportPath, lines.join('\n'));

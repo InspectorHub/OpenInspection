@@ -421,7 +421,7 @@ export class QBOService {
             if (contact.email) {
                 const found = await this.qboQuery<{ QueryResponse: { Customer?: Array<{ Id: string; SyncToken: string; DisplayName: string }> } }>(
                     tenantId,
-                    `SELECT * FROM Customer WHERE PrimaryEmailAddr = '${contact.email.replace(/'/g, "\\'")}' MAXRESULTS 5`,
+                    `SELECT * FROM Customer WHERE PrimaryEmailAddr = '${contact.email.replaceAll("'", "\\'")}' MAXRESULTS 5`,
                 );
                 const matches = found.QueryResponse.Customer ?? [];
                 const match = matches[0];

@@ -29,7 +29,7 @@ const TENANT_A_ID = '00000000-0000-0000-0000-000000000aaa';
 const TENANT_B_ID = '00000000-0000-0000-0000-000000000bbb';
 
 function d1(sql: string, cwd: string): void {
-    const escaped = sql.replace(/"/g, '\\"');
+    const escaped = sql.replaceAll('"', '\\"');
     try {
         execSync(
             `npx wrangler d1 execute openinspection-standalone-db --local --command "${escaped}" --yes`,
