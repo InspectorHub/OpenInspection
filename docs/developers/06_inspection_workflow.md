@@ -1,16 +1,12 @@
----
-domain: "Core Inspection Workflow & Reporting Engine"
-related_code_paths: ["apps/core/src/api/inspections.ts", "apps/core/src/api/ai.ts", "apps/core/src/api/bookings.ts", "apps/core/src/lib/db/schema/inspection.ts"]
----
-
-# 07. Core Inspection Workflow
+# Core Inspection Workflow
 
 ## 1. Data Model — Template-Driven JSON Schema
 
-Inspection forms are not flat database tables. The schema uses two key tables:
+Inspection forms are not flat database tables. Two key tables:
 
 ### `templates`
-Stores the form structure as a JSON blob in the `schema` column. Each tenant has one or more templates (a default is seeded on registration).
+
+Form structure as JSON in the `schema` column. Each tenant has one or more templates.
 
 ```json
 {
@@ -23,8 +19,7 @@ Stores the form structure as a JSON blob in the `schema` column. Each tenant has
         {
           "id": "item_roof",
           "title": "Roof Coverings",
-          "type": "condition",
-          "options": ["Satisfactory", "Marginal", "Defect", "Not Inspected"]
+          "type": "rich"
         }
       ]
     }
@@ -32,135 +27,120 @@ Stores the form structure as a JSON blob in the `schema` column. Each tenant has
 }
 ```
 
-There are **no** separate `TemplateSections` or `TemplateItems` tables. The entire nested structure lives in `templates.schema` (JSON column).
+**9 item types**: `rich` (rating + 3 canned-comment tabs) plus `boolean`, `text`, `textarea`, `number`, `select`, `multi_select`, `date`, `photo_only`. Rating stored on `result.rating`, non-rich values on `result.value`.
+
+**Rating systems** are configurable per template (`rating_system_id` → `rating_systems` table). Each system defines levels with labels, colors, and severity buckets.
+
+Schema is validated by `api/src/lib/validations/template.schema.ts` (single canonical v2 format).
 
 ### `inspection_results`
-Stores the inspector's field responses as a JSON blob in the `data` column. One row per inspection session.
+
+Inspector's field responses as JSON in `data`. One row per inspection.
 
 ```json
 {
-  "item_roof": { "status": "Defect", "notes": "Missing 3 shingles", "media": ["uuid-photo"] },
-  "item_siding": { "status": "Satisfactory", "notes": "" }
+  "item_roof": { "rating": "Defect", "notes": "Missing 3 shingles", "media": ["uuid-photo"] },
+  "item_siding": { "rating": "Satisfactory", "notes": "" }
 }
 ```
 
 Keys are item IDs from the template. Only items the inspector interacted with are stored (sparse).
 
-### Full Schema
-
-| Table | Key Columns | Purpose |
-|---|---|---|
-| `templates` | `tenantId`, `name`, `version`, `schema` (JSON) | Form structure definition |
-| `inspections` | `tenantId`, `inspectorId`, `templateId`, `propertyAddress`, `clientEmail`, `status`, `paymentStatus`, `price` | Job record |
-| `inspection_results` | `inspectionId`, `data` (JSON), `lastSyncedAt` | Field data collected |
-| `agreements` | `tenantId`, `name`, `content` (Markdown), `version` | Legal agreement template |
-| `inspection_agreements` | `inspectionId`, `signatureBase64`, `signedAt`, `ipAddress`, `userAgent` | Signed agreement record |
-| `availability` | `tenantId`, `inspectorId`, `dayOfWeek`, `startTime`, `endTime` | Weekly recurring schedule |
-| `availability_overrides` | `tenantId`, `inspectorId`, `date`, `isAvailable`, `startTime`, `endTime` | Date-specific slot changes |
-
 ## 2. Offline-First Field Collection
 
-The form renderer (`src/templates/pages/form-renderer.template.ts`) uses **IndexedDB** to cache form responses locally. When the inspector is offline, all changes are saved to IndexedDB. When connectivity is restored, a background sync queue PATCHes the accumulated changes to `PATCH /api/inspections/:id/results`.
+The form renderer (`frontend/app/routes/form-renderer.tsx`) uses the `useOfflineQueue` hook + IndexedDB to cache responses locally. When offline, changes are saved to IndexedDB. On reconnect, a background sync queue PATCHes changes to `PATCH /api/inspections/:id/results`.
 
-**Field-level merge**: `PATCH /api/inspections/:id/results` does a **last-write-wins merge per item key** — incoming fields are merged over the existing blob so each PATCH only needs to send changed items, not the full results object.
-
-> **Not implemented**: CRDT / incremental conflict resolution.
+**Field-level merge**: PATCH does last-write-wins per item key — only changed items need to be sent.
 
 ## 3. Photo Upload Pipeline
 
-Photos are uploaded via:
 ```
 POST /api/inspections/:id/upload
 Content-Type: multipart/form-data
 ```
 
-The Worker receives the file, stores it in R2 under a tenant-scoped key (`{tenantId}/{inspectionId}/{filename}`), and returns the key. Files are retrieved via:
-```
-GET /api/inspections/files/:key
-```
-The retrieval endpoint verifies the key is scoped to the requesting tenant before proxying from R2.
+Worker stores the file in R2 under `{tenantId}/{inspectionId}/{filename}`. Files retrieved via `GET /api/inspections/files/:key` (tenant-scoped verification before proxying from R2).
 
-> **Not implemented**: Direct presigned URL uploads (client-to-R2 bypass). All uploads currently pass through the Worker.
+Photos can have annotations and captions (`inspection_media_pool` table).
 
-## 4. Report Generation & PDF Export
+## 4. Report Generation & PDF
 
-When an inspection is completed (`POST /api/inspections/:id/complete`):
-1. `inspections.status` is set to `'completed'`
-2. Resend email is sent to `clientEmail` with a link to `GET /api/inspections/:id/report`
-3. The report page (`src/templates/pages/report.template.ts`) renders the full inspection as HTML
+When an inspection is published:
+1. `inspections.status` is set to `'published'`
+2. A report version snapshot is created (`report_versions` table)
+3. Email sent to client with report link
+4. Report rendered as HTML with print stylesheet — users invoke `window.print()` for PDF
 
-**PDF Export**: The report template includes print stylesheets (`@media print`). Users invoke `window.print()` in the browser to export a formatted PDF. No Puppeteer or third-party PDF service is used.
+Report viewer: `frontend/app/routes/public/report.tsx` (card-stack layout with section navigation).
 
-Report access is gated:
-- Agreement must be signed first (`inspection_agreements` record required)
-- Full report requires `paymentStatus === 'paid'` (blurred/locked otherwise)
+## 5. Canned Comments & AI
 
-## 5. Template CRUD (apps/core/src/api/inspections.ts)
+**Canned comments**: 250+ pre-written inspection comments in `comments` table. 3-tab picker (Satisfactory / Monitor / Defect) on each `rich` item. Slash-trigger (`/`) opens snippet picker in the notes field.
 
-Templates are managed by admin/owner users. All endpoints require JWT auth.
-
-| Endpoint | Role | Purpose |
-|---|---|---|
-| `GET /api/inspections/templates` | Any | List all templates (id, name, version) for tenant |
-| `POST /api/inspections/templates` | admin/owner | Create template — requires `name` + `schema` JSON |
-| `PUT /api/inspections/templates/:id` | admin/owner | Update name/schema, bumps `version` counter |
-| `DELETE /api/inspections/templates/:id` | admin/owner | Delete — blocked with 409 if any inspection references it |
-
-## 5b. Availability Management (apps/core/src/api/availability.ts)
-
-Inspectors manage their own weekly schedule and date-specific overrides. Admins can manage any inspector's schedule via `?inspectorId=` query param.
+**AI assistance** (`api/src/api/ai.ts`):
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/availability` | List weekly recurring slots |
-| `PUT /api/availability` | Full replace of weekly schedule; validates `dayOfWeek` (0–6), `startTime`, `endTime` |
-| `GET /api/availability/overrides` | List date-specific overrides |
-| `POST /api/availability/overrides` | Add block-out or extra slot for a specific date |
-| `DELETE /api/availability/overrides/:id` | Remove an override (returns 404 if not found) |
+| `POST /api/ai/comment-assist` | Professional rewrite of inspector's note |
+| `POST /api/ai/auto-summary` | Bullet-point summary of all defects |
 
-## 6. AI Assistance (apps/core/src/api/ai.ts)
+Both call Gemini 1.5 Flash. Temperature 0.2.
 
-| Endpoint | Input | Output |
+## 6. Template Management
+
+| Endpoint | Role | Purpose |
 |---|---|---|
-| `POST /api/ai/comment-assist` | `{inspectionId, itemId, rawNote}` | Professional rewrite of the inspector's note |
-| `POST /api/ai/auto-summary` | `{inspectionId}` | Bullet-point summary of all defects |
+| `GET /api/inspections/templates` | Any | List templates |
+| `POST /api/inspections/templates` | admin/owner | Create (name + schema JSON) |
+| `PUT /api/inspections/templates/:id` | admin/owner | Update, bumps version |
+| `DELETE /api/inspections/templates/:id` | admin/owner | Delete (409 if in use) |
+| `POST /api/inspections/templates/import-spectora` | admin/owner | Import from Spectora export |
 
-Both call **Gemini 1.5 Flash** via `callGemini()`. Temperature is 0.2 for consistent professional output.
+**Marketplace**: Community templates available via `GET /api/marketplace/templates` with one-click install.
 
-## 7. Screenshots
+## 7. Availability & Booking
 
-### Public Booking Page
+Inspectors manage weekly schedule + date overrides via `availability` / `availability_overrides` tables.
 
-![Booking Page](screenshots/core-booking.png)
-
-### Inspection Report (Demo)
-
-![Report Page](screenshots/core-report.png)
-
-See [`docs/screenshots.md`](../screenshots.md) for the full UI screenshot index.
+Public booking: `GET /api/public/book/:tenant/:slug` returns inspector profile + services. Customer submits via `POST /api/public/book` with Turnstile bot protection.
 
 ## 8. Execution Flow
 
 ```
-1. Admin creates inspection (POST /api/inspections/)
-   → selects template, assigns inspector, enters address
+1. Admin/inspector creates inspection
+   → selects template, assigns inspector, enters address + client info
 
-2. Inspector opens /inspections/:id/form on mobile
-   → template JSON parsed into interactive checklist UI
+2. Inspector opens inspection on mobile (form-renderer)
+   → template JSON parsed into interactive checklist
+   → keyboard-driven: 1-5 ratings, / snippet picker, Cmd-K palette
    → responses saved to IndexedDB immediately
 
 3. Inspector photographs defects
-   → POST /api/inspections/:id/upload → stored in R2
+   → POST /api/inspections/:id/upload → R2
 
 4. Background sync pushes IndexedDB data
-   → PATCH /api/inspections/:id/results
+   → PATCH /api/inspections/:id/results (field-level merge)
 
-5. Inspector marks complete (POST /api/inspections/:id/complete)
-   → status = 'completed'
+5. Inspector publishes report
+   → report version snapshot created
    → email sent to client with report link
 
-6. Client receives email → opens report URL
-   → signs agreement (POST /api/inspections/:id/sign)
-   → pays via Stripe checkout (POST /api/inspections/:id/checkout)
-   → full report unlocked
+6. Client receives email → opens report
+   → signs agreement if required
+   → pays via Stripe if required
+   → full report accessible
 ```
+
+## Key code paths
+
+| Path | Purpose |
+|---|---|
+| `api/src/api/inspections.ts` | Inspection + template CRUD |
+| `api/src/api/bookings.ts` | Public booking + availability |
+| `api/src/api/ai.ts` | AI comment assist + auto-summary |
+| `api/src/services/inspection.service.ts` | Core business logic (130KB) |
+| `api/src/lib/validations/template.schema.ts` | Template v2 schema validation |
+| `frontend/app/routes/inspection-edit.tsx` | 3-pane inspection editor |
+| `frontend/app/routes/form-renderer.tsx` | Mobile field form |
+| `frontend/app/hooks/useInspection.ts` | Inspection state management (866 LOC) |
+| `frontend/app/hooks/useCannedComments.ts` | Comment picker logic |
