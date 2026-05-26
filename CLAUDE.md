@@ -10,19 +10,19 @@ The open-source inspection engine. Dual-deploy architecture: a Hono API Worker +
 # API Worker (root package.json)
 npm install
 npm run dev          # Start API Worker local dev server (port 8788)
-npm run css:watch    # Watch and compile Tailwind CSS (legacy Hono SSR)
 npm run db:migrate   # Apply D1 migrations locally
 npm run type-check   # Run TypeScript type checks
 npm run lint         # Lint the codebase
 npm run test:unit    # Run unit tests via Vitest
-npm run deploy       # Deploy API Worker to Cloudflare Workers
+npm run deploy       # Build CSS + deploy API Worker to Cloudflare Workers
 
 # Frontend Worker (frontend/)
 cd frontend
+npm install
 npm run dev          # Start Remix dev server (port 5173, proxies API to 8788)
 npm run build        # Build Remix frontend for production
-npm run deploy       # Deploy Frontend Worker to Cloudflare Workers
-npm run typecheck    # Frontend TypeScript checks
+bash scripts/deploy.sh  # Build + deploy Frontend Worker to Cloudflare Workers
+npm run type-check   # Frontend TypeScript checks
 
 # E2E Tests
 npm run test:e2e              # API E2E tests (Playwright, api/tests/)
@@ -39,18 +39,18 @@ cd frontend && npm run test   # Frontend E2E tests (frontend/tests/)
 | `api/src/lib/middleware/` | Hono middleware (Authentication, RBAC, etc.) |
 | `api/src/lib/validations/` | Zod schemas per module |
 | `api/src/services/` | Business logic, DB queries (Drizzle) |
-| `api/src/templates/` | Legacy Hono SSR templates (kept for old system compat) |
 | `api/migrations/` | D1 database migration SQL files |
 | `api/tests/` | API unit + integration + E2E tests |
 | `frontend/app/routes/` | 75 Remix React route files |
-| `frontend/app/components/` | 59 React components |
-| `frontend/app/hooks/` | 8 React hooks (useInspection, useFindings, useKeyboard, etc.) |
+| `frontend/app/components/` | 61 React components |
+| `frontend/app/hooks/` | 9 React hooks (useInspection, useFindings, useKeyboard, etc.) |
 | `frontend/app/lib/` | API client (hono/client), session management, helpers |
-| `frontend/app/styles/tailwind.css` | Design System token layer (Tailwind v4) |
+| `frontend/app/styles/tailwind.css` | Design System 0523 token layer (Tailwind v4) |
+| `frontend/public/` | Static assets (fonts, logo, service worker, widget) |
+| `frontend/scripts/deploy.sh` | Build + patch wrangler.json + deploy Frontend Worker |
 | `frontend/tests/` | Frontend E2E + unit tests |
-| `packages/shared-ui/src/` | 11 shared React components (Button, Pill, Card, etc.) |
+| `packages/shared-ui/src/` | 12 shared React components (Button, Pill, Card, etc.) |
 | `packages/api-types/` | CoreApiType re-export for hono/client |
-| `public/` | Static assets for legacy Hono SSR (compiled CSS, fonts, JS) |
 
 ## Core Architecture
 
@@ -90,7 +90,7 @@ The frontend uses a **Token Relay BFF** pattern: the Remix server holds the JWT 
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`frontend/app/styles/tailwind.css`).
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. The Remix loader/action functions call the API Worker through a Service Binding (in production) or HTTP proxy (in dev).
 - **State management**: React hooks — `useInspection` (866 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
-- **Component library**: `packages/shared-ui/` provides 11 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
+- **Component library**: `packages/shared-ui/` provides 12 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 - **Offline**: Service Worker + `useOfflineQueue` hook for photo upload queue and field sync.
 
