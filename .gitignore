@@ -4,6 +4,8 @@ public/vendor/
 public/fonts/
 public/fonts.css
 src/generated/version.ts
+api/public/styles.css
+api/src/generated/version.ts
 .wrangler/
 .dev.vars
 dist/
