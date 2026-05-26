@@ -251,7 +251,7 @@ export default function SettingsAdvancedPage() {
             name="GEMINI_API_KEY"
             label="Gemini API Key"
             value={secrets.GEMINI_API_KEY}
-            hint="Stored encrypted. Leave blank to keep existing key."
+            hint="Powers AI comment suggestions and smart field completion. Get at aistudio.google.com/apikey"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"
@@ -266,7 +266,7 @@ export default function SettingsAdvancedPage() {
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Integration API keys</h3>
         <p className="text-[13px] text-ih-fg-3">
-          API keys for address autocomplete, property data, and application configuration.
+          These integrations enhance the inspection workflow. All are optional — features degrade gracefully when unconfigured.
         </p>
         <Form method="post" className="space-y-4 max-w-xl">
           <input type="hidden" name="intent" value="save-advanced-secrets" />
@@ -274,20 +274,20 @@ export default function SettingsAdvancedPage() {
             name="GOOGLE_PLACES_API_KEY"
             label="Google Places API key"
             value={secrets.GOOGLE_PLACES_API_KEY}
-            hint="Powers address autocomplete. Get a key at console.cloud.google.com."
+            hint="Address autocomplete on booking and new inspection forms. Create at console.cloud.google.com → Places API"
           />
           <SecretField
             name="ESTATED_API_KEY"
             label="Estated API key"
             value={secrets.ESTATED_API_KEY}
-            hint="Property data autofill (year built, sqft, etc.). Get a key at estated.com."
+            hint="Auto-fills Property Facts (year built, sqft, bedrooms). Get at estated.com → API"
           />
           <SecretField
             name="APP_BASE_URL"
             label="Application base URL"
             value={secrets.APP_BASE_URL}
             type="text"
-            hint="Public URL for OAuth callbacks and link generation (e.g. https://inspect.example.com)."
+            hint="Public URL of your deployment (e.g. https://app.yourdomain.com). Used in email links"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"

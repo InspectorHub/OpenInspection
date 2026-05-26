@@ -166,13 +166,13 @@ export default function SettingsIntegrations() {
             name="STRIPE_SECRET_KEY"
             label="Stripe Secret Key"
             value={secrets.STRIPE_SECRET_KEY}
-            hint="sk_live_... or sk_test_... Stored encrypted."
+            hint="Enables online payment for inspections. Get at dashboard.stripe.com → Developers → API Keys"
           />
           <SecretField
             name="STRIPE_WEBHOOK_SECRET"
             label="Stripe Webhook Secret"
             value={secrets.STRIPE_WEBHOOK_SECRET}
-            hint="whsec_... Used to verify Stripe webhook signatures."
+            hint="Verifies payment event notifications. Found at dashboard.stripe.com → Developers → Webhooks → Signing secret"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"

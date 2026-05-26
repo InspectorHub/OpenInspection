@@ -196,7 +196,7 @@ export default function SettingsSecurityPage() {
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Bot protection</h3>
         <p className="text-[13px] text-ih-fg-3">
-          Cloudflare Turnstile protects public forms (booking, agent signup) from bots.
+          Bot protection prevents automated form submissions on public-facing pages.
           Get keys at{" "}
           <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer"
             className="text-ih-primary hover:underline">
@@ -209,7 +209,7 @@ export default function SettingsSecurityPage() {
             name="TURNSTILE_SECRET_KEY"
             label="Turnstile Secret Key"
             value={secrets.TURNSTILE_SECRET_KEY}
-            hint="Server-side verification key. Use test key 1x0000000000000000000000000000000AA for local dev."
+            hint="Bot protection on booking and signup forms. Create at dash.cloudflare.com → Turnstile. Use test key 1x0000000000000000000000000000000AA for development"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"

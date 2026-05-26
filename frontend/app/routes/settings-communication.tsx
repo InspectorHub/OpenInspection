@@ -180,7 +180,8 @@ export default function SettingsCommunication() {
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email API keys</h3>
         <p className="text-[13px] text-ih-fg-3">
-          API keys for email delivery. Get a key at{" "}
+          Without email configured, password resets and booking confirmations will not be sent.
+          Get a key at{" "}
           <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">resend.com</a>.
         </p>
         <Form method="post" className="space-y-4">
@@ -190,14 +191,14 @@ export default function SettingsCommunication() {
               name="RESEND_API_KEY"
               label="Resend API key"
               value={secrets.RESEND_API_KEY}
-              hint="Stored encrypted. Leave blank to keep existing key."
+              hint="Email delivery for reports, confirmations, and password resets. Get your key at resend.com → API Keys"
             />
             <SecretField
               name="SENDER_EMAIL"
               label="Sender email (secret)"
               value={secrets.SENDER_EMAIL}
               type="text"
-              hint="Overrides the sender email above when set as a secret."
+              hint="Verified sender address (e.g. reports@yourdomain.com). Must be verified in your Resend account"
             />
           </div>
           <div className="flex justify-end pt-3 border-t border-ih-border">
@@ -252,13 +253,13 @@ export default function SettingsCommunication() {
               name="GOOGLE_CLIENT_ID"
               label="Google Client ID"
               value={secrets.GOOGLE_CLIENT_ID}
-              hint="OAuth 2.0 client ID from Google Cloud Console."
+              hint="Enables Google Calendar sync. Create at console.cloud.google.com → APIs → OAuth 2.0"
             />
             <SecretField
               name="GOOGLE_CLIENT_SECRET"
               label="Google Client Secret"
               value={secrets.GOOGLE_CLIENT_SECRET}
-              hint="Stored encrypted. Leave blank to keep existing."
+              hint="Paired with Client ID above. Found in the same OAuth 2.0 credentials page"
             />
           </div>
           <div className="flex justify-end pt-3 border-t border-ih-border">

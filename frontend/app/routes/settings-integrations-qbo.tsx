@@ -174,19 +174,19 @@ export default function SettingsIntegrationsQbo() {
             name="QBO_CLIENT_ID"
             label="QBO Client ID"
             value={secrets.QBO_CLIENT_ID}
-            hint="OAuth 2.0 client ID from your Intuit developer app."
+            hint="QuickBooks Online integration for invoice sync. Create at developer.intuit.com → My Apps"
           />
           <SecretField
             name="QBO_CLIENT_SECRET"
             label="QBO Client Secret"
             value={secrets.QBO_CLIENT_SECRET}
-            hint="Stored encrypted. Leave blank to keep existing."
+            hint="Paired with Client ID. Found in the same Intuit app settings"
           />
           <SecretField
             name="QBO_WEBHOOK_SECRET"
             label="QBO Webhook Verifier Token"
             value={secrets.QBO_WEBHOOK_SECRET}
-            hint="Used to verify webhook notifications from QuickBooks."
+            hint="Verifies QuickBooks data change notifications. Found at developer.intuit.com → Webhooks"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"
