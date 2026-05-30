@@ -28,9 +28,9 @@ export interface QueuedRequest {
  * React-side offline queue. Tracks connectivity, queues failed requests
  * in IndexedDB (via the global OfflineQueue adapter), and provides replay.
  *
- * For the Remix migration this is a thin adapter around navigator.onLine
+ * For the React Router v7 migration this is a thin adapter around navigator.onLine
  * state; the full Dexie-based sync engine from the Alpine side is not
- * ported yet. The save path goes through useFetcher (Remix BFF) which
+ * ported yet. The save path goes through useFetcher (React Router v7 BFF) which
  * handles retries via the browser's native fetch queue.
  */
 export function useOfflineQueue() {

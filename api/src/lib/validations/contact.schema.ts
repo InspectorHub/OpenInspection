@@ -30,3 +30,38 @@ export const ContactListQuerySchema = z.object({
     limit: z.coerce.number().min(1).max(200).default(50).describe('TODO describe limit field for the OpenInspection MCP integration'),
     offset: z.coerce.number().min(0).default(0).describe('TODO describe offset field for the OpenInspection MCP integration'),
 }).openapi('ContactListQuery');
+
+// ─── CSV bulk import (preview + commit) ─────────────────────────────────────
+export const ContactImportPreviewSchema = z.object({
+    csv: z.string().min(1).max(2_000_000).describe('Raw CSV text, up to 2 MB'),
+}).openapi('ContactImportPreview');
+
+export const ContactImportPreviewResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        columns: z.array(z.string()),
+        rows: z.array(z.record(z.string(), z.string())),
+        totalRowsDetected: z.number().int().min(0),
+        truncated: z.boolean(),
+    }),
+}).openapi('ContactImportPreviewResponse');
+
+export const ContactImportSchema = z.object({
+    csv: z.string().min(1).max(2_000_000).describe('Raw CSV text to import, up to 2 MB'),
+    mapping: z.object({
+        name: z.string().describe('CSV column header mapped to contact name'),
+        email: z.string().optional().describe('CSV column header mapped to email address'),
+        phone: z.string().optional().describe('CSV column header mapped to phone number'),
+        agency: z.string().optional().describe('CSV column header mapped to agency name'),
+        type: z.enum(['agent', 'client']).optional().describe('Default contact type for imported rows'),
+    }).describe('Column-to-field mapping confirmed by the user'),
+}).openapi('ContactImport');
+
+export const ContactImportResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        inserted: z.number().int().min(0),
+        skipped: z.number().int().min(0),
+        errors: z.array(z.object({ row: z.number(), message: z.string() })),
+    }),
+}).openapi('ContactImportResponse');

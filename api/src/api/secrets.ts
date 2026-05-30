@@ -6,14 +6,14 @@
  * (backwards compatibility); DB secrets are the fallback for self-hosted
  * tenants who configure keys via the Settings UI.
  */
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { encryptSecrets, decryptSecrets, maskSecret, isMasked } from '../lib/config-crypto';
-import { HonoConfig } from '../types/hono';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 
 /**
@@ -48,8 +48,6 @@ const SecretsResponseSchema = z.object({
 const SecretsInputSchema = z.record(z.string(), z.string().optional())
     .openapi('SecretsInput');
 
-const secretsRoutes = new OpenAPIHono<HonoConfig>();
-
 // ─── GET /secrets ──────────────────────────────────────────────────────────
 const getSecretsRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -66,34 +64,6 @@ const getSecretsRoute = createRoute(withMcpMetadata({
     operationId: 'getIntegrationSecrets',
     description: 'Returns all 14 integration secrets with values masked for safe display. Empty string means not configured.',
 }, { scopes: ['admin'], tier: 'extended' }));
-
-secretsRoutes.openapi(getSecretsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
-
-    const row = await db
-        .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .get();
-
-    let stored: Record<string, string> = {};
-    if (row?.encryptedSecrets) {
-        try {
-            stored = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
-        } catch {
-            // Corrupt or key-rotated — return empty, let admin re-enter
-        }
-    }
-
-    // Build masked output for every known key
-    const masked: Record<string, string> = {};
-    for (const key of INTEGRATION_SECRET_KEYS) {
-        masked[key] = maskSecret(stored[key] ?? null);
-    }
-
-    return c.json({ success: true as const, data: masked }, 200);
-});
 
 // ─── PUT /secrets ──────────────────────────────────────────────────────────
 const putSecretsRoute = createRoute(withMcpMetadata({
@@ -115,68 +85,6 @@ const putSecretsRoute = createRoute(withMcpMetadata({
     description: 'Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-secretsRoutes.openapi(putSecretsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    const db = drizzle(c.env.DB);
-
-    // 1. Load existing secrets
-    const row = await db
-        .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .get();
-
-    let existing: Record<string, string> = {};
-    if (row?.encryptedSecrets) {
-        try {
-            existing = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
-        } catch {
-            // Corrupt data — start fresh
-        }
-    }
-
-    // 2. Merge: skip masked values and empty strings (no change); only accept known keys
-    const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
-    for (const [key, value] of Object.entries(body)) {
-        if (!allowedKeys.has(key)) continue;
-        if (!value || isMasked(value)) continue;
-        // Empty string means "clear this secret"
-        if (value.trim() === '') {
-            delete existing[key];
-        } else {
-            existing[key] = value;
-        }
-    }
-
-    // 3. Encrypt and store
-    const cleaned = Object.fromEntries(
-        Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
-    );
-
-    const encrypted = Object.keys(cleaned).length > 0
-        ? await encryptSecrets(cleaned, c.env.JWT_SECRET)
-        : null;
-
-    if (row) {
-        await db.update(tenantConfigs)
-            .set({ encryptedSecrets: encrypted, updatedAt: new Date() })
-            .where(eq(tenantConfigs.tenantId, tenantId));
-    } else {
-        await db.insert(tenantConfigs).values({
-            tenantId,
-            encryptedSecrets: encrypted,
-            updatedAt: new Date(),
-        });
-    }
-
-    auditFromContext(c, 'config.secrets.update', 'tenant_config', {
-        metadata: { keysUpdated: Object.keys(body).filter(k => allowedKeys.has(k) && body[k] && !isMasked(body[k])) },
-    });
-
-    return c.json({ success: true as const }, 200);
-});
-
 // ─── POST /secrets (alias for PUT — backwards compat with settings-advanced action) ─
 const postSecretsRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -197,76 +105,167 @@ const postSecretsRoute = createRoute(withMcpMetadata({
     description: 'POST alias for PUT /secrets. Accepts the same body.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-secretsRoutes.openapi(postSecretsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    const db = drizzle(c.env.DB);
+export const secretsRoutes = createApiRouter()
+    .openapi(getSecretsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
 
-    let existing: Record<string, string> = {};
-    const row = await db
-        .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .get();
+        const row = await db
+            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
 
-    if (row?.encryptedSecrets) {
-        try {
-            existing = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
-        } catch { /* start fresh */ }
-    }
-
-    const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
-    // Also accept camelCase variants that the existing settings-advanced page sends
-    const camelToEnv: Record<string, string> = {
-        resendApiKey: 'RESEND_API_KEY',
-        senderEmail: 'SENDER_EMAIL',
-        geminiApiKey: 'GEMINI_API_KEY',
-        turnstileSecretKey: 'TURNSTILE_SECRET_KEY',
-        googleClientId: 'GOOGLE_CLIENT_ID',
-        googleClientSecret: 'GOOGLE_CLIENT_SECRET',
-        googlePlacesApiKey: 'GOOGLE_PLACES_API_KEY',
-        estatedApiKey: 'ESTATED_API_KEY',
-        qboClientId: 'QBO_CLIENT_ID',
-        qboClientSecret: 'QBO_CLIENT_SECRET',
-        qboWebhookSecret: 'QBO_WEBHOOK_SECRET',
-        stripeSecretKey: 'STRIPE_SECRET_KEY',
-        stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',
-        appBaseUrl: 'APP_BASE_URL',
-    };
-
-    for (const [key, value] of Object.entries(body)) {
-        const envKey = camelToEnv[key] ?? key;
-        if (!allowedKeys.has(envKey)) continue;
-        if (!value || isMasked(value)) continue;
-        if (value.trim() === '') {
-            delete existing[envKey];
-        } else {
-            existing[envKey] = value;
+        let stored: Record<string, string> = {};
+        if (row?.encryptedSecrets) {
+            try {
+                stored = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
+            } catch {
+                // Corrupt or key-rotated — return empty, let admin re-enter
+            }
         }
-    }
 
-    const cleaned = Object.fromEntries(
-        Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
-    );
+        // Build masked output for every known key
+        const masked: Record<string, string> = {};
+        for (const key of INTEGRATION_SECRET_KEYS) {
+            masked[key] = maskSecret(stored[key] ?? null);
+        }
 
-    const encrypted = Object.keys(cleaned).length > 0
-        ? await encryptSecrets(cleaned, c.env.JWT_SECRET)
-        : null;
+        return c.json({ success: true as const, data: masked }, 200);
+    })
+    .openapi(putSecretsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const db = drizzle(c.env.DB);
 
-    if (row) {
-        await db.update(tenantConfigs)
-            .set({ encryptedSecrets: encrypted, updatedAt: new Date() })
-            .where(eq(tenantConfigs.tenantId, tenantId));
-    } else {
-        await db.insert(tenantConfigs).values({
-            tenantId,
-            encryptedSecrets: encrypted,
-            updatedAt: new Date(),
+        // 1. Load existing secrets
+        const row = await db
+            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+
+        let existing: Record<string, string> = {};
+        if (row?.encryptedSecrets) {
+            try {
+                existing = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
+            } catch {
+                // Corrupt data — start fresh
+            }
+        }
+
+        // 2. Merge: skip masked values and empty strings (no change); only accept known keys
+        const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
+        for (const [key, value] of Object.entries(body)) {
+            if (!allowedKeys.has(key)) continue;
+            if (!value || isMasked(value)) continue;
+            // Empty string means "clear this secret"
+            if (value.trim() === '') {
+                delete existing[key];
+            } else {
+                existing[key] = value;
+            }
+        }
+
+        // 3. Encrypt and store
+        const cleaned = Object.fromEntries(
+            Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
+        );
+
+        const encrypted = Object.keys(cleaned).length > 0
+            ? await encryptSecrets(cleaned, c.env.JWT_SECRET)
+            : null;
+
+        if (row) {
+            await db.update(tenantConfigs)
+                .set({ encryptedSecrets: encrypted, updatedAt: new Date() })
+                .where(eq(tenantConfigs.tenantId, tenantId));
+        } else {
+            await db.insert(tenantConfigs).values({
+                tenantId,
+                encryptedSecrets: encrypted,
+                updatedAt: new Date(),
+            });
+        }
+
+        auditFromContext(c, 'config.secrets.update', 'tenant_config', {
+            metadata: { keysUpdated: Object.keys(body).filter(k => allowedKeys.has(k) && body[k] && !isMasked(body[k])) },
         });
-    }
 
-    auditFromContext(c, 'config.secrets.update', 'tenant_config');
-    return c.json({ success: true as const }, 200);
-});
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(postSecretsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const db = drizzle(c.env.DB);
+
+        let existing: Record<string, string> = {};
+        const row = await db
+            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+
+        if (row?.encryptedSecrets) {
+            try {
+                existing = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
+            } catch { /* start fresh */ }
+        }
+
+        const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
+        // Also accept camelCase variants that the existing settings-advanced page sends
+        const camelToEnv: Record<string, string> = {
+            resendApiKey: 'RESEND_API_KEY',
+            senderEmail: 'SENDER_EMAIL',
+            geminiApiKey: 'GEMINI_API_KEY',
+            turnstileSecretKey: 'TURNSTILE_SECRET_KEY',
+            googleClientId: 'GOOGLE_CLIENT_ID',
+            googleClientSecret: 'GOOGLE_CLIENT_SECRET',
+            googlePlacesApiKey: 'GOOGLE_PLACES_API_KEY',
+            estatedApiKey: 'ESTATED_API_KEY',
+            qboClientId: 'QBO_CLIENT_ID',
+            qboClientSecret: 'QBO_CLIENT_SECRET',
+            qboWebhookSecret: 'QBO_WEBHOOK_SECRET',
+            stripeSecretKey: 'STRIPE_SECRET_KEY',
+            stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',
+            appBaseUrl: 'APP_BASE_URL',
+        };
+
+        for (const [key, value] of Object.entries(body)) {
+            const envKey = camelToEnv[key] ?? key;
+            if (!allowedKeys.has(envKey)) continue;
+            if (!value || isMasked(value)) continue;
+            if (value.trim() === '') {
+                delete existing[envKey];
+            } else {
+                existing[envKey] = value;
+            }
+        }
+
+        const cleaned = Object.fromEntries(
+            Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
+        );
+
+        const encrypted = Object.keys(cleaned).length > 0
+            ? await encryptSecrets(cleaned, c.env.JWT_SECRET)
+            : null;
+
+        if (row) {
+            await db.update(tenantConfigs)
+                .set({ encryptedSecrets: encrypted, updatedAt: new Date() })
+                .where(eq(tenantConfigs.tenantId, tenantId));
+        } else {
+            await db.insert(tenantConfigs).values({
+                tenantId,
+                encryptedSecrets: encrypted,
+                updatedAt: new Date(),
+            });
+        }
+
+        auditFromContext(c, 'config.secrets.update', 'tenant_config');
+        return c.json({ success: true as const }, 200);
+    });
+
+export type SecretsApi = typeof secretsRoutes;
 
 export default secretsRoutes;

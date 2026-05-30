@@ -1,13 +1,13 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { availability, availabilityOverrides } from '../lib/db/schema';
-import { HonoConfig } from '../types/hono';
 import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
-import { 
-    AvailabilitySchema, 
+import {
+    AvailabilitySchema,
     OverrideSchema,
     AvailabilityListResponseSchema,
     OverrideListResponseSchema,
@@ -15,8 +15,6 @@ import {
 } from '../lib/validations/booking.schema';
 import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-
-const availabilityRoutes = new OpenAPIHono<HonoConfig>();
 
 /**
  * GET /api/availability
@@ -46,27 +44,6 @@ const listAvailabilityRoute = createRoute(withMcpMetadata({
         },
     },
 }, { scopes: ['read'], tier: 'primary' }));
-
-availabilityRoutes.openapi(listAvailabilityRoute, async (c) => {
-    const db = drizzle(c.env.DB);
-    const tenantId = c.get('tenantId');
-    const user = c.get('user');
-    const { inspectorId: queryId } = c.req.valid('query');
-    const inspectorId = queryId || user.sub;
-
-    const slots = await db.select()
-        .from(availability)
-        .where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId)))
-        .all();
-
-    // Ensure createdAt is formatted as a string for the response
-    const formattedAvailability = slots.map(s => ({
-        ...s,
-        createdAt: safeISODate(s.createdAt)
-    }));
-
-    return c.json({ success: true, data: formattedAvailability }, 200);
-});
 
 /**
  * PUT /api/availability
@@ -101,24 +78,6 @@ const updateScheduleRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-availabilityRoutes.openapi(updateScheduleRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const user = c.get('user');
-    const userRole = c.get('userRole');
-    const body = c.req.valid('json');
-
-    const inspectorId = body.inspectorId || user.sub;
-
-    if (inspectorId !== user.sub && !['admin', 'owner'].includes(userRole)) {
-        throw Errors.Forbidden('Can only manage your own availability');
-    }
-
-    const service = c.var.services.availability;
-    await service.updateWeeklySchedule(tenantId, inspectorId, body.slots);
-    
-    return c.json({ success: true, data: { count: body.slots.length } }, 200);
-});
-
 /**
  * GET /api/availability/overrides
  */
@@ -146,26 +105,6 @@ const listOverridesRoute = createRoute(withMcpMetadata({
         },
     },
 }, { scopes: ['read'], tier: 'extended' }));
-
-availabilityRoutes.openapi(listOverridesRoute, async (c) => {
-    const db = drizzle(c.env.DB);
-    const tenantId = c.get('tenantId');
-    const user = c.get('user');
-    const { inspectorId: queryId } = c.req.valid('query');
-    const inspectorId = queryId || user.sub;
-
-    const overrides = await db.select()
-        .from(availabilityOverrides)
-        .where(and(eq(availabilityOverrides.tenantId, tenantId), eq(availabilityOverrides.inspectorId, inspectorId)))
-        .all();
-
-    const formattedOverrides = overrides.map(o => ({
-        ...o,
-        createdAt: safeISODate(o.createdAt)
-    }));
-
-    return c.json({ success: true, data: formattedOverrides }, 200);
-});
 
 /**
  * POST /api/availability/overrides
@@ -199,31 +138,6 @@ const createOverrideRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-availabilityRoutes.openapi(createOverrideRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const user = c.get('user');
-    const userRole = c.get('userRole');
-    const body = c.req.valid('json');
-
-    const inspectorId = body.inspectorId || user.sub;
-    if (inspectorId !== user.sub && !['admin', 'owner'].includes(userRole)) {
-        throw Errors.Forbidden('Can only manage your own availability');
-    }
-
-    const service = c.var.services.availability;
-    // Filter undefined for exactOptionalPropertyTypes
-    const overrideParams = Object.fromEntries(
-        Object.entries(body).filter(([_, v]) => v !== undefined)
-    ) as typeof body;
-
-    const override = await service.addOverride(tenantId, {
-        ...overrideParams,
-        inspectorId
-    });
-
-    return c.json({ success: true, data: { override: override } }, 201);
-});
-
 /**
  * DELETE /api/availability/overrides/:id
  */
@@ -250,12 +164,95 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-availabilityRoutes.openapi(deleteOverrideRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const service = c.var.services.availability;
-    await service.deleteOverride(tenantId, id);
-    return c.json({ success: true }, 200);
-});
+export const availabilityRoutes = createApiRouter()
+    .openapi(listAvailabilityRoute, async (c) => {
+        const db = drizzle(c.env.DB);
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        const { inspectorId: queryId } = c.req.valid('query');
+        const inspectorId = queryId || user.sub;
+
+        const slots = await db.select()
+            .from(availability)
+            .where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId)))
+            .all();
+
+        // Ensure createdAt is formatted as a string for the response
+        const formattedAvailability = slots.map(s => ({
+            ...s,
+            createdAt: safeISODate(s.createdAt)
+        }));
+
+        return c.json({ success: true, data: formattedAvailability }, 200);
+    })
+    .openapi(updateScheduleRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        const userRole = c.get('userRole');
+        const body = c.req.valid('json');
+
+        const inspectorId = body.inspectorId || user.sub;
+
+        if (inspectorId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+            throw Errors.Forbidden('Can only manage your own availability');
+        }
+
+        const service = c.var.services.availability;
+        await service.updateWeeklySchedule(tenantId, inspectorId, body.slots);
+
+        return c.json({ success: true, data: { count: body.slots.length } }, 200);
+    })
+    .openapi(listOverridesRoute, async (c) => {
+        const db = drizzle(c.env.DB);
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        const { inspectorId: queryId } = c.req.valid('query');
+        const inspectorId = queryId || user.sub;
+
+        const overrides = await db.select()
+            .from(availabilityOverrides)
+            .where(and(eq(availabilityOverrides.tenantId, tenantId), eq(availabilityOverrides.inspectorId, inspectorId)))
+            .all();
+
+        const formattedOverrides = overrides.map(o => ({
+            ...o,
+            createdAt: safeISODate(o.createdAt)
+        }));
+
+        return c.json({ success: true, data: formattedOverrides }, 200);
+    })
+    .openapi(createOverrideRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        const userRole = c.get('userRole');
+        const body = c.req.valid('json');
+
+        const inspectorId = body.inspectorId || user.sub;
+        if (inspectorId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+            throw Errors.Forbidden('Can only manage your own availability');
+        }
+
+        const service = c.var.services.availability;
+        // Filter undefined for exactOptionalPropertyTypes
+        const overrideParams = Object.fromEntries(
+            Object.entries(body).filter(([_, v]) => v !== undefined)
+        ) as typeof body;
+
+        const override = await service.addOverride(tenantId, {
+            ...overrideParams,
+            inspectorId
+        });
+
+        return c.json({ success: true, data: { override: override } }, 201);
+    })
+    .openapi(deleteOverrideRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const service = c.var.services.availability;
+        await service.deleteOverride(tenantId, id);
+        return c.json({ success: true }, 200);
+    });
+
+export type AvailabilityApi = typeof availabilityRoutes;
 
 export default availabilityRoutes;

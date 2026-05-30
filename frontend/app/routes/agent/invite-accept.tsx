@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Form, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/invite-accept";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "You're invited - OpenInspection" }];
@@ -22,14 +22,15 @@ interface InviteData {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") ?? "";
   if (!token) {
     return { invite: null, error: "no-token" as const };
   }
   try {
-    const res = await apiFetch(`/api/agents/invite-info?token=${encodeURIComponent(token)}`);
+    const api = createApi(context);
+    const res = await api.agents["invite-info"].$get({ query: { token } });
     const body = res.ok ? await res.json() : {};
     if (!res.ok) {
       return { invite: null, error: "expired" as const };
@@ -48,18 +49,16 @@ export async function loader({ request }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
   const fd = await request.formData();
   const body = {
-    token: fd.get("token"),
-    password: fd.get("password"),
-    name: fd.get("name"),
+    token: String(fd.get("token") || ""),
+    password: String(fd.get("password") || ""),
+    name: String(fd.get("name") || ""),
   };
 
-  const res = await apiFetch("/api/agents/accept", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  const api = createApi(context);
+  const res = await api.agents.accept.$post({ json: body });
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || !json.success) {
@@ -124,7 +123,7 @@ export default function AgentInviteAcceptPage() {
       <div className="max-w-[540px] mx-auto px-6 py-14">
         {/* Brand */}
         <div className="flex items-center gap-3 mb-10">
-          <img src="/logo.svg" alt="" className="w-8 h-8" />
+          <img src="/logo.svg" alt="" className="w-8 h-8" width={32} height={32} />
           <span className="font-serif font-bold text-lg tracking-tight text-ih-fg-1">
             OpenInspection
           </span>

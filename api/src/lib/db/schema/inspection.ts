@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex, index, primaryKey } from 'drizzle-orm/sqlite-core';
 import { tenants, users } from './tenant';
 
 // Sprint 2 S2-1 — tenant-scoped rating systems library. The level list
@@ -67,6 +67,9 @@ export const inspections = sqliteTable('inspections', {
     cancelNotes:         text('cancel_notes'),  // Spec 3A
     paymentRequired:     integer('payment_required', { mode: 'boolean' }).notNull().default(false),
     agreementRequired:   integer('agreement_required', { mode: 'boolean' }).notNull().default(false),
+    // Spec 5H D2 — when true, InspectionService.publish() auto-injects the
+    // inspector's users.default_signature_base64 into inspection_results.data._inspector_signature.
+    autoSignOnPublish:   integer('auto_sign_on_publish', { mode: 'boolean' }).notNull().default(false),
     discountCodeId:      text('discount_code_id'),
     discountAmount:      integer('discount_amount'),
     closingDate:         text('closing_date'),
@@ -271,8 +274,25 @@ export const comments = sqliteTable('comments', {
     itemLabels: text('item_labels'),
     triggerCode: text('trigger_code'),
     searchKeywords: text('search_keywords'),
+    // Comments Library Upgrade — canonical single item label for the sort
+    // + filter UI in the inspection-edit Library drawer. Distinct from the
+    // existing plural `itemLabels` which stores all matched labels.
+    itemLabel: text('item_label'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
+
+// Comments Library Upgrade — per-user usage tracking. Drives the "most-used by
+// you" sort option + AUTO filter mode in the Library drawer. Composite PK on
+// (tenant, user, comment) gives O(1) upsert per touch.
+export const commentUsage = sqliteTable('comment_usage', {
+    tenantId:   text('tenant_id').notNull(),
+    userId:     text('user_id').notNull(),
+    commentId:  text('comment_id').notNull(),
+    useCount:   integer('use_count').notNull().default(0),
+    lastUsedAt: integer('last_used_at'),
+}, (table) => ({
+    pk: primaryKey({ columns: [table.tenantId, table.userId, table.commentId] }),
+}));
 
 export const agreementRequests = sqliteTable('agreement_requests', {
     id: text('id').primaryKey(),
@@ -288,6 +308,12 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     viewedAt: integer('viewed_at', { mode: 'timestamp' }),
     sentAt: integer('sent_at', { mode: 'timestamp' }),
     lastError: text('last_error'),
+    // Spec 5H D1 — optional inspector pre-sign. NULL until inspector signs.
+    inspectorSignatureBase64: text('inspector_signature_base64'),
+    inspectorSignedAt:        integer('inspector_signed_at', { mode: 'timestamp' }),
+    inspectorUserId:          text('inspector_user_id').references(() => users.id),
+    // Spec 5H P2 — opaque public-verifier token. Set on the sign event.
+    verificationToken: text('verification_token'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

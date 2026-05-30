@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useLoaderData, Link, useNavigate, useFetcher, useSearchParams } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { NewInspectionWizard } from "~/components/NewInspectionWizard";
 import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
@@ -172,12 +172,13 @@ function matchesWorkflow(i: Inspection, tab: TabKey): boolean {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
+    const api = createApi(context, { token });
     const [dashRes, tagsRes] = await Promise.all([
-      apiFetch("/api/inspections/dashboard", { token }),
-      apiFetch("/api/tags", { token }).catch(() => null),
+      api.inspections.dashboard.$get(),
+      api.tags.index.$get().catch(() => null),
     ]);
     const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
     const d = (json.data ?? {}) as unknown as DashboardData | undefined;
@@ -228,24 +229,24 @@ function getGreeting() {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const formData = await request.formData();
   const intent = formData.get("intent");
 
+  const api = createApi(context, { token });
   if (intent === "delete") {
     const id = formData.get("id") as string;
-    const res = await apiFetch(`/api/inspections/${id}`, { token, method: "DELETE" });
+    const res = await api.inspections[":id"].$delete({ param: { id } });
     return { ok: res.ok, intent: "delete" };
   }
   if (intent === "archive") {
     const ids = (formData.get("ids") as string).split(",");
     const results = await Promise.all(
       ids.map((id) =>
-        apiFetch(`/api/inspections/${id}`, {
-          token,
-          method: "PATCH",
-          body: JSON.stringify({ status: "cancelled" }),
+        api.inspections[":id"].$patch({
+          param: { id },
+          json: { status: "cancelled" },
         }),
       ),
     );
@@ -254,10 +255,9 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "status") {
     const id = formData.get("id") as string;
     const status = formData.get("status") as string;
-    const res = await apiFetch(`/api/inspections/${id}`, {
-      token,
-      method: "PATCH",
-      body: JSON.stringify({ status }),
+    const res = await api.inspections[":id"].$patch({
+      param: { id },
+      json: { status },
     });
     return { ok: res.ok, intent: "status" };
   }

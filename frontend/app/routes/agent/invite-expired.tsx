@@ -1,6 +1,5 @@
 import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/invite-expired";
-import { apiFetch } from "~/lib/api.server";
 
 export function meta() {
   return [{ title: "Invite expired - OpenInspection" }];

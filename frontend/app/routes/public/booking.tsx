@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Book an Inspection - OpenInspection" }];
@@ -16,7 +16,7 @@ interface InspectorProfile {
   services: { id: string; name: string; price: number; duration: number }[];
 }
 
-export async function loader({ params, request }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   // F7 — capture agent referral slug from ?ref= query parameter
   const url = new URL(request.url);
   const refRaw = url.searchParams.get("ref");
@@ -26,9 +26,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       : null;
 
   try {
-    const res = await apiFetch(
-      `/api/public/book/${params.tenant}/${params.slug}`,
-    );
+    const api = createApi(context);
+    const res = await api.bookings.book[":tenant"][":slug"].$get({
+      param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
+    });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     return {

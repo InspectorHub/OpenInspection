@@ -1,13 +1,13 @@
-import { Form, useActionData, useLoaderData, redirect } from "react-router";
+import { Form, useActionData, useLoaderData, useNavigation, redirect } from "react-router";
 import type { Route } from "./+types/guest-join";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 
 export function meta() {
   return [{ title: "Join as Guest - OpenInspection" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") || "";
 
@@ -17,7 +17,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   try {
 
-    const res = await apiFetch(`/api/auth/guest/validate?token=${encodeURIComponent(token)}`);
+    const api = createApi(context);
+    const res = await api.auth.guest.validate.$get({ query: { token } });
     if (!res.ok) {
       return { valid: false, error: "Invalid or expired guest link", invite: null };
     }
@@ -33,17 +34,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const token = String(formData.get("token") || "");
   const name = String(formData.get("name") || "");
 
   try {
 
-    const res = await apiFetch("/api/auth/guest/accept", {
-      method: "POST",
-      body: JSON.stringify({ token, name }),
-      csrf: true,
+    const api = createApi(context);
+    const res = await api.auth.guest.accept.$post({
+      json: { token, name },
     });
 
     if (!res.ok) {
@@ -64,7 +64,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (jwt) {
 
 
-      return createSessionWithToken(jwt, "/dashboard");
+      return createSessionWithToken(context, jwt, "/dashboard");
     }
 
     return redirect("/dashboard");
@@ -76,6 +76,8 @@ export async function action({ request }: Route.ActionArgs) {
 export default function GuestJoinPage() {
   const { valid, error: loaderError, invite } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
 
   if (!valid) {
     return (
@@ -94,7 +96,7 @@ export default function GuestJoinPage() {
     <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
       <div className="w-full max-w-md p-8">
         <div className="flex items-center gap-3 mb-8">
-          <img src="/logo.svg" alt="" className="w-8 h-8" />
+          <img src="/logo.svg" alt="" className="w-8 h-8" width={32} height={32} />
           <span className="text-lg font-bold text-ih-fg-1">
             OpenInspection
           </span>
@@ -133,9 +135,10 @@ export default function GuestJoinPage() {
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors"
+            disabled={isSubmitting}
+            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Join Inspection
+            {isSubmitting ? "Joining…" : "Join Inspection"}
           </button>
         </Form>
       </div>

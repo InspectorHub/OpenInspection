@@ -79,7 +79,12 @@ export class GuestInviteService {
             createdAt:       new Date().toISOString(),
         });
 
-        const url = `${globalThis.location?.origin ?? ''}/guest-join?token=${token}`;
+        // Workers runtime has no `location` global; this is a defensive
+        // origin lookup carried over from a browser-context predecessor.
+        // Use a typed cast rather than declare a global so we don't pollute
+        // shared types just for one optional read.
+        const loc = (globalThis as { location?: { origin?: string } }).location;
+        const url = `${loc?.origin ?? ''}/guest-join?token=${token}`;
         return { id, token, url, expiresAt };
     }
 

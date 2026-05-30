@@ -2,10 +2,12 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { useInspectionState } from "~/hooks/useInspection";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { useFindings } from "~/hooks/useFindings";
+import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
+import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "~/hooks/useKeyboard";
 import { useCannedComments } from "~/hooks/useCannedComments";
 import { useOfflineQueue } from "~/hooks/useOfflineQueue";
@@ -13,8 +15,11 @@ import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
 import { usePresence } from "~/hooks/usePresence";
 import { useTheme } from "~/hooks/useTheme";
 import { SectionRail } from "~/components/editor/SectionRail";
+import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { ItemList } from "~/components/editor/ItemList";
 import { ItemEditor } from "~/components/editor/ItemEditor";
+import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
+import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
 import { SideRail } from "~/components/editor/SideRail";
 import { SpeedMode } from "~/components/editor/SpeedMode";
 import { FooterBar } from "~/components/editor/FooterBar";
@@ -24,6 +29,14 @@ import { BurstCamera } from "~/components/editor/BurstCamera";
 import { PhotoStudio } from "~/components/editor/PhotoStudio";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
+import { SignaturePad } from "~/components/SignaturePad";
+import { PublishGateModal } from "~/components/editor/PublishGateModal";
+import { ToastPortal } from "~/components/Toast";
+import { useIsMobile } from "~/hooks/useBreakpoint";
+import { MobileAppBar } from "~/components/editor/MobileAppBar";
+import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/MobileDrawerTriggers";
+import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
+import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
 
 export function meta() {
  return [{ title: "Edit Inspection - OpenInspection" }];
@@ -33,14 +46,15 @@ export function meta() {
 /* Loader */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request, params }: Route.LoaderArgs) {
- const token = await requireToken(request);
+export async function loader({ request, params, context }: Route.LoaderArgs) {
+ const token = await requireToken(context, request);
  const id = params.id;
 
+ const api = createApi(context, { token });
  const [inspRes, resultsRes, reportRes] = await Promise.all([
- apiFetch(`/api/inspections/${id}`, { token }),
- apiFetch(`/api/inspections/${id}/results`, { token }),
- apiFetch(`/api/inspections/${id}/report-data`, { token }),
+ api.inspections[":id"].$get({ param: { id } }),
+ api.inspections[":id"].results.$get({ param: { id } }),
+ api.inspections[":id"]["report-data"].$get({ param: { id } }),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -89,19 +103,19 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 /* Action (BFF relay for client mutations) */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request, params }: Route.ActionArgs) {
- const token = await requireToken(request);
+export async function action({ request, params, context }: Route.ActionArgs) {
+ const token = await requireToken(context, request);
  const formData = await request.formData();
  const intent = formData.get("intent");
+ const api = createApi(context, { token });
 
  if (intent === "rate") {
  const itemId = String(formData.get("itemId"));
  const sectionId = String(formData.get("sectionId"));
  const rating = String(formData.get("rating"));
- await apiFetch(`/api/inspections/${params.id}/items/${itemId}/field`, {
- method: "PATCH",
- token,
- body: JSON.stringify({ field: "rating", value: rating, sectionId }),
+ await api.inspections[":id"].items[":itemId"].$patch({
+ param: { id: params.id, itemId },
+ json: { field: "rating", value: rating, sectionId, expectedVersion: 0, force: true },
  });
  }
 
@@ -109,10 +123,9 @@ export async function action({ request, params }: Route.ActionArgs) {
  const itemId = String(formData.get("itemId"));
  const sectionId = String(formData.get("sectionId"));
  const notes = String(formData.get("notes"));
- await apiFetch(`/api/inspections/${params.id}/items/${itemId}/field`, {
- method: "PATCH",
- token,
- body: JSON.stringify({ field: "notes", value: notes, sectionId }),
+ await api.inspections[":id"].items[":itemId"].$patch({
+ param: { id: params.id, itemId },
+ json: { field: "notes", value: notes, sectionId, expectedVersion: 0, force: true },
  });
  }
 
@@ -122,36 +135,96 @@ export async function action({ request, params }: Route.ActionArgs) {
  const tabName = String(formData.get("tabName"));
  const cannedId = String(formData.get("cannedId"));
  const included = formData.get("included") === "true";
- await apiFetch(`/api/inspections/${params.id}/items/${itemId}/field`, {
- method: "PATCH",
- token,
- body: JSON.stringify({
+ await api.inspections[":id"].items[":itemId"].$patch({
+ param: { id: params.id, itemId },
+ json: {
  field: "cannedToggle",
  value: { tabName, cannedId, included },
  sectionId,
- }),
+ expectedVersion: 0,
+ force: true,
+ },
+ });
+ }
+
+ if (intent === "set-defect-fields") {
+ const itemId = String(formData.get("itemId"));
+ const sectionId = String(formData.get("sectionId"));
+ const cannedId = String(formData.get("cannedId"));
+ const patch = JSON.parse(String(formData.get("patch")));
+ await api.inspections[":id"].items[":itemId"].$patch({
+ param: { id: params.id, itemId },
+ json: {
+ field: "defectFields",
+ value: { cannedId, ...patch },
+ sectionId,
+ expectedVersion: 0,
+ force: true,
+ },
+ });
+ }
+
+ if (intent === "set-item-attribute") {
+ const itemId = String(formData.get("itemId"));
+ const attributeId = String(formData.get("attributeId"));
+ const value = JSON.parse(String(formData.get("value")));
+ await api.inspections[":id"].items[":itemId"].$patch({
+ param: { id: params.id, itemId },
+ json: {
+ field: "itemAttribute",
+ value: { attributeId, value },
+ expectedVersion: 0,
+ force: true,
+ },
  });
  }
 
  if (intent === "save-all") {
  const data = formData.get("data");
  if (data) {
- await apiFetch(`/api/inspections/${params.id}/results`, {
- method: "PATCH",
- token,
- body: JSON.stringify({ data: JSON.parse(String(data)) }),
+ await api.inspections[":id"].results.$patch({
+ param: { id: params.id },
+ json: { data: JSON.parse(String(data)) },
  });
  }
  }
 
  if (intent === "publish") {
- await apiFetch(`/api/inspections/${params.id}/publish`, {
- method: "POST",
- token,
+ await api.inspections[":id"].publish.$post({ param: { id: params.id } });
+ }
+
+ if (intent === "toggle-auto-sign") {
+ const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
+ await api.inspections[":id"].$patch({
+ param: { id: params.id },
+ json: { autoSignOnPublish },
  });
  }
 
+ if (intent === "sign-inspector") {
+ const signatureBase64 = String(formData.get("signatureBase64") ?? "");
+ if (signatureBase64) {
+ await api.inspectionSync[":id"]["inspector-signature"].$post({
+ param: { id: params.id },
+ json: { signatureBase64, signedAt: new Date().toISOString() },
+ });
+ }
+ }
+
  return { ok: true };
+}
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function formatRelativeTime(epochSec: number): string {
+ const diffDays = Math.floor((Date.now() / 1000 - epochSec) / 86400);
+ if (diffDays <= 0) return 'today';
+ if (diffDays === 1) return '1 day ago';
+ if (diffDays < 7)   return `${diffDays} days ago`;
+ if (diffDays < 30)  return `${Math.floor(diffDays / 7)} wk ago`;
+ return `${Math.floor(diffDays / 30)} mo ago`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -188,6 +261,101 @@ export default function InspectionEditPage() {
  });
 
  /* ---------------------------------------------------------------- */
+ /* Inspection prefs (tenant clone scope, auto-advance delay, pinned tags) */
+ /* ---------------------------------------------------------------- */
+
+ const { prefs: inspectionPrefs } = useInspectionPrefs();
+
+ /* ---------------------------------------------------------------- */
+ /* Tag library fetch + memos */
+ /* ---------------------------------------------------------------- */
+
+ const [tagLibrary, setTagLibrary] = useState<TagPin[]>([]);
+ useEffect(() => {
+ (async () => {
+ try {
+ const res = await fetch('/api/tags', { credentials: 'include' });
+ if (res.ok) {
+ const body = await res.json() as { data?: Array<{ id: string; name: string; color: string }> };
+ setTagLibrary(body.data ?? []);
+ }
+ } catch { /* noop */ }
+ })();
+ }, []);
+
+ const pinnedTags = useMemo(() => {
+ return inspectionPrefs.pinnedTagIds
+ .map(id => tagLibrary.find(t => t.id === id))
+ .filter((t): t is TagPin => Boolean(t));
+ }, [inspectionPrefs.pinnedTagIds, tagLibrary]);
+
+ const activeTagIds = useMemo(() => {
+ if (!state.activeItemId) return new Set<string>();
+ const tags = state.tagsByItem?.[state.activeItemId] || [];
+ return new Set(tags.map((t: { id: string }) => t.id));
+ }, [state.activeItemId, state.tagsByItem]);
+
+ /* ---------------------------------------------------------------- */
+ /* Publish gate state (declared early — used in missingFields memo below) */
+ /* ---------------------------------------------------------------- */
+
+ const [publishReadiness, setPublishReadiness] = useState<PublishReadiness | null>(null);
+ const [showPublishGate, setShowPublishGate] = useState(false);
+
+ /* ---------------------------------------------------------------- */
+ /* Defect structured fields — local-state projections for ItemEditor */
+ /* ---------------------------------------------------------------- */
+
+ const activeResult = state.activeItemId
+ ? findings.getResult(state.activeItemId, state.currentSection?.id)
+ : null;
+
+ const defectStates = useMemo(() => {
+ const map = new Map<string, DefectFieldsValue>();
+ const defects = (activeResult as Record<string, unknown> | null)?.tabs as
+ | { defects?: Array<Record<string, unknown>> }
+ | undefined;
+ const rows = Array.isArray(defects?.defects) ? defects!.defects : [];
+ for (const d of rows) {
+ const cannedId = typeof d.cannedId === "string" ? d.cannedId : "";
+ if (!cannedId) continue;
+ map.set(cannedId, {
+ location:  typeof d.location  === "string" ? d.location  : null,
+ trade:     typeof d.trade     === "string" ? (d.trade     as DefectFieldsValue["trade"])     : null,
+ deadline:  typeof d.deadline  === "string" ? (d.deadline  as DefectFieldsValue["deadline"])  : null,
+ timeframe: typeof d.timeframe === "string" ? (d.timeframe as DefectFieldsValue["timeframe"]) : null,
+ });
+ }
+ return map;
+ }, [activeResult]);
+
+ const locationSuggestions = useMemo(() => {
+ const set = new Set<string>();
+ for (const value of Object.values(state.results)) {
+ const tabs = (value as Record<string, unknown> | null)?.tabs as
+ | { defects?: Array<Record<string, unknown>> }
+ | undefined;
+ const rows = Array.isArray(tabs?.defects) ? tabs!.defects : [];
+ for (const d of rows) {
+ if (typeof d.location === "string" && d.location.length > 0) set.add(d.location);
+ }
+ }
+ return Array.from(set);
+ }, [state.results]);
+
+ const missingFields = useMemo(() => {
+ const map = new Map<string, { location: boolean; trade: boolean }>();
+ if (!publishReadiness) return map;
+ for (const b of publishReadiness.blockingDefects) {
+  map.set(b.cannedId, {
+   location: b.missing.includes('location'),
+   trade:    b.missing.includes('trade'),
+  });
+ }
+ return map;
+ }, [publishReadiness]);
+
+ /* ---------------------------------------------------------------- */
  /* Canned comments library */
  /* ---------------------------------------------------------------- */
 
@@ -195,6 +363,40 @@ export default function InspectionEditPage() {
  inspectionId: String(state.inspection.id),
  bucketForRatingId: state.bucketForRatingId,
  });
+
+ /* ---------------------------------------------------------------- */
+ /* Server-fetched comments for the library drawer (sort/filter aware) */
+ /* ---------------------------------------------------------------- */
+
+ const [serverComments, setServerComments] = useState<Array<{
+ id: string; text: string; useCount?: number; lastUsedAt?: number | null;
+ }>>([]);
+
+ useEffect(() => {
+ if (!state.showCommentLibrary) { setServerComments([]); return; }
+ const ctx: { itemLabel?: string; section?: string; ratingBucket?: string } = {};
+ if (comments.filterMode === 'auto' && state.activeItem) {
+ ctx.itemLabel = (state.activeItem.label || state.activeItem.name || '') as string;
+ ctx.section   = state.currentSection?.title;
+ const r = state.activeItemId ? state.getResult(state.activeItemId)?.rating : null;
+ if (r && state.bucketForRatingId) {
+ ctx.ratingBucket = state.bucketForRatingId(r as string);
+ }
+ }
+ comments.fetchFiltered(ctx).then((rows) => {
+ setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>);
+ });
+ }, [
+ state.showCommentLibrary,
+ comments.sort,
+ comments.filterMode,
+ state.activeItemId,
+ state.activeItem,
+ state.currentSection,
+ comments.fetchFiltered,
+ state.getResult,
+ state.bucketForRatingId,
+ ]);
 
  /* ---------------------------------------------------------------- */
  /* Offline queue */
@@ -229,11 +431,91 @@ export default function InspectionEditPage() {
 
  const [tagPickerOpen, setTagPickerOpen] = useState(false);
 
+ /* ---------------------------------------------------------------- */
+ /* Auto-sign toggle + manual sign modal */
+ /* ---------------------------------------------------------------- */
+
+ const signFetcher = useFetcher<{ ok: boolean }>();
+ const [autoSign, setAutoSign] = useState<boolean>(
+  !!(state.inspection as Record<string, unknown>).autoSignOnPublish,
+ );
+ const [signModalOpen, setSignModalOpen] = useState(false);
+
+ // Sync autoSign local state from loader data when inspection changes
+ useEffect(() => {
+  setAutoSign(!!(state.inspection as Record<string, unknown>).autoSignOnPublish);
+ }, [state.inspection]);
+
+ const handleAutoSignToggle = useCallback(
+  (checked: boolean) => {
+   setAutoSign(checked);
+   signFetcher.submit(
+    { intent: "toggle-auto-sign", autoSignOnPublish: String(checked) },
+    { method: "post" },
+   );
+  },
+  [signFetcher],
+ );
+
+ const handleSignSubmit = useCallback(
+  async (dataUri: string) => {
+   signFetcher.submit(
+    { intent: "sign-inspector", signatureBase64: dataUri },
+    { method: "post" },
+   );
+   setSignModalOpen(false);
+  },
+  [signFetcher],
+ );
+
+ /* ---------------------------------------------------------------- */
+ /* Publish pre-flight */
+ /* ---------------------------------------------------------------- */
+
+ const handlePublishClick = useCallback(async () => {
+  try {
+   const res = await fetch(`/api/inspections/${state.inspection.id}/publish-readiness`, {
+    credentials: 'include',
+   });
+   if (res.ok) {
+    const readiness = await res.json() as PublishReadiness;
+    if (!readiness.ready) {
+     setPublishReadiness(readiness);
+     setShowPublishGate(true);
+     return;
+    }
+   }
+  } catch {
+   // Network/server error — fall through to publish (don't block UX on a flaky readiness check)
+  }
+  state.setShowPublishModal(true);
+ }, [state.inspection.id, state.setShowPublishModal]);
+
+ /* ---------------------------------------------------------------- */
+ /* Item attribute handler */
+ /* ---------------------------------------------------------------- */
+
+ const handleItemAttribute = useCallback((itemId: string, attributeId: string, value: string | number | boolean | null) => {
+  fetcher.submit(
+   {
+    intent: 'set-item-attribute',
+    itemId,
+    attributeId,
+    value: JSON.stringify(value),
+   },
+   { method: 'POST' },
+  );
+ }, [fetcher]);
+
  /* Photo studio state */
  const [photoStudioOpen, setPhotoStudioOpen] = useState(false);
  const [photoStudioUrl, setPhotoStudioUrl] = useState<string | null>(null);
  const [photoStudioIndex, setPhotoStudioIndex] = useState(0);
  const [photoStudioTotal, setPhotoStudioTotal] = useState(0);
+
+ /* Mobile shell state */
+ const isMobile = useIsMobile();
+ const [mobileDrawer, setMobileDrawer] = useState<MobileDrawerId | null>(null);
 
  const PRESET_TAGS = useMemo(() => [
   { id: "follow-up", name: "Follow Up", color: "#ef4444" },
@@ -255,6 +537,28 @@ export default function InspectionEditPage() {
    [state.activeItemId!]: updated,
   }));
  }, [state.activeItemId, state.tagsByItem, state.setTagsByItem]);
+
+ /* ---------------------------------------------------------------- */
+ /* Tag chip row + clone-last handler for ItemEditor */
+ /* ---------------------------------------------------------------- */
+
+ const tagChipRow = state.activeItemId ? (
+  <TagChipRow
+   pinnedTags={pinnedTags}
+   activeTagIds={activeTagIds}
+   onToggle={(tag) => toggleTag(tag)}
+  />
+ ) : null;
+
+ const handleCloneLast = useCallback((scope: 'rating' | 'rating_notes' | 'all') => {
+  if (!state.activeItemId || !state.currentSection) return;
+  findings.cloneLast(
+   state.currentSection.id,
+   state.activeItemId,
+   state.currentSectionItems as Array<{ id: string }>,
+   scope,
+  );
+ }, [findings, state.activeItemId, state.currentSection, state.currentSectionItems]);
 
  useEffect(() => {
   if (!tagPickerOpen) return;
@@ -291,9 +595,23 @@ export default function InspectionEditPage() {
  (rating: string) => {
  if (!state.activeItemId || !state.currentSection) return;
  findings.setRating(state.currentSection.id, state.activeItemId, rating);
- setTimeout(() => state.advanceToNextUnrated(), 150);
+ const level = state.ratingLevels?.find((l: { id: string; pausesAdvance?: boolean }) => l.id === rating);
+ if (level?.pausesAdvance) {
+ const ta = document.getElementById('notes-textarea') as HTMLTextAreaElement | null;
+ ta?.focus({ preventScroll: true });
+ return;
+ }
+ setTimeout(
+ () => state.advanceToNextUnrated((newSectionTitle: string) => {
+ pushToast({
+ message: `Entered next section: ${newSectionTitle}`,
+ durationMs: 2500,
+ });
+ }),
+ inspectionPrefs.autoAdvanceDelayMs,
+ );
  },
- [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated],
+ [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, inspectionPrefs.autoAdvanceDelayMs],
  );
 
  /* ---------------------------------------------------------------- */
@@ -524,7 +842,7 @@ export default function InspectionEditPage() {
  state.setCommentLibrarySelectedIdx(
  Math.min(
  state.commentLibrarySelectedIdx + 1,
- commentLibraryItems.length - 1,
+ Math.max(serverComments.length, commentLibraryItems.length) - 1,
  ),
  );
  },
@@ -534,13 +852,15 @@ export default function InspectionEditPage() {
  );
  },
  onLibrarySelect: () => {
- const sel = commentLibraryItems[state.commentLibrarySelectedIdx];
+ const sel = serverComments[state.commentLibrarySelectedIdx]
+ ?? commentLibraryItems[state.commentLibrarySelectedIdx];
  if (sel && state.activeItemId && state.currentSection) {
  findings.insertComment(
  state.currentSection.id,
  state.activeItemId,
  sel.text,
  );
+ if ('id' in sel && sel.id) comments.touchSnippet(sel.id as string);
  state.setShowCommentLibrary(false);
  }
  },
@@ -551,14 +871,7 @@ export default function InspectionEditPage() {
  },
  onSave: () => findings.saveNow(),
  onPublish: () => state.setShowPublishModal(true),
- onRepeatRating: () => {
- if (!state.activeItemId || !state.currentSection) return;
- findings.repeatPreviousRating(
- state.currentSection.id,
- state.activeItemId,
- state.currentSectionItems,
- );
- },
+ onCloneLast: () => handleCloneLast(inspectionPrefs.cloneDefault),
  onSaveAsSnippet: () => {
  if (!state.activeItemId) return;
  const r = state.getResult(state.activeItemId);
@@ -566,7 +879,7 @@ export default function InspectionEditPage() {
  if (!notes) return;
  const bucket = state.bucketForRatingId(r?.rating as string);
  const section = state.currentSection?.title || "";
- comments.saveSnippet(notes, bucket, section);
+ comments.saveSnippet(notes, bucket, section, undefined, (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined);
  },
  onToggleCheatsheet: () =>
  state.setShowCheatsheet(!state.showCheatsheet),
@@ -596,6 +909,7 @@ export default function InspectionEditPage() {
  speedRate,
  comments,
  commentLibraryItems,
+ serverComments,
  ],
  );
 
@@ -618,11 +932,173 @@ export default function InspectionEditPage() {
  }, [state]);
 
  /* ---------------------------------------------------------------- */
+ /* Hoisted column elements (shared between desktop + mobile shells) */
+ /* ---------------------------------------------------------------- */
+
+ const sectionRailEl = (
+ <SectionRail
+ sections={state.sections}
+ activeSection={state.currentSection?.id || ""}
+ onSelect={(id) => {
+ state.selectSectionById(id);
+ if (isMobile) setMobileDrawer(null);
+ }}
+ results={state.results}
+ sectionProgress={state.sectionProgress}
+ sectionDefectCount={state.sectionDefectCount}
+ />
+ );
+
+ const itemListEl = (
+ <ItemList
+ items={visibleItems}
+ sectionId={state.currentSection?.id || ""}
+ activeItemId={state.activeItemId}
+ onSelect={(id) => {
+ state.setActiveItemId(id);
+ if (isMobile) setMobileDrawer(null);
+ }}
+ results={state.results}
+ batchMode={state.batchMode}
+ batchSelected={state.batchSelected}
+ onBatchToggle={(id) => state.toggleBatchSelect(id)}
+ />
+ );
+
+ const itemEditorEl = state.activeItemId ? (
+ <ItemEditor
+ item={state.activeItem || undefined}
+ sectionTitle={state.currentSection?.title}
+ result={
+ state.activeItemId
+ ? findings.getResult(
+ state.activeItemId,
+ state.currentSection?.id,
+ )
+ : {}
+ }
+ onRating={handleRating}
+ onNotes={(notes) => {
+ if (state.activeItemId && state.currentSection) {
+ findings.setNotes(
+ state.currentSection.id,
+ state.activeItemId,
+ notes,
+ );
+ }
+ }}
+ onNotesBlur={(notes) => {
+ if (state.activeItemId && state.currentSection) {
+ findings.commitNotes(
+ state.currentSection.id,
+ state.activeItemId,
+ notes,
+ );
+ }
+ }}
+ onToggleCanned={(tabName, cannedId, included) => {
+ if (state.activeItemId && state.currentSection) {
+ findings.toggleCannedComment(
+ state.currentSection.id,
+ state.activeItemId,
+ tabName,
+ cannedId,
+ included,
+ );
+ }
+ }}
+ defectStates={defectStates}
+ locationSuggestions={locationSuggestions}
+ missingFields={missingFields}
+ onDefectFields={(cannedId, patch) => {
+ if (state.activeItemId && state.currentSection) {
+ findings.setDefectFields(
+ state.currentSection.id,
+ state.activeItemId,
+ cannedId,
+ patch,
+ );
+ }
+ }}
+ onItemAttribute={handleItemAttribute}
+ onCloneLast={handleCloneLast}
+ cloneDefaultScope={inspectionPrefs.cloneDefault}
+ tagChipRow={tagChipRow}
+ />
+ ) : (
+ <div className="flex items-center justify-center h-full text-slate-400">
+ <div className="text-center">
+ <p className="text-[13px]">
+ Select an item from the list to start editing
+ </p>
+ <p className="text-[11px] mt-2 text-slate-300">
+ Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> / <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd> to navigate
+ </p>
+ </div>
+ </div>
+ );
+
+ const sideRailEl = (
+ <SideRail
+ activeItem={state.activeItem ? { id: state.activeItem.id, label: (state.activeItem.label || state.activeItem.name || "") as string } : null}
+ activeResult={state.activeItemId ? state.getResult(state.activeItemId) : null}
+ ratingLevels={state.ratingLevels}
+ getRatingColor={state.getRatingColor}
+ getRatingLabel={state.getRatingLabel}
+ inspectionId={String(state.inspection.id)}
+ />
+ );
+
+ /* ---------------------------------------------------------------- */
  /* Render */
  /* ---------------------------------------------------------------- */
 
+ if (isMobile) {
+ return (
+ <div className="min-h-screen pb-14">
+ <ToastPortal />
+ <MobileAppBar
+ sectionTitle={state.currentSection?.title ?? ''}
+ itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? 'Select an item'}
+ onBack={() => navigate('/dashboard')}
+ onMore={() => { /* future: open more menu */ }}
+ />
+ <main className="p-4">
+ {state.activeItemId ? (
+ itemEditorEl
+ ) : (
+ <p className="text-center text-ih-fg-3 mt-12">Tap [☰ Sections] below to begin</p>
+ )}
+ </main>
+ <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} />
+ <MobileBottomDrawer
+ open={mobileDrawer === 'sections'}
+ onClose={() => setMobileDrawer(null)}
+ title="Sections"
+ >
+ {sectionRailEl}
+ </MobileBottomDrawer>
+ <MobileBottomDrawer
+ open={mobileDrawer === 'items'}
+ onClose={() => setMobileDrawer(null)}
+ title="Items"
+ >
+ {itemListEl}
+ </MobileBottomDrawer>
+ <MobileBottomDrawer
+ open={mobileDrawer === 'preview'}
+ onClose={() => setMobileDrawer(null)}
+ title="Preview"
+ >
+ {sideRailEl}
+ </MobileBottomDrawer>
+ </div>
+ );
+ }
+
  return (
  <div className="flex h-screen bg-ih-bg-card">
+ <ToastPortal />
  {/* Hidden photo input */}
  <input
  ref={photoInputRef}
@@ -660,6 +1136,21 @@ export default function InspectionEditPage() {
  onExit={() => state.setSpeedMode(false)}
  currentIndex={state.speedCurrent}
  totalCount={state.speedQueue.length}
+ onNextItem={() => {
+ if (state.speedCurrent < state.speedQueue.length - 1)
+ state.setSpeedCurrent(state.speedCurrent + 1);
+ }}
+ onPrevItem={() => {
+ if (state.speedCurrent > 0)
+ state.setSpeedCurrent(state.speedCurrent - 1);
+ }}
+ onJumpTo={(sectionId, itemId) => {
+ state.selectSectionById(sectionId);
+ state.setActiveItemId(itemId);
+ state.setSpeedMode(false);
+ }}
+ ratingLevels={state.ratingLevels}
+ sections={state.sections as Array<{ id: string; title?: string; name?: string; items?: Array<{ id: string; label?: string; name?: string }> }>}
  />
  )}
 
@@ -761,6 +1252,27 @@ export default function InspectionEditPage() {
  </div>
  )}
 
+ {/* Inspector sign modal */}
+ {signModalOpen && (
+ <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+ <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSignModalOpen(false)} />
+ <div className="relative bg-ih-bg-card rounded-xl shadow-2xl p-6 max-w-md w-full border border-ih-border">
+ <h3 className="text-[16px] font-bold text-ih-fg-1">Inspector Signature</h3>
+ <p className="text-[13px] text-ih-fg-3 mt-2 mb-4">
+ Sign this inspection. The signature will be saved and can be included in the published report.
+ </p>
+ <SignaturePad
+ onSubmit={handleSignSubmit}
+ onCancel={() => setSignModalOpen(false)}
+ label="Save signature"
+ />
+ {signFetcher.data && !(signFetcher.data as { ok: boolean }).ok && (
+ <p className="text-sm text-red-600 mt-2">Failed to save signature. Please try again.</p>
+ )}
+ </div>
+ </div>
+ )}
+
  {/* Comment library drawer */}
  {state.showCommentLibrary && (
  <div className="fixed inset-0 z-[80] flex">
@@ -778,6 +1290,58 @@ export default function InspectionEditPage() {
  &#x2715;
  </button>
  </div>
+
+ {/* Sort + Filter mode header */}
+ <div className="flex items-center gap-3 px-3 py-2 border-b border-ih-border">
+ <div className="flex items-center gap-1.5">
+ <span className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Filter</span>
+ <select
+ value={comments.filterMode}
+ onChange={e => comments.setFilterMode(e.target.value as 'auto' | 'all')}
+ className="px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-[11px]"
+ >
+ <option value="auto">Auto</option>
+ <option value="all">All</option>
+ </select>
+ </div>
+ <div className="flex items-center gap-1.5 ml-auto">
+ <span className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Sort</span>
+ <select
+ value={comments.sort}
+ onChange={e => comments.setSort(e.target.value)}
+ className="px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-[11px]"
+ >
+ <option value="relevance">Relevance</option>
+ <option value="recent">Recent use</option>
+ <option value="created">Recently added</option>
+ <option value="frequent">Most used</option>
+ <option value="alpha">A–Z</option>
+ </select>
+ </div>
+ </div>
+
+ {/* Context strip (auto mode + active item) */}
+ {comments.filterMode === 'auto' && state.activeItem && (
+ <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] bg-ih-bg-muted border-b border-ih-border">
+ <span className="text-slate-400">Context:</span>
+ <span>
+ {state.currentSection?.title} › {(state.activeItem.label || state.activeItem.name) as string}
+ </span>
+ {Boolean(state.activeItemId && state.getResult(state.activeItemId)?.rating) && (
+ <>
+ <span className="text-slate-400">·</span>
+ <span>
+ {state.getRatingLabel?.(state.getResult(state.activeItemId as string)?.rating as string) ?? ''}
+ </span>
+ </>
+ )}
+ <button
+ onClick={() => comments.setFilterMode('all')}
+ className="ml-auto text-slate-400 hover:text-slate-600"
+ aria-label="Clear filter"
+ >×</button>
+ </div>
+ )}
 
  {/* Filter chips */}
  <div className="flex gap-1 px-4 py-2 border-b border-ih-border flex-wrap">
@@ -820,42 +1384,45 @@ export default function InspectionEditPage() {
  autoFocus
  />
  <p className="text-[10px] text-slate-400 mt-1">
- {commentLibraryItems.length} comments
+ {serverComments.length} comments
  </p>
  </div>
 
- {/* Comment list */}
- <div className="flex-1 overflow-y-auto px-4 space-y-1 pb-4">
- {commentLibraryItems.map((entry, idx) => (
- <button
- key={`${entry.text.slice(0, 30)}-${idx}`}
+ {/* Comment list (server-fetched, sort/filter aware) */}
+ <div className="flex-1 overflow-y-auto pb-2">
+ <ul className="divide-y divide-ih-border">
+ {serverComments.map((c, idx) => (
+ <li
+ key={c.id}
  onClick={() => {
- if (state.activeItemId && state.currentSection) {
+ if (!state.currentSection || !state.activeItemId) return;
  findings.insertComment(
  state.currentSection.id,
  state.activeItemId,
- entry.text,
+ c.text,
  );
+ comments.touchSnippet(c.id);
  state.setShowCommentLibrary(false);
- }
  }}
- className={`w-full text-left p-2.5 rounded-lg text-[12px] transition-colors ${
+ className={`cursor-pointer ${
  idx === state.commentLibrarySelectedIdx
- ? "bg-ih-primary-tint ring-1 ring-indigo-200 dark:ring-indigo-700"
- : "hover:bg-slate-50 dark:hover:bg-slate-800"
+ ? "bg-ih-primary-tint ring-1 ring-inset ring-indigo-200 dark:ring-indigo-700"
+ : ""
  }`}
  >
- <span className="text-ih-fg-2 leading-relaxed">
- {entry.text}
+ <div className="flex items-start gap-2 p-2.5 hover:bg-ih-bg-muted">
+ <p className="flex-1 text-[12px] text-ih-fg-2 leading-relaxed">
+ {c.text}
+ </p>
+ <span className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">
+ {comments.sort === 'recent'   && c.lastUsedAt ? formatRelativeTime(c.lastUsedAt) : ''}
+ {comments.sort === 'frequent' && c.useCount   ? `${c.useCount}×`               : ''}
  </span>
- {entry.section && (
- <span className="block text-[10px] text-slate-400 mt-0.5">
- {entry.section}
- </span>
- )}
- </button>
+ </div>
+ </li>
  ))}
- {commentLibraryItems.length === 0 && (
+ </ul>
+ {serverComments.length === 0 && (
  <p className="text-[13px] text-ih-fg-3 text-center py-8">
  No comments match the current filter.
  </p>
@@ -962,6 +1529,23 @@ export default function InspectionEditPage() {
  </div>
  )}
 
+ {/* Publish gate modal */}
+ <PublishGateModal
+  open={showPublishGate}
+  readiness={publishReadiness}
+  onClose={() => setShowPublishGate(false)}
+  onJump={(b: PublishBlockingDefect) => {
+   state.selectSectionById(b.sectionId);
+   state.setActiveItemId(b.itemId);
+   setShowPublishGate(false);
+   setTimeout(() => {
+    const sel = b.missing[0] === 'trade' ? 'select' : 'input[type="text"]';
+    const el = document.querySelector<HTMLElement>(`[data-defect-id="${b.cannedId}"] ${sel}`);
+    if (el) el.focus();
+   }, 100);
+  }}
+ />
+
  {/* ------------------------------------------------------------ */}
  {/* Fixed top header with progress bar */}
  {/* ------------------------------------------------------------ */}
@@ -1045,17 +1629,18 @@ export default function InspectionEditPage() {
  </button>
 
  {/* Completion progress */}
- <div className="flex items-center gap-2">
- <div className="w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
- <div
- className="h-full bg-ih-primary dark:bg-indigo-500 rounded-full transition-all duration-300"
- style={{ width: `${state.progress.pct}%` }}
+ {(() => {
+ const stats = state.overallStats();
+ return (
+ <ProgressStripText
+ rated={stats.rated}
+ total={stats.total}
+ defects={stats.defect}
+ monitor={stats.monitor}
+ etaMinutes={stats.etaMinutes}
  />
- </div>
- <span className="text-[11px] font-mono text-ih-fg-3 whitespace-nowrap">
- {state.progress.rated}/{state.progress.total}
- </span>
- </div>
+ );
+ })()}
 
  {/* Save status indicator */}
  {state.saveStatus !== "idle" && (
@@ -1146,9 +1731,32 @@ export default function InspectionEditPage() {
  </svg>
  </button>
 
+ {/* Auto-sign toggle */}
+ <label className="hidden lg:inline-flex items-center gap-1.5 text-[11px] font-medium text-ih-fg-3 cursor-pointer select-none">
+ <input
+ type="checkbox"
+ checked={autoSign}
+ onChange={(e) => handleAutoSignToggle(e.target.checked)}
+ className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+ />
+ Auto-sign
+ </label>
+
+ {/* Sign now button */}
+ <button
+ onClick={() => setSignModalOpen(true)}
+ className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-slate-100 dark:hover:bg-slate-800 items-center gap-1.5"
+ title="Sign this inspection now"
+ >
+ <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+ </svg>
+ Sign now
+ </button>
+
  {/* Publish button */}
  <button
- onClick={() => state.setShowPublishModal(true)}
+ onClick={handlePublishClick}
  className="h-9 px-4 rounded-md bg-emerald-600 text-white font-bold text-[12px] hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5"
  >
  <svg
@@ -1174,16 +1782,7 @@ export default function InspectionEditPage() {
  {/* ------------------------------------------------------------ */}
  <div className="flex flex-1 pt-14 pb-9">
  {/* Column 1: Section Rail (200px) */}
- <SectionRail
- sections={state.sections}
- activeSection={state.currentSection?.id || ""}
- onSelect={(id) => {
- state.selectSectionById(id);
- }}
- results={state.results}
- sectionProgress={state.sectionProgress}
- sectionDefectCount={state.sectionDefectCount}
- />
+ {sectionRailEl}
 
  {/* Column 2: Item List (280px) OR Property Info */}
  <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
@@ -1249,16 +1848,7 @@ export default function InspectionEditPage() {
   </button>
  </div>
  )}
- <ItemList
- items={visibleItems}
- sectionId={state.currentSection?.id || ""}
- activeItemId={state.activeItemId}
- onSelect={(id) => state.setActiveItemId(id)}
- results={state.results}
- batchMode={state.batchMode}
- batchSelected={state.batchSelected}
- onBatchToggle={(id) => state.toggleBatchSelect(id)}
- />
+ {itemListEl}
  {state.batchMode && state.selectedBatchCount > 0 && (
  <div className="absolute bottom-0 left-0 right-0 bg-ih-bg-card border-t border-ih-border p-2 flex items-center gap-2">
   <span className="text-[11px] font-bold text-ih-fg-2">{state.selectedBatchCount} selected</span>
@@ -1288,72 +1878,11 @@ export default function InspectionEditPage() {
 
  {/* Column 3: Item Editor (flex-1, focal) */}
  <main className="flex-1 overflow-y-auto border-t-2 border-indigo-600 p-6">
- {state.activeItemId ? (
- <ItemEditor
- item={state.activeItem || undefined}
- sectionTitle={state.currentSection?.title}
- result={
- state.activeItemId
- ? findings.getResult(
- state.activeItemId,
- state.currentSection?.id,
- )
- : {}
- }
- onRating={handleRating}
- onNotes={(notes) => {
- if (state.activeItemId && state.currentSection) {
- findings.setNotes(
- state.currentSection.id,
- state.activeItemId,
- notes,
- );
- }
- }}
- onNotesBlur={(notes) => {
- if (state.activeItemId && state.currentSection) {
- findings.commitNotes(
- state.currentSection.id,
- state.activeItemId,
- notes,
- );
- }
- }}
- onToggleCanned={(tabName, cannedId, included) => {
- if (state.activeItemId && state.currentSection) {
- findings.toggleCannedComment(
- state.currentSection.id,
- state.activeItemId,
- tabName,
- cannedId,
- included,
- );
- }
- }}
- />
- ) : (
- <div className="flex items-center justify-center h-full text-slate-400">
- <div className="text-center">
- <p className="text-[13px]">
- Select an item from the list to start editing
- </p>
- <p className="text-[11px] mt-2 text-slate-300">
- Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> / <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd> to navigate
- </p>
- </div>
- </div>
- )}
+ {itemEditorEl}
  </main>
 
  {/* Column 4: SideRail */}
- <SideRail
- activeItem={state.activeItem ? { id: state.activeItem.id, label: (state.activeItem.label || state.activeItem.name || "") as string } : null}
- activeResult={state.activeItemId ? state.getResult(state.activeItemId) : null}
- ratingLevels={state.ratingLevels}
- getRatingColor={state.getRatingColor}
- getRatingLabel={state.getRatingLabel}
- inspectionId={String(state.inspection.id)}
- />
+ {sideRailEl}
  </div>
 
  {/* ------------------------------------------------------------ */}

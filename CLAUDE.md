@@ -1,6 +1,6 @@
 # CLAUDE.md — OpenInspection (Open Source Edition)
 
-The open-source inspection engine. Dual-deploy architecture: a Hono API Worker + a Remix frontend Worker, both on Cloudflare.
+The open-source inspection engine. Dual-deploy architecture: a Hono API Worker + a React Router v7 frontend Worker, both on Cloudflare.
 
 **Docs**: `docs/developers/` (architecture, deploy, testing, API ref) · `docs/getting-started.md` (user guide)
 
@@ -14,15 +14,26 @@ npm run db:migrate   # Apply D1 migrations locally
 npm run type-check   # Run TypeScript type checks
 npm run lint         # Lint the codebase
 npm run test:unit    # Run unit tests via Vitest
-npm run deploy       # Build CSS + deploy API Worker to Cloudflare Workers
+
+# Deploy — all from root, scheme is `deploy[:module][:env]`.
+# Omit module → both api + web. Default env for core is standalone.
+npm run deploy                  # api + web (standalone)
+npm run deploy:api              # api only (standalone)
+npm run deploy:web              # web only
+npm run deploy:standalone       # explicit alias for deploy
+npm run deploy:saas             # api (saas) + web (saas alias)
+npm run deploy:api:standalone   # api (standalone), explicit
+npm run deploy:api:saas         # api (saas)
+npm run deploy:web:standalone   # web (standalone), explicit
+npm run deploy:web:saas         # web (currently same as standalone — no web saas variant yet)
 
 # Frontend Worker (frontend/)
 cd frontend
 npm install
-npm run dev          # Start Remix dev server (port 5173, proxies API to 8788)
-npm run build        # Build Remix frontend for production
-bash scripts/deploy.sh  # Build + deploy Frontend Worker to Cloudflare Workers
+npm run dev          # Start React Router v7 dev server (port 5173, proxies API to 8788)
+npm run build        # Build React Router v7 frontend for production
 npm run type-check   # Frontend TypeScript checks
+# Deploy from root: `npm run deploy:web` (no per-directory deploy script)
 
 # E2E Tests
 npm run test:e2e              # API E2E tests (Playwright, api/tests/)
@@ -41,13 +52,13 @@ cd frontend && npm run test   # Frontend E2E tests (frontend/tests/)
 | `api/src/services/` | Business logic, DB queries (Drizzle) |
 | `api/migrations/` | D1 database migration SQL files |
 | `api/tests/` | API unit + integration + E2E tests |
-| `frontend/app/routes/` | 75 Remix React route files |
+| `frontend/app/routes/` | 75 React Router v7 route files |
 | `frontend/app/components/` | 61 React components |
 | `frontend/app/hooks/` | 9 React hooks (useInspection, useFindings, useKeyboard, etc.) |
 | `frontend/app/lib/` | API client (hono/client), session management, helpers |
 | `frontend/app/styles/tailwind.css` | Design System 0523 token layer (Tailwind v4) |
 | `frontend/public/` | Static assets (fonts, logo, service worker, widget) |
-| `frontend/scripts/deploy.sh` | Build + patch wrangler.json + deploy Frontend Worker |
+| `frontend/workers/app.ts` | Worker entry — passes cloudflare context to React Router request handler |
 | `frontend/tests/` | Frontend E2E + unit tests |
 | `packages/shared-ui/src/` | 12 shared React components (Button, Pill, Card, etc.) |
 | `packages/api-types/` | CoreApiType re-export for hono/client |
@@ -58,18 +69,18 @@ cd frontend && npm run test   # Frontend E2E tests (frontend/tests/)
 OpenInspection runs as two independent Cloudflare Workers:
 
 - **API Worker** (`api/`) — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
-- **Frontend Worker** (`frontend/`) — Remix + React 18 + Tailwind v4. Server-side renders the React UI on Cloudflare Workers. Calls the API Worker via Service Binding (zero-latency, no network hop).
+- **Frontend Worker** (`frontend/`) — React Router v7 + React 18 + Tailwind v4. Server-side renders the React UI on Cloudflare Workers. Calls the API Worker via Service Binding (zero-latency, no network hop).
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components shared between frontend and any future consumers.
 - **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the frontend's `hono/client` gets full end-to-end type safety.
 
-The frontend uses a **Token Relay BFF** pattern: the Remix server holds the JWT cookie and forwards it to the API Worker on every request, so the browser never sees the token.
+The frontend uses a **Token Relay BFF** pattern: the React Router v7 server holds the JWT cookie and forwards it to the API Worker on every request, so the browser never sees the token.
 
 ### Authentication
 - JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `api/src/lib/jwt-keyring.ts`.
 - Supports both Cookie (for dashboard) and Bearer Header (for API) token delivery.
 - PBKDF2-SHA256 password hashing (100k iterations, 16-byte salt). Legacy SHA-256 hashes auto-rehashed on login.
-- **Shared-SaaS login is portal-only.** When `APP_MODE=saas` + `SAAS_TOPOLOGY=shared`, `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: a single core D1 holds users for many tenants and `users.email` is now unique per-`(tenant_id, email)` (migration 0072), so a local form cannot disambiguate which tenant the user means. Entry into core in this mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone and silo deploys are unchanged — the local form still works because their email-to-tenant mapping is unambiguous.
-- **Switch workspace UI.** `MainLayout` renders a "Switch workspace" entry in the sidebar (desktop bottom section + mobile drawer) whenever `branding.isSharedSaas` is true and `PORTAL_API_URL` is set. The link points at `${PORTAL_API_URL}/workspace/switch`. Because the JWT carries a single `custom:tenantId`, this portal bounce is the only correct way to swap tenants without losing the session — portal will SSO us back here with the new tenant's cookie (which overwrites the old one).
+- **SaaS login is portal-only.** When `APP_MODE=saas` (regardless of topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys have a single core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (migration 0072), so a local form cannot disambiguate which tenant the user means. Entry into core in saas mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone deploys are unchanged — the local form still works because the single-tenant mapping is unambiguous.
+- **Switch workspace UI.** `MainLayout` renders a "Switch workspace" entry in the sidebar (desktop bottom section + mobile drawer) whenever `branding.isSaas` is true and `PORTAL_API_URL` is set. The link points at `${PORTAL_API_URL}/workspace/switch`. Because the JWT carries a single `custom:tenantId`, this portal bounce is the only correct way to swap tenants without losing the session — portal will SSO us back here with the new tenant's cookie (which overwrites the old one).
 
 ### Standalone Engine (Single-Tenant)
 - Optimized for single-tenant deployments (Private Instances).
@@ -85,10 +96,10 @@ The frontend uses a **Token Relay BFF** pattern: the Remix server holds the JWT 
 
 ## Frontend Architecture
 
-- **Framework**: Remix (React Router v7) on Cloudflare Workers with Vite.
-- **Rendering**: Full SSR — Remix server renders on the edge, hydrates on the client.
+- **Framework**: React Router v7 on Cloudflare Workers with Vite.
+- **Rendering**: Full SSR — React Router v7 server renders on the edge, hydrates on the client.
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`frontend/app/styles/tailwind.css`).
-- **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. The Remix loader/action functions call the API Worker through a Service Binding (in production) or HTTP proxy (in dev).
+- **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. The React Router v7 loader/action functions call the API Worker through a Service Binding (in production) or HTTP proxy (in dev).
 - **State management**: React hooks — `useInspection` (866 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
 - **Component library**: `packages/shared-ui/` provides 12 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
@@ -114,8 +125,8 @@ The frontend uses a **Token Relay BFF** pattern: the Remix server holds the JWT 
 | `PRIMARY_COLOR` | No | Custom branding color |
 | `SINGLE_TENANT_ID` | No | Fixed tenant ID for standalone mode |
 | `SETUP_CODE` | No | Verification code for first-time setup |
-| `PORTAL_API_URL` | No | Portal URL for M2M sync callbacks |
-| `PORTAL_M2M_SECRET`| No | Shared secret for M2M auth (`Authorization: Bearer {secret}`) |
+| `PORTAL_API_URL` | No | Portal URL for browser redirects (login bounce, billing, workspace switch) |
+| `PORTAL_SERVICE` | No | Service Binding to portal worker (SaaS mode only, declared in `wrangler.saas.toml`). Replaces HTTP+HMAC M2M auth. |
 | `STRIPE_SECRET_KEY` | No | Stripe API key (for Connect payments) |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook HMAC verification |
 | `GA_MEASUREMENT_ID` | No | Google Analytics tracking ID |
@@ -125,7 +136,7 @@ The frontend uses a **Token Relay BFF** pattern: the Remix server holds the JWT 
 ---
 
 - **API Framework**: [Hono](https://hono.dev/) with Zod OpenAPI.
-- **Frontend Framework**: [Remix](https://remix.run/) (React Router v7) + React 18.
+- **Frontend Framework**: [React Router v7](https://reactrouter.com/) + React 18.
 - **ORM**: [Drizzle ORM](https://orm.drizzle.team/) with D1.
 - **CSS**: [Tailwind CSS v4](https://tailwindcss.com/) with Design System 0523 tokens.
 - **Testing**: Vitest for unit tests; Playwright for E2E.
@@ -137,7 +148,7 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 - **ES256 keyring**: All JWT signing and verification MUST go through `api/src/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `diMiddleware` and exposed as `await c.var.keyringPromise`.
 - **kid required**: Every JWT MUST carry a `kid` header. `signJwt()` sets it from `JWT_CURRENT_KID`; `verifyJwt()` rejects tokens with no kid, or with a kid that is not in the keyring.
 - **iat claim**: `signJwt()` auto-injects `iat: Math.floor(Date.now() / 1000)` when the caller omits it. Without `iat`, KV session invalidation (`pwchanged:{userId}`) cannot work.
-- **No HS256 fallback**: There is NO legacy HS256 path. Pre-launch architectural choice — see rotation scripts and docs. The remaining `JWT_SECRET` env binding is now used only as KDF input for `config-crypto`, `qbo-crypto`, audit signing-key encryption, and M2M Bearer auth — never for JWT signing.
+- **No HS256 fallback**: There is NO legacy HS256 path. Pre-launch architectural choice — see rotation scripts and docs. The remaining `JWT_SECRET` env binding is now used only as KDF input for `config-crypto`, `qbo-crypto`, and audit signing-key encryption — never for JWT signing.
 - **Key rotation flow**: To rotate, provision `JWT_PRIVATE_KEY_V<N+1>` + `JWT_PUBLIC_KEY_V<N+1>` first (verify-only window), then flip `JWT_CURRENT_KID` to the new version. Old tokens remain verifiable until V<N> is retired.
 - **Token NOT in response body**: Login, setup, and join endpoints MUST NOT return the JWT in the JSON response. Tokens are delivered exclusively via `Set-Cookie` (HttpOnly).
 - **Cookie name**: Always use `__Host-inspector_token` (enforces `Secure`, `Path=/`, no `Domain`).

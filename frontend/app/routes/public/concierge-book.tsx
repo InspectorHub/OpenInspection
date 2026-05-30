@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Form, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/concierge-book";
-import { apiFetch } from "~/lib/api.server";
-import { requireToken } from "~/lib/session.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
-  return [{ title: "Book on behalf of client - OpenInspection" }];
+  return [{ title: "Book your inspection - OpenInspection" }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -13,29 +12,36 @@ export function meta() {
 /* ------------------------------------------------------------------ */
 
 interface ConciergeBookData {
-  inspector: {
-    name: string | null;
-    slug: string | null;
-    contactId: string;
-  };
-  agent: { name: string | null };
-  tenantId: string;
-  tenantName: string;
+  token: string;
+  tenant: { name: string; brand: Record<string, unknown> | null };
+  inspector: { id: string; name: string } | null;
+  availableSlots: Array<{ start: string; end: string }>;
+  expiresAt: string;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request, params }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token") ?? "";
+  if (!token) {
+    return { data: null, error: "no-token" as const };
+  }
   try {
-    const res = await apiFetch(`/api/concierge/book-info`, { token });
-    const body = res.ok ? await res.json() : {};
-    const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
-    return { data: (Object.keys(d).length > 0 ? d : null) as ConciergeBookData | null, error: res.ok ? null : "Not found" };
+    const api = createApi(context);
+    const res = await api.concierge["book-info"].$get({ query: { token } });
+    if (!res.ok) {
+      return { data: null, error: "expired" as const };
+    }
+    const body = (await res.json()) as { success: boolean; data?: Omit<ConciergeBookData, "token"> };
+    if (!body.success || !body.data) {
+      return { data: null, error: "expired" as const };
+    }
+    return { data: { ...body.data, token }, error: null };
   } catch {
-    return { data: null, error: "Service unavailable" };
+    return { data: null, error: "unknown" as const };
   }
 }
 
@@ -43,34 +49,32 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
   const fd = await request.formData();
-  const body = {
-    tenantId: fd.get("tenantId"),
-    inspectorContactId: fd.get("inspectorContactId"),
-    clientName: fd.get("clientName"),
-    clientEmail: fd.get("clientEmail"),
-    clientPhone: fd.get("clientPhone") || undefined,
-    propertyAddress: fd.get("propertyAddress"),
-    date: fd.get("date"),
-    timeSlot: fd.get("timeSlot"),
-    agreementRequired: fd.get("agreementRequired") === "on",
-    paymentRequired: fd.get("paymentRequired") === "on",
+  const token = (fd.get("token") as string) ?? "";
+  const slotStart = (fd.get("slotStart") as string) ?? "";
+  const slotEnd = (fd.get("slotEnd") as string) ?? "";
+
+  const payload = {
+    token,
+    slot: { start: slotStart, end: slotEnd },
+    contactName: (fd.get("contactName") as string) ?? "",
+    contactEmail: (fd.get("contactEmail") as string) ?? "",
+    contactPhone: (fd.get("contactPhone") as string) || undefined,
+    address: (fd.get("address") as string) ?? "",
+    notes: (fd.get("notes") as string) || undefined,
   };
 
-  const res = await apiFetch("/api/concierge/book", {
-    token,
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  const api = createApi(context);
+  const res = await api.concierge.book.$post({ json: payload });
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || !json.success) {
     const err = json.error as Record<string, string> | undefined;
-    return { success: false, error: err?.message || "Could not submit booking" };
+    return { success: false as const, error: err?.message || "Could not submit booking", confirmationToken: null };
   }
-  return { success: true, error: null };
+  const data = json.data as { bookingId: string; confirmationToken: string } | undefined;
+  return { success: true as const, error: null, confirmationToken: data?.confirmationToken ?? null };
 }
 
 /* ------------------------------------------------------------------ */
@@ -79,9 +83,9 @@ export async function action({ request }: Route.ActionArgs) {
 
 const TIMELINE_STEPS = [
   { label: "Submitted", sub: "Booking sent.", done: true, active: false },
-  { label: "Client confirms", sub: "Magic link sent -- waiting on the client.", done: false, active: true },
-  { label: "Agreement signed", sub: "Client reads and e-signs the inspection agreement.", done: false, active: false },
-  { label: "Inspection scheduled", sub: "You'll see it on your dashboard once locked in.", done: false, active: false },
+  { label: "Inspector confirms", sub: "Your inspector will lock in the slot shortly.", done: false, active: true },
+  { label: "Agreement signed", sub: "You'll read and e-sign the inspection agreement.", done: false, active: false },
+  { label: "Inspection scheduled", sub: "Watch your email for the calendar invite.", done: false, active: false },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -94,16 +98,31 @@ export default function ConciergeBookPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (loaderError || !data) {
+    const headline =
+      loaderError === "expired"
+        ? "This booking link has expired"
+        : loaderError === "no-token"
+          ? "No booking link provided"
+          : "Could not load booking information";
+    const body =
+      loaderError === "expired"
+        ? "Booking invite links have a short shelf life. Reach out to your inspector and they can send you a fresh one."
+        : loaderError === "no-token"
+          ? "It looks like the link is incomplete. Use the original email and try again, or contact your inspector."
+          : "The link may have been mistyped, or the invite was cancelled. Get in touch with your inspector.";
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-ih-fg-3">Could not load booking information.</p>
+        <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-9">
+          <h1 className="font-serif text-2xl font-bold mb-2 text-ih-fg-1">{headline}</h1>
+          <p className="text-[15px] text-ih-fg-3 leading-relaxed">{body}</p>
+        </div>
       </div>
     );
   }
 
-  const inspectorName = data.inspector.name || data.inspector.slug || "this inspector";
-  const agentName = data.agent.name || "Partner agent";
+  const inspectorName = data.inspector?.name || "your inspector";
   const submitted = actionData?.success === true;
+  const slots = data.availableSlots;
 
   return (
     <div className="min-h-screen bg-ih-bg-card">
@@ -111,20 +130,20 @@ export default function ConciergeBookPage() {
       <div className="sticky top-0 z-50 bg-orange-50 dark:bg-orange-900/30 border-b border-orange-200 dark:border-orange-800/40 px-6 py-3 flex items-center justify-between text-sm font-semibold text-orange-800 dark:text-orange-300">
         <span className="flex items-center gap-2">
           <span className="text-lg" aria-hidden="true">🔔</span>
-          <span>Booking on behalf of client</span>
+          <span>Book your inspection</span>
         </span>
         <span className="text-[13px] text-orange-700 dark:text-orange-400">
-          {agentName} &mdash; {data.tenantName}
+          {data.tenant.name}
         </span>
       </div>
 
       <main className="max-w-[720px] mx-auto px-5 py-10">
         <h1 className="font-serif text-[1.75rem] font-bold leading-tight mb-1 text-ih-fg-1">
-          Book for <span className="text-ih-fg-3">{inspectorName}</span>
+          Book with <span className="text-ih-fg-3">{inspectorName}</span>
         </h1>
         <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-7">
-          Fill in your client's details and pick a date. They'll get an email to
-          confirm and review the inspection agreement before anything is finalized.
+          Fill in your details and pick a date. You'll get an email confirmation
+          and a chance to e-sign the inspection agreement before anything is finalized.
         </p>
 
         {!submitted ? (
@@ -134,17 +153,16 @@ export default function ConciergeBookPage() {
             onSubmit={() => setSubmitting(true)}
             className="bg-ih-bg-card border border-ih-border rounded-xl p-7 space-y-4"
           >
-            <input type="hidden" name="tenantId" value={data.tenantId} />
-            <input type="hidden" name="inspectorContactId" value={data.inspector.contactId} />
+            <input type="hidden" name="token" value={data.token} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="space-y-1.5">
                 <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
-                  Client name
+                  Your name
                 </span>
                 <input
                   type="text"
-                  name="clientName"
+                  name="contactName"
                   required
                   maxLength={200}
                   placeholder="Sarah Buyer"
@@ -153,11 +171,11 @@ export default function ConciergeBookPage() {
               </label>
               <label className="space-y-1.5">
                 <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
-                  Client email
+                  Email
                 </span>
                 <input
                   type="email"
-                  name="clientEmail"
+                  name="contactEmail"
                   required
                   maxLength={200}
                   placeholder="sarah@example.com"
@@ -168,14 +186,14 @@ export default function ConciergeBookPage() {
 
             <label className="space-y-1.5 block">
               <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
-                Client phone{" "}
+                Phone{" "}
                 <span className="text-ih-fg-4 font-medium normal-case tracking-normal">
                   (optional)
                 </span>
               </span>
               <input
                 type="tel"
-                name="clientPhone"
+                name="contactPhone"
                 maxLength={40}
                 placeholder="(555) 123-4567"
                 className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
@@ -188,7 +206,7 @@ export default function ConciergeBookPage() {
               </span>
               <input
                 type="text"
-                name="propertyAddress"
+                name="address"
                 required
                 maxLength={500}
                 placeholder="1 Main St, Springfield"
@@ -196,49 +214,74 @@ export default function ConciergeBookPage() {
               />
             </label>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label className="space-y-1.5">
+            {slots.length > 0 ? (
+              <label className="space-y-1.5 block">
                 <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
-                  Date
-                </span>
-                <input
-                  type="date"
-                  name="date"
-                  required
-                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
-                />
-              </label>
-              <label className="space-y-1.5">
-                <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
-                  Time slot
+                  Slot
                 </span>
                 <select
-                  name="timeSlot"
                   required
+                  name="slotIndex"
+                  onChange={(e) => {
+                    const idx = Number(e.target.value);
+                    const slot = slots[idx];
+                    if (!slot) return;
+                    (document.getElementsByName("slotStart")[0] as HTMLInputElement).value = slot.start;
+                    (document.getElementsByName("slotEnd")[0] as HTMLInputElement).value = slot.end;
+                  }}
                   className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
                 >
                   <option value="">Select a slot</option>
-                  <option value="08:00">8:00 AM</option>
-                  <option value="09:00">9:00 AM</option>
-                  <option value="10:00">10:00 AM</option>
-                  <option value="11:00">11:00 AM</option>
-                  <option value="13:00">1:00 PM</option>
-                  <option value="14:00">2:00 PM</option>
-                  <option value="15:00">3:00 PM</option>
+                  {slots.map((slot, idx) => (
+                    <option key={`${slot.start}-${idx}`} value={idx}>
+                      {new Date(slot.start).toLocaleString()} – {new Date(slot.end).toLocaleString()}
+                    </option>
+                  ))}
                 </select>
+                <input type="hidden" name="slotStart" />
+                <input type="hidden" name="slotEnd" />
               </label>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="space-y-1.5">
+                  <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
+                    Preferred start
+                  </span>
+                  <input
+                    type="datetime-local"
+                    name="slotStart"
+                    required
+                    className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
+                    Preferred end
+                  </span>
+                  <input
+                    type="datetime-local"
+                    name="slotEnd"
+                    required
+                    className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  />
+                </label>
+              </div>
+            )}
 
-            <div className="space-y-2.5">
-              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-ih-border rounded-lg text-[14px] text-ih-fg-3 font-medium">
-                <input type="checkbox" name="agreementRequired" defaultChecked />
-                Inspector requires the client to e-sign an inspection agreement
-              </label>
-              <label className="flex items-center gap-2.5 px-3 py-2.5 border border-ih-border rounded-lg text-[14px] text-ih-fg-3 font-medium">
-                <input type="checkbox" name="paymentRequired" />
-                Inspector requires payment before the inspection
-              </label>
-            </div>
+            <label className="space-y-1.5 block">
+              <span className="block text-[13px] font-bold text-ih-fg-3 uppercase tracking-wide">
+                Notes{" "}
+                <span className="text-ih-fg-4 font-medium normal-case tracking-normal">
+                  (optional)
+                </span>
+              </span>
+              <textarea
+                name="notes"
+                rows={3}
+                placeholder="Anything your inspector should know."
+                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+              />
+            </label>
 
             <div className="pt-2">
               <button
@@ -246,7 +289,7 @@ export default function ConciergeBookPage() {
                 disabled={submitting}
                 className="w-full px-6 py-3.5 bg-[#F55A1A] text-white rounded-lg font-bold text-base hover:brightness-95 disabled:bg-slate-400 disabled:cursor-wait transition-all"
               >
-                {submitting ? "Sending..." : "Send booking to client"}
+                {submitting ? "Sending..." : "Send booking"}
               </button>
 
               {actionData?.error && (

@@ -1,23 +1,24 @@
 import { Outlet, useLoaderData } from "react-router";
 import type { Route } from "./+types/auth-layout";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { Sidebar, MobileHeader } from "~/components/Sidebar";
 import type { SessionContext } from "~/hooks/useSessionContext";
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
-  let context: SessionContext | null = null;
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
+  let sessionContext: SessionContext | null = null;
   try {
-    const res = await apiFetch("/api/session/context", { token });
+    const api = createApi(context, { token });
+    const res = await api.sessionContext.context.$get();
     if (res.ok) {
       const body = (await res.json()) as Record<string, unknown>;
-      context = body.data as SessionContext;
+      sessionContext = body.data as SessionContext;
     }
   } catch {
     // Graceful fallback — layout renders with defaults
   }
-  return { context };
+  return { context: sessionContext };
 }
 
 export default function AuthLayout() {

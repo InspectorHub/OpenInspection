@@ -8,7 +8,7 @@ import { ApprenticeService } from '../../services/apprentice.service';
 import { GuestInviteService } from '../../services/guest-invite.service';
 import { AIService } from '../../services/ai.service';
 import { AuthService } from '../../services/auth.service';
-import { OutboxService } from '../../services/outbox.service';
+import { OutboxService } from '../../portal/outbox.service';
 import { BookingService } from '../../services/booking.service';
 import { BrandingService } from '../../services/branding.service';
 import { EmailService } from '../../services/email.service';
@@ -49,7 +49,7 @@ import { IntegrationsService } from '../../services/integrations.service';
 import { AnalyticsService } from '../../services/analytics.service';
 
 import { StandaloneProvider } from '../integration/standalone';
-import { PortalProvider } from '../integration/portal';
+import { PortalProvider } from '../../portal/portal.provider';
 import { getDeploymentProfile } from '../deployment-profile';
 import { buildKeyring } from '../jwt-keyring';
 
@@ -90,7 +90,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
             switch (prop) {
                 case 'admin':
                     {
-                        const provider = c.env.PORTAL_API_URL
+                        const provider = c.env.PORTAL_SERVICE
                             ? new PortalProvider(c.env.DB, c.env.TENANT_CACHE)
                             : new StandaloneProvider(c.env.DB, c.env.TENANT_CACHE);
                         target.admin = new AdminService(c.env.DB, provider);

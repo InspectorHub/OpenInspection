@@ -43,7 +43,7 @@ export function InspectorToolsDock({
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-40">
+    <div className="hidden md:block fixed bottom-6 right-6 z-40">
       {dockOpen && <div className="fixed inset-0 z-[-1]" onClick={() => setDockOpen(false)} aria-hidden="true" />}
       {dockOpen && (
         <div className="absolute bottom-16 right-0 mb-2 ih-card p-2 min-w-[200px] bg-ih-bg-card border border-ih-border rounded-lg shadow-lg" role="menu" aria-label="Inspector tools">

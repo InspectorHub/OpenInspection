@@ -49,18 +49,26 @@ export class MarketplaceService {
   }
 
   async list(opts: { search?: string; category?: string; page?: number; pageSize?: number }) {
-    const { search = '', category = '', page = 1, pageSize = 12 } = opts;
+    const { search = '', category = '', page = 1, pageSize = 50 } = opts;
     const offset = (page - 1) * pageSize;
 
     const conditions = [];
     if (category) conditions.push(eq(marketplaceTemplates.category, category));
     if (search)   conditions.push(like(marketplaceTemplates.name, `%${escapeLikePattern(search)}%`));
+    const where = conditions.length ? and(...conditions) : undefined;
+
+    const totalRow = await this.db
+      .select({ c: sql<number>`count(*)` })
+      .from(marketplaceTemplates)
+      .where(where)
+      .get();
+    const total = totalRow?.c ?? 0;
 
     // Spec 4F — featured templates always sort first; within tier, sort by download count.
-    const rows = await this.db
+    const rawRows = await this.db
       .select()
       .from(marketplaceTemplates)
-      .where(conditions.length ? and(...conditions) : undefined)
+      .where(where)
       .orderBy(desc(marketplaceTemplates.featured), desc(marketplaceTemplates.downloadCount))
       .limit(pageSize)
       .offset(offset);
@@ -72,11 +80,13 @@ export class MarketplaceService {
 
     const importMap = new Map(imports.map(i => [i.marketplaceTemplateId, i.importedSemver]));
 
-    return rows.map(t => ({
+    const rows = rawRows.map(t => ({
       ...t,
       importedSemver: importMap.get(t.id) ?? null,
       hasUpdate: importMap.has(t.id) && importMap.get(t.id) !== t.semver,
     }));
+
+    return { rows, total };
   }
 
   /**

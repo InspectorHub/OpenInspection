@@ -2,8 +2,8 @@ import { Outlet, NavLink } from "react-router";
 import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
 
-export async function loader({ request }: Route.LoaderArgs) {
-  await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  await requireToken(context, request);
   return null;
 }
 

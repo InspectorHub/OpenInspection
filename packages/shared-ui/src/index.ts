@@ -9,3 +9,5 @@ export { EmptyState } from "./EmptyState";
 export { Skeleton } from "./Skeleton";
 export { Card } from "./Card";
 export { Modal } from "./Modal";
+export { Pagination } from "./Pagination";
+export type { PaginationProps } from "./Pagination";

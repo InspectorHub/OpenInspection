@@ -58,8 +58,11 @@ export class SigningKeyService {
 
         // Generate new keypair
         const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']) as CryptoKeyPair;
-        const pubBytes = new Uint8Array(await crypto.subtle.exportKey('spki', kp.publicKey));
-        const privBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
+        // exportKey's return type is `ArrayBuffer | JsonWebKey`; spki/pkcs8 always
+        // return ArrayBuffer at runtime, so we narrow with a cast rather than a
+        // runtime check that can never fail for these formats.
+        const pubBytes = new Uint8Array(await crypto.subtle.exportKey('spki', kp.publicKey) as ArrayBuffer);
+        const privBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey) as ArrayBuffer);
         const fingerprint = await sha256Hex(pubBytes);
 
         // Encrypt private key with AES-GCM

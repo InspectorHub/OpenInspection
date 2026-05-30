@@ -1,7 +1,7 @@
 import { Link, useLoaderData, useActionData, Form } from "react-router";
 import type { Route } from "./+types/settings-communication";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
 
 export function meta() {
@@ -21,13 +21,14 @@ interface EmailTemplate {
   active: boolean;
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
 
   // Fetch communication config + secrets in parallel
   const [commRes, secretsRes] = await Promise.all([
-    apiFetch("/api/admin/communication", { token }).catch(() => null),
-    apiFetch("/api/admin/secrets", { token }).catch(() => null),
+    api.admin.communication.$get().catch(() => null),
+    api.admin.secrets.$get().catch(() => null),
   ]);
 
   const commBody = commRes?.ok ? ((await commRes.json()) as Record<string, unknown>) : {};
@@ -54,19 +55,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const form = await request.formData();
   const intent = form.get("intent");
+  const api = createApi(context, { token });
 
   if (intent === "save-email") {
-    await apiFetch("/api/admin/communication", {
-      token,
-      method: "PATCH",
-      body: JSON.stringify({
-        senderEmail: form.get("senderEmail") || null,
-        replyTo: form.get("replyTo") || null,
-      }),
+    await api.admin.communication.$patch({
+      json: {
+        senderEmail: (form.get("senderEmail") as string) || null,
+        replyTo: (form.get("replyTo") as string) || null,
+      },
     });
   }
 
@@ -78,11 +78,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (senderEmail && typeof senderEmail === "string" && senderEmail.trim()) body.SENDER_EMAIL = senderEmail;
 
     if (Object.keys(body).length > 0) {
-      const res = await apiFetch("/api/admin/secrets", {
-        token,
-        method: "PUT",
-        body: JSON.stringify(body),
-      });
+      const res = await api.admin.secrets.$put({ json: body });
       if (!res.ok) {
         return { ok: false, error: "Failed to save email secrets." };
       }
@@ -98,11 +94,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (clientSecret && typeof clientSecret === "string" && clientSecret.trim()) body.GOOGLE_CLIENT_SECRET = clientSecret;
 
     if (Object.keys(body).length > 0) {
-      const res = await apiFetch("/api/admin/secrets", {
-        token,
-        method: "PUT",
-        body: JSON.stringify(body),
-      });
+      const res = await api.admin.secrets.$put({ json: body });
       if (!res.ok) {
         return { ok: false, error: "Failed to save calendar secrets." };
       }

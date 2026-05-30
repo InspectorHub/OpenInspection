@@ -1,7 +1,7 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
-import type { HonoConfig } from '../types/hono';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
@@ -13,13 +13,12 @@ import {
     ResultsBlobSchema,
     InspectorSignatureSchema,
 } from '../lib/validations/sync.schema';
-import { inspections, inspectionResults, templates } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, inspectionConflicts } from '../lib/db/schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-const syncRoutes = new OpenAPIHono<HonoConfig>();
-
+export const syncRoutes = createApiRouter()
 /* ── POST /api/inspections/:id/results/merge ──────────────────────────────── */
-syncRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/results/merge',
     tags: ["inspections"],
@@ -86,6 +85,26 @@ syncRoutes.openapi(createRoute(withMcpMetadata({
     );
 
     if (conflicts.length > 0) {
+        // Persist each conflict BEFORE returning the 409 so the conflict-resolver
+        // UI can re-fetch them via GET /api/inspections/:id/conflicts. The diff3
+        // MergeConflict shape is { itemId, field:'notes', base, ours, theirs } —
+        // `ours` → local, `theirs` → remote, and notes conflicts have no
+        // sectionId (notes are item-level), so section_id is null.
+        const createdAt = new Date().toISOString();
+        for (const cf of conflicts) {
+            await db.insert(inspectionConflicts).values({
+                id:           crypto.randomUUID(),
+                inspectionId: id,
+                itemId:       cf.itemId,
+                sectionId:    null,
+                field:        cf.field,
+                base:         typeof cf.base   === 'string' ? cf.base   : JSON.stringify(cf.base),
+                local:        typeof cf.ours   === 'string' ? cf.ours   : JSON.stringify(cf.ours),
+                remote:       typeof cf.theirs === 'string' ? cf.theirs : JSON.stringify(cf.theirs),
+                createdAt,
+            });
+        }
+
         return c.json({
             success: false as const,
             error: {
@@ -124,10 +143,9 @@ syncRoutes.openapi(createRoute(withMcpMetadata({
             conflicts: [] as Array<never>,
         },
     }, 200);
-});
-
+})
 /* ── DELETE /api/inspections/:id/items/:itemId/photos/:photoIndex ─────────── */
-syncRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'delete',
     path: '/{id}/items/{itemId}/photos/{photoIndex}',
     tags: ["inspections"],
@@ -184,10 +202,9 @@ syncRoutes.openapi(createRoute(withMcpMetadata({
     }
 
     return c.json({ success: true as const, data: { deletedKey } }, 200);
-});
-
+})
 /* ── POST /api/inspections/:id/inspector-signature ────────────────────────── */
-syncRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/inspector-signature',
     tags: ["inspections"],
@@ -242,10 +259,9 @@ syncRoutes.openapi(createRoute(withMcpMetadata({
     }
 
     return c.json({ success: true as const, data: { savedAt: signedAt } }, 200);
-});
-
+})
 /* ── POST /api/inspections/:id/template/upgrade ───────────────────────────── */
-syncRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/template/upgrade',
     tags: ["inspections"],
@@ -284,5 +300,7 @@ syncRoutes.openapi(createRoute(withMcpMetadata({
 
     return c.json({ success: true as const, data: { from: fromVersion, to: tpl.version } }, 200);
 });
+
+export type InspectionSyncApi = typeof syncRoutes;
 
 export default syncRoutes;

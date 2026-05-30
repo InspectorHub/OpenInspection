@@ -1,6 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/inspector-profile";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta({ data }: Route.MetaArgs) {
   const d = data as LoaderResult | undefined;
@@ -43,11 +43,12 @@ interface LoaderResult {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
   try {
-    const res = await apiFetch(
-      `/api/public/inspector/${params.tenant}/${params.slug}`,
-    );
+    const api = createApi(context);
+    const res = await api.publicShare.inspector[":tenant"][":slug"].$get({
+      param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
+    });
     const body = res.ok ? await res.json() : {};
     const data = ((body as Record<string, unknown>).data ?? {}) as { profile?: InspectorData; services?: ServiceItem[] };
     return {

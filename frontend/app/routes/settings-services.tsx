@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLoaderData, Form } from "react-router";
 import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Services & Catalog - Settings - OpenInspection" }];
@@ -24,10 +24,11 @@ interface Discount {
   active: boolean;
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
-    const res = await apiFetch("/api/admin/services", { token });
+    const api = createApi(context, { token });
+    const res = await api.admin.services.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
     const d = (body.data ?? {}) as Record<string, unknown>;
     return {
@@ -39,28 +40,26 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const form = await request.formData();
   const intent = form.get("intent");
+  const api = createApi(context, { token });
 
   if (intent === "create-service") {
-    await apiFetch("/api/admin/services", {
-      token,
-      method: "POST",
-      body: JSON.stringify({
-        name: form.get("name"),
-        description: form.get("description") || null,
+    await api.admin.services.$post({
+      json: {
+        name: form.get("name") as string,
+        description: (form.get("description") as string) || null,
         price: Number(form.get("price")) * 100 || 0,
-      }),
+      },
     });
   } else if (intent === "toggle-service") {
-    const id = form.get("id");
+    const id = String(form.get("id") ?? "");
     const active = form.get("active") === "true";
-    await apiFetch(`/api/admin/services/${id}`, {
-      token,
-      method: "PATCH",
-      body: JSON.stringify({ active: !active }),
+    await api.admin.services[":id"].$patch({
+      param: { id },
+      json: { active: !active },
     });
   }
 

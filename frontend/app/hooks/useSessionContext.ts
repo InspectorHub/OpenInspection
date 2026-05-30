@@ -12,7 +12,7 @@ export interface SessionContext {
     logoUrl: string | null;
     gaMeasurementId: string | null;
     reportTheme: string;
-    isSharedSaas: boolean;
+    isSaas: boolean;
     portalBaseUrl: string | null;
     tenantSubdomain: string | null;
     tenantStatus: string;

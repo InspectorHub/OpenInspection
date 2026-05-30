@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 
 const STEPS = ["Property", "Services", "Schedule", "Team"] as const;
-type Step = (typeof STEPS)[number];
 
 const PROPERTY_TYPES = [
   { value: "single_family", label: "Single Family" },
@@ -37,12 +36,29 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
   const [soloMode, setSoloMode] = useState(true);
   const [inspectorId, setInspectorId] = useState("");
 
+  useEffect(() => {
+    if (open) return;
+    setStep(0);
+    setPropertyType("single_family");
+    setAddress("");
+    setTemplateId("");
+    setServices(new Set());
+    setDate("");
+    setTime("09:00");
+    setSoloMode(true);
+    setInspectorId("");
+  }, [open]);
+
   if (!open) return null;
 
   const toggleService = (s: string) =>
     setServices((prev) => {
       const next = new Set(prev);
-      next.has(s) ? next.delete(s) : next.add(s);
+      if (next.has(s)) {
+        next.delete(s);
+      } else {
+        next.add(s);
+      }
       return next;
     });
 

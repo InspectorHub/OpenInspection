@@ -1,6 +1,5 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-printable";
-import { apiFetch } from "~/lib/api.server";
 
 export function meta() {
   return [{ title: "Signed Agreement - OpenInspection" }];
@@ -26,8 +25,9 @@ interface AgreementData {
 
 export async function loader({ params }: Route.LoaderArgs) {
   try {
-    const res = await apiFetch(
-      `/api/internal/agreement-render/${params.token}`,
+    const res = await fetch(
+      `/m2m/agreement-render/${encodeURIComponent(params.token)}`,
+      { credentials: "include" },
     );
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;

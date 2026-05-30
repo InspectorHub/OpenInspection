@@ -1,8 +1,8 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { setCookie } from 'hono/cookie';
 import { drizzle } from 'drizzle-orm/d1';
 import { desc, eq } from 'drizzle-orm';
-import type { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
 import { signJwt } from '../lib/jwt-keyring';
@@ -15,7 +15,6 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
  * "my-reports" and "leaderboard". These plural /api/agents routes own the
  * invite + accept lifecycle for the new global-agent persona.
  */
-const agentsRoutes = new OpenAPIHono<HonoConfig>();
 
 const InviteBodySchema = z
     .object({
@@ -56,24 +55,6 @@ const inviteRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "inviteAgent"
 }, { scopes: ['write'], tier: 'extended' }));
-
-agentsRoutes.openapi(inviteRoute, async (c) => {
-    // RBAC moved inside to keep OpenAPIHono context typing happy. Owners, admins,
-    // and rank-and-file inspectors can all invite agents.
-    await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
-
-    const tenantId = c.get('tenantId');
-    const user = c.get('user');
-    if (!tenantId || !user?.sub) throw Errors.Unauthorized();
-
-    const body = c.req.valid('json');
-    const result = await c.var.services.agent.invite(tenantId, user.sub, {
-        email: body.email,
-        ...(body.contactId ? { contactId: body.contactId } : {}),
-    });
-
-    return c.json({ success: true as const, data: result }, 200);
-});
 
 // --- POST /api/agents/accept ---
 
@@ -116,41 +97,6 @@ const acceptRoute = createRoute(withMcpMetadata({
     operationId: "acceptAgent"
 }, { scopes: ['write'], tier: 'extended' }));
 
-agentsRoutes.openapi(acceptRoute, async (c) => {
-    const body = c.req.valid('json');
-    const result = await c.var.services.agent.acceptInvite(body.token, {
-        password: body.password,
-        name: body.name,
-    });
-
-    // Mint the agent JWT — note the deliberate absence of a tenantId claim. Per
-    // Agent Accounts A1 the JWT carries no tenant scope; agent routes resolve a
-    // tenant per-request via resolveAgentTenant().
-    const keyring = await c.var.keyringPromise!;
-    const now = Math.floor(Date.now() / 1000);
-    const token = await signJwt({
-        sub: result.userId,
-        role: 'agent',
-        'custom:userRole': 'agent',
-        email: result.email,
-        iat: now,
-        exp: now + 60 * 60 * 24,
-    }, keyring);
-
-    setCookie(c, '__Host-inspector_token', token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'Strict',
-        path: '/',
-        maxAge: 60 * 60 * 24,
-    });
-
-    return c.json({
-        success: true as const,
-        data: { redirect: '/agent-dashboard', userId: result.userId },
-    }, 200);
-});
-
 // --- A2: GET /api/agents/links — inspector-side partner-link listing ---
 
 const LinkRowSchema = z
@@ -190,42 +136,6 @@ const listLinksRoute = createRoute(withMcpMetadata({
     operationId: "listAgentLinks"
 }, { scopes: ['read'], tier: 'extended' }));
 
-agentsRoutes.openapi(listLinksRoute, async (c) => {
-    await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
-    const tenantId = c.get('tenantId');
-    if (!tenantId) throw Errors.Unauthorized();
-    const db = drizzle(c.env.DB);
-    const rows = await db
-        .select({
-            id:          agentTenantLinks.id,
-            agentUserId: agentTenantLinks.agentUserId,
-            agentName:   users.name,
-            agentEmail:  users.email,
-            status:      agentTenantLinks.status,
-            createdAt:   agentTenantLinks.createdAt,
-            revokedAt:   agentTenantLinks.revokedAt,
-        })
-        .from(agentTenantLinks)
-        .leftJoin(users, eq(users.id, agentTenantLinks.agentUserId))
-        .where(eq(agentTenantLinks.tenantId, tenantId))
-        .orderBy(desc(agentTenantLinks.createdAt))
-        .all();
-    const links = rows.map((r) => {
-        const created = r.createdAt instanceof Date ? r.createdAt.getTime() : (r.createdAt ? Number(r.createdAt) : null);
-        const revoked = r.revokedAt instanceof Date ? r.revokedAt.getTime() : (r.revokedAt ? Number(r.revokedAt) : null);
-        return {
-            id:          r.id,
-            agentUserId: r.agentUserId,
-            agentName:   r.agentName ?? null,
-            agentEmail:  r.agentEmail ?? null,
-            status:      (r.status as 'pending' | 'active' | 'revoked'),
-            createdAt:   created,
-            revokedAt:   revoked,
-        };
-    });
-    return c.json({ success: true as const, data: { links } }, 200);
-});
-
 // --- A2: POST /api/agents/<linkId>/revoke ---
 
 const RevokeParamsSchema = z.object({
@@ -259,13 +169,102 @@ const revokeRoute = createRoute(withMcpMetadata({
     operationId: "revokeAgent"
 }, { scopes: ['write'], tier: 'extended' }));
 
-agentsRoutes.openapi(revokeRoute, async (c) => {
-    await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
-    const tenantId = c.get('tenantId');
-    if (!tenantId) throw Errors.Unauthorized();
-    const { linkId } = c.req.valid('param');
-    await c.var.services.agent.revokeLink(linkId, tenantId);
-    return c.json({ success: true as const, data: { ok: true as const } }, 200);
-});
+export const agentsRoutes = createApiRouter()
+    .openapi(inviteRoute, async (c) => {
+        // RBAC moved inside to keep OpenAPIHono context typing happy. Owners, admins,
+        // and rank-and-file inspectors can all invite agents.
+        await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
+
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        if (!tenantId || !user?.sub) throw Errors.Unauthorized();
+
+        const body = c.req.valid('json');
+        const result = await c.var.services.agent.invite(tenantId, user.sub, {
+            email: body.email,
+            ...(body.contactId ? { contactId: body.contactId } : {}),
+        });
+
+        return c.json({ success: true as const, data: result }, 200);
+    })
+    .openapi(acceptRoute, async (c) => {
+        const body = c.req.valid('json');
+        const result = await c.var.services.agent.acceptInvite(body.token, {
+            password: body.password,
+            name: body.name,
+        });
+
+        // Mint the agent JWT — note the deliberate absence of a tenantId claim. Per
+        // Agent Accounts A1 the JWT carries no tenant scope; agent routes resolve a
+        // tenant per-request via resolveAgentTenant().
+        const keyring = await c.var.keyringPromise!;
+        const now = Math.floor(Date.now() / 1000);
+        const token = await signJwt({
+            sub: result.userId,
+            role: 'agent',
+            'custom:userRole': 'agent',
+            email: result.email,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+        }, keyring);
+
+        setCookie(c, '__Host-inspector_token', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'Strict',
+            path: '/',
+            maxAge: 60 * 60 * 24,
+        });
+
+        return c.json({
+            success: true as const,
+            data: { redirect: '/agent-dashboard', userId: result.userId },
+        }, 200);
+    })
+    .openapi(listLinksRoute, async (c) => {
+        await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
+        const tenantId = c.get('tenantId');
+        if (!tenantId) throw Errors.Unauthorized();
+        const db = drizzle(c.env.DB);
+        const rows = await db
+            .select({
+                id:          agentTenantLinks.id,
+                agentUserId: agentTenantLinks.agentUserId,
+                agentName:   users.name,
+                agentEmail:  users.email,
+                status:      agentTenantLinks.status,
+                createdAt:   agentTenantLinks.createdAt,
+                revokedAt:   agentTenantLinks.revokedAt,
+            })
+            .from(agentTenantLinks)
+            .leftJoin(users, eq(users.id, agentTenantLinks.agentUserId))
+            .where(eq(agentTenantLinks.tenantId, tenantId))
+            .orderBy(desc(agentTenantLinks.createdAt))
+            .all();
+        const links = rows.map((r) => {
+            const created = r.createdAt instanceof Date ? r.createdAt.getTime() : (r.createdAt ? Number(r.createdAt) : null);
+            const revoked = r.revokedAt instanceof Date ? r.revokedAt.getTime() : (r.revokedAt ? Number(r.revokedAt) : null);
+            return {
+                id:          r.id,
+                agentUserId: r.agentUserId,
+                agentName:   r.agentName ?? null,
+                agentEmail:  r.agentEmail ?? null,
+                status:      (r.status as 'pending' | 'active' | 'revoked'),
+                createdAt:   created,
+                revokedAt:   revoked,
+            };
+        });
+        return c.json({ success: true as const, data: { links } }, 200);
+    })
+    .openapi(revokeRoute, async (c) => {
+        await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
+        const tenantId = c.get('tenantId');
+        if (!tenantId) throw Errors.Unauthorized();
+        const { linkId } = c.req.valid('param');
+        await c.var.services.agent.revokeLink(linkId, tenantId);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    });
+
+export type AgentsApi = typeof agentsRoutes;
 
 export default agentsRoutes;

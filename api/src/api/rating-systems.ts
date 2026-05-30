@@ -7,8 +7,8 @@
  * All mutations live behind the global JWT middleware + role gate. Reads
  * are open to inspectors so the Library page is browseable.
  */
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
-import type { HonoConfig } from '../types/hono';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
@@ -21,12 +21,10 @@ import {
 } from '../lib/validations/rating-system.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-const ratingSystemsRoutes = new OpenAPIHono<HonoConfig>();
-
 const IdParamSchema = z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') });
 
 /* ── GET /api/rating-systems ──────────────────────────────────────────── */
-ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
+const listRatingSystemsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["ratings"],
     summary: 'List rating systems for the current tenant (seed + custom)',
@@ -36,17 +34,10 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     },
     operationId: "listRatingSystems",
     description: "Auto-generated placeholder for listRatingSystems (GET /, ratings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' })), async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    // Lazy-seed defaults so first-time tenants always see the four canonical
-    // systems even if the seed:rating-systems script wasn't run for them.
-    await c.var.services.ratingSystem.seedDefaults(tenantId);
-    const data = await c.var.services.ratingSystem.list(tenantId);
-    return c.json({ success: true as const, data }, 200);
-});
+}, { scopes: ['read'], tier: 'extended' }));
 
 /* ── GET /api/rating-systems/:id ──────────────────────────────────────── */
-ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
+const getRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
@@ -57,16 +48,10 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     operationId: "getRatingSystem",
     summary: "Get rating system for current tenant",
     description: "Auto-generated placeholder for getRatingSystem (GET /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' })), async (c) => {
-    const { id } = c.req.valid('param');
-    const tenantId = c.get('tenantId') as string;
-    const sys = await c.var.services.ratingSystem.get(id, tenantId);
-    if (!sys) throw Errors.NotFound('Rating system not found');
-    return c.json({ success: true as const, data: sys }, 200);
-});
+}, { scopes: ['read'], tier: 'extended' }));
 
 /* ── POST /api/rating-systems ─────────────────────────────────────────── */
-ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
+const createRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
@@ -77,16 +62,10 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     operationId: "createRatingSystem",
     summary: "Create rating system for current tenant",
     description: "Auto-generated placeholder for createRatingSystem (POST /, ratings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
-    const input = c.req.valid('json');
-    const tenantId = c.get('tenantId') as string;
-    const sys = await c.var.services.ratingSystem.create(tenantId, input);
-    auditFromContext(c, 'rating_system.created', 'rating_system', { entityId: sys.id, metadata: { name: sys.name, slug: sys.slug } });
-    return c.json({ success: true as const, data: sys }, 200);
-});
+}, { scopes: ['write'], tier: 'extended' }));
 
 /* ── POST /api/rating-systems/:id/clone ───────────────────────────────── */
-ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
+const cloneRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/clone',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
@@ -100,17 +79,10 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     operationId: "cloneRatingSystem",
     summary: "Clone rating system for current tenant",
     description: "Auto-generated placeholder for cloneRatingSystem (POST /{id}/clone, ratings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
-    const { id } = c.req.valid('param');
-    const { name, slug } = c.req.valid('json');
-    const tenantId = c.get('tenantId') as string;
-    const sys = await c.var.services.ratingSystem.clone(id, tenantId, name, slug);
-    auditFromContext(c, 'rating_system.cloned', 'rating_system', { entityId: sys.id, metadata: { sourceId: id, name } });
-    return c.json({ success: true as const, data: sys }, 200);
-});
+}, { scopes: ['write'], tier: 'extended' }));
 
 /* ── PUT /api/rating-systems/:id ──────────────────────────────────────── */
-ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
+const replaceRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
@@ -124,17 +96,10 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     operationId: "replaceRatingSystem",
     summary: "Replace rating system for current tenant",
     description: "Auto-generated placeholder for replaceRatingSystem (PUT /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
-    const { id } = c.req.valid('param');
-    const patch = c.req.valid('json');
-    const tenantId = c.get('tenantId') as string;
-    const sys = await c.var.services.ratingSystem.update(id, tenantId, patch);
-    auditFromContext(c, 'rating_system.updated', 'rating_system', { entityId: sys.id });
-    return c.json({ success: true as const, data: sys }, 200);
-});
+}, { scopes: ['write'], tier: 'extended' }));
 
 /* ── DELETE /api/rating-systems/:id ───────────────────────────────────── */
-ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
+const deleteRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["ratings"],
     middleware: [requireRole(['owner', 'admin'])] as const,
@@ -148,12 +113,55 @@ ratingSystemsRoutes.openapi(createRoute(withMcpMetadata({
     operationId: "deleteRatingSystem",
     summary: "Delete rating system for current tenant",
     description: "Auto-generated placeholder for deleteRatingSystem (DELETE /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
-    const { id } = c.req.valid('param');
-    const tenantId = c.get('tenantId') as string;
-    const result = await c.var.services.ratingSystem.delete(id, tenantId);
-    auditFromContext(c, 'rating_system.deleted', 'rating_system', { entityId: id });
-    return c.json({ success: true as const, data: result }, 200);
-});
+}, { scopes: ['write'], tier: 'extended' }));
+
+export const ratingSystemsRoutes = createApiRouter()
+    .openapi(listRatingSystemsRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        // Lazy-seed defaults so first-time tenants always see the four canonical
+        // systems even if the seed:rating-systems script wasn't run for them.
+        await c.var.services.ratingSystem.seedDefaults(tenantId);
+        const data = await c.var.services.ratingSystem.list(tenantId);
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(getRatingSystemRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId') as string;
+        const sys = await c.var.services.ratingSystem.get(id, tenantId);
+        if (!sys) throw Errors.NotFound('Rating system not found');
+        return c.json({ success: true as const, data: sys }, 200);
+    })
+    .openapi(createRatingSystemRoute, async (c) => {
+        const input = c.req.valid('json');
+        const tenantId = c.get('tenantId') as string;
+        const sys = await c.var.services.ratingSystem.create(tenantId, input);
+        auditFromContext(c, 'rating_system.created', 'rating_system', { entityId: sys.id, metadata: { name: sys.name, slug: sys.slug } });
+        return c.json({ success: true as const, data: sys }, 200);
+    })
+    .openapi(cloneRatingSystemRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const { name, slug } = c.req.valid('json');
+        const tenantId = c.get('tenantId') as string;
+        const sys = await c.var.services.ratingSystem.clone(id, tenantId, name, slug);
+        auditFromContext(c, 'rating_system.cloned', 'rating_system', { entityId: sys.id, metadata: { sourceId: id, name } });
+        return c.json({ success: true as const, data: sys }, 200);
+    })
+    .openapi(replaceRatingSystemRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const patch = c.req.valid('json');
+        const tenantId = c.get('tenantId') as string;
+        const sys = await c.var.services.ratingSystem.update(id, tenantId, patch);
+        auditFromContext(c, 'rating_system.updated', 'rating_system', { entityId: sys.id });
+        return c.json({ success: true as const, data: sys }, 200);
+    })
+    .openapi(deleteRatingSystemRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId') as string;
+        const result = await c.var.services.ratingSystem.delete(id, tenantId);
+        auditFromContext(c, 'rating_system.deleted', 'rating_system', { entityId: id });
+        return c.json({ success: true as const, data: result }, 200);
+    });
+
+export type RatingSystemsApi = typeof ratingSystemsRoutes;
 
 export default ratingSystemsRoutes;

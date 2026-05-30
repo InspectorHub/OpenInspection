@@ -1,10 +1,10 @@
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
+import { createRoute } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lt } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema/inspection';
 import { users } from '../lib/db/schema/tenant';
-import type { HonoConfig } from '../types/hono';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
 import { getCalendarEventStyle } from '../lib/calendar-event-style';
@@ -44,8 +44,6 @@ async function refreshGoogleToken(clientId: string, clientSecret: string, refres
     return data.access_token;
 }
 
-const calendarEventsRoutes = new OpenAPIHono<HonoConfig>();
-
 const eventsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/',
@@ -72,7 +70,8 @@ const eventsRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['read'], tier: 'primary' }));
 
-calendarEventsRoutes.openapi(eventsRoute, async (c) => {
+export const calendarEventsRoutes = createApiRouter()
+    .openapi(eventsRoute, async (c) => {
     const { start, end } = c.req.valid('query');
     const tenantId = c.get('tenantId') as string;
     const jwtUser = c.get('user');
@@ -173,5 +172,7 @@ calendarEventsRoutes.openapi(eventsRoute, async (c) => {
 
     return c.json(events);
 });
+
+export type CalendarEventsApi = typeof calendarEventsRoutes;
 
 export default calendarEventsRoutes;

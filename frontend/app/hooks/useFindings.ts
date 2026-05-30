@@ -41,6 +41,26 @@ export interface CustomCommentEntry {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Pure helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+export function cloneByScope(
+    src: Record<string, unknown>,
+    scope: 'rating' | 'rating_notes' | 'all',
+): Record<string, unknown> {
+    if (scope === 'all') return { ...src };
+    if (scope === 'rating_notes') {
+        const next: Record<string, unknown> = {};
+        if ('rating' in src) next.rating = src.rating;
+        if ('notes' in src)  next.notes  = src.notes;
+        return next;
+    }
+    const next: Record<string, unknown> = {};
+    if ('rating' in src) next.rating = src.rating;
+    return next;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Hook                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -234,6 +254,49 @@ export function useFindings(
   );
 
   /* ---------------------------------------------------------------- */
+  /*  Defect structured fields (location / trade / deadline / timeframe) */
+  /* ---------------------------------------------------------------- */
+
+  const setDefectFields = useCallback(
+    (
+      sectionId: string,
+      itemId: string,
+      cannedId: string,
+      patch: { location?: string | null; trade?: string | null; deadline?: string | null; timeframe?: string | null },
+    ) => {
+      const key = fKey(sectionId, itemId);
+      setResults((prev) => {
+        const existing = (prev[key] as Record<string, unknown>) || {};
+        const existingTabs = (existing.tabs as Record<string, Array<Record<string, unknown>>>) || {};
+        const defects = [...(existingTabs.defects || [])];
+        const idx = defects.findIndex((d) => d.cannedId === cannedId);
+        const next: Record<string, unknown> =
+          idx >= 0 ? { ...defects[idx] } : { cannedId, included: true };
+        if ("location"  in patch) next.location  = patch.location;
+        if ("trade"     in patch) next.trade     = patch.trade;
+        if ("deadline"  in patch) next.deadline  = patch.deadline;
+        if ("timeframe" in patch) next.timeframe = patch.timeframe;
+        if (idx >= 0) defects[idx] = next;
+        else defects.push(next);
+        const updated = { ...existing, tabs: { ...existingTabs, defects } };
+        return { ...prev, [key]: updated, [itemId]: updated };
+      });
+      fetcher.submit(
+        {
+          intent: "set-defect-fields",
+          itemId,
+          sectionId,
+          cannedId,
+          patch: JSON.stringify(patch),
+        },
+        { method: "POST" },
+      );
+      setDirty(true);
+    },
+    [setResults, fetcher, setDirty],
+  );
+
+  /* ---------------------------------------------------------------- */
   /*  Comment insertion (from library)                                  */
   /* ---------------------------------------------------------------- */
 
@@ -269,30 +332,28 @@ export function useFindings(
   /*  Repeat previous rating (R key)                                   */
   /* ---------------------------------------------------------------- */
 
-  const repeatPreviousRating = useCallback(
+
+  const cloneLast = useCallback(
     (
       sectionId: string,
       itemId: string,
       sectionItems: Array<{ id: string }>,
+      scope: 'rating' | 'rating_notes' | 'all',
     ): boolean => {
       const activeIdx = sectionItems.findIndex((it) => it.id === itemId);
       let priorResult: Record<string, unknown> | null = null;
       for (let i = activeIdx - 1; i >= 0; i--) {
         const r = getResult(sectionItems[i].id, sectionId);
-        if (r && r.rating) {
-          priorResult = r;
-          break;
-        }
+        if (r && r.rating) { priorResult = r; break; }
       }
       if (!priorResult) return false;
-      // Clone entire result to active item
+      const projected = cloneByScope(priorResult, scope);
       const key = fKey(sectionId, itemId);
-      const cloned = JSON.parse(JSON.stringify(priorResult));
-      setResults((prev) => ({
-        ...prev,
-        [key]: cloned,
-        [itemId]: cloned,
-      }));
+      setResults((prev) => {
+        const existing = (prev[key] as Record<string, unknown>) || {};
+        const updated = { ...existing, ...projected };
+        return { ...prev, [key]: updated, [itemId]: updated };
+      });
       setDirty(true);
       return true;
     },
@@ -371,8 +432,9 @@ export function useFindings(
     commitNotes,
     setItemValue,
     toggleCannedComment,
+    setDefectFields,
     insertComment,
-    repeatPreviousRating,
+    cloneLast,
     batchSetRating,
     addPhotoToItem,
     getPhotoCount,

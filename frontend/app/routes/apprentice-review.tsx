@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/apprentice-review";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
 
 export function meta() {
@@ -21,10 +21,11 @@ interface ReviewItem {
   decision: string | null;
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
-    const res = await apiFetch("/api/team/apprentice-reviews", { token });
+    const api = createApi(context, { token });
+    const res = await api.team["apprentice-reviews"].$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
     return { items: (body.data ?? []) as ReviewItem[] };
   } catch {

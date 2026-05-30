@@ -84,7 +84,7 @@ export default defineConfig({
             name: 'cloud',
             testMatch: 'cloud-e2e.spec.ts',
             use: {
-                baseURL: process.env.CLOUD_BASE_URL || 'https://openinspection-standalone.important-new.workers.dev',
+                baseURL: process.env.CLOUD_BASE_URL || 'https://openinspection-api.important-new.workers.dev',
             },
         },
         // Design System 0520 subsystem A E2E suites. Skipped automatically

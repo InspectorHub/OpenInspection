@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-advanced";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
 
 /* ------------------------------------------------------------------ */
@@ -19,14 +19,15 @@ interface AdvancedConfig {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
 
   // Fetch Stripe connect status + secrets in parallel
   const [stripeRes, aiRes, secretsRes] = await Promise.all([
-    apiFetch("/api/admin/payments/status", { token }).catch(() => null),
-    apiFetch("/api/admin/ai/status", { token }).catch(() => null),
-    apiFetch("/api/admin/secrets", { token }).catch(() => null),
+    api.admin.payments.status.$get().catch(() => null),
+    api.admin.ai.status.$get().catch(() => null),
+    api.admin.secrets.$get().catch(() => null),
   ]);
 
   let stripeConnected = false;
@@ -63,21 +64,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const fd = await request.formData();
   const intent = fd.get("intent");
+  const api = createApi(context, { token });
 
   if (intent === "connect-stripe") {
     const accountId = fd.get("stripeAccountId");
     if (!accountId || typeof accountId !== "string" || !accountId.startsWith("acct_")) {
       return { success: false, error: "Please enter a valid Stripe account ID (starts with acct_)." };
     }
-    const res = await apiFetch("/api/admin/payments/connect", {
-      token,
-      method: "POST",
-      body: JSON.stringify({ accountId }),
-    });
+    const res = await api.admin.payments.connect.$post({ json: { accountId } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return { success: false, error: (err as Record<string, string>)?.message || "Failed to connect Stripe account." };
@@ -86,10 +84,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "disconnect-stripe") {
-    const res = await apiFetch("/api/admin/payments/disconnect", {
-      token,
-      method: "POST",
-    });
+    const res = await api.admin.payments.disconnect.$post();
     if (!res.ok) {
       return { success: false, error: "Failed to disconnect Stripe account." };
     }
@@ -101,11 +96,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
       return { success: false, error: "API key is required." };
     }
-    const res = await apiFetch("/api/admin/secrets", {
-      token,
-      method: "PUT",
-      body: JSON.stringify({ GEMINI_API_KEY: geminiApiKey }),
-    });
+    const res = await api.admin.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return { success: false, error: (err as Record<string, string>)?.message || "Failed to save AI configuration." };
@@ -120,11 +111,7 @@ export async function action({ request }: Route.ActionArgs) {
       if (val && typeof val === "string" && val.trim()) body[key] = val;
     }
     if (Object.keys(body).length > 0) {
-      const res = await apiFetch("/api/admin/secrets", {
-        token,
-        method: "PUT",
-        body: JSON.stringify(body),
-      });
+      const res = await api.admin.secrets.$put({ json: body });
       if (!res.ok) {
         return { success: false, error: "Failed to save integration keys." };
       }

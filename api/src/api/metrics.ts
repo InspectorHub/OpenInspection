@@ -1,15 +1,14 @@
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
+import { createRoute } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
-import { HonoConfig } from '../types/hono';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections, inspectionServices, contacts } from '../lib/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-const metricsRoutes = new OpenAPIHono<HonoConfig>();
-
-metricsRoutes.openapi(createRoute(withMcpMetadata({
+export const metricsRoutes = createApiRouter()
+    .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["metrics"],
     middleware: [requireRole(['owner', 'admin'])] as const,
@@ -113,4 +112,5 @@ metricsRoutes.openapi(createRoute(withMcpMetadata({
     });
 });
 
+export type MetricsApi = typeof metricsRoutes;
 export default metricsRoutes;

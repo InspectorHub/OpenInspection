@@ -9,7 +9,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = process.env.CLOUD_BASE_URL || 'https://openinspection-standalone.important-new.workers.dev';
+const BASE_URL = process.env.CLOUD_BASE_URL || 'https://openinspection-api.important-new.workers.dev';
 const NAV_TIMEOUT = 20000;
 
 const ADMIN_EMAIL = 'admin@cloudtest.com';

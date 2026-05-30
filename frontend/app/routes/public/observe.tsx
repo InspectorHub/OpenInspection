@@ -1,6 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/observe";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Observe Inspection - OpenInspection" }];
@@ -14,11 +14,12 @@ interface ObserveData {
   sections: { name: string; completedItems: number; totalItems: number }[];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
   try {
-    const res = await apiFetch(
-      `/api/public/observe/inspections/${params.id}`,
-    );
+    const api = createApi(context);
+    const res = await api.publicShare.observe.inspections[":id"].$get({
+      param: { id: params.id ?? "" },
+    });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     return {

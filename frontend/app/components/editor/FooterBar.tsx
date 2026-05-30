@@ -25,7 +25,7 @@ export function FooterBar({ connected = false, roster = [] }: FooterBarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-30 bg-ih-bg-card border-t border-ih-border px-4 py-1.5 flex items-center gap-3 text-[11px] text-ih-fg-3">
+    <div className="hidden md:flex fixed bottom-0 inset-x-0 z-30 bg-ih-bg-card border-t border-ih-border px-4 py-1.5 items-center gap-3 text-[11px] text-ih-fg-3">
       <div className="relative">
         <button
           onClick={() => setShortcutsOpen(!shortcutsOpen)}

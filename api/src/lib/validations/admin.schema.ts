@@ -192,16 +192,15 @@ export const ImportResponseSchema = createApiResponseSchema(z.object({
     }).describe('TODO describe imported field for the OpenInspection MCP integration'),
 })).openapi('ImportResponse');
 
-export const AgreementListResponseSchema = createApiResponseSchema(z.object({
-    agreements: z.array(z.object({
-        id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
-        tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-        name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
-        content: z.string().describe('TODO describe content field for the OpenInspection MCP integration'),
-        version: z.number().describe('TODO describe version field for the OpenInspection MCP integration'),
-        createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-    })).describe('TODO describe agreements field for the OpenInspection MCP integration'),
-})).openapi('AgreementListResponse');
+export const AgreementListResponseSchema = createApiResponseSchema(z.array(z.object({
+    id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+    tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
+    content: z.string().describe('TODO describe content field for the OpenInspection MCP integration'),
+    version: z.number().describe('TODO describe version field for the OpenInspection MCP integration'),
+    // Handler returns the raw Drizzle row; createdAt is a Date instance, not ISO string.
+    createdAt: z.date().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+}))).openapi('AgreementListResponse');
 
 export const SendAgreementSchema = z.object({
     agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
@@ -256,6 +255,8 @@ export const CommentSchema = z.object({
     category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
     ratingBucket: RatingBucketSchema.optional().nullable().openapi({ example: 'defect' }).describe('TODO describe ratingBucket field for the OpenInspection MCP integration'),
     section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    // Comments Library Upgrade — canonical single item label drives sort/filter.
+    itemLabel: z.string().max(120).optional().nullable().openapi({ example: 'Roof Covering' }),
 }).openapi('Comment');
 
 export const UpdateCommentSchema = z.object({
@@ -263,6 +264,7 @@ export const UpdateCommentSchema = z.object({
     category: z.string().max(50).nullable().optional().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
     ratingBucket: RatingBucketSchema.nullable().optional().openapi({ example: 'defect' }).describe('TODO describe ratingBucket field for the OpenInspection MCP integration'),
     section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
+    itemLabel: z.string().max(120).optional().nullable(),
 }).openapi('UpdateComment');
 
 export const CommentResponseSchema = z.object({
@@ -272,6 +274,9 @@ export const CommentResponseSchema = z.object({
     category: z.string().nullable().describe('TODO describe category field for the OpenInspection MCP integration'),
     ratingBucket: RatingBucketSchema.nullable().describe('TODO describe ratingBucket field for the OpenInspection MCP integration'),
     section: z.string().nullable().describe('TODO describe section field for the OpenInspection MCP integration'),
+    itemLabel: z.string().nullable().optional(),
+    useCount: z.number().int().optional(),
+    lastUsedAt: z.string().nullable().optional(),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }).openapi('CommentResponse');
 
@@ -281,7 +286,25 @@ export const ListCommentsQuerySchema = z.object({
     sectionId: z.string().max(64).optional().openapi({ example: 'roof-general' }).describe('Filter by section ID (matches within the section_ids JSON array)'),
     triggerCode: z.string().max(64).optional().openapi({ example: 'NI' }).describe('Filter by trigger code'),
     search: z.string().max(200).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
+    // Comments Library Upgrade — new sort + filter mode + context filters.
+    sort: z.enum(['relevance', 'recent', 'created', 'frequent', 'alpha']).optional().default('relevance'),
+    filterMode: z.enum(['auto', 'all']).optional().default('all'),
+    itemLabel: z.string().max(120).optional(),
+    // List Pagination PR — replace the old single-`limit` knob with shared
+    // pagination params. page is 1-indexed; pageSize ∈ {12,25,50,100}, default 50.
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int()
+        .refine((n) => [12, 25, 50, 100].includes(n), { message: 'pageSize must be one of 12, 25, 50, 100' })
+        .default(50),
 }).openapi('ListCommentsQuery');
+
+export const CommentTouchResponseSchema = z.object({
+    success: z.literal(true),
+    data:    z.object({
+        commentId: z.string(),
+        useCount:  z.number().int(),
+    }),
+}).openapi('CommentTouchResponse');
 
 // handoff-decisions §1 — attention thresholds (in hours, 1..720 = 30 days max)
 export const AttentionThresholdsSchema = z.object({
@@ -334,4 +357,27 @@ export const SeedStarterContentResponseSchema = createApiResponseSchema(z.object
     ratingSystemsSeeded:        z.number().int().nonnegative().describe('TODO describe ratingSystemsSeeded field for the OpenInspection MCP integration'),
     marketplaceLibrariesSeeded: z.number().int().nonnegative().describe('TODO describe marketplaceLibrariesSeeded field for the OpenInspection MCP integration'),
 })).openapi('SeedStarterContentResponse');
+
+/**
+ * Validation schema for inspector pre-sign request body.
+ * Spec 5H D1 — optional inspector signature before sending to client.
+ */
+export const InspectorSignSchema = z.object({
+    signatureBase64: z.string().min(50).max(500_000)
+        .regex(/^data:image\/(png|jpeg|svg\+xml);base64,/)
+        .openapi({ example: 'data:image/png;base64,iVBORw0KGgo...' })
+        .describe('Inspector signature as data URI with base64-encoded PNG/JPEG/SVG body.'),
+}).openapi('InspectorSign');
+
+/**
+ * Spec 5H D2 — save the authenticated user's default signature image.
+ * Reused for auto-sign on publish + as the SignaturePad default starting state
+ * in Settings → Profile.
+ */
+export const UserDefaultSignatureSchema = z.object({
+    signatureBase64: z.string().min(50).max(500_000)
+        .regex(/^data:image\/(png|jpeg|svg\+xml);base64,/)
+        .openapi({ example: 'data:image/png;base64,iVBORw0KGgo...' })
+        .describe('Inspector\'s saved signature as data URI. Reused for auto-sign on publish + as the SignaturePad default starting state.'),
+}).openapi('UserDefaultSignature');
 

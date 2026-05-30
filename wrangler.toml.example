@@ -1,12 +1,12 @@
-name = "openinspection-standalone"
+name = "openinspection-api"
 main = "api/src/index.ts"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-03-24"  # required for env.BROWSER.quickAction() (Browser Run)
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 preview_urls = true
 
 [triggers]
-crons = ["* * * * *", "0 2 * * *", "0 * * * *"]
+crons = ["*/5 * * * *"]  # single tick — scheduled.ts runs ALL jobs each call
 
 [assets]
 directory = "./api/public"
@@ -29,16 +29,15 @@ TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 # The SaaS topology typically uses a single
 # large D1 + a TENANT_CACHE KV partitioned by subdomain key prefix.
 [env.saas]
-name = "openinspection-saas"
+name = "openinspection-api-saas"
 [env.saas.vars]
 ENVIRONMENT = "production"
 APP_MODE = "saas"
-SAAS_TOPOLOGY = "shared"
 PORTAL_API_URL = "https://portal.your-domain.com"
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 [[env.saas.d1_databases]]
 binding = "DB"
-database_name = "openinspection-saas-db"
+database_name = "openinspection-db-saas"
 # Placeholder — create a separate D1 for the SaaS multi-tenant deployment
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "api/migrations"
@@ -52,10 +51,10 @@ namespace_id = "1003"
 simple = { limit = 10, period = 60 }
 [[env.saas.r2_buckets]]
 binding = "PHOTOS"
-bucket_name = "openinspection-saas-photos"
+bucket_name = "openinspection-photos-saas"
 [[env.saas.r2_buckets]]
 binding = "REPORTS"
-bucket_name = "openinspection-saas-reports"
+bucket_name = "openinspection-reports-saas"
 [env.saas.browser]
 binding = "BROWSER"
 [[env.saas.workflows]]
@@ -97,7 +96,7 @@ new_classes = ["InspectionPresenceDO", "TenantPresenceDO"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "openinspection-standalone-db"
+database_name = "openinspection-db"
 # Placeholder — `npm run setup:cloudflare` substitutes your real D1 ID
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "api/migrations"
@@ -118,7 +117,7 @@ enabled = true
 
 [[r2_buckets]]
 binding = "PHOTOS"
-bucket_name = "openinspection-standalone-photos"
+bucket_name = "openinspection-photos"
 
 # Spec 5A — Report PDF Pipeline. Stores Summary + Full Report PDFs
 # pre-rendered at publish time, served via signed URLs to client viewer.
@@ -127,7 +126,7 @@ bucket_name = "openinspection-standalone-photos"
 # below to render report HTML -> PDF.
 [[r2_buckets]]
 binding = "REPORTS"
-bucket_name = "openinspection-standalone-reports"
+bucket_name = "openinspection-reports"
 
 # Cloudflare Browser Rendering API — used by src/lib/pdf.ts to render
 # /report/:id into a PDF for email delivery. Beta as of 2026-05; free tier

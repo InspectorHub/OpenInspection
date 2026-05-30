@@ -21,9 +21,11 @@ const TENANT_ID = process.env.TENANT_ID || 'standalone';
 const DB_NAME   = process.env.DB_NAME   || 'DB';
 const LOCAL = process.argv.includes('--local');
 const SAAS  = process.argv.includes('--saas');
+const configIdx = process.argv.indexOf('--config');
+const configPath = configIdx > -1 ? process.argv[configIdx + 1] : (SAAS ? 'wrangler.saas.toml' : '');
 
 const flag       = LOCAL ? '--local' : '--remote';
-const configFlag = SAAS  ? '-c wrangler.saas.toml' : '';
+const configFlag = configPath ? `-c ${configPath}` : '';
 
 // SEEDS — copy of RECOMMENDATION_SEEDS from src/data/recommendation-seeds.ts — keep in sync.
 // Estimates are in USD cents (null = no estimate).

@@ -1,7 +1,7 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
-import type { HonoConfig } from '../types/hono';
 import { ErrorCode, Errors } from '../lib/errors';
 import { SetSlugRequestSchema } from '../lib/validations/profile.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
@@ -14,7 +14,6 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
  * `/api/profile/*`. JWT middleware populates tenantId/userId; availability
  * is re-checked inside the handler to close the optimistic-UI race.
  */
-const app = new OpenAPIHono<HonoConfig>();
 
 const getProfileRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -43,37 +42,6 @@ const getProfileRoute = createRoute(withMcpMetadata({
         },
     },
 }, { scopes: ['read'], tier: 'primary' }));
-
-app.openapi(getProfileRoute, async (c) => {
-    const userId = c.get('user')?.sub;
-    const tenantId = c.get('tenantId');
-    if (!userId || !tenantId) throw Errors.Unauthorized();
-
-    const row = await drizzle(c.env.DB as any).select({
-        name: users.name,
-        email: users.email,
-        phone: users.phone,
-        licenseNumber: users.licenseNumber,
-        slug: users.slug,
-        bio: users.bio,
-        photoUrl: users.photoUrl,
-        serviceAreas: users.serviceAreas,
-    }).from(users)
-      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
-      .get();
-
-    if (!row) throw Errors.NotFound('User not found');
-
-    let parsedAreas = null;
-    if (row.serviceAreas) {
-        try { parsedAreas = JSON.parse(row.serviceAreas); } catch {}
-    }
-
-    return c.json({
-        success: true as const,
-        data: { ...row, serviceAreas: parsedAreas },
-    }, 200);
-});
 
 const SlugConflictResponseSchema = z.object({
     success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'),
@@ -124,46 +92,6 @@ const patchProfileRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'primary' }));
 
-app.openapi(patchProfileRoute, async (c) => {
-    const userId = c.get('user')?.sub;
-    const tenantId = c.get('tenantId');
-    if (!userId || !tenantId) throw Errors.Unauthorized();
-
-    const body = c.req.valid('json');
-    const updates: Record<string, unknown> = {};
-
-    if (body.name !== undefined) updates.name = body.name;
-    if (body.phone !== undefined) updates.phone = body.phone;
-    if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
-    if (body.bio !== undefined) updates.bio = body.bio;
-
-    if (body.slug !== undefined) {
-        const userService = c.var.services.user;
-        const check = await userService.checkSlug(tenantId, body.slug, userId);
-        if (!check.available) {
-            return c.json({
-                success: false as const,
-                error: {
-                    message: check.reason === 'reserved'
-                        ? 'That slug is reserved. Please choose another.'
-                        : 'That slug is already taken.',
-                    code: ErrorCode.CONFLICT,
-                    details: { suggestions: check.suggestions ?? [] },
-                },
-            }, 409);
-        }
-        updates.slug = body.slug;
-    }
-
-    if (Object.keys(updates).length > 0) {
-        await drizzle(c.env.DB as any).update(users)
-            .set(updates)
-            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-    }
-
-    return c.json({ success: true as const, data: { ok: true as const } }, 200);
-});
-
 const setSlugRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/slug',
@@ -196,34 +124,6 @@ const setSlugRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-app.openapi(setSlugRoute, async (c) => {
-    const userId = c.get('user')?.sub;
-    const tenantId = c.get('tenantId');
-    if (!userId || !tenantId) throw Errors.Unauthorized();
-
-    const { slug } = c.req.valid('json');
-    const userService = c.var.services.user;
-    const check = await userService.checkSlug(tenantId, slug, userId);
-    if (!check.available) {
-        const message = check.reason === 'reserved'
-            ? 'That slug is reserved. Please choose another.'
-            : 'That slug is already taken.';
-        return c.json(
-            {
-                success: false as const,
-                error: {
-                    message,
-                    code: ErrorCode.CONFLICT,
-                    details: { suggestions: check.suggestions ?? [] },
-                },
-            },
-            409,
-        );
-    }
-    await userService.setSlug(userId, tenantId, slug);
-    return c.json({ success: true as const, data: { slug } }, 200);
-});
-
 // ── Sprint C-1 — profile photo upload + bio/service-areas details ──────────────
 
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -254,41 +154,6 @@ const photoUploadRoute = createRoute(withMcpMetadata({
         },
     },
 }, { scopes: ['write'], tier: 'extended' }));
-
-app.openapi(photoUploadRoute, async (c) => {
-    const userId = c.get('user')?.sub;
-    const tenantId = c.get('tenantId');
-    if (!userId || !tenantId) throw Errors.Unauthorized();
-
-    if (!c.env.PHOTOS) throw Errors.BadRequest('Photo storage not available');
-
-    const fd = await c.req.parseBody();
-    const file = fd['photo'];
-    if (!(file instanceof File)) throw Errors.BadRequest('photo missing');
-    if (file.size > MAX_PHOTO_BYTES) {
-        throw Errors.BadRequest(`photo > ${Math.round(MAX_PHOTO_BYTES / 1_000_000)}MB`);
-    }
-    if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type)) {
-        throw Errors.BadRequest('photo must be jpg, png, or webp');
-    }
-
-    const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
-    // Tenant-prefixed key keeps cross-tenant photos isolated even though the
-    // serving route at /photos/:key is public — keys are unguessable + scoped.
-    const key = `tenants/${tenantId}/inspector-photos/${userId}.${ext}`;
-    const buf = new Uint8Array(await file.arrayBuffer());
-    await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: file.type } });
-
-    const host = (c.env.APP_BASE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '')) || c.req.header('host') || '';
-    const proto = c.env.APP_BASE_URL?.startsWith('http://') ? 'http' : 'https';
-    const photoUrl = `${proto}://${host}/photos/${key}`;
-    await drizzle(c.env.DB).update(users)
-        .set({ photoUrl })
-        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-
-    logger.info('profile.photo.upload', { userId, tenantId, size: file.size, type: file.type });
-    return c.json({ success: true as const, data: { photoUrl } }, 200);
-});
 
 const ProfileDetailsSchema = z.object({
     bio: z.string().max(600).nullable().optional().describe('Free-form inspector biography shown on the public booking page; null clears it.'),
@@ -323,30 +188,163 @@ const detailsRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-app.openapi(detailsRoute, async (c) => {
-    const userId = c.get('user')?.sub;
-    const tenantId = c.get('tenantId');
-    if (!userId || !tenantId) throw Errors.Unauthorized();
+export const profileRoutes = createApiRouter()
+    .openapi(getProfileRoute, async (c) => {
+        const userId = c.get('user')?.sub;
+        const tenantId = c.get('tenantId');
+        if (!userId || !tenantId) throw Errors.Unauthorized();
 
-    const body = c.req.valid('json');
-    const updates: { bio?: string | null; serviceAreas?: string } = {};
-    if (body.bio !== undefined) updates.bio = body.bio;
-    if (body.serviceAreas !== undefined) {
-        updates.serviceAreas = JSON.stringify(body.serviceAreas);
-    }
-    if (Object.keys(updates).length === 0) {
+        const row = await drizzle(c.env.DB as never).select({
+            name: users.name,
+            email: users.email,
+            phone: users.phone,
+            licenseNumber: users.licenseNumber,
+            slug: users.slug,
+            bio: users.bio,
+            photoUrl: users.photoUrl,
+            serviceAreas: users.serviceAreas,
+        }).from(users)
+          .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
+          .get();
+
+        if (!row) throw Errors.NotFound('User not found');
+
+        let parsedAreas = null;
+        if (row.serviceAreas) {
+            try { parsedAreas = JSON.parse(row.serviceAreas); } catch { /* malformed JSON — fall through to null */ }
+        }
+
+        return c.json({
+            success: true as const,
+            data: { ...row, serviceAreas: parsedAreas },
+        }, 200);
+    })
+    .openapi(patchProfileRoute, async (c) => {
+        const userId = c.get('user')?.sub;
+        const tenantId = c.get('tenantId');
+        if (!userId || !tenantId) throw Errors.Unauthorized();
+
+        const body = c.req.valid('json');
+        const updates: Record<string, unknown> = {};
+
+        if (body.name !== undefined) updates.name = body.name;
+        if (body.phone !== undefined) updates.phone = body.phone;
+        if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
+        if (body.bio !== undefined) updates.bio = body.bio;
+
+        if (body.slug !== undefined) {
+            const userService = c.var.services.user;
+            const check = await userService.checkSlug(tenantId, body.slug, userId);
+            if (!check.available) {
+                return c.json({
+                    success: false as const,
+                    error: {
+                        message: check.reason === 'reserved'
+                            ? 'That slug is reserved. Please choose another.'
+                            : 'That slug is already taken.',
+                        code: ErrorCode.CONFLICT,
+                        details: { suggestions: check.suggestions ?? [] },
+                    },
+                }, 409);
+            }
+            updates.slug = body.slug;
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await drizzle(c.env.DB as never).update(users)
+                .set(updates)
+                .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+        }
+
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(setSlugRoute, async (c) => {
+        const userId = c.get('user')?.sub;
+        const tenantId = c.get('tenantId');
+        if (!userId || !tenantId) throw Errors.Unauthorized();
+
+        const { slug } = c.req.valid('json');
+        const userService = c.var.services.user;
+        const check = await userService.checkSlug(tenantId, slug, userId);
+        if (!check.available) {
+            const message = check.reason === 'reserved'
+                ? 'That slug is reserved. Please choose another.'
+                : 'That slug is already taken.';
+            return c.json(
+                {
+                    success: false as const,
+                    error: {
+                        message,
+                        code: ErrorCode.CONFLICT,
+                        details: { suggestions: check.suggestions ?? [] },
+                    },
+                },
+                409,
+            );
+        }
+        await userService.setSlug(userId, tenantId, slug);
+        return c.json({ success: true as const, data: { slug } }, 200);
+    })
+    .openapi(photoUploadRoute, async (c) => {
+        const userId = c.get('user')?.sub;
+        const tenantId = c.get('tenantId');
+        if (!userId || !tenantId) throw Errors.Unauthorized();
+
+        if (!c.env.PHOTOS) throw Errors.BadRequest('Photo storage not available');
+
+        const fd = await c.req.parseBody();
+        const file = fd['photo'];
+        if (!(file instanceof File)) throw Errors.BadRequest('photo missing');
+        if (file.size > MAX_PHOTO_BYTES) {
+            throw Errors.BadRequest(`photo > ${Math.round(MAX_PHOTO_BYTES / 1_000_000)}MB`);
+        }
+        if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type)) {
+            throw Errors.BadRequest('photo must be jpg, png, or webp');
+        }
+
+        const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+        // Tenant-prefixed key keeps cross-tenant photos isolated even though the
+        // serving route at /photos/:key is public — keys are unguessable + scoped.
+        const key = `tenants/${tenantId}/inspector-photos/${userId}.${ext}`;
+        const buf = new Uint8Array(await file.arrayBuffer());
+        await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: file.type } });
+
+        const host = (c.env.APP_BASE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '')) || c.req.header('host') || '';
+        const proto = c.env.APP_BASE_URL?.startsWith('http://') ? 'http' : 'https';
+        const photoUrl = `${proto}://${host}/photos/${key}`;
+        await drizzle(c.env.DB).update(users)
+            .set({ photoUrl })
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+
+        logger.info('profile.photo.upload', { userId, tenantId, size: file.size, type: file.type });
+        return c.json({ success: true as const, data: { photoUrl } }, 200);
+    })
+    .openapi(detailsRoute, async (c) => {
+        const userId = c.get('user')?.sub;
+        const tenantId = c.get('tenantId');
+        if (!userId || !tenantId) throw Errors.Unauthorized();
+
+        const body = c.req.valid('json');
+        const updates: { bio?: string | null; serviceAreas?: string } = {};
+        if (body.bio !== undefined) updates.bio = body.bio;
+        if (body.serviceAreas !== undefined) {
+            updates.serviceAreas = JSON.stringify(body.serviceAreas);
+        }
+        if (Object.keys(updates).length === 0) {
+            return c.json({ success: true as const, data: {} }, 200);
+        }
+        await drizzle(c.env.DB).update(users)
+            .set(updates)
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+
+        logger.info('profile.details.update', {
+            userId,
+            tenantId,
+            fields: Object.keys(updates).join(','),
+        });
         return c.json({ success: true as const, data: {} }, 200);
-    }
-    await drizzle(c.env.DB).update(users)
-        .set(updates)
-        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-
-    logger.info('profile.details.update', {
-        userId,
-        tenantId,
-        fields: Object.keys(updates).join(','),
     });
-    return c.json({ success: true as const, data: {} }, 200);
-});
 
-export default app;
+export type ProfileApi = typeof profileRoutes;
+
+export default profileRoutes;

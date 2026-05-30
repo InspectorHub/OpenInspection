@@ -1,36 +1,35 @@
-import { Form, useActionData, redirect } from "react-router";
+import { Form, useActionData, useNavigation, redirect } from "react-router";
 import type { Route } from "./+types/login";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Sign In - OpenInspection" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await getToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await getToken(context, request);
   if (token) return redirect("/dashboard");
   return null;
 }
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const email = String(formData.get("email") || "");
   const password = String(formData.get("password") || "");
 
   try {
-    const res = await apiFetch("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-      csrf: true,
-      headers: { "x-token-relay": "1" },
+    const api = createApi(context);
+    const res = await api.auth.login.$post({
+      json: { email, password },
+      header: { "x-token-relay": "1" },
     });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       console.error("[login] API error:", res.status, res.statusText, text.slice(0, 500));
       let parsed: Record<string, unknown> = {};
-      try { parsed = JSON.parse(text); } catch {}
+      try { parsed = JSON.parse(text); } catch { /* response wasn't JSON — fall through to default error */ }
       return {
         error:
           (parsed?.error as Record<string, string>)?.message ??
@@ -42,7 +41,7 @@ export async function action({ request }: Route.ActionArgs) {
     const jwt = body?.data?.token as string | undefined;
 
     if (jwt) {
-      return createSessionWithToken(jwt, "/dashboard");
+      return createSessionWithToken(context, jwt, "/dashboard");
     }
 
     if (body?.data?.requires2fa) {
@@ -57,12 +56,14 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function LoginPage() {
   const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
       <div className="w-full max-w-md p-8">
         <div className="flex items-center gap-3 mb-8">
-          <img src="/logo.svg" alt="" className="w-8 h-8" />
+          <img src="/logo.svg" alt="" className="w-8 h-8" width={32} height={32} />
           <span className="text-lg font-bold text-ih-fg-1">
             OpenInspection
           </span>
@@ -108,9 +109,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors"
+            disabled={isSubmitting}
+            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Sign In
+            {isSubmitting ? "Signing in…" : "Sign In"}
           </button>
         </Form>
       </div>

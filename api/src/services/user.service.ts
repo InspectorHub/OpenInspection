@@ -6,6 +6,25 @@ import { Errors } from '../lib/errors';
 
 const { users, slugReservations } = schema;
 
+/**
+ * Spec 5H D2 — persists the inspector's default signature image (data URI)
+ * to users.default_signature_base64. Reused by auto-sign-on-publish (Task 3.4)
+ * and pre-fills the SignaturePad in Settings → Profile.
+ */
+export async function saveUserDefaultSignature(
+    d1: D1Database,
+    userId: string,
+    signatureBase64: string,
+): Promise<void> {
+    const db = drizzle(d1, { schema });
+    const row = await db.select({ id: users.id }).from(users)
+        .where(eq(users.id, userId)).get();
+    if (!row) throw new Error('user not found');
+    await db.update(users)
+        .set({ defaultSignatureBase64: signatureBase64 })
+        .where(eq(users.id, userId));
+}
+
 export interface SlugAvailability {
     available: boolean;
     reason?: 'taken' | 'reserved' | 'invalid';

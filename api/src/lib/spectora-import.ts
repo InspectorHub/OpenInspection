@@ -223,6 +223,7 @@ export function convertSpectoraTemplate(input: SpectoraTemplate): ConvertResult 
             if (rl.color)        lvl.color = rl.color;
             lvl.severity = isDefect ? 'significant' : 'marginal';
             lvl.isDefect = isDefect;
+            lvl.pausesAdvance = isDefect;
             if (rl.default)      lvl.default = true;
             if (rl.description)  lvl.description = rl.description;
             return lvl;

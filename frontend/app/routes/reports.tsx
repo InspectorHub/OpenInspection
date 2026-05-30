@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/reports";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -18,10 +18,11 @@ interface Report {
   paymentStatus: string | null;
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
-    const res = await apiFetch("/api/inspections?status=completed,delivered", { token });
+    const api = createApi(context, { token });
+    const res = await api.inspections.index.$get({ query: { status: "completed,delivered" } });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
     return { reports: (body.data ?? []) as Report[] };
   } catch {

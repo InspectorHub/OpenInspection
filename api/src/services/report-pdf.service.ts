@@ -4,6 +4,7 @@ import { reportPdfs, tenantConfigs } from '../lib/db/schema';
 import type { ReportPdf } from '../lib/db/schema';
 import { generatePdfFromUrl } from '../lib/pdf';
 import { Errors } from '../lib/errors';
+import type { BrowserRun } from '../types/hono';
 
 export type ReportPdfType = 'summary' | 'full';
 export type ReportPdfStatus = 'queued' | 'rendering' | 'ready' | 'failed';
@@ -29,7 +30,7 @@ export type ReportPdfStatus = 'queued' | 'rendering' | 'ready' | 'failed';
 export class ReportPdfService {
     constructor(
         private db: D1Database,
-        private browser: Fetcher | undefined,        // BROWSER binding (optional — falls back to text-only email)
+        private browser: BrowserRun | undefined,     // BROWSER binding (optional — falls back to text-only email)
         private r2: R2Bucket | undefined,            // REPORTS bucket binding (optional during local dev)
     ) {}
 

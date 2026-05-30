@@ -1,17 +1,18 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/tags";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Tags - OpenInspection" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
-    const res = await apiFetch("/api/tags", { token });
+    const api = createApi(context, { token });
+    const res = await api.tags.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
     return { tags: (body.data ?? []) as unknown[] };
   } catch {

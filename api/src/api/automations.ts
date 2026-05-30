@@ -1,14 +1,12 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
-import type { HonoConfig } from '../types/hono';
 import {
     AutomationListResponseSchema, AutomationLogListResponseSchema,
     CreateAutomationSchema, UpdateAutomationSchema, AutomationSchema,
 } from '../lib/validations/automation.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-const automationsRoutes = new OpenAPIHono<HonoConfig>();
 
 // GET /api/automations
 const listRoute = createRoute(withMcpMetadata({
@@ -20,13 +18,6 @@ const listRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listAutomations (GET /, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-automationsRoutes.openapi(listRoute, async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    await c.var.services.automation.ensureSeeds(tenantId);
-    const rows = await c.var.services.automation.list(tenantId);
-    return c.json({ success: true, data: rows });
-});
-
 // POST /api/automations
 const createAutomationRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/', tags: ["automations"],
@@ -37,13 +28,6 @@ const createAutomationRoute = createRoute(withMcpMetadata({
     summary: "Create automation for current tenant",
     description: "Auto-generated placeholder for createAutomation (POST /, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
-
-automationsRoutes.openapi(createAutomationRoute, async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    const data = c.req.valid('json');
-    const row = await c.var.services.automation.create(tenantId, data);
-    return c.json({ success: true, data: row }, 201);
-});
 
 // GET /api/automations/logs/recent — Spec 3C, tenant-wide activity feed
 // MUST be registered BEFORE /logs/{inspectionId} to avoid path-param shadowing
@@ -57,13 +41,6 @@ const getRecentLogsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listAutomationLogsRecent (GET /logs/recent, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-automationsRoutes.openapi(getRecentLogsRoute, async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    const { limit } = c.req.valid('query');
-    const rows = await c.var.services.automation.listRecentLogs(tenantId, limit ?? 50);
-    return c.json({ success: true, data: rows });
-});
-
 // GET /api/automations/logs/:inspectionId — BEFORE /:id to avoid shadowing
 const getLogsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/logs/{inspectionId}', tags: ["automations"],
@@ -74,13 +51,6 @@ const getLogsRoute = createRoute(withMcpMetadata({
     summary: "Get automation log for current tenant",
     description: "Auto-generated placeholder for getAutomationLog (GET /logs/{inspectionId}, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
-
-automationsRoutes.openapi(getLogsRoute, async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    const { inspectionId } = c.req.valid('param');
-    const rows = await c.var.services.automation.getLogs(tenantId, inspectionId);
-    return c.json({ success: true, data: rows });
-});
 
 // PATCH /api/automations/:id
 const updateRoute = createRoute(withMcpMetadata({
@@ -96,15 +66,6 @@ const updateRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for patchAutomation (PATCH /{id}, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-automationsRoutes.openapi(updateRoute, async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    const { id } = c.req.valid('param');
-    const data = c.req.valid('json');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod partial() adds undefined to values, incompatible with exactOptionalPropertyTypes
-    const row = await c.var.services.automation.update(tenantId, id, data as any);
-    return c.json({ success: true, data: row });
-});
-
 // DELETE /api/automations/:id
 const deleteRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}', tags: ["automations"],
@@ -116,11 +77,46 @@ const deleteRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteAutomation (DELETE /{id}, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-automationsRoutes.openapi(deleteRoute, async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    const { id } = c.req.valid('param');
-    await c.var.services.automation.delete(tenantId, id);
-    return c.json({ success: true });
-});
+export const automationsRoutes = createApiRouter()
+    .openapi(listRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        await c.var.services.automation.ensureSeeds(tenantId);
+        const rows = await c.var.services.automation.list(tenantId);
+        return c.json({ success: true, data: rows });
+    })
+    .openapi(createAutomationRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const data = c.req.valid('json');
+        const row = await c.var.services.automation.create(tenantId, data);
+        return c.json({ success: true, data: row }, 201);
+    })
+    .openapi(getRecentLogsRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { limit } = c.req.valid('query');
+        const rows = await c.var.services.automation.listRecentLogs(tenantId, limit ?? 50);
+        return c.json({ success: true, data: rows });
+    })
+    .openapi(getLogsRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { inspectionId } = c.req.valid('param');
+        const rows = await c.var.services.automation.getLogs(tenantId, inspectionId);
+        return c.json({ success: true, data: rows });
+    })
+    .openapi(updateRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        const data = c.req.valid('json');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod partial() adds undefined to values, incompatible with exactOptionalPropertyTypes
+        const row = await c.var.services.automation.update(tenantId, id, data as any);
+        return c.json({ success: true, data: row });
+    })
+    .openapi(deleteRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        await c.var.services.automation.delete(tenantId, id);
+        return c.json({ success: true });
+    });
+
+export type AutomationsApi = typeof automationsRoutes;
 
 export default automationsRoutes;

@@ -36,14 +36,14 @@ export interface BrandingConfig {
     /** PR 2 — tenant subdomain (path segment). Needed for path-tenant booking
      *  URLs (`<host>/book/<tenant>/<slug>`). Populated by inspectorPaletteMiddleware. */
     tenantSubdomain?: string | null | undefined;
-    /** Shared-SaaS mode flag — true when this worker runs as `APP_MODE=saas`
-     *  with `SAAS_TOPOLOGY=shared`. Plumbed via brandingMiddleware so layouts
-     *  can render the "Switch workspace" affordance (the only way for a
-     *  multi-workspace identity to leave the current tenant) and so the
-     *  login/forgot-password handlers can 302 to the portal-issued sign-in
-     *  flow instead of presenting a local form that can no longer
-     *  disambiguate which `(tenantId, email)` row to authenticate against. */
-    isSharedSaas?: boolean | undefined;
+    /** SaaS mode flag — true when this worker runs as `APP_MODE=saas`.
+     *  Plumbed via brandingMiddleware so layouts can render the "Switch
+     *  workspace" affordance (the only way for a multi-workspace identity
+     *  to leave the current tenant) and so the login/forgot-password
+     *  handlers can 302 to the portal-issued sign-in flow instead of
+     *  presenting a local form that can no longer disambiguate which
+     *  `(tenantId, email)` row to authenticate against. */
+    isSaas?: boolean | undefined;
     /** Portal base URL exposed to the browser for the "Switch workspace"
      *  link and login bounce. Resolved from `PORTAL_API_URL` at request
      *  time. Null when running standalone or when `PORTAL_API_URL` is

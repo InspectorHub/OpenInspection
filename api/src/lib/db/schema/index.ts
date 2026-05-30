@@ -51,3 +51,7 @@ export { observerLinks } from './observer';
 export { reportVersions } from './report-versions';
 // Design System 0520 subsystem E — IdentitySwitcher links
 export { userIdentityLinks } from './identity-links';
+// Public concierge booking flow (Tasks 15-17 of typed-hono-dead-routes-cleanup)
+export { conciergeInvites, conciergeBookings } from './concierge';
+// Inspection sync conflicts (Tasks 12-14 of typed-hono-dead-routes-cleanup)
+export { inspectionConflicts } from './inspection-conflicts';

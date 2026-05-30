@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { Form, useLoaderData, useActionData } from "react-router";
+import { useLoaderData } from "react-router";
 import type { Route } from "./+types/concierge-confirm";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
-  return [{ title: "Confirm your inspection - OpenInspection" }];
+  return [{ title: "Booking confirmed - OpenInspection" }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -12,66 +11,40 @@ export function meta() {
 /* ------------------------------------------------------------------ */
 
 interface ConfirmData {
-  token: string;
-  inspector: {
-    name: string | null;
-    photoUrl: string | null;
-    email: string | null;
+  booking: {
+    id: string;
+    start: string;
+    end: string;
+    address: string;
+    contactName: string;
+    tenant: { name: string };
   };
-  inspection: {
-    propertyAddress: string;
-    date: string;
-    clientName: string | null;
-    agreementRequired: boolean;
-  };
-  agreementSnippet?: string;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") ?? "";
   if (!token) {
     return { data: null, error: "no-token" as const };
   }
   try {
-    const res = await apiFetch(
-      `/api/concierge/confirm-info?token=${encodeURIComponent(token)}`,
-    );
-    const body = res.ok ? await res.json() : {};
+    const api = createApi(context);
+    const res = await api.concierge["confirm-info"].$get({ query: { token } });
     if (!res.ok) {
       return { data: null, error: "expired" as const };
     }
-    const d = ((body as Record<string, unknown>).data ?? {}) as unknown as ConfirmData | undefined;
-    return { data: d && Object.keys(d).length > 0 ? { ...d, token } : null, error: null };
+    const body = (await res.json()) as { success: boolean; data?: ConfirmData };
+    if (!body.success || !body.data) {
+      return { data: null, error: "expired" as const };
+    }
+    return { data: body.data, error: null };
   } catch {
     return { data: null, error: "unknown" as const };
   }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Action                                                             */
-/* ------------------------------------------------------------------ */
-
-export async function action({ request }: Route.ActionArgs) {
-  const fd = await request.formData();
-  const token = fd.get("token") as string;
-
-  const res = await apiFetch("/api/concierge/confirm", {
-    method: "POST",
-    body: JSON.stringify({ token }),
-  });
-
-  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (res.ok && json.success) {
-    const data = json.data as Record<string, string> | undefined;
-    return { error: null, redirect: data?.redirect || "/" };
-  }
-  const err = json.error as Record<string, string> | undefined;
-  return { error: err?.message || "Could not confirm. Please try again.", redirect: null };
 }
 
 /* ------------------------------------------------------------------ */
@@ -88,19 +61,26 @@ function initials(name: string | null | undefined): string {
   ).toUpperCase();
 }
 
+function formatSlot(start: string, end: string): string {
+  try {
+    const s = new Date(start);
+    const e = new Date(end);
+    const sameDay = s.toDateString() === e.toDateString();
+    if (sameDay) {
+      return `${s.toLocaleDateString(undefined, { dateStyle: "long" })}, ${s.toLocaleTimeString(undefined, { timeStyle: "short" })} – ${e.toLocaleTimeString(undefined, { timeStyle: "short" })}`;
+    }
+    return `${s.toLocaleString()} – ${e.toLocaleString()}`;
+  } catch {
+    return `${start} – ${end}`;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
 export default function ConciergeConfirmPage() {
   const { data, error: loaderError } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  const [submitting, setSubmitting] = useState(false);
-
-  // Redirect on success
-  if (typeof window !== "undefined" && actionData?.redirect) {
-    window.location.href = actionData.redirect;
-  }
 
   // Error / expired states
   if (loaderError || !data) {
@@ -112,10 +92,10 @@ export default function ConciergeConfirmPage() {
           : "We couldn't find that confirmation link";
     const body =
       loaderError === "expired"
-        ? "Confirmation links are valid for 7 days. Reach out to your agent or inspector and they can send you a fresh one."
+        ? "Confirmation links are valid for a short window. Reach out to your inspector and they can resend the original."
         : loaderError === "no-token"
-          ? "It looks like the link is incomplete. Use the original email and try again, or contact your agent."
-          : "The link may have been mistyped, or the booking was cancelled. Get in touch with your agent.";
+          ? "It looks like the link is incomplete. Use the original email and try again, or contact your inspector."
+          : "The link may have been mistyped, or the booking was cancelled. Get in touch with your inspector.";
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-9">
@@ -133,7 +113,8 @@ export default function ConciergeConfirmPage() {
     );
   }
 
-  const inspectorName = data.inspector.name || data.inspector.email || "your inspector";
+  const { booking } = data;
+  const slotLabel = formatSlot(booking.start, booking.end);
 
   return (
     <div className="min-h-screen bg-ih-bg-card">
@@ -147,42 +128,26 @@ export default function ConciergeConfirmPage() {
         </div>
 
         <h1 className="font-serif text-[2rem] font-bold leading-tight mb-2 text-ih-fg-1">
-          Confirm your inspection
+          Your booking is in
         </h1>
         <p className="text-base text-ih-fg-3 leading-relaxed mb-8">
-          {data.inspector.name ? (
-            <strong className="text-ih-fg-1">
-              {data.inspector.name}
-            </strong>
-          ) : (
-            "Your inspector"
-          )}{" "}
-          has scheduled an inspection on your behalf. Review the details below
-          and confirm to lock it in.
+          Thanks{booking.contactName ? `, ${booking.contactName}` : ""}. Your inspector
+          will be in touch shortly to lock in the slot below and walk you through
+          the next steps.
         </p>
 
         {/* Summary card */}
         <article className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden mb-6">
           <div className="flex items-center gap-4 p-7 border-b border-ih-border">
-            {data.inspector.photoUrl ? (
-              <span className="w-[72px] h-[72px] rounded-full overflow-hidden shrink-0 bg-orange-50 dark:bg-orange-900/20">
-                <img
-                  src={data.inspector.photoUrl}
-                  alt={inspectorName}
-                  className="w-full h-full object-cover"
-                />
-              </span>
-            ) : (
-              <span className="w-[72px] h-[72px] rounded-full bg-orange-50 dark:bg-orange-900/20 text-[#F55A1A] flex items-center justify-center font-serif font-bold text-2xl shrink-0">
-                {initials(data.inspector.name)}
-              </span>
-            )}
+            <span className="w-[72px] h-[72px] rounded-full bg-orange-50 dark:bg-orange-900/20 text-[#F55A1A] flex items-center justify-center font-serif font-bold text-2xl shrink-0">
+              {initials(booking.tenant.name)}
+            </span>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4 mb-1">
-                Your inspector
+                Inspection by
               </div>
               <div className="font-serif text-2xl font-bold text-ih-fg-1 leading-tight">
-                {inspectorName}
+                {booking.tenant.name}
               </div>
             </div>
           </div>
@@ -192,71 +157,42 @@ export default function ConciergeConfirmPage() {
                 Property
               </span>
               <span className="text-base font-semibold text-ih-fg-1">
-                {data.inspection.propertyAddress}
+                {booking.address}
               </span>
             </div>
             <div>
               <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4">
-                Date
+                Slot
               </span>
               <span className="text-base font-semibold text-ih-fg-1">
-                {data.inspection.date}
+                {slotLabel}
               </span>
             </div>
-            {data.inspection.clientName && (
+            {booking.contactName && (
               <div>
                 <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4">
-                  Client
+                  Booked for
                 </span>
                 <span className="text-base font-semibold text-ih-fg-1">
-                  {data.inspection.clientName}
+                  {booking.contactName}
                 </span>
               </div>
             )}
+            <div>
+              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-ih-fg-4">
+                Reference
+              </span>
+              <span className="text-base font-mono text-ih-fg-3">
+                {booking.id}
+              </span>
+            </div>
           </div>
         </article>
 
-        {/* Agreement preview */}
-        {data.inspection.agreementRequired && data.agreementSnippet && (
-          <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6 mb-6">
-            <h3 className="font-serif text-lg font-bold text-ih-fg-1 mb-2">
-              Inspection agreement (preview)
-            </h3>
-            <p className="text-[15px] italic text-ih-fg-3 leading-relaxed">
-              {data.agreementSnippet}
-            </p>
-            <p className="mt-3.5 text-[13px] text-ih-fg-4">
-              After confirming you'll be taken to the full agreement to read and e-sign.
-            </p>
-          </section>
-        )}
-        {data.inspection.agreementRequired && !data.agreementSnippet && (
-          <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6 mb-6">
-            <h3 className="font-serif text-lg font-bold text-ih-fg-1 mb-2">
-              Inspection agreement
-            </h3>
-            <p className="text-[15px] italic text-ih-fg-3 leading-relaxed">
-              After confirming you'll be taken to the full inspection agreement to read and e-sign.
-            </p>
-          </section>
-        )}
-
-        {/* Confirm form */}
-        <Form method="post" onSubmit={() => setSubmitting(true)} className="mt-7">
-          <input type="hidden" name="token" value={data.token} />
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full px-6 py-4 bg-[#F55A1A] text-white rounded-lg font-bold text-base hover:brightness-95 disabled:bg-slate-400 disabled:cursor-wait transition-all"
-          >
-            {submitting ? "Confirming..." : "Confirm and continue"}
-          </button>
-          {actionData?.error && (
-            <div className="mt-3 px-4 py-3 bg-ih-bad-bg border border-ih-bad rounded-lg text-[14px] text-ih-bad-fg">
-              {actionData.error}
-            </div>
-          )}
-        </Form>
+        <p className="text-[14px] text-ih-fg-3 leading-relaxed">
+          Watch your email — we'll send the full inspection agreement and a
+          calendar invite as soon as your inspector confirms the slot.
+        </p>
       </main>
     </div>
   );

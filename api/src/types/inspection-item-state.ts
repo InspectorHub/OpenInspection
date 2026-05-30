@@ -14,6 +14,7 @@
  *  follow-up if the embedded approach proves limiting.)
  */
 import type { DefectCategory } from './template-schema';
+import type { DefectTrade, DefectDeadline, DefectTimeframe } from './defect-fields';
 
 /**
  * State for a non-defect canned comment (Information / Limitations).
@@ -29,7 +30,8 @@ export interface CannedCommentState {
 
 /**
  * State for a defect canned comment. Adds category override (defaults to
- * the template's category) + location + per-defect photos.
+ * the template's category) + location + structured trade/deadline/timeframe
+ * + per-defect photos.
  */
 export interface DefectCommentState {
     cannedId: string;
@@ -37,6 +39,9 @@ export interface DefectCommentState {
     comment?: string | null;
     category?: DefectCategory;
     location?: string | null;
+    trade?: DefectTrade | null;
+    deadline?: DefectDeadline | null;
+    timeframe?: DefectTimeframe | null;
     photos?: Array<{ key: string; annotatedKey?: string; annotationsJson?: string }>;
 }
 

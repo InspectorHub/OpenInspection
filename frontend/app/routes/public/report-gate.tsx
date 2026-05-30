@@ -1,6 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-gate";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Report access - OpenInspection" }];
@@ -30,11 +30,12 @@ interface GateData {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params, request }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   try {
-    const res = await apiFetch(
-      `/api/public/report-gate/${params.tenant}/${params.id}`,
-    );
+    const api = createApi(context);
+    const res = await api.publicShare["report-gate"][":tenant"][":id"].$get({
+      param: { tenant: params.tenant ?? "", id: params.id ?? "" },
+    });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
     const d = (body.data ?? {}) as Record<string, unknown>;
     return { gate: (Object.keys(d).length > 0 ? d : null) as GateData | null, error: res.ok ? null : "Not found" };

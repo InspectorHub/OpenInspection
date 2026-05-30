@@ -7,12 +7,10 @@
  * JWT-guarded; tenant scope from the JWT claim. Both responses are
  * read-only and safe to cache for ~60 seconds at the edge.
  */
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
-import type { HonoConfig } from '../types/hono';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-const analyticsRoutes = new OpenAPIHono<HonoConfig>();
 
 const growthRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -24,13 +22,6 @@ const growthRoute = createRoute(withMcpMetadata({
     operationId: "listAnalyticGrowth",
     description: "Auto-generated placeholder for listAnalyticGrowth (GET /growth, metrics domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
-analyticsRoutes.openapi(growthRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-    const { months } = c.req.valid('query');
-    const out = await c.var.services.analytics.growth(tenantId, months);
-    return c.json({ success: true as const, data: out }, 200);
-});
 
 const heatmapRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -41,11 +32,21 @@ const heatmapRoute = createRoute(withMcpMetadata({
     operationId: "listAnalyticFindingsHeatmap",
     description: "Auto-generated placeholder for listAnalyticFindingsHeatmap (GET /findings-heatmap, metrics domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
-analyticsRoutes.openapi(heatmapRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-    const out = await c.var.services.analytics.findingsHeatmap(tenantId);
-    return c.json({ success: true as const, data: out }, 200);
-});
 
+export const analyticsRoutes = createApiRouter()
+    .openapi(growthRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+        const { months } = c.req.valid('query');
+        const out = await c.var.services.analytics.growth(tenantId, months);
+        return c.json({ success: true as const, data: out }, 200);
+    })
+    .openapi(heatmapRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+        const out = await c.var.services.analytics.findingsHeatmap(tenantId);
+        return c.json({ success: true as const, data: out }, 200);
+    });
+
+export type AnalyticsApi = typeof analyticsRoutes;
 export default analyticsRoutes;

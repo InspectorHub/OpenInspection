@@ -1,6 +1,6 @@
 # Testing — apps/core
 
-Tests cover both the API Worker and the Remix Frontend Worker.
+Tests cover both the API Worker and the React Router v7 Frontend Worker.
 
 ## Quick Start
 
@@ -18,7 +18,7 @@ npx playwright test --config api/playwright.config.ts
 
 ### Frontend Tests
 
-Frontend E2E and unit tests live in `frontend/tests/`. They test the Remix React UI against the running API Worker.
+Frontend E2E and unit tests live in `frontend/tests/`. They test the React Router v7 React UI against the running API Worker.
 
 ```bash
 # Terminal 1: Start API Worker
@@ -176,7 +176,7 @@ npx playwright test --config api/playwright.config.ts --reporter=list
 
 ## Frontend Tests
 
-Frontend tests live in `frontend/tests/` and cover the Remix React UI.
+Frontend tests live in `frontend/tests/` and cover the React Router v7 React UI.
 
 ### Running
 

@@ -1,5 +1,5 @@
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
-import { HonoConfig } from '../types/hono';
+import { createRoute } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { checkRateLimit } from '../lib/rate-limit';
 import {
@@ -13,8 +13,6 @@ import {
     CommentEditResponseSchema,
 } from '../lib/validations/ai.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-const aiRoutes = new OpenAPIHono<HonoConfig>();
 
 /**
  * POST /api/ai/comment-assist
@@ -49,14 +47,6 @@ const commentAssistRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createAiCommentAssist (POST /comment-assist, ai domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-aiRoutes.openapi(commentAssistRoute, async (c) => {
-    const { text, context } = c.req.valid('json');
-    const service = c.var.services.ai;
-    
-    const professionalText = await service.generateProfessionalComment(text, context);
-    return c.json({ success: true, data: { text: professionalText } }, 200);
-});
-
 /**
  * POST /api/ai/auto-summary
  * Generates a high-level summary of defects.
@@ -90,15 +80,6 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createAiAutoSummary (POST /auto-summary, ai domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-aiRoutes.openapi(autoSummaryRoute, async (c) => {
-    const { inspectionId } = c.req.valid('json');
-    const tenantId = c.get('tenantId');
-    const service = c.var.services.ai;
-    
-    const summary = await service.generateInspectionSummary(tenantId, inspectionId);
-    return c.json({ success: true, data: { summary } }, 200);
-});
-
 /**
  * POST /api/ai/suggest-comment
  * Returns 3 AI-generated professional comments for a specific inspection item.
@@ -109,7 +90,7 @@ aiRoutes.openapi(autoSummaryRoute, async (c) => {
  * inspector instruction (e.g. "shorten", "add NW corner detail"). Rate-limited
  * the same way as login + booking endpoints.
  */
-aiRoutes.openapi(createRoute(withMcpMetadata({
+const commentEditRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/comment/edit',
     tags: ["ai"],
@@ -126,24 +107,9 @@ aiRoutes.openapi(createRoute(withMcpMetadata({
     },
     operationId: "createAiCommentEdit",
     description: "Auto-generated placeholder for createAiCommentEdit (POST /comment/edit, ai domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
-    await checkRateLimit(c, 'ai-comment-edit');
-    const input = c.req.valid('json');
-    // Strip undefined optional fields so service stays exactOptionalPropertyTypes-clean.
-    const payload = {
-        itemLabel:       input.itemLabel,
-        sectionTitle:    input.sectionTitle,
-        tab:             input.tab,
-        originalComment: input.originalComment,
-        instruction:     input.instruction,
-        ...(input.category !== undefined ? { category: input.category } : {}),
-        ...(input.location !== undefined ? { location: input.location } : {}),
-    };
-    const rewritten = await c.var.services.ai.rewriteComment(payload);
-    return c.json({ success: true, data: { rewritten } }, 200);
-});
+}, { scopes: ['write'], tier: 'extended' }));
 
-aiRoutes.openapi(createRoute(withMcpMetadata({
+const suggestCommentRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/suggest-comment',
     tags: ["ai"],
@@ -162,10 +128,46 @@ aiRoutes.openapi(createRoute(withMcpMetadata({
     },
     operationId: "createAiSuggestComment",
     description: "Auto-generated placeholder for createAiSuggestComment (POST /suggest-comment, ai domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' })), async (c) => {
-    const params = c.req.valid('json');
-    const suggestions = await c.var.services.ai.suggestComment(params);
-    return c.json({ success: true, data: suggestions });
-});
+}, { scopes: ['write'], tier: 'extended' }));
+
+export const aiRoutes = createApiRouter()
+    .openapi(commentAssistRoute, async (c) => {
+        const { text, context } = c.req.valid('json');
+        const service = c.var.services.ai;
+
+        const professionalText = await service.generateProfessionalComment(text, context);
+        return c.json({ success: true, data: { text: professionalText } }, 200);
+    })
+    .openapi(autoSummaryRoute, async (c) => {
+        const { inspectionId } = c.req.valid('json');
+        const tenantId = c.get('tenantId');
+        const service = c.var.services.ai;
+
+        const summary = await service.generateInspectionSummary(tenantId, inspectionId);
+        return c.json({ success: true, data: { summary } }, 200);
+    })
+    .openapi(commentEditRoute, async (c) => {
+        await checkRateLimit(c, 'ai-comment-edit');
+        const input = c.req.valid('json');
+        // Strip undefined optional fields so service stays exactOptionalPropertyTypes-clean.
+        const payload = {
+            itemLabel:       input.itemLabel,
+            sectionTitle:    input.sectionTitle,
+            tab:             input.tab,
+            originalComment: input.originalComment,
+            instruction:     input.instruction,
+            ...(input.category !== undefined ? { category: input.category } : {}),
+            ...(input.location !== undefined ? { location: input.location } : {}),
+        };
+        const rewritten = await c.var.services.ai.rewriteComment(payload);
+        return c.json({ success: true, data: { rewritten } }, 200);
+    })
+    .openapi(suggestCommentRoute, async (c) => {
+        const params = c.req.valid('json');
+        const suggestions = await c.var.services.ai.suggestComment(params);
+        return c.json({ success: true, data: suggestions });
+    });
+
+export type AiApi = typeof aiRoutes;
 
 export default aiRoutes;

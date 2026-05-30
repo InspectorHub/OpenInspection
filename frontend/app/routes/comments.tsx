@@ -2,21 +2,34 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/comments";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { createApi } from "~/lib/api-client.server";
+import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from "@core/shared-ui";
+import { usePagination } from "~/hooks/usePagination";
 
 export function meta() {
   return [{ title: "Comments Library - OpenInspection" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
-    const res = await apiFetch("/api/admin/comments", { token });
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { comments: (body.data ?? []) as unknown[] };
+    const url = new URL(request.url);
+    const page     = url.searchParams.get("page")     ?? "1";
+    const pageSize = url.searchParams.get("pageSize") ?? "50";
+    const api = createApi(context, { token });
+    const res = await api.admin.comments.$get({ query: { page, pageSize } });
+    const body = res.ok
+      ? ((await res.json()) as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
+      : { data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } };
+    return {
+      comments: (body.data ?? []) as unknown[],
+      meta: body.meta ?? { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+    };
   } catch {
-    return { comments: [] };
+    return {
+      comments: [] as unknown[],
+      meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+    };
   }
 }
 
@@ -34,15 +47,16 @@ const BUCKET_TONE: Record<string, "sat" | "monitor" | "defect"> = {
 };
 
 export default function CommentsPage() {
-  const { comments } = useLoaderData<typeof loader>();
+  const { comments, meta } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState("all");
+  const { setPage, setPageSize } = usePagination();
 
   return (
     <div className="space-y-[18px]">
       <PageHeader
         eyebrow="Library · Comments"
         title="Comments Library"
-        meta={`${comments.length} in library`}
+        meta={`${meta.total} in library`}
         actions={
           <Button variant="primary">+ Add comment</Button>
         }
@@ -58,19 +72,30 @@ export default function CommentsPage() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {comments.map((c: any) => (
-            <Card key={c.id} className="p-4">
-              <p className="text-[13px] text-ih-fg-3 line-clamp-3">{c.text}</p>
-              <div className="flex items-center gap-2 mt-2">
-                {c.ratingBucket && (
-                  <Pill tone={BUCKET_TONE[c.ratingBucket] || "gen"}>{c.ratingBucket}</Pill>
-                )}
-                {c.section && <span className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-4">{c.section}</span>}
-              </div>
-            </Card>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {comments.map((c: any) => (
+              <Card key={c.id} className="p-4">
+                <p className="text-[13px] text-ih-fg-3 line-clamp-3">{c.text}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  {c.ratingBucket && (
+                    <Pill tone={BUCKET_TONE[c.ratingBucket] || "gen"}>{c.ratingBucket}</Pill>
+                  )}
+                  {c.section && <span className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-4">{c.section}</span>}
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <Pagination
+            page={meta.page}
+            pageSize={meta.pageSize}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </>
       )}
     </div>
   );

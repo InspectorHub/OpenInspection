@@ -33,9 +33,9 @@ const PORTAL_ROOT = join(CORE_ROOT, '..', 'portal');
 
 // [label, cwd, wrangler-config-flag, env-flag]
 const TARGETS = [
-    ['openinspection-standalone',  CORE_ROOT,   '',                          ''],
-    ['openinspection-saas',        CORE_ROOT,   '',                          '--env saas'],
-    ['inspectorhub-core-shared',   CORE_ROOT,   '-c wrangler.saas.toml',     ''],
+    ['openinspection-api',         CORE_ROOT,   '',                          ''],
+    ['openinspection-saas-api',    CORE_ROOT,   '',                          '--env saas'],
+    ['openinspection-saas-api',    CORE_ROOT,   '-c wrangler.saas.toml',     ''],
     ['inspectorhub-portal',        PORTAL_ROOT, '',                          ''],
 ];
 

@@ -1,7 +1,7 @@
 import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
  return [{ title: "Agent Dashboard - OpenInspection" }];
@@ -17,10 +17,11 @@ interface Referral {
  inspectorName: string | null;
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
- const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+ const token = await requireToken(context, request);
  try {
- const res = await apiFetch("/api/agent/referrals", { token });
+ const api = createApi(context, { token });
+ const res = await api.agent.referrals.$get();
  const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
  return {
  referrals: (body.data ?? []) as Referral[],

@@ -37,6 +37,8 @@ export const users = sqliteTable('users', {
     // completed their profile yet. `serviceAreas` stores a JSON array of
     // {city, state, zip} objects; parsed/validated in UserService.getProfileBySlug.
     photoUrl: text('photo_url'),
+    // Spec 5H D2 — saved signature used for auto-sign on publish + Settings prefill.
+    defaultSignatureBase64: text('default_signature_base64'),
     bio: text('bio'),
     serviceAreas: text('service_areas'),
     // Booking #7 Sprint A — per-tenant unique inspector slug used for /book/<slug>.
@@ -86,6 +88,10 @@ export const users = sqliteTable('users', {
     // teammates who join via team invite (only the tenant owner answers
     // the role survey at signup).
     signupRole:           text('signup_role'),
+    // Account soft-delete marker — set by POST /api/account/delete after
+    // the user retypes their email to confirm. NULL = active. Kept rather
+    // than hard-deleted so audit-linked rows remain referentially intact.
+    deletedAt:            integer('deleted_at', { mode: 'timestamp' }),
 });
 
 /**
@@ -159,6 +165,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
         .$type<{ agreement_unsigned_h: number; invoice_overdue_h: number; report_unpublished_h: number }>()
         .notNull()
         .default(sql`'{"agreement_unsigned_h":72,"invoice_overdue_h":72,"report_unpublished_h":72}'`),
+    // Workflow shortcuts PR — { cloneDefault, autoAdvanceDelayMs, pinnedTagIds }
+    // Nullable; server applies hard-coded defaults when NULL.
+    inspectionPrefs: text('inspection_prefs', { mode: 'json' })
+        .$type<{ cloneDefault: 'rating' | 'rating_notes' | 'all'; autoAdvanceDelayMs: number; pinnedTagIds: string[] }>(),
     // Sprint 2 S2-4 — when true, published reports render the per-defect
     // "Estimated cost: $X – $Y" badge.
     showEstimates: integer('show_estimates', { mode: 'boolean' }).notNull().default(false),
@@ -199,6 +209,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // PDF generation at publish time + the Refresh PDFs / Download PDF
     // dropdown in the report viewer.
     enablePdfPipeline: integer('enable_pdf_pipeline', { mode: 'boolean' }).notNull().default(false),
+    // Spec 5H D2 — tenant-default for newly-created inspections'
+    // auto_sign_on_publish flag. False by default.
+    autoSignOnPublishDefault: integer('auto_sign_on_publish_default', { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
     teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
     apprenticeReviewRequired: integer('apprentice_review_required', { mode: 'boolean' }).notNull().default(false),

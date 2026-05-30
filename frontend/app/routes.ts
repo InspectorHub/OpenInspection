@@ -22,6 +22,8 @@ export default [
     ),
     route("r/:id/invoice", "routes/public/invoice.tsx"),
     route("verify/:envelopeId", "routes/public/verify.tsx"),
+    route("verify", "routes/public/verify-offline.tsx"),
+    route("v/:token", "routes/public/verify-token.tsx"),
     route("observe/inspections/:id", "routes/public/observe.tsx"),
     route(
       "concierge/book/:tenant/:slug",
@@ -81,6 +83,7 @@ export default [
     layout("routes/settings-layout.tsx", [
       route("settings", "routes/settings-hub.tsx"),
       route("settings/profile", "routes/settings-profile.tsx"),
+      route("settings/inspection", "routes/settings-inspection.tsx"),
       route("settings/workspace", "routes/settings-workspace.tsx"),
       route("settings/services", "routes/settings-services.tsx"),
       route("settings/communication", "routes/settings-communication.tsx"),

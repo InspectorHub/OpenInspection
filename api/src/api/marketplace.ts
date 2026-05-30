@@ -1,7 +1,7 @@
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
+import { createRoute } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
-import { HonoConfig } from '../types/hono';
 import { Errors, AppError } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
 import {
@@ -11,45 +11,54 @@ import {
 import {
     ImportHistoryQuerySchema,
 } from '../lib/validations/import-history.schema';
+import {
+    paginationQuerySchema,
+    PaginatedMetaSchema,
+    buildMeta,
+} from '../lib/validations/pagination.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-const marketplaceRoutes = new OpenAPIHono<HonoConfig>();
-
+export const marketplaceRoutes = createApiRouter()
 // GET /api/templates/marketplace
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["marketplace"],
     summary: "List marketplaces for current tenant",
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
-        query: z.object({
-            search:   z.string().optional().describe('TODO describe search field for the OpenInspection MCP integration'),
-            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction']).optional().describe('TODO describe category field for the OpenInspection MCP integration'),
-            page:     z.coerce.number().int().min(1).optional().describe('TODO describe page field for the OpenInspection MCP integration'),
-            pageSize: z.coerce.number().int().min(1).max(100).optional().describe('TODO describe pageSize field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+        query: paginationQuerySchema.extend({
+            search:   z.string().optional(),
+            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction', 'standards_aligned']).optional(),
+        }),
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.any()).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
-            description: 'OK',
+            content: { 'application/json': { schema: z.object({
+                success: z.boolean(),
+                data:    z.array(z.any()),
+                meta:    PaginatedMetaSchema,
+            }) } },
+            description: 'Paginated list of marketplace templates for the current tenant.',
         },
     },
     operationId: "listMarketplaces",
-    description: "Auto-generated placeholder for listMarketplaces (GET /, marketplace domain). TODO: replace with a real description sourced from the handler."
+    description: "Paginated list of marketplace templates for the current tenant.",
 }, { scopes: ['read'], tier: 'primary' })), async (c) => {
     const q = c.req.valid('query');
-    const data = await c.var.services.marketplace.list({
+    const { rows, total } = await c.var.services.marketplace.list({
         ...(q.search   !== undefined ? { search:   q.search }   : {}),
         ...(q.category !== undefined ? { category: q.category } : {}),
-        ...(q.page     !== undefined ? { page:     q.page }     : {}),
-        ...(q.pageSize !== undefined ? { pageSize: q.pageSize } : {}),
+        page:     q.page,
+        pageSize: q.pageSize,
     });
-    return c.json({ success: true, data });
-});
-
+    return c.json({
+        success: true,
+        data: rows,
+        meta: buildMeta({ total, page: q.page, pageSize: q.pageSize }),
+    });
+})
 // POST /api/templates/marketplace/:id/import
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/import',
     tags: ["marketplace"],
     summary: 'Import marketplace template as tenant copy',
@@ -75,10 +84,9 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
         }
         throw err;
     }
-});
-
+})
 // Spec 5G M2 — Library marketplace (comments, snippets)
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/libraries',
     tags: ["marketplace"],
     summary: 'List marketplace libraries (comment packs, snippet packs)',
@@ -95,13 +103,12 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     const q = c.req.valid('query');
     const data = await c.var.services.marketplace.listLibraries(q.kind ? { kind: q.kind } : {});
     return c.json({ success: true, data });
-});
-
+})
 // review — Update an already-imported template to the latest marketplace
 // semver. Scheme 2: creates a NEW local copy with a "(vX.Y.Z)" suffix and
 // re-points the import marker; the old local row is preserved so existing
 // inspections do not break.
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/update',
     tags: ["marketplace"],
     summary: 'Update tenant copy to latest marketplace version (creates new local copy)',
@@ -152,9 +159,8 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
         if (err instanceof AppError) throw err;
         throw err;
     }
-});
-
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+})
+    .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/libraries/{id}/import',
     tags: ["marketplace"],
     summary: 'Import marketplace library into tenant',
@@ -181,11 +187,10 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return c.json({ success: false, error: { code: 'import_failed', message: msg, stack } }, 500) as any;
     }
-});
-
+})
 // review — Update an already-imported library to the latest marketplace
 // semver. Scheme 2: appends new rows; does NOT delete previous import.
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/libraries/{id}/update',
     tags: ["marketplace"],
     summary: 'Update tenant library import to latest marketplace version (adds new rows)',
@@ -234,12 +239,11 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
         if (err instanceof AppError) throw err;
         throw err;
     }
-});
-
+})
 // Sprint 2 S2-7 — Library "replace" mode update. Deletes prior-import rows
 // before inserting the new pack. Owner/admin only; user must acknowledge the
 // edit-loss when prior rows have been modified.
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'post', path: '/libraries/{libraryId}/imports/replace',
     tags: ["marketplace"],
     summary: 'Replace tenant library import (deletes prior rows + inserts new pack)',
@@ -304,11 +308,10 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
         if (err instanceof AppError) throw err;
         throw err;
     }
-});
-
+})
 // Sprint 2 S2-8 — Per-import history list. Tenant-scoped, optional template
 // or library filter. Used by the version-history drawer on /templates and /comments.
-marketplaceRoutes.openapi(createRoute(withMcpMetadata({
+    .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/imports/history',
     tags: ["marketplace"],
     summary: 'List per-import history events',
@@ -341,4 +344,5 @@ marketplaceRoutes.openapi(createRoute(withMcpMetadata({
     return c.json({ success: true, data: result }, 200);
 });
 
+export type MarketplaceApi = typeof marketplaceRoutes;
 export default marketplaceRoutes;

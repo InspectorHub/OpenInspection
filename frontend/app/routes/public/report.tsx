@@ -1,6 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
  return [{ title: "Inspection Report - OpenInspection" }];
@@ -13,6 +13,13 @@ interface ReportSection {
  defects: number;
 }
 
+interface InspectorSignature {
+ signatureBase64: string;
+ signedAt: string | number;
+ auto?: boolean;
+ userId?: string;
+}
+
 interface ReportData {
  address: string;
  date: string | null;
@@ -21,17 +28,24 @@ interface ReportData {
  sections: ReportSection[];
  defectSummary: { safety: number; recommendation: number; maintenance: number };
  reportTheme?: string;
+ inspectorSignature?: InspectorSignature | null;
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
  try {
- const res = await apiFetch(
- `/api/public/report/${params.tenant}/${params.id}`,
- );
+ const api = createApi(context);
+ const res = await api.publicShare.report[":tenant"][":id"].$get({
+ param: { tenant: params.tenant ?? "", id: params.id ?? "" },
+ });
  const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
  const d = (body.data ?? {}) as Record<string, unknown>;
+ // Extract _inspector_signature if the API embeds it in the response
+ const rawSig = (d.inspectorSignature ?? d._inspector_signature) as InspectorSignature | null | undefined;
+ const reportData: ReportData | null = Object.keys(d).length > 0
+ ? { ...(d as unknown as ReportData), inspectorSignature: rawSig ?? null }
+ : null;
  return {
- report: (Object.keys(d).length > 0 ? d : null) as ReportData | null,
+ report: reportData,
  error: res.ok ? null : "Report not found",
  };
  } catch {
@@ -54,8 +68,16 @@ export default function ReportPage() {
  }
 
  const { defectSummary: ds } = report;
+ const inspectorSig = report.inspectorSignature ?? null;
 
  return (
+ <>
+ <style>{`
+ @media print {
+ .signature-block img { max-height: 60px; }
+ .signature-block { page-break-inside: avoid; }
+ }
+ `}</style>
  <div className="max-w-3xl mx-auto p-6" data-theme={report.reportTheme || undefined}>
  {/* Header */}
  <div className="mb-8">
@@ -107,6 +129,26 @@ export default function ReportPage() {
  </div>
  ))}
  </div>
+
+ {/* Inspector signature block */}
+ {inspectorSig && (
+ <section className="mt-12 pt-6 border-t border-ih-border signature-block">
+ <h3 className="text-sm font-semibold mb-2">Signed by Inspector</h3>
+ <img
+ src={inspectorSig.signatureBase64}
+ alt="Inspector signature"
+ className="max-w-[240px] max-h-[80px] border border-ih-border bg-white p-1"
+ />
+ <p className="text-xs text-ih-fg-3 mt-1">
+ {report.inspectorName || "Inspector"} &middot;{" "}
+ {new Date(inspectorSig.signedAt).toUTCString()}
+ {inspectorSig.auto && (
+ <span className="ml-2 italic">(auto-signed at publish)</span>
+ )}
+ </p>
+ </section>
+ )}
  </div>
+ </>
  );
 }

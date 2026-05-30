@@ -14,7 +14,7 @@ import type { HonoConfig } from '../../types/hono';
  * resolve `/setup`-prefixed paths without a real tenant — see
  * `features/tenant-routing/index.ts`.
  *
- * NOTE: The setup page HTML is now served by the Remix frontend.
+ * NOTE: The setup page HTML is now served by the React Router v7 frontend.
  * This module only provides the profile gate so that /setup returns 404
  * in saas modes where the wizard is not applicable.
  */
@@ -27,8 +27,8 @@ export function setupWizardRoutes(): Hono<HonoConfig> {
         return next();
     });
 
-    // GET /setup — Remix frontend serves the actual page; this handler
-    // returns a minimal redirect or passthrough so Remix can pick it up.
+    // GET /setup — React Router v7 frontend serves the actual page; this handler
+    // returns a minimal redirect or passthrough so React Router v7 can pick it up.
     // The profile gate above ensures saas deploys get 404.
     app.get('/', (c) => c.text('Setup wizard', 200));
 

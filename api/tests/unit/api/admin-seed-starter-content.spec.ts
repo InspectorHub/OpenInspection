@@ -3,9 +3,9 @@
  *   POST /api/admin/seed-starter-content integration tests.
  *
  * Mounts the real `adminRoutes` on a fresh OpenAPIHono so we exercise the
- * actual middleware chain (verifyM2mAuth via Bearer token + the route
- * handler). `drizzle-orm/d1` is mocked to a better-sqlite3 instance so
- * existence checks + seed inserts hit a real-ish DB.
+ * actual middleware chain (Service Binding guard via cf-worker header + the
+ * route handler). `drizzle-orm/d1` is mocked to a better-sqlite3 instance
+ * so existence checks + seed inserts hit a real-ish DB.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -23,7 +23,7 @@ describe('POST /api/admin/seed-starter-content', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sqlite: any;
     const tenantId = '00000000-0000-0000-0000-000000000001';
-    const M2M_SECRET = 'test-m2m-secret-v1';
+    const CF_WORKER_HEADER = 'portal-api';
 
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
@@ -63,16 +63,16 @@ describe('POST /api/admin/seed-starter-content', () => {
         vi.clearAllMocks();
     });
 
-    it('seeds starter content with valid Bearer M2M auth', async () => {
+    it('seeds starter content with valid cf-worker header (Service Binding)', async () => {
         const app = buildApp();
         const res = await app.request('/api/admin/seed-starter-content', {
             method: 'POST',
             headers: {
-                'content-type':  'application/json',
-                'authorization': `Bearer ${M2M_SECRET}`,
+                'content-type': 'application/json',
+                'cf-worker':    CF_WORKER_HEADER,
             },
             body: JSON.stringify({ tenantId }),
-        }, { PORTAL_M2M_SECRET_V1: M2M_SECRET, DB: {} } as Record<string, unknown>);
+        }, { DB: {} } as Record<string, unknown>);
 
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
@@ -84,27 +84,13 @@ describe('POST /api/admin/seed-starter-content', () => {
         expect(body.data.cannedCommentsSeeded).toBe(250);
     });
 
-    it('returns 401 when Authorization header is missing', async () => {
+    it('returns 401 when cf-worker header is missing', async () => {
         const app = buildApp();
         const res = await app.request('/api/admin/seed-starter-content', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ tenantId }),
-        }, { PORTAL_M2M_SECRET_V1: M2M_SECRET, DB: {} } as Record<string, unknown>);
-
-        expect(res.status).toBe(401);
-    });
-
-    it('returns 401 when Bearer token does not match any configured secret', async () => {
-        const app = buildApp();
-        const res = await app.request('/api/admin/seed-starter-content', {
-            method: 'POST',
-            headers: {
-                'content-type':  'application/json',
-                'authorization': 'Bearer wrong-secret',
-            },
-            body: JSON.stringify({ tenantId }),
-        }, { PORTAL_M2M_SECRET_V1: M2M_SECRET, DB: {} } as Record<string, unknown>);
+        }, { DB: {} } as Record<string, unknown>);
 
         expect(res.status).toBe(401);
     });
@@ -114,11 +100,11 @@ describe('POST /api/admin/seed-starter-content', () => {
         const res = await app.request('/api/admin/seed-starter-content', {
             method: 'POST',
             headers: {
-                'content-type':  'application/json',
-                'authorization': `Bearer ${M2M_SECRET}`,
+                'content-type': 'application/json',
+                'cf-worker':    CF_WORKER_HEADER,
             },
             body: JSON.stringify({ tenantId: '00000000-0000-0000-0000-999999999999' }),
-        }, { PORTAL_M2M_SECRET_V1: M2M_SECRET, DB: {} } as Record<string, unknown>);
+        }, { DB: {} } as Record<string, unknown>);
 
         expect(res.status).toBe(404);
     });

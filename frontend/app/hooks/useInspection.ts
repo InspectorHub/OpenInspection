@@ -13,6 +13,7 @@ export interface RatingLevel {
   severity?: string;
   isDefect?: boolean;
   description?: string;
+  pausesAdvance?: boolean;
 }
 
 export interface SchemaItem {
@@ -402,21 +403,28 @@ export function useInspectionState(opts: UseInspectionOptions) {
   const sectionProgress = useCallback(
     (sectionId: string) => {
       const sec = sections.find((s) => s.id === sectionId);
-      if (!sec) return { rated: 0, total: 0, percent: 0 };
+      if (!sec) return { rated: 0, total: 0, percent: 0, hasDefect: false };
       const total = sec.items.length;
-      if (total === 0) return { rated: 0, total: 0, percent: 0 };
+      if (total === 0)
+        return { rated: 0, total: 0, percent: 0, hasDefect: false };
       let rated = 0;
+      let hasDefect = false;
       for (const item of sec.items) {
         const r = getResult(item.id, sec.id);
-        if (r.rating != null) rated++;
+        if (r.rating != null) {
+          rated++;
+          const level = ratingLevels.find((l) => l.id === r.rating);
+          if (level?.isDefect) hasDefect = true;
+        }
       }
       return {
         rated,
         total,
         percent: Math.round((rated / total) * 100),
+        hasDefect,
       };
     },
-    [sections, getResult],
+    [sections, getResult, ratingLevels],
   );
 
   const sectionDefectCount = useCallback(
@@ -456,6 +464,30 @@ export function useInspectionState(opts: UseInspectionOptions) {
       }
     }
     return { total, rated, satisfactory, monitor, defect };
+  }, [sections, getResult, bucketForRatingId]);
+
+  /** Overall stats incl. ETA — shape used by progress visualizations */
+  const overallStats = useCallback(() => {
+    let total = 0;
+    let rated = 0;
+    let satisfactory = 0;
+    let monitor = 0;
+    let defect = 0;
+    for (const sec of sections) {
+      const items = sec.items || [];
+      for (const item of items) {
+        total++;
+        const ratingId = getResult(item.id, sec.id)?.rating as string | null;
+        if (!ratingId) continue;
+        rated++;
+        const bucket = bucketForRatingId(ratingId);
+        if (bucket === "satisfactory") satisfactory++;
+        else if (bucket === "monitor") monitor++;
+        else if (bucket === "defect") defect++;
+      }
+    }
+    const etaMinutes = Math.ceil((total - rated) * 0.35);
+    return { total, rated, satisfactory, monitor, defect, etaMinutes };
   }, [sections, getResult, bucketForRatingId]);
 
   /* ---------------------------------------------------------------- */
@@ -527,22 +559,35 @@ export function useInspectionState(opts: UseInspectionOptions) {
     [activeItemId, currentSectionItems, currentSectionIdx, sections],
   );
 
-  const advanceToNextUnrated = useCallback(() => {
-    if (!activeItemId) return;
-    const items = currentSectionItems;
-    const curIdx = items.findIndex((i) => i.id === activeItemId);
-    for (let i = curIdx + 1; i < items.length; i++) {
-      const r = getResult(items[i].id, currentSection?.id);
+  const advanceToNextUnrated = useCallback((
+    onCrossedSection?: (newSectionTitle: string) => void,
+  ) => {
+    if (!activeItemId || !currentSection) return;
+    const sIdx = sections.findIndex((s: any) => s.id === currentSection.id);
+    if (sIdx < 0) return;
+    const fromIdx = currentSectionItems.findIndex((i: any) => i.id === activeItemId);
+    for (let i = fromIdx + 1; i < currentSectionItems.length; i++) {
+      const r = getResult(currentSectionItems[i].id, currentSection.id);
       if (!r.rating) {
-        setActiveItemId(items[i].id);
+        setActiveItemId(currentSectionItems[i].id);
         return;
       }
     }
-    // No unrated ahead, advance to next
-    if (curIdx < items.length - 1) {
-      setActiveItemId(items[curIdx + 1].id);
+    for (let s = sIdx + 1; s < sections.length; s++) {
+      const sec = sections[s];
+      const items = sec.items as Array<{ id: string }>;
+      for (const it of items) {
+        const r = getResult(it.id, sec.id);
+        if (!r.rating) {
+          selectSectionById(sec.id);
+          setActiveItemId(it.id);
+          onCrossedSection?.(sec.title);
+          return;
+        }
+      }
     }
-  }, [activeItemId, currentSectionItems, currentSection, getResult]);
+    // Nothing unrated — stay put.
+  }, [activeItemId, currentSectionItems, currentSection, sections, getResult, selectSectionById]);
 
   /* ---------------------------------------------------------------- */
   /*  Search                                                           */
@@ -859,6 +904,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
     sectionProgress,
     sectionDefectCount,
     reportStats,
+    overallStats,
 
     // Misc
     formattedDate,

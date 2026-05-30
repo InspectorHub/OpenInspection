@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-sign";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
  return [{ title: "Sign Agreement - OpenInspection" }];
@@ -15,11 +15,12 @@ interface AgreementData {
  signedAt: string | null;
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
  try {
- const res = await apiFetch(
- `/api/public/agreements/sign/${params.tenant}/${params.token}`,
- );
+ const api = createApi(context);
+ const res = await api.publicShare.agreements.sign[":tenant"][":token"].$get({
+ param: { tenant: params.tenant ?? "", token: params.token ?? "" },
+ });
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
  return {

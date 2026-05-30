@@ -136,7 +136,7 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
 
   const siteName = ctx?.branding?.siteName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
-  const showSwitchWorkspace = ctx?.branding?.isSharedSaas && ctx?.branding?.portalBaseUrl;
+  const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
 
   if (!open) return null;
   return (
@@ -243,7 +243,7 @@ export function Sidebar() {
   const userName = ctx?.user?.name || "Inspector";
   const userSubline = ctx?.branding?.tenantSubdomain || "openinspection.dev";
   const userInitials = ctx?.user?.initials || "OI";
-  const showSwitchWorkspace = ctx?.branding?.isSharedSaas && ctx?.branding?.portalBaseUrl;
+  const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
 
   useEffect(() => {
     setCollapsed(getInitialCollapsed());
@@ -259,7 +259,9 @@ export function Sidebar() {
       } else {
         document.documentElement.removeAttribute("data-sidebar-collapsed");
       }
-    } catch {}
+    } catch {
+      // localStorage may be unavailable (SSR, private mode); ignore.
+    }
   }
 
   return (

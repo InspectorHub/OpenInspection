@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { templates, inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
@@ -58,26 +58,39 @@ export class TemplateService {
     /**
      * Lists all templates for a tenant.
      */
-    async listTemplates(tenantId: string) {
+    async listTemplates(tenantId: string, opts: { page?: number; pageSize?: number } = {}) {
+        const { page = 1, pageSize = 50 } = opts;
         const db = this.getDrizzle();
+
+        const totalRow = await db
+            .select({ c: sql<number>`count(*)` })
+            .from(templates)
+            .where(eq(templates.tenantId, tenantId))
+            .get();
+        const total = totalRow?.c ?? 0;
+
         const rows = await db.select({ id: templates.id, name: templates.name, version: templates.version, schema: templates.schema })
             .from(templates)
             .where(eq(templates.tenantId, tenantId))
+            .orderBy(desc(templates.createdAt))
+            .limit(pageSize)
+            .offset((page - 1) * pageSize)
             .all();
-        // review polish — surface marketplace-import flag so UI can tag rows.
+
         const { tenantMarketplaceImports } = await import('../lib/db/schema/marketplace');
         const imports = await db.select({ localTemplateId: tenantMarketplaceImports.localTemplateId })
             .from(tenantMarketplaceImports)
             .where(eq(tenantMarketplaceImports.tenantId, tenantId))
             .all();
         const importedIds = new Set(imports.map(i => i.localTemplateId as string));
-        return rows.map(row => ({
+        const mapped = rows.map(row => ({
             id: row.id,
             name: row.name,
             version: row.version,
             itemCount: this.countSchemaItems(row.schema as never),
             source: importedIds.has(row.id as string) ? 'marketplace' as const : 'custom' as const,
         }));
+        return { rows: mapped, total };
     }
 
     /**

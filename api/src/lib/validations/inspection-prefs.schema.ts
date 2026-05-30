@@ -1,0 +1,31 @@
+/**
+ * Workflow shortcuts PR — tenant-level inspector editor preferences.
+ *
+ * Stored as JSON in `tenant_configs.inspection_prefs`. Validated on every
+ * PATCH; server applies DEFAULT_INSPECTION_PREFS when the column is NULL
+ * or any field is missing.
+ */
+import { z } from '@hono/zod-openapi';
+
+export const InspectionPrefsSchema = z.object({
+    cloneDefault:       z.enum(['rating', 'rating_notes', 'all']),
+    autoAdvanceDelayMs: z.number().int().min(0).max(2000),
+    pinnedTagIds:       z.array(z.string().min(1)).max(5),
+}).openapi('InspectionPrefs');
+
+export type InspectionPrefs = z.infer<typeof InspectionPrefsSchema>;
+
+/** All fields optional — used by PATCH to support partial updates. */
+export const InspectionPrefsPatchSchema = InspectionPrefsSchema.partial().openapi('InspectionPrefsPatch');
+export type InspectionPrefsPatch = z.infer<typeof InspectionPrefsPatchSchema>;
+
+export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
+    cloneDefault:       'rating_notes',
+    autoAdvanceDelayMs: 200,
+    pinnedTagIds:       [],
+};
+
+/** Merge a possibly-partial DB row with the defaults. */
+export function withDefaults(row: Partial<InspectionPrefs> | null | undefined): InspectionPrefs {
+    return { ...DEFAULT_INSPECTION_PREFS, ...(row ?? {}) };
+}

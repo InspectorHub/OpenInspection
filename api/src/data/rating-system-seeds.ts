@@ -16,6 +16,8 @@ export interface SeedLevel {
     color:   string;
     bucket:  'satisfactory' | 'monitor' | 'defect' | 'na';
     hotkey?: string;
+    /** Workflow shortcuts PR — pause auto-advance after rating with this level. */
+    pausesAdvance?: boolean;
 }
 
 export interface SeedRatingSystem {
@@ -33,11 +35,11 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Standard four-tier rating used in most residential inspections.',
         isDefault:   true,
         levels: [
-            { abbr: 'Sat', label: 'Satisfactory',    color: '#10b981', bucket: 'satisfactory', hotkey: '1' },
-            { abbr: 'Mon', label: 'Monitor',         color: '#f59e0b', bucket: 'monitor',      hotkey: '2' },
-            { abbr: 'D',   label: 'Defect',          color: '#ef4444', bucket: 'defect',       hotkey: '3' },
-            { abbr: 'NI',  label: 'Not Inspected',   color: '#94a3b8', bucket: 'na',           hotkey: '4' },
-            { abbr: 'NP',  label: 'Not Present',     color: '#cbd5e1', bucket: 'na',           hotkey: '5' },
+            { abbr: 'Sat', label: 'Satisfactory',    color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
+            { abbr: 'Mon', label: 'Monitor',         color: '#f59e0b', bucket: 'monitor',      hotkey: '2', pausesAdvance: true  },
+            { abbr: 'D',   label: 'Defect',          color: '#ef4444', bucket: 'defect',       hotkey: '3', pausesAdvance: true  },
+            { abbr: 'NI',  label: 'Not Inspected',   color: '#94a3b8', bucket: 'na',           hotkey: '4', pausesAdvance: false },
+            { abbr: 'NP',  label: 'Not Present',     color: '#cbd5e1', bucket: 'na',           hotkey: '5', pausesAdvance: false },
         ],
     },
     {
@@ -46,10 +48,10 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Texas Real Estate Commission standard: Inspected / Not Inspected / Not Present / Deficient.',
         isDefault:   false,
         levels: [
-            { abbr: 'I',  label: 'Inspected',     color: '#10b981', bucket: 'satisfactory', hotkey: '1' },
-            { abbr: 'NI', label: 'Not Inspected', color: '#94a3b8', bucket: 'na',           hotkey: '2' },
-            { abbr: 'NP', label: 'Not Present',   color: '#cbd5e1', bucket: 'na',           hotkey: '3' },
-            { abbr: 'D',  label: 'Deficient',     color: '#ef4444', bucket: 'defect',       hotkey: '4' },
+            { abbr: 'I',  label: 'Inspected',     color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
+            { abbr: 'NI', label: 'Not Inspected', color: '#94a3b8', bucket: 'na',           hotkey: '2', pausesAdvance: false },
+            { abbr: 'NP', label: 'Not Present',   color: '#cbd5e1', bucket: 'na',           hotkey: '3', pausesAdvance: false },
+            { abbr: 'D',  label: 'Deficient',     color: '#ef4444', bucket: 'defect',       hotkey: '4', pausesAdvance: true  },
         ],
     },
     {
@@ -58,14 +60,14 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Inspector Toolbelt full granularity scheme — finer severity tracking for detailed reports.',
         isDefault:   false,
         levels: [
-            { abbr: 'F',   label: 'Functional',      color: '#10b981', bucket: 'satisfactory', hotkey: '1' },
-            { abbr: 'LM',  label: 'Low Maintenance', color: '#34d399', bucket: 'satisfactory', hotkey: '2' },
-            { abbr: 'Mon', label: 'Monitor',         color: '#fbbf24', bucket: 'monitor',      hotkey: '3' },
-            { abbr: 'Mar', label: 'Marginal',        color: '#f59e0b', bucket: 'monitor',      hotkey: '4' },
-            { abbr: 'D',   label: 'Deficiency',      color: '#ef4444', bucket: 'defect',       hotkey: '5' },
-            { abbr: 'H',   label: 'Hazard',          color: '#dc2626', bucket: 'defect',       hotkey: '6' },
-            { abbr: 'NP',  label: 'Not Present',     color: '#cbd5e1', bucket: 'na',           hotkey: '7' },
-            { abbr: 'NI',  label: 'Not Inspected',   color: '#94a3b8', bucket: 'na',           hotkey: '8' },
+            { abbr: 'F',   label: 'Functional',      color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
+            { abbr: 'LM',  label: 'Low Maintenance', color: '#34d399', bucket: 'satisfactory', hotkey: '2', pausesAdvance: false },
+            { abbr: 'Mon', label: 'Monitor',         color: '#fbbf24', bucket: 'monitor',      hotkey: '3', pausesAdvance: true  },
+            { abbr: 'Mar', label: 'Marginal',        color: '#f59e0b', bucket: 'monitor',      hotkey: '4', pausesAdvance: true  },
+            { abbr: 'D',   label: 'Deficiency',      color: '#ef4444', bucket: 'defect',       hotkey: '5', pausesAdvance: true  },
+            { abbr: 'H',   label: 'Hazard',          color: '#dc2626', bucket: 'defect',       hotkey: '6', pausesAdvance: true  },
+            { abbr: 'NP',  label: 'Not Present',     color: '#cbd5e1', bucket: 'na',           hotkey: '7', pausesAdvance: false },
+            { abbr: 'NI',  label: 'Not Inspected',   color: '#94a3b8', bucket: 'na',           hotkey: '8', pausesAdvance: false },
         ],
     },
     {
@@ -74,9 +76,9 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Inspector Toolbelt simplified scheme — Functional / Marginal / Deficient. Fast for screening visits.',
         isDefault:   false,
         levels: [
-            { abbr: 'F',   label: 'Functional', color: '#10b981', bucket: 'satisfactory', hotkey: '1' },
-            { abbr: 'Mar', label: 'Marginal',   color: '#f59e0b', bucket: 'monitor',      hotkey: '2' },
-            { abbr: 'D',   label: 'Deficient',  color: '#ef4444', bucket: 'defect',       hotkey: '3' },
+            { abbr: 'F',   label: 'Functional', color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
+            { abbr: 'Mar', label: 'Marginal',   color: '#f59e0b', bucket: 'monitor',      hotkey: '2', pausesAdvance: true  },
+            { abbr: 'D',   label: 'Deficient',  color: '#ef4444', bucket: 'defect',       hotkey: '3', pausesAdvance: true  },
         ],
     },
 ];

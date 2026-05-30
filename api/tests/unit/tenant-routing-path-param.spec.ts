@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { tenantRouter } from '../../src/features/tenant-routing';
 import type { HonoConfig } from '../../src/types/hono';
-import { SAAS_SHARED_PROFILE, STANDALONE_PROFILE } from '../../src/lib/deployment-profile';
+import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../src/lib/deployment-profile';
 
-function makeApp(profile = SAAS_SHARED_PROFILE) {
+function makeApp(profile = SAAS_PROFILE) {
     const app = new Hono<HonoConfig>();
     app.use('*', async (c, next) => { c.set('profile', profile); await next(); });
     app.use('*', tenantRouter);

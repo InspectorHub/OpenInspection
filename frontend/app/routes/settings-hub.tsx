@@ -8,6 +8,12 @@ const GROUPS = [
     icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
   },
   {
+    to: "/settings/inspection",
+    title: "Inspection workflow",
+    desc: "Clone defaults, auto-advance, pinned tags.",
+    icon: "M4 6h16M4 12h10M4 18h7M18 14v6m-3-3h6",
+  },
+  {
     to: "/settings/booking",
     title: "Online Booking",
     desc: "Schedule, availability, booking page.",

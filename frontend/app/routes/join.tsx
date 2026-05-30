@@ -1,13 +1,12 @@
-import { Form, useActionData, useLoaderData, redirect } from "react-router";
+import { Form, useActionData, useLoaderData, useNavigation, redirect } from "react-router";
 import type { Route } from "./+types/join";
-import { apiFetch } from "~/lib/api.server";
-import { createSessionWithToken } from "~/lib/session.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Accept Invite - OpenInspection" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") || "";
 
@@ -16,7 +15,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   try {
-    const res = await apiFetch(`/api/auth/invite/validate?token=${encodeURIComponent(token)}`);
+    const api = createApi(context);
+    const res = await api.auth.invite.validate.$get({ query: { token } });
     if (!res.ok) {
       return { valid: false, error: "Invalid or expired invite link", invite: null };
     }
@@ -32,17 +32,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
-export async function action({ request }: Route.ActionArgs) {
+export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const token = String(formData.get("token") || "");
   const password = String(formData.get("password") || "");
   const name = String(formData.get("name") || "");
 
   try {
-    const res = await apiFetch("/api/auth/invite/accept", {
-      method: "POST",
-      body: JSON.stringify({ token, password, name }),
-      csrf: true,
+    const api = createApi(context);
+    const res = await api.auth.invite.accept.$post({
+      json: { token, password, name },
     });
 
     if (!res.ok) {
@@ -64,7 +63,7 @@ export async function action({ request }: Route.ActionArgs) {
       const { createSessionWithToken: createSession } = await import(
         "~/lib/session.server"
       );
-      return createSession(jwt, "/dashboard");
+      return createSession(context, jwt, "/dashboard");
     }
 
     return redirect("/login");
@@ -76,6 +75,8 @@ export async function action({ request }: Route.ActionArgs) {
 export default function JoinPage() {
   const { valid, error: loaderError, invite } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
 
   if (!valid) {
     return (
@@ -94,7 +95,7 @@ export default function JoinPage() {
     <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
       <div className="w-full max-w-md p-8">
         <div className="flex items-center gap-3 mb-8">
-          <img src="/logo.svg" alt="" className="w-8 h-8" />
+          <img src="/logo.svg" alt="" className="w-8 h-8" width={32} height={32} />
           <span className="text-lg font-bold text-ih-fg-1">
             OpenInspection
           </span>
@@ -143,9 +144,10 @@ export default function JoinPage() {
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors"
+            disabled={isSubmitting}
+            className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Accept Invite
+            {isSubmitting ? "Accepting…" : "Accept Invite"}
           </button>
         </Form>
       </div>

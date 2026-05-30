@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { renderTemplate } from "../../lib/mustache";
+import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
 
 interface SideRailProps {
   activeItem?: { id: string; label: string; type?: string } | null;
@@ -9,12 +11,11 @@ interface SideRailProps {
   inspectionId?: string;
 }
 
-type TabId = "preview" | "library" | "recall";
+type TabId = "preview" | "library";
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "preview", label: "Preview", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
   { id: "library", label: "Library", icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" },
-  { id: "recall", label: "Recall", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
 ];
 
 export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColor, getRatingLabel, inspectionId }: SideRailProps) {
@@ -68,15 +69,41 @@ export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColo
 
                   {/* Canned comments */}
                   {activeResult.tabs && Array.isArray(activeResult.tabs) && (() => {
-                    const included = (activeResult.tabs as Array<{ name?: string; comments?: Array<{ id: string; text: string; included?: boolean }> }>)
-                      .flatMap(tab => (tab.comments || []).filter(c => c.included).map(c => ({ ...c, tabName: tab.name })));
+                    const included = (activeResult.tabs as Array<{ name?: string; comments?: Array<Record<string, unknown>> }>)
+                      .flatMap(tab => (tab.comments || [])
+                        .filter(c => c.included)
+                        .map(c => ({ ...c, tabName: tab.name } as Record<string, unknown> & { tabName: string | undefined })));
+                    // Item attribute values (brand, year, etc.) feed Mustache tokens
+                    // alongside the defect-level fields below.
+                    const attrVars: Record<string, string | null> = {};
+                    const attrs = activeResult.attributes;
+                    if (attrs && typeof attrs === "object") {
+                      for (const [k, v] of Object.entries(attrs as Record<string, unknown>)) {
+                        if (v === null || v === undefined) attrVars[k] = null;
+                        else if (typeof v === "string") attrVars[k] = v.length > 0 ? v : null;
+                        else if (typeof v === "number" && Number.isFinite(v)) attrVars[k] = String(v);
+                        else if (typeof v === "boolean") attrVars[k] = v ? "yes" : "no";
+                        else attrVars[k] = null;
+                      }
+                    }
                     return included.length > 0 ? (
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Comments</span>
                         <ul className="mt-1 space-y-1">
-                          {included.map((c, i) => (
-                            <li key={i} className="text-[11px] text-ih-fg-2 pl-2 border-l-2 border-ih-border">{c.text}</li>
-                          ))}
+                          {included.map((c, i) => {
+                            const isDefect = c.tabName === "defects";
+                            const text = (c.text as string) || "";
+                            const rendered = isDefect ? renderTemplate(text, {
+                              location:  (c.location  as string | null | undefined) ?? null,
+                              trade:     (c.trade     as string | undefined) ? DEFECT_TRADE_LABELS[c.trade as keyof typeof DEFECT_TRADE_LABELS]         : null,
+                              deadline:  (c.deadline  as string | undefined) ? DEFECT_DEADLINE_LABELS[c.deadline as keyof typeof DEFECT_DEADLINE_LABELS] : null,
+                              timeframe: (c.timeframe as string | undefined) ? DEFECT_TIMEFRAME_LABELS[c.timeframe as keyof typeof DEFECT_TIMEFRAME_LABELS] : null,
+                              ...attrVars,
+                            }) : text;
+                            return (
+                              <li key={i} className="text-[11px] text-ih-fg-2 pl-2 border-l-2 border-ih-border">{rendered}</li>
+                            );
+                          })}
                         </ul>
                       </div>
                     ) : null;
@@ -108,9 +135,6 @@ export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColo
                 <input type="text" placeholder="Search comments..." className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2" />
                 <p className="text-[13px] text-ih-fg-3 text-center py-8">Type <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">/</kbd> in the note field to search.</p>
               </div>
-            )}
-            {activeTab === "recall" && (
-              <p className="text-[13px] text-ih-fg-3 text-center py-8">Prior inspections' notes for similar items.</p>
             )}
           </div>
         </div>

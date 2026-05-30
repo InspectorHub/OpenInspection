@@ -1,11 +1,11 @@
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
+import { createRoute } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, sql } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { inspections } from '../lib/db/schema/inspection';
 import { contacts } from '../lib/db/schema/contact';
-import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
 import {
     AgentReportsQuerySchema,
@@ -17,8 +17,6 @@ import {
     ConciergeBookResponseSchema,
 } from '../lib/validations/agent.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-const agentRoutes = new OpenAPIHono<HonoConfig>();
 
 /**
  * GET /api/agents/my-reports
@@ -48,36 +46,6 @@ const getReportsRoute = createRoute(withMcpMetadata({
     operationId: "listAgentMyReports",
     description: "Auto-generated placeholder for listAgentMyReports (GET /my-reports, agents domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['agent'], tier: 'extended' }));
-
-agentRoutes.openapi(getReportsRoute, async (c) => {
-    // Move RBAC check inside to fix OpenAPIHono type inference issues with context
-    await requireRole(['office_staff', 'admin'])(c, async () => {});
-
-    const tenantId = c.get('tenantId');
-    const user = c.get('user');
-    const userRole = c.get('userRole');
-    const { agentId: queryAgentId } = c.req.valid('query');
-    const db = drizzle(c.env.DB);
-
-    // Admins/owners can pass ?agentId= to view any agent's reports
-    const agentId =
-        userRole === 'admin'
-            ? (queryAgentId ?? user.sub)
-            : user.sub;
-
-    const rows = await db
-        .select()
-        .from(inspections)
-        .where(and(
-            eq(inspections.tenantId, tenantId),
-            eq(inspections.referredByAgentId, agentId)
-        ));
-
-    return c.json({ 
-        success: true, 
-        data: { agentId, reports: rows } 
-    }, 200);
-});
 
 /**
  * UC-A-5 — agent's flattened recommendations grouped by safety / recommendation /
@@ -121,13 +89,6 @@ const myRecommendationsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listAgentMyRecommendations (GET /my-recommendations, agents domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['agent'], tier: 'extended' }));
 
-agentRoutes.openapi(myRecommendationsRoute, async (c) => {
-    await requireRole(['agent'])(c, async () => {});
-    const user = c.get('user');
-    const groups = await c.var.services.agent.listRecommendationsForAgent(user.sub);
-    return c.json({ success: true, data: groups }, 200);
-});
-
 /**
  * GET /api/agents/leaderboard
  * Admin/owner leaderboard based on referral counts.
@@ -153,37 +114,6 @@ const getLeaderboardRoute = createRoute(withMcpMetadata({
     operationId: "leaderboardAgent",
     description: "Auto-generated placeholder for leaderboardAgent (GET /leaderboard, agents domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['agent'], tier: 'extended' }));
-
-agentRoutes.openapi(getLeaderboardRoute, async (c) => {
-    await requireRole(['owner', 'admin', 'inspector', 'agent'])(c, async () => {});
-
-    const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
-
-    // JOIN contacts to surface agent name + agency in one query (review
-    // — UI was an orphan; now leaderboard card needs displayable rows).
-    const rows = await db
-        .select({
-            agentId: inspections.referredByAgentId,
-            name:    contacts.name,
-            agency:  contacts.agency,
-            email:   contacts.email,
-            total:   sql<number>`count(*)`,
-        })
-        .from(inspections)
-        .leftJoin(contacts, eq(inspections.referredByAgentId, contacts.id))
-        .where(eq(inspections.tenantId, tenantId))
-        .groupBy(inspections.referredByAgentId, contacts.name, contacts.agency, contacts.email)
-        .orderBy(sql`count(*) DESC`);
-
-    // Exclude rows where agentId is null (un-referred inspections)
-    const leaderboard = rows.filter((r) => r.agentId !== null);
-
-    return c.json({
-        success: true,
-        data: { leaderboard }
-    }, 200);
-});
 
 /**
  * Agent Accounts A2 — POST /api/agent/profile
@@ -213,23 +143,6 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     operationId: "createAgentProfile",
     description: "Auto-generated placeholder for createAgentProfile (POST /profile, agents domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['agent'], tier: 'extended' }));
-
-agentRoutes.openapi(updateProfileRoute, async (c) => {
-    await requireRole(['agent'])(c, async () => {});
-    const user = c.get('user');
-    if (!user?.sub) throw Errors.Unauthorized();
-
-    const body = c.req.valid('json');
-    const patch: Parameters<typeof c.var.services.agent.updateProfile>[1] = {};
-    if (body.slug !== undefined)             patch.slug             = body.slug;
-    if (body.name !== undefined)             patch.name             = body.name;
-    if (body.notifyOnReferral !== undefined) patch.notifyOnReferral = body.notifyOnReferral;
-    if (body.notifyOnReport !== undefined)   patch.notifyOnReport   = body.notifyOnReport;
-    if (body.notifyOnPaid !== undefined)     patch.notifyOnPaid     = body.notifyOnPaid;
-
-    await c.var.services.agent.updateProfile(user.sub, patch);
-    return c.json({ success: true as const, data: { ok: true as const } }, 200);
-});
 
 /**
  * Agent Accounts A3 — POST /api/agent/concierge-book
@@ -261,26 +174,110 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createAgentConciergeBook (POST /concierge-book, agents domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['agent'], tier: 'extended' }));
 
-agentRoutes.openapi(conciergeBookRoute, async (c) => {
-    await requireRole(['agent'])(c, async () => {});
-    const agentUserId = c.get('agentUserId');
-    if (!agentUserId) throw Errors.Unauthorized('Agent identity missing from token');
+export const agentRoutes = createApiRouter()
+    .openapi(getReportsRoute, async (c) => {
+        // Move RBAC check inside to fix OpenAPIHono type inference issues with context
+        await requireRole(['office_staff', 'admin'])(c, async () => {});
 
-    const body = c.req.valid('json');
-    const result = await c.var.services.concierge.createBooking({
-        tenantId: body.tenantId,
-        agentUserId,
-        inspectorContactId: body.inspectorContactId,
-        date: body.date,
-        timeSlot: body.timeSlot,
-        propertyAddress: body.propertyAddress,
-        clientName: body.clientName,
-        clientEmail: body.clientEmail,
-        ...(body.clientPhone ? { clientPhone: body.clientPhone } : {}),
-        agreementRequired: body.agreementRequired,
-        paymentRequired: body.paymentRequired,
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        const userRole = c.get('userRole');
+        const { agentId: queryAgentId } = c.req.valid('query');
+        const db = drizzle(c.env.DB);
+
+        // Admins/owners can pass ?agentId= to view any agent's reports
+        const agentId =
+            userRole === 'admin'
+                ? (queryAgentId ?? user.sub)
+                : user.sub;
+
+        const rows = await db
+            .select()
+            .from(inspections)
+            .where(and(
+                eq(inspections.tenantId, tenantId),
+                eq(inspections.referredByAgentId, agentId)
+            ));
+
+        return c.json({
+            success: true,
+            data: { agentId, reports: rows }
+        }, 200);
+    })
+    .openapi(myRecommendationsRoute, async (c) => {
+        await requireRole(['agent'])(c, async () => {});
+        const user = c.get('user');
+        const groups = await c.var.services.agent.listRecommendationsForAgent(user.sub);
+        return c.json({ success: true, data: groups }, 200);
+    })
+    .openapi(getLeaderboardRoute, async (c) => {
+        await requireRole(['owner', 'admin', 'inspector', 'agent'])(c, async () => {});
+
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+
+        // JOIN contacts to surface agent name + agency in one query (review
+        // — UI was an orphan; now leaderboard card needs displayable rows).
+        const rows = await db
+            .select({
+                agentId: inspections.referredByAgentId,
+                name:    contacts.name,
+                agency:  contacts.agency,
+                email:   contacts.email,
+                total:   sql<number>`count(*)`,
+            })
+            .from(inspections)
+            .leftJoin(contacts, eq(inspections.referredByAgentId, contacts.id))
+            .where(eq(inspections.tenantId, tenantId))
+            .groupBy(inspections.referredByAgentId, contacts.name, contacts.agency, contacts.email)
+            .orderBy(sql`count(*) DESC`);
+
+        // Exclude rows where agentId is null (un-referred inspections)
+        const leaderboard = rows.filter((r) => r.agentId !== null);
+
+        return c.json({
+            success: true,
+            data: { leaderboard }
+        }, 200);
+    })
+    .openapi(updateProfileRoute, async (c) => {
+        await requireRole(['agent'])(c, async () => {});
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized();
+
+        const body = c.req.valid('json');
+        const patch: Parameters<typeof c.var.services.agent.updateProfile>[1] = {};
+        if (body.slug !== undefined)             patch.slug             = body.slug;
+        if (body.name !== undefined)             patch.name             = body.name;
+        if (body.notifyOnReferral !== undefined) patch.notifyOnReferral = body.notifyOnReferral;
+        if (body.notifyOnReport !== undefined)   patch.notifyOnReport   = body.notifyOnReport;
+        if (body.notifyOnPaid !== undefined)     patch.notifyOnPaid     = body.notifyOnPaid;
+
+        await c.var.services.agent.updateProfile(user.sub, patch);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(conciergeBookRoute, async (c) => {
+        await requireRole(['agent'])(c, async () => {});
+        const agentUserId = c.get('agentUserId');
+        if (!agentUserId) throw Errors.Unauthorized('Agent identity missing from token');
+
+        const body = c.req.valid('json');
+        const result = await c.var.services.concierge.createBooking({
+            tenantId: body.tenantId,
+            agentUserId,
+            inspectorContactId: body.inspectorContactId,
+            date: body.date,
+            timeSlot: body.timeSlot,
+            propertyAddress: body.propertyAddress,
+            clientName: body.clientName,
+            clientEmail: body.clientEmail,
+            ...(body.clientPhone ? { clientPhone: body.clientPhone } : {}),
+            agreementRequired: body.agreementRequired,
+            paymentRequired: body.paymentRequired,
+        });
+        return c.json({ success: true as const, data: result }, 200);
     });
-    return c.json({ success: true as const, data: result }, 200);
-});
+
+export type AgentApi = typeof agentRoutes;
 
 export default agentRoutes;

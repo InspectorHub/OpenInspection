@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Form, Link, useLoaderData, useActionData } from "react-router";
+import { Form, Link, useLoaderData, useActionData, useFetcher } from "react-router";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { SignaturePad } from "~/components/SignaturePad";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -23,9 +24,10 @@ interface Profile {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
-  const res = await apiFetch("/api/profile", { token });
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const res = await api.profile.index.$get();
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   return { profile: (body.data ?? {}) as Profile };
 }
@@ -34,24 +36,40 @@ export async function loader({ request }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
   const fd = await request.formData();
+  const intent = fd.get("intent") as string | null;
+
+  // Handle save-signature intent from the SignaturePad fetcher
+  if (intent === "save-signature") {
+    const signatureBase64 = fd.get("signatureBase64") as string | null;
+    if (!signatureBase64) {
+      return { success: false, error: "No signature data provided", intent };
+    }
+    const res = await api.users.me.signature.$post({
+      json: { signatureBase64 },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: (err as Record<string, string>)?.message || "Save failed", intent };
+    }
+    return { success: true, error: null, intent };
+  }
+
+  // Default: save profile fields
   const body: Record<string, unknown> = {};
   for (const key of ["name", "phone", "licenseNumber", "slug", "bio"]) {
     const v = fd.get(key);
     if (v !== null) body[key] = v;
   }
-  const res = await apiFetch("/api/profile", {
-    token,
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
+  const res = await api.profile.index.$patch({ json: body });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    return { success: false, error: (err as Record<string, string>)?.message || "Save failed" };
+    return { success: false, error: (err as Record<string, string>)?.message || "Save failed", intent };
   }
-  return { success: true, error: null };
+  return { success: true, error: null, intent };
 }
 
 /* ------------------------------------------------------------------ */
@@ -64,6 +82,13 @@ export default function SettingsProfilePage() {
   const [bioLen, setBioLen] = useState((profile.bio ?? "").length);
   const ctx = useSessionContext();
   const tenant = ctx?.branding?.tenantSubdomain;
+
+  // Signature pad state
+  const sigFetcher = useFetcher<typeof action>();
+  const [showSigPad, setShowSigPad] = useState(false);
+  const sigSaved = sigFetcher.data?.success && sigFetcher.data?.intent === "save-signature";
+  const sigError = sigFetcher.data?.error && sigFetcher.data?.intent === "save-signature"
+    ? sigFetcher.data.error : null;
 
   return (
     <div className="space-y-[18px]">
@@ -128,7 +153,7 @@ export default function SettingsProfilePage() {
               className="block w-full rounded-md border border-ih-border bg-ih-bg-card px-3 py-2 text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-colors text-ih-fg-1" />
             <p className="text-[11px] text-ih-fg-3">Lowercase letters, numbers, and hyphens (3-32 chars).</p>
           </div>
-          {profile.slug && tenant && (
+          {profile.slug && tenant ? (
             <div className="flex items-center gap-3 pt-2">
               <a href={`/inspector/${tenant}/${profile.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-ih-primary font-bold hover:underline">
                 View my public profile &rarr;
@@ -137,6 +162,10 @@ export default function SettingsProfilePage() {
                 View my booking page &rarr;
               </a>
             </div>
+          ) : (
+            <p className="text-[12px] text-ih-fg-3 italic pt-2">
+              Set a slug above and Save Profile to enable your public profile and booking links.
+            </p>
           )}
         </section>
 
@@ -200,6 +229,49 @@ export default function SettingsProfilePage() {
           </button>
         </div>
       </Form>
+
+      {/* Saved signature */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <header className="space-y-1">
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Saved Signature</h3>
+          <p className="text-[12px] text-ih-fg-3">
+            Your signature is applied to agreements you send and can be used for auto-sign on report publish.
+          </p>
+        </header>
+
+        {sigSaved && (
+          <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
+            Signature saved.
+          </div>
+        )}
+        {sigError && (
+          <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
+            {sigError}
+          </div>
+        )}
+
+        {showSigPad ? (
+          <SignaturePad
+            label="Save Signature"
+            onCancel={() => setShowSigPad(false)}
+            onSubmit={async (dataUri) => {
+              const fd = new FormData();
+              fd.append("intent", "save-signature");
+              fd.append("signatureBase64", dataUri);
+              sigFetcher.submit(fd, { method: "post" });
+              setShowSigPad(false);
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowSigPad(true)}
+            className="px-4 py-2 bg-ih-bg-muted border border-ih-border text-ih-fg-1 rounded-md font-semibold text-[13px] hover:bg-ih-bg-card hover:border-ih-primary transition-all"
+          >
+            {sigSaved ? "Update signature" : "Add signature"}
+          </button>
+        )}
+      </section>
     </div>
   );
 }

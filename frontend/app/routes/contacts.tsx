@@ -2,21 +2,22 @@ import { useState, useRef, useCallback } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/contacts";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Contacts - OpenInspection" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   const url = new URL(request.url);
   const filterType = url.searchParams.get("type") || "";
   try {
+    const api = createApi(context, { token });
     const [contactsRes, agentsRes] = await Promise.all([
-      apiFetch(`/api/contacts${filterType ? `?type=${filterType}` : ""}`, { token }),
-      apiFetch("/api/agents", { token }),
+      api.contacts.index.$get({ query: filterType ? { type: filterType } : {} }),
+      api.agents.index.$get(),
     ]);
     const contactsBody = contactsRes.ok ? ((await contactsRes.json()) as Record<string, unknown>) : { data: [] };
     const agentsBody = agentsRes.ok ? ((await agentsRes.json()) as Record<string, unknown>) : { data: [] };
@@ -30,55 +31,76 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const form = await request.formData();
   const intent = form.get("intent") as string;
+
+  const api = createApi(context, { token });
 
   if (intent === "create" || intent === "update") {
     const id = form.get("id") as string | null;
     const body = {
-      name: form.get("name"),
-      email: form.get("email"),
-      phone: form.get("phone"),
-      agency: form.get("agency"),
-      type: form.get("type"),
+      name: form.get("name") as string,
+      email: form.get("email") as string,
+      phone: form.get("phone") as string,
+      agency: form.get("agency") as string,
+      type: form.get("type") as string,
     };
     const res = id
-      ? await apiFetch(`/api/contacts/${id}`, { token, method: "PUT", body: JSON.stringify(body) })
-      : await apiFetch("/api/contacts", { token, method: "POST", body: JSON.stringify(body) });
+      ? await api.contacts[":id"].$put({ param: { id }, json: body })
+      : await api.contacts.index.$post({ json: body });
     return { ok: res.ok };
   }
 
   if (intent === "delete") {
     const id = form.get("id") as string;
-    const res = await apiFetch(`/api/contacts/${id}`, { token, method: "DELETE" });
+    const res = await api.contacts[":id"].$delete({ param: { id } });
     return { ok: res.ok };
   }
 
   if (intent === "csv-import") {
     const csvText = form.get("csvText") as string;
-    const res = await apiFetch("/api/contacts/import", {
-      token,
-      method: "POST",
-      body: JSON.stringify({ csv: csvText }),
-    });
+    // The preview endpoint surfaces detected columns; the UI currently
+    // auto-maps by case-insensitive header name (name/email/phone/agency).
+    // Customers picking custom column names can be supported by a future
+    // mapping picker — the typed backend already accepts arbitrary mappings.
+    const mapping = inferMappingFromCsv(csvText);
+    const res = await api.contacts.import.$post({ json: { csv: csvText, mapping } });
     const data = res.ok ? await res.json() : {};
     return { ok: res.ok, result: data };
   }
 
   if (intent === "csv-preview") {
     const csvText = form.get("csvText") as string;
-    const res = await apiFetch("/api/contacts/import/preview", {
-      token,
-      method: "POST",
-      body: JSON.stringify({ csv: csvText }),
-    });
+    const res = await api.contacts.import.preview.$post({ json: { csv: csvText } });
     const data = res.ok ? await res.json() : {};
     return { ok: res.ok, preview: data };
   }
 
   return { ok: false };
+}
+
+/**
+ * Best-effort column mapping for the simple "paste CSV → import" flow:
+ * matches column headers case-insensitively against the canonical field
+ * names. If the CSV uses non-standard headers, falls back to the first
+ * column as `name` so the import still succeeds for the common case.
+ */
+function inferMappingFromCsv(csv: string): { name: string; email?: string; phone?: string; agency?: string } {
+  const firstLine = csv.split(/\r?\n/, 1)[0] ?? "";
+  const cols = firstLine.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+  const find = (...needles: string[]) =>
+    cols.find((c) => needles.some((n) => c.toLowerCase() === n));
+  const nameCol = find("name", "full name", "contact") ?? cols[0] ?? "name";
+  const emailCol = find("email", "e-mail");
+  const phoneCol = find("phone", "tel", "mobile");
+  const agencyCol = find("agency", "company", "organization");
+  const m: { name: string; email?: string; phone?: string; agency?: string } = { name: nameCol };
+  if (emailCol) m.email = emailCol;
+  if (phoneCol) m.phone = phoneCol;
+  if (agencyCol) m.agency = agencyCol;
+  return m;
 }
 
 interface Contact {

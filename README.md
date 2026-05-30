@@ -1,6 +1,10 @@
-# OpenInspection
+<p align="center">
+  <img src="frontend/public/logo.svg" alt="OpenInspection" width="140" />
+</p>
 
-> The first open-source SaaS-grade home inspection app. Self-host on Cloudflare for ~$0/month.
+<h1 align="center">OpenInspection</h1>
+
+<p align="center">The first open-source SaaS-grade home inspection app. Self-host on Cloudflare for ~$0/month.</p>
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/InspectorHub/OpenInspection)
 [![GitHub Discussions](https://img.shields.io/github/discussions/InspectorHub/OpenInspection)](https://github.com/InspectorHub/OpenInspection/discussions)
@@ -20,7 +24,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 ### Architecture
 
 - **API Worker** (`api/`) — Hono + Drizzle + D1, handles all business logic
-- **Frontend Worker** (`frontend/`) — Remix + React 18 + Tailwind v4, SSR on CF Workers
+- **Frontend Worker** (`frontend/`) — React Router v7 + React 18 + Tailwind v4, SSR on CF Workers
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based components
 - Both deploy as independent CF Workers; frontend calls API via Service Binding (zero-latency)
 
@@ -32,7 +36,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 
 ### Customer experience
 - Public booking widget with Turnstile bot protection
-- E-sign agreements with Ed25519 audit chain
+- E-sign agreements with Ed25519 audit chain — server-rendered signed PDF + Certificate of Completion via Browser Run, evidence-pack zip with email delivery, public verifier URL (`/v/<token>`) with QR code on PDFs + offline self-verify (`/verify`) for court-friendly independence from the server, optional inspector pre-sign
 - Branded report viewer with print-as-PDF
 
 ### Agent / referral
@@ -50,8 +54,8 @@ A complete home inspection software stack: inspector dashboard, public booking w
 - **Free to run**: Cloudflare Workers Free tier covers a solo inspector's full year. Pay only for a domain (~$10).
 - **Yours**: fork it, change templates, add integrations. No vendor lock-in.
 - **Fast**: edge-deployed, < 100 ms response times globally
-- **Compliant**: PBKDF2-SHA256 password hashing, Ed25519 audit chain on e-signatures, multi-tenant data isolation
-- **Modern**: Remix + React 18 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
+- **Compliant**: PBKDF2-SHA256 password hashing, hash-chained Ed25519 audit log on e-signatures (ESIGN Act + UETA), server-rendered PDF + Certificate of Completion via Browser Run, offline-verifiable evidence pack, multi-tenant data isolation
+- **Modern**: React Router v7 + React 18 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
 
 ## Quick start
 
@@ -62,16 +66,20 @@ Not ready to commit to running infrastructure? Spin up a managed workspace at [*
 ### Option 1: One-Click Deploy
 
 1. Click the **Deploy to Cloudflare** button above — this deploys the API Worker
-2. Follow the dashboard prompts to create your D1 database, R2 bucket, and KV namespace
-3. Deploy the frontend Worker:
+2. Follow the dashboard prompts to provision the bindings declared in `wrangler.toml.example`: one D1 database, two R2 buckets (`PHOTOS` + `REPORTS`), and one KV namespace (`TENANT_CACHE`). The standalone profile additionally declares two Durable Object classes and one Workflow — Cloudflare creates these on first deploy.
+3. Configure the frontend Worker config and run the deploy script from root:
    ```bash
-   cd frontend
-   npm install && npm run deploy
+   cp frontend/wrangler.toml.example frontend/wrangler.toml   # edit API_URL + SESSION_SECRET
+   npm install
+   npm run deploy:web                                          # web only
+   # or npm run deploy to deploy api + web together
    ```
 4. Visit your API Worker URL → `/setup` (e.g., `https://openinspection.your-account.workers.dev/setup`)
-5. A 6-digit setup code is generated and logged on first boot. Enter it to initialize your admin account.
+5. A 6-digit setup code is generated on first boot. The code itself is **not** printed in logs — recover it with one of:
+   - **Recommended**: set `SETUP_CODE=<any 6-digit value>` as a Worker secret before deploying, then use that value at `/setup`
+   - Or read the generated code from KV: `wrangler kv key get setup_verification_code --binding TENANT_CACHE` (1-hour TTL)
 
-> The frontend connects to the API via a [Service Binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/) (zero-latency, no network hop). Both workers are configured in their respective `wrangler.toml` files.
+> The frontend calls the API via a [Service Binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/) (zero-latency, no network hop). The API Worker is configured by the root `wrangler.toml` (copy from `wrangler.toml.example`); the Frontend Worker uses `frontend/wrangler.toml` (copy from `frontend/wrangler.toml.example`) with `main = "./workers/app.ts"` — the standard `wrangler deploy` flow handles the rest.
 
 ### Option 2: CLI-First
 ```bash
@@ -103,11 +111,11 @@ Detailed setup: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). 
 ## Tech stack
 
 - **Cloudflare Workers**: edge runtime (dual Worker deploy — API + Frontend)
-- **Remix** + React 18: frontend SSR on Workers
+- **React Router v7** + React 18: frontend SSR on Workers
 - **Hono** + Zod OpenAPI: typed API layer
 - **Drizzle ORM** + Cloudflare D1: SQLite at the edge
 - **Cloudflare R2 / KV**: object storage and config cache
-- **Tailwind CSS v4**: design system tokens + utility CSS
+- **Tailwind CSS**: v4 (frontend, design system tokens + utility CSS) · v3 (API Worker, SSR report pages)
 - **Optional**: Gemini AI, Stripe Connect, Resend email, Google Places
 
 ## Community

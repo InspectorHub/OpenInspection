@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking-embed";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Book inspection" }];
@@ -17,20 +17,24 @@ interface EmbedData {
   inspectorName: string;
   tenantSubdomain: string;
   siteKey: string;
-  style: "full" | "compact";
+  theme: "light" | "dark" | "branded";
 }
 
 /* ------------------------------------------------------------------ */
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params, request }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const style = url.searchParams.get("style") === "compact" ? "compact" : "full";
+  // Branded mode currently renders as light — backlog C-6 will wire tenant.primaryColor through the public booking API.
+  const raw = url.searchParams.get("style");
+  const theme: EmbedData["theme"] =
+    raw === "dark" ? "dark" : raw === "branded" ? "branded" : "light";
   try {
-    const res = await apiFetch(
-      `/api/public/book/${params.tenant}/${params.slug}`,
-    );
+    const api = createApi(context);
+    const res = await api.bookings.book[":tenant"][":slug"].$get({
+      param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
+    });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Partial<EmbedData> | undefined;
     return {
@@ -41,7 +45,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
             inspectorName: d.inspectorName ?? "Inspector",
             tenantSubdomain: d.tenantSubdomain ?? params.tenant ?? "",
             siteKey: d.siteKey ?? "",
-            style,
+            theme,
           } satisfies EmbedData)
         : null,
       error: res.ok ? null : "Not found",
@@ -57,29 +61,22 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export default function BookingEmbedPage() {
   const { data, error } = useLoaderData<typeof loader>();
-  const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const isDark = data && (data as EmbedData).theme === "dark";
+    document.documentElement.setAttribute("data-color-scheme", isDark ? "dark" : "light");
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [data]);
 
   if (error || !data) {
     return (
       <div style={{ padding: 16 }}>
         <p style={{ color: "#64748b", fontSize: 13 }}>Booking unavailable.</p>
-      </div>
-    );
-  }
-
-  if (data.style === "compact" && !showForm) {
-    return (
-      <div className="p-6 text-center bg-ih-bg-card border border-ih-border rounded-xl">
-        <p className="text-[13px] text-ih-fg-3 mb-3">
-          Book with {data.inspectorName}
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="w-full px-4 py-3 bg-ih-primary text-white rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
-        >
-          Schedule an inspection
-        </button>
       </div>
     );
   }

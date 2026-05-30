@@ -1,6 +1,6 @@
-name = "openinspection-standalone"
+name = "openinspection-api"
 main = "src/index.ts"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-03-24"  # required for env.BROWSER.quickAction() (Browser Run)
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 preview_urls = true
@@ -18,60 +18,12 @@ APP_MODE = "standalone"
 # Default: Cloudflare's official always-pass test key (safe to use until you go live)
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
-# ── SaaS environment override ──────────────────────────────────────────────
-# Deploy with `wrangler deploy --env saas` to bring up a multi-tenant
-# control-plane-fronted worker at app.<your-domain>. Pairs with
-# apps/portal for billing + onboarding. Replace PORTAL_API_URL with your
-# own portal worker that owns Stripe + onboarding workflows.
-#
-# IMPORTANT: wrangler does NOT inherit top-level resource bindings into
-# env-specific overrides. Every binding must be redeclared under env.saas.*.
-# The SaaS topology typically uses a single
-# large D1 + a TENANT_CACHE KV partitioned by subdomain key prefix.
-[env.saas]
-name = "openinspection-saas"
-[env.saas.vars]
-ENVIRONMENT = "production"
-APP_MODE = "saas"
-SAAS_TOPOLOGY = "shared"
-PORTAL_API_URL = "https://portal.your-domain.com"
-TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
-[[env.saas.d1_databases]]
-binding = "DB"
-database_name = "openinspection-saas-db"
-# Placeholder — create a separate D1 for the SaaS multi-tenant deployment
-database_id = "00000000-0000-0000-0000-000000000000"
-migrations_dir = "migrations"
-[[env.saas.kv_namespaces]]
-binding = "TENANT_CACHE"
-id = "00000000000000000000000000000000"
-[[env.saas.unsafe.bindings]]
-type = "ratelimit"
-name = "RATE_LIMITER"
-namespace_id = "1003"
-simple = { limit = 10, period = 60 }
-[[env.saas.r2_buckets]]
-binding = "PHOTOS"
-bucket_name = "openinspection-saas-photos"
-[[env.saas.r2_buckets]]
-binding = "REPORTS"
-bucket_name = "openinspection-saas-reports"
-[env.saas.browser]
-binding = "BROWSER"
-[[env.saas.workflows]]
-binding = "SIGN_COMPLETION_WORKFLOW"
-name = "sign-completion-workflow-saas"
-class_name = "SignCompletionWorkflow"
-# Design System 0520 subsystem B — presence DOs mirrored into saas env.
-[[env.saas.durable_objects.bindings]]
-name       = "INSPECTION_PRESENCE"
-class_name = "InspectionPresenceDO"
-[[env.saas.durable_objects.bindings]]
-name       = "TENANT_PRESENCE"
-class_name = "TenantPresenceDO"
-[[env.saas.migrations]]
-tag = "v1"
-new_classes = ["InspectionPresenceDO", "TenantPresenceDO"]
+# ── SaaS deployment ─────────────────────────────────────────────────────
+# For multi-tenant SaaS mode (paired with apps/portal), use the separate
+# wrangler.saas.toml config file:
+#   wrangler deploy --config wrangler.saas.toml
+# That file declares a Service Binding (PORTAL_SERVICE) for zero-latency
+# M2M communication with the portal worker. See src/portal/README.md.
 
 # ── Secrets — set via: wrangler secret put SECRET_NAME ──────────────────────
 # Run `npm run setup:cloudflare` to be prompted for each one interactively.

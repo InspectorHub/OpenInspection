@@ -474,3 +474,182 @@ export class ConciergeService {
 
 // re-export for any future callsite that wants to filter by NULL conciergeStatus
 export { isNull };
+
+/* ------------------------------------------------------------------ */
+/*  Public booking flow (Tasks 15-17 of typed-hono-dead-routes-cleanup) */
+/* ------------------------------------------------------------------ */
+//
+// Stand-alone helpers for the unauthenticated /book-info, /book, /confirm-info
+// endpoints. These intentionally bypass the `ConciergeService` class — the
+// class models the agent → inspector → client state machine, whereas these
+// helpers model the simpler invite-token-to-booking flow opened by a public
+// magic link.
+
+import { conciergeInvites, conciergeBookings } from '../lib/db/schema';
+
+interface BookingInviteRow {
+    token: string;
+    tenantId: string;
+    inspectorId: string | null;
+    expiresAt: string;
+    createdAt: string | null;
+}
+
+interface BookingRow {
+    id: string;
+    confirmationToken: string;
+    tenantId: string;
+    inviteToken: string;
+    slotStart: string;
+    slotEnd: string;
+    contactName: string;
+    contactEmail: string;
+    contactPhone: string | null;
+    address: string;
+    notes: string | null;
+    createdAt: string | null;
+}
+
+interface TenantRow {
+    id: string;
+    name: string;
+}
+
+export interface BookInfoResult {
+    tenant: { name: string; brand: Record<string, unknown> | null };
+    inspector: { id: string; name: string } | null;
+    availableSlots: Array<{ start: string; end: string }>;
+    expiresAt: string;
+}
+
+export interface CreateBookingInput {
+    token: string;
+    slot: { start: string; end: string };
+    contactName: string;
+    contactEmail: string;
+    contactPhone?: string | undefined;
+    address: string;
+    notes?: string | undefined;
+}
+
+export interface CreateBookingResult {
+    bookingId: string;
+    confirmationToken: string;
+}
+
+export interface ConfirmInfoResult {
+    booking: {
+        id: string;
+        start: string;
+        end: string;
+        address: string;
+        contactName: string;
+        tenant: { name: string };
+    };
+}
+
+/**
+ * Read the tenant brand + (placeholder) available slots for a booking page
+ * keyed by a public invite token. Throws on missing or expired token.
+ *
+ * NOTE: `availableSlots` is currently a stub empty array — calendar
+ * integration is tracked in a separate plan. The route is wired and the
+ * frontend renders so the customer can still submit a free-form slot.
+ */
+export async function getBookInfo(db: any, token: string): Promise<BookInfoResult> {
+    const invite = (await db
+        .select()
+        .from(conciergeInvites)
+        .where(eq(conciergeInvites.token, token))
+        .get()) as BookingInviteRow | undefined;
+    if (!invite) throw new Error('Invalid token');
+    if (new Date(invite.expiresAt) < new Date()) throw new Error('Token expired');
+
+    const tenant = (await db
+        .select()
+        .from(tenants)
+        .where(eq(tenants.id, invite.tenantId))
+        .get()) as (TenantRow & { brand?: Record<string, unknown> }) | undefined;
+
+    return {
+        tenant: {
+            name: tenant?.name ?? 'Unknown',
+            // Tenant brand column is not yet on the schema; surface null until
+            // the brand-on-tenant migration lands.
+            brand: (tenant as any)?.brand ?? null,
+        },
+        inspector: null,
+        availableSlots: [],
+        expiresAt: invite.expiresAt,
+    };
+}
+
+/**
+ * Insert a `concierge_bookings` row keyed by an invite token + a freshly minted
+ * confirmation token. Throws on missing/expired invite.
+ */
+export async function createBooking(
+    db: any,
+    input: CreateBookingInput,
+): Promise<CreateBookingResult> {
+    const invite = (await db
+        .select()
+        .from(conciergeInvites)
+        .where(eq(conciergeInvites.token, input.token))
+        .get()) as BookingInviteRow | undefined;
+    if (!invite) throw new Error('Invalid token');
+    if (new Date(invite.expiresAt) < new Date()) throw new Error('Token expired');
+
+    const bookingId = crypto.randomUUID();
+    const confirmationToken = crypto.randomUUID().replace(/-/g, '');
+
+    await db.insert(conciergeBookings).values({
+        id: bookingId,
+        confirmationToken,
+        tenantId: invite.tenantId,
+        inviteToken: input.token,
+        slotStart: input.slot.start,
+        slotEnd: input.slot.end,
+        contactName: input.contactName,
+        contactEmail: input.contactEmail,
+        contactPhone: input.contactPhone ?? null,
+        address: input.address,
+        notes: input.notes ?? null,
+        createdAt: new Date().toISOString(),
+    } as any);
+
+    return { bookingId, confirmationToken };
+}
+
+/**
+ * Fetch a just-created booking by its confirmation token for the
+ * /confirm-info page. Throws on missing token.
+ */
+export async function getConfirmInfo(
+    db: any,
+    confirmationToken: string,
+): Promise<ConfirmInfoResult> {
+    const booking = (await db
+        .select()
+        .from(conciergeBookings)
+        .where(eq(conciergeBookings.confirmationToken, confirmationToken))
+        .get()) as BookingRow | undefined;
+    if (!booking) throw new Error('Invalid confirmation token');
+
+    const tenant = (await db
+        .select()
+        .from(tenants)
+        .where(eq(tenants.id, booking.tenantId))
+        .get()) as TenantRow | undefined;
+
+    return {
+        booking: {
+            id: booking.id,
+            start: booking.slotStart,
+            end: booking.slotEnd,
+            address: booking.address,
+            contactName: booking.contactName,
+            tenant: { name: tenant?.name ?? 'Unknown' },
+        },
+    };
+}

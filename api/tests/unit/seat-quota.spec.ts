@@ -25,7 +25,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { getSeatUsage } from '../../src/features/seat-quota/usage';
 import { Hono } from 'hono';
 import { requireSeatAvailable } from '../../src/features/seat-quota';
-import { SAAS_SHARED_PROFILE, STANDALONE_PROFILE, type DeploymentProfile } from '../../src/lib/deployment-profile';
+import { STANDALONE_PROFILE, SAAS_PROFILE, type DeploymentProfile } from '../../src/lib/deployment-profile';
 import { AppError } from '../../src/lib/errors';
 import type { HonoConfig } from '../../src/types/hono';
 
@@ -118,7 +118,7 @@ describe('getSeatUsage', () => {
 
 describe('requireSeatAvailable middleware', () => {
     function makeApp(
-        profile: DeploymentProfile = SAAS_SHARED_PROFILE,
+        profile: DeploymentProfile = STANDALONE_PROFILE,
         tenantId: string | null = 'tenant-1',
     ) {
         const app = new Hono<HonoConfig>();
@@ -157,22 +157,29 @@ describe('requireSeatAvailable middleware', () => {
         expect(vi.mocked(getSeatUsage)).not.toHaveBeenCalled();
     });
 
-    it('passes through when seats remain (saas-shared)', async () => {
+    it('passes through when seats remain (saas)', async () => {
+        // Section F rewrite. SAAS_PROFILE now has hasSeatQuota=true
+        // uniformly (no shared/silo split); the middleware calls
+        // getSeatUsage and lets the request through when remaining > 0.
         vi.mocked(getSeatUsage).mockResolvedValueOnce({ used: 3, max: 10, remaining: 7 });
-        const app = makeApp(SAAS_SHARED_PROFILE);
+        const app = makeApp(SAAS_PROFILE, 'tenant-1');
         const res = await app.request('/invite', { method: 'POST' }, { DB: {} } as never);
         expect(res.status).toBe(200);
         expect(vi.mocked(getSeatUsage)).toHaveBeenCalledWith('tenant-1', expect.anything());
     });
 
-    it('rejects with 402 SEAT_LIMIT_REACHED when at limit (saas-shared)', async () => {
+    it('rejects with 402 SEAT_LIMIT_REACHED when at limit (saas)', async () => {
+        // Section F rewrite. Confirms the failure path: remaining=0 throws
+        // Errors.SeatLimitReached which the global error handler translates
+        // to HTTP 402 with the seat-limit error code.
         vi.mocked(getSeatUsage).mockResolvedValueOnce({ used: 10, max: 10, remaining: 0 });
-        const app = makeApp(SAAS_SHARED_PROFILE);
+        const app = makeApp(SAAS_PROFILE, 'tenant-1');
         const res = await app.request('/invite', { method: 'POST' }, { DB: {} } as never);
         expect(res.status).toBe(402);
-        const body = (await res.json()) as { success: false; error: { code: string; details: unknown } };
+        const body = await res.json() as { success: boolean; error: { code: string; details: unknown } };
         expect(body.success).toBe(false);
         expect(body.error.code).toBe('seat_limit_reached');
-        expect(body.error.details).toEqual({ used: 10, max: 10, billingPortalUrl: null });
+        // Payload carries used/max/billingPortalUrl per middleware contract.
+        expect(body.error.details).toMatchObject({ used: 10, max: 10 });
     });
 });

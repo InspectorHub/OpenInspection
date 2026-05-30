@@ -18,7 +18,7 @@ const getArg = (key) => {
 // Configuration Paths & Naming
 const TOML_PATH = path.resolve(getArg('--config') || getArg('--toml') || 'wrangler.toml');
 const TOML_EXAMPLE_PATH = path.resolve(path.dirname(TOML_PATH), 'wrangler.toml.example');
-const PROJECT_SLUG = getArg('--name') || 'openinspection-standalone';
+const PROJECT_SLUG = getArg('--name') || 'openinspection-api';
 const PROJECT_TITLE = getArg('--app-name') || getArg('--title') || 'OpenInspection';
 
 // Dynamic Resource Naming

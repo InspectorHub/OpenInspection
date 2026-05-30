@@ -1,6 +1,8 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, eq as eqDz, asc as ascDz, desc as descDz } from 'drizzle-orm';
+import { eq, and, like, eq as eqDz, asc as ascDz, desc as descDz, sql as sqlTpl } from 'drizzle-orm';
+import { buildMeta } from '../lib/validations/pagination.schema';
 import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
@@ -8,10 +10,9 @@ import { safeISODate } from '../lib/date';
 import { getBaseUrl, getBookingHost } from '../lib/url';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { agreementSignUrl } from '../lib/public-urls';
-import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
-import { verifyM2mAuth } from '../lib/m2m-auth';
+import { isServiceBindingCall } from '../portal/service-binding-guard';
 import {
     UpdateBrandingSchema,
     InviteMemberSchema,
@@ -31,6 +32,7 @@ import {
     CommentResponseSchema,
     UpdateCommentSchema,
     ListCommentsQuerySchema,
+    CommentTouchResponseSchema,
     StripeConnectAccountSchema,
     AttentionThresholdsSchema,
     AttentionThresholdsResponseSchema,
@@ -39,13 +41,16 @@ import {
     DashboardColumnPrefsResponseSchema,
     SeedStarterContentBodySchema,
     SeedStarterContentResponseSchema,
+    InspectorSignSchema,
 } from '../lib/validations/admin.schema';
+import { applyInspectorPreSign } from '../services/agreement.service';
+import { SigningKeyService } from '../services/signing-key.service';
+import { AuditLogService } from '../services/audit-log.service';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
+import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-const adminRoutes = new OpenAPIHono<HonoConfig>();
 
 /**
  * GET /api/admin/export
@@ -70,15 +75,6 @@ const exportDataRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for exportTenant (GET /export, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(exportDataRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const adminService = c.var.services.admin;
-    const data = await adminService.getExport(tenantId);
-    
-    auditFromContext(c, 'data.export', 'bulk_export');
-
-    return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data } }, 200);
-});
 
 /**
  * POST /api/admin/invite
@@ -112,21 +108,6 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for inviteTenant (POST /invite, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(inviteMemberRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    
-    const adminService = c.var.services.admin;
-    const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role);
-
-    const inviteLink = `${getBaseUrl(c)}/join?token=${inviteId}`;
-
-    const emailPromise = c.var.services.email.sendInvitation(body.email, inviteLink)
-        .catch(() => { /* email delivery is best-effort */ });
-    c.executionCtx.waitUntil(emailPromise);
-
-    return c.json({ success: true, data: { inviteLink, expiresAt: expiresAt.toISOString() } }, 201);
-});
 
 /**
  * POST /api/admin/import
@@ -165,96 +146,6 @@ const importDataRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for importTenant (POST /import, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(importDataRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-
-    const importedInspections = Array.isArray(body.inspections) ? body.inspections : [];
-    const importedTemplates = Array.isArray(body.templates) ? body.templates : [];
-    const importedAgreements = Array.isArray(body.agreements) ? body.agreements : [];
-    const importedResults = Array.isArray(body.inspectionResults) ? body.inspectionResults : [];
-
-    const total = importedInspections.length + importedTemplates.length + 
-                  importedAgreements.length + importedResults.length;
-    if (total === 0) throw Errors.BadRequest('No importable records found.');
-    if (total > 5000) throw Errors.BadRequest('Payload too large.');
-
-    const db = drizzle(c.env.DB);
-    const counts = { templates: 0, agreements: 0, inspections: 0, results: 0 };
-
-    interface TemplateImport { id: string; name: string; version?: number; schema: unknown; createdAt?: string }
-    interface AgreementImport { id: string; name: string; content: string; version?: number; createdAt?: string }
-    interface InspectionImport { 
-        id: string; propertyAddress: string; inspectorId?: string; clientName?: string; 
-        clientEmail?: string; templateId?: string; date?: string; status?: string; 
-        paymentStatus?: string; price?: number; createdAt?: string 
-    }
-    interface ResultImport { id: string; inspectionId: string; data: unknown; lastSyncedAt?: string }
-
-    for (const t of importedTemplates as unknown as TemplateImport[]) {
-        if (!t.id || !t.name) continue;
-        await db.insert(templates).values({
-            id: t.id, tenantId, name: t.name, version: t.version ?? 1,
-            schema: typeof t.schema === 'string' ? t.schema : JSON.stringify(t.schema),
-            createdAt: t.createdAt ? new Date(t.createdAt) : new Date(),
-        }).onConflictDoNothing().run();
-        counts.templates++;
-    }
-
-    for (const a of importedAgreements as unknown as AgreementImport[]) {
-        if (!a.id || !a.name) continue;
-        await db.insert(agreementTable).values({
-            id: a.id, tenantId, name: a.name, content: a.content || '', version: a.version ?? 1,
-            createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
-        }).onConflictDoNothing().run();
-        counts.agreements++;
-    }
-
-    for (const ins of importedInspections as unknown as InspectionImport[]) {
-        if (!ins.id || !ins.propertyAddress) continue;
-        await db.insert(inspections).values({
-            id: ins.id, tenantId, propertyAddress: ins.propertyAddress,
-            inspectorId: ins.inspectorId || null, clientName: ins.clientName || null,
-            clientEmail: ins.clientEmail || null, templateId: ins.templateId || null,
-            date: ins.date || new Date().toISOString(), status: ins.status || 'draft',
-            paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
-            createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
-        }).onConflictDoNothing().run();
-        counts.inspections++;
-    }
-
-    for (const r of importedResults as unknown as ResultImport[]) {
-        if (!r.id || !r.inspectionId) continue;
-        
-        // Verify inspectionId belongs to current tenant
-        const inspection = await db.select().from(inspections)
-            .where(eq(inspections.id, r.inspectionId))
-            .get();
-        
-        if (!inspection) {
-            logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} not found`);
-            continue;
-        }
-        
-        if (inspection.tenantId !== tenantId) {
-            logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} belongs to different tenant`);
-            continue;
-        }
-        
-        await db.insert(inspectionResults).values({
-            id: r.id,
-            tenantId,
-            inspectionId: r.inspectionId,
-            data: typeof r.data === 'string' ? r.data : JSON.stringify(r.data),
-            lastSyncedAt: r.lastSyncedAt ? new Date(r.lastSyncedAt) : new Date(),
-        }).onConflictDoNothing().run();
-        counts.results++;
-    }
-
-    auditFromContext(c, 'data.import', 'import', { metadata: { counts } });
-
-    return c.json({ success: true, data: { message: 'Import complete.', imported: counts } }, 200);
-});
 
 /**
  * GET /api/admin/members
@@ -279,19 +170,6 @@ const listMembersRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantMembers (GET /members, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(listMembersRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const adminService = c.var.services.admin;
-    const members = await adminService.getMembers(tenantId);
-    
-    // Map Date to string for schema compatibility
-    const formattedMembers = members.members.map((m: { id: string; email: string; role: string; createdAt: Date }) => ({
-        ...m,
-        createdAt: safeISODate(m.createdAt)
-    }));
-    
-    return c.json({ success: true, data: formattedMembers }, 200);
-});
 
 /**
  * GET Agreements
@@ -316,11 +194,6 @@ const listAgreementsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantAgreements (GET /agreements, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(listAgreementsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const agreementService = c.var.services.agreement;
-    return c.json({ success: true, data: await agreementService.listAgreements(tenantId) }, 200);
-});
 
 const createAgreementRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -351,13 +224,6 @@ const createAgreementRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createTenantAgreements (POST /agreements, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(createAgreementRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    const agreementService = c.var.services.agreement;
-    const agreement = await agreementService.createAgreement(tenantId, body.name, body.content);
-    return c.json({ success: true, data: { agreement: agreement } }, 201);
-});
 
 const updateAgreementRoute = createRoute(withMcpMetadata({
     method: 'put',
@@ -389,14 +255,6 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for updateTenantAgreement (PUT /agreements/{id}, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(updateAgreementRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const body = c.req.valid('json');
-    const agreementService = c.var.services.agreement;
-    const agreement = await agreementService.updateAgreement(id, tenantId, body.name, body.content);
-    return c.json({ success: true, data: { agreement: agreement } }, 200);
-});
 
 const deleteAgreementRoute = createRoute(withMcpMetadata({
     method: 'delete',
@@ -421,13 +279,6 @@ const deleteAgreementRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteTenantAgreement (DELETE /agreements/{id}, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(deleteAgreementRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const agreementService = c.var.services.agreement;
-    await agreementService.deleteAgreement(id, tenantId);
-    return c.json({ success: true }, 200);
-});
 
 /**
  * GET /api/admin/audit-logs
@@ -460,30 +311,6 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantAuditLogs (GET /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(getAuditLogsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { limit, cursor, action, entityType } = c.req.valid('query');
-    const adminService = c.var.services.admin;
-    const result = await adminService.getAuditLogs(tenantId, {
-        limit: parseInt(limit || '50'),
-        cursor,
-        action,
-        entityType
-    } as Parameters<typeof adminService.getAuditLogs>[1]);
-
-    // Map Date to string for schema compatibility
-    const formattedResult = {
-        ...result,
-        items: result.logs.map(log => ({
-            ...log,
-            createdAt: safeISODate(log.createdAt)
-        }))
-    };
-
-    auditFromContext(c, 'audit.view', 'audit_log');
-
-    return c.json({ success: true, data: formattedResult }, 200);
-});
 
 /**
  * POST /api/admin/audit-logs
@@ -525,14 +352,6 @@ const postAuditLogRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createTenantAuditLogs (POST /audit-logs, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(postAuditLogRoute, async (c) => {
-    const { action, resourceType, resourceId, detail } = c.req.valid('json');
-    auditFromContext(c, action, resourceType, {
-        entityId: resourceId,
-        ...(detail ? { metadata: detail } : {}),
-    });
-    return c.json({ success: true }, 200);
-});
 
 /**
  * DELETE /api/admin/data
@@ -566,18 +385,6 @@ const eraseDataRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteTenantData (DELETE /data, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(eraseDataRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    const adminService = c.var.services.admin;
-    const counts = await adminService.eraseClientData(tenantId, body.clientEmail);
-    
-    auditFromContext(c, 'data.delete', 'client', {
-        metadata: { clientEmail: body.clientEmail, ...counts },
-    });
-
-    return c.json({ success: true, data: { message: 'Client data erased successfully.', ...counts } }, 200);
-});
 
 /**
  * GET /api/admin/branding
@@ -602,26 +409,6 @@ const getBrandingRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantBranding (GET /branding, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(getBrandingRoute, async (c) => {
-    const brandingService = c.var.services.branding;
-    const branding = await brandingService.getBranding(c.get('tenantId'), {
-        siteName: c.env.APP_NAME || 'OpenInspection',
-        primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
-        supportEmail: c.env.SENDER_EMAIL || 'support@example.com'
-    });
-    
-    const formattedBranding = {
-        ...branding,
-        siteName: branding.siteName || c.env.APP_NAME || 'OpenInspection',
-        primaryColor: branding.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
-        supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
-        logoUrl: branding.logoUrl || null,
-        billingUrl: branding.billingUrl || null,
-        gaMeasurementId: branding.gaMeasurementId || null
-    };
-
-    return c.json({ success: true, data: { branding: formattedBranding } }, 200);
-});
 
 /**
  * POST /api/admin/branding
@@ -655,23 +442,6 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createTenantBranding (POST /branding, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(updateBrandingRoute, async (c) => {
-    const body = c.req.valid('json');
-    const brandingService = c.var.services.branding;
-    const result = await brandingService.updateBranding(c.get('tenantId'), body);
-    
-    const formattedResult = {
-        ...result,
-        siteName: result.siteName || c.env.APP_NAME || 'OpenInspection',
-        primaryColor: result.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
-        supportEmail: result.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
-        logoUrl: result.logoUrl || null,
-        billingUrl: result.billingUrl || null,
-        gaMeasurementId: result.gaMeasurementId || null
-    };
-
-    return c.json({ success: true, data: { branding: formattedResult } }, 200);
-});
 
 /**
  * POST /api/admin/branding/logo
@@ -697,7 +467,7 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), logoUrl: z.string().describe('TODO describe logoUrl field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ logoUrl: z.string().describe('TODO describe logoUrl field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
             description: 'Success',
@@ -707,15 +477,6 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createTenantBrandingLogo (POST /branding/logo, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(uploadLogoRoute, async (c) => {
-    const formData = await c.req.formData();
-    const file = formData.get('logo') as File;
-    if (!file || !(file instanceof File)) throw Errors.BadRequest('No logo file provided.');
-
-    const brandingService = c.var.services.branding;
-    const logoUrl = await brandingService.uploadLogo(c.get('tenantId'), file);
-    return c.json({ success: true, data: { logoUrl } }, 200);
-});
 
 // ─── Integration Config & Secrets ────────────────────────────────────────────
 
@@ -749,15 +510,6 @@ const getConfigRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantConfig (GET /config, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(getConfigRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const svc = c.var.services.branding;
-    const [integrationConfig, secrets] = await Promise.all([
-        svc.getIntegrationConfig(tenantId),
-        svc.getMaskedSecrets(tenantId, c.env.JWT_SECRET),
-    ]);
-    return c.json({ success: true, data: { integrationConfig, secrets } }, 200);
-});
 
 const updateIntegrationConfigRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -773,12 +525,6 @@ const updateIntegrationConfigRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createTenantConfig (POST /config, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(updateIntegrationConfigRoute, async (c) => {
-    const body = c.req.valid('json');
-    await c.var.services.branding.updateIntegrationConfig(c.get('tenantId'), body as unknown as import('../services/branding.service').IntegrationConfig);
-    auditFromContext(c, 'config.integration.update', 'tenant_config');
-    return c.json({ success: true }, 200);
-});
 
 const updateSecretsRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -794,12 +540,6 @@ const updateSecretsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createTenantConfigSecrets (POST /config/secrets, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(updateSecretsRoute, async (c) => {
-    const body = c.req.valid('json');
-    await c.var.services.branding.updateSecrets(c.get('tenantId'), c.env.JWT_SECRET, body as unknown as import('../services/branding.service').SecretsConfig);
-    auditFromContext(c, 'config.secrets.update', 'tenant_config');
-    return c.json({ success: true }, 200);
-});
 
 // --- Agreement Signing ---
 
@@ -820,99 +560,6 @@ const sendAgreementRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for sendTenant (POST /agreements/send, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(sendAgreementRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    const svc = c.var.services.agreement;
-
-    const request = await svc.createSigningRequest(tenantId, {
-        agreementId: body.agreementId,
-        clientEmail: body.clientEmail,
-        ...(body.clientName !== undefined ? { clientName: body.clientName } : {}),
-        ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
-    });
-    const tenantSlug = c.get('requestedSubdomain') ?? '';
-    const signUrl = agreementSignUrl(getBookingHost(c), tenantSlug, request.token);
-
-    // Spec 5H D-patch — fetch the agreement HTML at send-time to compute its
-    // content hash. This is the "what was the client agreed to" anchor for
-    // the audit chain — recomputable later to prove the DB version matches.
-    let agreementContentHash: string | null = null;
-    let agreementName: string | null = null;
-    try {
-        const agreement = await drizzle(c.env.DB, { schema })
-            .select({ name: schema.agreements.name, content: schema.agreements.content })
-            .from(schema.agreements)
-            .where(eq(schema.agreements.id, body.agreementId))
-            .get();
-        if (agreement) {
-            agreementName = agreement.name;
-            const bytes = new TextEncoder().encode(agreement.content || '');
-            const buf = await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer);
-            const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-            agreementContentHash = `sha256:${hex}`;
-        }
-    } catch (e) {
-        logger.warn('audit.agreement.hash.failed', { agreementId: body.agreementId, error: (e as Error).message });
-    }
-
-    // Spec 5H P0.1 — append request.created to the audit chain
-    try {
-        await c.var.services.auditLog.append(tenantId, request.id, 'request.created', {
-            actorId: c.get('user')?.sub ?? null,
-            agreementContentHash,
-            agreementId: body.agreementId,
-            agreementName,
-            clientEmail: body.clientEmail,
-            clientName: body.clientName ?? null,
-            envelopeId: request.id,
-            inspectionId: body.inspectionId ?? null,
-            tenantId,
-            tsMs: Date.now(),
-        });
-    } catch (e) {
-        logger.warn('audit.append.created.failed', { requestId: request.id, error: (e as Error).message });
-    }
-
-    // Sprint B-4a — append the sender (current admin/inspector) signature so
-    // the client can rebook with this user via the embedded booking link.
-    const senderId = c.get('user')?.sub;
-    let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; slug: string | null } | undefined;
-    if (senderId) {
-        try {
-            const row = await drizzle(c.env.DB).select({
-                name:          schema.users.name,
-                email:         schema.users.email,
-                phone:         schema.users.phone,
-                licenseNumber: schema.users.licenseNumber,
-                slug:          schema.users.slug,
-            }).from(schema.users)
-                .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
-                .get();
-            sigInspector = row ?? undefined;
-        } catch (err) {
-            logger.warn('agreement.signature.lookup.failed', { senderId, error: (err as Error).message });
-        }
-    }
-
-    await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c))
-        .catch(e => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
-
-    // Append request.sent only after email is dispatched (or attempted)
-    try {
-        await c.var.services.auditLog.append(tenantId, request.id, 'request.sent', {
-            envelopeId: request.id,
-            recipientEmail: body.clientEmail,
-            signUrl,
-            tsMs: Date.now(),
-        });
-    } catch (e) {
-        logger.warn('audit.append.sent.failed', { requestId: request.id, error: (e as Error).message });
-    }
-
-    auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, clientEmail: body.clientEmail } });
-    return c.json({ success: true as const, data: { token: request.token, signUrl } }, 200);
-});
 
 // --- Spec 5H — Signing Requests admin views ---
 
@@ -923,35 +570,11 @@ const listSigningRequestsRoute = createRoute(withMcpMetadata({
     summary: 'List signing requests for tenant',
     middleware: [requireRole(['owner', 'admin'])],
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ requests: z.array(z.unknown()).describe('TODO describe requests field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.unknown()).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
     },
     operationId: "listTenantAgreementsRequests",
     description: "Auto-generated placeholder for listTenantAgreementsRequests (GET /agreements/requests, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(listSigningRequestsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
-    const rows = await db
-        .select({
-            id: agreementRequestsTable.id,
-            agreementId: agreementRequestsTable.agreementId,
-            clientName: agreementRequestsTable.clientName,
-            clientEmail: agreementRequestsTable.clientEmail,
-            inspectionId: agreementRequestsTable.inspectionId,
-            status: agreementRequestsTable.status,
-            createdAt: agreementRequestsTable.createdAt,
-            sentAt: agreementRequestsTable.sentAt,
-            viewedAt: agreementRequestsTable.viewedAt,
-            signedAt: agreementRequestsTable.signedAt,
-            agreementName: agreementsTable.name,
-        })
-        .from(agreementRequestsTable)
-        .leftJoin(agreementsTable, eqDz(agreementRequestsTable.agreementId, agreementsTable.id))
-        .where(eqDz(agreementRequestsTable.tenantId, tenantId))
-        .orderBy(descDz(agreementRequestsTable.createdAt))
-        .limit(200);
-    return c.json({ success: true as const, data: rows }, 200);
-});
 
 const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -967,52 +590,6 @@ const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
     operationId: "getTenantAgreementsRequest",
     description: "Auto-generated placeholder for getTenantAgreementsRequest (GET /agreements/requests/{id}, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(getSigningRequestDetailRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const id = c.req.valid('param').id;
-    const db = drizzle(c.env.DB, { schema });
-    const reqRow = await db
-        .select()
-        .from(schema.agreementRequests)
-        .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
-        .get();
-    if (!reqRow) throw Errors.NotFound('Signing request not found');
-    const agreement = await db
-        .select()
-        .from(schema.agreements)
-        .where(eqDz(schema.agreements.id, reqRow.agreementId))
-        .get();
-    const auditRows = await db
-        .select()
-        .from(schema.esignAuditLogs)
-        .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
-        .orderBy(ascDz(schema.esignAuditLogs.createdAt))
-        .all();
-    const verify = await c.var.services.auditLog.verifyChain(tenantId, id);
-    return c.json({
-        success: true as const,
-        data: {
-            request: reqRow,
-            agreement: agreement ? { id: agreement.id, name: agreement.name } : null,
-            auditEvents: auditRows.map((r) => {
-                let payload: Record<string, unknown> = {};
-                try { payload = JSON.parse(r.payloadJson); } catch { /* ignore */ }
-                return {
-                    id: r.id,
-                    event: r.event,
-                    createdAt: r.createdAt,
-                    payload,
-                    hash: r.hash,
-                    prevHash: r.prevHash,
-                    signature: r.signature,
-                    keyFingerprint: r.keyFingerprint,
-                };
-            }),
-            chainValid: verify.valid,
-            chainReason: verify.valid ? null : verify.reason,
-        },
-    }, 200);
-});
 
 const downloadAuditTrailRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -1027,53 +604,6 @@ const downloadAuditTrailRoute = createRoute(withMcpMetadata({
     operationId: "listTenantAgreementsRequestsAuditTrail",
     description: "Auto-generated placeholder for listTenantAgreementsRequestsAuditTrail (GET /agreements/requests/{id}/audit-trail, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(downloadAuditTrailRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const id = c.req.valid('param').id;
-    const db = drizzle(c.env.DB, { schema });
-    const reqRow = await db
-        .select()
-        .from(schema.agreementRequests)
-        .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
-        .get();
-    if (!reqRow) throw Errors.NotFound('Signing request not found');
-    const auditRows = await db
-        .select()
-        .from(schema.esignAuditLogs)
-        .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
-        .orderBy(ascDz(schema.esignAuditLogs.createdAt))
-        .all();
-    const pubKey = await c.var.services.signingKey.getPublicKey(tenantId);
-    const payload = {
-        envelopeId: id,
-        tenantId,
-        clientName: reqRow.clientName,
-        clientEmail: reqRow.clientEmail,
-        status: reqRow.status,
-        publicKeyPem: pubKey?.pem ?? null,
-        keyFingerprint: pubKey?.fingerprint ?? null,
-        algorithm: 'Ed25519',
-        events: auditRows.map((r) => ({
-            id: r.id,
-            event: r.event,
-            createdAt: r.createdAt,
-            payloadJson: r.payloadJson,
-            prevHash: r.prevHash,
-            hash: r.hash,
-            signature: r.signature,
-            keyFingerprint: r.keyFingerprint,
-        })),
-        exportedAt: new Date().toISOString(),
-    };
-    return new Response(JSON.stringify(payload, null, 2), {
-        status: 200,
-        headers: {
-            'Content-Type': 'application/json',
-            'Content-Disposition': `attachment; filename="audit-trail-${id.slice(0, 8)}.json"`,
-        },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any;
-});
 
 // --- Comments Library ---
 
@@ -1101,7 +631,7 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     request: { query: ListCommentsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ comments: z.array(CommentResponseSchema).describe('TODO describe comments field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(CommentResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
             description: 'Success',
         },
     },
@@ -1110,29 +640,6 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantComments (GET /comments, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(listCommentsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { rating, section, sectionId, triggerCode, search } = c.req.valid('query');
-    const db = drizzle(c.env.DB);
-    // Filters layered defensively: tenantId always first (multi-tenant
-    // isolation rule from CLAUDE.md), then optional rating bucket / section
-    // / free-text search.
-    const conditions = [eq(comments.tenantId, tenantId)];
-    if (rating) conditions.push(eq(comments.ratingBucket, rating));
-    if (section) conditions.push(eq(comments.section, section));
-    if (sectionId) {
-        conditions.push(like(comments.sectionIds, `%"${escapeLikePattern(sectionId)}"%`));
-    }
-    if (triggerCode) {
-        conditions.push(eq(comments.triggerCode, triggerCode));
-    }
-    let rows = await db.select().from(comments).where(and(...conditions)).all();
-    if (search && search.trim()) {
-        const needle = search.trim().toLowerCase();
-        rows = rows.filter(r => r.text.toLowerCase().includes(needle));
-    }
-    return c.json({ success: true as const, data: rows.map(commentRowToResponse) }, 200);
-});
 
 const createCommentRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -1152,28 +659,6 @@ const createCommentRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createTenantComments (POST /comments, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(createCommentRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { text, category, ratingBucket, section } = c.req.valid('json');
-    const db = drizzle(c.env.DB);
-    const row = {
-        id: crypto.randomUUID(),
-        tenantId,
-        text,
-        category: category ?? null,
-        ratingBucket: ratingBucket ?? null,
-        section: section ?? null,
-        // S2-7 — libraryId tracks marketplace provenance; null for tenant-authored.
-        libraryId: null as string | null,
-        sectionIds: null as string | null,
-        itemLabels: null as string | null,
-        triggerCode: null as string | null,
-        searchKeywords: null as string | null,
-        createdAt: new Date(),
-    };
-    await db.insert(comments).values(row);
-    return c.json({ success: true as const, data: { comment: commentRowToResponse(row) } }, 201);
-});
 
 const deleteCommentRoute = createRoute(withMcpMetadata({
     method: 'delete',
@@ -1194,16 +679,6 @@ const deleteCommentRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteTenantComment (DELETE /comments/{id}, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(deleteCommentRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const db = drizzle(c.env.DB);
-    const existing = await db.select().from(comments)
-        .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
-    if (!existing) throw Errors.NotFound('Comment not found');
-    await db.delete(comments).where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
-    return c.json({ success: true }, 200);
-});
 
 const updateCommentRoute = createRoute(withMcpMetadata({
     method: 'put',
@@ -1227,35 +702,28 @@ const updateCommentRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for updateTenantComment (PUT /comments/{id}, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(updateCommentRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const { text, category, ratingBucket, section } = c.req.valid('json');
-    const db = drizzle(c.env.DB);
-    const existing = await db.select().from(comments)
-        .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
-    if (!existing) throw Errors.NotFound('Comment not found');
-    const patch = {
-        text,
-        category: category ?? null,
-        ratingBucket: ratingBucket ?? null,
-        section: section ?? null,
-    };
-    await db.update(comments)
-        .set(patch)
-        .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
-    const updated = { ...existing, ...patch };
-    auditFromContext(c, 'comment.updated', 'comment', {
-        entityId: id,
-        metadata: {
-            category: category ?? null,
-            ratingBucket: ratingBucket ?? null,
-            section: section ?? null,
-            textPreview: text.slice(0, 80),
+
+// Comments Library Upgrade — per-user usage counter. Inspectors call this
+// after dropping a snippet into a report; the count drives the "frequent"
+// sort + AUTO filter mode in the Library drawer.
+const touchCommentRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path:   '/comments/{id}/touch',
+    tags:   ['admin'],
+    summary: "Record an inspector's use of a snippet (per-user counter)",
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string().min(1) }) },
+    responses: {
+        200: {
+            description: 'Updated usage row',
+            content: { 'application/json': { schema: CommentTouchResponseSchema } },
         },
-    });
-    return c.json({ success: true as const, data: { comment: commentRowToResponse(updated) } }, 200);
-});
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "touchTenantComment",
+    description: "Increment per-user usage counter for a comment library entry.",
+}, { scopes: ['admin'], tier: 'extended' }));
+
 
 // --- Widget Origin Allowlist ---
 
@@ -1275,11 +743,6 @@ const getWidgetOriginsRoute = createRoute(withMcpMetadata({
     operationId: "listTenantWidgetOrigins",
     description: "Auto-generated placeholder for listTenantWidgetOrigins (GET /widget/origins, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(getWidgetOriginsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const origins = await c.var.services.widget.getAllowedOrigins(tenantId);
-    return c.json({ success: true as const, data: { origins } }, 200);
-});
 
 const setWidgetOriginsRoute = createRoute(withMcpMetadata({
     method: 'put',
@@ -1298,12 +761,6 @@ const setWidgetOriginsRoute = createRoute(withMcpMetadata({
     operationId: "updateTenantWidgetOrigin",
     description: "Auto-generated placeholder for updateTenantWidgetOrigin (PUT /widget/origins, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(setWidgetOriginsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { origins } = c.req.valid('json');
-    await c.var.services.widget.setAllowedOrigins(tenantId, origins);
-    return c.json({ success: true as const, data: { origins } }, 200);
-});
 
 // --- Stripe Connect (inspector-facing) ---
 
@@ -1323,11 +780,6 @@ const getStripeConnectRoute = createRoute(withMcpMetadata({
     operationId: "listTenantStripeConnect",
     description: "Auto-generated placeholder for listTenantStripeConnect (GET /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(getStripeConnectRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { accountId } = await c.var.services.admin.getStripeConnect(tenantId);
-    return c.json({ success: true as const, data: { accountId } }, 200);
-});
 
 const setStripeConnectRoute = createRoute(withMcpMetadata({
     method: 'put',
@@ -1346,13 +798,6 @@ const setStripeConnectRoute = createRoute(withMcpMetadata({
     operationId: "updateTenantStripeConnect",
     description: "Auto-generated placeholder for updateTenantStripeConnect (PUT /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(setStripeConnectRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { accountId } = c.req.valid('json');
-    await c.var.services.admin.setStripeConnect(tenantId, accountId);
-    auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'set' } });
-    return c.json({ success: true as const, data: { accountId } }, 200);
-});
 
 const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     method: 'delete',
@@ -1370,12 +815,6 @@ const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     operationId: "deleteTenantStripeConnect",
     description: "Auto-generated placeholder for deleteTenantStripeConnect (DELETE /stripe-connect, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(deleteStripeConnectRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    await c.var.services.admin.setStripeConnect(tenantId, null);
-    auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'cleared' } });
-    return c.json({ success: true as const, data: { accountId: null } }, 200);
-});
 
 // --- Earnings Summary ---
 
@@ -1406,11 +845,6 @@ const getEarningsSummaryRoute = createRoute(withMcpMetadata({
     operationId: "listTenantEarningsSummary",
     description: "Auto-generated placeholder for listTenantEarningsSummary (GET /earnings-summary, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
-adminRoutes.openapi(getEarningsSummaryRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const summary = await c.var.services.invoice.getEarningsSummary(tenantId);
-    return c.json({ success: true as const, data: summary }, 200);
-});
 
 // --- ICS Subscription Token ---
 
@@ -1438,82 +872,15 @@ const icsTokenRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantIcsToken (GET /ics-token, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(icsTokenRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
-
-    const configs = await db
-        .select()
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .limit(1);
-
-    let token = configs[0]?.icsToken ?? null;
-
-    if (!token) {
-        token = crypto.randomUUID().replace(/-/g, '');
-        if (configs[0]) {
-            await db
-                .update(tenantConfigs)
-                .set({ icsToken: token, updatedAt: new Date() })
-                .where(eq(tenantConfigs.tenantId, tenantId));
-        } else {
-            await db.insert(tenantConfigs).values({
-                tenantId,
-                icsToken: token,
-                updatedAt: new Date(),
-            });
-        }
-    }
-
-    const baseUrl = getBaseUrl(c);
-    return c.json({ success: true as const, data: { url: `${baseUrl}/api/ics/${token}` } }, 200);
-});
 
 /**
  * POST /api/admin/backfill-default-templates — Spec 4F polish backfill.
  * One-shot M2M endpoint: loops through every tenant and seeds the 7 default templates
  * (idempotent — TemplateSeedService.bulkSeed skips existing names per tenant).
  *
- * Auth: PORTAL_M2M_SECRET via Authorization: Bearer.
+ * Auth: Service Binding (cf-worker header).
  * Use case: existing tenants that pre-date Spec 4F's auto-seed-on-tenant-init hook.
  */
-adminRoutes.openapi(withMcpMetadata({
-    method: 'post',
-    path: '/backfill-default-templates',
-    operationId: 'backfillDefaultTemplates',
-    tags: ['sysadmin'],
-    summary: 'Backfill default templates across all tenants',
-    description: 'M2M one-shot endpoint that seeds the default 7 templates for every tenant. Idempotent — TemplateSeedService.bulkSeed skips templates that already exist by name per tenant.',
-    responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
-        401: { description: 'Unauthorized' },
-    },
-}, { scopes: [], tier: 'excluded' }), async (c) => {
-    if (!verifyM2mAuth(c.req.header('authorization'), c.env as unknown as Record<string, string | undefined>)) {
-        throw Errors.Unauthorized();
-    }
-
-    const { tenants } = await import('../lib/db/schema');
-    const { TemplateSeedService } = await import('../services/template-seed.service');
-    const db = drizzle(c.env.DB);
-    const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).all();
-    const svc = new TemplateSeedService(c.env.DB);
-
-    const results: { tenantId: string; name: string; seeded: number; skipped: number }[] = [];
-    for (const t of allTenants) {
-        try {
-            const r = await svc.bulkSeed(t.id as string);
-            results.push({ tenantId: t.id as string, name: (t.name as string) ?? '', ...r });
-        } catch (err) {
-            logger.error('Backfill failed for tenant', { tenantId: t.id }, err instanceof Error ? err : undefined);
-        }
-    }
-    const totalSeeded = results.reduce((sum, r) => sum + r.seeded, 0);
-    const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
-    logger.info('Backfill complete', { tenantCount: results.length, totalSeeded, totalSkipped });
-    return c.json({ success: true as const }, 200);
-});
 
 // --- Attention Thresholds (handoff-decisions §1) ---
 //
@@ -1536,16 +903,6 @@ const getAttentionThresholdsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantAttentionThresholds (GET /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(getAttentionThresholdsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
-    const row = await db.select({ thresholds: tenantConfigs.attentionThresholds })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .limit(1);
-    const thresholds = row[0]?.thresholds ?? ATTENTION_THRESHOLDS_DEFAULTS;
-    return c.json({ success: true as const, data: { thresholds } }, 200);
-});
 
 const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     method: 'patch',
@@ -1564,31 +921,6 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for patchTenantAttentionThreshold (PATCH /attention-thresholds, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(updateAttentionThresholdsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    const db = drizzle(c.env.DB);
-
-    const existing = await db.select({ tenantId: tenantConfigs.tenantId })
-        .from(tenantConfigs)
-        .where(eq(tenantConfigs.tenantId, tenantId))
-        .limit(1);
-
-    if (existing.length === 0) {
-        await db.insert(tenantConfigs).values({
-            tenantId,
-            reportTheme: 'modern',
-            attentionThresholds: body,
-            updatedAt: new Date(),
-        });
-    } else {
-        await db.update(tenantConfigs)
-            .set({ attentionThresholds: body, updatedAt: new Date() })
-            .where(eq(tenantConfigs.tenantId, tenantId));
-    }
-    auditFromContext(c, 'config.attention_thresholds.update', 'tenant_config', { metadata: { ...body } });
-    return c.json({ success: true as const, data: { thresholds: body } }, 200);
-});
 
 // --- Dashboard Column Prefs (Round-2 backlog #2 — Spectora §5.1 / §E.7) ---
 //
@@ -1615,11 +947,6 @@ const getDashboardColumnsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listTenantDashboardColumns (GET /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(getDashboardColumnsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const columns = await c.var.services.dashboardPrefs.getColumnPrefs(tenantId);
-    return c.json({ success: true as const, data: { columns } }, 200);
-});
 
 const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
     method: 'patch',
@@ -1638,13 +965,6 @@ const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for patchTenantDashboardColumn (PATCH /dashboard-columns, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(updateDashboardColumnsRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-    const columns = await c.var.services.dashboardPrefs.setColumnPrefs(tenantId, body.columns);
-    auditFromContext(c, 'config.dashboard_columns.update', 'tenant_config', { metadata: { columns } });
-    return c.json({ success: true as const, data: { columns } }, 200);
-});
 
 // -----------------------------------------------------------------------------
 // GET /api/admin/tenant-config — read booking-related tenant config flags
@@ -1673,17 +993,6 @@ const tenantConfigGetRoute = createRoute(withMcpMetadata({
     description: "Returns booking-related tenant configuration flags (conciergeReviewRequired, blockUnsignedAgreement)."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(tenantConfigGetRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const config = await c.var.services.branding.getBranding(tenantId);
-    return c.json({
-        success: true as const,
-        data: {
-            conciergeReviewRequired: config?.conciergeReviewRequired ?? false,
-            blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
-        },
-    }, 200);
-});
 
 // -----------------------------------------------------------------------------
 // Agent Accounts A3 — concierge review-mode toggle (PATCH /api/admin/tenant-config)
@@ -1717,23 +1026,6 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for patchTenantTenantConfig (PATCH /tenant-config, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(tenantConfigPatchRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-
-    const update: Partial<typeof tenantConfigs.$inferInsert> = {};
-    if (body.conciergeReviewRequired !== undefined) {
-        update.conciergeReviewRequired = body.conciergeReviewRequired;
-    }
-    if (Object.keys(update).length === 0) {
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    }
-    await c.var.services.branding.updateBranding(tenantId, update);
-    auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
-        metadata: update,
-    });
-    return c.json({ success: true as const, data: { ok: true as const } }, 200);
-});
 
 /**
  * Design System 0520 subsystem C P8 T8.2 — portal → core seat-quota sync.
@@ -1743,45 +1035,8 @@ adminRoutes.openapi(tenantConfigPatchRoute, async (c) => {
  * Updates `tenants.max_users` so the seat-guard middleware + Guest-
  * InviteService.claim see the new cap on the next request.
  *
- * Auth: `Authorization: Bearer <PORTAL_M2M_SECRET>` (or any active V<N>).
+ * Auth: Service Binding (cf-worker header).
  */
-adminRoutes.openapi(withMcpMetadata({
-    method: 'post',
-    path: '/sync-quota',
-    operationId: 'syncTenantSeatQuota',
-    tags: ['sysadmin'],
-    summary: 'Sync tenant seat quota from portal',
-    description: 'M2M endpoint called by the portal whenever a tenant\'s subscription seat count changes. Updates the tenant\'s max_users column so InviteService.claim sees the new cap on the next request.',
-    request: { body: { content: { 'application/json': { schema: SyncQuotaSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-    responses: {
-        200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
-        401: { description: 'Unauthorized' },
-        404: { description: 'Tenant not found' },
-    },
-}, { scopes: [], tier: 'excluded' }), async (c) => {
-    if (!verifyM2mAuth(c.req.header('authorization'), c.env as unknown as Record<string, string | undefined>)) {
-        throw Errors.Unauthorized();
-    }
-
-    const { tenantId, maxUsers } = c.req.valid('json');
-    const { tenants } = await import('../lib/db/schema');
-    const db = drizzle(c.env.DB);
-
-    const result = await db.update(tenants)
-        .set({ maxUsers })
-        .where(eq(tenants.id, tenantId))
-        .returning({ id: tenants.id });
-    if (result.length === 0) throw Errors.NotFound('Tenant not found');
-
-    // Invalidate the per-tenant KV cache so the next request reads the
-    // fresh maxUsers value rather than the stale snapshot.
-    try {
-        await c.env.TENANT_CACHE.delete(`tenant:${tenantId}`);
-    } catch { /* cache miss is fine — read-through repopulates */ }
-
-    logger.info('sync-quota applied', { tenantId, maxUsers });
-    return c.json({ success: true as const }, 200);
-});
 
 /**
  * POST /api/admin/seed-starter-content — Trial Sample-Data Mode spec (2026-05-20).
@@ -1792,41 +1047,9 @@ adminRoutes.openapi(withMcpMetadata({
  * rating-systems / marketplace defaults). Idempotent — safe to retry on
  * workflow re-run.
  *
- * Auth: `Authorization: Bearer <PORTAL_M2M_SECRET>` (or any active V<N>);
+ * Auth: Service Binding (cf-worker header);
  * matches the other portal → core M2M endpoints in this file.
  */
-adminRoutes.openapi(withMcpMetadata({
-    method: 'post',
-    path: '/seed-starter-content',
-    operationId: 'seedStarterContentForTenant',
-    tags: ['sysadmin'],
-    summary: 'Seed starter content into newly-provisioned tenant',
-    description: 'M2M endpoint invoked by the portal\'s OnboardingWorkflow once a tenant is provisioned. Seeds initial templates, agreements, rating-systems, and marketplace defaults. Idempotent — safe to retry.',
-    request: { body: { content: { 'application/json': { schema: SeedStarterContentBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: SeedStarterContentResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
-            description: 'Seed counts (zero on idempotent re-run)',
-        },
-        401: { description: 'Unauthorized' },
-        404: { description: 'Tenant not found' },
-    },
-}, { scopes: [], tier: 'excluded' }), async (c) => {
-    if (!verifyM2mAuth(c.req.header('authorization'), c.env as unknown as Record<string, string | undefined>)) {
-        throw Errors.Unauthorized();
-    }
-
-    const { tenantId } = c.req.valid('json');
-    const { tenants } = await import('../lib/db/schema');
-    const db = drizzle(c.env.DB);
-    const existing = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, tenantId)).get();
-    if (!existing) throw Errors.NotFound('Tenant not found');
-
-    const { seedStarterContent } = await import('../services/starter-content.service');
-    const result = await seedStarterContent(c.env.DB, tenantId);
-
-    return c.json({ success: true as const, data: result }, 200);
-});
 
 // --- Finding Key Migration (one-time data migration) ---
 //
@@ -1861,112 +1084,1238 @@ const migrateFindingKeysRoute = createRoute(withMcpMetadata({
     description: 'Batch-converts inspection_results.data keys from legacy itemId format to composite _default:sectionId:itemId format. Idempotent — already-composite keys are skipped.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-adminRoutes.openapi(migrateFindingKeysRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const db = drizzle(c.env.DB);
 
-    let processed = 0;
-    let migrated = 0;
-    let skipped = 0;
+/**
+ * GET /api/admin/system/br-smoke
+ *
+ * Diagnostic — invokes `env.BROWSER.fetch(url, { Accept: 'application/pdf' })`
+ * and returns the raw outcome so an operator can confirm Cloudflare Browser
+ * Run (formerly Browser Rendering) is provisioned for the account before
+ * flipping `tenant_configs.enable_pdf_pipeline`. Does NOT persist anything;
+ * does NOT count toward audit chain.
+ *
+ * Default probe URL is `https://example.com` — a stable third-party page
+ * that should always render to a small (<10 KB) PDF when BR is live.
+ * Override with `?url=` for richer testing (e.g. a published `/report/...`
+ * route on the same Worker).
+ */
+const BrSmokeQuerySchema = z.object({
+    url: z.string().url().optional().openapi({ example: 'https://example.com' }).describe('Target URL for the BR probe; defaults to https://example.com.'),
+});
+const BrSmokeResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        bindingPresent: z.boolean().describe('Whether env.BROWSER is wired by wrangler.toml.'),
+        probedUrl: z.string(),
+        status: z.number().nullable().describe('HTTP status returned by env.BROWSER.fetch; null if the call threw.'),
+        ok: z.boolean().describe('True iff status is 2xx AND content-type is application/pdf.'),
+        contentType: z.string().nullable(),
+        contentLength: z.number().nullable().describe('Body byte length read into memory (capped at 1 MB).'),
+        durationMs: z.number().describe('Wall time for env.BROWSER.fetch round-trip.'),
+        error: z.string().nullable().describe('Exception message if the call threw.'),
+        hint: z.string().describe('Human-readable interpretation of the result.'),
+    }),
+});
+const brSmokeRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/system/br-smoke',
+    tags: ['admin'],
+    summary: 'Probe Cloudflare Browser Run binding (env.BROWSER) liveness',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { query: BrSmokeQuerySchema },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: BrSmokeResponseSchema } },
+            description: 'Probe result — see hint field for interpretation.',
+        },
+    },
+    operationId: 'brSmokeProbe',
+    description: 'Operator diagnostic for confirming Browser Run is enabled before enabling the per-tenant PDF pipeline.',
+}, { scopes: ['admin'], tier: 'extended' }));
 
-    const BATCH_SIZE = 50;
-    let offset = 0;
 
-    // Process inspections in batches
-    while (true) {
-        const batch = await db.select({
-            id:                inspections.id,
-            templateId:        inspections.templateId,
-            templateSnapshot:  inspections.templateSnapshot,
-        })
-        .from(inspections)
-        .where(eq(inspections.tenantId, tenantId))
-        .limit(BATCH_SIZE)
-        .offset(offset);
+/**
+ * PATCH /api/admin/pdf-pipeline
+ *
+ * Toggle the per-tenant Browser-Run PDF pipeline flag (`tenant_configs.enable_pdf_pipeline`,
+ * migration 0059). When false, all Spec 5A/5H render call-sites skip
+ * `env.BROWSER.fetch()` to avoid burning Worker CPU on a binding that may
+ * be unprovisioned. Default for a fresh tenant is false.
+ *
+ * Note: the same field is also accepted by `POST /api/admin/branding`
+ * alongside other tenant config — this endpoint exists for ops automation
+ * that wants a single-purpose URL without touching unrelated fields.
+ */
+const PdfPipelineToggleSchema = z.object({
+    enabled: z.boolean().openapi({ example: true }).describe('Whether to enable the server-side PDF rendering pipeline for this tenant.'),
+});
+const PdfPipelineResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        tenantId: z.string(),
+        enabled: z.boolean(),
+    }),
+});
+const togglePdfPipelineRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/pdf-pipeline',
+    tags: ['admin'],
+    summary: 'Toggle the per-tenant Browser-Run PDF rendering pipeline',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: {
+        body: { content: { 'application/json': { schema: PdfPipelineToggleSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: PdfPipelineResponseSchema } },
+            description: 'Pipeline flag persisted; new value echoed.',
+        },
+    },
+    operationId: 'togglePdfPipeline',
+    description: 'Flips tenant_configs.enable_pdf_pipeline (Spec 5A / Spec 5H gate). Verify env.BROWSER liveness with GET /api/admin/system/br-smoke first.',
+}, { scopes: ['admin'], tier: 'extended' }));
 
-        if (batch.length === 0) break;
-        offset += batch.length;
 
-        for (const insp of batch) {
-            // Load the results row for this inspection
-            const resultsRow = await db.select()
-                .from(inspectionResults)
-                .where(and(
-                    eq(inspectionResults.inspectionId, insp.id),
-                    eq(inspectionResults.tenantId, tenantId),
-                ))
+const inspectorSignRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/agreement-requests/{id}/inspector-sign',
+    tags: ['admin'],
+    summary: 'Inspector pre-signs an agreement before sending to client',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    request: {
+        params: z.object({ id: z.string() }),
+        body: { content: { 'application/json': { schema: InspectorSignSchema } } },
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Signed' },
+        409: { description: 'Envelope not in pending status' },
+    },
+    operationId: 'inspectorPreSignAgreement',
+    description: 'Spec 5H D1 — optional inspector pre-sign. Allowed only while envelope is pending.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+
+
+export const adminRoutes = createApiRouter()
+    .openapi(exportDataRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const adminService = c.var.services.admin;
+        const data = await adminService.getExport(tenantId);
+        
+        auditFromContext(c, 'data.export', 'bulk_export');
+
+        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data } }, 200);
+    })
+    .openapi(inviteMemberRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        
+        const adminService = c.var.services.admin;
+        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role);
+
+        const inviteLink = `${getBaseUrl(c)}/join?token=${inviteId}`;
+
+        const emailPromise = c.var.services.email.sendInvitation(body.email, inviteLink)
+            .catch(() => { /* email delivery is best-effort */ });
+        c.executionCtx.waitUntil(emailPromise);
+
+        return c.json({ success: true, data: { inviteLink, expiresAt: expiresAt.toISOString() } }, 201);
+    })
+    .openapi(importDataRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+
+        const importedInspections = Array.isArray(body.inspections) ? body.inspections : [];
+        const importedTemplates = Array.isArray(body.templates) ? body.templates : [];
+        const importedAgreements = Array.isArray(body.agreements) ? body.agreements : [];
+        const importedResults = Array.isArray(body.inspectionResults) ? body.inspectionResults : [];
+
+        const total = importedInspections.length + importedTemplates.length + 
+                      importedAgreements.length + importedResults.length;
+        if (total === 0) throw Errors.BadRequest('No importable records found.');
+        if (total > 5000) throw Errors.BadRequest('Payload too large.');
+
+        const db = drizzle(c.env.DB);
+        const counts = { templates: 0, agreements: 0, inspections: 0, results: 0 };
+
+        interface TemplateImport { id: string; name: string; version?: number; schema: unknown; createdAt?: string }
+        interface AgreementImport { id: string; name: string; content: string; version?: number; createdAt?: string }
+        interface InspectionImport { 
+            id: string; propertyAddress: string; inspectorId?: string; clientName?: string; 
+            clientEmail?: string; templateId?: string; date?: string; status?: string; 
+            paymentStatus?: string; price?: number; createdAt?: string 
+        }
+        interface ResultImport { id: string; inspectionId: string; data: unknown; lastSyncedAt?: string }
+
+        for (const t of importedTemplates as unknown as TemplateImport[]) {
+            if (!t.id || !t.name) continue;
+            await db.insert(templates).values({
+                id: t.id, tenantId, name: t.name, version: t.version ?? 1,
+                schema: typeof t.schema === 'string' ? t.schema : JSON.stringify(t.schema),
+                createdAt: t.createdAt ? new Date(t.createdAt) : new Date(),
+            }).onConflictDoNothing().run();
+            counts.templates++;
+        }
+
+        for (const a of importedAgreements as unknown as AgreementImport[]) {
+            if (!a.id || !a.name) continue;
+            await db.insert(agreementTable).values({
+                id: a.id, tenantId, name: a.name, content: a.content || '', version: a.version ?? 1,
+                createdAt: a.createdAt ? new Date(a.createdAt) : new Date(),
+            }).onConflictDoNothing().run();
+            counts.agreements++;
+        }
+
+        for (const ins of importedInspections as unknown as InspectionImport[]) {
+            if (!ins.id || !ins.propertyAddress) continue;
+            await db.insert(inspections).values({
+                id: ins.id, tenantId, propertyAddress: ins.propertyAddress,
+                inspectorId: ins.inspectorId || null, clientName: ins.clientName || null,
+                clientEmail: ins.clientEmail || null, templateId: ins.templateId || null,
+                date: ins.date || new Date().toISOString(), status: ins.status || 'draft',
+                paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
+                createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
+            }).onConflictDoNothing().run();
+            counts.inspections++;
+        }
+
+        for (const r of importedResults as unknown as ResultImport[]) {
+            if (!r.id || !r.inspectionId) continue;
+            
+            // Verify inspectionId belongs to current tenant
+            const inspection = await db.select().from(inspections)
+                .where(eq(inspections.id, r.inspectionId))
                 .get();
-
-            if (!resultsRow || !resultsRow.data) {
-                skipped++;
+            
+            if (!inspection) {
+                logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} not found`);
                 continue;
             }
+            
+            if (inspection.tenantId !== tenantId) {
+                logger.warn(`Skipping result ${r.id}: inspection ${r.inspectionId} belongs to different tenant`);
+                continue;
+            }
+            
+            await db.insert(inspectionResults).values({
+                id: r.id,
+                tenantId,
+                inspectionId: r.inspectionId,
+                data: typeof r.data === 'string' ? r.data : JSON.stringify(r.data),
+                lastSyncedAt: r.lastSyncedAt ? new Date(r.lastSyncedAt) : new Date(),
+            }).onConflictDoNothing().run();
+            counts.results++;
+        }
 
-            const data: Record<string, unknown> = typeof resultsRow.data === 'string'
-                ? JSON.parse(resultsRow.data)
-                : resultsRow.data as Record<string, unknown>;
+        auditFromContext(c, 'data.import', 'import', { metadata: { counts } });
 
-            // Build itemId → sectionId mapping from template snapshot or
-            // live template schema
-            const itemToSection = new Map<string, string>();
+        return c.json({ success: true, data: { message: 'Import complete.', imported: counts } }, 200);
+    })
+    .openapi(listMembersRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const adminService = c.var.services.admin;
+        const members = await adminService.getMembers(tenantId);
+        
+        // Map Date to string for schema compatibility
+        const formattedMembers = members.members.map((m: { id: string; email: string; role: string; createdAt: Date }) => ({
+            ...m,
+            createdAt: safeISODate(m.createdAt)
+        }));
+        
+        return c.json({ success: true, data: formattedMembers }, 200);
+    })
+    .openapi(listAgreementsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const agreementService = c.var.services.agreement;
+        return c.json({ success: true, data: await agreementService.listAgreements(tenantId) }, 200);
+    })
+    .openapi(createAgreementRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const agreementService = c.var.services.agreement;
+        const agreement = await agreementService.createAgreement(tenantId, body.name, body.content);
+        return c.json({ success: true, data: { agreement: agreement } }, 201);
+    })
+    .openapi(updateAgreementRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const body = c.req.valid('json');
+        const agreementService = c.var.services.agreement;
+        const agreement = await agreementService.updateAgreement(id, tenantId, body.name, body.content);
+        return c.json({ success: true, data: { agreement: agreement } }, 200);
+    })
+    .openapi(deleteAgreementRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const agreementService = c.var.services.agreement;
+        await agreementService.deleteAgreement(id, tenantId);
+        return c.json({ success: true }, 200);
+    })
+    .openapi(getAuditLogsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { limit, cursor, action, entityType } = c.req.valid('query');
+        const adminService = c.var.services.admin;
+        const result = await adminService.getAuditLogs(tenantId, {
+            limit: parseInt(limit || '50'),
+            cursor,
+            action,
+            entityType
+        } as Parameters<typeof adminService.getAuditLogs>[1]);
 
-            interface SchemaSectionLite { id: string; items?: Array<{ id: string }> }
-            let sections: SchemaSectionLite[] = [];
+        // Map Date to string for schema compatibility
+        const formattedResult = {
+            ...result,
+            items: result.logs.map(log => ({
+                ...log,
+                createdAt: safeISODate(log.createdAt)
+            }))
+        };
 
-            const snap = insp.templateSnapshot as { sections?: SchemaSectionLite[] } | null;
-            if (snap && Array.isArray(snap?.sections)) {
-                sections = snap.sections;
-            } else if (insp.templateId) {
-                const tpl = await db.select().from(templates)
-                    .where(and(eq(templates.id, insp.templateId), eq(templates.tenantId, tenantId)))
+        auditFromContext(c, 'audit.view', 'audit_log');
+
+        return c.json({ success: true, data: formattedResult }, 200);
+    })
+    .openapi(postAuditLogRoute, async (c) => {
+        const { action, resourceType, resourceId, detail } = c.req.valid('json');
+        auditFromContext(c, action, resourceType, {
+            entityId: resourceId,
+            ...(detail ? { metadata: detail } : {}),
+        });
+        return c.json({ success: true }, 200);
+    })
+    .openapi(eraseDataRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const adminService = c.var.services.admin;
+        const counts = await adminService.eraseClientData(tenantId, body.clientEmail);
+        
+        auditFromContext(c, 'data.delete', 'client', {
+            metadata: { clientEmail: body.clientEmail, ...counts },
+        });
+
+        return c.json({ success: true, data: { message: 'Client data erased successfully.', ...counts } }, 200);
+    })
+    .openapi(getBrandingRoute, async (c) => {
+        const brandingService = c.var.services.branding;
+        const branding = await brandingService.getBranding(c.get('tenantId'), {
+            siteName: c.env.APP_NAME || 'OpenInspection',
+            primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
+            supportEmail: c.env.SENDER_EMAIL || 'support@example.com'
+        });
+        
+        const formattedBranding = {
+            ...branding,
+            siteName: branding.siteName || c.env.APP_NAME || 'OpenInspection',
+            primaryColor: branding.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
+            supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
+            logoUrl: branding.logoUrl || null,
+            billingUrl: branding.billingUrl || null,
+            gaMeasurementId: branding.gaMeasurementId || null
+        };
+
+        return c.json({ success: true, data: { branding: formattedBranding } }, 200);
+    })
+    .openapi(updateBrandingRoute, async (c) => {
+        const body = c.req.valid('json');
+        const brandingService = c.var.services.branding;
+        const result = await brandingService.updateBranding(c.get('tenantId'), body);
+        
+        const formattedResult = {
+            ...result,
+            siteName: result.siteName || c.env.APP_NAME || 'OpenInspection',
+            primaryColor: result.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
+            supportEmail: result.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
+            logoUrl: result.logoUrl || null,
+            billingUrl: result.billingUrl || null,
+            gaMeasurementId: result.gaMeasurementId || null
+        };
+
+        return c.json({ success: true, data: { branding: formattedResult } }, 200);
+    })
+    .openapi(uploadLogoRoute, async (c) => {
+        const formData = await c.req.formData();
+        const file = formData.get('logo') as File;
+        if (!file || !(file instanceof File)) throw Errors.BadRequest('No logo file provided.');
+
+        const brandingService = c.var.services.branding;
+        const logoUrl = await brandingService.uploadLogo(c.get('tenantId'), file);
+        return c.json({ success: true, data: { logoUrl } }, 200);
+    })
+    .openapi(getConfigRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const svc = c.var.services.branding;
+        const [integrationConfig, secrets] = await Promise.all([
+            svc.getIntegrationConfig(tenantId),
+            svc.getMaskedSecrets(tenantId, c.env.JWT_SECRET),
+        ]);
+        return c.json({ success: true, data: { integrationConfig, secrets } }, 200);
+    })
+    .openapi(updateIntegrationConfigRoute, async (c) => {
+        const body = c.req.valid('json');
+        await c.var.services.branding.updateIntegrationConfig(c.get('tenantId'), body as unknown as import('../services/branding.service').IntegrationConfig);
+        auditFromContext(c, 'config.integration.update', 'tenant_config');
+        return c.json({ success: true }, 200);
+    })
+    .openapi(updateSecretsRoute, async (c) => {
+        const body = c.req.valid('json');
+        await c.var.services.branding.updateSecrets(c.get('tenantId'), c.env.JWT_SECRET, body as unknown as import('../services/branding.service').SecretsConfig);
+        auditFromContext(c, 'config.secrets.update', 'tenant_config');
+        return c.json({ success: true }, 200);
+    })
+    .openapi(sendAgreementRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const svc = c.var.services.agreement;
+
+        const request = await svc.createSigningRequest(tenantId, {
+            agreementId: body.agreementId,
+            clientEmail: body.clientEmail,
+            ...(body.clientName !== undefined ? { clientName: body.clientName } : {}),
+            ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
+        });
+        const tenantSlug = c.get('requestedSubdomain') ?? '';
+        const signUrl = agreementSignUrl(getBookingHost(c), tenantSlug, request.token);
+
+        // Spec 5H D-patch — fetch the agreement HTML at send-time to compute its
+        // content hash. This is the "what was the client agreed to" anchor for
+        // the audit chain — recomputable later to prove the DB version matches.
+        let agreementContentHash: string | null = null;
+        let agreementName: string | null = null;
+        try {
+            const agreement = await drizzle(c.env.DB, { schema })
+                .select({ name: schema.agreements.name, content: schema.agreements.content })
+                .from(schema.agreements)
+                .where(eq(schema.agreements.id, body.agreementId))
+                .get();
+            if (agreement) {
+                agreementName = agreement.name;
+                const bytes = new TextEncoder().encode(agreement.content || '');
+                const buf = await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer);
+                const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+                agreementContentHash = `sha256:${hex}`;
+            }
+        } catch (e) {
+            logger.warn('audit.agreement.hash.failed', { agreementId: body.agreementId, error: (e as Error).message });
+        }
+
+        // Spec 5H P0.1 — append request.created to the audit chain
+        try {
+            await c.var.services.auditLog.append(tenantId, request.id, 'request.created', {
+                actorId: c.get('user')?.sub ?? null,
+                agreementContentHash,
+                agreementId: body.agreementId,
+                agreementName,
+                clientEmail: body.clientEmail,
+                clientName: body.clientName ?? null,
+                envelopeId: request.id,
+                inspectionId: body.inspectionId ?? null,
+                tenantId,
+                tsMs: Date.now(),
+            });
+        } catch (e) {
+            logger.warn('audit.append.created.failed', { requestId: request.id, error: (e as Error).message });
+        }
+
+        // Sprint B-4a — append the sender (current admin/inspector) signature so
+        // the client can rebook with this user via the embedded booking link.
+        const senderId = c.get('user')?.sub;
+        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; slug: string | null } | undefined;
+        if (senderId) {
+            try {
+                const row = await drizzle(c.env.DB).select({
+                    name:          schema.users.name,
+                    email:         schema.users.email,
+                    phone:         schema.users.phone,
+                    licenseNumber: schema.users.licenseNumber,
+                    slug:          schema.users.slug,
+                }).from(schema.users)
+                    .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
                     .get();
-                const live = tpl?.schema as { sections?: SchemaSectionLite[] } | null;
-                if (live && Array.isArray(live?.sections)) {
-                    sections = live.sections;
-                }
+                sigInspector = row ?? undefined;
+            } catch (err) {
+                logger.warn('agreement.signature.lookup.failed', { senderId, error: (err as Error).message });
             }
+        }
 
-            for (const sec of sections) {
-                for (const item of (sec.items ?? [])) {
-                    itemToSection.set(item.id, sec.id);
-                }
+        await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c))
+            .catch(e => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+
+        // Append request.sent only after email is dispatched (or attempted)
+        try {
+            await c.var.services.auditLog.append(tenantId, request.id, 'request.sent', {
+                envelopeId: request.id,
+                recipientEmail: body.clientEmail,
+                signUrl,
+                tsMs: Date.now(),
+            });
+        } catch (e) {
+            logger.warn('audit.append.sent.failed', { requestId: request.id, error: (e as Error).message });
+        }
+
+        auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, clientEmail: body.clientEmail } });
+        return c.json({ success: true as const, data: { token: request.token, signUrl } }, 200);
+    })
+    .openapi(listSigningRequestsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+        const rows = await db
+            .select({
+                id: agreementRequestsTable.id,
+                agreementId: agreementRequestsTable.agreementId,
+                clientName: agreementRequestsTable.clientName,
+                clientEmail: agreementRequestsTable.clientEmail,
+                inspectionId: agreementRequestsTable.inspectionId,
+                status: agreementRequestsTable.status,
+                createdAt: agreementRequestsTable.createdAt,
+                sentAt: agreementRequestsTable.sentAt,
+                viewedAt: agreementRequestsTable.viewedAt,
+                signedAt: agreementRequestsTable.signedAt,
+                agreementName: agreementsTable.name,
+            })
+            .from(agreementRequestsTable)
+            .leftJoin(agreementsTable, eqDz(agreementRequestsTable.agreementId, agreementsTable.id))
+            .where(eqDz(agreementRequestsTable.tenantId, tenantId))
+            .orderBy(descDz(agreementRequestsTable.createdAt))
+            .limit(200);
+        return c.json({ success: true as const, data: rows }, 200);
+    })
+    .openapi(getSigningRequestDetailRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const id = c.req.valid('param').id;
+        const db = drizzle(c.env.DB, { schema });
+        const reqRow = await db
+            .select()
+            .from(schema.agreementRequests)
+            .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
+            .get();
+        if (!reqRow) throw Errors.NotFound('Signing request not found');
+        const agreement = await db
+            .select()
+            .from(schema.agreements)
+            .where(eqDz(schema.agreements.id, reqRow.agreementId))
+            .get();
+        const auditRows = await db
+            .select()
+            .from(schema.esignAuditLogs)
+            .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
+            .orderBy(ascDz(schema.esignAuditLogs.createdAt))
+            .all();
+        const verify = await c.var.services.auditLog.verifyChain(tenantId, id);
+        return c.json({
+            success: true as const,
+            data: {
+                request: reqRow,
+                agreement: agreement ? { id: agreement.id, name: agreement.name } : null,
+                auditEvents: auditRows.map((r) => {
+                    let payload: Record<string, unknown> = {};
+                    try { payload = JSON.parse(r.payloadJson); } catch { /* ignore */ }
+                    return {
+                        id: r.id,
+                        event: r.event,
+                        createdAt: r.createdAt,
+                        payload,
+                        hash: r.hash,
+                        prevHash: r.prevHash,
+                        signature: r.signature,
+                        keyFingerprint: r.keyFingerprint,
+                    };
+                }),
+                chainValid: verify.valid,
+                chainReason: verify.valid ? null : verify.reason,
+            },
+        }, 200);
+    })
+    .openapi(downloadAuditTrailRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const id = c.req.valid('param').id;
+        const db = drizzle(c.env.DB, { schema });
+        const reqRow = await db
+            .select()
+            .from(schema.agreementRequests)
+            .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
+            .get();
+        if (!reqRow) throw Errors.NotFound('Signing request not found');
+        const auditRows = await db
+            .select()
+            .from(schema.esignAuditLogs)
+            .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
+            .orderBy(ascDz(schema.esignAuditLogs.createdAt))
+            .all();
+        const pubKey = await c.var.services.signingKey.getPublicKey(tenantId);
+        const payload = {
+            envelopeId: id,
+            tenantId,
+            clientName: reqRow.clientName,
+            clientEmail: reqRow.clientEmail,
+            status: reqRow.status,
+            publicKeyPem: pubKey?.pem ?? null,
+            keyFingerprint: pubKey?.fingerprint ?? null,
+            algorithm: 'Ed25519',
+            events: auditRows.map((r) => ({
+                id: r.id,
+                event: r.event,
+                createdAt: r.createdAt,
+                payloadJson: r.payloadJson,
+                prevHash: r.prevHash,
+                hash: r.hash,
+                signature: r.signature,
+                keyFingerprint: r.keyFingerprint,
+            })),
+            exportedAt: new Date().toISOString(),
+        };
+        return new Response(JSON.stringify(payload, null, 2), {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Disposition': `attachment; filename="audit-trail-${id.slice(0, 8)}.json"`,
+            },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any;
+    })
+    .openapi(listCommentsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { rating, section, sectionId, triggerCode, search, sort, filterMode, itemLabel, page, pageSize } = c.req.valid('query');
+        // Per-user usage join — needs the JWT subject (same convention as the
+        // touch endpoint above and the rest of admin.ts).
+        const userId = c.get('user')?.sub ?? '';
+        const auto = filterMode === 'auto';
+        const db = drizzle(c.env.DB);
+        // Filters layered defensively: tenantId always first (multi-tenant
+        // isolation rule from CLAUDE.md). `sectionId` / `triggerCode` are
+        // explicit user-typed filters and always apply; `rating` / `section`
+        // / `itemLabel` are context-derived and only apply when filterMode=auto
+        // (filterMode=all means "ignore inspection context, show everything").
+        const conditions = [eq(comments.tenantId, tenantId)];
+        if (sectionId) {
+            conditions.push(like(comments.sectionIds, `%"${escapeLikePattern(sectionId)}"%`));
+        }
+        if (triggerCode) {
+            conditions.push(eq(comments.triggerCode, triggerCode));
+        }
+        if (auto && rating) conditions.push(eq(comments.ratingBucket, rating));
+        if (auto && section) conditions.push(eq(comments.section, section));
+        if (auto && itemLabel) conditions.push(eq(comments.itemLabel, itemLabel));
+
+        // ORDER BY by sort. SQLite treats NULL as smaller than any value, so
+        // descDz(commentUsage.lastUsedAt) naturally puts user-touched rows first
+        // and untouched rows last — matches the `recent` / `frequent` specs.
+        const orderByExpr =
+            sort === 'recent'   ? [descDz(commentUsage.lastUsedAt)]
+          : sort === 'created'  ? [descDz(comments.createdAt)]
+          : sort === 'frequent' ? [descDz(commentUsage.useCount), descDz(commentUsage.lastUsedAt)]
+          : sort === 'alpha'    ? [ascDz(comments.text)]
+          :                       [ascDz(comments.ratingBucket), descDz(comments.createdAt)];
+
+        let rows = await db.select({
+            id:             comments.id,
+            tenantId:       comments.tenantId,
+            text:           comments.text,
+            category:       comments.category,
+            ratingBucket:   comments.ratingBucket,
+            section:        comments.section,
+            sectionIds:     comments.sectionIds,
+            itemLabels:     comments.itemLabels,
+            itemLabel:      comments.itemLabel,
+            triggerCode:    comments.triggerCode,
+            searchKeywords: comments.searchKeywords,
+            libraryId:      comments.libraryId,
+            createdAt:      comments.createdAt,
+            useCount:       commentUsage.useCount,
+            lastUsedAt:     commentUsage.lastUsedAt,
+        })
+            .from(comments)
+            .leftJoin(commentUsage, and(
+                eq(commentUsage.commentId, comments.id),
+                eq(commentUsage.tenantId,  tenantId),
+                eq(commentUsage.userId,    userId),
+            ))
+            .where(and(...conditions))
+            .orderBy(...orderByExpr)
+            .limit(pageSize)
+            .offset((page - 1) * pageSize)
+            .all();
+
+        // Total count for pagination meta. `search` is applied in JS after the
+        // limit query (legacy behavior) so the COUNT is necessarily an upper bound
+        // when search is present — for the no-search case (the common one) it is
+        // exact.
+        const totalRow = await db
+            .select({ c: sqlTpl<number>`count(*)` })
+            .from(comments)
+            .where(and(...conditions))
+            .get();
+        const total = totalRow?.c ?? 0;
+        if (search && search.trim()) {
+            const needle = search.trim().toLowerCase();
+            rows = rows.filter(r => r.text.toLowerCase().includes(needle));
+        }
+        // `commentRowToResponse` is exported via the local helper above and used
+        // by the create / update routes — we extend in-place at the route to
+        // avoid touching the create / update signatures.
+        const data = rows.map(r => ({
+            ...commentRowToResponse(r),
+            useCount:   r.useCount ?? 0,
+            // commentUsage.lastUsedAt is a UNIX seconds integer (see touch handler).
+            lastUsedAt: r.lastUsedAt != null ? new Date(r.lastUsedAt * 1000).toISOString() : null,
+        }));
+        return c.json({
+            success: true as const,
+            data,
+            meta: buildMeta({ total, page, pageSize }),
+        }, 200);
+    })
+    .openapi(createCommentRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { text, category, ratingBucket, section } = c.req.valid('json');
+        const db = drizzle(c.env.DB);
+        const row = {
+            id: crypto.randomUUID(),
+            tenantId,
+            text,
+            category: category ?? null,
+            ratingBucket: ratingBucket ?? null,
+            section: section ?? null,
+            // S2-7 — libraryId tracks marketplace provenance; null for tenant-authored.
+            libraryId: null as string | null,
+            sectionIds: null as string | null,
+            itemLabels: null as string | null,
+            triggerCode: null as string | null,
+            searchKeywords: null as string | null,
+            itemLabel: null as string | null,
+            createdAt: new Date(),
+        };
+        await db.insert(comments).values(row);
+        return c.json({ success: true as const, data: { comment: commentRowToResponse(row) } }, 201);
+    })
+    .openapi(deleteCommentRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const db = drizzle(c.env.DB);
+        const existing = await db.select().from(comments)
+            .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
+        if (!existing) throw Errors.NotFound('Comment not found');
+        await db.delete(comments).where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
+        return c.json({ success: true }, 200);
+    })
+    .openapi(updateCommentRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const { text, category, ratingBucket, section } = c.req.valid('json');
+        const db = drizzle(c.env.DB);
+        const existing = await db.select().from(comments)
+            .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
+        if (!existing) throw Errors.NotFound('Comment not found');
+        const patch = {
+            text,
+            category: category ?? null,
+            ratingBucket: ratingBucket ?? null,
+            section: section ?? null,
+        };
+        await db.update(comments)
+            .set(patch)
+            .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
+        const updated = { ...existing, ...patch };
+        auditFromContext(c, 'comment.updated', 'comment', {
+            entityId: id,
+            metadata: {
+                category: category ?? null,
+                ratingBucket: ratingBucket ?? null,
+                section: section ?? null,
+                textPreview: text.slice(0, 80),
+            },
+        });
+        return c.json({ success: true as const, data: { comment: commentRowToResponse(updated) } }, 200);
+    })
+    .openapi(touchCommentRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        // Convention in this file: auth middleware stashes the decoded JWT under
+        // the 'user' key with `.sub` as the user id (see lines ~866, ~2169).
+        const userId = c.get('user')?.sub ?? '';
+        if (!userId) throw Errors.Unauthorized();
+        const now = Math.floor(Date.now() / 1000);
+        const db = drizzle(c.env.DB);
+
+        const existing = await db.select().from(commentUsage)
+            .where(and(
+                eq(commentUsage.tenantId,  tenantId),
+                eq(commentUsage.userId,    userId),
+                eq(commentUsage.commentId, id),
+            ))
+            .get();
+
+        if (existing) {
+            const nextCount = existing.useCount + 1;
+            await db.update(commentUsage)
+                .set({ useCount: nextCount, lastUsedAt: now })
+                .where(and(
+                    eq(commentUsage.tenantId,  tenantId),
+                    eq(commentUsage.userId,    userId),
+                    eq(commentUsage.commentId, id),
+                ));
+            return c.json({ success: true as const, data: { commentId: id, useCount: nextCount } }, 200);
+        }
+
+        await db.insert(commentUsage).values({
+            tenantId, userId, commentId: id, useCount: 1, lastUsedAt: now,
+        });
+        return c.json({ success: true as const, data: { commentId: id, useCount: 1 } }, 200);
+    })
+    .openapi(getWidgetOriginsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const origins = await c.var.services.widget.getAllowedOrigins(tenantId);
+        return c.json({ success: true as const, data: { origins } }, 200);
+    })
+    .openapi(setWidgetOriginsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { origins } = c.req.valid('json');
+        await c.var.services.widget.setAllowedOrigins(tenantId, origins);
+        return c.json({ success: true as const, data: { origins } }, 200);
+    })
+    .openapi(getStripeConnectRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { accountId } = await c.var.services.admin.getStripeConnect(tenantId);
+        return c.json({ success: true as const, data: { accountId } }, 200);
+    })
+    .openapi(setStripeConnectRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { accountId } = c.req.valid('json');
+        await c.var.services.admin.setStripeConnect(tenantId, accountId);
+        auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'set' } });
+        return c.json({ success: true as const, data: { accountId } }, 200);
+    })
+    .openapi(deleteStripeConnectRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        await c.var.services.admin.setStripeConnect(tenantId, null);
+        auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'cleared' } });
+        return c.json({ success: true as const, data: { accountId: null } }, 200);
+    })
+    .openapi(getEarningsSummaryRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const summary = await c.var.services.invoice.getEarningsSummary(tenantId);
+        return c.json({ success: true as const, data: summary }, 200);
+    })
+    .openapi(icsTokenRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+
+        const configs = await db
+            .select()
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .limit(1);
+
+        let token = configs[0]?.icsToken ?? null;
+
+        if (!token) {
+            token = crypto.randomUUID().replace(/-/g, '');
+            if (configs[0]) {
+                await db
+                    .update(tenantConfigs)
+                    .set({ icsToken: token, updatedAt: new Date() })
+                    .where(eq(tenantConfigs.tenantId, tenantId));
+            } else {
+                await db.insert(tenantConfigs).values({
+                    tenantId,
+                    icsToken: token,
+                    updatedAt: new Date(),
+                });
             }
+        }
 
-            // Rewrite legacy keys
-            let changed = false;
-            const newData: Record<string, unknown> = {};
-            for (const [key, value] of Object.entries(data)) {
-                // Already composite (has 2+ colons) — keep as-is
-                if (key.split(':').length >= 3) {
-                    newData[key] = value;
+        const baseUrl = getBaseUrl(c);
+        return c.json({ success: true as const, data: { url: `${baseUrl}/api/ics/${token}` } }, 200);
+    })
+    .openapi(withMcpMetadata({
+        method: 'post',
+        path: '/backfill-default-templates',
+        operationId: 'backfillDefaultTemplates',
+        tags: ['sysadmin'],
+        summary: 'Backfill default templates across all tenants',
+        description: 'M2M one-shot endpoint that seeds the default 7 templates for every tenant. Idempotent — TemplateSeedService.bulkSeed skips templates that already exist by name per tenant.',
+        responses: {
+            200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
+            401: { description: 'Unauthorized' },
+        },
+    }, { scopes: [], tier: 'excluded' }), async (c) => {
+        if (!isServiceBindingCall(c)) {
+            throw Errors.Unauthorized();
+        }
+
+        const { tenants } = await import('../lib/db/schema');
+        const { TemplateSeedService } = await import('../services/template-seed.service');
+        const db = drizzle(c.env.DB);
+        const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).all();
+        const svc = new TemplateSeedService(c.env.DB);
+
+        const results: { tenantId: string; name: string; seeded: number; skipped: number }[] = [];
+        for (const t of allTenants) {
+            try {
+                const r = await svc.bulkSeed(t.id as string);
+                results.push({ tenantId: t.id as string, name: (t.name as string) ?? '', ...r });
+            } catch (err) {
+                logger.error('Backfill failed for tenant', { tenantId: t.id }, err instanceof Error ? err : undefined);
+            }
+        }
+        const totalSeeded = results.reduce((sum, r) => sum + r.seeded, 0);
+        const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
+        logger.info('Backfill complete', { tenantCount: results.length, totalSeeded, totalSkipped });
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(getAttentionThresholdsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+        const row = await db.select({ thresholds: tenantConfigs.attentionThresholds })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .limit(1);
+        const thresholds = row[0]?.thresholds ?? ATTENTION_THRESHOLDS_DEFAULTS;
+        return c.json({ success: true as const, data: { thresholds } }, 200);
+    })
+    .openapi(updateAttentionThresholdsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const db = drizzle(c.env.DB);
+
+        const existing = await db.select({ tenantId: tenantConfigs.tenantId })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .limit(1);
+
+        if (existing.length === 0) {
+            await db.insert(tenantConfigs).values({
+                tenantId,
+                reportTheme: 'modern',
+                attentionThresholds: body,
+                updatedAt: new Date(),
+            });
+        } else {
+            await db.update(tenantConfigs)
+                .set({ attentionThresholds: body, updatedAt: new Date() })
+                .where(eq(tenantConfigs.tenantId, tenantId));
+        }
+        auditFromContext(c, 'config.attention_thresholds.update', 'tenant_config', { metadata: { ...body } });
+        return c.json({ success: true as const, data: { thresholds: body } }, 200);
+    })
+    .openapi(getDashboardColumnsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const columns = await c.var.services.dashboardPrefs.getColumnPrefs(tenantId);
+        return c.json({ success: true as const, data: { columns } }, 200);
+    })
+    .openapi(updateDashboardColumnsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const columns = await c.var.services.dashboardPrefs.setColumnPrefs(tenantId, body.columns);
+        auditFromContext(c, 'config.dashboard_columns.update', 'tenant_config', { metadata: { columns } });
+        return c.json({ success: true as const, data: { columns } }, 200);
+    })
+    .openapi(tenantConfigGetRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const config = await c.var.services.branding.getBranding(tenantId);
+        return c.json({
+            success: true as const,
+            data: {
+                conciergeReviewRequired: config?.conciergeReviewRequired ?? false,
+                blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
+            },
+        }, 200);
+    })
+    .openapi(tenantConfigPatchRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+
+        const update: Partial<typeof tenantConfigs.$inferInsert> = {};
+        if (body.conciergeReviewRequired !== undefined) {
+            update.conciergeReviewRequired = body.conciergeReviewRequired;
+        }
+        if (Object.keys(update).length === 0) {
+            return c.json({ success: true as const, data: { ok: true as const } }, 200);
+        }
+        await c.var.services.branding.updateBranding(tenantId, update);
+        auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
+            metadata: update,
+        });
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(withMcpMetadata({
+        method: 'post',
+        path: '/sync-quota',
+        operationId: 'syncTenantSeatQuota',
+        tags: ['sysadmin'],
+        summary: 'Sync tenant seat quota from portal',
+        description: 'M2M endpoint called by the portal whenever a tenant\'s subscription seat count changes. Updates the tenant\'s max_users column so InviteService.claim sees the new cap on the next request.',
+        request: { body: { content: { 'application/json': { schema: SyncQuotaSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+        responses: {
+            200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
+            401: { description: 'Unauthorized' },
+            404: { description: 'Tenant not found' },
+        },
+    }, { scopes: [], tier: 'excluded' }), async (c) => {
+        if (!isServiceBindingCall(c)) {
+            throw Errors.Unauthorized();
+        }
+
+        const { tenantId, maxUsers } = c.req.valid('json');
+        const { tenants } = await import('../lib/db/schema');
+        const db = drizzle(c.env.DB);
+
+        const result = await db.update(tenants)
+            .set({ maxUsers })
+            .where(eq(tenants.id, tenantId))
+            .returning({ id: tenants.id });
+        if (result.length === 0) throw Errors.NotFound('Tenant not found');
+
+        // Invalidate the per-tenant KV cache so the next request reads the
+        // fresh maxUsers value rather than the stale snapshot.
+        try {
+            await c.env.TENANT_CACHE.delete(`tenant:${tenantId}`);
+        } catch { /* cache miss is fine — read-through repopulates */ }
+
+        logger.info('sync-quota applied', { tenantId, maxUsers });
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(withMcpMetadata({
+        method: 'post',
+        path: '/seed-starter-content',
+        operationId: 'seedStarterContentForTenant',
+        tags: ['sysadmin'],
+        summary: 'Seed starter content into newly-provisioned tenant',
+        description: 'M2M endpoint invoked by the portal\'s OnboardingWorkflow once a tenant is provisioned. Seeds initial templates, agreements, rating-systems, and marketplace defaults. Idempotent — safe to retry.',
+        request: { body: { content: { 'application/json': { schema: SeedStarterContentBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+        responses: {
+            200: {
+                content: { 'application/json': { schema: SeedStarterContentResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+                description: 'Seed counts (zero on idempotent re-run)',
+            },
+            401: { description: 'Unauthorized' },
+            404: { description: 'Tenant not found' },
+        },
+    }, { scopes: [], tier: 'excluded' }), async (c) => {
+        if (!isServiceBindingCall(c)) {
+            throw Errors.Unauthorized();
+        }
+
+        const { tenantId } = c.req.valid('json');
+        const { tenants } = await import('../lib/db/schema');
+        const db = drizzle(c.env.DB);
+        const existing = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, tenantId)).get();
+        if (!existing) throw Errors.NotFound('Tenant not found');
+
+        const { seedStarterContent } = await import('../services/starter-content.service');
+        const result = await seedStarterContent(c.env.DB, tenantId);
+
+        return c.json({ success: true as const, data: result }, 200);
+    })
+    .openapi(migrateFindingKeysRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+
+        let processed = 0;
+        let migrated = 0;
+        let skipped = 0;
+
+        const BATCH_SIZE = 50;
+        let offset = 0;
+
+        // Process inspections in batches
+        while (true) {
+            const batch = await db.select({
+                id:                inspections.id,
+                templateId:        inspections.templateId,
+                templateSnapshot:  inspections.templateSnapshot,
+            })
+            .from(inspections)
+            .where(eq(inspections.tenantId, tenantId))
+            .limit(BATCH_SIZE)
+            .offset(offset);
+
+            if (batch.length === 0) break;
+            offset += batch.length;
+
+            for (const insp of batch) {
+                // Load the results row for this inspection
+                const resultsRow = await db.select()
+                    .from(inspectionResults)
+                    .where(and(
+                        eq(inspectionResults.inspectionId, insp.id),
+                        eq(inspectionResults.tenantId, tenantId),
+                    ))
+                    .get();
+
+                if (!resultsRow || !resultsRow.data) {
+                    skipped++;
                     continue;
                 }
-                const sectionId = itemToSection.get(key) ?? '_unknown';
-                const compositeKey = `_default:${sectionId}:${key}`;
-                newData[compositeKey] = value;
-                changed = true;
-            }
 
-            if (changed) {
-                await db.update(inspectionResults)
-                    .set({ data: newData as unknown as object, lastSyncedAt: new Date() })
-                    .where(eq(inspectionResults.id, resultsRow.id));
-                migrated++;
-            } else {
-                skipped++;
+                const data: Record<string, unknown> = typeof resultsRow.data === 'string'
+                    ? JSON.parse(resultsRow.data)
+                    : resultsRow.data as Record<string, unknown>;
+
+                // Build itemId → sectionId mapping from template snapshot or
+                // live template schema
+                const itemToSection = new Map<string, string>();
+
+                interface SchemaSectionLite { id: string; items?: Array<{ id: string }> }
+                let sections: SchemaSectionLite[] = [];
+
+                const snap = insp.templateSnapshot as { sections?: SchemaSectionLite[] } | null;
+                if (snap && Array.isArray(snap?.sections)) {
+                    sections = snap.sections;
+                } else if (insp.templateId) {
+                    const tpl = await db.select().from(templates)
+                        .where(and(eq(templates.id, insp.templateId), eq(templates.tenantId, tenantId)))
+                        .get();
+                    const live = tpl?.schema as { sections?: SchemaSectionLite[] } | null;
+                    if (live && Array.isArray(live?.sections)) {
+                        sections = live.sections;
+                    }
+                }
+
+                for (const sec of sections) {
+                    for (const item of (sec.items ?? [])) {
+                        itemToSection.set(item.id, sec.id);
+                    }
+                }
+
+                // Rewrite legacy keys
+                let changed = false;
+                const newData: Record<string, unknown> = {};
+                for (const [key, value] of Object.entries(data)) {
+                    // Already composite (has 2+ colons) — keep as-is
+                    if (key.split(':').length >= 3) {
+                        newData[key] = value;
+                        continue;
+                    }
+                    const sectionId = itemToSection.get(key) ?? '_unknown';
+                    const compositeKey = `_default:${sectionId}:${key}`;
+                    newData[compositeKey] = value;
+                    changed = true;
+                }
+
+                if (changed) {
+                    await db.update(inspectionResults)
+                        .set({ data: newData as unknown as object, lastSyncedAt: new Date() })
+                        .where(eq(inspectionResults.id, resultsRow.id));
+                    migrated++;
+                } else {
+                    skipped++;
+                }
+                processed++;
             }
-            processed++;
         }
-    }
 
-    auditFromContext(c, 'admin.migrate_finding_keys', 'inspection_results', {
-        metadata: { processed, migrated, skipped },
+        auditFromContext(c, 'admin.migrate_finding_keys', 'inspection_results', {
+            metadata: { processed, migrated, skipped },
+        });
+
+        return c.json({
+            success: true as const,
+            data: { processed, migrated, skipped },
+        }, 200);
+    })
+    .openapi(brSmokeRoute, async (c) => {
+        const { url } = c.req.valid('query');
+        const probedUrl = url ?? 'https://example.com';
+        const browser = c.env.BROWSER;
+
+        if (!browser) {
+            return c.json({
+                success: true as const,
+                data: {
+                    bindingPresent: false,
+                    probedUrl,
+                    status: null,
+                    ok: false,
+                    contentType: null,
+                    contentLength: null,
+                    durationMs: 0,
+                    error: null,
+                    hint: 'env.BROWSER not bound. Add [browser] binding = "BROWSER" to wrangler.toml and redeploy.',
+                },
+            }, 200);
+        }
+
+        const start = Date.now();
+        let status: number | null = null;
+        let contentType: string | null = null;
+        let contentLength: number | null = null;
+        let error: string | null = null;
+        let body: ArrayBuffer | null = null;
+
+        try {
+            const res = await browser.quickAction('pdf', { url: probedUrl });
+            status = res.status;
+            contentType = res.headers.get('content-type');
+            body = await res.arrayBuffer();
+            contentLength = Math.min(body.byteLength, 1_048_576);
+        } catch (e) {
+            error = (e as Error).message;
+        }
+
+        const durationMs = Date.now() - start;
+        const ok = status !== null && status >= 200 && status < 300
+            && (contentType?.includes('application/pdf') ?? false);
+
+        let hint: string;
+        if (error) {
+            hint = `Call threw before returning: ${error}. Likely a TypeError (binding misconfigured) or compatibility_date too old (need >= "2026-03-24" for .quickAction()).`;
+        } else if (status === 404) {
+            const bodyPreview = body ? new TextDecoder().decode(body.slice(0, 64)) : '';
+            hint = bodyPreview.startsWith('Not Found')
+                ? 'Browser Run NOT provisioned for this account. Enable Browser Run in the CF dashboard, then re-probe.'
+                : `Probed URL returned 404 from origin (not from BR). Try a known-good URL like https://example.com.`;
+        } else if (ok) {
+            hint = `Browser Run is live. Returned a ${contentLength}-byte PDF in ${durationMs} ms. Safe to enable the per-tenant pipeline.`;
+        } else {
+            hint = `Unexpected response — status=${status}, content-type=${contentType}. Inspect manually before enabling the pipeline.`;
+        }
+
+        logger.info('br-smoke probe', { probedUrl, status, contentType, contentLength, durationMs, ok });
+
+        return c.json({
+            success: true as const,
+            data: { bindingPresent: true, probedUrl, status, ok, contentType, contentLength, durationMs, error, hint },
+        }, 200);
+    })
+    .openapi(togglePdfPipelineRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { enabled } = c.req.valid('json');
+
+        const brandingService = c.var.services.branding;
+        await brandingService.updateBranding(tenantId, { enablePdfPipeline: enabled });
+
+        auditFromContext(c, 'config.tenant_config.patch', 'tenant_configs', {
+            metadata: { field: 'enablePdfPipeline', enabled },
+        });
+
+        return c.json({
+            success: true as const,
+            data: { tenantId, enabled },
+        }, 200);
+    })
+    .openapi(inspectorSignRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const { signatureBase64 } = c.req.valid('json');
+        const tenantId = c.get('tenantId') as string;
+        const userId = c.get('user')?.sub ?? '';
+        try {
+            await applyInspectorPreSign(c.env.DB, tenantId, id, userId, signatureBase64);
+        } catch (e) {
+            const msg = (e as Error).message;
+            if (msg.includes('not found')) throw Errors.NotFound(msg);
+            if (msg.includes('can only pre-sign')) {
+                return c.json({ success: false, error: { code: 'invalid_state', message: msg } }, 409);
+            }
+            throw e;
+        }
+        const signing = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+        const auditLog = new AuditLogService(c.env.DB, signing);
+        await auditLog.append(tenantId, id, 'agreement.inspector_signed', {
+            inspectorUserId: userId,
+            tsMs: Date.now(),
+        });
+        return c.json({ success: true as const }, 200);
     });
 
-    return c.json({
-        success: true as const,
-        data: { processed, migrated, skipped },
-    }, 200);
-});
+export type AdminApi = typeof adminRoutes;
 
 export default adminRoutes;

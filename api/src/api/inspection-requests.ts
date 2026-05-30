@@ -9,8 +9,8 @@
  *   POST   /api/inspection-requests/:id/inspections — append a sub-inspection
  */
 
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
-import { HonoConfig } from '../types/hono';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
 import {
@@ -22,8 +22,6 @@ import {
     InspectionRequestResponseSchema,
 } from '../lib/validations/inspection-request.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-const inspectionRequestsRoutes = new OpenAPIHono<HonoConfig>();
 
 const listRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -42,19 +40,6 @@ const listRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listInspectionRequests (GET /, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-inspectionRequestsRoutes.openapi(listRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const q = c.req.valid('query');
-    const filter: { status?: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'; from?: string; to?: string; limit?: number; offset?: number } = {
-        limit: q.limit, offset: q.offset,
-    };
-    if (q.status) filter.status = q.status;
-    if (q.from)   filter.from   = q.from;
-    if (q.to)     filter.to     = q.to;
-    const rows = await c.var.services.inspectionRequest.list(tenantId, filter);
-    return c.json({ success: true, data: rows, meta: { total: rows.length } }, 200);
-});
-
 const detailRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["inspections"],
@@ -71,14 +56,6 @@ const detailRoute = createRoute(withMcpMetadata({
     operationId: "getInspectionRequest",
     description: "Auto-generated placeholder for getInspectionRequest (GET /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
-
-inspectionRequestsRoutes.openapi(detailRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const request = await c.var.services.inspectionRequest.get(tenantId, id);
-    if (!request) throw Errors.NotFound('Inspection request not found');
-    return c.json({ success: true, data: { request } }, 200);
-});
 
 // Sprint 2 S2-2 — resolve the parent request for an inspection.
 // Used by the inspection-edit "Part X of Y" badge + sibling switcher.
@@ -109,13 +86,6 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for getInspectionRequestByInspection (GET /by-inspection/{inspectionId}, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-inspectionRequestsRoutes.openapi(byInspectionRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { inspectionId } = c.req.valid('param');
-    const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId);
-    return c.json({ success: true as const, data: { request: request ?? null } }, 200);
-});
-
 const createReqRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["inspections"],
@@ -134,38 +104,6 @@ const createReqRoute = createRoute(withMcpMetadata({
     operationId: "createInspectionRequest",
     description: "Auto-generated placeholder for createInspectionRequest (POST /, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
-
-inspectionRequestsRoutes.openapi(createReqRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const body = c.req.valid('json');
-
-    const reqInput: {
-        clientName: string; clientEmail?: string | null; clientPhone?: string | null;
-        propertyAddress: string; propertyCity?: string | null; propertyState?: string | null;
-        propertyZip?: string | null; scheduledAt: string; notes?: string | null; inspectorId?: string | null;
-    } = {
-        clientName:      body.clientName,
-        propertyAddress: body.propertyAddress,
-        scheduledAt:     body.scheduledAt,
-    };
-    if ('clientEmail'  in body) reqInput.clientEmail  = body.clientEmail  ?? null;
-    if ('clientPhone'  in body) reqInput.clientPhone  = body.clientPhone  ?? null;
-    if ('propertyCity' in body) reqInput.propertyCity = body.propertyCity ?? null;
-    if ('propertyState' in body) reqInput.propertyState = body.propertyState ?? null;
-    if ('propertyZip'  in body) reqInput.propertyZip  = body.propertyZip  ?? null;
-    if ('notes'        in body) reqInput.notes        = body.notes        ?? null;
-    if (body.inspectorId)       reqInput.inspectorId  = body.inspectorId;
-
-    const subs = body.subInspections.map(s => {
-        const out: { templateId: string; price?: number; notes?: string | null } = { templateId: s.templateId };
-        if (s.price !== undefined) out.price = s.price;
-        if (s.notes !== undefined) out.notes = s.notes ?? null;
-        return out;
-    });
-
-    const created = await c.var.services.inspectionRequest.create(tenantId, reqInput, subs);
-    return c.json({ success: true, data: { request: created } }, 201);
-});
 
 const updateReqRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
@@ -186,19 +124,6 @@ const updateReqRoute = createRoute(withMcpMetadata({
     operationId: "replaceInspectionRequest",
     description: "Auto-generated placeholder for replaceInspectionRequest (PUT /{id}, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
-
-inspectionRequestsRoutes.openapi(updateReqRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const raw = c.req.valid('json');
-    const patch: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(raw)) {
-        if (v !== undefined) patch[k] = v;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updated = await c.var.services.inspectionRequest.update(tenantId, id, patch as any);
-    return c.json({ success: true, data: { request: updated } }, 200);
-});
 
 const addSubRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/inspections',
@@ -230,15 +155,86 @@ const addSubRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createInspectionRequestInspections (POST /{id}/inspections, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-inspectionRequestsRoutes.openapi(addSubRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const { id } = c.req.valid('param');
-    const body = c.req.valid('json');
-    const sub: { templateId: string; price?: number; notes?: string | null } = { templateId: body.templateId };
-    if (body.price !== undefined) sub.price = body.price;
-    if (body.notes !== undefined) sub.notes = body.notes ?? null;
-    const updated = await c.var.services.inspectionRequest.addSubInspection(tenantId, id, sub);
-    return c.json({ success: true, data: { request: updated } }, 200);
-});
+export const inspectionRequestsRoutes = createApiRouter()
+    .openapi(listRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const q = c.req.valid('query');
+        const filter: { status?: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'; from?: string; to?: string; limit?: number; offset?: number } = {
+            limit: q.limit, offset: q.offset,
+        };
+        if (q.status) filter.status = q.status;
+        if (q.from)   filter.from   = q.from;
+        if (q.to)     filter.to     = q.to;
+        const rows = await c.var.services.inspectionRequest.list(tenantId, filter);
+        return c.json({ success: true, data: rows, meta: { total: rows.length } }, 200);
+    })
+    .openapi(detailRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const request = await c.var.services.inspectionRequest.get(tenantId, id);
+        if (!request) throw Errors.NotFound('Inspection request not found');
+        return c.json({ success: true, data: { request } }, 200);
+    })
+    .openapi(byInspectionRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { inspectionId } = c.req.valid('param');
+        const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId);
+        return c.json({ success: true as const, data: { request: request ?? null } }, 200);
+    })
+    .openapi(createReqRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+
+        const reqInput: {
+            clientName: string; clientEmail?: string | null; clientPhone?: string | null;
+            propertyAddress: string; propertyCity?: string | null; propertyState?: string | null;
+            propertyZip?: string | null; scheduledAt: string; notes?: string | null; inspectorId?: string | null;
+        } = {
+            clientName:      body.clientName,
+            propertyAddress: body.propertyAddress,
+            scheduledAt:     body.scheduledAt,
+        };
+        if ('clientEmail'  in body) reqInput.clientEmail  = body.clientEmail  ?? null;
+        if ('clientPhone'  in body) reqInput.clientPhone  = body.clientPhone  ?? null;
+        if ('propertyCity' in body) reqInput.propertyCity = body.propertyCity ?? null;
+        if ('propertyState' in body) reqInput.propertyState = body.propertyState ?? null;
+        if ('propertyZip'  in body) reqInput.propertyZip  = body.propertyZip  ?? null;
+        if ('notes'        in body) reqInput.notes        = body.notes        ?? null;
+        if (body.inspectorId)       reqInput.inspectorId  = body.inspectorId;
+
+        const subs = body.subInspections.map(s => {
+            const out: { templateId: string; price?: number; notes?: string | null } = { templateId: s.templateId };
+            if (s.price !== undefined) out.price = s.price;
+            if (s.notes !== undefined) out.notes = s.notes ?? null;
+            return out;
+        });
+
+        const created = await c.var.services.inspectionRequest.create(tenantId, reqInput, subs);
+        return c.json({ success: true, data: { request: created } }, 201);
+    })
+    .openapi(updateReqRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const raw = c.req.valid('json');
+        const patch: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(raw)) {
+            if (v !== undefined) patch[k] = v;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updated = await c.var.services.inspectionRequest.update(tenantId, id, patch as any);
+        return c.json({ success: true, data: { request: updated } }, 200);
+    })
+    .openapi(addSubRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const body = c.req.valid('json');
+        const sub: { templateId: string; price?: number; notes?: string | null } = { templateId: body.templateId };
+        if (body.price !== undefined) sub.price = body.price;
+        if (body.notes !== undefined) sub.notes = body.notes ?? null;
+        const updated = await c.var.services.inspectionRequest.addSubInspection(tenantId, id, sub);
+        return c.json({ success: true, data: { request: updated } }, 200);
+    });
+
+export type InspectionRequestsApi = typeof inspectionRequestsRoutes;
 
 export default inspectionRequestsRoutes;

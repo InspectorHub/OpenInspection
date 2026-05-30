@@ -687,6 +687,85 @@ export class EmailService {
             </div>`,
         );
     }
+
+    /**
+     * Spec 5H P4 — delivers the signed agreement PDF and evidence pack ZIP
+     * to the client after the sign-completion workflow finishes.
+     *
+     * Called by Step 5 (email-parties) of SignCompletionWorkflow. Best-effort:
+     * silently no-ops when RESEND_API_KEY is absent (mirrors the existing
+     * `sendEmail` guard). The two binary attachments are converted to base64
+     * using the same `arrayBufferToBase64` helper used throughout this class.
+     *
+     * @param to               Client email address
+     * @param clientName       Signer name shown in the greeting
+     * @param envelopeId       Agreement request ID (used as display reference)
+     * @param verifyUrl        Public verification URL for the signed document
+     * @param signedPdfBytes   Raw bytes of the signed agreement PDF
+     * @param evidenceZipBytes Raw bytes of the evidence pack ZIP
+     */
+    async sendEvidencePack(params: {
+        to: string;
+        clientName: string;
+        envelopeId: string;
+        verifyUrl: string;
+        signedPdfBytes: Uint8Array;
+        evidenceZipBytes: Uint8Array;
+    }): Promise<void> {
+        const { to, clientName, envelopeId, verifyUrl, signedPdfBytes, evidenceZipBytes } = params;
+        const escape = escapeHtml;
+        const name = escape(clientName);
+        const html = `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;">
+          <tr>
+            <td style="padding:32px 32px 8px 32px;">
+              <h1 style="margin:0 0 8px 0;font-size:18px;font-weight:600;line-height:1.4;color:#0f172a;">Your signed agreement</h1>
+              <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#64748b;">
+                Hi ${name}, your signed agreement and full evidence pack are attached to this email for your records.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 16px;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8;font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">
+                  Envelope: ${escape(envelopeId)}<br>
+                  Attachments: signed-agreement.pdf · evidence-pack.zip
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 32px 32px 32px;">
+              <a href="${verifyUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;padding:10px 18px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;">Verify signed agreement</a>
+              <p style="margin:16px 0 0 0;font-size:11px;line-height:1.5;color:#94a3b8;">
+                If the button does not work, paste this URL into your browser:<br>
+                <span style="color:#64748b;word-break:break-all;">${verifyUrl}</span>
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:16px 0 0 0;font-size:11px;color:#94a3b8;">Sent by ${escape(this.appName)}</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+        await this.sendEmail(
+            [to],
+            'Your signed agreement',
+            html,
+            [
+                { filename: 'signed-agreement.pdf', content: signedPdfBytes.buffer as ArrayBuffer, contentType: 'application/pdf' },
+                { filename: 'evidence-pack.zip',    content: evidenceZipBytes.buffer as ArrayBuffer, contentType: 'application/zip' },
+            ],
+        );
+    }
 }
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {

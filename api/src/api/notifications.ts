@@ -1,5 +1,5 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
-import type { HonoConfig } from '../types/hono';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import {
     ListNotificationsQuerySchema,
     ListNotificationsResponseSchema,
@@ -9,8 +9,6 @@ import {
 import { Errors } from '../lib/errors';
 import type { ListOptions } from '../services/notification.service';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-const notificationsRoutes = new OpenAPIHono<HonoConfig>();
 
 /**
  * Convert a service-layer notification row to the API DTO.
@@ -62,23 +60,6 @@ const listRoute = createRoute(withMcpMetadata({
     operationId: "listNotifications",
     description: "Auto-generated placeholder for listNotifications (GET /, notifications domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'primary' }));
-notificationsRoutes.openapi(listRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const userId   = requireUserId(c);
-    const q = c.req.valid('query');
-    const opts: ListOptions = {
-        ...(q.unread === '1' ? { unread: true } : {}),
-        ...(q.includeArchived === '1' ? { includeArchived: true } : {}),
-        ...(q.limit ? { limit: q.limit } : {}),
-        ...(q.cursor ? { cursor: q.cursor } : {}),
-    };
-    const result = await c.var.services.notification.list(tenantId, userId, opts);
-    return c.json({
-        success: true as const,
-        data: result.items.map(dto),
-        meta: { nextCursor: result.nextCursor },
-    }, 200);
-});
 
 // GET /unread-count
 const unreadCountRoute = createRoute(withMcpMetadata({
@@ -96,12 +77,6 @@ const unreadCountRoute = createRoute(withMcpMetadata({
     operationId: "unreadCountNotification",
     description: "Auto-generated placeholder for unreadCountNotification (GET /unread-count, notifications domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
-notificationsRoutes.openapi(unreadCountRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const userId   = requireUserId(c);
-    const count = await c.var.services.notification.unreadCount(tenantId, userId);
-    return c.json({ success: true as const, data: { count } }, 200);
-});
 
 // POST /mark-read
 const markReadRoute = createRoute(withMcpMetadata({
@@ -120,13 +95,6 @@ const markReadRoute = createRoute(withMcpMetadata({
     operationId: "markReadNotification",
     description: "Auto-generated placeholder for markReadNotification (POST /mark-read, notifications domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
-notificationsRoutes.openapi(markReadRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const userId   = requireUserId(c);
-    const { ids } = c.req.valid('json');
-    await c.var.services.notification.markRead(tenantId, userId, ids);
-    return c.json({ success: true as const, data: { ok: true as const } }, 200);
-});
 
 // POST /mark-all-read
 const markAllRoute = createRoute(withMcpMetadata({
@@ -144,12 +112,6 @@ const markAllRoute = createRoute(withMcpMetadata({
     operationId: "markAllReadNotification",
     description: "Auto-generated placeholder for markAllReadNotification (POST /mark-all-read, notifications domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
-notificationsRoutes.openapi(markAllRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const userId   = requireUserId(c);
-    await c.var.services.notification.markAllRead(tenantId, userId);
-    return c.json({ success: true as const, data: { ok: true as const } }, 200);
-});
 
 // DELETE /{id} — archive (soft-delete)
 const archiveRoute = createRoute(withMcpMetadata({
@@ -168,12 +130,52 @@ const archiveRoute = createRoute(withMcpMetadata({
     operationId: "deleteNotification",
     description: "Auto-generated placeholder for deleteNotification (DELETE /{id}, notifications domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'primary' }));
-notificationsRoutes.openapi(archiveRoute, async (c) => {
-    const tenantId = c.get('tenantId');
-    const userId   = requireUserId(c);
-    const { id } = c.req.valid('param');
-    await c.var.services.notification.archive(tenantId, userId, id);
-    return c.json({ success: true as const, data: { ok: true as const } }, 200);
-});
+
+export const notificationsRoutes = createApiRouter()
+    .openapi(listRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const userId   = requireUserId(c);
+        const q = c.req.valid('query');
+        const opts: ListOptions = {
+            ...(q.unread === '1' ? { unread: true } : {}),
+            ...(q.includeArchived === '1' ? { includeArchived: true } : {}),
+            ...(q.limit ? { limit: q.limit } : {}),
+            ...(q.cursor ? { cursor: q.cursor } : {}),
+        };
+        const result = await c.var.services.notification.list(tenantId, userId, opts);
+        return c.json({
+            success: true as const,
+            data: result.items.map(dto),
+            meta: { nextCursor: result.nextCursor },
+        }, 200);
+    })
+    .openapi(unreadCountRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const userId   = requireUserId(c);
+        const count = await c.var.services.notification.unreadCount(tenantId, userId);
+        return c.json({ success: true as const, data: { count } }, 200);
+    })
+    .openapi(markReadRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const userId   = requireUserId(c);
+        const { ids } = c.req.valid('json');
+        await c.var.services.notification.markRead(tenantId, userId, ids);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(markAllRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const userId   = requireUserId(c);
+        await c.var.services.notification.markAllRead(tenantId, userId);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(archiveRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const userId   = requireUserId(c);
+        const { id } = c.req.valid('param');
+        await c.var.services.notification.archive(tenantId, userId, id);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    });
+
+export type NotificationsApi = typeof notificationsRoutes;
 
 export default notificationsRoutes;

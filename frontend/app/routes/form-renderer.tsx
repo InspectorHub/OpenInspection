@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/form-renderer";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
  return [{ title: "Inspection Form - OpenInspection" }];
@@ -64,14 +64,15 @@ interface ItemResult {
 /* Loader */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request, params }: Route.LoaderArgs) {
- const token = await requireToken(request);
+export async function loader({ request, params, context }: Route.LoaderArgs) {
+ const token = await requireToken(context, request);
  const id = params.id;
 
  try {
+ const api = createApi(context, { token });
  const [inspRes, resultsRes] = await Promise.all([
- apiFetch(`/api/inspections/${id}`, { token }),
- apiFetch(`/api/inspections/${id}/results`, { token }).catch(() => null),
+ api.inspections[":id"].$get({ param: { id } }),
+ api.inspections[":id"].results.$get({ param: { id } }).catch(() => null),
  ]);
  const inspBody = inspRes.ok ? await inspRes.json() : {};
  const data = ((inspBody as Record<string, unknown>).data ?? {}) as Record<string, unknown> | undefined;
@@ -137,27 +138,41 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 /* Action */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request, params }: Route.ActionArgs) {
- const token = await requireToken(request);
+export async function action({ request, params, context }: Route.ActionArgs) {
+ const token = await requireToken(context, request);
  const formData = await request.formData();
  const intent = formData.get("intent");
 
+ const api = createApi(context, { token });
+
  if (intent === "save") {
- const results = formData.get("results") as string;
- if (!results) return { error: "No results" };
- const res = await apiFetch(`/api/inspections/${params.id}/results/batch`, {
- method: "POST",
- token,
- body: results,
+ const resultsJson = formData.get("results") as string;
+ if (!resultsJson) return { error: "No results" };
+ // Client serialises the patch array already decomposed from its local
+ // findingKey-indexed results map (see handleSave). The action just
+ // forwards it to the typed batch endpoint in one round-trip.
+ let parsed: { patches?: Array<{ itemId: string; sectionId: string; field: "rating" | "notes" | "value"; value: unknown }> };
+ try {
+ parsed = JSON.parse(resultsJson);
+ } catch {
+ return { error: "Malformed results payload" };
+ }
+ const patches = parsed.patches ?? [];
+ if (patches.length === 0) {
+ // Nothing dirty — treat as success (editor already reflects server state).
+ return { success: true };
+ }
+ const res = await api.inspections[":id"].results.batch.$post({
+ param: { id: params.id! },
+ json: { patches },
  });
  if (!res.ok) return { error: "Failed to save results" };
  return { success: true };
  }
 
  if (intent === "complete") {
- const res = await apiFetch(`/api/inspections/${params.id}/complete`, {
- method: "POST",
- token,
+ const res = await api.inspections[":id"].complete.$post({
+ param: { id: params.id },
  });
  if (!res.ok) return { error: "Failed to mark as complete" };
  return { completed: true };
@@ -418,8 +433,24 @@ export default function FormRendererPage() {
 
  /* ---- Save ---- */
  function handleSave() {
+ // Decompose the editor's keyed-by-findingKey results map into a flat patch
+ // array the typed batch endpoint consumes. Each non-null scalar field
+ // becomes one patch; the action posts them in one round-trip.
+ const patches: Array<{ itemId: string; sectionId: string; field: "rating" | "notes" | "value"; value: unknown }> = [];
+ for (const [key, fields] of Object.entries(results)) {
+ // findingKey is "unit:section:item"; fall back to the bare key on legacy entries.
+ const parts = key.split(":");
+ const sectionId = parts.length === 3 ? parts[1] : "default";
+ const itemId = parts.length === 3 ? parts[2] : key;
+ for (const f of ["rating", "notes", "value"] as const) {
+ const v = (fields as Record<string, unknown>)[f];
+ if (v !== undefined && v !== null && v !== "") {
+ patches.push({ itemId, sectionId, field: f, value: v });
+ }
+ }
+ }
  fetcher.submit(
- { intent: "save", results: JSON.stringify({ results }) },
+ { intent: "save", results: JSON.stringify({ patches }) },
  { method: "post" },
  );
  }

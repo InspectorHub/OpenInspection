@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/settings-event-types";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 interface EventType {
   id: string;
@@ -19,10 +19,11 @@ export function meta() {
   return [{ title: "Event Types - OpenInspection" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
-    const res = await apiFetch("/api/admin/event-types", { token });
+    const api = createApi(context, { token });
+    const res = await api.admin["event-types"].$get();
     if (!res.ok) return { types: [] };
     const body = await res.json();
     return { types: ((body as Record<string, unknown>).data ?? []) as EventType[] };

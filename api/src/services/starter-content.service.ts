@@ -163,6 +163,7 @@ export async function seedStarterContent(
                 section:      c.category,
                 sectionIds:   null,
                 itemLabels:   null,
+                itemLabel:    c.itemLabel || null,
                 triggerCode:  null,
                 searchKeywords: null,
                 createdAt:    now,

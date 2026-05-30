@@ -10,6 +10,7 @@
  *   import { Icon } from '../../lib/icons';
  *   <Icon name="dashboard" size={16} />
  */
+import type { JSX } from 'hono/jsx/jsx-runtime';
 
 export const ICON_PATHS: Record<string, string> = {
     dashboard:  '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',

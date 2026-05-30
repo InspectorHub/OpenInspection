@@ -32,5 +32,29 @@ export default tseslint.config(
                 message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
             }],
         },
+    },
+    {
+        // Dead-routes cleanup (2026-05-30) — guard against re-introducing raw
+        // /api/* string-literal fetches and the now-deleted apiFetch helper in
+        // route files. The 17 retained apiFetch dead-route sites were all migrated
+        // to the typed createApi(context, { token }) client; this keeps it that way.
+        // Scoped to routes/** so browser-side component fetches aren't false-flagged.
+        files: ['frontend/app/routes/**/*.ts', 'frontend/app/routes/**/*.tsx'],
+        rules: {
+            'no-restricted-syntax': ['warn',
+                {
+                    selector: "JSXAttribute[name.name='x-cloak']",
+                    message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+                {
+                    selector: "CallExpression[callee.name='fetch'][arguments.0.type='Literal'][arguments.0.value=/^\\u002Fapi\\u002F/]",
+                    message: 'Do not call fetch("/api/...") with a string literal. Use createApi(context) from ~/lib/api-client.server for typed access.',
+                },
+                {
+                    selector: "CallExpression[callee.name='apiFetch']",
+                    message: 'apiFetch was removed. Use createApi(context, { token }) from ~/lib/api-client.server.',
+                },
+            ],
+        },
     }
 );

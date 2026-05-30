@@ -2,7 +2,9 @@ import { useState, useMemo, useCallback } from "react";
 import { useLoaderData, useFetcher, useNavigate, Link } from "react-router";
 import type { Route } from "./+types/templates";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
+import { Pagination } from "@core/shared-ui";
+import { usePagination } from "~/hooks/usePagination";
 
 export function meta() {
   return [{ title: "Templates - OpenInspection" }];
@@ -34,15 +36,26 @@ interface Template {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   try {
-    const res = await apiFetch("/api/inspections/templates", { token });
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    const url = new URL(request.url);
+    const page     = url.searchParams.get("page")     ?? "1";
+    const pageSize = url.searchParams.get("pageSize") ?? "50";
+    const api = createApi(context, { token });
+    const res = await api.inspections.templates.$get({ query: { page, pageSize } });
+    const body = res.ok
+      ? ((await res.json()) as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
+      : { data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } };
     const templates = (body.data ?? []) as Template[];
-    return { templates, token };
+    const meta = body.meta ?? { total: 0, page: 1, pageSize: 50, totalPages: 1 };
+    return { templates, meta, token };
   } catch {
-    return { templates: [] as Template[], token: "" };
+    return {
+      templates: [] as Template[],
+      meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+      token: "",
+    };
   }
 }
 
@@ -50,18 +63,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  const api = createApi(context, { token });
 
   if (intent === "create") {
     const name = (formData.get("name") as string)?.trim();
     if (!name) return { error: "Name is required" };
-    const res = await apiFetch("/api/inspections/templates", {
-      token,
-      method: "POST",
-      body: JSON.stringify({ name, schema: { schemaVersion: 2, sections: [] } }),
+    const res = await api.inspections.templates.$post({
+      json: { name, schema: { schemaVersion: 2, sections: [] } },
     });
     if (res.ok) {
       const result = await res.json();
@@ -78,21 +91,18 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "delete") {
     const id = formData.get("id") as string;
-    const res = await apiFetch(`/api/inspections/templates/${id}`, { token, method: "DELETE" });
+    const res = await api.inspections.templates[":id"].$delete({ param: { id } });
     return { ok: res.ok, intent: "delete" };
   }
 
   if (intent === "duplicate") {
-    const id = formData.get("id") as string;
     const name = formData.get("name") as string;
     const schema = formData.get("schema") as string;
-    const res = await apiFetch("/api/inspections/templates", {
-      token,
-      method: "POST",
-      body: JSON.stringify({
+    const res = await api.inspections.templates.$post({
+      json: {
         name: name + " (Copy)",
         schema: schema ? JSON.parse(schema) : { schemaVersion: 2, sections: [] },
-      }),
+      },
     });
     if (res.ok) {
       const result = await res.json();
@@ -112,10 +122,8 @@ export async function action({ request }: Route.ActionArgs) {
     if (!name || !payload) return { error: "Name and JSON are required" };
     let parsed: unknown;
     try { parsed = JSON.parse(payload); } catch (e) { return { error: "Invalid JSON" }; }
-    const res = await apiFetch("/api/inspections/templates/import-spectora", {
-      token,
-      method: "POST",
-      body: JSON.stringify({ name, spectora: parsed }),
+    const res = await api.inspections.templates["import-spectora"].$post({
+      json: { name, spectora: parsed as Record<string, unknown> },
     });
     if (res.ok) {
       const result = await res.json();
@@ -149,9 +157,10 @@ function countItems(t: Template): number {
 /* ------------------------------------------------------------------ */
 
 export default function TemplatesPage() {
-  const { templates } = useLoaderData<typeof loader>();
+  const { templates, meta } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
   const navigate = useNavigate();
+  const { setPage, setPageSize } = usePagination();
 
   const [view, setView] = useState<"list" | "card">("list");
   const [searchQuery, setSearchQuery] = useState("");
@@ -426,6 +435,15 @@ export default function TemplatesPage() {
           )}
         </div>
       )}
+
+      <Pagination
+        page={meta.page}
+        pageSize={meta.pageSize}
+        total={meta.total}
+        totalPages={meta.totalPages}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {/* Create modal */}
       {createOpen && (

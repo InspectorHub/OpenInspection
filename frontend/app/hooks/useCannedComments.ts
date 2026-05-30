@@ -93,6 +93,81 @@ export function useCannedComments(options: {
   const [userSnippets, setUserSnippets] = useState<CommentEntry[]>([]);
   const [localSnippets, setLocalSnippets] = useState<CommentEntry[]>([]);
 
+  const [sort, setSortInner] = useState<string>(() => {
+    try {
+      return localStorage.getItem("oi:library:sort") ?? "relevance";
+    } catch {
+      return "relevance";
+    }
+  });
+  const [filterMode, setFilterModeInner] = useState<"auto" | "all">(() => {
+    try {
+      return (
+        (localStorage.getItem("oi:library:filter-mode") as "auto" | "all") ??
+        "auto"
+      );
+    } catch {
+      return "auto";
+    }
+  });
+
+  const setSort = useCallback((s: string) => {
+    setSortInner(s);
+    try {
+      localStorage.setItem("oi:library:sort", s);
+    } catch {
+      /* noop */
+    }
+  }, []);
+  const setFilterMode = useCallback((m: "auto" | "all") => {
+    setFilterModeInner(m);
+    try {
+      localStorage.setItem("oi:library:filter-mode", m);
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const fetchFiltered = useCallback(
+    async (ctx: {
+      itemLabel?: string;
+      section?: string;
+      ratingBucket?: string;
+    }) => {
+      const params = new URLSearchParams();
+      params.set("sort", sort);
+      params.set("filterMode", filterMode);
+      if (filterMode === "auto") {
+        if (ctx.itemLabel) params.set("itemLabel", ctx.itemLabel);
+        if (ctx.section) params.set("section", ctx.section);
+        if (ctx.ratingBucket) params.set("rating", ctx.ratingBucket);
+      }
+      try {
+        const res = await fetch(`/api/admin/comments?${params}`, {
+          credentials: "include",
+        });
+        if (!res.ok) return [];
+        const body = (await res.json()) as { data?: unknown[] };
+        return body.data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    [sort, filterMode],
+  );
+
+  const touchSnippet = useCallback((id: string) => {
+    // Fire-and-forget; no UI dependency on the response.
+    try {
+      fetch(`/api/admin/comments/${id}/touch`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      /* noop */
+    }
+  }, []);
+
   // Load user snippets from server
   useEffect(() => {
     (async () => {
@@ -221,12 +296,19 @@ export function useCannedComments(options: {
 
   /** Save current notes as a snippet (server-first, localStorage fallback) */
   const saveSnippet = useCallback(
-    async (text: string, bucket: string, section: string, title?: string) => {
+    async (
+      text: string,
+      bucket: string,
+      section: string,
+      title?: string,
+      itemLabel?: string,
+    ) => {
       const body = {
         text,
         ratingBucket: bucket === "all" ? null : bucket,
         section: section || null,
         category: title || null,
+        itemLabel: itemLabel || null,
       };
       try {
         const res = await fetch("/api/admin/comments", {
@@ -289,5 +371,11 @@ export function useCannedComments(options: {
     getQuickComments,
     saveSnippet,
     userSnippets,
+    sort,
+    setSort,
+    filterMode,
+    setFilterMode,
+    fetchFiltered,
+    touchSnippet,
   };
 }

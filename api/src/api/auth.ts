@@ -1,9 +1,11 @@
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import { createApiRouter } from '../lib/openapi-router';
+import type { HonoConfig } from '../types/hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, sql } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { setCookie, deleteCookie } from 'hono/cookie';
-import { HonoConfig } from '../types/hono';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { getBaseUrl } from '../lib/url';
@@ -59,8 +61,6 @@ export interface AuthPayload {
     iat?: number;
 }
 
-const coreAuthRoutes = new OpenAPIHono<HonoConfig>();
-
 // --- Routes ---
 
 const loginRoute = createRoute(withMcpMetadata({
@@ -90,77 +90,6 @@ const loginRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-coreAuthRoutes.openapi(loginRoute, async (c) => {
-    // Shared-SaaS deploys disable the local password form — see the
-    // matching guard on GET /login. Returning Gone (410) + a redirect
-    // hint lets stale clients (cached SPA build, scripted callers) bail
-    // out cleanly instead of attempting credential validation against
-    // a per-(tenant_id,email) row they can't disambiguate.
-    const profile = c.var.profile;
-    if (profile?.mode === 'saas' && profile?.saasTopology === 'shared') {
-        const portal = c.env.PORTAL_API_URL?.replace(/\/$/, '') ?? null;
-        return c.json({
-            success: false,
-            error: {
-                code: 'LOGIN_MOVED_TO_PORTAL',
-                message: 'Sign in via the workspace portal; this tenant runs in shared-SaaS mode.',
-                ...(portal ? { details: { redirect: `${portal}/login` } } : {}),
-            },
-        }, 410);
-    }
-
-    await checkRateLimit(c, 'login');
-
-    const body = c.req.valid('json');
-    const user = await c.var.services.auth.validateCredentials(body.email, body.password);
-
-    const keyring = await c.var.keyringPromise!;
-    const now = Math.floor(Date.now() / 1000);
-
-    // Spec 4A — If the user has 2FA enabled, return a short-lived challenge token instead of
-    // the session JWT. The client must POST it back along with a TOTP code to /api/auth/login/2fa
-    // before any session is granted.
-    if (user.totpEnabled) {
-        const challengeToken = await signJwt({
-            sub: user.id,
-            t: 'challenge',
-            iat: now,
-            exp: now + 60 * 5,
-        }, keyring);
-        // Intentionally NOT a Set-Cookie — challenge tokens travel JSON-only so a stolen
-        // session cookie alone never permits 2FA bypass.
-        return c.json({
-            success: true,
-            data: { requires2fa: true, challengeToken }
-        }, 200);
-    }
-
-    // Email is intentionally NOT in the payload — JWTs are signed but not encrypted, and the
-    // token travels through logs / intermediaries. PII belongs in the DB, not in the bearer.
-    const token = await signJwt({
-        sub: user.id,
-        'custom:tenantId': user.tenantId,
-        'custom:userRole': user.role,
-        role: user.role,
-        iat: now,
-        exp: now + 60 * 60 * 24,
-    }, keyring);
-
-    setCookie(c, '__Host-inspector_token', token, authCookieOptions());
-
-    // Token Relay BFF: when the Remix SSR frontend (server-to-server) calls
-    // this endpoint, Workers fetch() may strip Set-Cookie. The BFF signals
-    // itself via X-Token-Relay header; we return the JWT in the body so the
-    // BFF can store it in its own session cookie. The browser never sees this
-    // header because the BFF is the only caller — browsers use the HttpOnly
-    // cookie path exclusively.
-    const isBff = c.req.header('x-token-relay') === '1';
-    return c.json({
-        success: true,
-        data: { redirect: '/dashboard', ...(isBff ? { token } : {}) }
-    }, 200);
-});
-
 const changePasswordRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/change-password',
@@ -186,17 +115,6 @@ const changePasswordRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-coreAuthRoutes.openapi(changePasswordRoute, async (c) => {
-    // The global JWT middleware has already verified the token and populated c.var.user.
-    const user = c.get('user');
-    if (!user?.sub) throw Errors.Unauthorized();
-
-    const body = c.req.valid('json');
-    await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
-
-    return c.json({ success: true }, 200);
-});
-
 const joinTeamRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/join',
@@ -220,29 +138,6 @@ const joinTeamRoute = createRoute(withMcpMetadata({
         }
     }
 }, { scopes: [], tier: 'excluded' }));
-
-coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
-    const body = c.req.valid('json');
-    const user = await c.var.services.auth.joinTeam(body.token, body.password);
-
-    const keyring = await c.var.keyringPromise!;
-    const now = Math.floor(Date.now() / 1000);
-    const token = await signJwt({
-        sub: user.id,
-        'custom:tenantId': user.tenantId,
-        'custom:userRole': user.role,
-        role: user.role,
-        iat: now,
-        exp: now + 60 * 60 * 24,
-    }, keyring);
-
-    setCookie(c, '__Host-inspector_token', token, authCookieOptions());
-
-    return c.json({
-        success: true,
-        data: { redirect: '/dashboard' }
-    }, 200);
-});
 
 /**
  * GET /sso?code=<uuid>
@@ -279,48 +174,6 @@ const ssoConsumeRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-coreAuthRoutes.openapi(ssoConsumeRoute, async (c) => {
-    const { code } = c.req.valid('query');
-    if (!c.env.TENANT_CACHE) return c.redirect('/login?sso=unavailable', 302);
-
-    const raw = await c.env.TENANT_CACHE.get(`sso:${code}`);
-    if (!raw) return c.redirect('/login?sso=expired', 302);
-    // Single-use: delete BEFORE issuing the cookie so a parallel replay
-    // can't piggyback on a still-resolving call.
-    await c.env.TENANT_CACHE.delete(`sso:${code}`);
-
-    let parsed: { userId?: string; tenantId?: string };
-    try { parsed = JSON.parse(raw); } catch { return c.redirect('/login?sso=invalid', 302); }
-    if (!parsed.userId || !parsed.tenantId) return c.redirect('/login?sso=invalid', 302);
-
-    const { drizzle } = await import('drizzle-orm/d1');
-    const { eq, and } = await import('drizzle-orm');
-    const { users } = await import('../lib/db/schema');
-    const d = drizzle(c.env.DB);
-    const user = await d.select().from(users)
-        .where(and(eq(users.id, parsed.userId), eq(users.tenantId, parsed.tenantId)))
-        .get();
-    if (!user) return c.redirect('/login?sso=invalid', 302);
-
-    const keyring = await c.var.keyringPromise!;
-    const now = Math.floor(Date.now() / 1000);
-    const token = await signJwt({
-        sub: user.id,
-        'custom:tenantId': user.tenantId,
-        'custom:userRole': user.role,
-        role: user.role,
-        iat: now,
-        exp: now + 60 * 60 * 24,
-        // Marker so audit logs / downstream middleware can detect that
-        // this session was minted via portal handoff rather than direct
-        // password login.
-        'custom:sso': true,
-    }, keyring);
-
-    setCookie(c, '__Host-inspector_token', token, authCookieOptions());
-    return c.redirect('/dashboard', 302);
-});
-
 const forgotPasswordRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/forgot-password',
@@ -346,41 +199,10 @@ const forgotPasswordRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': { schema: z.object({ success: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }) }
             },
-            description: 'Password reset disabled — shared-SaaS tenants must use the workspace portal'
+            description: 'Password reset disabled — SaaS tenants must use the workspace portal'
         }
     }
 }, { scopes: [], tier: 'excluded' }));
-
-coreAuthRoutes.openapi(forgotPasswordRoute, async (c) => {
-    // Shared-SaaS deploys disable the local password form — see the matching
-    // guard on POST /api/auth/login. Password resets must go through the
-    // workspace portal which owns the identity layer for shared tenants.
-    const profile = c.var.profile;
-    if (profile?.mode === 'saas' && profile?.saasTopology === 'shared') {
-        return c.json({
-            success: false as const,
-            error: {
-                code: 'PASSWORD_RESET_MOVED_TO_PORTAL',
-                message: 'Use the workspace portal to reset your password.',
-            },
-        }, 410);
-    }
-
-    await checkRateLimit(c, 'forgot');
-
-    const body = c.req.valid('json');
-    const resetToken = await c.var.services.auth.createPasswordResetToken(body.email);
-    
-    if (!resetToken) return c.json({ success: true }, 200);
-
-    const baseUrl = getBaseUrl(c);
-    const resetLink = `${baseUrl}/login?reset_token=${resetToken}`;
-
-    await c.var.services.email.sendPasswordReset(body.email, resetLink)
-        .catch(() => { /* email delivery is best-effort */ });
-
-    return c.json({ success: true }, 200);
-});
 
 const resetPasswordRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -405,12 +227,6 @@ const resetPasswordRoute = createRoute(withMcpMetadata({
         }
     }
 }, { scopes: [], tier: 'excluded' }));
-
-coreAuthRoutes.openapi(resetPasswordRoute, async (c) => {
-    const body = c.req.valid('json');
-    await c.var.services.auth.resetPassword(body.token, body.newPassword);
-    return c.json({ success: true }, 200);
-});
 
 const setupRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -437,89 +253,6 @@ const setupRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-coreAuthRoutes.openapi(setupRoute, async (c) => {
-    // 1. Safety Check: Only allow if no tenant-scoped users exist.
-    // Agent Accounts A1 — global agents (tenant_id IS NULL) are unrelated to
-    // first-time tenant initialization, so they must not block setup.
-    const db = drizzle(c.env.DB);
-    const existingTenantUser = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
-    if (existingTenantUser) {
-        return c.json({ success: false, error: { code: 'already_initialized', message: 'System already initialized' } }, 409);
-    }
-
-
-    const body = c.req.valid('json');
-
-    // 2. Verification Code Check
-    const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE?.get('setup_verification_code');
-    if (storedCode && body.verificationCode !== storedCode) {
-        return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
-    }
-
-
-    // 3. Initialize Workspace
-    const passwordHash = await c.var.services.auth.hashPassword(body.password);
-    const tenantId = c.env.SINGLE_TENANT_ID || '00000000-0000-0000-0000-000000000000';
-    const subdomain = body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-    await c.var.services.admin.updateTenantStatus({
-        id: tenantId,
-        name: body.companyName,
-        subdomain,
-        status: 'active',
-        adminEmail: body.email,
-        adminPasswordHash: passwordHash,
-        adminName: body.adminName,
-    });
-
-    // Cleanup code
-    if (c.env.TENANT_CACHE) await c.env.TENANT_CACHE.delete('setup_verification_code');
-
-    // Auto-seed default recommendations library for the new tenant
-    try {
-        const { RECOMMENDATION_SEEDS } = await import('../data/recommendation-seeds');
-        await c.var.services.recommendation.bulkSeed(tenantId, RECOMMENDATION_SEEDS);
-    } catch (seedErr) {
-        // Don't block setup if seed fails — log and continue
-        logger.error('Auto-seed recommendations failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
-    }
-
-    // Spec 4D — Auto-seed default event types (5 defaults: radon, mold, water, sewer scope, etc.)
-    try {
-        await c.var.services.event.bulkSeed(tenantId);
-    } catch (seedErr) {
-        logger.error('Auto-seed event types failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
-    }
-
-    // Spec 4F — Auto-seed default 6 templates (residential, pre-listing, new-construction, sewer-scope, radon, mold)
-    try {
-        await c.var.services.templateSeed.bulkSeed(tenantId);
-    } catch (seedErr) {
-        logger.error('Auto-seed templates failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
-    }
-
-    // 4. Issue a JWT for the new admin so the caller can authenticate immediately
-    const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
-    if (newUser) {
-        const keyring = await c.var.keyringPromise!;
-        const now = Math.floor(Date.now() / 1000);
-        const token = await signJwt({
-            sub: newUser.id,
-            'custom:tenantId': newUser.tenantId,
-            'custom:userRole': newUser.role,
-            role: newUser.role,
-            iat: now,
-            exp: now + 60 * 60 * 24,
-        }, keyring);
-        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
-    }
-
-    return c.json({
-        success: true,
-        data: { redirect: '/dashboard' }
-    }, 200);
-});
-
 const skipSetupRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/setup/skip',
@@ -538,20 +271,6 @@ const skipSetupRoute = createRoute(withMcpMetadata({
         401: { description: 'Unauthorized' }
     }
 }, { scopes: [], tier: 'excluded' }));
-
-coreAuthRoutes.openapi(skipSetupRoute, async (c) => {
-    const user = c.get('user');
-    if (!user?.sub) throw Errors.Unauthorized('Not signed in');
-
-    const db = drizzle(c.env.DB);
-    const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
-    const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
-    onboardingState.skipped = true;
-
-    await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
-
-    return c.json({ success: true, data: { skipped: true } }, 200);
-});
 
 const meRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -583,47 +302,6 @@ const meRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'primary' }));
 
-coreAuthRoutes.openapi(meRoute, async (c) => {
-    const user = c.get('user');
-    if (!user?.sub) throw Errors.Unauthorized();
-
-    // Email is stored only in the DB, never the JWT.
-    const db = drizzle(c.env.DB);
-    const row = await db.select({
-        email: users.email,
-        name: users.name,
-        phone: users.phone,
-        licenseNumber: users.licenseNumber,
-        onboardingState: users.onboardingState,
-        totpEnabled: users.totpEnabled,
-        totpRecoveryCodes: users.totpRecoveryCodes,
-    }).from(users).where(eq(users.id, user.sub)).get();
-
-    let recoveryCodesRemaining: number | null = null;
-    if (row?.totpEnabled && row.totpRecoveryCodes) {
-        try { recoveryCodesRemaining = (JSON.parse(row.totpRecoveryCodes) as string[]).length; }
-        catch { recoveryCodesRemaining = 0; }
-    }
-
-    return c.json({
-        success: true,
-        data: {
-            user: {
-                id: user.sub,
-                email: row?.email,
-                name: row?.name || null,
-                phone: row?.phone || null,
-                licenseNumber: row?.licenseNumber || null,
-                onboardingState: row?.onboardingState ?? null,
-                tenantId: c.get('tenantId'),
-                role: c.get('userRole'),
-                totpEnabled: !!row?.totpEnabled,
-                recoveryCodesRemaining,
-            }
-        }
-    }, 200);
-});
-
 // ── Profile update ──────────────────────────────────────────────────────────
 const updateProfileRoute = createRoute(withMcpMetadata({
     method: 'patch',
@@ -654,24 +332,6 @@ const updateProfileRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: ['write'], tier: 'extended' }));
 
-coreAuthRoutes.openapi(updateProfileRoute, async (c) => {
-    const user = c.get('user');
-    if (!user?.sub) throw Errors.Unauthorized();
-
-    const body = c.req.valid('json');
-    const updates: Record<string, string | null> = {};
-    if (body.name !== undefined) updates.name = body.name || null;
-    if (body.phone !== undefined) updates.phone = body.phone || null;
-    if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber || null;
-
-    if (Object.keys(updates).length > 0) {
-        const db = drizzle(c.env.DB);
-        await db.update(users).set(updates).where(eq(users.id, user.sub)).run();
-    }
-
-    return c.json({ success: true, data: { updated: true } }, 200);
-});
-
 const logoutRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/logout',
@@ -689,35 +349,6 @@ const logoutRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-coreAuthRoutes.openapi(logoutRoute, async (c) => {
-    // If the request carries a valid token, revoke all of this user's tokens server-side.
-    // The JS client can't clear an HttpOnly cookie — we must do it via Set-Cookie.
-    const user = c.get('user');
-    if (user?.sub) {
-        await c.var.services.auth.invalidateUserSessions(user.sub);
-    }
-
-    deleteCookie(c, '__Host-inspector_token', {
-        path: '/',
-        secure: true,
-        sameSite: 'Strict',
-    });
-
-    // iter-2 production bug #4 — clear the CSRF cookie alongside the auth
-    // cookie. Without this, `__Host-csrf_token` outlives the session and
-    // becomes a fixation vector: a subsequent login on the same browser
-    // inherits the same CSRF token, which an attacker who exfiltrated it
-    // pre-logout can replay against the new session. Same `__Host-` prefix
-    // rules apply (Secure + Path=/).
-    deleteCookie(c, '__Host-csrf_token', {
-        path: '/',
-        secure: true,
-        sameSite: 'Strict',
-    });
-
-    return c.json({ success: true }, 200);
-});
-
 // ─── Spec 4A — TOTP 2FA endpoints ──────────────────────────────────────────
 // All 5 endpoints below were added by Spec 4A. They are additive — no existing
 // behaviour was altered beyond the requires2fa branch in the login handler above.
@@ -725,7 +356,7 @@ coreAuthRoutes.openapi(logoutRoute, async (c) => {
 const TOTP_ISSUER = 'OpenInspection';
 
 /** Look up the current user row or 401 if the JWT is missing/stale. */
-async function loadCurrentUser(c: Parameters<Parameters<typeof coreAuthRoutes.openapi>[1]>[0]) {
+async function loadCurrentUser(c: Context<HonoConfig>) {
     const userPayload = c.get('user');
     if (!userPayload?.sub) throw Errors.Unauthorized();
     const db = drizzle(c.env.DB);
@@ -747,33 +378,6 @@ const totpSetupRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'extended' }));
 
-coreAuthRoutes.openapi(totpSetupRoute, async (c) => {
-    const me = await loadCurrentUser(c);
-    const totpSvc = c.var.services.totp;
-
-    const secret = totpSvc.generateSecret();
-    const recoveryCodes = totpSvc.generateRecoveryCodes(8);
-    const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
-    const otpAuthUrl = totpSvc.buildOtpAuthUrl({ accountName: me.email, issuer: TOTP_ISSUER, secret });
-    const qrCodeDataUri = await totpSvc.qrCodeDataUri(otpAuthUrl);
-
-    // Persist the secret + recovery hashes immediately, but keep totpEnabled=false until
-    // the user proves they can produce a valid code via /2fa/verify. This way an abandoned
-    // setup never locks anyone out.
-    const db = drizzle(c.env.DB);
-    await db.update(users).set({
-        totpSecret: secret,
-        totpRecoveryCodes: JSON.stringify(recoveryHashes),
-        totpEnabled: false,
-        totpVerifiedAt: null,
-    }).where(eq(users.id, me.id));
-
-    return c.json({
-        success: true,
-        data: { secret, qrCodeDataUri, recoveryCodes }
-    }, 200);
-});
-
 const totpVerifyRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/2fa/verify',
@@ -788,23 +392,6 @@ const totpVerifyRoute = createRoute(withMcpMetadata({
         401: { description: 'Unauthorized' },
     }
 }, { scopes: [], tier: 'extended' }));
-
-coreAuthRoutes.openapi(totpVerifyRoute, async (c) => {
-    const me = await loadCurrentUser(c);
-    if (!me.totpSecret) throw Errors.BadRequest('No pending 2FA setup. Call /2fa/setup first.');
-
-    const { code } = c.req.valid('json');
-    const ok = c.var.services.totp.verifyCode(me.totpSecret, code);
-    if (!ok) throw Errors.BadRequest('Invalid verification code');
-
-    const db = drizzle(c.env.DB);
-    await db.update(users).set({
-        totpEnabled: true,
-        totpVerifiedAt: new Date(),
-    }).where(eq(users.id, me.id));
-
-    return c.json({ success: true }, 200);
-});
 
 const totpDisableRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -821,39 +408,6 @@ const totpDisableRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'extended' }));
 
-coreAuthRoutes.openapi(totpDisableRoute, async (c) => {
-    const me = await loadCurrentUser(c);
-    const { password, code } = c.req.valid('json');
-
-    const [pwOk] = await verifyPassword(password, me.passwordHash);
-    if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
-
-    if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
-
-    const totpSvc = c.var.services.totp;
-    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
-    let updatedHashes: string[] | null = null;
-    if (!codeOk && me.totpRecoveryCodes) {
-        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
-        const result = await totpSvc.consumeRecoveryCode(code, hashes);
-        codeOk = result.matched;
-        if (result.matched) updatedHashes = result.remainingHashes;
-    }
-    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
-
-    const db = drizzle(c.env.DB);
-    await db.update(users).set({
-        totpSecret: null,
-        totpEnabled: false,
-        totpRecoveryCodes: null,
-        totpVerifiedAt: null,
-    }).where(eq(users.id, me.id));
-
-    // updatedHashes intentionally discarded — we are wiping all 2FA state anyway.
-    void updatedHashes;
-    return c.json({ success: true }, 200);
-});
-
 const totpRegenRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/2fa/recovery-codes/regenerate',
@@ -867,41 +421,6 @@ const totpRegenRoute = createRoute(withMcpMetadata({
         401: { description: 'Unauthorized' },
     }
 }, { scopes: [], tier: 'extended' }));
-
-coreAuthRoutes.openapi(totpRegenRoute, async (c) => {
-    const me = await loadCurrentUser(c);
-    const { password, code } = c.req.valid('json');
-
-    const [pwOk] = await verifyPassword(password, me.passwordHash);
-    if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
-
-    if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
-
-    const totpSvc = c.var.services.totp;
-    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
-    if (!codeOk && me.totpRecoveryCodes) {
-        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
-        const result = await totpSvc.consumeRecoveryCode(code, hashes);
-        codeOk = result.matched;
-        // We are about to overwrite recovery codes wholesale, so consuming the matched code
-        // here doesn't need to be persisted separately.
-    }
-    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
-
-    const recoveryCodes = totpSvc.generateRecoveryCodes(8);
-    const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
-
-    const db = drizzle(c.env.DB);
-    await db.update(users).set({
-        totpRecoveryCodes: JSON.stringify(recoveryHashes),
-    }).where(eq(users.id, me.id));
-
-    // QR code is irrelevant on regenerate; surface an empty string to keep the schema stable.
-    return c.json({
-        success: true,
-        data: { secret: me.totpSecret, qrCodeDataUri: '', recoveryCodes }
-    }, 200);
-});
 
 const login2faRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -918,57 +437,527 @@ const login2faRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-coreAuthRoutes.openapi(login2faRoute, async (c) => {
-    await checkRateLimit(c, 'login');
-
-    const { challengeToken, code } = c.req.valid('json');
-    const keyring = await c.var.keyringPromise!;
-
-    let payload: Record<string, unknown>;
-    try {
-        payload = await verifyJwt(challengeToken, keyring);
-    } catch {
-        throw Errors.Unauthorized('Invalid or expired challenge');
-    }
-    if (payload['t'] !== 'challenge' || typeof payload['sub'] !== 'string') {
-        throw Errors.Unauthorized('Invalid challenge token');
-    }
-    const userId = payload['sub'] as string;
-
-    const db = drizzle(c.env.DB);
-    const me = await db.select().from(users).where(eq(users.id, userId)).get();
-    if (!me || !me.totpEnabled || !me.totpSecret) {
-        throw Errors.Unauthorized('Invalid challenge token');
-    }
-
-    const totpSvc = c.var.services.totp;
-    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
-    if (!codeOk && me.totpRecoveryCodes) {
-        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
-        const result = await totpSvc.consumeRecoveryCode(code, hashes);
-        if (result.matched) {
-            codeOk = true;
-            // Single-use semantics: persist remaining hashes immediately, before we issue
-            // the session cookie. If the DB write fails we don't want to grant a session.
-            await db.update(users).set({
-                totpRecoveryCodes: JSON.stringify(result.remainingHashes),
-            }).where(eq(users.id, me.id));
+export const coreAuthRoutes = createApiRouter()
+    .openapi(loginRoute, async (c) => {
+        // SaaS deploys disable the local password form (login via portal) —
+        // see the matching guard on GET /login. Returning Gone (410) + a
+        // redirect hint lets stale clients (cached SPA build, scripted callers)
+        // bail out cleanly instead of attempting credential validation against
+        // a per-(tenant_id,email) row they can't disambiguate.
+        const profile = c.var.profile;
+        if (profile?.mode === 'saas') {
+            const portal = c.env.PORTAL_API_URL?.replace(/\/$/, '') ?? null;
+            return c.json({
+                success: false,
+                error: {
+                    code: 'LOGIN_MOVED_TO_PORTAL',
+                    message: 'Sign in via the workspace portal.',
+                    ...(portal ? { details: { redirect: `${portal}/login` } } : {}),
+                },
+            }, 410);
         }
-    }
-    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
 
-    const now = Math.floor(Date.now() / 1000);
-    const sessionToken = await signJwt({
-        sub: me.id,
-        'custom:tenantId': me.tenantId,
-        'custom:userRole': me.role,
-        role: me.role,
-        iat: now,
-        exp: now + 60 * 60 * 24,
-    }, keyring);
+        await checkRateLimit(c, 'login');
 
-    setCookie(c, '__Host-inspector_token', sessionToken, authCookieOptions());
-    return c.json({ success: true, data: { redirect: '/dashboard' } }, 200);
-});
+        const body = c.req.valid('json');
+        const user = await c.var.services.auth.validateCredentials(body.email, body.password);
+
+        const keyring = await c.var.keyringPromise!;
+        const now = Math.floor(Date.now() / 1000);
+
+        // Spec 4A — If the user has 2FA enabled, return a short-lived challenge token instead of
+        // the session JWT. The client must POST it back along with a TOTP code to /api/auth/login/2fa
+        // before any session is granted.
+        if (user.totpEnabled) {
+            const challengeToken = await signJwt({
+                sub: user.id,
+                t: 'challenge',
+                iat: now,
+                exp: now + 60 * 5,
+            }, keyring);
+            // Intentionally NOT a Set-Cookie — challenge tokens travel JSON-only so a stolen
+            // session cookie alone never permits 2FA bypass.
+            return c.json({
+                success: true,
+                data: { requires2fa: true, challengeToken }
+            }, 200);
+        }
+
+        // Email is intentionally NOT in the payload — JWTs are signed but not encrypted, and the
+        // token travels through logs / intermediaries. PII belongs in the DB, not in the bearer.
+        const token = await signJwt({
+            sub: user.id,
+            'custom:tenantId': user.tenantId,
+            'custom:userRole': user.role,
+            role: user.role,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+        }, keyring);
+
+        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+
+        // Token Relay BFF: when the React Router v7 SSR frontend (server-to-server) calls
+        // this endpoint, Workers fetch() may strip Set-Cookie. The BFF signals
+        // itself via X-Token-Relay header; we return the JWT in the body so the
+        // BFF can store it in its own session cookie. The browser never sees this
+        // header because the BFF is the only caller — browsers use the HttpOnly
+        // cookie path exclusively.
+        const isBff = c.req.header('x-token-relay') === '1';
+        return c.json({
+            success: true,
+            data: { redirect: '/dashboard', ...(isBff ? { token } : {}) }
+        }, 200);
+    })
+    .openapi(changePasswordRoute, async (c) => {
+        // The global JWT middleware has already verified the token and populated c.var.user.
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized();
+
+        const body = c.req.valid('json');
+        await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
+
+        return c.json({ success: true }, 200);
+    })
+    .openapi(joinTeamRoute, async (c) => {
+        const body = c.req.valid('json');
+        const user = await c.var.services.auth.joinTeam(body.token, body.password);
+
+        const keyring = await c.var.keyringPromise!;
+        const now = Math.floor(Date.now() / 1000);
+        const token = await signJwt({
+            sub: user.id,
+            'custom:tenantId': user.tenantId,
+            'custom:userRole': user.role,
+            role: user.role,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+        }, keyring);
+
+        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+
+        return c.json({
+            success: true,
+            data: { redirect: '/dashboard' }
+        }, 200);
+    })
+    .openapi(ssoConsumeRoute, async (c) => {
+        const { code } = c.req.valid('query');
+        if (!c.env.TENANT_CACHE) return c.redirect('/login?sso=unavailable', 302);
+
+        const raw = await c.env.TENANT_CACHE.get(`sso:${code}`);
+        if (!raw) return c.redirect('/login?sso=expired', 302);
+        // Single-use: delete BEFORE issuing the cookie so a parallel replay
+        // can't piggyback on a still-resolving call.
+        await c.env.TENANT_CACHE.delete(`sso:${code}`);
+
+        let parsed: { userId?: string; tenantId?: string };
+        try { parsed = JSON.parse(raw); } catch { return c.redirect('/login?sso=invalid', 302); }
+        if (!parsed.userId || !parsed.tenantId) return c.redirect('/login?sso=invalid', 302);
+
+        const { drizzle } = await import('drizzle-orm/d1');
+        const { eq, and } = await import('drizzle-orm');
+        const { users } = await import('../lib/db/schema');
+        const d = drizzle(c.env.DB);
+        const user = await d.select().from(users)
+            .where(and(eq(users.id, parsed.userId), eq(users.tenantId, parsed.tenantId)))
+            .get();
+        if (!user) return c.redirect('/login?sso=invalid', 302);
+
+        const keyring = await c.var.keyringPromise!;
+        const now = Math.floor(Date.now() / 1000);
+        const token = await signJwt({
+            sub: user.id,
+            'custom:tenantId': user.tenantId,
+            'custom:userRole': user.role,
+            role: user.role,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+            // Marker so audit logs / downstream middleware can detect that
+            // this session was minted via portal handoff rather than direct
+            // password login.
+            'custom:sso': true,
+        }, keyring);
+
+        setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+        return c.redirect('/dashboard', 302);
+    })
+    .openapi(forgotPasswordRoute, async (c) => {
+        // SaaS deploys disable the local password form (password reset via
+        // portal) — see the matching guard on POST /api/auth/login. Password
+        // resets must go through the workspace portal which owns the identity
+        // layer for SaaS tenants.
+        const profile = c.var.profile;
+        if (profile?.mode === 'saas') {
+            return c.json({
+                success: false as const,
+                error: {
+                    code: 'PASSWORD_RESET_MOVED_TO_PORTAL',
+                    message: 'Use the workspace portal to reset your password.',
+                },
+            }, 410);
+        }
+
+        await checkRateLimit(c, 'forgot');
+
+        const body = c.req.valid('json');
+        const resetToken = await c.var.services.auth.createPasswordResetToken(body.email);
+
+        if (!resetToken) return c.json({ success: true }, 200);
+
+        const baseUrl = getBaseUrl(c);
+        const resetLink = `${baseUrl}/login?reset_token=${resetToken}`;
+
+        await c.var.services.email.sendPasswordReset(body.email, resetLink)
+            .catch(() => { /* email delivery is best-effort */ });
+
+        return c.json({ success: true }, 200);
+    })
+    .openapi(resetPasswordRoute, async (c) => {
+        const body = c.req.valid('json');
+        await c.var.services.auth.resetPassword(body.token, body.newPassword);
+        return c.json({ success: true }, 200);
+    })
+    .openapi(setupRoute, async (c) => {
+        // 1. Safety Check: Only allow if no tenant-scoped users exist.
+        // Agent Accounts A1 — global agents (tenant_id IS NULL) are unrelated to
+        // first-time tenant initialization, so they must not block setup.
+        const db = drizzle(c.env.DB);
+        const existingTenantUser = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
+        if (existingTenantUser) {
+            return c.json({ success: false, error: { code: 'already_initialized', message: 'System already initialized' } }, 409);
+        }
+
+
+        const body = c.req.valid('json');
+
+        // 2. Verification Code Check
+        const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE?.get('setup_verification_code');
+        if (storedCode && body.verificationCode !== storedCode) {
+            return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
+        }
+
+
+        // 3. Initialize Workspace
+        const passwordHash = await c.var.services.auth.hashPassword(body.password);
+        const tenantId = c.env.SINGLE_TENANT_ID || '00000000-0000-0000-0000-000000000000';
+        const subdomain = body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+        await c.var.services.admin.updateTenantStatus({
+            id: tenantId,
+            name: body.companyName,
+            subdomain,
+            status: 'active',
+            adminEmail: body.email,
+            adminPasswordHash: passwordHash,
+            adminName: body.adminName,
+        });
+
+        // Cleanup code
+        if (c.env.TENANT_CACHE) await c.env.TENANT_CACHE.delete('setup_verification_code');
+
+        // Auto-seed default recommendations library for the new tenant
+        try {
+            const { RECOMMENDATION_SEEDS } = await import('../data/recommendation-seeds');
+            await c.var.services.recommendation.bulkSeed(tenantId, RECOMMENDATION_SEEDS);
+        } catch (seedErr) {
+            // Don't block setup if seed fails — log and continue
+            logger.error('Auto-seed recommendations failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
+        }
+
+        // Spec 4D — Auto-seed default event types (5 defaults: radon, mold, water, sewer scope, etc.)
+        try {
+            await c.var.services.event.bulkSeed(tenantId);
+        } catch (seedErr) {
+            logger.error('Auto-seed event types failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
+        }
+
+        // Spec 4F — Auto-seed default 6 templates (residential, pre-listing, new-construction, sewer-scope, radon, mold)
+        try {
+            await c.var.services.templateSeed.bulkSeed(tenantId);
+        } catch (seedErr) {
+            logger.error('Auto-seed templates failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
+        }
+
+        // 4. Issue a JWT for the new admin so the caller can authenticate immediately
+        const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
+        if (newUser) {
+            const keyring = await c.var.keyringPromise!;
+            const now = Math.floor(Date.now() / 1000);
+            const token = await signJwt({
+                sub: newUser.id,
+                'custom:tenantId': newUser.tenantId,
+                'custom:userRole': newUser.role,
+                role: newUser.role,
+                iat: now,
+                exp: now + 60 * 60 * 24,
+            }, keyring);
+            setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+        }
+
+        return c.json({
+            success: true,
+            data: { redirect: '/dashboard' }
+        }, 200);
+    })
+    .openapi(skipSetupRoute, async (c) => {
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized('Not signed in');
+
+        const db = drizzle(c.env.DB);
+        const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
+        const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
+        onboardingState.skipped = true;
+
+        await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
+
+        return c.json({ success: true, data: { skipped: true } }, 200);
+    })
+    .openapi(meRoute, async (c) => {
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized();
+
+        // Email is stored only in the DB, never the JWT.
+        const db = drizzle(c.env.DB);
+        const row = await db.select({
+            email: users.email,
+            name: users.name,
+            phone: users.phone,
+            licenseNumber: users.licenseNumber,
+            onboardingState: users.onboardingState,
+            totpEnabled: users.totpEnabled,
+            totpRecoveryCodes: users.totpRecoveryCodes,
+        }).from(users).where(eq(users.id, user.sub)).get();
+
+        let recoveryCodesRemaining: number | null = null;
+        if (row?.totpEnabled && row.totpRecoveryCodes) {
+            try { recoveryCodesRemaining = (JSON.parse(row.totpRecoveryCodes) as string[]).length; }
+            catch { recoveryCodesRemaining = 0; }
+        }
+
+        return c.json({
+            success: true,
+            data: {
+                user: {
+                    id: user.sub,
+                    email: row?.email,
+                    name: row?.name || null,
+                    phone: row?.phone || null,
+                    licenseNumber: row?.licenseNumber || null,
+                    onboardingState: row?.onboardingState ?? null,
+                    tenantId: c.get('tenantId'),
+                    role: c.get('userRole'),
+                    totpEnabled: !!row?.totpEnabled,
+                    recoveryCodesRemaining,
+                }
+            }
+        }, 200);
+    })
+    .openapi(updateProfileRoute, async (c) => {
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized();
+
+        const body = c.req.valid('json');
+        const updates: Record<string, string | null> = {};
+        if (body.name !== undefined) updates.name = body.name || null;
+        if (body.phone !== undefined) updates.phone = body.phone || null;
+        if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber || null;
+
+        if (Object.keys(updates).length > 0) {
+            const db = drizzle(c.env.DB);
+            await db.update(users).set(updates).where(eq(users.id, user.sub)).run();
+        }
+
+        return c.json({ success: true, data: { updated: true } }, 200);
+    })
+    .openapi(logoutRoute, async (c) => {
+        // If the request carries a valid token, revoke all of this user's tokens server-side.
+        // The JS client can't clear an HttpOnly cookie — we must do it via Set-Cookie.
+        const user = c.get('user');
+        if (user?.sub) {
+            await c.var.services.auth.invalidateUserSessions(user.sub);
+        }
+
+        deleteCookie(c, '__Host-inspector_token', {
+            path: '/',
+            secure: true,
+            sameSite: 'Strict',
+        });
+
+        // iter-2 production bug #4 — clear the CSRF cookie alongside the auth
+        // cookie. Without this, `__Host-csrf_token` outlives the session and
+        // becomes a fixation vector: a subsequent login on the same browser
+        // inherits the same CSRF token, which an attacker who exfiltrated it
+        // pre-logout can replay against the new session. Same `__Host-` prefix
+        // rules apply (Secure + Path=/).
+        deleteCookie(c, '__Host-csrf_token', {
+            path: '/',
+            secure: true,
+            sameSite: 'Strict',
+        });
+
+        return c.json({ success: true }, 200);
+    })
+    .openapi(totpSetupRoute, async (c) => {
+        const me = await loadCurrentUser(c);
+        const totpSvc = c.var.services.totp;
+
+        const secret = totpSvc.generateSecret();
+        const recoveryCodes = totpSvc.generateRecoveryCodes(8);
+        const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
+        const otpAuthUrl = totpSvc.buildOtpAuthUrl({ accountName: me.email, issuer: TOTP_ISSUER, secret });
+        const qrCodeDataUri = await totpSvc.qrCodeDataUri(otpAuthUrl);
+
+        // Persist the secret + recovery hashes immediately, but keep totpEnabled=false until
+        // the user proves they can produce a valid code via /2fa/verify. This way an abandoned
+        // setup never locks anyone out.
+        const db = drizzle(c.env.DB);
+        await db.update(users).set({
+            totpSecret: secret,
+            totpRecoveryCodes: JSON.stringify(recoveryHashes),
+            totpEnabled: false,
+            totpVerifiedAt: null,
+        }).where(eq(users.id, me.id));
+
+        return c.json({
+            success: true,
+            data: { secret, qrCodeDataUri, recoveryCodes }
+        }, 200);
+    })
+    .openapi(totpVerifyRoute, async (c) => {
+        const me = await loadCurrentUser(c);
+        if (!me.totpSecret) throw Errors.BadRequest('No pending 2FA setup. Call /2fa/setup first.');
+
+        const { code } = c.req.valid('json');
+        const ok = c.var.services.totp.verifyCode(me.totpSecret, code);
+        if (!ok) throw Errors.BadRequest('Invalid verification code');
+
+        const db = drizzle(c.env.DB);
+        await db.update(users).set({
+            totpEnabled: true,
+            totpVerifiedAt: new Date(),
+        }).where(eq(users.id, me.id));
+
+        return c.json({ success: true }, 200);
+    })
+    .openapi(totpDisableRoute, async (c) => {
+        const me = await loadCurrentUser(c);
+        const { password, code } = c.req.valid('json');
+
+        const [pwOk] = await verifyPassword(password, me.passwordHash);
+        if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
+
+        if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
+
+        const totpSvc = c.var.services.totp;
+        let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+        let updatedHashes: string[] | null = null;
+        if (!codeOk && me.totpRecoveryCodes) {
+            const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+            const result = await totpSvc.consumeRecoveryCode(code, hashes);
+            codeOk = result.matched;
+            if (result.matched) updatedHashes = result.remainingHashes;
+        }
+        if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+        const db = drizzle(c.env.DB);
+        await db.update(users).set({
+            totpSecret: null,
+            totpEnabled: false,
+            totpRecoveryCodes: null,
+            totpVerifiedAt: null,
+        }).where(eq(users.id, me.id));
+
+        // updatedHashes intentionally discarded — we are wiping all 2FA state anyway.
+        void updatedHashes;
+        return c.json({ success: true }, 200);
+    })
+    .openapi(totpRegenRoute, async (c) => {
+        const me = await loadCurrentUser(c);
+        const { password, code } = c.req.valid('json');
+
+        const [pwOk] = await verifyPassword(password, me.passwordHash);
+        if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
+
+        if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
+
+        const totpSvc = c.var.services.totp;
+        let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+        if (!codeOk && me.totpRecoveryCodes) {
+            const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+            const result = await totpSvc.consumeRecoveryCode(code, hashes);
+            codeOk = result.matched;
+            // We are about to overwrite recovery codes wholesale, so consuming the matched code
+            // here doesn't need to be persisted separately.
+        }
+        if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+        const recoveryCodes = totpSvc.generateRecoveryCodes(8);
+        const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
+
+        const db = drizzle(c.env.DB);
+        await db.update(users).set({
+            totpRecoveryCodes: JSON.stringify(recoveryHashes),
+        }).where(eq(users.id, me.id));
+
+        // QR code is irrelevant on regenerate; surface an empty string to keep the schema stable.
+        return c.json({
+            success: true,
+            data: { secret: me.totpSecret, qrCodeDataUri: '', recoveryCodes }
+        }, 200);
+    })
+    .openapi(login2faRoute, async (c) => {
+        await checkRateLimit(c, 'login');
+
+        const { challengeToken, code } = c.req.valid('json');
+        const keyring = await c.var.keyringPromise!;
+
+        let payload: Record<string, unknown>;
+        try {
+            payload = await verifyJwt(challengeToken, keyring);
+        } catch {
+            throw Errors.Unauthorized('Invalid or expired challenge');
+        }
+        if (payload['t'] !== 'challenge' || typeof payload['sub'] !== 'string') {
+            throw Errors.Unauthorized('Invalid challenge token');
+        }
+        const userId = payload['sub'] as string;
+
+        const db = drizzle(c.env.DB);
+        const me = await db.select().from(users).where(eq(users.id, userId)).get();
+        if (!me || !me.totpEnabled || !me.totpSecret) {
+            throw Errors.Unauthorized('Invalid challenge token');
+        }
+
+        const totpSvc = c.var.services.totp;
+        let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+        if (!codeOk && me.totpRecoveryCodes) {
+            const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+            const result = await totpSvc.consumeRecoveryCode(code, hashes);
+            if (result.matched) {
+                codeOk = true;
+                // Single-use semantics: persist remaining hashes immediately, before we issue
+                // the session cookie. If the DB write fails we don't want to grant a session.
+                await db.update(users).set({
+                    totpRecoveryCodes: JSON.stringify(result.remainingHashes),
+                }).where(eq(users.id, me.id));
+            }
+        }
+        if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+        const now = Math.floor(Date.now() / 1000);
+        const sessionToken = await signJwt({
+            sub: me.id,
+            'custom:tenantId': me.tenantId,
+            'custom:userRole': me.role,
+            role: me.role,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+        }, keyring);
+
+        setCookie(c, '__Host-inspector_token', sessionToken, authCookieOptions());
+        return c.json({ success: true, data: { redirect: '/dashboard' } }, 200);
+    });
+
+export type CoreAuthApi = typeof coreAuthRoutes;
 
 export default coreAuthRoutes;

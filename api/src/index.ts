@@ -39,9 +39,10 @@ import integrationsApiRoutes from './api/integrations';
 import analyticsRoutes from './api/analytics';
 import guestRoutes from './api/guest';
 import billingRoutes from './api/billing';
-import integrationRoutes from './api/integration';
+import integrationRoutes from './portal/integration.routes';
 import inspectionsRoutes from './api/inspections';
 import tenantPresenceRoutes from './api/tenant-presence';
+import inspectionPrefsRoutes from './api/inspection-prefs';
 import aiRoutes from './api/ai';
 import bookingsRoutes from './api/bookings';
 import adminRoutes from './api/admin';
@@ -81,10 +82,37 @@ import conciergeRoutes from './api/concierge';
 import sessionContextRoutes from './api/session-context';
 import qboRoutes from './api/qbo';
 import qboWebhookRoutes from './api/qbo-webhook';
+import agreementsRenderRoutes from './api/agreements-render';
+import evidenceRoutes from './api/evidence';
+import wellKnownRoutes from './api/well-known';
 
-const app = new OpenAPIHono<HonoConfig>();
+const app = new OpenAPIHono<HonoConfig>({
+    // Intercept Zod validation failures so the response body carries a readable
+    // `error.message` + per-field map, instead of the default ZodError dump that
+    // leaks `[ { expected, code, path, message } ]` to the UI.
+    defaultHook: (result, c) => {
+        if (result.success) return;
+        const issues = result.error.issues;
+        const fields: Record<string, string> = {};
+        for (const i of issues) {
+            const key = i.path.length ? i.path.join('.') : '_';
+            if (!fields[key]) fields[key] = i.message;
+        }
+        const summary = issues
+            .map((i) => (i.path.length ? `${i.path.join('.')}: ${i.message}` : i.message))
+            .join('; ');
+        return c.json({
+            success: false,
+            error: {
+                code: 'VALIDATION_ERROR',
+                message: summary || 'Validation failed',
+                fields,
+            },
+        }, 400);
+    },
+});
 
-// CORS — allows Remix frontend (separate origin in dev) to call API endpoints.
+// CORS — allows React Router v7 frontend (separate origin in dev) to call API endpoints.
 // In production both share the same origin; this is primarily for local dev
 // where Vite runs on :5173 and the API Worker runs on :8787.
 app.use('/api/*', cors({
@@ -201,8 +229,13 @@ app.use('*', async (c, next) => {
     const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup';
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
-    const isConciergePublic = path.startsWith('/confirm/') || path === '/api/concierge/confirm';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook';
+    const isConciergePublic =
+        path.startsWith('/confirm/') ||
+        path === '/api/concierge/confirm' ||
+        path === '/api/concierge/book-info' ||
+        path === '/api/concierge/book' ||
+        path === '/api/concierge/confirm-info';
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook';
 
     // Design System 0520 subsystem D P5 — observer surfaces are gated by
     // the dedicated observer-cookie middleware, not JWT.
@@ -393,6 +426,7 @@ app.use('/api/*', requireActiveSubscription);
 //
 // Middleware `.use()` and inline `.get()` handlers are kept as separate `app.*`
 // statements (above and below) since they don't affect the route type signature.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- referenced via `typeof routes` on line 800 (CoreApiType export)
 const routes = app
   // Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
   .route('/api/auth', coreAuthRoutes)
@@ -409,6 +443,10 @@ const routes = app
   // (one WS per dashboard tab). Per-inspection presence is mounted inline on
   // inspectionsRoutes above as /api/inspections/:id/presence/ws.
   .route('/api/tenant', tenantPresenceRoutes)
+  // Workflow shortcuts PR — tenant-scoped editor preferences (clone defaults,
+  // auto-advance delay, pinned tag ids). GET returns merged defaults; PATCH
+  // validates and persists.
+  .route('/api/tenant/inspection-prefs', inspectionPrefsRoutes)
   .route('/api/inspections', inspectionSyncRoutes)
   // Sprint 3 S3-3 — tag link/unlink endpoints share the /api/inspections root
   // so the URL carries inspection id + item id directly. Mounted before the
@@ -433,6 +471,8 @@ const routes = app
   // UC-C-7 — public share-token mint (customer Forward report flow).
   .route('/api/public', publicShareRoutes)
   .route('/api/admin', adminRoutes)
+  // Evidence download — GET /api/admin/agreement-requests/:id/pdf + certificate.pdf
+  .route('/api/admin', evidenceRoutes)
   // Secret UI化 — GET/PUT/POST /api/admin/secrets for all 14 integration keys
   .route('/api/admin', secretsRoutes)
   .route('/api/agent', agentRoutes)
@@ -442,7 +482,7 @@ const routes = app
   .route('/api/agent-signup', agentSignupRoutes)
   // Agent Accounts A3 — concierge magic-link confirmation (public, no JWT)
   .route('/api/concierge', conciergeRoutes)
-  // Remix frontend session context (branding + user + deployment info)
+  // React Router v7 frontend session context (branding + user + deployment info)
   .route('/api/session', sessionContextRoutes)
   .route('/api/places', placesRoutes)
   .route('/api/availability', availabilityRoutes)
@@ -470,6 +510,10 @@ const routes = app
   .route('/api/notifications', notificationsRoutes)
   .route('/settings/integrations/qbo', qboRoutes)
   .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
+  // Spec 5H — signed agreement render for Browser-Run PDF export (token-in-URL, no JWT).
+  .route('/m2m', agreementsRenderRoutes)
+  // Spec 5H — public key discovery for independent verification of tenant signing keys.
+  .route('/.well-known', wellKnownRoutes)
   // Profile-gated setup wizard — 404s in saas modes (see features/setup-wizard).
   .route('/setup', setupWizardRoutes())
 ;
@@ -543,7 +587,7 @@ app.get('/ui', (c) => {
     `);
 });
 
-// ---------- SSR page handlers removed — Remix frontend serves all HTML pages ----------
+// ---------- SSR page handlers removed — React Router v7 frontend serves all HTML pages ----------
 
 
 
@@ -686,6 +730,17 @@ app.get('/api/public/verify/:envelopeId/document', async (c) => {
     return c.redirect(agreementSignPath(data.tenantSubdomain, data.reqRow.token), 302);
 });
 
+app.get('/api/public/verify-by-token/:token', async (c) => {
+    const token = c.req.param('token') as string;
+    const db = drizzle(c.env.DB, { schema });
+    const row = await db.select({ id: schema.agreementRequests.id })
+        .from(schema.agreementRequests)
+        .where(eq(schema.agreementRequests.verificationToken, token))
+        .get();
+    if (!row) return c.json({ success: false, error: { message: 'Not found', code: 'NOT_FOUND' } }, 404);
+    return c.json({ success: true, data: { envelopeId: row.id } });
+});
+
 app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
     const envelopeId = c.req.param('envelopeId') as string;
     const data = await loadVerifyData(c, envelopeId);
@@ -711,7 +766,7 @@ app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
 app.get('/', (c) => c.redirect('/dashboard'));
 
 // Global catch-all 404. API requests get JSON; everything else gets plain text
-// (the Remix frontend handles HTML 404 rendering).
+// (the React Router v7 frontend handles HTML 404 rendering).
 app.notFound((c) => {
     const url = new URL(c.req.url);
     if (url.pathname.startsWith('/api/')) {
@@ -743,7 +798,7 @@ export { TenantPresenceDO     } from './durable-objects/tenant-presence';
 // inspects the doc without needing a live request.
 export { app };
 
-// Remix migration — typed RPC client for the frontend Remix app.
+// React Router v7 migration — typed RPC client for the frontend React Router v7 app.
 // `routes` carries the accumulated path schemas from all chained `.route()`
 // calls. Currently the sub-routers use void `.openapi()` calls (not chained),
 // so request/response types are blank. Once sub-routers also chain their

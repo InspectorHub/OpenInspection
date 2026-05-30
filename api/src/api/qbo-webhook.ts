@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { HonoConfig } from '../types/hono';
+import { HonoConfig } from '../types/hono';
 import { logger } from '../lib/logger';
 
 const api = new Hono<HonoConfig>();

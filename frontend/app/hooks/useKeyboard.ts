@@ -35,7 +35,8 @@ export interface KeyboardHandlers {
   onPhoto: () => void;
   onSave: () => void;
   onPublish: () => void;
-  onRepeatRating: () => void;
+  /** Workflow shortcuts PR — R key clones the previous item via tenant scope default. */
+  onCloneLast: () => void;
   onSaveAsSnippet: () => void;
   onToggleCheatsheet: () => void;
 
@@ -280,10 +281,10 @@ export function useKeyboard(
         return;
       }
 
-      // R = repeat previous rating
+      // R = clone last (uses tenant default scope, set by inspection-edit).
       if (e.key === "r" || e.key === "R") {
         e.preventDefault();
-        h.onRepeatRating();
+        h.onCloneLast();
         return;
       }
 

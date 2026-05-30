@@ -28,7 +28,7 @@ for (const [src, dest] of jsFiles) {
   console.log(`  vendor/${dest}`);
 }
 
-// Dexie removed — offline IndexedDB code migrated to Remix frontend.
+// Dexie removed — offline IndexedDB code migrated to React Router v7 frontend.
 
 // ── node-diff3 (server-side three-way merge) ───────────────────────────────────
 // Vendored to public/ for the SW only — server uses the npm package directly.

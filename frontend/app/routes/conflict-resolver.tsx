@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/conflict-resolver";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Resolve Conflicts - OpenInspection" }];
@@ -14,6 +14,8 @@ export function meta() {
 
 interface Conflict {
   id: string;
+  itemId: string;
+  sectionId: string | null;
   field: string;
   section: string;
   item: string;
@@ -22,12 +24,18 @@ interface Conflict {
   theirs: string | null;
 }
 
+/** Renders a persisted conflict value (stored as JSON) for display. */
+function toDisplay(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
   const url = new URL(request.url);
   const inspectionId = url.searchParams.get("inspection") || "";
 
@@ -36,19 +44,24 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   try {
-    const res = await apiFetch(
-      `/api/inspections/${inspectionId}/conflicts`,
-      { token },
-    );
+    const api = createApi(context, { token });
+    const res = await api.inspections[":id"].conflicts.$get({ param: { id: inspectionId } });
     if (!res.ok) {
       return { conflicts: [] as Conflict[], inspectionId, error: "No conflicts found" };
     }
     const body = await res.json();
-    return {
-      conflicts: ((body as Record<string, unknown>).data ?? []) as Conflict[],
-      inspectionId,
-      error: null,
-    };
+    const conflicts: Conflict[] = body.data.conflicts.map((c) => ({
+      id: c.id,
+      itemId: c.itemId,
+      sectionId: c.sectionId,
+      field: c.field,
+      section: c.sectionId ?? "—",
+      item: c.itemId,
+      base: toDisplay(c.base),
+      yours: toDisplay(c.local),
+      theirs: toDisplay(c.remote),
+    }));
+    return { conflicts, inspectionId, error: null };
   } catch {
     return { conflicts: [] as Conflict[], inspectionId, error: "Service unavailable" };
   }
@@ -58,27 +71,40 @@ export async function loader({ request }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+type Resolution = {
+  itemId: string;
+  sectionId: string | null;
+  field: string;
+  chosen: "local" | "remote" | "base";
+};
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const formData = await request.formData();
   const inspectionId = String(formData.get("inspectionId") || "");
-  const resolutions: Record<string, string> = {};
 
+  // Each resolved conflict submits a JSON-encoded `resolve:<id>` hidden field
+  // carrying { itemId, sectionId, field, chosen } — the exact shape the typed
+  // POST /conflicts/resolve route accepts.
+  const resolutions: Resolution[] = [];
   for (const [key, value] of formData.entries()) {
-    if (key.startsWith("resolve:")) {
-      resolutions[key.replace("resolve:", "")] = String(value);
+    if (!key.startsWith("resolve:")) continue;
+    try {
+      const r = JSON.parse(String(value)) as Resolution;
+      if (r.itemId && r.field && r.chosen) resolutions.push(r);
+    } catch {
+      // skip malformed entries
     }
   }
 
+  if (resolutions.length === 0) return { error: "No resolutions selected" };
+
   try {
-    const res = await apiFetch(
-      `/api/inspections/${inspectionId}/conflicts/resolve`,
-      {
-        method: "POST",
-        token,
-        body: JSON.stringify({ resolutions }),
-      },
-    );
+    const api = createApi(context, { token });
+    const res = await api.inspections[":id"].conflicts.resolve.$post({
+      param: { id: inspectionId },
+      json: { resolutions },
+    });
     if (!res.ok) return { error: "Failed to resolve conflicts" };
     return { success: true };
   } catch {
@@ -125,8 +151,6 @@ export default function ConflictResolverPage() {
         <div className="space-y-4">
           {conflicts.map((c) => {
             const choice = resolved[c.id];
-            const resolvedValue =
-              choice === "yours" ? c.yours : choice === "theirs" ? c.theirs : c.base;
 
             return (
               <div
@@ -200,12 +224,24 @@ export default function ConflictResolverPage() {
                   </button>
                 </div>
 
-                {/* Hidden input for form submission */}
+                {/* Hidden input for form submission — carries the typed
+                    resolution shape the POST route accepts (yours→local,
+                    theirs→remote). */}
                 {choice && (
                   <input
                     type="hidden"
                     name={`resolve:${c.id}`}
-                    value={resolvedValue ?? ""}
+                    value={JSON.stringify({
+                      itemId: c.itemId,
+                      sectionId: c.sectionId,
+                      field: c.field,
+                      chosen:
+                        choice === "yours"
+                          ? "local"
+                          : choice === "theirs"
+                            ? "remote"
+                            : "base",
+                    })}
                   />
                 )}
               </div>

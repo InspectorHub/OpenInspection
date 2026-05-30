@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Form, Link, useLoaderData, useActionData } from "react-router";
 import type { Route } from "./+types/settings-account";
 import { requireToken } from "~/lib/session.server";
-import { apiFetch } from "~/lib/api.server";
+import { createApi } from "~/lib/api-client.server";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -18,9 +18,10 @@ interface AccountInfo {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ request }: Route.LoaderArgs) {
-  const token = await requireToken(request);
-  const res = await apiFetch("/api/auth/me", { token });
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const res = await api.auth.me.$get();
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   return { account: (body.data ?? {}) as AccountInfo };
 }
@@ -29,32 +30,33 @@ export async function loader({ request }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function action({ request }: Route.ActionArgs) {
-  const token = await requireToken(request);
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
   const fd = await request.formData();
   const intent = fd.get("intent");
 
+  const api = createApi(context, { token });
+
   if (intent === "export-data") {
-    const res = await apiFetch("/api/account/export", { token, method: "POST" });
+    const res = await api.identity.account.export.$post();
     if (!res.ok) {
       return { success: false, error: "Data export failed. Please try again." };
     }
-    return { success: true, error: null, message: "Data export initiated. You will receive a download link via email." };
+    return { success: true, error: null, message: "Data export complete. Your account data is available below." };
   }
 
   if (intent === "delete-account") {
-    const password = fd.get("password");
-    if (!password) {
-      return { success: false, error: "Password is required to delete your account." };
+    const confirmEmail = String(fd.get("confirmEmail") ?? "").trim();
+    if (!confirmEmail) {
+      return { success: false, error: "Retype your account email to confirm deletion." };
     }
-    const res = await apiFetch("/api/account/delete", {
-      token,
-      method: "POST",
-      body: JSON.stringify({ password }),
-    });
+    const res = await api.identity.account.delete.$post({ json: { confirmEmail } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return { success: false, error: (err as Record<string, string>)?.message || "Account deletion failed." };
+      const msg = (err as { error?: { message?: string } })?.error?.message
+        ?? (err as Record<string, string>)?.message
+        ?? "Account deletion failed.";
+      return { success: false, error: msg };
     }
     return { success: true, error: null, message: "Account deleted." };
   }
@@ -147,12 +149,13 @@ export default function SettingsAccountPage() {
           <Form method="post" className="space-y-3 max-w-sm">
             <input type="hidden" name="intent" value="delete-account" />
             <div className="space-y-2">
-              <label htmlFor="deletePassword" className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
-                Enter your password to confirm
+              <label htmlFor="confirmEmail" className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
+                Retype your email to confirm
               </label>
               <input
-                type="password" id="deletePassword" name="password" required
-                autoComplete="current-password"
+                type="email" id="confirmEmail" name="confirmEmail" required
+                autoComplete="off"
+                placeholder={account.email ?? "your@email.com"}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-bad focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1"
               />
             </div>

@@ -17,6 +17,10 @@ import { computePreflightFromData } from '../lib/preflight';
 import { decideFieldWrite, applyFieldWrite } from '../lib/field-version';
 import { ApprenticeService } from './apprentice.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
+import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
+import { renderTemplate, listUnresolved } from '../lib/mustache';
+import type { DefectCommentState } from '../types/inspection-item-state';
+import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 
 /** Slug → label map for resolving aggregated recommendation badges in
  *  getReportData. Built once at module load. */
@@ -38,7 +42,7 @@ const RECOMMENDATION_CATEGORY_LABELS = new Map<string, string>(
  * does not reject the whole patch. Mirrors the canned-comment + photo merge
  * strategy used elsewhere in updateResults().
  */
-function sanitizeDefectStates(data: Record<string, unknown>): void {
+export function sanitizeDefectStates(data: Record<string, unknown>): void {
     const validSlugs = new Set<string>(RECOMMENDATION_CATEGORY_IDS);
     for (const key of Object.keys(data)) {
         const entry = data[key] as { tabs?: { defects?: unknown } } | null | undefined;
@@ -62,6 +66,16 @@ function sanitizeDefectStates(data: Record<string, unknown>): void {
                         d[side] = null;
                     }
                 }
+            }
+            // trade / deadline / timeframe — enum or null (drop unknown values)
+            if ('trade' in d) {
+                d.trade = isDefectTrade(d.trade) ? d.trade : null;
+            }
+            if ('deadline' in d) {
+                d.deadline = isDefectDeadline(d.deadline) ? d.deadline : null;
+            }
+            if ('timeframe' in d) {
+                d.timeframe = isDefectTimeframe(d.timeframe) ? d.timeframe : null;
             }
         }
     }
@@ -114,6 +128,120 @@ function mapRatingSystemLevels(levels: Array<Record<string, unknown>>): RatingLe
                 ...(typeof lvl.description === 'string' ? { description: lvl.description } : {}),
             };
         });
+}
+
+/**
+ * Resolve a defect-state row into the variables consumed by the Mustache
+ * renderer when substituting tokens like `{{location}}` / `{{trade}}` in
+ * canned-comment prose. Falls back to the template's default `location`
+ * when the inspector hasn't filled an inspection-specific override.
+ */
+function stringifyAttributeValue(v: unknown): string | null {
+    if (v === null || v === undefined) return null;
+    if (typeof v === 'string') return v.length > 0 ? v : null;
+    if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+    if (typeof v === 'boolean') return v ? 'yes' : 'no';
+    return null;
+}
+
+function resolveDefectMustacheVars(
+    st: DefectCommentState | undefined,
+    d: CannedDefect,
+    itemAttributes?: Record<string, unknown>,
+): Record<string, string | null> {
+    const location = (typeof st?.location === 'string' && st.location.length > 0)
+        ? st.location
+        : (d.location || null);
+    const vars: Record<string, string | null> = {
+        location,
+        trade:     st?.trade     ? DEFECT_TRADE_LABELS[st.trade]         : null,
+        deadline:  st?.deadline  ? DEFECT_DEADLINE_LABELS[st.deadline]   : null,
+        timeframe: st?.timeframe ? DEFECT_TIMEFRAME_LABELS[st.timeframe] : null,
+    };
+    if (itemAttributes) {
+        for (const [k, v] of Object.entries(itemAttributes)) {
+            if (k in vars) continue; // defect-level vars take precedence
+            vars[k] = stringifyAttributeValue(v);
+        }
+    }
+    return vars;
+}
+
+export interface PublishBlockingDefect {
+    sectionId:        string;
+    sectionTitle:     string;
+    itemId:           string;
+    itemLabel:        string;
+    cannedId:         string;
+    cannedTitle:      string;
+    missing:          Array<'location' | 'trade'>;
+    unresolvedTokens: string[];
+}
+
+export interface PublishReadiness {
+    ready: boolean;
+    blockingDefects: PublishBlockingDefect[];
+}
+
+/**
+ * Task 12 — pure function: walks the template schema + inspection results
+ * and returns the set of included defects that are missing required fields
+ * (location and/or trade). Unresolved Mustache tokens in the rendered comment
+ * are also reported.
+ *
+ * Required: location + trade.
+ * Advisory (not blocking): deadline, timeframe.
+ */
+export function computePublishReadinessFromState(
+    schema: TemplateSchemaV2,
+    results: Record<string, unknown>,
+): PublishReadiness {
+    const blocking: PublishBlockingDefect[] = [];
+    for (const section of schema.sections ?? []) {
+        for (const item of section.items ?? []) {
+            if (item.type !== 'rich') continue;
+            const defectsTpl = item.tabs?.defects ?? [];
+            const entry = results[item.id] as { tabs?: { defects?: DefectCommentState[] }; attributes?: Record<string, unknown> } | undefined;
+            const stateRows = entry?.tabs?.defects ?? [];
+            const stateById = new Map(stateRows.map(d => [d.cannedId, d]));
+            const itemAttrVars: Record<string, string | null> = {};
+            if (entry?.attributes) {
+                for (const [k, v] of Object.entries(entry.attributes)) {
+                    itemAttrVars[k] = stringifyAttributeValue(v);
+                }
+            }
+            for (const d of defectsTpl) {
+                const st = stateById.get(d.id);
+                const included = st ? !!st.included : !!d.default;
+                if (!included) continue;
+                const missing: Array<'location' | 'trade'> = [];
+                const hasLocation = (typeof st?.location === 'string' && st.location.length > 0)
+                    || (typeof d.location === 'string' && d.location.length > 0);
+                if (!hasLocation) missing.push('location');
+                if (!st?.trade) missing.push('trade');
+                const effectiveComment = (st?.comment && st.comment.length > 0) ? st.comment : d.comment;
+                const unresolved = listUnresolved(effectiveComment, {
+                    location:  hasLocation ? 'x' : null,
+                    trade:     st?.trade     ?? null,
+                    deadline:  st?.deadline  ?? null,
+                    timeframe: st?.timeframe ?? null,
+                    ...itemAttrVars,
+                });
+                if (missing.length === 0 && unresolved.length === 0) continue;
+                blocking.push({
+                    sectionId:        section.id,
+                    sectionTitle:     section.title,
+                    itemId:           item.id,
+                    itemLabel:        item.label,
+                    cannedId:         d.id,
+                    cannedTitle:      d.title,
+                    missing,
+                    unresolvedTokens: unresolved,
+                });
+            }
+        }
+    }
+    return { ready: blocking.length === 0, blockingDefects: blocking };
 }
 
 type Inspection = z.infer<typeof InspectionSchema>;
@@ -1178,7 +1306,7 @@ export class InspectionService {
         inspectionId: string,
         tenantId: string,
         itemId: string,
-        field: 'rating' | 'notes' | 'value',
+        field: 'rating' | 'notes' | 'value' | 'cannedToggle' | 'defectFields' | 'itemAttribute',
         value: unknown,
         expectedVersion: number,
         userId: string,
@@ -1216,7 +1344,7 @@ export class InspectionService {
                 if (u?.role === 'apprentice') {
                     const apprenticeSvc = new ApprenticeService(this.db);
                     const queued = await apprenticeSvc.submitForReview(
-                        tenantId, userId, inspectionId, itemId, field, value,
+                        tenantId, userId, inspectionId, itemId, field as 'rating' | 'notes' | 'value', value,
                     );
                     return queued;
                 }
@@ -1243,12 +1371,46 @@ export class InspectionService {
 
         const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
         const cur = data[key] ?? data[itemId]; // fallback for legacy
-        const decision = decideFieldWrite(cur, field, value, expectedVersion, { force: opts?.force ?? false });
+
+        // Compound writes: defectFields / itemAttribute mutate nested shapes
+        // inside the item entry instead of overwriting a single scalar field.
+        // We translate them into a normalized entry update on the umbrella
+        // sub-key (`tabs` or `attributes`), then let applyFieldWrite handle
+        // the version bump on that sub-key so the optimistic-concurrency
+        // counter is preserved.
+        let mutableField: string = field;
+        let mutableValue: unknown = value;
+        if (field === 'defectFields' && value && typeof value === 'object' && 'cannedId' in (value as Record<string, unknown>)) {
+            const v = value as { cannedId: string; location?: string | null; trade?: string | null; deadline?: string | null; timeframe?: string | null };
+            const base = (cur ?? {}) as Record<string, unknown>;
+            const tabs = (base.tabs ?? {}) as Record<string, unknown>;
+            const defects = Array.isArray(tabs.defects) ? (tabs.defects as Array<Record<string, unknown>>) : [];
+            const idx = defects.findIndex(d => d?.cannedId === v.cannedId);
+            const next: Record<string, unknown> = idx >= 0 ? { ...defects[idx] } : { cannedId: v.cannedId, included: true };
+            if ('location'  in v) next.location  = v.location;
+            if ('trade'     in v) next.trade     = v.trade;
+            if ('deadline'  in v) next.deadline  = v.deadline;
+            if ('timeframe' in v) next.timeframe = v.timeframe;
+            const nextDefects = idx >= 0 ? defects.map((d, i) => i === idx ? next : d) : [...defects, next];
+            mutableValue = { ...tabs, defects: nextDefects };
+            mutableField = 'tabs';
+        }
+        if (field === 'itemAttribute' && value && typeof value === 'object' && 'attributeId' in (value as Record<string, unknown>)) {
+            const v = value as { attributeId: string; value: unknown };
+            const base = (cur ?? {}) as Record<string, unknown>;
+            const attrs = (base.attributes ?? {}) as Record<string, unknown>;
+            const nextAttrs = { ...attrs, [v.attributeId]: v.value };
+            mutableField = 'attributes' as typeof field;
+            mutableValue = nextAttrs;
+        }
+
+        const decision = decideFieldWrite(cur, mutableField, mutableValue, expectedVersion, { force: opts?.force ?? false });
         if (decision.kind === 'conflict') return decision;
 
         const now = Math.floor(Date.now() / 1000);
-        const { entry, newVersion } = applyFieldWrite(cur, field, value, userId, now);
+        const { entry, newVersion } = applyFieldWrite(cur, mutableField, mutableValue, userId, now);
         data[key] = entry;
+        sanitizeDefectStates(data);
         if (key !== itemId) delete data[itemId]; // migrate on write
 
         if (existing) {
@@ -1401,7 +1563,7 @@ export class InspectionService {
         interface PhotoEntry        { key: string; annotatedKey?: string; annotationsJson?: string }
         // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
         // estimate range (cents). All optional so legacy defects render.
-        interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null }
+        interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null; trade?: string | null; deadline?: string | null; timeframe?: string | null }
         interface CannedState       { cannedId: string; included: boolean; comment?: string | null }
         interface ResultEntry {
             rating?:         string;
@@ -1410,6 +1572,7 @@ export class InspectionService {
             recommendation?: string;
             estimateMin?:    number;
             estimateMax?:    number;
+            attributes?:     Record<string, unknown>;
             tabs?: {
                 information?: CannedState[];
                 limitations?: CannedState[];
@@ -1549,7 +1712,7 @@ export class InspectionService {
                     return {
                         ...d,
                         included,
-                        effectiveComment: override ?? d.comment,
+                        effectiveComment: renderTemplate(override ?? d.comment, resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes)),
                         effectiveCategory: st?.category ?? d.category,
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
                         defectPhotos: (st?.photos ?? []).map(p => {
@@ -2103,6 +2266,42 @@ export class InspectionService {
         // below — all four paths now block on trigger).
         await fireAutomation(this.db, tenantId, inspectionId, 'report.published');
 
+        // Spec 5H D2 — auto-sign on publish: if the inspection has the flag
+        // enabled AND the assigned inspector has a saved signature, inject
+        // _inspector_signature into inspection_results.data so the published
+        // report renders with the signature without requiring a manual step.
+        const inspForSign = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (inspForSign?.autoSignOnPublish && inspForSign.inspectorId) {
+            const inspector = await db.select().from(users)
+                .where(eq(users.id, inspForSign.inspectorId)).get();
+            if (inspector?.defaultSignatureBase64) {
+                const resultsRow = await db.select().from(inspectionResults)
+                    .where(eq(inspectionResults.inspectionId, inspectionId)).get();
+                const data: Record<string, unknown> = (resultsRow?.data as Record<string, unknown>) ?? {};
+                data._inspector_signature = {
+                    signatureBase64: inspector.defaultSignatureBase64,
+                    signedAt:        Date.now(),
+                    userId:          inspector.id,
+                    auto:            true,
+                };
+                if (resultsRow) {
+                    await db.update(inspectionResults)
+                        .set({ data: data as object, lastSyncedAt: new Date() })
+                        .where(eq(inspectionResults.id, resultsRow.id));
+                } else {
+                    await db.insert(inspectionResults).values({
+                        id:           crypto.randomUUID(),
+                        tenantId,
+                        inspectionId,
+                        data:         data as object,
+                        lastSyncedAt: new Date(),
+                    });
+                }
+            }
+        }
+
         const tenantRow = await db.select({ subdomain: tenants.subdomain })
             .from(tenants).where(eq(tenants.id, tenantId)).get();
         const tenantSlug = tenantRow?.subdomain ?? '';
@@ -2543,6 +2742,63 @@ export class InspectionService {
         if (!val) return null;
         const [inspectionId, tenantId] = val.split(':');
         return { inspectionId, tenantId };
+    }
+
+    /**
+     * Task 12 — check whether an inspection has all required defect fields
+     * filled in for every included defect (location + trade). Returns the
+     * PublishReadiness payload so the pre-publish gate can surface blocking
+     * defects to the inspector.
+     *
+     * Schema resolution mirrors getReportData: inspection templateSnapshot
+     * takes precedence over the live template.schema.
+     */
+    async computePublishReadiness(inspectionId: string, tenantId: string): Promise<PublishReadiness> {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        const template = inspection.templateId
+            ? await db.select().from(templates)
+                .where(and(eq(templates.id, inspection.templateId as string), eq(templates.tenantId, tenantId)))
+                .get()
+            : null;
+
+        const resultsRow = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+
+        // Prefer per-inspection snapshot over live template schema (mirrors getReportData).
+        const inspectionSnapshotRaw = (inspection as unknown as { templateSnapshot?: unknown }).templateSnapshot;
+        const inspectionSnapshot = inspectionSnapshotRaw
+            ? (typeof inspectionSnapshotRaw === 'string' ? JSON.parse(inspectionSnapshotRaw as string) : inspectionSnapshotRaw)
+            : null;
+        const hasInspectionSnapshot = inspectionSnapshot
+            && typeof inspectionSnapshot === 'object'
+            && Array.isArray((inspectionSnapshot as { sections?: unknown }).sections)
+            && (inspectionSnapshot as { sections: unknown[] }).sections.length > 0;
+
+        const rawSchema = hasInspectionSnapshot
+            ? inspectionSnapshot
+            : template?.schema
+                ? (typeof template.schema === 'string' ? JSON.parse(template.schema) : template.schema)
+                : { sections: [] };
+
+        interface RawSchemaData { sections?: unknown[] }
+        const schemaData: TemplateSchemaV2 = Array.isArray(rawSchema)
+            ? ({ schemaVersion: 2, sections: [{ id: 'general', title: 'General', items: rawSchema }] } as unknown as TemplateSchemaV2)
+            : (rawSchema as RawSchemaData).sections
+                ? rawSchema as TemplateSchemaV2
+                : ({ schemaVersion: 2, sections: [] } as unknown as TemplateSchemaV2);
+
+        const resultData: Record<string, unknown> = resultsRow?.data
+            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, unknown>
+            : {};
+
+        return computePublishReadinessFromState(schemaData, resultData);
     }
 }
 

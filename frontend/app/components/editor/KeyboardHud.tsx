@@ -59,7 +59,7 @@ export function KeyboardHud() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div className="absolute inset-0 bg-slate-900/85 backdrop-blur-sm" onClick={() => setOpen(false)} />
       <div className="relative bg-white rounded-lg shadow-md border border-slate-200 max-w-4xl w-full max-h-[85vh] overflow-y-auto">
         <header className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">

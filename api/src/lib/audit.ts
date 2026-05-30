@@ -17,10 +17,13 @@ export type AuditAction =
     | 'inspection.bulk_status'
     | 'inspection.template_upgraded'
     | 'inspection.results_merged'
+    | 'inspection.results_batch_patched'
     | 'inspection.sync_conflict_resolved'
+    | 'inspection.conflicts_resolved'
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
     | 'inspection.media.attach'
+    | 'inspection.inspector_signed'
     | 'persistence.granted'
     | 'persistence.denied'
     | 'template.create'
@@ -39,6 +42,7 @@ export type AuditAction =
     | 'agreement.viewed'
     | 'agreement.declined'
     | 'agreement.expired'
+    | 'agreement.inspector_signed'
     | 'recommendation.created'
     | 'recommendation.updated'
     | 'recommendation.deleted'
@@ -63,6 +67,8 @@ export type AuditAction =
     | 'tag.linked'
     | 'tag.unlinked'
     | 'inspection.property_facts.autofill'
+    | 'inspection.template_snapshot.update'
+    | 'inspection.rating_system.switch'
     | 'admin.migrate_finding_keys';
 
 export interface AuditParams {

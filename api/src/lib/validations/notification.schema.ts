@@ -36,10 +36,10 @@ export const NotificationDtoSchema = z.object({
 
 export const ListNotificationsResponseSchema = z.object({
     success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-    data: z.object({
-        items:      z.array(NotificationDtoSchema).describe('TODO describe items field for the OpenInspection MCP integration'),
+    data: z.array(NotificationDtoSchema).describe('TODO describe data field for the OpenInspection MCP integration'),
+    meta: z.object({
         nextCursor: z.string().nullable().describe('TODO describe nextCursor field for the OpenInspection MCP integration'),
-    }).describe('TODO describe data field for the OpenInspection MCP integration'),
+    }).describe('TODO describe meta field for the OpenInspection MCP integration'),
 });
 
 export const UnreadCountResponseSchema = z.object({

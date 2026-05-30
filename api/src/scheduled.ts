@@ -4,7 +4,7 @@ import { AutomationService } from './services/automation.service';
 import { AgreementService } from './services/agreement.service';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
-import { flushOutboxOnce } from './services/outbox.service';
+import { flushOutboxOnce } from './portal/outbox.service';
 import { qboConnections } from './lib/db/schema/qbo';
 import { logger } from './lib/logger';
 
@@ -19,28 +19,9 @@ export interface ScheduledEnv {
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
     QBO_WEBHOOK_SECRET?: string;
-    // Multi-workspace sync: portal base URL + M2M secret(s) for the
-    // outbox flush worker. Optional — flush is a no-op when missing.
-    PORTAL_API_URL?: string;
-    PORTAL_M2M_SECRET?: string;
-    PORTAL_M2M_CURRENT_KID?: string;
-    PORTAL_M2M_SECRET_V1?: string;
-    PORTAL_M2M_SECRET_V2?: string;
-    PORTAL_M2M_SECRET_V3?: string;
-}
-
-/**
- * Pick the outbound M2M secret for portal → core or core → portal calls.
- * Prefers the keyring slot named by PORTAL_M2M_CURRENT_KID, falls back
- * to the legacy single-secret env, returns null when nothing is set.
- */
-function resolveOutboundM2mSecret(env: ScheduledEnv): string | null {
-    const kid = env.PORTAL_M2M_CURRENT_KID;
-    if (kid) {
-        const slot = (env as unknown as Record<string, string | undefined>)[`PORTAL_M2M_SECRET_${kid.toUpperCase()}`];
-        if (slot) return slot;
-    }
-    return env.PORTAL_M2M_SECRET ?? null;
+    // Multi-workspace sync: Service Binding to portal for the outbox
+    // flush worker. Optional — flush is a no-op when missing.
+    PORTAL_SERVICE?: Fetcher;
 }
 
 async function runQBOCDC(env: ScheduledEnv): Promise<void> {
@@ -93,56 +74,63 @@ async function cleanupPendingAttachments(photos: R2Bucket): Promise<void> {
 }
 
 export async function scheduled(
-    event: ScheduledEvent,
+    _event: ScheduledEvent,
     env: ScheduledEnv,
     _ctx: ExecutionContext,
 ): Promise<void> {
-    // Daily at 02:00 UTC — expire stale agreement_requests (Spec 2A)
-    if (event.cron === '0 2 * * *') {
+    // Single unified cron (recommended: `*/5 * * * *`) — runs all
+    // periodic tasks each tick. All jobs are idempotent and the
+    // increased frequency for the daily/hourly ones is harmless:
+    //   - agreementService.expireOlderThan is a WHERE-filtered UPDATE
+    //     that no-ops once the rows are already expired.
+    //   - runQBOCDC processes only connections with new CDC entries
+    //     since last sync; cost is proportional to actual change.
+    // If you have spare CF cron triggers, you can split this back out
+    // (see git history for the per-cron-expression branching version).
+
+    // 1. Agreement expiry (Spec 2A — was daily 02:00 UTC)
+    try {
         const agreementService = new AgreementService(env.DB);
         const count = await agreementService.expireOlderThan(14);
-        logger.info('[cron] expired agreements', { count });
-        return;
+        if (count > 0) logger.info('[cron] expired agreements', { count });
+    } catch (e) {
+        logger.error('[cron] agreement expiry failed', {}, e instanceof Error ? e : undefined);
     }
 
-    // Hourly at :00 — QBO CDC payment status sync
-    if (event.cron === '0 * * * *') {
+    // 2. QBO CDC payment sync (was hourly)
+    try {
         await runQBOCDC(env);
-        return;
+    } catch (e) {
+        logger.error('[cron] QBO CDC failed', {}, e instanceof Error ? e : undefined);
     }
 
-    // Every-minute — automation flush
+    // 3. Automation email queue flush
     if (!env.RESEND_API_KEY) {
-        logger.info('scheduled: RESEND_API_KEY not set, skipping');
+        logger.info('scheduled: RESEND_API_KEY not set, skipping automation flush');
     } else {
-        const svc = new AutomationService(env.DB);
-        await svc.flush(
-            env.RESEND_API_KEY,
-            env.SENDER_EMAIL || '',
-            env.APP_NAME || 'OpenInspection',
-            env.APP_BASE_URL || '',
-        );
-    }
-
-    // Every-minute — drain the user-sync outbox to portal so identities
-    // + memberships stay coherent across the two apps. No-op when the
-    // portal base URL / M2M secret is missing (e.g. standalone deploys).
-    if (env.PORTAL_API_URL) {
-        const m2mSecret = resolveOutboundM2mSecret(env);
-        if (m2mSecret) {
-            try {
-                await flushOutboxOnce(env.DB, env.PORTAL_API_URL, m2mSecret, 50);
-            } catch (err) {
-                // flushOutboxOnce handles per-row errors internally; only
-                // catch the catastrophic "couldn't even start" case here.
-                logger.error('[cron:outbox] flush threw', {}, err instanceof Error ? err : undefined);
-            }
-        } else {
-            logger.info('[cron:outbox] flush skipped (no M2M secret)');
+        try {
+            const svc = new AutomationService(env.DB);
+            await svc.flush(
+                env.RESEND_API_KEY,
+                env.SENDER_EMAIL || '',
+                env.APP_NAME || 'OpenInspection',
+                env.APP_BASE_URL || '',
+            );
+        } catch (e) {
+            logger.error('[cron] automation flush failed', {}, e instanceof Error ? e : undefined);
         }
     }
 
-    // Phase T (T26): clean up abandoned _pending message attachments older than 24h.
+    // 4. Drain user-sync outbox to portal (no-op for standalone)
+    if (env.PORTAL_SERVICE) {
+        try {
+            await flushOutboxOnce(env.DB, env.PORTAL_SERVICE, 50);
+        } catch (err) {
+            logger.error('[cron:outbox] flush threw', {}, err instanceof Error ? err : undefined);
+        }
+    }
+
+    // 5. Clean up abandoned _pending message attachments older than 24h
     try {
         if (env.PHOTOS) await cleanupPendingAttachments(env.PHOTOS);
     } catch (e) {

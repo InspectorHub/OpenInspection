@@ -1,5 +1,5 @@
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
-import { HonoConfig } from '../types/hono';
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -22,8 +22,6 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
  * Autocomplete session (~$0.017) instead of one per keystroke. The
  * proxy passes the `sessiontoken` straight through to Google.
  */
-const placesRoutes = new OpenAPIHono<HonoConfig>();
-
 const GOOGLE_BASE = 'https://maps.googleapis.com/maps/api/place';
 
 async function sha256Hex(input: string): Promise<string> {
@@ -46,13 +44,16 @@ const autocompleteRoute = createRoute(withMcpMetadata({
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({
-                results: z.array(z.object({
+                success: z.literal(true),
+                data: z.array(z.object({
                     placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
                     description: z.string().describe('TODO describe description field for the OpenInspection MCP integration'),
                     mainText: z.string().describe('TODO describe mainText field for the OpenInspection MCP integration'),
                     secondaryText: z.string().describe('TODO describe secondaryText field for the OpenInspection MCP integration'),
-                })).describe('TODO describe results field for the OpenInspection MCP integration'),
-                cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
+                })).describe('TODO describe data field for the OpenInspection MCP integration'),
+                meta: z.object({
+                    cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
+                }),
             }) } },
             description: 'Autocomplete suggestions',
         },
@@ -61,7 +62,46 @@ const autocompleteRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for autocompletePlace (GET /autocomplete, bookings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-placesRoutes.openapi(autocompleteRoute, async (c) => {
+// ── GET /api/places/details ────────────────────────────────────────────────
+const detailsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/details',
+    tags: ["bookings"],
+    summary: 'Address details (Google Places Details proxy)',
+    request: {
+        query: z.object({
+            placeId: z.string().min(8).max(200).openapi({ example: 'ChIJxxx' }).describe('TODO describe placeId field for the OpenInspection MCP integration'),
+            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
+        }).describe('TODO describe query field for the OpenInspection MCP integration'),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(true),
+                data: z.object({
+                    placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
+                    formatted: z.string().describe('TODO describe formatted field for the OpenInspection MCP integration'),
+                    street: z.string().nullable().describe('TODO describe street field for the OpenInspection MCP integration'),
+                    city: z.string().nullable().describe('TODO describe city field for the OpenInspection MCP integration'),
+                    state: z.string().nullable().describe('TODO describe state field for the OpenInspection MCP integration'),
+                    zip: z.string().nullable().describe('TODO describe zip field for the OpenInspection MCP integration'),
+                    county: z.string().nullable().describe('TODO describe county field for the OpenInspection MCP integration'),
+                    lat: z.number().describe('TODO describe lat field for the OpenInspection MCP integration'),
+                    lng: z.number().describe('TODO describe lng field for the OpenInspection MCP integration'),
+                }),
+                meta: z.object({
+                    cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
+                }),
+            }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            description: 'Place details',
+        },
+    },
+    operationId: "listPlaceDetails",
+    description: "Auto-generated placeholder for listPlaceDetails (GET /details, bookings domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['read'], tier: 'extended' }));
+
+export const placesRoutes = createApiRouter()
+    .openapi(autocompleteRoute, async (c) => {
     const apiKey = c.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) throw Errors.BadRequest('Address autocomplete unavailable: GOOGLE_PLACES_API_KEY not configured');
 
@@ -115,42 +155,8 @@ placesRoutes.openapi(autocompleteRoute, async (c) => {
     }
 
     return c.json({ success: true, data: results, meta: { cached: false } }, 200);
-});
-
-// ── GET /api/places/details ────────────────────────────────────────────────
-const detailsRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/details',
-    tags: ["bookings"],
-    summary: 'Address details (Google Places Details proxy)',
-    request: {
-        query: z.object({
-            placeId: z.string().min(8).max(200).openapi({ example: 'ChIJxxx' }).describe('TODO describe placeId field for the OpenInspection MCP integration'),
-            session: z.string().min(8).max(128).openapi({ example: '550e8400-e29b-41d4-a716-446655440099' }).describe('TODO describe session field for the OpenInspection MCP integration'),
-        }).describe('TODO describe query field for the OpenInspection MCP integration'),
-    },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: z.object({
-                placeId: z.string().describe('TODO describe placeId field for the OpenInspection MCP integration'),
-                formatted: z.string().describe('TODO describe formatted field for the OpenInspection MCP integration'),
-                street: z.string().nullable().describe('TODO describe street field for the OpenInspection MCP integration'),
-                city: z.string().nullable().describe('TODO describe city field for the OpenInspection MCP integration'),
-                state: z.string().nullable().describe('TODO describe state field for the OpenInspection MCP integration'),
-                zip: z.string().nullable().describe('TODO describe zip field for the OpenInspection MCP integration'),
-                county: z.string().nullable().describe('TODO describe county field for the OpenInspection MCP integration'),
-                lat: z.number().describe('TODO describe lat field for the OpenInspection MCP integration'),
-                lng: z.number().describe('TODO describe lng field for the OpenInspection MCP integration'),
-                cached: z.boolean().describe('TODO describe cached field for the OpenInspection MCP integration'),
-            }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
-            description: 'Place details',
-        },
-    },
-    operationId: "listPlaceDetails",
-    description: "Auto-generated placeholder for listPlaceDetails (GET /details, bookings domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' }));
-
-placesRoutes.openapi(detailsRoute, async (c) => {
+})
+    .openapi(detailsRoute, async (c) => {
     const apiKey = c.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) throw Errors.BadRequest('Address details unavailable: GOOGLE_PLACES_API_KEY not configured');
 
@@ -224,5 +230,7 @@ placesRoutes.openapi(detailsRoute, async (c) => {
 
     return c.json({ success: true, data: payload, meta: { cached: false } }, 200);
 });
+
+export type PlacesApi = typeof placesRoutes;
 
 export default placesRoutes;

@@ -155,6 +155,8 @@ export interface RatingLevel {
     isDefect?: boolean;
     default?: boolean;
     description?: string;
+    /** Workflow shortcuts PR — pause auto-advance after rating with this level. */
+    pausesAdvance?: boolean;
 }
 
 export interface RatingSystem {
