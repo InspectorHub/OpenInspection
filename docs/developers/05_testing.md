@@ -18,7 +18,7 @@ npx playwright test --config api/playwright.config.ts
 
 ### Frontend Tests
 
-Frontend E2E and unit tests live in `frontend/tests/`. They test the React Router v7 React UI against the running API Worker.
+Frontend E2E and unit tests live in `tests-web/`. They test the React Router v7 React UI against the running API Worker.
 
 ```bash
 # Terminal 1: Start API Worker
@@ -107,7 +107,7 @@ npx playwright test
 1. Admin creates inspection with `referredByAgentId` via `POST /api/inspections`
 2. Agent calls `GET /api/agent/my-reports` — sees inspections where `referredByAgentId` matches their JWT `sub`
 3. Admin calls `GET /api/agent/leaderboard` — referral counts grouped by agent
-4. Public booking via `POST /api/public/book` with `agentId` body field also stores the referral
+4. Public booking via `POST /public/book` with `agentId` body field also stores the referral
    (Note: dev-mode tenantId is the subdomain string `'dev'`, not the UUID — verified separately via authenticated endpoint)
 
 ### Tenant Tier/Status Sync
@@ -176,7 +176,7 @@ npx playwright test --config api/playwright.config.ts --reporter=list
 
 ## Frontend Tests
 
-Frontend tests live in `frontend/tests/` and cover the React Router v7 React UI.
+Frontend tests live in `tests-web/` and cover the React Router v7 React UI.
 
 ### Running
 

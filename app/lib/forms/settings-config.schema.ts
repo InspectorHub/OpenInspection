@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Form schemas for the SETTINGS/config pages, mirroring the API's validation
- * rules (api/src/lib/validations/* and api/src/api/admin.ts). Kept as plain zod
+ * rules (src/lib/validations/* and src/api/admin.ts). Kept as plain zod
  * (no `.openapi()`) so the SAME schema runs in each route action
  * (`parseWithZod`) and in the browser via Conform's `onValidate` — one
  * validation source, progressive-enhancement safe.
@@ -17,7 +17,7 @@ import { z } from "zod";
 /**
  * Stripe Connect — `connect-stripe` intent on /settings/advanced.
  * Mirrors the API's inspector-facing stripe-connect body
- * (api/src/lib/validations/admin.schema.ts): account id must look like
+ * (src/lib/validations/admin.schema.ts): account id must look like
  * `acct_` + 10+ alphanumerics.
  */
 export const stripeConnectSchema = z.object({

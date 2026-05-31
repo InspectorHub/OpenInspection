@@ -18,7 +18,7 @@ Health check.
 
 ---
 
-### `GET /api/public/inspectors`
+### `GET /public/inspectors`
 List all inspectors for the current tenant (used by the booking page).
 
 **Response:**
@@ -32,7 +32,7 @@ List all inspectors for the current tenant (used by the booking page).
 
 ---
 
-### `GET /api/public/availability/:inspectorId?date=YYYY-MM-DD`
+### `GET /public/availability/:inspectorId?date=YYYY-MM-DD`
 Get available time slots for an inspector on a given date. Slots are 1-hour blocks derived from base weekly availability, minus any overrides and existing bookings.
 
 **Query params:**
@@ -45,7 +45,7 @@ Get available time slots for an inspector on a given date. Slots are 1-hour bloc
 
 ---
 
-### `POST /api/public/book`
+### `POST /public/book`
 Submit a booking request. Creates an inspection record with `status: 'draft'`.
 
 **Request body:**

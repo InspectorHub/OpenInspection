@@ -94,17 +94,17 @@ Browser → Frontend Worker (React Router v7 SSR) → Service Binding → API Wo
 
 ### Adding a New Page
 
-1. Create route file in `frontend/app/routes/my-page.tsx`
-2. Register in `frontend/app/routes.ts`
+1. Create route file in `app/routes/my-page.tsx`
+2. Register in `app/routes.ts`
 3. Loader calls `apiFetch("/api/...")` with token from session
 4. Use `packages/shared-ui` components + Design System tokens (`bg-ih-primary`, `text-ih-fg-1`)
 
 ### Adding a New API Endpoint
 
-1. Create or extend a route file in `api/src/api/`
-2. Define Zod schema in `api/src/lib/validations/`
-3. Business logic in `api/src/services/`
-4. Register route in `api/src/index.ts`
+1. Create or extend a route file in `src/api/`
+2. Define Zod schema in `src/lib/validations/`
+3. Business logic in `src/services/`
+4. Register route in `src/index.ts`
 5. Follow route metadata conventions (`docs/developers/07_route_metadata.md`)
 
 ### Further Reading

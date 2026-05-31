@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/logo.svg" alt="OpenInspection" width="140" />
+  <img src="public/logo.svg" alt="OpenInspection" width="140" />
 </p>
 
 <h1 align="center">OpenInspection</h1>

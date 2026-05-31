@@ -147,7 +147,7 @@ export interface Api {
 }
 
 /**
- * Module mount paths. Verified against `apps/core/api/src/index.ts` route()
+ * Module mount paths. Verified against `apps/core/src/index.ts` route()
  * calls. Some modules share a mount (e.g. inspections + inspectionSync +
  * inspectionTag all under `/api/inspections`); each client only sees ITS OWN
  * routes typed in its `*Api`, so collisions on the path prefix are fine.

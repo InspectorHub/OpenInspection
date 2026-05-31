@@ -77,7 +77,7 @@ npm run deploy:web                                          # web only
 # or `npm run deploy` to deploy api + web together
 ```
 
-The Worker entry at `frontend/workers/app.ts` calls `createRequestHandler` with `import("virtual:react-router/server-build")` and passes `{ cloudflare: { env, ctx } }` as the React Router `AppLoadContext`. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline works without a custom script.
+The Worker entry at `workers/app.ts` calls `createRequestHandler` with `import("virtual:react-router/server-build")` and passes `{ cloudflare: { env, ctx } }` as the React Router `AppLoadContext`. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline works without a custom script.
 
 The Service Binding to the API Worker (`API_WORKER`, see table above) is declared in `frontend/wrangler.toml`. Ensure the API Worker is deployed first so the binding resolves at deploy time.
 

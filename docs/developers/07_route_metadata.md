@@ -63,7 +63,7 @@ Default by HTTP method:
 Override when:
 - `/api/admin/*` or `/api/sysadmin/*` → `['admin']`
 - agent-specific routes → `['agent']`
-- public routes (`/api/public/*`, `/api/auth/*`, M2M) → `[]` and set `tier: 'excluded'`
+- public routes (`/public/*`, `/api/auth/*`, M2M) → `[]` and set `tier: 'excluded'`
 
 ## `x-tier` exposure
 

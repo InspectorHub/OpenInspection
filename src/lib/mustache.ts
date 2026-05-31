@@ -8,7 +8,7 @@
  * their literal `{{key}}` token so the publish-readiness gate can detect
  * them via {@link listUnresolved}.
  *
- * Mirrored verbatim at `frontend/app/lib/mustache.ts` so the live preview
+ * Mirrored verbatim at `app/lib/mustache.ts` so the live preview
  * and PDF pipeline produce identical output.
  */
 

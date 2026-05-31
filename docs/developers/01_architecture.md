@@ -73,7 +73,7 @@ apps/core/
 │   │   │   ├── auth.ts            # /api/auth/{login,register,reset-password,...}
 │   │   │   ├── inspections.ts     # /api/inspections/* + share/print
 │   │   │   ├── ai.ts              # /api/ai/{suggest-comment,comment/edit}
-│   │   │   ├── booking.ts         # /api/public/* (no auth) + /api/book
+│   │   │   ├── booking.ts         # /public/* (no auth) + /api/book
 │   │   │   └── ...
 │   │   ├── services/              # Business logic, DB queries (Drizzle)
 │   │   ├── features/              # Feature-scoped modules (per-strategy splits)
@@ -159,7 +159,7 @@ Every D1 table includes `tenant_id` (NOT NULL). Three deployment modes:
 - **Shared SaaS**: one Worker, many tenants, each on a subdomain (`acme.app.com`, `xyz.app.com`).
 - **Silo SaaS**: per-tenant dedicated D1 (provisioned via Cloudflare API).
 
-Tenant resolution lives in `api/src/features/tenant-routing/` (entry point `index.ts`, with per-strategy resolvers in sibling files). The `tenantRouter` middleware tries three strategies in order:
+Tenant resolution lives in `src/features/tenant-routing/` (entry point `index.ts`, with per-strategy resolvers in sibling files). The `tenantRouter` middleware tries three strategies in order:
 
 1. **Path-param resolution** (`resolve-by-path-param.ts`) — matches URL patterns like `/book/:tenant/:slug` first so public routes work uniformly across all deploy modes
 2. **Subdomain resolution** (`resolve-by-subdomain.ts`) — silo / shared SaaS: extracts the subdomain from the `Host` header, looks up the tenant via KV (5-minute TTL) with D1 fallback, then writes the result back to KV
@@ -223,14 +223,14 @@ const inspections = await c.var.services.inspection.list({ status: 'in_progress'
 // c.var.services.inspection is auto-instantiated with c.get('tenantId')
 ```
 
-The DI proxy in `api/src/lib/middleware/di.ts` lazy-instantiates each service on first access per request.
+The DI proxy in `src/lib/middleware/di.ts` lazy-instantiates each service on first access per request.
 
 ## Frontend layer
 
-- **React Router v7 SSR**: Routes in `frontend/app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
-- **React components**: 59 components in `frontend/app/components/`, organized by domain (inspection, template, booking, etc.).
+- **React Router v7 SSR**: Routes in `app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
+- **React components**: 59 components in `app/components/`, organized by domain (inspection, template, booking, etc.).
 - **Hooks**: 9 custom hooks handle complex state — `useInspection` (866 LOC), `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `useOfflineQueue`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`.
-- **Design tokens**: Tailwind v4 with Design System 0523 tokens in `frontend/app/styles/tailwind.css`.
+- **Design tokens**: Tailwind v4 with Design System 0523 tokens in `app/styles/tailwind.css`.
 - **Shared UI**: `packages/shared-ui/` provides 12 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 
@@ -248,7 +248,7 @@ The DI proxy in `api/src/lib/middleware/di.ts` lazy-instantiates each service on
 
 ## Background work
 
-- **Onboarding workflow** (`api/src/workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
+- **Onboarding workflow** (`src/workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
 - **Cron triggers**: notification reminder sweeps (hourly), report-ready automations.
 
 ## Cost model (Cloudflare Free tier)

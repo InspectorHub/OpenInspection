@@ -4,9 +4,9 @@ Cloudflare D1 (SQLite). Schema defined in Drizzle ORM, applied via migration fil
 
 ## Source of truth
 
-- **Drizzle schema**: `api/src/lib/db/schema/` — TypeScript table definitions
-- **Baseline migration**: `api/migrations/0001_baseline.sql` — 54 tables, 90+ indexes
-- **Schema re-export**: `api/src/lib/db/schema/index.ts`
+- **Drizzle schema**: `src/lib/db/schema/` — TypeScript table definitions
+- **Baseline migration**: `migrations/0001_baseline.sql` — 54 tables, 90+ indexes
+- **Schema re-export**: `src/lib/db/schema/index.ts`
 
 ## Running migrations
 
@@ -37,7 +37,7 @@ npm run db:migrate:remote
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
 
-For the complete schema (all 54 tables with columns, indexes, and constraints), see `api/migrations/0001_baseline.sql`.
+For the complete schema (all 54 tables with columns, indexes, and constraints), see `migrations/0001_baseline.sql`.
 
 ## Drizzle ORM usage
 
