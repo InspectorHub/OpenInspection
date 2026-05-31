@@ -35,7 +35,7 @@ export function AgentCommandPalette({ inspectors, agentSlug, bookingHost }: Agen
       { id: "page-dashboard", group: "Pages", label: "Dashboard", hint: "G then D", href: "/agent-dashboard" },
       { id: "page-inspectors", group: "Pages", label: "Inspectors", hint: "G then I", href: "/agent-inspectors" },
       { id: "page-settings", group: "Pages", label: "Settings", hint: "G then S", href: "/agent-settings/profile" },
-      { id: "action-signout", group: "Actions", label: "Sign out", hint: "log out", action: "signout" },
+      { id: "action-signout", group: "Actions", label: "Log out", hint: "log out", action: "signout" },
     ];
     const ref = agentSlug ? `?ref=${encodeURIComponent(agentSlug)}` : "";
     for (const insp of inspectors) {

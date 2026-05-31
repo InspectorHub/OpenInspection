@@ -39,9 +39,30 @@ export async function getSession(context: AppLoadContext, request: Request) {
   return getStorage(context).getSession(request.headers.get("Cookie"));
 }
 
+/** Read a single raw cookie value from the request's Cookie header. */
+function readRawCookie(request: Request, name: string): string | null {
+  const header = request.headers.get("Cookie");
+  if (!header) return null;
+  for (const part of header.split(/;\s*/)) {
+    const eq = part.indexOf("=");
+    if (eq > 0 && part.slice(0, eq) === name) {
+      return decodeURIComponent(part.slice(eq + 1));
+    }
+  }
+  return null;
+}
+
 export async function getToken(context: AppLoadContext, request: Request): Promise<string | null> {
   const session = await getSession(context, request);
-  return session.get("token") || null;
+  const fromSession = session.get("token");
+  if (fromSession) return fromSession;
+  // Fallback: the SSO handoff consume (GET /sso, server/api/auth.ts) sets the
+  // JWT only in the raw `__Host-inspector_token` cookie and never writes the
+  // React Router `__session` cookie that createUserSession sets on local form
+  // login. Without this fallback, loaders' requireToken() bounce every SSO
+  // arrival to /login even though the session is valid. Both cookies carry the
+  // same JWT; the value is used purely as the bearer token for createApi().
+  return readRawCookie(request, "__Host-inspector_token");
 }
 
 export async function requireToken(context: AppLoadContext, request: Request): Promise<string> {

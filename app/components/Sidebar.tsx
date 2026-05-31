@@ -190,7 +190,7 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
           </div>
           <a href="/logout" className="w-full flex items-center gap-3 px-3 py-2 rounded-[6px] text-ih-bad-fg hover:bg-ih-bad-bg transition-all font-medium text-[13px]">
             <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            <span>Sign Out</span>
+            <span>Log Out</span>
           </a>
         </div>
       </div>
@@ -355,10 +355,10 @@ export function Sidebar() {
         <a
           href="/logout"
           className={`flex items-center gap-2.5 px-[10px] py-[7px] rounded-[6px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bad-bg hover:text-ih-bad-fg transition-all ${collapsed ? "justify-center" : ""}`}
-          title={collapsed ? "Sign out" : undefined}
+          title={collapsed ? "Log out" : undefined}
         >
           <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-          {!collapsed && <span>Sign Out</span>}
+          {!collapsed && <span>Log Out</span>}
         </a>
       </div>
     </aside>

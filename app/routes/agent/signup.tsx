@@ -36,7 +36,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!res.ok || !(json as Record<string, unknown>).success) {
     const err = json.error as Record<string, string> | undefined;
     if (err?.code === "conflict") {
-      return submission.reply({ formErrors: ["That email is already registered. Sign in instead."] });
+      return submission.reply({ formErrors: ["That email is already registered. Log in instead."] });
     }
     return submission.reply({ formErrors: [err?.message || "Could not create account"] });
   }
@@ -230,7 +230,7 @@ export default function AgentSignupPage() {
               to="/login"
               className="text-ih-primary font-medium hover:underline"
             >
-              Sign in
+              Log in
             </Link>
           </p>
         </div>

@@ -127,6 +127,7 @@ export class OutboxService {
 export async function flushOutboxOnce(
     db: D1Database,
     portalService: Fetcher,
+    m2mHeader: string,
     limit = 50,
 ): Promise<{ posted: number; pending: number; failed: number }> {
     const svc = new OutboxService(db);
@@ -148,6 +149,7 @@ export async function flushOutboxOnce(
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'x-portal-m2m': m2mHeader,
                 },
                 body,
             });

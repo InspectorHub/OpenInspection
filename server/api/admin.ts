@@ -1939,7 +1939,7 @@ export const adminRoutes = createApiRouter()
             401: { description: 'Unauthorized' },
         },
     }, { scopes: [], tier: 'excluded' }), async (c) => {
-        if (!isServiceBindingCall(c)) {
+        if (!(await isServiceBindingCall(c))) {
             throw Errors.Unauthorized();
         }
 
@@ -2052,7 +2052,7 @@ export const adminRoutes = createApiRouter()
             404: { description: 'Tenant not found' },
         },
     }, { scopes: [], tier: 'excluded' }), async (c) => {
-        if (!isServiceBindingCall(c)) {
+        if (!(await isServiceBindingCall(c))) {
             throw Errors.Unauthorized();
         }
 
@@ -2092,7 +2092,7 @@ export const adminRoutes = createApiRouter()
             404: { description: 'Tenant not found' },
         },
     }, { scopes: [], tier: 'excluded' }), async (c) => {
-        if (!isServiceBindingCall(c)) {
+        if (!(await isServiceBindingCall(c))) {
             throw Errors.Unauthorized();
         }
 
