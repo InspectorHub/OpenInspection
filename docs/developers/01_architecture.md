@@ -100,7 +100,7 @@ apps/core/
 │   ├── shared-ui/src/             # shared React components
 │   └── api-types/                 # CoreApiType for hono/client
 ├── scripts/                       # Setup, seed, backup, deploy helpers
-└── wrangler.jsonc                 # Single-worker config + bindings (gitignored; copy from wrangler.jsonc.example)
+└── wrangler.jsonc                 # Single-worker config + bindings (committed, placeholder IDs; real IDs in gitignored wrangler.local.jsonc / wrangler.saas.jsonc)
 ```
 
 ## Request flow

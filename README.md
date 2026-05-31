@@ -67,19 +67,19 @@ Not ready to commit to running infrastructure? Spin up a managed workspace at [*
 ### Option 1: One-Click Deploy
 
 1. Click the **Deploy to Cloudflare** button above — this deploys the Worker
-2. Follow the dashboard prompts to provision the bindings declared in `wrangler.jsonc.example`: one D1 database, two R2 buckets (`PHOTOS` + `REPORTS`), and one KV namespace (`TENANT_CACHE`). The standalone profile additionally declares two Durable Object classes and one Workflow — Cloudflare creates these on first deploy.
-3. Configure the Worker and deploy from root:
+2. Follow the dashboard prompts. Cloudflare reads the committed `wrangler.jsonc` (placeholder IDs) and **auto-provisions + binds** the resources: one D1 database, two R2 buckets (`PHOTOS` + `REPORTS`), one KV namespace (`TENANT_CACHE`), the `BROWSER` binding, two Durable Object classes and one Workflow — no manual ID entry.
+3. Or deploy from the CLI:
    ```bash
-   cp wrangler.jsonc.example wrangler.jsonc   # substitute real D1 / KV / R2 IDs
    npm install
-   npm run deploy                             # build + wrangler deploy -c wrangler.jsonc
+   npm run setup:cloudflare   # provisions D1/KV/R2 + writes real IDs to a gitignored wrangler.local.jsonc
+   npm run deploy             # build + wrangler deploy
    ```
 4. Visit your Worker URL → `/setup` (e.g., `https://openinspection.your-account.workers.dev/setup`)
 5. A 6-digit setup code is generated on first boot. The code itself is **not** printed in logs — recover it with one of:
    - **Recommended**: set `SETUP_CODE=<any 6-digit value>` as a Worker secret before deploying, then use that value at `/setup`
    - Or read the generated code from KV: `wrangler kv key get setup_verification_code --binding TENANT_CACHE` (1-hour TTL)
 
-> React Router loaders/actions call the API in-process through an injected `API_WORKER` self-binding (zero-latency, no network hop, no second worker). The single Worker is configured by `wrangler.jsonc` (copy from `wrangler.jsonc.example`) with `main = "./workers/app.ts"` — `npm run deploy` builds and ships it.
+> React Router loaders/actions call the API in-process through an injected `API_WORKER` self-binding (zero-latency, no network hop, no second worker). The single Worker is configured by the committed `wrangler.jsonc` (placeholder IDs — CF fills real ones on one-click; or `npm run setup:cloudflare` writes a gitignored `wrangler.local.jsonc`) with `main = "./workers/app.ts"` — `npm run deploy` builds and ships it.
 
 ### Option 2: CLI-First
 ```bash

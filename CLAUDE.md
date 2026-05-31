@@ -15,7 +15,8 @@ npm run dev          # Build + run the worker locally (react-router build + wran
                      # No HMR. `npm run dev:hmr` (react-router dev) is currently broken by
                      # the in-process API module graph — see docs/developers.
 npm run build        # react-router build — bundles src/ (API) + app/ (RR SSR) into one worker
-npm run deploy       # build + wrangler deploy -c wrangler.jsonc (single worker)
+npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
+npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
 npm run type-check   # react-router typegen + tsc (app tsconfig.json + api tsconfig.api.json)
 npm run lint
 npm run test:unit    # API unit tests (vitest --config vitest.api.config.ts)
@@ -28,6 +29,20 @@ npm run db:migrate:remote   # apply migrations to remote D1
 npm run db:generate         # generate a forward migration from schema changes
 npm run db:check            # drift gate: schema vs migrations/ must match
 ```
+
+## Wrangler config & deploy
+
+One file per deploy target; the build bakes whichever config wins (vite `configPath`:
+`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > `wrangler.jsonc`).
+
+| File | Tracked? | Purpose |
+|---|---|---|
+| `wrangler.jsonc` | committed (PLACEHOLDER ids) | standalone + the **Deploy to Cloudflare** one-click default — CF auto-provisions D1/KV/R2 and injects real ids (no real ids in the repo). |
+| `wrangler.local.jsonc` | gitignored | your real standalone ids (written by `scripts/setup-cloudflare.js`). |
+| `wrangler.saas.jsonc` | gitignored | InspectorHub private SaaS (`APP_MODE=saas`, `PORTAL_SERVICE`, crons, `*-saas` resources). |
+
+`wrangler deploy` runs against the built `build/server/wrangler.json`. `scripts/wrangler.mjs`
+applies the same config resolution to direct wrangler commands (db:migrate).
 
 ## Key Files & Directories
 

@@ -75,7 +75,7 @@ npm run dev                    # build-based; http://localhost:8788 (serves API 
 | `npm run build` | `react-router build` — bundle `src/` API + `app/` SSR into one worker |
 | `npm run db:migrate` | Apply D1 migrations locally |
 | `npm run db:generate` | Generate a forward migration from schema changes |
-| `npm run deploy` | Build + `wrangler deploy -c wrangler.jsonc` (single worker) |
+| `npm run deploy` | Build + `wrangler deploy` (single worker) |
 | `npm run test:unit` | API unit tests (Vitest, `vitest.api.config.ts`) |
 | `npm run test:web` | Web unit tests (Vitest, `vitest.config.ts`) |
 | `npm run lint` | ESLint |
