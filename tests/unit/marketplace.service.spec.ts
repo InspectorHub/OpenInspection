@@ -257,7 +257,7 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
     });
 
     it('imports a marketplace template with its sections intact (post-Spec1 fix)', async () => {
-        // Seed marketplace_templates with the CORRECT shape that seed-marketplace.js now produces:
+        // Seed marketplace_templates with the CORRECT shape the importer expects:
         // {sections: [...]} at the top level (not nested under a second .schema key).
         // Spec 5B — v2 schema shape: schemaVersion: 2 + rich items with tabs.
         const richItem = (id: string, label: string) => ({

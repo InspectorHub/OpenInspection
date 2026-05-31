@@ -119,7 +119,7 @@ export const ratingSystemsRoutes = createApiRouter()
     .openapi(listRatingSystemsRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         // Lazy-seed defaults so first-time tenants always see the four canonical
-        // systems even if the seed:rating-systems script wasn't run for them.
+        // systems even if starter content was never seeded for them.
         await c.var.services.ratingSystem.seedDefaults(tenantId);
         const data = await c.var.services.ratingSystem.list(tenantId);
         return c.json({ success: true as const, data }, 200);
