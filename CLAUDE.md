@@ -48,7 +48,7 @@ npm run db:check            # drift gate: schema vs migrations/ must match
 | `app/lib/` | API client (hono/client over the in-process binding), session management, helpers |
 | `app/styles/tailwind.css` | Design System 0523 token layer (Tailwind v4) |
 | `public/` | Static assets (fonts, logo, service worker, widget) |
-| `tests-web/` | Web E2E + unit tests |
+| `tests/web/` | Web E2E + unit tests |
 | `packages/shared-ui/src/` | shared React components (Button, Pill, Card, etc.) |
 | `packages/api-types/` | CoreApiType re-export for hono/client |
 

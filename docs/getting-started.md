@@ -52,7 +52,7 @@ app/                  React Router v7 web UI (React SSR on CF Workers)
 packages/shared-ui/   Design System 0523 components (Button, Card, Pill, etc.)
 packages/api-types/   Hono app type re-export for end-to-end type safety
 migrations/           D1 SQL migrations (drizzle-kit schema-first)
-tests/                API tests · tests-web/  Web tests
+tests/                API tests · tests/web/  Web tests
 docs/developers/      Architecture, deploy, API ref, testing
 scripts/              Setup, seed, backup, key rotation utilities
 ```

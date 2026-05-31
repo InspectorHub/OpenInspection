@@ -1,6 +1,6 @@
 # Testing — apps/core
 
-The single Worker serves both the API and the React Router v7 UI, so tests cover both surfaces against one running worker. API tests live in `tests/`; web tests live in `tests-web/`.
+The single Worker serves both the API and the React Router v7 UI, so tests cover both surfaces against one running worker. API tests live in `tests/`; web tests live in `tests/web/`.
 
 ## Quick Start
 
@@ -20,7 +20,7 @@ API unit tests run with `npm run test:unit` (vitest, `vitest.api.config.ts`).
 
 ### Web Tests
 
-Web unit + E2E tests live in `tests-web/`. They test the React Router v7 React UI against the same running worker.
+Web unit + E2E tests live in `tests/web/`. They test the React Router v7 React UI against the same running worker.
 
 ```bash
 # Terminal 1: Start the worker (build-based)
@@ -175,7 +175,7 @@ npx playwright test --config playwright.api.config.ts --reporter=list
 
 ## Web Tests
 
-Web tests live in `tests-web/` and cover the React Router v7 React UI.
+Web tests live in `tests/web/` and cover the React Router v7 React UI.
 
 ### Running
 

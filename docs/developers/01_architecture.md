@@ -95,7 +95,7 @@ apps/core/
 │   └── styles/tailwind.css        # Design System 0523 token layer
 ├── migrations/                    # D1 SQL migrations (drizzle-kit schema-first: 0000_baseline.sql + forward)
 ├── tests/                         # API unit + integration + E2E tests
-├── tests-web/                     # Web E2E + unit tests
+├── tests/web/                     # Web E2E + unit tests
 ├── packages/
 │   ├── shared-ui/src/             # shared React components
 │   └── api-types/                 # CoreApiType for hono/client

@@ -5,7 +5,7 @@
  * Tests page rendering, SPA navigation, shared-ui components, and UI interactions.
  *
  * Covers: Auth via form POST, SPA navigation, shared-ui components, page rendering
- * Run: npx playwright test tests-web/e2e/frontend-browser.spec.ts
+ * Run: npx playwright test tests/web/e2e/frontend-browser.spec.ts
  */
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';

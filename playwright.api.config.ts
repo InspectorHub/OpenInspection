@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
     globalSetup: './tests/global-setup.ts',
     testDir: './tests',
-    testIgnore: ['**/*.integration.spec.ts', '**/unit/**', 'cloud-e2e.spec.ts'],
+    testIgnore: ['**/*.integration.spec.ts', '**/unit/**', '**/web/**', 'cloud-e2e.spec.ts'],
     timeout: 30000,
     use: {
         headless: true,
