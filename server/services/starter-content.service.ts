@@ -7,7 +7,7 @@
  *
  *   - 3 inspection templates  (Residential / Pre-Listing / Sewer Scope)
  *   - 1 agreement template    (generic pre-inspection w/ disclaimer)
- *   - 250 canned comments     (the legacy comment library from seed-comments.js)
+ *   - 250 canned comments     (from starter-content/fixtures/canned-comments)
  *   - 3 event_types           (Standard / Pre-Listing / Sewer Scope)
  *   - 4 tags                  (Safety concern / Needs maintenance / Cosmetic / Follow-up needed)
  *   - 80 recommendations      (from server/data/recommendation-seeds.ts)
@@ -78,6 +78,39 @@ import { RECOMMENDATIONS } from './starter-content/fixtures/recommendations';
 import { RATING_SYSTEMS } from './starter-content/fixtures/rating-systems';
 import { MARKETPLACE_LIBRARIES } from './starter-content/fixtures/marketplace';
 
+/**
+ * Insert many rows in as few D1 round-trips as possible: multi-row INSERTs
+ * chunked to stay under D1's 100-bound-parameter-per-statement limit, all sent
+ * in a single db.batch(). No-op for an empty array. This turns hundreds of
+ * sequential awaited inserts (slow, and a long window during which a closed
+ * setup tab leaves partial data) into one batched round-trip per table.
+ */
+async function batchInsert(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    d: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    table: any,
+    rows: Record<string, unknown>[],
+): Promise<void> {
+    if (rows.length === 0) return;
+
+    // Drivers without batch support (e.g. unit-test mocks): sequential inserts.
+    if (typeof d.batch !== 'function') {
+        for (const row of rows) await d.insert(table).values(row).run();
+        return;
+    }
+
+    const colsPerRow = Object.keys(rows[0]!).length || 1;
+    const maxRowsPerStmt = Math.max(1, Math.floor(100 / colsPerRow));
+    const stmts = [];
+    for (let i = 0; i < rows.length; i += maxRowsPerStmt) {
+        stmts.push(d.insert(table).values(rows.slice(i, i + maxRowsPerStmt)));
+    }
+    // d.batch wants a non-empty tuple; stmts is guaranteed non-empty here.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await d.batch(stmts as [any, ...any[]]);
+}
+
 export interface StarterContentResult {
     inspectionTemplatesSeeded: number;
     agreementTemplatesSeeded:  number;
@@ -109,18 +142,16 @@ export async function seedStarterContent(
         const existing = await d.select({ name: templates.name }).from(templates)
             .where(eq(templates.tenantId, tenantId)).all();
         const existingNames = new Set(existing.map(r => r.name as string));
-        for (const t of INSPECTION_TEMPLATES) {
-            if (existingNames.has(t.name)) continue;
-            await d.insert(templates).values({
-                id:        crypto.randomUUID(),
-                tenantId,
-                name:      t.name,
-                version:   1,
-                schema:    JSON.stringify(t.schema),
-                createdAt: new Date(),
-            }).run();
-            inspectionTemplatesSeeded++;
-        }
+        const rows = INSPECTION_TEMPLATES.filter(t => !existingNames.has(t.name)).map(t => ({
+            id:        crypto.randomUUID(),
+            tenantId,
+            name:      t.name,
+            version:   1,
+            schema:    JSON.stringify(t.schema),
+            createdAt: new Date(),
+        }));
+        await batchInsert(d, templates, rows);
+        inspectionTemplatesSeeded = rows.length;
     }
 
     // ── agreement templates ─────────────────────────────────────────────
@@ -151,10 +182,9 @@ export async function seedStarterContent(
             .where(eq(comments.tenantId, tenantId)).all();
         const existingKeys = new Set(existing.map(r => `${r.category ?? ''}::${r.text}`));
         const now = new Date();
-        for (const c of CANNED_COMMENTS) {
-            const key = `${c.category ?? ''}::${c.text}`;
-            if (existingKeys.has(key)) continue;
-            await d.insert(comments).values({
+        const rows = CANNED_COMMENTS
+            .filter(c => !existingKeys.has(`${c.category ?? ''}::${c.text}`))
+            .map(c => ({
                 id:           crypto.randomUUID(),
                 tenantId,
                 text:         c.text,
@@ -167,9 +197,9 @@ export async function seedStarterContent(
                 triggerCode:  null,
                 searchKeywords: null,
                 createdAt:    now,
-            }).run();
-            cannedCommentsSeeded++;
-        }
+            }));
+        await batchInsert(d, comments, rows);
+        cannedCommentsSeeded = rows.length;
     }
 
     // ── event types ─────────────────────────────────────────────────────
@@ -178,22 +208,20 @@ export async function seedStarterContent(
         const existing = await d.select({ slug: eventTypes.slug }).from(eventTypes)
             .where(eq(eventTypes.tenantId, tenantId)).all();
         const existingSlugs = new Set(existing.map(r => r.slug as string));
-        for (const e of EVENT_TYPES) {
-            if (existingSlugs.has(e.slug)) continue;
-            await d.insert(eventTypes).values({
-                id:                 crypto.randomUUID(),
-                tenantId,
-                name:               e.name,
-                slug:               e.slug,
-                defaultDurationMin: e.defaultDurationMin,
-                defaultPriceCents:  e.defaultPriceCents,
-                color:              e.color,
-                sortOrder:          e.sortOrder,
-                active:             true,
-                createdAt:          new Date(),
-            }).run();
-            eventTypesSeeded++;
-        }
+        const rows = EVENT_TYPES.filter(e => !existingSlugs.has(e.slug)).map(e => ({
+            id:                 crypto.randomUUID(),
+            tenantId,
+            name:               e.name,
+            slug:               e.slug,
+            defaultDurationMin: e.defaultDurationMin,
+            defaultPriceCents:  e.defaultPriceCents,
+            color:              e.color,
+            sortOrder:          e.sortOrder,
+            active:             true,
+            createdAt:          new Date(),
+        }));
+        await batchInsert(d, eventTypes, rows);
+        eventTypesSeeded = rows.length;
     }
 
     // ── tags ────────────────────────────────────────────────────────────
@@ -203,18 +231,16 @@ export async function seedStarterContent(
             .where(eq(tags.tenantId, tenantId)).all();
         const existingNames = new Set(existing.map(r => r.name as string));
         const now = Date.now();
-        for (const tag of TAGS) {
-            if (existingNames.has(tag.name)) continue;
-            await d.insert(tags).values({
-                id:        crypto.randomUUID(),
-                tenantId,
-                name:      tag.name,
-                color:     tag.color,
-                isSeed:    1,
-                createdAt: now,
-            }).run();
-            tagsSeeded++;
-        }
+        const rows = TAGS.filter(tag => !existingNames.has(tag.name)).map(tag => ({
+            id:        crypto.randomUUID(),
+            tenantId,
+            name:      tag.name,
+            color:     tag.color,
+            isSeed:    1,
+            createdAt: now,
+        }));
+        await batchInsert(d, tags, rows);
+        tagsSeeded = rows.length;
     }
 
     // ── recommendations ─────────────────────────────────────────────────
@@ -223,10 +249,9 @@ export async function seedStarterContent(
         const existing = await d.select({ category: recommendations.category, name: recommendations.name })
             .from(recommendations).where(eq(recommendations.tenantId, tenantId)).all();
         const existingKeys = new Set(existing.map(r => `${r.category ?? ''}::${r.name}`));
-        for (const r of RECOMMENDATIONS) {
-            const key = `${r.category ?? ''}::${r.name}`;
-            if (existingKeys.has(key)) continue;
-            await d.insert(recommendations).values({
+        const rows = RECOMMENDATIONS
+            .filter(r => !existingKeys.has(`${r.category ?? ''}::${r.name}`))
+            .map(r => ({
                 id:                   crypto.randomUUID(),
                 tenantId,
                 category:             r.category,
@@ -237,9 +262,9 @@ export async function seedStarterContent(
                 defaultRepairSummary: r.defaultRepairSummary,
                 createdByUserId:      null,
                 createdAt:            new Date(),
-            }).run();
-            recommendationsSeeded++;
-        }
+            }));
+        await batchInsert(d, recommendations, rows);
+        recommendationsSeeded = rows.length;
     }
 
     // ── rating systems ──────────────────────────────────────────────────
@@ -249,8 +274,7 @@ export async function seedStarterContent(
             .where(eq(ratingSystems.tenantId, tenantId)).all();
         const existingSlugs = new Set(existing.map(r => r.slug as string));
         const now = Date.now();
-        for (const rs of RATING_SYSTEMS) {
-            if (existingSlugs.has(rs.slug)) continue;
+        const rows = RATING_SYSTEMS.filter(rs => !existingSlugs.has(rs.slug)).map(rs => {
             const levels = rs.levels.map((lvl, idx) => ({
                 id:    crypto.randomUUID(),
                 abbr:  lvl.abbr,
@@ -260,7 +284,7 @@ export async function seedStarterContent(
                 ...(lvl.hotkey ? { hotkey: lvl.hotkey } : {}),
                 order: idx,
             }));
-            await d.insert(ratingSystems).values({
+            return {
                 id:          crypto.randomUUID(),
                 tenantId,
                 name:        rs.name,
@@ -272,9 +296,10 @@ export async function seedStarterContent(
                 isSeed:      true,
                 createdAt:   now,
                 updatedAt:   now,
-            }).run();
-            ratingSystemsSeeded++;
-        }
+            };
+        });
+        await batchInsert(d, ratingSystems, rows);
+        ratingSystemsSeeded = rows.length;
     }
 
     // ── marketplace libraries (GLOBAL table) ────────────────────────────
@@ -286,24 +311,22 @@ export async function seedStarterContent(
         const existing = await d.select({ name: marketplaceLibraries.name }).from(marketplaceLibraries).all();
         const existingNames = new Set(existing.map(r => r.name as string));
         const now = new Date().toISOString();
-        for (const lib of MARKETPLACE_LIBRARIES) {
-            if (existingNames.has(lib.name)) continue;
-            await d.insert(marketplaceLibraries).values({
-                id:            crypto.randomUUID(),
-                name:          lib.name,
-                kind:          lib.kind,
-                semver:        lib.semver,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                schema:        lib.schema as any,
-                authorId:      'system',
-                changelog:     lib.changelog,
-                downloadCount: 0,
-                featured:      lib.featured,
-                createdAt:     now,
-                updatedAt:     now,
-            }).run();
-            marketplaceLibrariesSeeded++;
-        }
+        const rows = MARKETPLACE_LIBRARIES.filter(lib => !existingNames.has(lib.name)).map(lib => ({
+            id:            crypto.randomUUID(),
+            name:          lib.name,
+            kind:          lib.kind,
+            semver:        lib.semver,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            schema:        lib.schema as any,
+            authorId:      'system',
+            changelog:     lib.changelog,
+            downloadCount: 0,
+            featured:      lib.featured,
+            createdAt:     now,
+            updatedAt:     now,
+        }));
+        await batchInsert(d, marketplaceLibraries, rows);
+        marketplaceLibrariesSeeded = rows.length;
     }
 
     const result: StarterContentResult = {
