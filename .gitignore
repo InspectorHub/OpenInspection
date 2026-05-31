@@ -17,6 +17,7 @@ backups/
 *.bak
 .env*
 .dev.vars*
+!.dev.vars.example
 test-results/
 
 # Cloudflare config — wrangler.jsonc (standalone, PLACEHOLDER ids) IS committed as the
