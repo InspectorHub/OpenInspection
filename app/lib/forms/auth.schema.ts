@@ -44,7 +44,7 @@ export const setupSchema = z.object({
     .max(120, "Name is too long"),
   email: z.string().min(1, "Email is required").email("Invalid email address"),
   password: strongPassword,
-  setupCode: z.string().min(6, "Setup code is required"),
+  setupCode: z.string().min(6, "Setup code must be at least 6 characters"),
 });
 
 export type SetupInput = z.infer<typeof setupSchema>;

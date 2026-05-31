@@ -198,7 +198,7 @@ export default function SetupPage() {
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.setupCode.errors[0]}</p>
             ) : (
               <p className="mt-1 text-[11px] text-ih-fg-3">
-                Enter the value of the <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">SETUP_CODE</code> secret. Don&apos;t have one yet? Add it to this Worker in the Cloudflare dashboard under <span className="font-medium text-ih-fg-2">Settings → Variables and Secrets</span> (type Secret), then refresh this page.{" "}
+                <span className="font-medium text-ih-fg-2">Required (at least 6 characters).</span> Enter the value of the <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">SETUP_CODE</code> secret. Don&apos;t have one yet? Add it to this Worker in the Cloudflare dashboard under <span className="font-medium text-ih-fg-2">Settings → Variables and Secrets</span> (type Secret), then refresh this page.{" "}
                 <a
                   href="https://developers.cloudflare.com/workers/configuration/environment-variables/#add-environment-variables-via-the-dashboard"
                   target="_blank"
