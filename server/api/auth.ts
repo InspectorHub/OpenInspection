@@ -630,9 +630,13 @@ export const coreAuthRoutes = createApiRouter()
 
         const body = c.req.valid('json');
 
-        // 2. Verification Code Check
-        const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE?.get('setup_verification_code');
-        if (storedCode && body.verificationCode !== storedCode) {
+        // 2. Verification Code Check — gated solely by the SETUP_CODE secret.
+        // Fail closed when it is unset so an unprotected Worker can't be claimed.
+        const storedCode = c.env.SETUP_CODE;
+        if (!storedCode) {
+            return c.json({ success: false, error: { code: 'setup_code_unset', message: 'SETUP_CODE is not configured on this Worker. Set it as a secret and try again.' } }, 400);
+        }
+        if (body.verificationCode !== storedCode) {
             return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
         }
 
@@ -651,9 +655,6 @@ export const coreAuthRoutes = createApiRouter()
             adminPasswordHash: passwordHash,
             adminName: body.adminName,
         });
-
-        // Cleanup code
-        if (c.env.TENANT_CACHE) await c.env.TENANT_CACHE.delete('setup_verification_code');
 
         // Auto-seed default recommendations library for the new tenant
         try {

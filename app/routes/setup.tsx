@@ -198,7 +198,15 @@ export default function SetupPage() {
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.setupCode.errors[0]}</p>
             ) : (
               <p className="mt-1 text-[11px] text-ih-fg-3">
-                Value of the <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">SETUP_CODE</code> secret you provisioned on the API Worker (e.g. <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">wrangler secret put SETUP_CODE</code>). Falls back to KV key <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">setup_verification_code</code> when unset.
+                Enter the value of the <code className="px-1 py-0.5 bg-ih-bg-muted rounded text-ih-fg-3 font-mono text-[10px]">SETUP_CODE</code> secret. Don&apos;t have one yet? Add it to this Worker in the Cloudflare dashboard under <span className="font-medium text-ih-fg-2">Settings → Variables and Secrets</span> (type Secret), then refresh this page.{" "}
+                <a
+                  href="https://developers.cloudflare.com/workers/configuration/environment-variables/#add-environment-variables-via-the-dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-500 hover:text-indigo-600 underline underline-offset-2"
+                >
+                  How to add a secret →
+                </a>
               </p>
             )}
           </div>

@@ -7,7 +7,7 @@ import { signObserverCookie } from './lib/observer-cookie';
 import { verifyJwt } from './lib/jwt-keyring';
 import { classifyJwtPayload } from './lib/auth/jwt-claims';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, asc, sql } from 'drizzle-orm';
+import { and, eq, asc } from 'drizzle-orm';
 import { users } from './lib/db/schema';
 import * as schema from './lib/db/schema';
 
@@ -242,40 +242,8 @@ app.use('*', async (c, next) => {
 
     if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || isObserverPublic || path === '/setup' || path === '/login' || path === '/join' || path === '/guest-join' || path.startsWith('/agreements/sign/')) return next();
 
-    // Generate setup code if system is uninitialized and we are in standalone
-    // (gated on `hasSetupWizard` — only the standalone profile enables it).
-    if (c.var.profile.hasSetupWizard && c.env.TENANT_CACHE) {
-        // Prefer explicit environment variable if set by user during deployment
-        const storedCode = c.env.SETUP_CODE || await c.env.TENANT_CACHE.get('setup_verification_code');
-
-        if (!storedCode) {
-            const db = drizzle(c.env.DB);
-            // Only count tenant-scoped users (admin/inspector). Global agents
-            // (tenant_id IS NULL, A1) are unrelated to first-time setup state.
-            const user = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
-            if (!user) {
-                // Use CSPRNG with rejection sampling so the one-hour bootstrap code is unbiased
-                // and unpredictable. CodeQL js/biased-cryptographic-random — modulo on
-                // crypto.getRandomValues introduces non-uniform distribution; reject any value
-                // beyond the largest multiple of RANGE that still fits in Uint32.
-                const RANGE = 900000;
-                const MAX = Math.floor(0xFFFFFFFF / RANGE) * RANGE;
-                let rand: number;
-                do { rand = crypto.getRandomValues(new Uint32Array(1))[0]!; } while (rand >= MAX);
-                const newCode = (100000 + (rand % RANGE)).toString();
-                await c.env.TENANT_CACHE.put('setup_verification_code', newCode, { expirationTtl: 3600 });
-                logger.warn('New system detected. System initialization code generated.');
-                logger.info('Initialization code stored in KV. Use SETUP_CODE env var in production.');
-            }
-        } else if (c.env.SETUP_CODE) {
-             // Just log that we are using the user-defined code
-             const db = drizzle(c.env.DB);
-             const user = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
-             if (!user) {
-                 logger.info('System initialization required. Using user-defined SETUP_CODE.');
-             }
-        }
-    }
+    // First-time setup is gated solely by the SETUP_CODE secret, validated in
+    // POST /api/auth/setup. No KV bootstrap code is generated here.
 
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.startsWith('Bearer ')
