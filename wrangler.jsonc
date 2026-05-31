@@ -50,7 +50,7 @@
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_classes": ["InspectionPresenceDO", "TenantPresenceDO"] }
+    { "tag": "v1", "new_sqlite_classes": ["InspectionPresenceDO", "TenantPresenceDO"] }
   ],
   "unsafe": {
     "bindings": [
