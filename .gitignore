@@ -19,7 +19,6 @@ backups/
 .dev.vars*
 test-results/
 
-# Cloudflare config — wrangler.jsonc is generated from wrangler.jsonc.example
 # Cloudflare config — wrangler.jsonc (standalone, PLACEHOLDER ids) IS committed as the
 # public OSS / one-click-deploy default (CF auto-provisions resources + injects real ids).
 # Real ids / private configs live in gitignored variant files:
