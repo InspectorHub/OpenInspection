@@ -656,27 +656,19 @@ export const coreAuthRoutes = createApiRouter()
             adminName: body.adminName,
         });
 
-        // Auto-seed default recommendations library for the new tenant
+        // Auto-seed the FULL starter content library for the new tenant in one
+        // idempotent pass: inspection templates, agreement templates, 250 canned
+        // comments, event types, tags, recommendations, rating systems, and the
+        // global marketplace libraries. This is the same canonical seeder the
+        // admin "seed starter content" endpoint uses, so /setup yields a fully
+        // populated workspace (no separate post-deploy seed step needed).
         try {
-            const { RECOMMENDATION_SEEDS } = await import('../data/recommendation-seeds');
-            await c.var.services.recommendation.bulkSeed(tenantId, RECOMMENDATION_SEEDS);
+            const { seedStarterContent } = await import('../services/starter-content.service');
+            const seeded = await seedStarterContent(c.env.DB, tenantId);
+            logger.info('Auto-seeded starter content during setup', { tenantId, ...seeded });
         } catch (seedErr) {
-            // Don't block setup if seed fails — log and continue
-            logger.error('Auto-seed recommendations failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
-        }
-
-        // Spec 4D — Auto-seed default event types (5 defaults: radon, mold, water, sewer scope, etc.)
-        try {
-            await c.var.services.event.bulkSeed(tenantId);
-        } catch (seedErr) {
-            logger.error('Auto-seed event types failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
-        }
-
-        // Spec 4F — Auto-seed default 6 templates (residential, pre-listing, new-construction, sewer-scope, radon, mold)
-        try {
-            await c.var.services.templateSeed.bulkSeed(tenantId);
-        } catch (seedErr) {
-            logger.error('Auto-seed templates failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
+            // Don't block setup if seeding fails — log and continue.
+            logger.error('Auto-seed starter content failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
         }
 
         // 4. Issue a JWT for the new admin so the caller can authenticate immediately
