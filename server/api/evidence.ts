@@ -17,7 +17,7 @@ export async function downloadAgreementPdf(
     envelopeId: string,
     tenantId: string,
 ): Promise<Response> {
-    if (!r2) return new Response('REPORTS bucket not configured', { status: 500 });
+    if (!r2) return new Response('Storage bucket not configured', { status: 500 });
     const db = drizzle(d1, { schema });
     const row = await db.select().from(schema.agreementRequests)
         .where(eq(schema.agreementRequests.id, envelopeId)).get();
@@ -43,7 +43,7 @@ export async function downloadCertPdf(
     envelopeId: string,
     tenantId: string,
 ): Promise<Response> {
-    if (!r2) return new Response('REPORTS bucket not configured', { status: 500 });
+    if (!r2) return new Response('Storage bucket not configured', { status: 500 });
     const db = drizzle(d1, { schema });
     const row = await db.select().from(schema.agreementRequests)
         .where(eq(schema.agreementRequests.id, envelopeId)).get();
@@ -69,7 +69,7 @@ export async function downloadEvidenceZip(
     envelopeId: string,
     tenantId: string,
 ): Promise<Response> {
-    if (!r2) return new Response('REPORTS bucket not configured', { status: 500 });
+    if (!r2) return new Response('Storage bucket not configured', { status: 500 });
     const db = drizzle(d1, { schema });
     const row = await db.select().from(schema.agreementRequests)
         .where(eq(schema.agreementRequests.id, envelopeId)).get();
@@ -138,17 +138,17 @@ export const evidenceRoutes = createApiRouter()
     .openapi(downloadAgreementRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
-        return downloadAgreementPdf(c.env.DB, c.env.REPORTS, id, tenantId);
+        return downloadAgreementPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
     })
     .openapi(downloadCertRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
-        return downloadCertPdf(c.env.DB, c.env.REPORTS, id, tenantId);
+        return downloadCertPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
     })
     .openapi(downloadEvidenceRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
-        return downloadEvidenceZip(c.env.DB, c.env.REPORTS, id, tenantId);
+        return downloadEvidenceZip(c.env.DB, c.env.PHOTOS, id, tenantId);
     });
 
 export type EvidenceApi = typeof evidenceRoutes;

@@ -82,7 +82,7 @@ export class ReportPdfService {
         opts: { reportUrl: string; sourceVersion: number },
     ): Promise<ReportPdf> {
         if (!this.browser) throw Errors.BadRequest('PDF rendering unavailable: BROWSER binding not configured');
-        if (!this.r2) throw Errors.BadRequest('PDF storage unavailable: REPORTS bucket binding not configured');
+        if (!this.r2) throw Errors.BadRequest('PDF storage unavailable: storage bucket binding not configured');
 
         // type=summary appends &summary=1 so the report template can render
         // a condensed view (defects + safety only). Implementation wired in
@@ -92,7 +92,7 @@ export class ReportPdfService {
             : opts.reportUrl;
 
         const pdfBuffer = await generatePdfFromUrl(this.browser, renderUrl);
-        const r2Key = `${tenantId}/${inspectionId}/${type}.pdf`;
+        const r2Key = `${tenantId}/${inspectionId}/reports/${type}.pdf`;
         await this.r2.put(r2Key, pdfBuffer);
 
         const now = Date.now();
@@ -141,7 +141,7 @@ export class ReportPdfService {
      * if the D1 row says status='ready', but guard anyway).
      */
     async streamPdf(record: ReportPdf): Promise<R2ObjectBody | null> {
-        if (!this.r2) throw Errors.BadRequest('PDF storage unavailable: REPORTS bucket binding not configured');
+        if (!this.r2) throw Errors.BadRequest('PDF storage unavailable: storage bucket binding not configured');
         if (record.status !== 'ready') {
             throw Errors.BadRequest(`PDF not ready (status=${record.status})`);
         }
