@@ -14,7 +14,7 @@ export interface BrowserRun {
 
 /**
  * Global environment bindings for the Cloudflare Worker.
- * Defines the expected resources from wrangler.toml.
+ * Defines the expected resources from wrangler.jsonc.
  */
 export interface AppEnv {
     // Infrastructure

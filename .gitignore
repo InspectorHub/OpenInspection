@@ -20,10 +20,12 @@ backups/
 test-results/
 
 # Cloudflare config — wrangler.jsonc is generated from wrangler.jsonc.example
-# by scripts/setup-cloudflare.js (substitutes real D1 / KV / R2 IDs in place
-# of the 00000...000 placeholders). Only the .example template is tracked;
-# the populated config is local-only.
-wrangler.jsonc
+# Cloudflare config — wrangler.jsonc (standalone, PLACEHOLDER ids) IS committed as the
+# public OSS / one-click-deploy default (CF auto-provisions resources + injects real ids).
+# Real ids / private configs live in gitignored variant files:
+#   wrangler.local.jsonc — your real standalone ids (scripts/setup-cloudflare.js writes it)
+#   wrangler.saas.jsonc  — InspectorHub private SaaS config
+wrangler.*.jsonc
 wrangler.toml
 wrangler.*.toml
 

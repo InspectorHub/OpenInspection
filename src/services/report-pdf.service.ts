@@ -13,7 +13,7 @@ export type ReportPdfStatus = 'queued' | 'rendering' | 'ready' | 'failed';
  * Spec 5A — Report PDF Pipeline.
  *
  * Wraps the existing src/lib/pdf.ts:generatePdfFromUrl primitive with:
- * - R2 persistence (REPORTS bucket — see wrangler.toml)
+ * - R2 persistence (REPORTS bucket — see wrangler.jsonc)
  * - Summary vs Full Report distinction
  * - D1 metadata tracking with stale detection (source_version vs inspection.updatedAt)
  * - Manual Refresh API

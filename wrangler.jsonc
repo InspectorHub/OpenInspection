@@ -1,8 +1,10 @@
-// Single-worker (react-router-hono-fullstack-template shape) config template.
-// Copy to wrangler.jsonc and substitute real D1 / KV / R2 / ratelimit IDs.
-// `scripts/setup-cloudflare.js` can populate these. The populated wrangler.jsonc
-// is gitignored (local-only); only this .example is tracked.
 {
+  // Committed STANDALONE config with PLACEHOLDER ids — the public OSS default and
+  // the "Deploy to Cloudflare" one-click target. Cloudflare auto-provisions the D1 /
+  // KV / R2 resources and injects real ids at deploy time, so no real account ids
+  // live in the repo. For local dev / your own remote deploy, `scripts/setup-cloudflare.js`
+  // writes a gitignored `wrangler.local.jsonc` with real ids (the build prefers it).
+  // SaaS mode uses a separate gitignored `wrangler.saas.jsonc`.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "openinspection",
   "main": "./workers/app.ts",
@@ -27,7 +29,7 @@
     }
   ],
   "kv_namespaces": [
-    { "binding": "TENANT_CACHE", "id": "0000000000000000000000000000000000" }
+    { "binding": "TENANT_CACHE", "id": "00000000000000000000000000000000" }
   ],
   "r2_buckets": [
     { "binding": "PHOTOS", "bucket_name": "openinspection-photos" },

@@ -6,7 +6,7 @@ It is only active when deployed with `wrangler.saas.toml` (which declares the
 
 **Self-hosted users: do not modify files in this directory.**
 
-In standalone deployments (the default `wrangler.toml`), none of this code
+In standalone deployments (the default `wrangler.jsonc`), none of this code
 executes — the Service Binding is absent and all portal-related code paths
 are guarded by `if (env.PORTAL_SERVICE)` checks.
 

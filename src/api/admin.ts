@@ -1105,7 +1105,7 @@ const BrSmokeQuerySchema = z.object({
 const BrSmokeResponseSchema = z.object({
     success: z.literal(true),
     data: z.object({
-        bindingPresent: z.boolean().describe('Whether env.BROWSER is wired by wrangler.toml.'),
+        bindingPresent: z.boolean().describe('Whether env.BROWSER is wired by wrangler.jsonc.'),
         probedUrl: z.string(),
         status: z.number().nullable().describe('HTTP status returned by env.BROWSER.fetch; null if the call threw.'),
         ok: z.boolean().describe('True iff status is 2xx AND content-type is application/pdf.'),
@@ -2231,7 +2231,7 @@ export const adminRoutes = createApiRouter()
                     contentLength: null,
                     durationMs: 0,
                     error: null,
-                    hint: 'env.BROWSER not bound. Add [browser] binding = "BROWSER" to wrangler.toml and redeploy.',
+                    hint: 'env.BROWSER not bound. Add [browser] binding = "BROWSER" to wrangler.jsonc and redeploy.',
                 },
             }, 200);
         }

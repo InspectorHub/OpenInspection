@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { seedFixtures } from './seed-fixtures';
@@ -55,8 +55,9 @@ export default function globalSetup() {
 
         // Clear all KV keys (setup codes, pwchanged tokens, cached tenants)
         try {
-            const toml = readFileSync(path.join(appDir, 'wrangler.toml'), 'utf8');
-            const nsMatch = toml.match(/\[\[kv_namespaces\]\][^[]*?id\s*=\s*"([^"]+)"/);
+            const cfgFile = existsSync(path.join(appDir, 'wrangler.local.jsonc')) ? 'wrangler.local.jsonc' : 'wrangler.jsonc';
+            const cfg = readFileSync(path.join(appDir, cfgFile), 'utf8');
+            const nsMatch = cfg.match(/"kv_namespaces"[^\]]*?"id":\s*"([^"]+)"/);
             const nsId = nsMatch?.[1];
             if (nsId) {
                 const listOutput = execSync(

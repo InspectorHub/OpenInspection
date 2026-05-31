@@ -76,7 +76,7 @@ function sqlEscape(s) {
     return String(s).replace(/'/g, "''");
 }
 
-console.log(`[backfill] target: ${configFlag || 'wrangler.toml'} (${local ? 'local' : 'remote'})`);
+console.log(`[backfill] target: ${configFlag || 'wrangler.local.jsonc'} (${local ? 'local' : 'remote'})`);
 
 // Step 1 — list every tenant.
 const tenantsRows = wranglerD1Query('SELECT id, name FROM tenants ORDER BY id');

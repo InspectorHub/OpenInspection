@@ -765,7 +765,7 @@ export { SignCompletionWorkflow } from './workflows/sign-completion-workflow';
 
 // Design System 0520 subsystem B phase 2 — presence Durable Objects.
 // wrangler needs them re-exported from the entrypoint so it can discover
-// the class names referenced by [[durable_objects.bindings]] in wrangler.toml.
+// the class names referenced by [[durable_objects.bindings]] in wrangler.jsonc.
 export { InspectionPresenceDO } from './durable-objects/inspection-presence';
 export { TenantPresenceDO     } from './durable-objects/tenant-presence';
 

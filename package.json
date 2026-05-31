@@ -11,12 +11,20 @@
   "bugs": {
     "url": "https://github.com/InspectorHub/OpenInspection/issues"
   },
+  "cloudflare": {
+    "label": "OpenInspection",
+    "products": ["Workers"],
+    "categories": ["starter"],
+    "docs_url": "https://github.com/InspectorHub/OpenInspection#readme",
+    "publish": true
+  },
   "scripts": {
     "dev": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state",
     "dev:hmr": "npm run vendor:copy && react-router dev",
     "build": "npm run vendor:copy && node scripts/gen-version.js && react-router build",
     "preview": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state",
-    "deploy": "npm run build && wrangler deploy -c wrangler.jsonc",
+    "deploy": "npm run build && wrangler deploy -c build/server/wrangler.json",
+    "deploy:saas": "cross-env WRANGLER_CONFIG=wrangler.saas.jsonc npm run build && wrangler deploy -c build/server/wrangler.json",
     "vendor:copy": "node scripts/vendor-copy.js",
     "gen-version": "node scripts/gen-version.js",
     "type-check": "react-router typegen && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit && node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.api.json --noEmit",
@@ -26,8 +34,9 @@
     "test:unit": "vitest run --config vitest.api.config.ts",
     "test:web": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
-    "db:migrate": "wrangler d1 migrations apply DB --local -c wrangler.jsonc",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote -c wrangler.jsonc",
+    "db:migrate": "node scripts/wrangler.mjs d1 migrations apply DB --local",
+    "db:migrate:remote": "node scripts/wrangler.mjs d1 migrations apply DB --remote",
+    "db:migrate:saas:remote": "cross-env WRANGLER_CONFIG=wrangler.saas.jsonc node scripts/wrangler.mjs d1 migrations apply DB --remote",
     "db:check": "node scripts/verify-migration-equivalence.mjs",
     "db:generate": "drizzle-kit generate",
     "seed:test-user": "node scripts/seed-test-user.mjs",
@@ -92,6 +101,7 @@
     "better-sqlite3": "^12.8.0",
     "chart.js": "^4.5.1",
     "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.7",
     "eslint": "^9.39.4",
     "eslint-plugin-import": "^2.32.0",
