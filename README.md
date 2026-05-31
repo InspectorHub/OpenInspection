@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/logo.svg" alt="OpenInspection" width="140" />
+  <img src="public/logo.svg" alt="OpenInspection" width="140" />
 </p>
 
 <h1 align="center">OpenInspection</h1>
@@ -23,10 +23,11 @@ A complete home inspection software stack: inspector dashboard, public booking w
 
 ### Architecture
 
-- **API Worker** (`api/`) — Hono + Drizzle + D1, handles all business logic
-- **Frontend Worker** (`frontend/`) — React Router v7 + React 18 + Tailwind v4, SSR on CF Workers
+- **Single Cloudflare Worker** (`workers/app.ts`) — a Hono entry that mounts the full API in-process and delegates page routes to React Router v7 SSR (the cloudflare/react-router-hono-fullstack-template shape)
+- **API** (`server/`) — Hono + Drizzle + D1, handles all business logic
+- **Web** (`app/`) — React Router v7 + React 18 + Tailwind v4, SSR on CF Workers
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based components
-- Both deploy as independent CF Workers; frontend calls API via Service Binding (zero-latency)
+- One deployable; React Router loaders/actions call the API directly through an in-process `API_WORKER` self-binding (no network hop, no second worker)
 
 ### Inspector workflow
 - 3-pane editor with 248 canned comments, slash-trigger snippet picker, AI rewrite
@@ -65,21 +66,20 @@ Not ready to commit to running infrastructure? Spin up a managed workspace at [*
 
 ### Option 1: One-Click Deploy
 
-1. Click the **Deploy to Cloudflare** button above — this deploys the API Worker
-2. Follow the dashboard prompts to provision the bindings declared in `wrangler.toml.example`: one D1 database, two R2 buckets (`PHOTOS` + `REPORTS`), and one KV namespace (`TENANT_CACHE`). The standalone profile additionally declares two Durable Object classes and one Workflow — Cloudflare creates these on first deploy.
-3. Configure the frontend Worker config and run the deploy script from root:
+1. Click the **Deploy to Cloudflare** button above — this deploys the Worker
+2. Follow the dashboard prompts. Cloudflare reads the committed `wrangler.jsonc` (placeholder IDs) and **auto-provisions + binds** the resources: one D1 database, two R2 buckets (`PHOTOS` + `REPORTS`), one KV namespace (`TENANT_CACHE`), the `BROWSER` binding, two Durable Object classes and one Workflow — no manual ID entry.
+3. Or deploy from the CLI:
    ```bash
-   cp frontend/wrangler.toml.example frontend/wrangler.toml   # edit API_URL + SESSION_SECRET
    npm install
-   npm run deploy:web                                          # web only
-   # or npm run deploy to deploy api + web together
+   npm run setup:cloudflare   # provisions D1/KV/R2 + writes real IDs to a gitignored wrangler.local.jsonc
+   npm run deploy             # build + wrangler deploy
    ```
-4. Visit your API Worker URL → `/setup` (e.g., `https://openinspection.your-account.workers.dev/setup`)
+4. Visit your Worker URL → `/setup` (e.g., `https://openinspection.your-account.workers.dev/setup`)
 5. A 6-digit setup code is generated on first boot. The code itself is **not** printed in logs — recover it with one of:
    - **Recommended**: set `SETUP_CODE=<any 6-digit value>` as a Worker secret before deploying, then use that value at `/setup`
    - Or read the generated code from KV: `wrangler kv key get setup_verification_code --binding TENANT_CACHE` (1-hour TTL)
 
-> The frontend calls the API via a [Service Binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/) (zero-latency, no network hop). The API Worker is configured by the root `wrangler.toml` (copy from `wrangler.toml.example`); the Frontend Worker uses `frontend/wrangler.toml` (copy from `frontend/wrangler.toml.example`) with `main = "./workers/app.ts"` — the standard `wrangler deploy` flow handles the rest.
+> React Router loaders/actions call the API in-process through an injected `API_WORKER` self-binding (zero-latency, no network hop, no second worker). The single Worker is configured by the committed `wrangler.jsonc` (placeholder IDs — CF fills real ones on one-click; or `npm run setup:cloudflare` writes a gitignored `wrangler.local.jsonc`) with `main = "./workers/app.ts"` — `npm run deploy` builds and ships it.
 
 ### Option 2: CLI-First
 ```bash
@@ -110,12 +110,12 @@ Detailed setup: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). 
 
 ## Tech stack
 
-- **Cloudflare Workers**: edge runtime (dual Worker deploy — API + Frontend)
+- **Cloudflare Workers**: edge runtime (single Worker — Hono entry mounts the API in-process + delegates page routes to React Router SSR)
 - **React Router v7** + React 18: frontend SSR on Workers
 - **Hono** + Zod OpenAPI: typed API layer
 - **Drizzle ORM** + Cloudflare D1: SQLite at the edge
 - **Cloudflare R2 / KV**: object storage and config cache
-- **Tailwind CSS**: v4 (frontend, design system tokens + utility CSS) · v3 (API Worker, SSR report pages)
+- **Tailwind CSS**: v4 only (via `@tailwindcss/vite`, design system tokens + utility CSS)
 - **Optional**: Gemini AI, Stripe Connect, Resend email, Google Places
 
 ## Community

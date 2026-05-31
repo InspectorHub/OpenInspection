@@ -6,12 +6,12 @@ This guide covers self-hosted production deploys — what every adopter does to 
 
 ## Architecture overview
 
-OpenInspection deploys as two independent Cloudflare Workers:
+OpenInspection deploys as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape):
 
-- **API Worker** (`api/`) — Hono + Drizzle + D1. All business logic, auth, and data.
-- **Frontend Worker** (`frontend/`) — React Router v7 + React 18 + Tailwind v4. SSR on Workers. Calls the API Worker via Service Binding (zero-latency, no network hop).
+- **`workers/app.ts`** — a Hono entry that mounts the full API (`src/`, Hono + Drizzle + D1) in-process for API-owned paths and delegates all other (page) routes to React Router v7 SSR (`app/`, React 18 + Tailwind v4).
+- React Router loaders/actions call the API DIRECTLY through an injected in-process `API_WORKER` self-binding — no network hop, no second worker, no Service Binding between workers.
 
-Both must be deployed for a complete installation.
+One deployable; `npm run deploy` builds and ships it.
 
 ---
 
@@ -23,22 +23,22 @@ The recommended path is the one-click button in the README:
 [Deploy to Cloudflare] → fork → run `npm run setup:cloudflare`
 ```
 
-For the manual flow, see [`docs/developers/06_deployment.md`](./developers/06_deployment.md).
+For the manual flow, see the **Quick start** section in the [README](../../README.md).
 
 ### Required Cloudflare resources
 
 | Resource         | Binding         | Purpose                                                    |
 |------------------|-----------------|------------------------------------------------------------|
-| Workers          | (two workers)   | API Worker + Frontend Worker.                              |
+| Worker           | (one worker)    | Single Worker (API in-process + React Router SSR).        |
 | D1 database      | `DB`            | All structured data (inspections, users, comments, ...).   |
 | R2 bucket        | `PHOTOS`        | Field-form photo uploads.                                  |
 | R2 bucket        | `REPORTS`       | Pre-rendered Summary + Full Report PDFs (Spec 5A).         |
 | KV namespace     | `TENANT_CACHE`  | Branding + tenant-config 1-hour cache.                     |
 | Browser binding  | `BROWSER`       | PDF rendering for reports + e-sign certificates.           |
 | Workflow         | `SIGN_COMPLETION_WORKFLOW` | Async e-sign pipeline (Spec 5H).                           |
-| Service Binding  | `API_WORKER`    | Frontend Worker → API Worker (zero-latency RPC).           |
+| Durable Objects  | `INSPECTION_PRESENCE`, `TENANT_PRESENCE` | Live presence for the editor.               |
 
-`npm run setup:cloudflare` provisions every binding listed above and writes their IDs back into your local `wrangler.toml`. Re-run with `--refresh-setup-code` to mint a new first-run setup code if you misplace yours.
+`npm run setup:cloudflare` provisions every binding listed above and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped from the committed placeholder `wrangler.jsonc`). Re-run with `--refresh-setup-code` to mint a new first-run setup code if you misplace yours.
 
 ### Minimum secrets
 
@@ -52,54 +52,34 @@ For the manual flow, see [`docs/developers/06_deployment.md`](./developers/06_de
 
 Set them via `wrangler secret put SECRET_NAME` or through the Cloudflare dashboard.
 
-### Deploy API Worker
+### Deploy the Worker
 
 ```bash
-npm run deploy:api
-# Applies remote D1 migrations, rebuilds Tailwind CSS, and ships the API
-# Worker via the standalone wrangler config (the default env). For SaaS:
-# npm run deploy:api:saas
+npm install
+npm run setup:cloudflare   # provisions D1/KV/R2 + writes real IDs to wrangler.local.jsonc
+npm run deploy             # standalone: build + wrangler deploy (uses wrangler.local.jsonc)
+# npm run deploy:saas      # saas: uses the gitignored wrangler.saas.jsonc
 ```
 
-After the API Worker boots, visit `https://<your-worker>.workers.dev/setup` and enter the 6-digit setup code. **The code itself is not printed in logs** — recover it with one of:
+`npm run deploy` runs `react-router build` (bundling `src/` API + `app/` SSR into one worker) then `wrangler deploy` against the built `build/server/wrangler.json`. The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`). Apply remote D1 migrations with `npm run db:migrate:remote`.
+
+> **One-click**: the committed `wrangler.jsonc` carries placeholder IDs; the README's *Deploy to Cloudflare* button provisions resources and injects real IDs automatically — no manual `setup:cloudflare` needed for that path.
+
+After the Worker boots, visit `https://<your-worker>.workers.dev/setup` and enter the 6-digit setup code. **The code itself is not printed in logs** — recover it with one of:
 
 - **Recommended**: set `SETUP_CODE=<any 6-digit value>` as a Worker secret before deploying (`wrangler secret put SETUP_CODE`) and use that value at `/setup`.
 - Or read the auto-generated code from KV: `wrangler kv key get setup_verification_code --binding TENANT_CACHE` (1-hour TTL). Re-run `npm run setup:cloudflare -- --refresh-setup-code` to mint a fresh one if it expires.
 
 That bootstraps your first admin account.
 
-### Deploy Frontend Worker
+### How the single worker is wired
 
-```bash
-cp frontend/wrangler.toml.example frontend/wrangler.toml   # edit API_URL + SESSION_SECRET
-npm install
-npm run deploy:web                                          # web only
-# or `npm run deploy` to deploy api + web together
-```
-
-The Worker entry at `frontend/workers/app.ts` calls `createRequestHandler` with `import("virtual:react-router/server-build")` and passes `{ cloudflare: { env, ctx } }` as the React Router `AppLoadContext`. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline works without a custom script.
-
-The Service Binding to the API Worker (`API_WORKER`, see table above) is declared in `frontend/wrangler.toml`. Ensure the API Worker is deployed first so the binding resolves at deploy time.
-
-### Deploy order
-
-1. Deploy the **API Worker** first (`npm run deploy:api` from root)
-2. Deploy the **Frontend Worker** second (`npm run deploy:web` from root)
-3. Point your domain's DNS to the Frontend Worker (it is the public-facing entry point)
-
-Or run `npm run deploy` to do both in order in a single command.
+The Worker entry at `workers/app.ts` is a Hono app. It routes API-owned paths (`/api/*`, `/status`, `/sign/*`, …) to the API app (`src/`) in-process, and sends every other path to React Router via `createRequestHandler` with `import("virtual:react-router/server-build")`, passing `{ cloudflare: { env, ctx } }` as the `AppLoadContext`. Before delegating to SSR it injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app directly — no network hop, no second worker. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline ships everything.
 
 ### Local development
 
-For local dev, both workers run independently:
-
 ```bash
-# Terminal 1: API Worker (port 8788)
-npm run dev
-
-# Terminal 2: Frontend Worker (port 5173, proxies API calls to 8788)
-cd frontend
-npm run dev
+npm run dev          # build-based: react-router build + wrangler dev (one worker, port 8788)
 ```
 
-The frontend dev server automatically proxies API requests to the API Worker running on port 8788.
+`npm run dev` is build-based (no HMR): it runs `react-router build` and then `wrangler dev` against the bundled worker. `npm run dev:hmr` (`react-router dev`) is currently broken by the in-process API module graph, so use `npm run dev`. Apply local D1 migrations first with `npm run db:migrate`.

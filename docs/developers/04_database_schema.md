@@ -1,22 +1,30 @@
 # Database Schema
 
-Cloudflare D1 (SQLite). Schema defined in Drizzle ORM, applied via migration files.
+Cloudflare D1 (SQLite). Migrations are **drizzle-kit schema-first**: the Drizzle ORM schema is the source of truth, and migration SQL is generated from it.
 
 ## Source of truth
 
-- **Drizzle schema**: `api/src/lib/db/schema/` — TypeScript table definitions
-- **Baseline migration**: `api/migrations/0001_baseline.sql` — 54 tables, 90+ indexes
-- **Schema re-export**: `api/src/lib/db/schema/index.ts`
+- **Drizzle schema**: `server/lib/db/schema/` — TypeScript table definitions (the source of truth)
+- **Baseline migration**: `migrations/0000_baseline.sql` — the full baseline schema (50+ tables, plus indexes)
+- **Schema re-export**: `server/lib/db/schema/index.ts`
 
 ## Running migrations
 
 ```bash
-# Local dev (D1 emulator)
+# Generate a forward migration from schema changes (drizzle-kit diff vs migrations/meta/)
+npm run db:generate
+
+# Apply migrations to local D1 (D1 emulator); wrangler owns the d1_migrations table
 npm run db:migrate
 
-# Production
+# Apply migrations to remote D1
 npm run db:migrate:remote
+
+# Drift gate: schema vs migrations/ must match (run in CI)
+npm run db:check
 ```
+
+Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `drizzle-kit migrate` — wrangler owns the `d1_migrations` bookkeeping table. `npm run db:generate` only emits the forward SQL.
 
 ## Key tables
 
@@ -37,7 +45,7 @@ npm run db:migrate:remote
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
 
-For the complete schema (all 54 tables with columns, indexes, and constraints), see `api/migrations/0001_baseline.sql`.
+For the complete schema (all tables with columns, indexes, and constraints), see `migrations/0000_baseline.sql` — or the Drizzle definitions in `server/lib/db/schema/`, which are the source of truth.
 
 ## Drizzle ORM usage
 

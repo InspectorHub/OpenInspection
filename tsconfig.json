@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "paths": {
+      "~/*": ["./app/*"],
+      "@core/shared-ui": ["./packages/shared-ui/src/index.ts"]
+    },
+    "rootDirs": [".", "./.react-router/types"],
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo.app"
+  },
+  "include": ["app/**/*.ts", "app/**/*.tsx", "vite.config.ts"],
+  "exclude": ["node_modules", "build", "dist"]
+}

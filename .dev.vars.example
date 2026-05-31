@@ -1,7 +1,15 @@
 # Copy this file to .dev.vars for local development
 # .dev.vars is gitignored and must never be committed
 
-# Required: JWT signing secret (use a long random string in production)
+# Required for first-time setup: the code you enter at /setup to create the first
+# admin account. Choose any value with AT LEAST 6 characters. In the one-click
+# deploy wizard this shows up as a secret field — set it there. You can also add
+# or change it later in the dashboard (Settings -> Variables and Secrets) or via
+# `wrangler secret put SETUP_CODE`.
+SETUP_CODE=change-me-6-chars-min
+
+# Optional: JWT signing secret. On deploy it is auto-generated if unset
+# (scripts/ensure-jwt-secrets.mjs); set this only to pin a specific value.
 JWT_SECRET=your-jwt-secret-here
 
 # Optional: Resend API key for sending report emails to clients

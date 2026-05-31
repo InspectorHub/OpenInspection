@@ -16,7 +16,7 @@ const getArg = (key) => {
 };
 
 // Configuration Paths & Naming
-const TOML_PATH = path.resolve(getArg('--config') || getArg('--toml') || 'wrangler.toml');
+const TOML_PATH = path.resolve(getArg('--config') || 'wrangler.local.jsonc');
 const PROJECT_SLUG = getArg('--name') || 'openinspection';
 
 // Project Context (Initialized via Args or Fallback)
@@ -275,7 +275,7 @@ async function executeTeardown() {
     try {
         if (hasToml) {
             fs.renameSync(TOML_PATH, backupPath);
-            info("Temporarily bypassing wrangler.toml to avoid ID conflicts");
+            info("Temporarily bypassing wrangler.local.jsonc to avoid ID conflicts");
         }
 
         // 1. Delete Worker
@@ -316,14 +316,13 @@ async function executeTeardown() {
         }
     }
 
-    // 5. Remove wrangler.toml — it's gitignored and regenerated from
-    // wrangler.toml.example on the next `npm run setup:cloudflare`, so we
-    // don't need to scrub IDs in-place anymore (avoids the truncation /
-    // partial-write bugs that motivated the .example split).
-    step("Step 5: Removing wrangler.toml...");
+    // 5. Remove wrangler.local.jsonc — it's gitignored and re-bootstrapped from
+    // the committed placeholder wrangler.jsonc on the next `npm run setup:cloudflare`,
+    // so we don't need to scrub IDs in-place anymore.
+    step("Step 5: Removing wrangler.local.jsonc...");
     if (fs.existsSync(TOML_PATH)) {
         fs.unlinkSync(TOML_PATH);
-        info("wrangler.toml removed (regenerated from wrangler.toml.example on next setup)");
+        info("wrangler.local.jsonc removed (re-bootstrapped from wrangler.jsonc on next setup)");
     }
 
     // Verification

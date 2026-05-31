@@ -16,15 +16,17 @@ const getArg = (key) => {
 };
 
 // Configuration Paths & Naming
-const TOML_PATH = path.resolve(getArg('--config') || getArg('--toml') || 'wrangler.toml');
-const TOML_EXAMPLE_PATH = path.resolve(path.dirname(TOML_PATH), 'wrangler.toml.example');
-const PROJECT_SLUG = getArg('--name') || 'openinspection-api';
+// CONFIG_PATH = the gitignored local config with real ids (written here);
+// TEMPLATE_PATH = the committed placeholder wrangler.jsonc it's bootstrapped from.
+const TOML_PATH = path.resolve(getArg('--config') || 'wrangler.local.jsonc');
+const TOML_EXAMPLE_PATH = path.resolve(path.dirname(TOML_PATH), 'wrangler.jsonc');
+const PROJECT_SLUG = getArg('--name') || 'openinspection';
 const PROJECT_TITLE = getArg('--app-name') || getArg('--title') || 'OpenInspection';
 
 // Dynamic Resource Naming
 const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
 const KV_NAME = getArg('--kv-name') || `${PROJECT_SLUG}-tenant-cache`;
-const BUCKETS = [`${PROJECT_SLUG}-photos`];
+const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-reports`];
 const WORKER_NAME = PROJECT_SLUG;
 
 const isForce = args.includes('--force') || args.includes('-y') || args.includes('--yes');
@@ -44,7 +46,7 @@ const step = (msg) => { console.log(`\n▶ ${msg}`); };
 const warn = (msg) => console.warn(`  ⚠ ${msg}`);
 const die = (msg) => { console.error(`\n  ✗ ERROR: ${msg}`); process.exit(1); };
 
-// wrangler.toml is gitignored — generated from wrangler.toml.example on first
+// wrangler.local.jsonc is gitignored — generated from wrangler.jsonc on first
 // setup. Real D1 / KV / R2 IDs are patched into the local copy further below;
 // the template stays untouched and tracked in git so self-hosters always have
 // a known-good starting point.
@@ -298,10 +300,10 @@ if (conflictD1) {
         d1Id = d1Output.match(/database_id\s*=\s*"([^"]*)"/)?.[1] || d1Output.match(/"uuid":\s*"([^"]*)"/)?.[1];
     }
     
-    // Fallback: Check wrangler.toml if create failed with "exists" and list didn't help
+    // Fallback: Check wrangler.local.jsonc if create failed with "exists" and list didn't help
     if (!d1Id && d1Output.includes('already exists') && fs.existsSync(TOML_PATH)) {
         const toml = fs.readFileSync(TOML_PATH, 'utf8');
-        const existingId = toml.match(/database_id\s*=\s*"([0-9a-f-]{36})"/)?.[1];
+        const existingId = toml.match(/"database_id":\s*"([0-9a-f-]{36})"/)?.[1];
         if (existingId && existingId !== '00000000-0000-0000-0000-000000000000') {
             d1Id = existingId;
             warn(`Using existing D1 ID from ${TOML_PATH}: ${d1Id}`);
@@ -349,16 +351,16 @@ for (const bucket of BUCKETS) {
 }
 info("R2 buckets ready");
 
-// 6. Patch wrangler.toml
+// 6. Patch wrangler.local.jsonc
 step(`Step 5: Patching ${TOML_PATH} with resource IDs...`);
 if (fs.existsSync(TOML_PATH)) {
     let toml = fs.readFileSync(TOML_PATH, 'utf8');
     // More robust regex for patching with word boundaries
-    toml = toml.replace(/\bdatabase_id\s*=\s*"00000000-0000-0000-0000-000000000000"/, `database_id = "${d1Id}"`);
-    toml = toml.replace(/\bid\s*=\s*"00000000000000000000000000000000"/, `id = "${kvId}"`);
+    toml = toml.replace(/"database_id":\s*"00000000-0000-0000-0000-000000000000"/, `"database_id": "${d1Id}"`);
+    toml = toml.replace(/"id":\s*"00000000000000000000000000000000"/, `"id": "${kvId}"`);
     // Final generic fallback if placeholders were already changed
-    if (!toml.includes(d1Id)) toml = toml.replace(/\bdatabase_id\s*=\s*"[^"]*"/, `database_id = "${d1Id}"`);
-    if (!toml.includes(kvId)) toml = toml.replace(/\bid\s*=\s*"[^"]*"/, `id = "${kvId}"`);
+    if (!toml.includes(d1Id)) toml = toml.replace(/"database_id":\s*"[^"]*"/, `"database_id": "${d1Id}"`);
+    if (!toml.includes(kvId)) toml = toml.replace(/"id":\s*"[^"]*"/, `"id": "${kvId}"`);
     fs.writeFileSync(TOML_PATH, toml);
     info(`${TOML_PATH} updated`);
 }
@@ -372,9 +374,9 @@ info("Migrations applied");
 if (PROJECT_TITLE !== 'OpenInspection' && fs.existsSync(TOML_PATH)) {
     step(`Step 7: Applying custom branding for ${PROJECT_TITLE}...`);
     let toml = fs.readFileSync(TOML_PATH, 'utf8');
-    toml = toml.replace(/APP_NAME\s*=\s*"[^"]*"/, `APP_NAME = "${PROJECT_TITLE}"`);
+    toml = toml.replace(/"APP_NAME":\s*"[^"]*"/, `"APP_NAME": "${PROJECT_TITLE}"`);
     fs.writeFileSync(TOML_PATH, toml);
-    info("APP_NAME updated in wrangler.toml");
+    info("APP_NAME updated in wrangler.local.jsonc");
 }
 
 // 8. Generate Setup Verification Code

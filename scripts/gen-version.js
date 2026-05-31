@@ -1,6 +1,6 @@
 /**
  * gen-version.js — reads .git to extract current commit info,
- * then writes src/generated/version.ts before build/deploy.
+ * then writes server/generated/version.ts before build/deploy.
  *
  * Handles both regular repos and git submodules (.git as a file).
  */
@@ -74,7 +74,7 @@ function readGitFiles() {
 const { commit, shortCommit, branch } = getGitInfo();
 const buildTime = new Date().toISOString();
 
-const outDir = join(root, 'api', 'src', 'generated');
+const outDir = join(root, 'server', 'generated');
 mkdirSync(outDir, { recursive: true });
 
 writeFileSync(

@@ -1,6 +1,6 @@
 # Testing — apps/core
 
-Tests cover both the API Worker and the React Router v7 Frontend Worker.
+The single Worker serves both the API and the React Router v7 UI, so tests cover both surfaces against one running worker. API tests live in `tests/`; web tests live in `tests/web/`.
 
 ## Quick Start
 
@@ -10,25 +10,24 @@ End-to-end tests use [Playwright](https://playwright.dev/). Tests run against a 
 
 ```bash
 # Terminal 1
-npm run dev          # http://localhost:8788
+npm run dev          # build-based; http://localhost:8788
 
 # Terminal 2
-npx playwright test --config api/playwright.config.ts
+npx playwright test --config playwright.api.config.ts
 ```
 
-### Frontend Tests
+API unit tests run with `npm run test:unit` (vitest, `vitest.api.config.ts`).
 
-Frontend E2E and unit tests live in `frontend/tests/`. They test the React Router v7 React UI against the running API Worker.
+### Web Tests
+
+Web unit + E2E tests live in `tests/web/`. They test the React Router v7 React UI against the same running worker.
 
 ```bash
-# Terminal 1: Start API Worker
-npm run dev
+# Terminal 1: Start the worker (build-based)
+npm run dev          # http://localhost:8788
 
-# Terminal 2: Start Frontend dev server
-cd frontend && npm run dev
-
-# Terminal 3: Run frontend tests
-cd frontend && npm run test
+# Terminal 2: Run web unit tests
+npm run test:web     # vitest, vitest.config.ts
 ```
 
 ## Test Results
@@ -50,7 +49,7 @@ npm run db:migrate
 npm run dev
 
 # In another terminal:
-npx playwright test
+npx playwright test --config playwright.api.config.ts
 ```
 
 ## Test Structure
@@ -107,7 +106,7 @@ npx playwright test
 1. Admin creates inspection with `referredByAgentId` via `POST /api/inspections`
 2. Agent calls `GET /api/agent/my-reports` — sees inspections where `referredByAgentId` matches their JWT `sub`
 3. Admin calls `GET /api/agent/leaderboard` — referral counts grouped by agent
-4. Public booking via `POST /api/public/book` with `agentId` body field also stores the referral
+4. Public booking via `POST /public/book` with `agentId` body field also stores the referral
    (Note: dev-mode tenantId is the subdomain string `'dev'`, not the UUID — verified separately via authenticated endpoint)
 
 ### Tenant Tier/Status Sync
@@ -155,14 +154,14 @@ test.describe('agreement CRUD (authenticated)', () => {
 
 ## Playwright Config
 
-Config lives at `api/playwright.config.ts`. Tests run serially (1 worker) — some describe blocks have stateful dependencies (create → update → delete).
+API E2E config lives at `playwright.api.config.ts` (web E2E uses `playwright.config.ts`). Tests run serially (1 worker) — some describe blocks have stateful dependencies (create → update → delete).
 
 ## Useful Commands
 
 ```bash
-npx playwright test --config api/playwright.config.ts --grep "availability"
-npx playwright test --config api/playwright.config.ts --grep "agent referral"
-npx playwright test --config api/playwright.config.ts --reporter=list
+npx playwright test --config playwright.api.config.ts --grep "availability"
+npx playwright test --config playwright.api.config.ts --grep "agent referral"
+npx playwright test --config playwright.api.config.ts --reporter=list
 ```
 
 ## CI Notes
@@ -174,20 +173,19 @@ npx playwright test --config api/playwright.config.ts --reporter=list
 - **Turnstile is required** — `TURNSTILE_SECRET_KEY` must be set even for local dev and CI. Use Cloudflare's always-pass test secret (`1x0000000000000000000000000000000AA`). If absent, `POST /api/book` throws a 500 error.
 - The Cloudflare Turnstile test keys in `.dev.vars.example` always pass validation — safe for CI.
 
-## Frontend Tests
+## Web Tests
 
-Frontend tests live in `frontend/tests/` and cover the React Router v7 React UI.
+Web tests live in `tests/web/` and cover the React Router v7 React UI.
 
 ### Running
 
 ```bash
-cd frontend
-npm run test              # run all frontend tests
-npm run test -- --grep "dashboard"   # filter by name
+npm run test:web                          # run all web unit tests (vitest.config.ts)
+npm run test:web -- --grep "dashboard"    # filter by name
 ```
 
 ### Requirements
 
-- Both the API Worker (`npm run dev` in root, port 8788) and the Frontend dev server (`npm run dev` in `frontend/`, port 5173) must be running.
-- The API Worker must have a seeded database (run `npm run db:migrate` first).
+- The single Worker (`npm run dev` in root, port 8788) must be running for E2E flows.
+- The worker must have a seeded database (run `npm run db:migrate` first).
 - Same `.dev.vars` / Turnstile key requirements as the API E2E tests.

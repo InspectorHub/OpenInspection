@@ -1,6 +1,6 @@
 # Route Metadata Conventions
 
-Every `createRoute()` call under `src/api/` must declare metadata used by the
+Every `createRoute()` call under `server/api/` must declare metadata used by the
 MCP server + Skill generator. The vitest gate at
 `src/__tests__/route-metadata.test.ts` enforces this on CI; missing or
 malformed metadata fails the build.
@@ -63,7 +63,7 @@ Default by HTTP method:
 Override when:
 - `/api/admin/*` or `/api/sysadmin/*` → `['admin']`
 - agent-specific routes → `['agent']`
-- public routes (`/api/public/*`, `/api/auth/*`, M2M) → `[]` and set `tier: 'excluded'`
+- public routes (`/public/*`, `/api/auth/*`, M2M) → `[]` and set `tier: 'excluded'`
 
 ## `x-tier` exposure
 

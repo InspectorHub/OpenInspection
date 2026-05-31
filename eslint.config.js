@@ -5,13 +5,13 @@ export default tseslint.config(
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     {
-        ignores: ['dist/**', 'dist-check/**', 'node_modules/**', '.wrangler/**', 'eslint.config.js', 'tailwind.config.js', 'public/**', 'tests/**', 'scripts/**'],
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.react-router/**', 'node_modules/**', '.wrangler/**', 'eslint.config.js', 'public/**', 'tests/**', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
         languageOptions: {
             parserOptions: {
-                project: true,
+                project: ['./tsconfig.json', './tsconfig.api.json'],
                 tsconfigRootDir: import.meta.dirname,
             },
         },
@@ -39,7 +39,7 @@ export default tseslint.config(
         // route files. The 17 retained apiFetch dead-route sites were all migrated
         // to the typed createApi(context, { token }) client; this keeps it that way.
         // Scoped to routes/** so browser-side component fetches aren't false-flagged.
-        files: ['frontend/app/routes/**/*.ts', 'frontend/app/routes/**/*.tsx'],
+        files: ['app/routes/**/*.ts', 'app/routes/**/*.tsx'],
         rules: {
             'no-restricted-syntax': ['warn',
                 {

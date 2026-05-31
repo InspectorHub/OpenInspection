@@ -1,6 +1,6 @@
 # Architecture
 
-OpenInspection is a multi-tenant home inspection app deployed as two independent Cloudflare Workers (API + Frontend). This doc covers the high-level architecture for self-hosters, contributors, and reviewers.
+OpenInspection is a multi-tenant home inspection app deployed as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full API in-process and delegates page routes to React Router v7 SSR. This doc covers the high-level architecture for self-hosters, contributors, and reviewers.
 
 ## Stack at a glance
 
@@ -22,37 +22,34 @@ OpenInspection is a multi-tenant home inspection app deployed as two independent
 | Payments | Stripe Connect (optional) |
 | Auth | ES256 JWT in HttpOnly cookie + PBKDF2-SHA256 password hashing |
 
-## Dual-Deploy Architecture
+## Single-Worker Architecture
 
-OpenInspection runs as two independent Cloudflare Workers:
+OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app that is the worker entry: it mounts the full API (`src/`) for API-owned paths and delegates everything else (page routes) to the React Router v7 SSR handler.
 
 ```
-                    ┌─────────────────────────┐
-  Browser ────────► │  Frontend Worker         │
-                    │  React Router v7 + React 18        │
-                    │  SSR on CF Workers       │
-                    │                          │
-                    │  Token Relay BFF:        │
-                    │  holds JWT cookie,       │
-                    │  forwards to API         │
-                    └─────────┬───────────────┘
-                              │ Service Binding
-                              │ (zero-latency)
-                    ┌─────────▼───────────────┐
-                    │  API Worker              │
-                    │  Hono + Drizzle + D1     │
-                    │  All business logic      │
-                    │                          │
-                    │  D1 · R2 · KV · Workflow │
-                    └─────────────────────────┘
+                    ┌──────────────────────────────────────────┐
+  Browser ────────► │  Single Worker (workers/app.ts)           │
+                    │  Hono entry                                │
+                    │                                            │
+                    │  ┌──────────────────┐  ┌────────────────┐ │
+                    │  │ /api/*, /status, │  │ everything else│ │
+                    │  │ /sign/*, … →     │  │ → React Router │ │
+                    │  │ API app (src/)   │  │ v7 SSR (app/)  │ │
+                    │  │ in-process       │◄─┤ in-process     │ │
+                    │  │ Hono+Drizzle+D1  │  │ API_WORKER     │ │
+                    │  └──────────────────┘  └────────────────┘ │
+                    │                                            │
+                    │  D1 · R2 · KV · Workflow · Durable Objects │
+                    └──────────────────────────────────────────┘
 ```
 
-- **API Worker** (`api/`) — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
-- **Frontend Worker** (`frontend/`) — React Router v7 + React 18 + Tailwind v4. Server-side renders the React UI. Calls API Worker via Service Binding (no network hop in production) or HTTP proxy (in local dev).
+- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, ICS/observe feeds) to the API app and sends everything else to the React Router v7 SSR handler. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
+- **`src/`** — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
+- **`app/`** — React Router v7 + React 18 + Tailwind v4. Server-side renders the React UI on the edge.
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.).
-- **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the frontend's `hono/client` gets full end-to-end type safety.
+- **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the web layer's `hono/client` gets full end-to-end type safety.
 
-The frontend uses a **Token Relay BFF** pattern: the React Router v7 server holds the JWT cookie and forwards it to the API Worker on every request, so the browser never sees the token directly.
+The web layer uses a **Token Relay BFF** pattern: the React Router v7 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token directly.
 
 ### Why React Router v7
 
@@ -66,59 +63,59 @@ The frontend uses a **Token Relay BFF** pattern: the React Router v7 server hold
 
 ```
 apps/core/
-├── api/
-│   ├── src/
-│   │   ├── index.ts               # Hono app entry, middleware order, route registration
-│   │   ├── api/                   # Route handlers (one file per resource)
-│   │   │   ├── auth.ts            # /api/auth/{login,register,reset-password,...}
-│   │   │   ├── inspections.ts     # /api/inspections/* + share/print
-│   │   │   ├── ai.ts              # /api/ai/{suggest-comment,comment/edit}
-│   │   │   ├── booking.ts         # /api/public/* (no auth) + /api/book
-│   │   │   └── ...
-│   │   ├── services/              # Business logic, DB queries (Drizzle)
-│   │   ├── features/              # Feature-scoped modules (per-strategy splits)
-│   │   │   └── tenant-routing/    # Tenant resolution: path-param → subdomain → fixed
-│   │   ├── lib/
-│   │   │   ├── middleware/        # Hono middleware (auth, RBAC, branding, DI)
-│   │   │   ├── db/                # Drizzle schema + utils
-│   │   │   ├── validations/       # Zod schemas per module
-│   │   │   ├── errors.ts          # AppError + ErrorCode + Errors factory
-│   │   │   ├── logger.ts          # Structured JSON logger (use this, not console)
-│   │   │   └── ics.ts             # iCalendar string builder
-│   │   └── workflows/             # Cloudflare Workflow durable steps
-│   ├── migrations/                # D1 SQL migrations (00xx_<name>.sql)
-│   └── tests/                     # API unit + integration + E2E tests
-├── frontend/
-│   ├── app/
-│   │   ├── root.tsx               # React Router v7 root layout
-│   │   ├── routes.ts              # Route configuration
-│   │   ├── entry.server.tsx       # React Router v7 CF Workers entry
-│   │   ├── routes/                # 75 route files (loader + action + component)
-│   │   ├── components/            # 61 React components
-│   │   ├── hooks/                 # 9 React hooks
-│   │   ├── lib/                   # API client (hono/client), session, helpers
-│   │   └── styles/tailwind.css    # Design System 0523 token layer
-│   └── tests/                     # Frontend E2E + unit tests
+├── workers/
+│   └── app.ts                     # Single-worker entry: Hono mounts API in-process + delegates pages to RR SSR
+├── src/                           # API (Hono + Drizzle + D1)
+│   ├── index.ts                   # Hono app entry, middleware order, route registration
+│   ├── api/                       # Route handlers (one file per resource)
+│   │   ├── auth.ts                # /api/auth/{login,register,reset-password,...}
+│   │   ├── inspections.ts         # /api/inspections/* + share/print
+│   │   ├── ai.ts                  # /api/ai/{suggest-comment,comment/edit}
+│   │   ├── booking.ts             # /public/* (no auth) + /api/book
+│   │   └── ...
+│   ├── services/                  # Business logic, DB queries (Drizzle)
+│   ├── features/                  # Feature-scoped modules (per-strategy splits)
+│   │   └── tenant-routing/        # Tenant resolution: path-param → subdomain → fixed
+│   ├── lib/
+│   │   ├── middleware/            # Hono middleware (auth, RBAC, branding, DI)
+│   │   ├── db/                    # Drizzle schema + utils
+│   │   ├── validations/           # Zod schemas per module
+│   │   ├── errors.ts              # AppError + ErrorCode + Errors factory
+│   │   ├── logger.ts              # Structured JSON logger (use this, not console)
+│   │   └── ics.ts                 # iCalendar string builder
+│   └── workflows/                 # Cloudflare Workflow durable steps
+├── app/                           # Web (React Router v7 + React 18 + Tailwind v4)
+│   ├── root.tsx                   # React Router v7 root layout
+│   ├── routes.ts                  # Route configuration
+│   ├── entry.server.tsx           # React Router v7 CF Workers entry
+│   ├── routes/                    # Route files (loader + action + component)
+│   ├── components/                # React components
+│   ├── hooks/                     # React hooks
+│   ├── lib/                       # API client (hono/client over the in-process binding), session, helpers
+│   └── styles/tailwind.css        # Design System 0523 token layer
+├── migrations/                    # D1 SQL migrations (drizzle-kit schema-first: 0000_baseline.sql + forward)
+├── tests/                         # API unit + integration + E2E tests
+├── tests/web/                     # Web E2E + unit tests
 ├── packages/
-│   ├── shared-ui/src/             # 11 shared React components
+│   ├── shared-ui/src/             # shared React components
 │   └── api-types/                 # CoreApiType for hono/client
 ├── scripts/                       # Setup, seed, backup, deploy helpers
-└── wrangler.toml                  # API Worker config + bindings (local dev)
+└── wrangler.jsonc                 # Single-worker config + bindings (committed, placeholder IDs; real IDs in gitignored wrangler.local.jsonc / wrangler.saas.jsonc)
 ```
 
 ## Request flow
 
-### Frontend (React Router v7) flow
+### Page (React Router v7) flow
 
 ```
 Browser request
    ↓
-Cloudflare edge → Frontend Worker fetch handler
+Cloudflare edge → single Worker (workers/app.ts) → Hono routes non-API paths to RR SSR
    ↓
 React Router v7 server (SSR):
    1. Route matched → loader() or action() executes
    2. Reads session cookie (Token Relay BFF)
-   3. Calls API Worker via Service Binding (hono/client)
+   3. Calls the in-process API via the injected API_WORKER binding (hono/client) — no network hop
    4. Renders React component tree to HTML
    ↓
 HTML + hydration bundle sent to browser
@@ -126,12 +123,12 @@ HTML + hydration bundle sent to browser
 Client-side: React hydrates, subsequent navigations use client-side routing
 ```
 
-### API Worker flow
+### API flow
 
 ```
-API request (from Frontend Worker or direct)
+API request (from an RR loader/action via the in-process API_WORKER binding, or direct over HTTP)
    ↓
-Cloudflare edge → API Worker fetch handler
+Cloudflare edge → single Worker (workers/app.ts) → Hono routes API-owned paths to the API app
    ↓
 Hono middleware stack (in order):
    1. CSP / security headers
@@ -159,7 +156,7 @@ Every D1 table includes `tenant_id` (NOT NULL). Three deployment modes:
 - **Shared SaaS**: one Worker, many tenants, each on a subdomain (`acme.app.com`, `xyz.app.com`).
 - **Silo SaaS**: per-tenant dedicated D1 (provisioned via Cloudflare API).
 
-Tenant resolution lives in `api/src/features/tenant-routing/` (entry point `index.ts`, with per-strategy resolvers in sibling files). The `tenantRouter` middleware tries three strategies in order:
+Tenant resolution lives in `src/features/tenant-routing/` (entry point `index.ts`, with per-strategy resolvers in sibling files). The `tenantRouter` middleware tries three strategies in order:
 
 1. **Path-param resolution** (`resolve-by-path-param.ts`) — matches URL patterns like `/book/:tenant/:slug` first so public routes work uniformly across all deploy modes
 2. **Subdomain resolution** (`resolve-by-subdomain.ts`) — silo / shared SaaS: extracts the subdomain from the `Host` header, looks up the tenant via KV (5-minute TTL) with D1 fallback, then writes the result back to KV
@@ -171,7 +168,7 @@ Tenant resolution lives in `api/src/features/tenant-routing/` (entry point `inde
 - Each request: middleware verifies JWT signature + checks `iat >= KV[pwchanged:userId]`
 - Password change: writes `pwchanged:userId = now()` to KV → invalidates all prior tokens server-side
 - Browser JS never sees the token (HttpOnly enforced); same-origin `fetch()` sends the cookie automatically.
-- Frontend Worker uses Token Relay BFF: React Router v7 server reads the cookie and forwards it via Service Binding to the API Worker.
+- The web layer uses Token Relay BFF: the React Router v7 server reads the cookie and forwards it to the in-process API on every request.
 
 ## E-signature (Spec 5H)
 
@@ -195,7 +192,7 @@ Customer signs at `/agreements/sign/:tenant/:token` → API writes an `agreement
 4. Append `workflow.complete` audit row recording the SHA-256 hashes of all three artifacts.
 5. Email the client via Resend with `signed.pdf` and `evidence.zip` as attachments.
 
-Browser Run requires `compatibility_date >= "2026-03-24"` in `wrangler.toml` and uses the free tier (10 browser-minutes/day — sufficient for typical inspection volume). Admin download endpoints for signed.pdf, certificate.pdf, and evidence.zip are Worker-proxied from R2.
+Browser Run requires `compatibility_date >= "2026-03-24"` in `wrangler.jsonc` and uses the free tier (10 browser-minutes/day — sufficient for typical inspection volume). Admin download endpoints for signed.pdf, certificate.pdf, and evidence.zip are Worker-proxied from R2.
 
 ### Verification flow
 
@@ -223,14 +220,14 @@ const inspections = await c.var.services.inspection.list({ status: 'in_progress'
 // c.var.services.inspection is auto-instantiated with c.get('tenantId')
 ```
 
-The DI proxy in `api/src/lib/middleware/di.ts` lazy-instantiates each service on first access per request.
+The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on first access per request.
 
 ## Frontend layer
 
-- **React Router v7 SSR**: Routes in `frontend/app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
-- **React components**: 59 components in `frontend/app/components/`, organized by domain (inspection, template, booking, etc.).
+- **React Router v7 SSR**: Routes in `app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
+- **React components**: 59 components in `app/components/`, organized by domain (inspection, template, booking, etc.).
 - **Hooks**: 9 custom hooks handle complex state — `useInspection` (866 LOC), `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `useOfflineQueue`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`.
-- **Design tokens**: Tailwind v4 with Design System 0523 tokens in `frontend/app/styles/tailwind.css`.
+- **Design tokens**: Tailwind v4 with Design System 0523 tokens in `app/styles/tailwind.css`.
 - **Shared UI**: `packages/shared-ui/` provides 12 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 
@@ -248,7 +245,7 @@ The DI proxy in `api/src/lib/middleware/di.ts` lazy-instantiates each service on
 
 ## Background work
 
-- **Onboarding workflow** (`api/src/workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
+- **Onboarding workflow** (`server/workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
 - **Cron triggers**: notification reminder sweeps (hourly), report-ready automations.
 
 ## Cost model (Cloudflare Free tier)
@@ -274,4 +271,4 @@ A solo inspector doing 50 inspections/month uses approximately 1-2% of Free tier
 | D1 reads | 5M/day | — |
 | R2 storage | 10 GB | — |
 
-React Router v7 SSR adds ~1-3ms CPU per request. The API Worker bundle is ~250KB gzip, well within limits. Browser Run (server-side PDF) is on the Free tier (10 min/day); requires `compatibility_date >= "2026-03-24"` and the `[browser]` binding in `wrangler.toml`.
+React Router v7 SSR adds ~1-3ms CPU per request. The combined Worker bundle stays well within limits. Browser Run (server-side PDF) is on the Free tier (10 min/day); requires `compatibility_date >= "2026-03-24"` and the `browser` binding in `wrangler.jsonc`.

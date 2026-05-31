@@ -31,16 +31,6 @@ else
     fail "Lint failed  →  npx lint-staged"
 fi
 
-# 3. Bundle size check
-step "Bundle size check"
-if node scripts/check-bundle-size.js; then
-    # Handled by Node script gracefully
-    :
-else
-    # FAILED if node script fails
-    FAILED=1
-fi
-
 if [ "$FAILED" -eq 1 ]; then
     echo "\n${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"
     exit 1

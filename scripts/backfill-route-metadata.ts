@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-console */
 /**
  * Codemod: backfill MCP/Skill route metadata across every createRoute() in
- * src/api/*.ts. Idempotent — re-running is a no-op for already-wrapped routes.
+ * server/api/*.ts. Idempotent — re-running is a no-op for already-wrapped routes.
  *
  * What it does for each `createRoute({...})`:
  *  1. Skip if already wrapped with `withMcpMetadata(...)`.

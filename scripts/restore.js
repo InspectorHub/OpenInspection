@@ -13,7 +13,7 @@ const getArg = (key) => {
     return (idx !== -1 && process.argv[idx + 1] && !process.argv[idx + 1].startsWith('--')) ? process.argv[idx + 1] : null;
 };
 
-const TOML_PATH = getArg('--config') || getArg('--toml') || 'wrangler.toml';
+const TOML_PATH = getArg('--config') || 'wrangler.local.jsonc';
 const PROJECT_SLUG = 'openinspection';
 
 // Dynamic Resource Naming

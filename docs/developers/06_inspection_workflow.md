@@ -31,7 +31,7 @@ Form structure as JSON in the `schema` column. Each tenant has one or more templ
 
 **Rating systems** are configurable per template (`rating_system_id` → `rating_systems` table). Each system defines levels with labels, colors, and severity buckets.
 
-Schema is validated by `api/src/lib/validations/template.schema.ts` (single canonical v2 format).
+Schema is validated by `server/lib/validations/template.schema.ts` (single canonical v2 format).
 
 ### `inspection_results`
 
@@ -48,7 +48,7 @@ Keys are item IDs from the template. Only items the inspector interacted with ar
 
 ## 2. Offline-First Field Collection
 
-The form renderer (`frontend/app/routes/form-renderer.tsx`) uses the `useOfflineQueue` hook + IndexedDB to cache responses locally. When offline, changes are saved to IndexedDB. On reconnect, a background sync queue PATCHes changes to `PATCH /api/inspections/:id/results`.
+The form renderer (`app/routes/form-renderer.tsx`) uses the `useOfflineQueue` hook + IndexedDB to cache responses locally. When offline, changes are saved to IndexedDB. On reconnect, a background sync queue PATCHes changes to `PATCH /api/inspections/:id/results`.
 
 **Field-level merge**: PATCH does last-write-wins per item key — only changed items need to be sent.
 
@@ -71,13 +71,13 @@ When an inspection is published:
 3. Email sent to client with report link
 4. Report rendered as HTML with print stylesheet — users invoke `window.print()` for PDF
 
-Report viewer: `frontend/app/routes/public/report.tsx` (card-stack layout with section navigation).
+Report viewer: `app/routes/public/report.tsx` (card-stack layout with section navigation).
 
 ## 5. Canned Comments & AI
 
 **Canned comments**: 250+ pre-written inspection comments in `comments` table. 3-tab picker (Satisfactory / Monitor / Defect) on each `rich` item. Slash-trigger (`/`) opens snippet picker in the notes field.
 
-**AI assistance** (`api/src/api/ai.ts`):
+**AI assistance** (`server/api/ai.ts`):
 
 | Endpoint | Purpose |
 |---|---|
@@ -102,7 +102,7 @@ Both call Gemini 1.5 Flash. Temperature 0.2.
 
 Inspectors manage weekly schedule + date overrides via `availability` / `availability_overrides` tables.
 
-Public booking: `GET /api/public/book/:tenant/:slug` returns inspector profile + services. Customer submits via `POST /api/public/book` with Turnstile bot protection.
+Public booking: `GET /public/book/:tenant/:slug` returns inspector profile + services. Customer submits via `POST /public/book` with Turnstile bot protection.
 
 ## 8. Execution Flow
 
@@ -135,12 +135,12 @@ Public booking: `GET /api/public/book/:tenant/:slug` returns inspector profile +
 
 | Path | Purpose |
 |---|---|
-| `api/src/api/inspections.ts` | Inspection + template CRUD |
-| `api/src/api/bookings.ts` | Public booking + availability |
-| `api/src/api/ai.ts` | AI comment assist + auto-summary |
-| `api/src/services/inspection.service.ts` | Core business logic (130KB) |
-| `api/src/lib/validations/template.schema.ts` | Template v2 schema validation |
-| `frontend/app/routes/inspection-edit.tsx` | 3-pane inspection editor |
-| `frontend/app/routes/form-renderer.tsx` | Mobile field form |
-| `frontend/app/hooks/useInspection.ts` | Inspection state management (866 LOC) |
-| `frontend/app/hooks/useCannedComments.ts` | Comment picker logic |
+| `server/api/inspections.ts` | Inspection + template CRUD |
+| `server/api/bookings.ts` | Public booking + availability |
+| `server/api/ai.ts` | AI comment assist + auto-summary |
+| `server/services/inspection.service.ts` | Core business logic (130KB) |
+| `server/lib/validations/template.schema.ts` | Template v2 schema validation |
+| `app/routes/inspection-edit.tsx` | 3-pane inspection editor |
+| `app/routes/form-renderer.tsx` | Mobile field form |
+| `app/hooks/useInspection.ts` | Inspection state management (866 LOC) |
+| `app/hooks/useCannedComments.ts` | Comment picker logic |
