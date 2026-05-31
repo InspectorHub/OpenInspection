@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inspectorSignature } from '../../src/lib/inspector-signature';
+import { inspectorSignature } from '../../server/lib/inspector-signature';
 
 const FULL_USER = {
     name: 'Mike Reynolds',

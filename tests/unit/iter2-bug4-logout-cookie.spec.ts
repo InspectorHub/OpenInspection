@@ -52,7 +52,7 @@ describe('iter-2 #4 — logout cookie deletion contract', () => {
         // Pin the production behavior by importing the actual helper used by
         // the logout handler. If somebody removes the second deleteCookie
         // call, this test breaks immediately.
-        const auth = await import('../../src/api/auth');
+        const auth = await import('../../server/api/auth');
         // The module exports `default` (coreAuthRoutes). We verify that the
         // logout handler is wired by sending a synthetic request through the
         // Hono router and reading the resulting Set-Cookie headers.

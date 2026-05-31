@@ -11,10 +11,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { InspectionService } from '../../src/services/inspection.service';
-import { PropertyFactsSchema, UpdateInspectionSchema } from '../../src/lib/validations/inspection.schema';
+import { InspectionService } from '../../server/services/inspection.service';
+import { PropertyFactsSchema, UpdateInspectionSchema } from '../../server/lib/validations/inspection.schema';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));

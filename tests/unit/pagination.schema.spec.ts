@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { paginationQuerySchema, PaginatedMetaSchema, buildMeta } from '../../src/lib/validations/pagination.schema';
+import { paginationQuerySchema, PaginatedMetaSchema, buildMeta } from '../../server/lib/validations/pagination.schema';
 
 describe('paginationQuerySchema', () => {
     it('defaults page=1 pageSize=50 when omitted', () => {

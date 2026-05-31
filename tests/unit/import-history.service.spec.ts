@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ImportHistoryService } from '../../src/services/import-history.service';
+import { ImportHistoryService } from '../../server/services/import-history.service';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
-import { tenantMarketplaceImportHistory } from '../../src/lib/db/schema/marketplace';
+import * as schema from '../../server/lib/db/schema';
+import { tenantMarketplaceImportHistory } from '../../server/lib/db/schema/marketplace';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));

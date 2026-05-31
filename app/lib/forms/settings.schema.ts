@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Settings form schemas, mirroring the API's validation rules (see
- * `src/lib/validations/*.schema.ts` and inline route schemas). Kept as
+ * `server/lib/validations/*.schema.ts` and inline route schemas). Kept as
  * plain zod (no `.openapi()`) so the SAME schema runs in each route's action
  * (`parseWithZod`) and in the browser via Conform's `onValidate` — one
  * validation source, progressive-enhancement safe.
@@ -81,7 +81,7 @@ export type TurnstileInput = z.infer<typeof turnstileSchema>;
 
 /**
  * Profile fields — mirrors the API's inline `PatchProfileSchema` in
- * `src/api/profile.ts` (name max 100, phone max 30, licenseNumber max 50,
+ * `server/api/profile.ts` (name max 100, phone max 30, licenseNumber max 50,
  * slug 3..32 lowercase/digit/hyphen, bio max 600). All fields optional so a
  * partial save leaves untouched fields unchanged. Empty strings are allowed
  * (the input may be left blank); only slug enforces a format when present.

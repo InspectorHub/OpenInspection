@@ -11,9 +11,9 @@
  *   - delete cascades the item links
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TagService } from '../../src/services/tag.service';
+import { TagService } from '../../server/services/tag.service';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));

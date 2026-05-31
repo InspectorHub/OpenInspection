@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { inspections, tenantConfigs, conciergeConfirmTokens } from '../../src/lib/db/schema';
+import { inspections, tenantConfigs, conciergeConfirmTokens } from '../../server/lib/db/schema';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 
 /**
  * Agent Accounts A3 — Schema verification for concierge booking.

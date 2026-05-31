@@ -7,7 +7,7 @@
  * item) without spinning up an in-memory D1 fixture for each case.
  */
 import { describe, it, expect } from 'vitest';
-import { decideFieldWrite, applyFieldWrite } from '../../src/lib/field-version';
+import { decideFieldWrite, applyFieldWrite } from '../../server/lib/field-version';
 
 describe('decideFieldWrite (subsystem B phase 3)', () => {
     it('returns ok when versions match', () => {

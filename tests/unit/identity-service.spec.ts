@@ -11,9 +11,9 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { IdentityService } from '../../src/services/identity.service';
+import { IdentityService } from '../../server/services/identity.service';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -22,7 +22,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // Stub signJwt so the test doesn't need a real ES256 keyring. The
 // service module imports it from jwt-keyring; we replace the function
 // with a deterministic stub that echoes the payload as base64.
-vi.mock('../../src/lib/jwt-keyring', () => ({
+vi.mock('../../server/lib/jwt-keyring', () => ({
     signJwt: vi.fn(async (payload: Record<string, unknown>) =>
         `eyJ${Buffer.from(JSON.stringify(payload)).toString('base64url')}.test.sig`,
     ),

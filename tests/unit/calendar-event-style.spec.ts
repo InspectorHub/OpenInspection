@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCalendarEventStyle } from '../../src/lib/calendar-event-style';
+import { getCalendarEventStyle } from '../../server/lib/calendar-event-style';
 
 describe('getCalendarEventStyle (iter-2 bug #5)', () => {
     it('renders draft inspections with a DRAFT prefix and lighter color', () => {

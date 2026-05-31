@@ -6,7 +6,7 @@
  * the inspection + parses inspection_results.data and delegates here.
  */
 import { describe, it, expect } from 'vitest';
-import { computePreflightFromData } from '../../src/lib/preflight';
+import { computePreflightFromData } from '../../server/lib/preflight';
 
 const baseInspection = {
     coverPhotoId:     null,

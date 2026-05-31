@@ -4,9 +4,9 @@ Cloudflare D1 (SQLite). Migrations are **drizzle-kit schema-first**: the Drizzle
 
 ## Source of truth
 
-- **Drizzle schema**: `src/lib/db/schema/` — TypeScript table definitions (the source of truth)
+- **Drizzle schema**: `server/lib/db/schema/` — TypeScript table definitions (the source of truth)
 - **Baseline migration**: `migrations/0000_baseline.sql` — the full baseline schema (50+ tables, plus indexes)
-- **Schema re-export**: `src/lib/db/schema/index.ts`
+- **Schema re-export**: `server/lib/db/schema/index.ts`
 
 ## Running migrations
 
@@ -45,7 +45,7 @@ Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `driz
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
 
-For the complete schema (all tables with columns, indexes, and constraints), see `migrations/0000_baseline.sql` — or the Drizzle definitions in `src/lib/db/schema/`, which are the source of truth.
+For the complete schema (all tables with columns, indexes, and constraints), see `migrations/0000_baseline.sql` — or the Drizzle definitions in `server/lib/db/schema/`, which are the source of truth.
 
 ## Drizzle ORM usage
 

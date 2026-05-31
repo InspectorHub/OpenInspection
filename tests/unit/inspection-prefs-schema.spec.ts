@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { InspectionPrefsSchema, InspectionPrefsPatchSchema, DEFAULT_INSPECTION_PREFS } from '../../src/lib/validations/inspection-prefs.schema';
+import { InspectionPrefsSchema, InspectionPrefsPatchSchema, DEFAULT_INSPECTION_PREFS } from '../../server/lib/validations/inspection-prefs.schema';
 
 describe('InspectionPrefsSchema', () => {
     it('accepts a valid prefs object', () => {

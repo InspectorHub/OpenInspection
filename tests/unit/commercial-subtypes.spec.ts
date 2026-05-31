@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PLATFORM_SUBTYPES, METADATA_PRESETS, getSubtypeDef, getMetadataPreset } from '../../src/lib/commercial-subtypes';
-import { sectionApplies, getApplicableSections } from '../../src/lib/section-applicability';
-import type { TemplateSection } from '../../src/types/template-schema';
+import { PLATFORM_SUBTYPES, METADATA_PRESETS, getSubtypeDef, getMetadataPreset } from '../../server/lib/commercial-subtypes';
+import { sectionApplies, getApplicableSections } from '../../server/lib/section-applicability';
+import type { TemplateSection } from '../../server/types/template-schema';
 
 describe('PLATFORM_SUBTYPES', () => {
     it('has 6 entries', () => {

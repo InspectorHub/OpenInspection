@@ -3,8 +3,8 @@ import {
     getDeploymentProfile,
     STANDALONE_PROFILE,
     SAAS_PROFILE,
-} from '../../src/lib/deployment-profile';
-import type { AppEnv } from '../../src/types/hono';
+} from '../../server/lib/deployment-profile';
+import type { AppEnv } from '../../server/types/hono';
 
 const FALLBACK_TENANT = '00000000-0000-0000-0000-000000000000';
 

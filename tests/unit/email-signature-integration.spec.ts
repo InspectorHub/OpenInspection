@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EmailService } from '../../src/services/email.service';
+import { EmailService } from '../../server/services/email.service';
 
 const STUB_INSPECTOR = {
     name: 'Mike Reynolds',

@@ -7,7 +7,7 @@ import {
     highlightMatches,
     type SearchableSection,
     type SearchableResults,
-} from '../../src/lib/editor-search';
+} from '../../server/lib/editor-search';
 
 /**
  * Competitor parity App.E.3 (Spectora) — editor full-text search.

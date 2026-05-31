@@ -1,8 +1,8 @@
 /**
- * Unit tests for src/lib/jwt-keyring.ts — ES256 multi-version keyring.
+ * Unit tests for server/lib/jwt-keyring.ts — ES256 multi-version keyring.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { buildKeyring, signJwt, verifyJwt } from '../../src/lib/jwt-keyring';
+import { buildKeyring, signJwt, verifyJwt } from '../../server/lib/jwt-keyring';
 
 interface Pem { privatePem: string; publicPem: string }
 

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { diMiddleware } from '../../src/lib/middleware/di';
-import type { HonoConfig } from '../../src/types/hono';
-import type { DeploymentProfile } from '../../src/lib/deployment-profile';
+import { diMiddleware } from '../../server/lib/middleware/di';
+import type { HonoConfig } from '../../server/types/hono';
+import type { DeploymentProfile } from '../../server/lib/deployment-profile';
 
 function makeApp(env: Partial<HonoConfig['Bindings']>) {
     const app = new Hono<HonoConfig>();

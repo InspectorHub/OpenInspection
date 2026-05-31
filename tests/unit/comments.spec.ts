@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { eq, and } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
-import { comments, tenants } from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
+import { comments, tenants } from '../../server/lib/db/schema';
 
 /**
  * Spec 2026-05-07 — Comments Library unification.

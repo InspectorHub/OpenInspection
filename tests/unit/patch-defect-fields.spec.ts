@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeDefectStates } from '../../src/services/inspection.service';
+import { sanitizeDefectStates } from '../../server/services/inspection.service';
 
 /**
  * Integration-flavored: we exercise the JSON-shape merge directly. A

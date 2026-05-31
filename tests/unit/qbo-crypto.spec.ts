@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encryptToken, decryptToken, deriveKey } from '../../src/lib/qbo-crypto';
+import { encryptToken, decryptToken, deriveKey } from '../../server/lib/qbo-crypto';
 
 const TEST_SECRET = 'a'.repeat(32); // 32-char JWT_SECRET for tests
 

@@ -9,7 +9,7 @@
  * Legacy 'inspector' aliased to 'lead' via the role-alias shim.
  */
 import { describe, it, expect } from 'vitest';
-import { canEdit } from '../../src/lib/rbac/can-edit';
+import { canEdit } from '../../server/lib/rbac/can-edit';
 
 const baseInspection = {
     id: 'i1',

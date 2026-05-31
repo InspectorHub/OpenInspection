@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { convertSpectoraTemplate, type SpectoraTemplate } from '../../src/lib/spectora-import';
-import { TemplateSchemaV2Schema } from '../../src/lib/validations/template.schema';
+import { convertSpectoraTemplate, type SpectoraTemplate } from '../../server/lib/spectora-import';
+import { TemplateSchemaV2Schema } from '../../server/lib/validations/template.schema';
 
 const SAMPLE_SPECTORA: SpectoraTemplate = {
     id: 'spectora_tpl_42',

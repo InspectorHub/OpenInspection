@@ -5,7 +5,7 @@
  * { items, units } diff payload consumed by /inspections/:id/versions/:n/diff.
  */
 import { describe, it, expect } from 'vitest';
-import { computeDiff } from '../../src/lib/version-diff';
+import { computeDiff } from '../../server/lib/version-diff';
 
 describe('computeDiff (subsystem D P7)', () => {
     it('detects added item', () => {

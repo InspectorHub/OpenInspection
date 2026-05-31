@@ -5,9 +5,9 @@
  * sibling-name uniqueness + cycle detection.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { UnitService } from '../../src/services/unit.service';
+import { UnitService } from '../../server/services/unit.service';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));

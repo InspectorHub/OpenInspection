@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../../src/lib/validations/unit.schema';
+import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../../server/lib/validations/unit.schema';
 
 describe('CreateUnitSchema (subsystem D P1 T1.3)', () => {
     it('accepts root building', () => {

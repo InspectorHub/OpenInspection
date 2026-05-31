@@ -1,9 +1,9 @@
 /**
- * JWT test helper â€?generates valid tokens for E2E tests.
+ * JWT test helper ï¿½?generates valid tokens for E2E tests.
  * Uses hono/jwt's sign() (already a project dependency).
  * No /src changes required.
  *
- * Dev secret must match the fallback in src/index.ts:
+ * Dev secret must match the fallback in server/index.ts:
  *   'fallback_secret_for_local_dev'
  *
  * Usage in tests:

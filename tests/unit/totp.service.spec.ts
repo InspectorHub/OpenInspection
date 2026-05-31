@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TotpService } from '../../src/services/totp.service';
+import { TotpService } from '../../server/services/totp.service';
 import { TOTP } from 'otpauth';
 
 const svc = new TotpService();

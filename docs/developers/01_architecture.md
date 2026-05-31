@@ -220,7 +220,7 @@ const inspections = await c.var.services.inspection.list({ status: 'in_progress'
 // c.var.services.inspection is auto-instantiated with c.get('tenantId')
 ```
 
-The DI proxy in `src/lib/middleware/di.ts` lazy-instantiates each service on first access per request.
+The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on first access per request.
 
 ## Frontend layer
 
@@ -245,7 +245,7 @@ The DI proxy in `src/lib/middleware/di.ts` lazy-instantiates each service on fir
 
 ## Background work
 
-- **Onboarding workflow** (`src/workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
+- **Onboarding workflow** (`server/workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
 - **Cron triggers**: notification reminder sweeps (hourly), report-ready automations.
 
 ## Cost model (Cloudflare Free tier)

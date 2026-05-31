@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computePublishReadinessFromState } from '../../src/services/inspection.service';
+import { computePublishReadinessFromState } from '../../server/services/inspection.service';
 
 describe('computePublishReadinessFromState', () => {
     const schema = {

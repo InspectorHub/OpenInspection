@@ -9,7 +9,7 @@
  * label, falling back to section + rating-bucket scoring.
  */
 import { describe, it, expect } from 'vitest';
-import { rankCannedCommentsForItem, type CannedCommentLike } from '../../src/services/inspection.service';
+import { rankCannedCommentsForItem, type CannedCommentLike } from '../../server/services/inspection.service';
 
 const sample: CannedCommentLike[] = [
     { id: 'c1', section: 'Roof',  category: 'Roof Covering',         text: 'Roof covering appears serviceable.',                  ratingBucket: 'satisfactory' },

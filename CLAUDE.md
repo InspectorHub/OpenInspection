@@ -14,7 +14,7 @@ npm install
 npm run dev          # Build + run the worker locally (react-router build + wrangler dev).
                      # No HMR. `npm run dev:hmr` (react-router dev) is currently broken by
                      # the in-process API module graph — see docs/developers.
-npm run build        # react-router build — bundles src/ (API) + app/ (RR SSR) into one worker
+npm run build        # react-router build — bundles server/ (API) + app/ (RR SSR) into one worker
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
 npm run type-check   # react-router typegen + tsc (app tsconfig.json + api tsconfig.api.json)
@@ -23,7 +23,7 @@ npm run test:unit    # API unit tests (vitest --config vitest.api.config.ts)
 npm run test:web     # Web unit tests (vitest --config vitest.config.ts)
 npm run test:e2e     # Playwright E2E
 
-# Database — drizzle-kit schema-first (src/lib/db/schema is the source of truth)
+# Database — drizzle-kit schema-first (server/lib/db/schema is the source of truth)
 npm run db:migrate          # apply migrations to local D1
 npm run db:migrate:remote   # apply migrations to remote D1
 npm run db:generate         # generate a forward migration from schema changes
@@ -49,12 +49,12 @@ applies the same config resolution to direct wrangler commands (db:migrate).
 | File/Dir | Purpose |
 |---|---|
 | `workers/app.ts` | Single-worker entry — Hono mounts the full API in-process + delegates page routes to React Router SSR |
-| `src/index.ts` | Hono API entry point and route configuration |
-| `src/api/` | API route handlers (Auth, Inspections, Bookings, etc.) |
-| `src/lib/db/` | Drizzle ORM schema (`src/lib/db/schema`) and database utilities |
-| `src/lib/middleware/` | Hono middleware (Authentication, RBAC, etc.) |
-| `src/lib/validations/` | Zod schemas per module |
-| `src/services/` | Business logic, DB queries (Drizzle) |
+| `server/index.ts` | Hono API entry point and route configuration |
+| `server/api/` | API route handlers (Auth, Inspections, Bookings, etc.) |
+| `server/lib/db/` | Drizzle ORM schema (`server/lib/db/schema`) and database utilities |
+| `server/lib/middleware/` | Hono middleware (Authentication, RBAC, etc.) |
+| `server/lib/validations/` | Zod schemas per module |
+| `server/services/` | Business logic, DB queries (Drizzle) |
 | `migrations/` | D1 migration SQL (drizzle-kit schema-first: `0000_baseline.sql` + forward) |
 | `tests/` | API unit + integration + E2E tests |
 | `app/routes/` | React Router v7 route files |
@@ -72,8 +72,8 @@ applies the same config resolution to direct wrangler commands (db:migrate).
 ### Single-Worker Architecture
 OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fullstack-template shape):
 
-- **`workers/app.ts`** — a Hono app is the worker entry. It mounts the full API (`src/`) for API-owned paths and delegates everything else to the React Router v7 SSR handler. It injects an **in-process `API_WORKER` self-binding** so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding).
-- **`src/`** — Hono + Drizzle + D1. All business logic, authentication, and data access. Typed JSON API.
+- **`workers/app.ts`** — a Hono app is the worker entry. It mounts the full API (`server/`) for API-owned paths and delegates everything else to the React Router v7 SSR handler. It injects an **in-process `API_WORKER` self-binding** so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding).
+- **`server/`** — Hono + Drizzle + D1. All business logic, authentication, and data access. Typed JSON API.
 - **`app/`** — React Router v7 + React 18 + Tailwind v4. Server-side renders the React UI on the edge.
 - **`packages/shared-ui/`** — Design System 0523 token-based React components.
 - **`packages/api-types/`** — Re-exports the Hono app type so `hono/client` gets full end-to-end type safety.
@@ -81,7 +81,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 **Token Relay BFF** pattern: the React Router v7 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token.
 
 ### Authentication
-- JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `src/lib/jwt-keyring.ts`.
+- JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `server/lib/jwt-keyring.ts`.
 - Supports both Cookie (for dashboard) and Bearer Header (for API) token delivery.
 - PBKDF2-SHA256 password hashing (100k iterations, 16-byte salt). Legacy SHA-256 hashes auto-rehashed on login.
 - **SaaS login is portal-only.** When `APP_MODE=saas` (regardless of topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys have a single core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (migration 0072), so a local form cannot disambiguate which tenant the user means. Entry into core in saas mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone deploys are unchanged — the local form still works because the single-tenant mapping is unambiguous.
@@ -93,7 +93,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - Stable API surface designed to be extended by SaaS overlay branches (e.g., `saas` branch).
 
 ### Inspection Engine
-- JSON-schema based inspection templates (`src/types/template-schema.ts`, single canonical v2 — see `src/lib/validations/template.schema.ts`).
+- JSON-schema based inspection templates (`server/types/template-schema.ts`, single canonical v2 — see `server/lib/validations/template.schema.ts`).
 - 9 item types: `rich` (rating + 3 canned-comment tabs) plus `boolean / text / textarea / number / select / multi_select / date / photo_only` for non-rated data points. Inspection side stores rating on `result.rating` and non-rich values on `result.value`.
 - Spectora import path: `POST /api/inspections/templates/import-spectora` accepts a raw Spectora export + a name, runs `lib/spectora-import.ts` (4-bucket → 3-tab mapping, identifier preservation via `source`), creates a template in one shot. UI entry point: "Import Spectora" button on `/templates`.
 - Support for field results, e-signatures, and report generation.
@@ -150,7 +150,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 
 These rules are **mandatory** for any code that touches authentication. Violations reintroduce critical vulnerabilities.
 
-- **ES256 keyring**: All JWT signing and verification MUST go through `src/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `diMiddleware` and exposed as `await c.var.keyringPromise`.
+- **ES256 keyring**: All JWT signing and verification MUST go through `server/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `diMiddleware` and exposed as `await c.var.keyringPromise`.
 - **kid required**: Every JWT MUST carry a `kid` header. `signJwt()` sets it from `JWT_CURRENT_KID`; `verifyJwt()` rejects tokens with no kid, or with a kid that is not in the keyring.
 - **iat claim**: `signJwt()` auto-injects `iat: Math.floor(Date.now() / 1000)` when the caller omits it. Without `iat`, KV session invalidation (`pwchanged:{userId}`) cannot work.
 - **No HS256 fallback**: There is NO legacy HS256 path. Pre-launch architectural choice — see rotation scripts and docs. The remaining `JWT_SECRET` env binding is now used only as KDF input for `config-crypto`, `qbo-crypto`, and audit signing-key encryption — never for JWT signing.
@@ -161,14 +161,14 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 - **deleteCookie secure**: Every `deleteCookie()` MUST include `{ path: '/', secure: true }`. Omitting `secure` on `__Host-` cookies throws a runtime exception.
 - **No localStorage tokens**: Frontend JS MUST NOT store tokens in `localStorage` or `document.cookie`. Same-origin `fetch()` sends the HttpOnly cookie automatically.
 - **KV invalidation**: On password change/reset/delete, write `pwchanged:{userId}` to KV. Auth middleware rejects tokens with `iat < changedAt`.
-- **D1 date safety**: Always use `safeISODate()` / `safeTimestamp()` from `src/lib/date.ts` when serializing DB date values. D1 returns mixed formats (Date, int, string).
+- **D1 date safety**: Always use `safeISODate()` / `safeTimestamp()` from `server/lib/date.ts` when serializing DB date values. D1 returns mixed formats (Date, int, string).
 
 ## Input Validation Rules
 
 - **Zod required**: Every API endpoint that accepts user input (body, query, params) MUST validate using a Zod schema. No manual `if (!field)` or TypeScript generics-only validation.
 - **OpenAPIHono routes**: Use `createRoute()` with `request.body/query/params` schemas and access validated data via `c.req.valid('json')`, `c.req.valid('query')`, `c.req.valid('param')`.
 - **Non-OpenAPIHono routes**: Use `schema.safeParse(await c.req.json())` and return 400 on failure. This applies to workaround routes that cannot use `createRoute()`.
-- **Schema location**: All Zod schemas live in `src/lib/validations/*.schema.ts`. Do not define schemas inline in route handlers.
+- **Schema location**: All Zod schemas live in `server/lib/validations/*.schema.ts`. Do not define schemas inline in route handlers.
 - **No raw c.req.json()**: Never use `c.req.json<T>()` with only TypeScript generics — generics provide zero runtime protection.
 
 ## Language Rules
@@ -179,7 +179,7 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 
 - **No raw console**: Server-side code MUST use `import { logger } from '../lib/logger'` instead of `console.log/error/warn/info`. The `Logger` class outputs structured JSON for log aggregators.
 - **Exception**: Client-side JS inside `<script>` tags or inline template scripts (runs in browser) MAY use `console.*`.
-- **Exception**: `src/lib/logger.ts` itself uses `console.info` internally — that is correct and must not be changed.
+- **Exception**: `server/lib/logger.ts` itself uses `console.info` internally — that is correct and must not be changed.
 - **Error signature**: `logger.error(message, data?, error?)` — second arg is `Record<string, unknown>`, third is optional `Error`. Do NOT pass raw Error as second arg.
 - **No sensitive data in logs**: Never log JWT tokens, passwords, API keys, or full request bodies. Log only error messages, status codes, and non-sensitive identifiers.
 

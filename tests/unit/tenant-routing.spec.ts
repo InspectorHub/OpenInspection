@@ -1,18 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { HonoConfig } from '../../src/types/hono';
-import { STANDALONE_PROFILE, SAAS_PROFILE } from '../../src/lib/deployment-profile';
+import type { HonoConfig } from '../../server/types/hono';
+import { STANDALONE_PROFILE, SAAS_PROFILE } from '../../server/lib/deployment-profile';
 
 // Mock the fixed-tenant resolver so we can deterministically simulate the
 // "resolver ran but tenantId remains unset" branch that the standalone 503
 // safety net (introduced in Section A) defends against. Hoisted by vitest
 // before tenantRouter loads, so the production middleware sees the stub.
-vi.mock('../../src/features/tenant-routing/resolve-by-fixed-tenant', () => ({
+vi.mock('../../server/features/tenant-routing/resolve-by-fixed-tenant', () => ({
     resolveByFixedTenant: vi.fn(),
 }));
 
-import { tenantRouter } from '../../src/features/tenant-routing';
-import { resolveByFixedTenant } from '../../src/features/tenant-routing/resolve-by-fixed-tenant';
+import { tenantRouter } from '../../server/features/tenant-routing';
+import { resolveByFixedTenant } from '../../server/features/tenant-routing/resolve-by-fixed-tenant';
 
 const FALLBACK_TENANT = '00000000-0000-0000-0000-000000000000';
 

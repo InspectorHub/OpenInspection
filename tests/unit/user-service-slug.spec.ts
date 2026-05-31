@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { UserService } from '../../src/services/user.service';
+import { UserService } from '../../server/services/user.service';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 // Mock drizzle-orm/d1 to return our in-memory better-sqlite3 db so the service

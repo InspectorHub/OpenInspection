@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bookingUrl, inspectorProfileUrl, inspectorCalendarUrl, reportUrl, signUrl, agreementSignUrl, agreementSignPath, embedBookingUrl, m2mAgreementRenderUrl } from '../../src/lib/public-urls';
+import { bookingUrl, inspectorProfileUrl, inspectorCalendarUrl, reportUrl, signUrl, agreementSignUrl, agreementSignPath, embedBookingUrl, m2mAgreementRenderUrl } from '../../server/lib/public-urls';
 
 describe('public URL builders', () => {
     it('bookingUrl emits /book/<tenant>/<inspector>', () => {

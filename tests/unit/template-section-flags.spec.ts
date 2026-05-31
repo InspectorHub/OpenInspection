@@ -7,7 +7,7 @@
  * those fields onto the report data contract works end-to-end.
  */
 import { describe, it, expect } from 'vitest';
-import { CreateTemplateSchema } from '../../src/lib/validations/template.schema';
+import { CreateTemplateSchema } from '../../server/lib/validations/template.schema';
 
 const baseItem = {
     id: 'i1',

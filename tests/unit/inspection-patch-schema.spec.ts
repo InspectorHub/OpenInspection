@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PatchItemFieldSchema, PatchPropertyFactSchema } from '../../src/lib/validations/inspection-patch.schema';
+import { PatchItemFieldSchema, PatchPropertyFactSchema } from '../../server/lib/validations/inspection-patch.schema';
 
 describe('PatchItemFieldSchema (subsystem B phase 3)', () => {
     it('accepts a rating field write', () => {

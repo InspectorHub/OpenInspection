@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeReportStats, getRatingColor, getRatingBucket } from '../../src/lib/report-utils';
+import { computeReportStats, getRatingColor, getRatingBucket } from '../../server/lib/report-utils';
 
 const defaultLevels = [
   { id: 'S', label: 'Satisfactory', abbreviation: 'SAT', color: '#22c55e', severity: 'good' as const, isDefect: false },

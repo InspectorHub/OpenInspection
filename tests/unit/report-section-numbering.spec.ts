@@ -3,7 +3,7 @@ import {
     canEditSection,
     formatSectionHeading,
     buildSectionEditHref,
-} from '../../src/lib/report-section-numbering';
+} from '../../server/lib/report-section-numbering';
 
 /**
  * Competitor parity App.F.4 (Spectora) — auto-numbered section headings

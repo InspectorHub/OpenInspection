@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { AuthService } from '../../src/services/auth.service';
-import { verifyPassword } from '../../src/lib/password';
+import { AuthService } from '../../server/services/auth.service';
+import { verifyPassword } from '../../server/lib/password';
 import { MockKV } from './mocks';
 import { createTestDb, setupSchema } from './db';
-import { users, tenantInvites, tenants } from '../../src/lib/db/schema';
+import { users, tenantInvites, tenants } from '../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 
 // Mock the drizzle-orm/d1 module to return our in-memory SQLite DB
 vi.mock('drizzle-orm/d1', () => ({

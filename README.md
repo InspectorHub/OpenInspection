@@ -24,7 +24,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 ### Architecture
 
 - **Single Cloudflare Worker** (`workers/app.ts`) — a Hono entry that mounts the full API in-process and delegates page routes to React Router v7 SSR (the cloudflare/react-router-hono-fullstack-template shape)
-- **API** (`src/`) — Hono + Drizzle + D1, handles all business logic
+- **API** (`server/`) — Hono + Drizzle + D1, handles all business logic
 - **Web** (`app/`) — React Router v7 + React 18 + Tailwind v4, SSR on CF Workers
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based components
 - One deployable; React Router loaders/actions call the API directly through an in-process `API_WORKER` self-binding (no network hop, no second worker)

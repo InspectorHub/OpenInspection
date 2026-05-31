@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ICON_PATHS, Icon } from '../../src/lib/icons';
+import { ICON_PATHS, Icon } from '../../server/lib/icons';
 
 describe('ICON_PATHS', () => {
     it('has at least 27 entries', () => {

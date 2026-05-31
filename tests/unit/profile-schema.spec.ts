@@ -3,7 +3,7 @@ import {
     SlugSchema,
     SetSlugRequestSchema,
     SlugAvailabilityResponseSchema,
-} from '../../src/lib/validations/profile.schema';
+} from '../../server/lib/validations/profile.schema';
 
 describe('SlugSchema', () => {
     it('accepts lowercase alphanum + hyphens, 3-32 chars', () => {

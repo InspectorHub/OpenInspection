@@ -6,7 +6,7 @@ import {
     isLegacyKey,
     migrateLegacyKey,
     DEFAULT_UNIT,
-} from '../../src/lib/finding-key';
+} from '../../server/lib/finding-key';
 
 describe('findingKey', () => {
     it('builds 3-part key with unitId', () => {

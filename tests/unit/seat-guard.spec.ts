@@ -6,7 +6,7 @@
  * guest billing or role-based quota.
  */
 import { describe, it, expect } from 'vitest';
-import { computeSeatsUsed, isAtOrOverQuota } from '../../src/lib/middleware/seat-guard';
+import { computeSeatsUsed, isAtOrOverQuota } from '../../server/lib/middleware/seat-guard';
 
 describe('seat-guard pure helpers (subsystem C P5)', () => {
     const NOW = 1_700_000_000;

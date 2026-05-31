@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BrandingService } from '../../src/services/branding.service';
+import { BrandingService } from '../../server/services/branding.service';
 
 describe('BrandingService.resolveReportTheme', () => {
     const svc = new BrandingService({} as never, {} as never);

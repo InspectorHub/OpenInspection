@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Form schemas, mirroring the API's validation rules
- * (src/lib/validations/auth.schema.ts). Kept as plain zod (no `.openapi()`)
+ * (server/lib/validations/auth.schema.ts). Kept as plain zod (no `.openapi()`)
  * so the SAME schema runs in the action (`parseWithZod`) and in the browser via
  * Conform's `onValidate` — one validation source, progressive-enhancement safe.
  *
@@ -20,7 +20,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 /**
  * Shared strong-password rule, mirroring the API's `passwordSchema`
- * (src/lib/validations/shared.schema.ts): min 8 chars with at least one
+ * (server/lib/validations/shared.schema.ts): min 8 chars with at least one
  * uppercase letter, one digit, and one special character.
  */
 const strongPassword = z

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { users } from '../../src/lib/db/schema/tenant';
+import { users } from '../../server/lib/db/schema/tenant';
 import { createTestDb, setupSchema } from './db';
 
 describe('users schema — A1', () => {

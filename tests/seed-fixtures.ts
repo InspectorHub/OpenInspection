@@ -20,7 +20,7 @@ const BRANCH_B_EMAIL = 'branch-b@seed.test';
 
 // PBKDF2-SHA256 of 'seedpassword' with a fixed salt — pre-computed so we
 // don't have to import the password helper into a setup script. Format
-// matches src/lib/password.ts (salt:iterations:hash all base64).
+// matches server/lib/password.ts (salt:iterations:hash all base64).
 // Verified manually by hashing 'seedpassword' through the same routine.
 const SEED_PASSWORD_HASH =
     'c2VlZHNhbHRzZWVkc2FsdA==:100000:5VlRX7Qd5LRMc+IT5Z3rWUmWzkn29w7Vw31o0kHGymY=';

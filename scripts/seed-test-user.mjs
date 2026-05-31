@@ -9,7 +9,7 @@
  *   default: admin@example.com / testpassword123
  *
  * Uses the same PBKDF2-SHA256 (100k iters, 16-byte salt, `pbkdf2:salt:hash`)
- * format as src/lib/password.ts, and the standalone SINGLE_TENANT_ID.
+ * format as server/lib/password.ts, and the standalone SINGLE_TENANT_ID.
  */
 import { execSync } from "node:child_process";
 import { writeFileSync, rmSync } from "node:fs";

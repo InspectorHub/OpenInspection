@@ -11,7 +11,7 @@
  *   - Empty / too-short address rejects with BadRequest.
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { PropertyLookupService } from '../../src/services/property-lookup.service';
+import { PropertyLookupService } from '../../server/services/property-lookup.service';
 
 describe('PropertyLookupService', () => {
     const originalFetch = globalThis.fetch;

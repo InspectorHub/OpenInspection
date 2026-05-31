@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeResults, type ResultsBlob } from '../../src/services/diff3.service';
+import { mergeResults, type ResultsBlob } from '../../server/services/diff3.service';
 
 const base: ResultsBlob = {
     item1: { status: 'satisfactory', notes: 'Original note.', photos: [{ key: 'p1' }], updatedAt: 1 },

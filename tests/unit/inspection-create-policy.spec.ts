@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { InspectionService } from '../../src/services/inspection.service';
-import { ScopedDB } from '../../src/lib/db/scoped';
+import { InspectionService } from '../../server/services/inspection.service';
+import { ScopedDB } from '../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));

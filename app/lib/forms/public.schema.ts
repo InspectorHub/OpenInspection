@@ -9,7 +9,7 @@ import { z } from "zod";
 /**
  * Concierge booking — POST to /concierge-book action.
  * Mirrors the API's `BookRequestSchema`
- * (src/lib/validations/concierge.schema.ts): contactName + address are
+ * (server/lib/validations/concierge.schema.ts): contactName + address are
  * required (min 1), contactEmail must be a valid email, phone + notes optional.
  * The invite `token` and the chosen slot start/end come through hidden inputs
  * and are validated here too (slot start/end required) so the no-JS path is

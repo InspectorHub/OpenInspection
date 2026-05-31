@@ -16,7 +16,7 @@ const root = process.cwd();
 
 // Regenerate the baseline from the CURRENT Drizzle schema so this doubles as a
 // live drift gate (db:check): migrations/ vs schema must stay structurally equal.
-console.log('Regenerating baseline from src/lib/db/schema…');
+console.log('Regenerating baseline from server/lib/db/schema…');
 rmSync(join(root, 'drizzle-tmp'), { recursive: true, force: true });
 execSync('npx drizzle-kit generate --config drizzle.config.trial.ts', { cwd: root, stdio: 'ignore' });
 

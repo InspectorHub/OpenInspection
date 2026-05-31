@@ -7,7 +7,7 @@
  * accept new tokens carrying 'lead'.
  */
 import { describe, it, expect } from 'vitest';
-import { normaliseRole, ROLE_ALIASES, requireRole } from '../../src/lib/middleware/rbac';
+import { normaliseRole, ROLE_ALIASES, requireRole } from '../../server/lib/middleware/rbac';
 
 describe('normaliseRole', () => {
     it('aliases inspector → lead', () => {

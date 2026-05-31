@@ -1,5 +1,5 @@
 /**
- * Route metadata gate — fails CI when any route in src/api/ lacks the
+ * Route metadata gate — fails CI when any route in server/api/ lacks the
  * required MCP/Skill metadata. See:
  *   docs/superpowers/specs/2026-05-21-core-skill-mcp-integration-design.md
  *   docs/route-metadata-conventions.md
@@ -9,7 +9,7 @@
  * complete when the set is empty.
  */
 import { describe, it, expect } from 'vitest';
-import { app } from '../../src/index';
+import { app } from '../../server/index';
 import {
     VALID_TAGS,
     VALID_SECONDARY_TAGS,
@@ -20,7 +20,7 @@ import {
     MIN_DESCRIPTION_CHARS,
     MIN_FIELD_DESCRIPTION_CHARS,
     PRIMARY_TIER_CAP,
-} from '../../src/lib/route-metadata-standards';
+} from '../../server/lib/route-metadata-standards';
 
 // Phase 0 done: every /api/* module has full route metadata + field descriptions
 // (route metadata from PR #21, Zod field descriptions from this PR).

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getInspectionStatusIcons } from '../../src/lib/inspection-status';
+import { getInspectionStatusIcons } from '../../server/lib/inspection-status';
 
 describe('Round-2 F2 — getInspectionStatusIcons', () => {
     it('returns all-false for a draft inspection with no flags', () => {

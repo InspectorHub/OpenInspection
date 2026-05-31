@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ReportPdfService } from '../../src/services/report-pdf.service';
+import { ReportPdfService } from '../../server/services/report-pdf.service';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
-vi.mock('../../src/lib/pdf', () => ({
+vi.mock('../../server/lib/pdf', () => ({
     generatePdfFromUrl: vi.fn(async () => new ArrayBuffer(1024)),
 }));
-import { generatePdfFromUrl } from '../../src/lib/pdf';
+import { generatePdfFromUrl } from '../../server/lib/pdf';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const INSP_1   = '00000000-0000-0000-0000-0000000000b1';

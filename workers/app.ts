@@ -4,7 +4,7 @@
 // (API worker + web worker + Service Binding) topology with one deployable.
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
-import apiHandler, { app as apiApp } from "../src/index";
+import apiHandler, { app as apiApp } from "../server/index";
 
 declare module "react-router" {
   export interface AppLoadContext {
@@ -80,6 +80,6 @@ export default {
 
 // Re-export Durable Objects + Workflow so wrangler can bind them on the single
 // worker (their class names are referenced by the combined wrangler config).
-export { InspectionPresenceDO } from "../src/durable-objects/inspection-presence";
-export { TenantPresenceDO } from "../src/durable-objects/tenant-presence";
-export { SignCompletionWorkflow } from "../src/workflows/sign-completion-workflow";
+export { InspectionPresenceDO } from "../server/durable-objects/inspection-presence";
+export { TenantPresenceDO } from "../server/durable-objects/tenant-presence";
+export { SignCompletionWorkflow } from "../server/workflows/sign-completion-workflow";

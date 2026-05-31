@@ -4,6 +4,6 @@ import { defineConfig } from 'drizzle-kit';
 // The real config (drizzle.config.ts) writes to ./migrations.
 export default defineConfig({
   dialect: 'sqlite',
-  schema: './src/lib/db/schema/index.ts',
+  schema: './server/lib/db/schema/index.ts',
   out: './drizzle-tmp',
 });

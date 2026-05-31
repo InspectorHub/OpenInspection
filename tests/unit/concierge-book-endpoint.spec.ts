@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import agentRoutes from '../../src/api/agent';
-import type { HonoConfig } from '../../src/types/hono';
+import agentRoutes from '../../server/api/agent';
+import type { HonoConfig } from '../../server/types/hono';
 
 /**
  * Agent Accounts A3 — POST /api/agent/concierge-book integration shape.

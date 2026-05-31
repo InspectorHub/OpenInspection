@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderTemplate, listUnresolved } from '../../src/lib/mustache';
+import { renderTemplate, listUnresolved } from '../../server/lib/mustache';
 
 describe('renderTemplate', () => {
     it('substitutes single variable', () => {

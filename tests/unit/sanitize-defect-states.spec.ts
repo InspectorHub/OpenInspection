@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 // sanitizeDefectStates is module-private; export it for testing if it isn't already.
 // If still private, add `export` keyword on its declaration in inspection.service.ts.
-import { sanitizeDefectStates } from '../../src/services/inspection.service';
+import { sanitizeDefectStates } from '../../server/services/inspection.service';
 
 describe('sanitizeDefectStates — new structured fields', () => {
     it('keeps a valid trade/deadline/timeframe trio', () => {

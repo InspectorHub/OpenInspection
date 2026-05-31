@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { TemplateSchemaV2Schema } from '../../src/lib/validations/template.schema';
+import { TemplateSchemaV2Schema } from '../../server/lib/validations/template.schema';
 
 /**
  * Spec 5B — every seed JSON must be a valid v2 template document.
@@ -9,7 +9,7 @@ import { TemplateSchemaV2Schema } from '../../src/lib/validations/template.schem
  * conform to the new structural rules. Fix the JSON, not the schema.
  */
 describe('Spec 5B — seed templates conform to v2 schema', () => {
-    const seedDir = path.resolve(__dirname, '../../src/data/seed-templates');
+    const seedDir = path.resolve(__dirname, '../../server/data/seed-templates');
     const files = fs.readdirSync(seedDir).filter(f => f.endsWith('.json'));
 
     expect(files.length).toBeGreaterThan(0);

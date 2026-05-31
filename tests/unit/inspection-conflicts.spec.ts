@@ -7,9 +7,9 @@
  * POST /conflicts/resolve against an in-memory SQLite DB.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { listPendingConflicts, resolveConflicts } from '../../src/services/conflicts.service';
+import { listPendingConflicts, resolveConflicts } from '../../server/services/conflicts.service';
 import { createTestDb, setupSchema } from './db';
-import { inspectionConflicts } from '../../src/lib/db/schema';
+import { inspectionConflicts } from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));

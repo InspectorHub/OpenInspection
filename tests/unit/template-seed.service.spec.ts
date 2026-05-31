@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_AUTO_SEED_NAMES, TemplateSeedService } from '../../src/services/template-seed.service';
+import { DEFAULT_AUTO_SEED_NAMES, TemplateSeedService } from '../../server/services/template-seed.service';
 
 describe('TemplateSeedService', () => {
     it('exposes bulkSeed', () => {

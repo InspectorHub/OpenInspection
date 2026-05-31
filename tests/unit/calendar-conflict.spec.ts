@@ -4,7 +4,7 @@
  * Pure helper that decides whether dropping an inspection on a new date/hour
  * collides with another inspection on the same tenant's calendar.
  *
- * The function lives in `src/lib/calendar-conflict.ts` so it can be reused
+ * The function lives in `server/lib/calendar-conflict.ts` so it can be reused
  * from both the FullCalendar drag handler (eventDrop / eventAllow) and from
  * any future swap modal logic without pulling in the DOM.
  */
@@ -14,7 +14,7 @@ import {
     detectSlotConflict,
     sameDayHour,
     type CalendarItem,
-} from '../../src/lib/calendar-conflict';
+} from '../../server/lib/calendar-conflict';
 
 const inspections: CalendarItem[] = [
     { id: 'a', date: '2026-06-15T09:00:00.000Z' },

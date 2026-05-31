@@ -31,7 +31,7 @@ Form structure as JSON in the `schema` column. Each tenant has one or more templ
 
 **Rating systems** are configurable per template (`rating_system_id` → `rating_systems` table). Each system defines levels with labels, colors, and severity buckets.
 
-Schema is validated by `src/lib/validations/template.schema.ts` (single canonical v2 format).
+Schema is validated by `server/lib/validations/template.schema.ts` (single canonical v2 format).
 
 ### `inspection_results`
 
@@ -77,7 +77,7 @@ Report viewer: `app/routes/public/report.tsx` (card-stack layout with section na
 
 **Canned comments**: 250+ pre-written inspection comments in `comments` table. 3-tab picker (Satisfactory / Monitor / Defect) on each `rich` item. Slash-trigger (`/`) opens snippet picker in the notes field.
 
-**AI assistance** (`src/api/ai.ts`):
+**AI assistance** (`server/api/ai.ts`):
 
 | Endpoint | Purpose |
 |---|---|
@@ -135,11 +135,11 @@ Public booking: `GET /public/book/:tenant/:slug` returns inspector profile + ser
 
 | Path | Purpose |
 |---|---|
-| `src/api/inspections.ts` | Inspection + template CRUD |
-| `src/api/bookings.ts` | Public booking + availability |
-| `src/api/ai.ts` | AI comment assist + auto-summary |
-| `src/services/inspection.service.ts` | Core business logic (130KB) |
-| `src/lib/validations/template.schema.ts` | Template v2 schema validation |
+| `server/api/inspections.ts` | Inspection + template CRUD |
+| `server/api/bookings.ts` | Public booking + availability |
+| `server/api/ai.ts` | AI comment assist + auto-summary |
+| `server/services/inspection.service.ts` | Core business logic (130KB) |
+| `server/lib/validations/template.schema.ts` | Template v2 schema validation |
 | `app/routes/inspection-edit.tsx` | 3-pane inspection editor |
 | `app/routes/form-renderer.tsx` | Mobile field form |
 | `app/hooks/useInspection.ts` | Inspection state management (866 LOC) |

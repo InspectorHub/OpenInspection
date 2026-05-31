@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from './db';
-import { tenants, users } from '../../src/lib/db/schema';
+import { tenants, users } from '../../server/lib/db/schema';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 
 // Mock the drizzle-orm/d1 module so the helper's `drizzle(d1)` call returns
 // our in-memory SQLite-backed Drizzle instance instead of a real D1 client.
@@ -13,8 +13,8 @@ vi.mock('drizzle-orm/d1', () => ({
 // Mock the usage module so the middleware's getSeatUsage import is
 // replaced with a vi.fn() controllable per-test. Hoisted by vitest before
 // the middleware module evaluates, so it sees the stub.
-vi.mock('../../src/features/seat-quota/usage', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../../src/features/seat-quota/usage')>();
+vi.mock('../../server/features/seat-quota/usage', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../server/features/seat-quota/usage')>();
     return {
         ...actual,
         getSeatUsage: vi.fn(actual.getSeatUsage),
@@ -22,12 +22,12 @@ vi.mock('../../src/features/seat-quota/usage', async (importOriginal) => {
 });
 
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import { getSeatUsage } from '../../src/features/seat-quota/usage';
+import { getSeatUsage } from '../../server/features/seat-quota/usage';
 import { Hono } from 'hono';
-import { requireSeatAvailable } from '../../src/features/seat-quota';
-import { STANDALONE_PROFILE, SAAS_PROFILE, type DeploymentProfile } from '../../src/lib/deployment-profile';
-import { AppError } from '../../src/lib/errors';
-import type { HonoConfig } from '../../src/types/hono';
+import { requireSeatAvailable } from '../../server/features/seat-quota';
+import { STANDALONE_PROFILE, SAAS_PROFILE, type DeploymentProfile } from '../../server/lib/deployment-profile';
+import { AppError } from '../../server/lib/errors';
+import type { HonoConfig } from '../../server/types/hono';
 
 describe('getSeatUsage', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
@@ -122,7 +122,7 @@ describe('requireSeatAvailable middleware', () => {
         tenantId: string | null = 'tenant-1',
     ) {
         const app = new Hono<HonoConfig>();
-        // Mirror the global error handler from src/index.ts so the
+        // Mirror the global error handler from server/index.ts so the
         // AppError thrown by the middleware translates to a JSON 4xx.
         app.onError((err, c) => {
             if (err instanceof AppError) {

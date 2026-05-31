@@ -4,8 +4,8 @@ import {
     findBuildingOfUnit,
     resolveUnitSections,
     resolveUnitSectionItems,
-} from '../../src/lib/inspection-resolvers';
-import type { TemplateSchemaV2 } from '../../src/types/template-schema';
+} from '../../server/lib/inspection-resolvers';
+import type { TemplateSchemaV2 } from '../../server/types/template-schema';
 
 const structure = {
     buildings: [

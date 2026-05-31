@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { setupWizardRoutes } from '../../src/features/setup-wizard';
-import type { HonoConfig } from '../../src/types/hono';
-import { STANDALONE_PROFILE, SAAS_PROFILE } from '../../src/lib/deployment-profile';
+import { setupWizardRoutes } from '../../server/features/setup-wizard';
+import type { HonoConfig } from '../../server/types/hono';
+import { STANDALONE_PROFILE, SAAS_PROFILE } from '../../server/lib/deployment-profile';
 
 describe('setup-wizard mount gating', () => {
     it('returns the setup page when profile.hasSetupWizard is true', async () => {

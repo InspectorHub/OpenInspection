@@ -2,11 +2,11 @@
  * Design System 0520 subsystem E P7.1 — analytics aggregator tests.
  *
  * The AnalyticsService is a thin DB wrapper; the pure aggregators in
- * src/lib/analytics.ts contain the actual logic and are unit-tested
+ * server/lib/analytics.ts contain the actual logic and are unit-tested
  * here without any DB plumbing.
  */
 import { describe, it, expect } from 'vitest';
-import { groupInspectionsByMonth, summariseHeatmap } from '../../src/lib/analytics';
+import { groupInspectionsByMonth, summariseHeatmap } from '../../server/lib/analytics';
 
 describe('groupInspectionsByMonth (subsystem E P7.1)', () => {
     it('returns N empty buckets when no inspections exist', () => {

@@ -4,7 +4,7 @@
  * Round-trips + tampering + expiry + bad-secret cases.
  */
 import { describe, it, expect } from 'vitest';
-import { signObserverCookie, verifyObserverCookie } from '../../src/lib/observer-cookie';
+import { signObserverCookie, verifyObserverCookie } from '../../server/lib/observer-cookie';
 
 const SECRET = 'a'.repeat(32);
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EmailService } from '../../src/services/email.service';
+import { EmailService } from '../../server/services/email.service';
 
 /**
  * Agent Accounts A3 — Resend templates for the concierge state machine.

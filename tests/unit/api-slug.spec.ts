@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { SetSlugRequestSchema } from '../../src/lib/validations/profile.schema';
-import publicSlugRoutes from '../../src/api/public-slug';
-import profileRoutes from '../../src/api/profile';
+import { SetSlugRequestSchema } from '../../server/lib/validations/profile.schema';
+import publicSlugRoutes from '../../server/api/public-slug';
+import profileRoutes from '../../server/api/profile';
 
 describe('API contract — slug', () => {
     it('Set slug request schema validates lowercase + length', () => {

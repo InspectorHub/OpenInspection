@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { AIService } from '../../src/services/ai.service';
+import { AIService } from '../../server/services/ai.service';
 
 /**
  * Spec 5B P2B — AIService.rewriteComment unit tests.

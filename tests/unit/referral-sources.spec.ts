@@ -8,8 +8,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { SEED_REFERRAL_SOURCES, resolveReferralSources } from '../../src/lib/referral-sources';
-import { UpdateBrandingSchema } from '../../src/lib/validations/admin.schema';
+import { SEED_REFERRAL_SOURCES, resolveReferralSources } from '../../server/lib/referral-sources';
+import { UpdateBrandingSchema } from '../../server/lib/validations/admin.schema';
 
 describe('resolveReferralSources', () => {
     it('returns the seven seed values when no custom list', () => {

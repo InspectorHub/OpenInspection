@@ -26,6 +26,6 @@
       "@core/api-types": ["./packages/api-types/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "worker-configuration.d.ts"],
+  "include": ["server/**/*.ts", "server/**/*.tsx", "worker-configuration.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

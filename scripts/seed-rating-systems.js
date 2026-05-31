@@ -9,7 +9,7 @@
  *
  * Idempotent: skips any system whose (tenant_id, slug) pair already exists.
  *
- * SEEDS duplicated from src/data/rating-system-seeds.ts — keep in sync with
+ * SEEDS duplicated from server/data/rating-system-seeds.ts — keep in sync with
  * the runtime service-layer seeder. Both paths normalize the level list so
  * any caller can rely on UUID + display order being filled in.
  */
@@ -30,7 +30,7 @@ const configPath = configIdx > -1 ? process.argv[configIdx + 1] : (SAAS ? 'wrang
 const flag       = LOCAL ? '--local' : '--remote';
 const configFlag = configPath ? `-c ${configPath}` : '';
 
-// ── Seed data — mirror of src/data/rating-system-seeds.ts ─────────────────
+// ── Seed data — mirror of server/data/rating-system-seeds.ts ─────────────────
 const SEEDS = [
     {
         slug:        'oi-4tier',

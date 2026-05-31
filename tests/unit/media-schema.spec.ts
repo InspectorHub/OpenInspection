@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UpdateMediaAnnotationsSchema } from '../../src/lib/validations/media.schema';
+import { UpdateMediaAnnotationsSchema } from '../../server/lib/validations/media.schema';
 
 describe('UpdateMediaAnnotationsSchema', () => {
     it('accepts valid annotations + caption', () => {

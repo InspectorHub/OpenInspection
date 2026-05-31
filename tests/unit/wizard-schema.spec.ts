@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateInspectionFromWizardSchema } from '../../src/lib/validations/wizard.schema';
+import { CreateInspectionFromWizardSchema } from '../../server/lib/validations/wizard.schema';
 
 const valid = {
     property: { address: '123 Main St', yearBuilt: 1973, sqft: 1840, propertyType: 'single_family' as const },

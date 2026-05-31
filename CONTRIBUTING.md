@@ -27,11 +27,11 @@ Detailed setup including Cloudflare bindings and environment variables: [`docs/d
 These are summarized from `CLAUDE.md` — read that file for the canonical, exhaustive rules.
 
 - **Language**: TypeScript with strict mode. All source code, comments, docs, commit messages, and user-facing strings in **English only**.
-- **Validation**: Every API endpoint uses Zod. Schemas live in `src/lib/validations/*.schema.ts`. No manual `if (!field)` checks.
+- **Validation**: Every API endpoint uses Zod. Schemas live in `server/lib/validations/*.schema.ts`. No manual `if (!field)` checks.
 - **Auth**: HS256 JWT in HttpOnly cookie, PBKDF2 password hashing. Never use a fallback secret. Read `CLAUDE.md` § JWT & Auth Security Rules.
 - **Multi-tenant**: Every D1 table includes `tenant_id`. Use `c.var.services.xxx` (DI proxy) — services auto-scope to the tenant.
 - **Logging**: Server-side code uses `import { logger } from '../lib/logger'`. Browser-side `console.*` is fine.
-- **CSS**: Tailwind utilities + canonical v3 tokens defined in `src/styles/input.css`. No `font-black` outside stat numbers, no `rounded-2xl`, no `tracking-tightest`. The design system reference is at `docs/superpowers/plans/2026-05-08-sprint1-design-system-reference.md`.
+- **CSS**: Tailwind utilities + canonical v3 tokens defined in `server/styles/input.css`. No `font-black` outside stat numbers, no `rounded-2xl`, no `tracking-tightest`. The design system reference is at `docs/superpowers/plans/2026-05-08-sprint1-design-system-reference.md`.
 
 ## Commit style
 

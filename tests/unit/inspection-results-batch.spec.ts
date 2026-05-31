@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from './db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
-import { applyResultsBatch } from '../../src/services/inspection-results.service';
-import { inspections, inspectionResults, tenants } from '../../src/lib/db/schema';
+import { applyResultsBatch } from '../../server/services/inspection-results.service';
+import { inspections, inspectionResults, tenants } from '../../server/lib/db/schema';
 
 /**
  * Typed-Hono dead-routes cleanup Task 10 — vectorised result patches.

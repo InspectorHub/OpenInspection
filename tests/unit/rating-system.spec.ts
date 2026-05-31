@@ -12,10 +12,10 @@
  *   - report-utils + bucket mapping survives the new shape
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { RatingSystemService } from '../../src/services/rating-system.service';
-import { RECOMMENDATION_CATEGORIES, getRecommendationCategory, getRecommendationPhrase } from '../../src/lib/recommendation-categories';
+import { RatingSystemService } from '../../server/services/rating-system.service';
+import { RECOMMENDATION_CATEGORIES, getRecommendationCategory, getRecommendationPhrase } from '../../server/lib/recommendation-categories';
 import { createTestDb, setupSchema } from './db';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));

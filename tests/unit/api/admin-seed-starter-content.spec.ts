@@ -10,13 +10,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../../../src/lib/db/schema';
+import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
-import type { HonoConfig } from '../../../src/types/hono';
+import type { HonoConfig } from '../../../server/types/hono';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import adminRoutes from '../../../src/api/admin';
+import adminRoutes from '../../../server/api/admin';
 
 describe('POST /api/admin/seed-starter-content', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
@@ -28,7 +28,7 @@ describe('POST /api/admin/seed-starter-content', () => {
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
         app.route('/api/admin', adminRoutes);
-        // Mirror src/index.ts global error handler: AppError carries `status`
+        // Mirror server/index.ts global error handler: AppError carries `status`
         // (not `statusCode`); everything else is a 500.
         app.onError((err: unknown, c) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

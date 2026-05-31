@@ -5,12 +5,12 @@ import {
     getBookInfo,
     createBooking,
     getConfirmInfo,
-} from '../../src/services/concierge.service';
+} from '../../server/services/concierge.service';
 import {
     conciergeInvites,
     conciergeBookings,
     tenants,
-} from '../../src/lib/db/schema';
+} from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 /**

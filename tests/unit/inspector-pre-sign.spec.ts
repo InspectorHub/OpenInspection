@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import { createTestDb, setupSchema } from './db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import { applyInspectorPreSign } from '../../src/services/agreement.service';
+import { applyInspectorPreSign } from '../../server/services/agreement.service';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const REQ_ID = '00000000-0000-0000-0000-000000000200';

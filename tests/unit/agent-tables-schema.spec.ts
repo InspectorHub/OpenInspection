@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { agentTenantLinks, agentInvites } from '../../src/lib/db/schema/tenant';
+import { agentTenantLinks, agentInvites } from '../../server/lib/db/schema/tenant';
 import { createTestDb, setupSchema } from './db';
 
 describe('agent tables schema — A1', () => {

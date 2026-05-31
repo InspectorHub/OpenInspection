@@ -2,7 +2,7 @@ node_modules/
 public/vendor/
 public/fonts/
 public/fonts.css
-src/generated/version.ts
+server/generated/version.ts
 .wrangler/
 .react-router/
 .dev.vars

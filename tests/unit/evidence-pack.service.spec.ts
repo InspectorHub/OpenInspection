@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { unzipSync, strFromU8 } from 'fflate';
-import { buildEvidencePack } from '../../src/services/evidence-pack.service';
+import { buildEvidencePack } from '../../server/services/evidence-pack.service';
 
 describe('buildEvidencePack', () => {
   it('zips signed.pdf + certificate.pdf + audit-trail.json + public-key.pem', async () => {

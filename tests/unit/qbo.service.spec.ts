@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('../../src/lib/qbo-crypto', () => ({
+vi.mock('../../server/lib/qbo-crypto', () => ({
     encryptToken: vi.fn(async (text: string) => `enc:${text}`),
     decryptToken: vi.fn(async (text: string) => text.replace('enc:', '')),
 }));
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
-import { QBOService } from '../../src/services/qbo.service';
+import { QBOService } from '../../server/services/qbo.service';
 
 describe('QBOService.buildBasicAuth', () => {
     it('base64-encodes client_id:client_secret', () => {

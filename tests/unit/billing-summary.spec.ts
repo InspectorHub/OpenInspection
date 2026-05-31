@@ -1,13 +1,13 @@
 /**
  * Design System 0520 subsystem C P9 T9.1 — billing summary pure helper.
  *
- * The route handler in src/api/billing.ts is a thin wrapper around two
+ * The route handler in server/api/billing.ts is a thin wrapper around two
  * drizzle queries + this pure aggregator. Splitting `summariseSeats`
  * out makes the seat-breakdown logic unit-testable without spinning a
  * full Hono context.
  */
 import { describe, it, expect } from 'vitest';
-import { summariseSeats } from '../../src/lib/billing-summary';
+import { summariseSeats } from '../../server/lib/billing-summary';
 
 describe('summariseSeats (subsystem C P9.1)', () => {
     const NOW = 1_700_000_000;

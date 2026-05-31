@@ -10,10 +10,10 @@
  *   * use UTC `Z`-suffixed timestamps without milliseconds
  *   * emit CRLF line endings (RFC 5545 §3.1)
  *
- * No external library — implementation is local to `src/lib/ics.ts`.
+ * No external library — implementation is local to `server/lib/ics.ts`.
  */
 import { describe, it, expect } from 'vitest';
-import { buildIcs } from '../../src/lib/ics';
+import { buildIcs } from '../../server/lib/ics';
 
 describe('buildIcs RFC 5545 compliance', () => {
     it('produces a valid VCALENDAR / VEVENT block', () => {

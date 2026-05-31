@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { users } from '../../src/lib/db/schema/tenant';
+import { users } from '../../server/lib/db/schema/tenant';
 
 describe('users — A2 notification prefs schema', () => {
     it('declares notify_on_referral, notify_on_report, notify_on_paid', () => {

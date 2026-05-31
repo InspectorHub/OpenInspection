@@ -2,8 +2,8 @@
 /**
  * Codemod: backfill `.describe('TODO: <field>')` on every Zod object-property
  * that has no description yet. Targets both:
- *   - src/lib/validations/*.schema.ts (centralised schemas)
- *   - src/api/*.ts                    (inline z.object({...}) inside createRoute)
+ *   - server/lib/validations/*.schema.ts (centralised schemas)
+ *   - server/api/*.ts                    (inline z.object({...}) inside createRoute)
  *
  * Idempotent — fields whose chain already includes `.describe(`
  * or `.openapi({... description: ... })` are skipped.

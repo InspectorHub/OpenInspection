@@ -35,7 +35,7 @@ try {
   }
 } catch { /* fallback */ }
 
-const SEED_DIR = join(__dirname, '../src/data/seed-templates');
+const SEED_DIR = join(__dirname, '../server/data/seed-templates');
 
 // Spec 4F — `featured: 1` flags Spectora-parity defaults for marketplace top-sort + auto-seed on tenant init.
 // S3-5 — `internachi-13.json` is a standards-aligned 13-section template covering the InterNACHI Standards of Practice. Featured under category `standards_aligned`.

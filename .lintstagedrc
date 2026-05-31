@@ -1,5 +1,5 @@
 {
-  "src/**/*.{ts,tsx}": [
+  "server/**/*.{ts,tsx}": [
     "eslint --fix"
   ],
   "app/**/*.{ts,tsx}": [

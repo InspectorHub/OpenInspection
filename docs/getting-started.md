@@ -103,10 +103,10 @@ Browser → single Worker (Hono entry):
 
 ### Adding a New API Endpoint
 
-1. Create or extend a route file in `src/api/`
-2. Define Zod schema in `src/lib/validations/`
-3. Business logic in `src/services/`
-4. Register route in `src/index.ts`
+1. Create or extend a route file in `server/api/`
+2. Define Zod schema in `server/lib/validations/`
+3. Business logic in `server/services/`
+4. Register route in `server/index.ts`
 5. Follow route metadata conventions (`docs/developers/07_route_metadata.md`)
 
 ### Further Reading

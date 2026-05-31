@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // `cloudflare:workers` is only available in the Workers runtime; stub
-      // it out so route-metadata tests can import src/index.ts in Node.
+      // it out so route-metadata tests can import server/index.ts in Node.
       'cloudflare:workers': path.resolve(__dirname, 'tests/unit/stubs/cloudflare-workers.ts'),
     },
   },
@@ -21,7 +21,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/services/**/*.ts'],
+      include: ['server/services/**/*.ts'],
     },
   },
 });

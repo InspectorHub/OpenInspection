@@ -9,12 +9,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import { createTestDb, setupSchema } from './db';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import { seedStarterContent } from '../../src/services/starter-content.service';
+import { seedStarterContent } from '../../server/services/starter-content.service';
 
 describe('seedStarterContent', () => {
     let testDb: BetterSQLite3Database<typeof schema>;

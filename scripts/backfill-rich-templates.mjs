@@ -43,7 +43,7 @@ const SEED_FILES = [
 ];
 
 const seeds = SEED_FILES.map((f) => {
-    const raw = JSON.parse(readFileSync(join(ROOT, 'src/data/seed-templates', f), 'utf8'));
+    const raw = JSON.parse(readFileSync(join(ROOT, 'server/data/seed-templates', f), 'utf8'));
     return { name: raw.name, schema: JSON.stringify(raw.schema) };
 });
 

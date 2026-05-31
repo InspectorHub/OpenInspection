@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { AdminService } from '../../src/services/admin.service';
+import { AdminService } from '../../server/services/admin.service';
 import { MockKV } from './mocks';
 import { createTestDb, setupSchema } from './db';
-import { users, tenantInvites, inspections, inspectionAgreements, tenants, templates } from '../../src/lib/db/schema';
+import { users, tenantInvites, inspections, inspectionAgreements, tenants, templates } from '../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 
 // Mock the drizzle-orm/d1 module to return our in-memory SQLite DB
 vi.mock('drizzle-orm/d1', () => ({

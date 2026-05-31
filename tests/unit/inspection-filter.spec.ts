@@ -4,7 +4,7 @@ import {
     countByFilter,
     INSPECTION_FILTERS,
     type FilterableInspection,
-} from '../../src/lib/inspection-filter';
+} from '../../server/lib/inspection-filter';
 
 /**
  * Competitor parity Feature C1 — time-based inspection filter tabs.

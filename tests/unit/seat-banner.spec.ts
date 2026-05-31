@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SeatBanner } from '../../src/features/seat-quota/seat-banner';
+import { SeatBanner } from '../../server/features/seat-quota/seat-banner';
 
 async function renderHtml(node: ReturnType<typeof SeatBanner>): Promise<string> {
     const resolved = await node;

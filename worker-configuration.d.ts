@@ -3,7 +3,7 @@
 // Runtime types generated with workerd@1.20260405.1 2024-09-23 nodejs_compat
 declare namespace Cloudflare {
 	interface GlobalProps {
-		mainModule: typeof import("./src/index");
+		mainModule: typeof import("./server/index");
 	}
 	interface Env {
 		TENANT_CACHE: KVNamespace;

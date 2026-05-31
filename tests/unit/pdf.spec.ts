@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { generatePdfFromUrl } from '../../src/lib/pdf';
+import { generatePdfFromUrl } from '../../server/lib/pdf';
 
 describe('generatePdfFromUrl', () => {
     it('returns ArrayBuffer when BROWSER binding renders successfully', async () => {

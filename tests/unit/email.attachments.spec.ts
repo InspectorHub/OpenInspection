@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EmailService } from '../../src/services/email.service';
+import { EmailService } from '../../server/services/email.service';
 
 describe('EmailService.sendEmail with attachments', () => {
     let fetchSpy: ReturnType<typeof vi.fn>;

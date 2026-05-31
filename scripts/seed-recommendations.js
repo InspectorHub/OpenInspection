@@ -8,7 +8,7 @@
  *
  * Idempotent: skips if existing count >= seed count for this tenant.
  *
- * SEEDS duplicated from src/data/recommendation-seeds.ts — keep in sync.
+ * SEEDS duplicated from server/data/recommendation-seeds.ts — keep in sync.
  * Estimates are stored in USD cents (e.g. 30000 = $300).
  */
 import { execSync } from 'child_process';
@@ -27,7 +27,7 @@ const configPath = configIdx > -1 ? process.argv[configIdx + 1] : (SAAS ? 'wrang
 const flag       = LOCAL ? '--local' : '--remote';
 const configFlag = configPath ? `-c ${configPath}` : '';
 
-// SEEDS — copy of RECOMMENDATION_SEEDS from src/data/recommendation-seeds.ts — keep in sync.
+// SEEDS — copy of RECOMMENDATION_SEEDS from server/data/recommendation-seeds.ts — keep in sync.
 // Estimates are in USD cents (null = no estimate).
 const SEEDS = [
     // ──────────────── Roof (10) ────────────────

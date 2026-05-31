@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { WidgetService } from '../../src/services/widget.service';
+import { WidgetService } from '../../server/services/widget.service';
 import { createTestDb, setupSchema } from './db';
-import { tenants, tenantConfigs, auditLogs } from '../../src/lib/db/schema';
-import * as schema from '../../src/lib/db/schema';
+import { tenants, tenantConfigs, auditLogs } from '../../server/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 

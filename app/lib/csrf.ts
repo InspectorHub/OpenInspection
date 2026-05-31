@@ -1,7 +1,7 @@
 /**
  * Generate a matching CSRF token + cookie pair for the BFF to attach to
  * non-GET API requests. The API verifies via `requireCsrfToken` middleware
- * (apps/core/src/lib/middleware/csrf.ts), which expects:
+ * (apps/core/server/lib/middleware/csrf.ts), which expects:
  *   - request header `x-csrf-token: <token>`
  *   - request cookie `__Host-csrf_token=<token>` (same value)
  */

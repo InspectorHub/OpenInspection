@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auditLogs } from '../../src/lib/db/schema/tenant';
+import { auditLogs } from '../../server/lib/db/schema/tenant';
 
 describe('auditLogs schema — Sprint B-3', () => {
     it('declares an inspector_slug TEXT column (nullable)', () => {

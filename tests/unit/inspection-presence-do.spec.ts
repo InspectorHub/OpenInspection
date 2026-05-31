@@ -26,12 +26,12 @@ import { resolve } from 'node:path';
 
 describe('Presence Durable Objects — smoke', () => {
     it('InspectionPresenceDO class name matches wrangler binding', () => {
-        const src = readFileSync(resolve(__dirname, '../../src/durable-objects/inspection-presence.ts'), 'utf8');
+        const src = readFileSync(resolve(__dirname, '../../server/durable-objects/inspection-presence.ts'), 'utf8');
         expect(src).toMatch(/export class InspectionPresenceDO/);
     });
 
     it('TenantPresenceDO class name matches wrangler binding', () => {
-        const src = readFileSync(resolve(__dirname, '../../src/durable-objects/tenant-presence.ts'), 'utf8');
+        const src = readFileSync(resolve(__dirname, '../../server/durable-objects/tenant-presence.ts'), 'utf8');
         expect(src).toMatch(/export class TenantPresenceDO/);
     });
 

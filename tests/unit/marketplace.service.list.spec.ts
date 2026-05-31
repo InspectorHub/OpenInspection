@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { MarketplaceService } from '../../src/services/marketplace.service';
+import { MarketplaceService } from '../../server/services/marketplace.service';
 import { createTestDb, setupSchema } from './db';
-import { marketplaceTemplates } from '../../src/lib/db/schema';
+import { marketplaceTemplates } from '../../server/lib/db/schema';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../../src/lib/db/schema';
+import * as schema from '../../server/lib/db/schema';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';

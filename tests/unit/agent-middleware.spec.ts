@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyJwtPayload } from '../../src/lib/auth/jwt-claims';
+import { classifyJwtPayload } from '../../server/lib/auth/jwt-claims';
 import type { JWTPayload } from 'hono/utils/jwt/types';
 
 describe('classifyJwtPayload — A1', () => {

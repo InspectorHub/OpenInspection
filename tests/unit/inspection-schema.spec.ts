@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateInspectionSchema } from '../../src/lib/validations/inspection.schema';
+import { CreateInspectionSchema } from '../../server/lib/validations/inspection.schema';
 
 /**
  * iter-1 production bug #1 — `clientEmail` Zod validation rejected an empty
