@@ -1,0 +1,63 @@
+// Single-worker (react-router-hono-fullstack-template shape) config template.
+// Copy to wrangler.jsonc and substitute real D1 / KV / R2 / ratelimit IDs.
+// `scripts/setup-cloudflare.js` can populate these. The populated wrangler.jsonc
+// is gitignored (local-only); only this .example is tracked.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openinspection",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2026-05-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "./build/client", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  "vars": {
+    "ENVIRONMENT": "production",
+    "APP_MODE": "standalone",
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+    "SINGLE_TENANT_ID": "00000000-0000-0000-0000-000000000000",
+    "JWT_CURRENT_KID": "v1"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "openinspection-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    { "binding": "TENANT_CACHE", "id": "0000000000000000000000000000000000" }
+  ],
+  "r2_buckets": [
+    { "binding": "PHOTOS", "bucket_name": "openinspection-photos" },
+    { "binding": "REPORTS", "bucket_name": "openinspection-reports" }
+  ],
+  "browser": { "binding": "BROWSER" },
+  "workflows": [
+    {
+      "binding": "SIGN_COMPLETION_WORKFLOW",
+      "name": "sign-completion-workflow",
+      "class_name": "SignCompletionWorkflow"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "INSPECTION_PRESENCE", "class_name": "InspectionPresenceDO" },
+      { "name": "TENANT_PRESENCE", "class_name": "TenantPresenceDO" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_classes": ["InspectionPresenceDO", "TenantPresenceDO"] }
+  ],
+  "unsafe": {
+    "bindings": [
+      {
+        "type": "ratelimit",
+        "name": "RATE_LIMITER",
+        "namespace_id": "1001",
+        "simple": { "limit": 10, "period": 60 }
+      }
+    ]
+  }
+}

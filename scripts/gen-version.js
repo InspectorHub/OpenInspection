@@ -74,7 +74,7 @@ function readGitFiles() {
 const { commit, shortCommit, branch } = getGitInfo();
 const buildTime = new Date().toISOString();
 
-const outDir = join(root, 'api', 'src', 'generated');
+const outDir = join(root, 'src', 'generated');
 mkdirSync(outDir, { recursive: true });
 
 writeFileSync(
