@@ -1,9 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants, users, recommendations } from '../lib/db/schema';
+import { tenants, users } from '../lib/db/schema';
 import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { logger } from '../lib/logger';
-import { RECOMMENDATION_SEEDS } from '../data/recommendation-seeds';
 
 /**
  * Portal implementation of IntegrationProvider.
@@ -38,43 +37,12 @@ export class PortalProvider implements IntegrationProvider {
                 createdAt: new Date(),
             });
 
-            // Auto-seed default recommendations library for the new tenant
-            try {
-                for (const seed of RECOMMENDATION_SEEDS) {
-                    await db.insert(recommendations).values({
-                        id: crypto.randomUUID(),
-                        tenantId: newTenantId,
-                        category: seed.category ?? null,
-                        name: seed.name,
-                        severity: seed.severity,
-                        defaultEstimateMin: seed.defaultEstimateMin ?? null,
-                        defaultEstimateMax: seed.defaultEstimateMax ?? null,
-                        defaultRepairSummary: seed.defaultRepairSummary,
-                        createdByUserId: null,
-                        createdAt: new Date(),
-                    });
-                }
-            } catch (seedErr) {
-                logger.error('Auto-seed recommendations failed in portal provider', { tenantId: newTenantId }, seedErr instanceof Error ? seedErr : undefined);
-            }
-
-            // Spec 4D — Auto-seed default event types
-            try {
-                const { EventService } = await import('../services/event.service');
-                const eventSvc = new EventService(this.db);
-                await eventSvc.bulkSeed(newTenantId);
-            } catch (seedErr) {
-                logger.error('Auto-seed event types failed in portal provider', { tenantId: newTenantId }, seedErr instanceof Error ? seedErr : undefined);
-            }
-
-            // Spec 4F — Auto-seed default 6 templates
-            try {
-                const { TemplateSeedService } = await import('../services/template-seed.service');
-                const seedSvc = new TemplateSeedService(this.db);
-                await seedSvc.bulkSeed(newTenantId);
-            } catch (seedErr) {
-                logger.error('Auto-seed templates failed in portal provider', { tenantId: newTenantId }, seedErr instanceof Error ? seedErr : undefined);
-            }
+            // Starter content (templates, comments, recommendations, rating
+            // systems, marketplace, …) is seeded by the portal OnboardingWorkflow's
+            // dedicated `seed-starter-content` step, which calls
+            // POST /api/admin/seed-starter-content -> seedStarterContent right
+            // after this sync. That seeder is idempotent, batched, and complete,
+            // so we no longer partial-seed here (it used to duplicate a subset).
         } else {
             await db.update(tenants)
                 .set({
