@@ -1,7 +1,7 @@
 /**
  * React Router v7 Frontend Browser Tests
  *
- * Adapted from api/tests/standalone-browser.spec.ts for the React Router v7 frontend.
+ * Adapted from tests/standalone-browser.spec.ts for the React Router v7 frontend.
  * Tests page rendering, SPA navigation, shared-ui components, and UI interactions.
  *
  * Covers: Auth via form POST, SPA navigation, shared-ui components, page rendering
