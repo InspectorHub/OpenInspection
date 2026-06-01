@@ -6,7 +6,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "@cloudflare/workers-types"],
     "paths": {
       "~/*": ["./app/*"],
       "@core/shared-ui": ["./packages/shared-ui/src/index.ts"]

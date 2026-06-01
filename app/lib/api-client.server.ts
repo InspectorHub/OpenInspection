@@ -214,8 +214,17 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
     const baseUrl = getApiUrl(context);
     const fetcher = buildFetch(context, opts.token);
 
+    // `hc<T>` constrains `T extends Hono<...>`. Each per-module type (`AdminApi`,
+    // etc.) is `typeof <x>Routes` where `<x>Routes` is an `OpenAPIHono` instance —
+    // which extends `Hono` — so the conditional resolves to `T` at every call site
+    // below while satisfying the constraint (without it, `hc<T>` errors TS2344 and
+    // the whole typed client degrades to loose types — see backlog C-10).
     const mk = <T>(mount: string) =>
-        hc<T>(`${baseUrl}${mount}`, { fetch: fetcher });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        hc<T extends import("hono").Hono<any, any, any> ? T : never>(
+            `${baseUrl}${mount}`,
+            { fetch: fetcher },
+        );
 
     return {
         admin:              mk<AdminApi>(MOUNT.admin),
