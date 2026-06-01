@@ -2168,6 +2168,29 @@ export class InspectionService {
     }
 
     /**
+     * C-10 ③-D — flattened payload for the public customer repair-request page
+     * (`/r/:id/repair-request`). Reuses the repair-list aggregator and adds the
+     * client email (so the page can prefill the "email me a copy" field).
+     */
+    async getRepairRequestData(inspectionId: string, tenantId: string) {
+        const rl = await this.getRepairList(inspectionId, tenantId);
+        const insp = await this.getDrizzle()
+            .select({ clientEmail: inspections.clientEmail })
+            .from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        return {
+            inspectionId:    rl.inspection.id,
+            propertyAddress: rl.inspection.propertyAddress,
+            inspectionDate:  rl.inspection.date,
+            inspectorName:   rl.inspection.inspectorName,
+            clientEmail:     insp?.clientEmail ?? null,
+            defects:         rl.defects,
+            showEstimates:   rl.showEstimates,
+        };
+    }
+
+    /**
      * Returns tab counts for the inspection list UI.
      * Single query with 6 conditional aggregates to avoid N+1.
      */

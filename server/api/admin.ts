@@ -44,7 +44,7 @@ import {
 import { applyInspectorPreSign } from '../services/agreement.service';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
-import { SuccessResponseSchema } from '../lib/validations/shared.schema';
+import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validations/shared.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
 import { commentUsage } from '../lib/db/schema/inspection';
@@ -1099,7 +1099,90 @@ const inspectorSignRoute = createRoute(withMcpMetadata({
     description: 'Spec 5H D1 — optional inspector pre-sign. Allowed only while envelope is pending.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
+/* ---- C-10 ③-D — Scheduling event-types CRUD (over EventService) ---- */
+const EventTypeRowSchema = z.object({
+    id:                 z.string().describe('Event-type id.'),
+    name:               z.string().describe('Display name.'),
+    slug:               z.string().describe('URL/identifier slug (unique per tenant).'),
+    defaultDurationMin: z.number().nullable().describe('Default duration in minutes.'),
+    defaultPriceCents:  z.number().nullable().describe('Default price in cents.'),
+    color:              z.string().nullable().describe('Calendar color hex.'),
+    sortOrder:          z.number().nullable().describe('Display sort order.'),
+    active:             z.boolean().describe('Whether the type is selectable.'),
+});
+const EventTypeCreateSchema = z.object({
+    name:               z.string().min(1).describe('Display name.'),
+    slug:               z.string().min(1).describe('URL/identifier slug (unique per tenant).'),
+    defaultDurationMin: z.number().int().optional().describe('Default duration in minutes.'),
+    defaultPriceCents:  z.number().int().optional().describe('Default price in cents.'),
+    color:              z.string().optional().describe('Calendar color hex.'),
+    sortOrder:          z.number().int().optional().describe('Display sort order.'),
+}).openapi('EventTypeCreate');
+const EventTypeUpdateSchema = EventTypeCreateSchema.partial().openapi('EventTypeUpdate');
+const EventTypeIdParam = z.object({ id: z.string().describe('Event-type id.') });
 
+const listEventTypesRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/event-types',
+    tags: ['admin'],
+    summary: 'List scheduling event types',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.array(EventTypeRowSchema)) } }, description: 'Event types' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'listEventTypes',
+    description: 'Lists the tenant scheduling event types (Radon, Sewer Scope, etc.) used by the calendar + booking flow, ordered by sortOrder.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const createEventTypeRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/event-types',
+    tags: ['admin'],
+    summary: 'Create a scheduling event type',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { body: { content: { 'application/json': { schema: EventTypeCreateSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(EventTypeRowSchema) } }, description: 'Created event type' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'createEventType',
+    description: 'Creates a scheduling event type for the tenant. The slug must be unique per tenant; defaults are applied for omitted duration/price/color/sortOrder.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const updateEventTypeRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/event-types/{id}',
+    tags: ['admin'],
+    summary: 'Update a scheduling event type',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: EventTypeIdParam, body: { content: { 'application/json': { schema: EventTypeUpdateSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(EventTypeRowSchema) } }, description: 'Updated event type' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' }, 404: { description: 'Not found' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'updateEventType',
+    description: 'Partially updates a scheduling event type by id (tenant-scoped) and returns the fresh row for the settings list.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const deleteEventTypeRoute = createRoute(withMcpMetadata({
+    method: 'delete',
+    path: '/event-types/{id}',
+    tags: ['admin'],
+    summary: 'Delete or deactivate a scheduling event type',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: EventTypeIdParam },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ ok: z.literal(true) })) } }, description: 'Deleted/deactivated' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'deleteEventType',
+    description: 'Deletes a scheduling event type when unused, or soft-deactivates it (active=false) when existing inspection events reference it, preserving history.',
+}, { scopes: ['admin'], tier: 'extended' }));
 
 export const adminRoutes = createApiRouter()
     .openapi(exportDataRoute, async (c) => {
@@ -2177,6 +2260,32 @@ export const adminRoutes = createApiRouter()
             tsMs: Date.now(),
         });
         return c.json({ success: true as const }, 200);
+    })
+    .openapi(listEventTypesRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const data = await c.var.services.event.listEventTypes(tenantId);
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(createEventTypeRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const data = await c.var.services.event.createEventType(tenantId, body);
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(updateEventTypeRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const body = c.req.valid('json');
+        await c.var.services.event.updateEventType(tenantId, id, body);
+        const fresh = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id);
+        if (!fresh) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Event type not found' } }, 404);
+        return c.json({ success: true as const, data: fresh }, 200);
+    })
+    .openapi(deleteEventTypeRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        await c.var.services.event.deactivateEventType(tenantId, id);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 
 export type AdminApi = typeof adminRoutes;
