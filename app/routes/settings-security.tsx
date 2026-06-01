@@ -25,11 +25,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
 
-  // TODO(C-10 collapse): hono/client collapses api.auth.me.$get and api.admin.secrets.$get
-  // to non-callable unions; localized assertions until the typed-hono spike resolves it. Binding preserved.
   const [meRes, secretsRes] = await Promise.all([
-    (api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>)(),
-    (api.admin.secrets.$get as unknown as (args?: unknown) => Promise<Response>)().catch(() => null),
+    api.auth.me.$get(),
+    api.secrets.secrets.$get().catch(() => null),
   ]);
 
   const meBody = meRes.ok ? ((await meRes.json()) as Record<string, unknown>) : {};
@@ -79,9 +77,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "save-turnstile") {
     const val = fd.get("TURNSTILE_SECRET_KEY");
     if (val && typeof val === "string" && val.trim()) {
-      // TODO(C-10 collapse): hono/client collapses api.admin.secrets.$put body type;
-      // localized assertion keeps the in-process binding. Binding preserved.
-      const res = await (api.admin.secrets.$put as unknown as (args: { json: Record<string, string> }) => Promise<Response>)({
+      const res = await api.secrets.secrets.$put({
         json: { TURNSTILE_SECRET_KEY: val },
       });
       if (!res.ok) {

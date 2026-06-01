@@ -31,7 +31,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // Fetch communication config + secrets in parallel
   const [commRes, secretsRes] = await Promise.all([
     api.admin.communication.$get().catch(() => null),
-    api.admin.secrets.$get().catch(() => null),
+    api.secrets.secrets.$get().catch(() => null),
   ]);
 
   const commBody = commRes?.ok ? ((await commRes.json()) as Record<string, unknown>) : {};
@@ -87,7 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (senderEmail && typeof senderEmail === "string" && senderEmail.trim()) body.SENDER_EMAIL = senderEmail;
 
     if (Object.keys(body).length > 0) {
-      const res = await api.admin.secrets.$put({ json: body });
+      const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
         return { ok: false, error: "Failed to save email secrets." };
       }
@@ -103,7 +103,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (clientSecret && typeof clientSecret === "string" && clientSecret.trim()) body.GOOGLE_CLIENT_SECRET = clientSecret;
 
     if (Object.keys(body).length > 0) {
-      const res = await api.admin.secrets.$put({ json: body });
+      const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
         return { ok: false, error: "Failed to save calendar secrets." };
       }

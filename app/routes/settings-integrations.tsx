@@ -11,7 +11,7 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const secretsRes = await api.admin.secrets.$get().catch(() => null);
+  const secretsRes = await api.secrets.secrets.$get().catch(() => null);
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
   return {
@@ -35,7 +35,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
     if (Object.keys(body).length > 0) {
       const api = createApi(context, { token });
-      const res = await api.admin.secrets.$put({ json: body });
+      const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
         return { success: false, error: "Failed to save Stripe keys." };
       }

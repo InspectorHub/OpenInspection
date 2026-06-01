@@ -27,13 +27,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   // Fetch Stripe connect status + secrets in parallel.
   // ai.status has no server route — omit it and default geminiConfigured to false.
-  // TODO(C-10 collapse): hono/client collapses api.admin.* to a non-callable union;
-  // localized assertions until the typed-hono spike resolves it. Binding preserved.
-  const stripeGetFn = api.admin["stripe-connect"].$get as unknown as (args?: unknown) => Promise<Response>;
-  const secretsGetFn = api.admin.secrets.$get as unknown as (args?: unknown) => Promise<Response>;
   const [stripeRes, secretsRes] = await Promise.all([
-    stripeGetFn().catch(() => null),
-    secretsGetFn().catch(() => null),
+    api.admin["stripe-connect"].$get().catch(() => null),
+    api.secrets.secrets.$get().catch(() => null),
   ]);
 
   let stripeConnected = false;
@@ -78,9 +74,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return submission.reply();
     }
     const { stripeAccountId } = submission.value;
-    // TODO(C-10 collapse): hono/client collapses api.admin["stripe-connect"].$put body type;
-    // localized assertion keeps the in-process binding. Binding preserved.
-    const res = await (api.admin["stripe-connect"].$put as unknown as (args: { json: { accountId: string } }) => Promise<Response>)({ json: { accountId: stripeAccountId } });
+    const res = await api.admin["stripe-connect"].$put({ json: { accountId: stripeAccountId } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return submission.reply({
@@ -91,9 +85,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "disconnect-stripe") {
-    // TODO(C-10 collapse): hono/client collapses api.admin["stripe-connect"].$delete;
-    // localized assertion keeps the in-process binding. Binding preserved.
-    const res = await (api.admin["stripe-connect"].$delete as unknown as (args?: unknown) => Promise<Response>)();
+    const res = await api.admin["stripe-connect"].$delete();
     if (!res.ok) {
       return { success: false, error: "Failed to disconnect Stripe account." };
     }
@@ -105,9 +97,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
       return { success: false, error: "API key is required." };
     }
-    // TODO(C-10 collapse): hono/client collapses api.admin.secrets.$put body type;
-    // localized assertion keeps the in-process binding. Binding preserved.
-    const res = await (api.admin.secrets.$put as unknown as (args: { json: Record<string, string> }) => Promise<Response>)({ json: { GEMINI_API_KEY: geminiApiKey } });
+    const res = await api.secrets.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return { success: false, error: (err as Record<string, string>)?.message || "Failed to save AI configuration." };
@@ -122,9 +112,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (val && typeof val === "string" && val.trim()) body[key] = val;
     }
     if (Object.keys(body).length > 0) {
-      // TODO(C-10 collapse): hono/client collapses api.admin.secrets.$put body type;
-      // localized assertion keeps the in-process binding. Binding preserved.
-      const res = await (api.admin.secrets.$put as unknown as (args: { json: Record<string, string> }) => Promise<Response>)({ json: body });
+      const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
         return { success: false, error: "Failed to save integration keys." };
       }
