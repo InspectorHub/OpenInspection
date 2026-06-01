@@ -87,9 +87,15 @@ export async function createSessionWithToken(
 
 export async function destroyUserSession(context: AppLoadContext, request: Request) {
   const session = await getSession(context, request);
-  return redirect("/login", {
-    headers: {
-      "Set-Cookie": await getStorage(context).destroySession(session),
-    },
-  });
+  const headers = new Headers();
+  headers.append("Set-Cookie", await getStorage(context).destroySession(session));
+  // Also expire the raw JWT cookie the API sets (and that getToken() falls back
+  // to). Without this, logout would clear only the RR `__session` cookie and the
+  // getToken fallback would keep the user authenticated via __Host-inspector_token.
+  // __Host- prefix requires Secure + Path=/ + no Domain.
+  headers.append(
+    "Set-Cookie",
+    "__Host-inspector_token=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
+  );
+  return redirect("/login", { headers });
 }
