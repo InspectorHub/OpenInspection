@@ -437,6 +437,36 @@ const login2faRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
+// C-10 ③-B — GET /api/auth/invite-info?token= — preview the invited email +
+// workspace name on the team-invite accept page (`/join`) before the form.
+const inviteInfoRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/invite-info',
+    tags: ['auth', 'public'],
+    summary: 'Resolve a team-invite token for the accept page',
+    request: { query: z.object({ token: z.string().describe('Team-invite token (the invite id) from the URL.') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ email: z.string(), workspaceName: z.string() })) } }, description: 'Invite preview' },
+        404: { description: 'Invite not found, expired, or already used' },
+    },
+    operationId: 'getInviteInfo',
+    description: 'Public, no-login resolution of a team-invite token into the invited email + workspace name for the /join accept page. Returns 404 for unknown/expired/used invites so the page renders its recovery state.',
+}, { scopes: [], tier: 'excluded' }));
+
+// C-10 ③-B — GET /api/auth/setup-status — whether first-run setup is done, so
+// the `/setup` page can redirect to /login when the instance already has users.
+const setupStatusRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/setup-status',
+    tags: ['auth', 'public'],
+    summary: 'Report whether first-run setup is complete',
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ isSetUp: z.boolean() })) } }, description: 'Setup status' },
+    },
+    operationId: 'getSetupStatus',
+    description: 'Public, no-login check of whether the instance has completed first-run setup (any tenant-scoped user exists). Drives the /setup page redirect guard.',
+}, { scopes: [], tier: 'excluded' }));
+
 export const coreAuthRoutes = createApiRouter()
     .openapi(loginRoute, async (c) => {
         // SaaS deploys disable the local password form (login via portal) —
@@ -520,7 +550,7 @@ export const coreAuthRoutes = createApiRouter()
     })
     .openapi(joinTeamRoute, async (c) => {
         const body = c.req.valid('json');
-        const user = await c.var.services.auth.joinTeam(body.token, body.password);
+        const user = await c.var.services.auth.joinTeam(body.token, body.password, body.name);
 
         const keyring = await c.var.keyringPromise!;
         const now = Math.floor(Date.now() / 1000);
@@ -949,6 +979,16 @@ export const coreAuthRoutes = createApiRouter()
 
         setCookie(c, '__Host-inspector_token', sessionToken, authCookieOptions());
         return c.json({ success: true, data: { redirect: '/dashboard' } }, 200);
+    })
+    .openapi(inviteInfoRoute, async (c) => {
+        const { token } = c.req.valid('query');
+        const info = await c.var.services.auth.getInviteInfo(token);
+        if (!info) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
+        return c.json({ success: true as const, data: info }, 200);
+    })
+    .openapi(setupStatusRoute, async (c) => {
+        const isSetUp = await c.var.services.auth.isSetUp();
+        return c.json({ success: true as const, data: { isSetUp } }, 200);
     });
 
 export type CoreAuthApi = typeof coreAuthRoutes;

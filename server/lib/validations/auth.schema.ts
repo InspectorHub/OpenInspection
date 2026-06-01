@@ -50,6 +50,10 @@ export const JoinTeamSchema = z.object({
         example: 'NewPassword1!',
         description: 'Password to set for the newly created account — min 8 chars with uppercase, digit, and special character.',
     }),
+    name: z.string().min(1).max(120).optional().openapi({
+        example: 'Jamie Rivera',
+        description: 'Display name the joining member types on the accept form. Optional; stored on the new user when present.',
+    }),
 });
 
 /**

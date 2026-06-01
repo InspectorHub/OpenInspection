@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
-import { users, tenantInvites } from '../lib/db/schema';
+import { eq, and, sql } from 'drizzle-orm';
+import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { logger } from '../lib/logger';
@@ -111,7 +111,7 @@ export class AuthService {
      * tenant — we only reject when it already exists within THIS tenant.
      * UNIQUE(tenant_id, email) at the DB layer is the hard backstop.
      */
-    async joinTeam(token: string, password: string) {
+    async joinTeam(token: string, password: string, name?: string) {
         const db = this.getDrizzle();
         const invite = await db.select().from(tenantInvites).where(eq(tenantInvites.id, token)).get();
 
@@ -126,6 +126,7 @@ export class AuthService {
 
         const passwordHash = await hashPassword(password);
         const userId = crypto.randomUUID();
+        const trimmedName = name?.trim();
 
         await db.insert(users).values({
             id: userId,
@@ -133,6 +134,7 @@ export class AuthService {
             email: invite.email,
             passwordHash,
             role: invite.role,
+            ...(trimmedName ? { name: trimmedName } : {}),
             createdAt: new Date(),
         });
 
@@ -153,6 +155,33 @@ export class AuthService {
         }
 
         return { id: userId, email: invite.email, tenantId: invite.tenantId, role: invite.role };
+    }
+
+    /**
+     * C-10 ③-B — preview metadata for the team-invite accept page (`/join`).
+     * Returns the invited email + workspace name for a LIVE invite (pending +
+     * not expired), or null so the page can render its expired/invalid state.
+     * The invite id is the token (see joinTeam).
+     */
+    async getInviteInfo(token: string): Promise<{ email: string; workspaceName: string } | null> {
+        const db = this.getDrizzle();
+        const invite = await db.select().from(tenantInvites).where(eq(tenantInvites.id, token)).get();
+        if (!invite) return null;
+        if (invite.status !== 'pending') return null;
+        if (invite.expiresAt < new Date()) return null;
+        const tenant = await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, invite.tenantId)).get();
+        return { email: invite.email, workspaceName: tenant?.name ?? '' };
+    }
+
+    /**
+     * C-10 ③-B — whether the instance has completed first-run setup, i.e. any
+     * tenant-scoped user exists. Drives the `/setup` page's redirect-if-done
+     * guard. Mirrors the existing-user check in the setup handler.
+     */
+    async isSetUp(): Promise<boolean> {
+        const db = this.getDrizzle();
+        const row = await db.select({ id: users.id }).from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
+        return !!row;
     }
 
     /**

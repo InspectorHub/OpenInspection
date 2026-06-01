@@ -19,7 +19,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   try {
     const api = createApi(context);
-    const res = await api.auth.invite.validate.$get({ query: { token } });
+    const res = await api.auth["invite-info"].$get({ query: { token } });
     if (!res.ok) {
       return { valid: false, error: "Invalid or expired invite link", invite: null };
     }
@@ -48,7 +48,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   try {
     const api = createApi(context);
-    const res = await api.auth.invite.accept.$post({
+    const res = await api.auth.join.$post({
       json: { token, password, name },
     });
 
