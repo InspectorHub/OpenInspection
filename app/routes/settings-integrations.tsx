@@ -46,7 +46,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { success: false, error: "Unknown action" };
 }
 
-const INTEGRATIONS = [
+type Integration = {
+  id: string;
+  name: string;
+  description: string;
+  status: "available" | "connected";
+  href?: string;
+  color: string;
+};
+
+const INTEGRATIONS: Integration[] = [
   {
     id: "qbo",
     name: "QuickBooks Online",
