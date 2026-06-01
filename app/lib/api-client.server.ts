@@ -2,6 +2,7 @@ import { hc } from "hono/client";
 import type { AppLoadContext } from "react-router";
 import type {
     AdminApi,
+    AdminBrandingApi,
     AgentApi,
     AgentsApi,
     AgentSignupApi,
@@ -98,6 +99,7 @@ function buildFetch(context: AppLoadContext, token?: string): typeof fetch {
 
 export interface Api {
     admin:              ReturnType<typeof hc<AdminApi>>;
+    adminBranding:      ReturnType<typeof hc<AdminBrandingApi>>;
     agent:              ReturnType<typeof hc<AgentApi>>;
     agents:             ReturnType<typeof hc<AgentsApi>>;
     agentSignup:        ReturnType<typeof hc<AgentSignupApi>>;
@@ -154,6 +156,7 @@ export interface Api {
  */
 const MOUNT: Record<keyof Api, string> = {
     admin:              "/api/admin",
+    adminBranding:      "/api/admin",
     agent:              "/api/agent",
     agents:             "/api/agents",
     agentSignup:        "/api/agent-signup",
@@ -228,6 +231,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
 
     return {
         admin:              mk<AdminApi>(MOUNT.admin),
+        adminBranding:      mk<AdminBrandingApi>(MOUNT.adminBranding),
         agent:              mk<AgentApi>(MOUNT.agent),
         agents:             mk<AgentsApi>(MOUNT.agents),
         agentSignup:        mk<AgentSignupApi>(MOUNT.agentSignup),

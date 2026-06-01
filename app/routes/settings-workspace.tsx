@@ -29,9 +29,7 @@ const THEMES = ["modern", "classic", "minimal"] as const;
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  // TODO(C-10 collapse): hono/client collapses api.admin.branding.$get to a non-callable
-  // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
-  const res = await (api.admin.branding.$get as unknown as (args?: unknown) => Promise<Response>)();
+  const res = await api.adminBranding.branding.$get({});
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   return { branding: (body.data ?? {}) as Branding };
 }
@@ -64,9 +62,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   const api = createApi(context, { token });
-  // TODO(C-10 collapse): hono/client collapses api.admin.branding.$post to a non-callable
-  // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
-  const res = await (api.admin.branding.$post as unknown as (args: { json: Record<string, unknown> }) => Promise<Response>)({ json: body });
+  // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
+  // cast through unknown to satisfy the strict hono/client intersection type. (C-10)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const res = await api.adminBranding.branding.$post({ json: body } as unknown as Parameters<typeof api.adminBranding.branding.$post>[0]);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     return submission.reply({

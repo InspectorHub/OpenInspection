@@ -45,6 +45,7 @@ import inspectionPrefsRoutes from './api/inspection-prefs';
 import aiRoutes from './api/ai';
 import bookingsRoutes from './api/bookings';
 import adminRoutes from './api/admin';
+import adminBrandingRoutes from './api/admin/branding';
 import secretsRoutes from './api/secrets';
 import agentRoutes from './api/agent';
 import agentsRoutes from './api/agents';
@@ -437,6 +438,8 @@ const routes = app
   // UC-C-7 — public share-token mint (customer Forward report flow).
   .route('/api/public', publicShareRoutes)
   .route('/api/admin', adminRoutes)
+  // Branding sub-router — extracted to fix hono/client type-collapse (C-10)
+  .route('/api/admin', adminBrandingRoutes)
   // Evidence download — GET /api/admin/agreement-requests/:id/pdf + certificate.pdf
   .route('/api/admin', evidenceRoutes)
   // Secret UI化 — GET/PUT/POST /api/admin/secrets for all 14 integration keys

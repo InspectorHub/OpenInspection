@@ -6,6 +6,7 @@ export type { CoreApiType } from '../../server/index';
 // Per-module typed-client surface. One client per module so `hc<TModule>`
 // stays under the TS structural check depth limit.
 export type { AdminApi }              from '../../server/api/admin';
+export type { AdminBrandingApi }      from '../../server/api/admin/branding';
 export type { AgentApi }              from '../../server/api/agent';
 export type { AgentsApi }             from '../../server/api/agents';
 export type { AgentSignupApi }        from '../../server/api/agent-signup';
