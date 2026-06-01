@@ -48,7 +48,39 @@ const claimRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createGuestClaim (POST /claim, guest domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: [], tier: 'extended' }));
 
+// C-10 ③-B — GET /api/guest/invite-info?token= — preview the workspace + role
+// a guest invite grants, for the /guest-join accept page (JWT-exempt, like claim).
+const inviteInfoRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/invite-info',
+    tags: ["guest"],
+    summary: 'Resolve a guest invite token for the accept page',
+    request: { query: z.object({ token: z.string().describe('Guest invite token from the URL.') }) },
+    responses: {
+        200: {
+            description: 'Invite preview',
+            content: { 'application/json': { schema: z.object({
+                success: z.boolean().describe('Always true on the 200 path.'),
+                data:    z.object({
+                    workspaceName: z.string().describe('Inviting workspace name.'),
+                    role:          z.string().describe('Role the invite grants (lead/specialist/apprentice/office).'),
+                    expiresAt:     z.number().describe('Invite expiry (unix epoch seconds).'),
+                }).describe('Guest invite preview.'),
+            }) } },
+        },
+        404: { description: 'Not found / expired / already claimed' },
+    },
+    operationId: "getGuestInviteInfo",
+    description: "Public, no-login resolution of a guest invite token into the workspace name + granted role + expiry for the /guest-join page. 404 for unknown/expired/claimed tokens.",
+}, { scopes: [], tier: 'extended' }));
+
 export const guestRoutes = createApiRouter()
+    .openapi(inviteInfoRoute, async (c) => {
+        const { token } = c.req.valid('query');
+        const info = await c.var.services.guestInvite.getInviteInfo(token);
+        if (!info) throw Errors.NotFound('Invalid or expired invite token');
+        return sendSuccess(c, info);
+    })
     .openapi(claimRoute, async (c) => {
         const body = c.req.valid('json');
         const db   = drizzle(c.env.DB);

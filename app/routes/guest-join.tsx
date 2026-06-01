@@ -21,7 +21,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
 
     const api = createApi(context);
-    const res = await api.auth.guest.validate.$get({ query: { token } });
+    const res = await api.guest["invite-info"].$get({ query: { token } });
     if (!res.ok) {
       return { valid: false, error: "Invalid or expired guest link", invite: null };
     }
@@ -30,7 +30,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     return {
       valid: true,
       error: null,
-      invite: (Object.keys(d).length > 0 ? d : null) as { inspectionAddress: string; inspectorName: string } | null,
+      invite: (Object.keys(d).length > 0 ? d : null) as { workspaceName: string; role: string; expiresAt: number } | null,
     };
   } catch {
     return { valid: false, error: "Service unavailable", invite: null };
@@ -46,13 +46,13 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (submission.status !== "success") {
     return submission.reply();
   }
-  const { name } = submission.value;
+  const { name, email, password } = submission.value;
 
   try {
 
     const api = createApi(context);
-    const res = await api.auth.guest.accept.$post({
-      json: { token, name },
+    const res = await api.guest.claim.$post({
+      json: { token, name, email, password },
     });
 
     if (!res.ok) {
@@ -124,8 +124,8 @@ export default function GuestJoinPage() {
         </h1>
         <p className="text-sm text-ih-fg-3 mb-6">
           {invite
-            ? `${invite.inspectorName} has invited you to collaborate on the inspection at ${invite.inspectionAddress}.`
-            : "You have been invited to collaborate on an inspection."}
+            ? `You've been invited to join ${invite.workspaceName} as a ${invite.role}. Create your account below.`
+            : "You have been invited to collaborate. Create your account below."}
         </p>
 
         <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
@@ -145,6 +145,42 @@ export default function GuestJoinPage() {
             />
             {fields.name.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.name.errors[0]}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor={fields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
+              Email
+            </label>
+            <input
+              id={fields.email.id}
+              name={fields.email.name}
+              type="email"
+              autoComplete="email"
+              placeholder="jane@example.com"
+              aria-invalid={fields.email.errors ? true : undefined}
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+            />
+            {fields.email.errors && (
+              <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
+              Password
+            </label>
+            <input
+              id={fields.password.id}
+              name={fields.password.name}
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              aria-invalid={fields.password.errors ? true : undefined}
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+            />
+            {fields.password.errors && (
+              <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
             )}
           </div>
 

@@ -16,7 +16,7 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { guestInvites, users } from '../lib/db/schema';
+import { guestInvites, users, tenants } from '../lib/db/schema';
 import { hashPassword } from '../lib/password';
 import { generateRandomToken } from '../lib/random-token';
 import { computeSeatsUsed } from '../lib/middleware/seat-guard';
@@ -54,6 +54,22 @@ export class GuestInviteService {
 
     private getDrizzle() {
         return drizzle(this.db);
+    }
+
+    /**
+     * C-10 ③-B — preview metadata for the /guest-join accept page. guest_invites
+     * carries no email/inspection, so the page shows the WORKSPACE + ROLE the
+     * invite grants. Returns null for unknown / expired / already-claimed tokens
+     * so the page renders its "link unavailable" state.
+     */
+    async getInviteInfo(token: string): Promise<{ workspaceName: string; role: string; expiresAt: number } | null> {
+        const db = this.getDrizzle();
+        const invite = await db.select().from(guestInvites).where(eq(guestInvites.token, token)).get();
+        if (!invite) return null;
+        if (invite.claimedByUserId) return null;
+        if (invite.expiresAt < Math.floor(Date.now() / 1000)) return null;
+        const tenant = await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, invite.tenantId)).get();
+        return { workspaceName: tenant?.name ?? '', role: invite.role, expiresAt: invite.expiresAt };
     }
 
     async mint(tenantId: string, input: MintInput): Promise<{
