@@ -32,6 +32,63 @@ const reportRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing/expired/revoked or does not match the requested inspection.',
 }, { scopes: [], tier: 'extended' }));
 
+// Public inspector marketing profile (by slug). Tenant resolves from the
+// subdomain (no token — public page); returns whitelisted public fields only.
+const PublicInspectorProfileSchema = z.object({
+    profile: z.object({
+        name: z.string().nullable(),
+        bio: z.string().nullable(),
+        photoUrl: z.string().nullable(),
+        slug: z.string().nullable(),
+        serviceAreas: z.array(z.object({ city: z.string(), state: z.string() })),
+    }).nullable(),
+    services: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string().nullable().optional(),
+        priceCents: z.number().nullable().optional(),
+        durationMinutes: z.number().nullable().optional(),
+    })),
+});
+
+const inspectorRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/inspector/{tenant}/{slug}',
+    tags: ['public'],
+    summary: 'Public inspector marketing profile',
+    request: { params: z.object({ tenant: z.string(), slug: z.string() }) },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(PublicInspectorProfileSchema) } }, description: 'Public profile + bookable services' },
+        404: { description: 'Tenant or inspector not found' },
+    },
+    operationId: 'getPublicInspectorProfile',
+    description: 'Public, no-login inspector profile resolved by tenant subdomain + slug. Returns only public marketing fields (name/bio/photo/serviceAreas) + bookable services — never email/phone/license/ids.',
+}, { scopes: [], tier: 'extended' }));
+
+// Public invoice for the report-gate "Pay invoice" CTA (by inspection id;
+// tenant resolves from subdomain). The id is unguessable; tenant-scoped query.
+const PublicInvoiceSchema = z.object({
+    id: z.string(),
+    amountCents: z.number(),
+    status: z.string(),
+    dueDate: z.string().nullable().optional(),
+    lineItems: z.array(z.object({ description: z.string(), amountCents: z.number() })).optional(),
+}).nullable();
+
+const invoiceRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/r/{id}/invoice',
+    tags: ['public'],
+    summary: 'Public invoice for an inspection (pay-link landing)',
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(PublicInvoiceSchema) } }, description: 'Invoice (or null if none)' },
+        404: { description: 'Tenant not resolved' },
+    },
+    operationId: 'getPublicInvoice',
+    description: 'Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from subdomain; tenant-scoped query.',
+}, { scopes: [], tier: 'extended' }));
+
 export const publicReportRoutes = createApiRouter()
     .openapi(reportRoute, async (c) => {
         const { id } = c.req.valid('param');
@@ -42,6 +99,30 @@ export const publicReportRoutes = createApiRouter()
         }
         const data = await c.var.services.inspection.getReportData(id, access.tenantId);
         return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(inspectorRoute, async (c) => {
+        const { slug } = c.req.valid('param');
+        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Inspector not found' } }, 404);
+        const profile = await c.var.services.user.getProfileBySlug(tenantId, slug);
+        const services = await c.var.services.service.listServices(tenantId);
+        return c.json({
+            success: true as const,
+            data: {
+                profile: profile ? {
+                    name: profile.name, bio: profile.bio, photoUrl: profile.photoUrl,
+                    slug: profile.slug, serviceAreas: profile.serviceAreas,
+                } : null,
+                services,
+            },
+        }, 200);
+    })
+    .openapi(invoiceRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+        const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
+        return c.json({ success: true as const, data: inv }, 200);
     });
 
 export type PublicReportApi = typeof publicReportRoutes;

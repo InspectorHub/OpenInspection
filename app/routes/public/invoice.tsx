@@ -20,7 +20,7 @@ interface InvoiceData {
 export async function loader({ params, context }: Route.LoaderArgs) {
  try {
  const api = createApi(context);
- const res = await api.publicShare.r[":id"].invoice.$get({
+ const res = await api.publicReport.r[":id"].invoice.$get({
  param: { id: params.id ?? "" },
  });
  const body = res.ok ? await res.json() : {};

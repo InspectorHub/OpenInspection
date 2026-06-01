@@ -46,7 +46,7 @@ interface LoaderResult {
 export async function loader({ params, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context);
-    const res = await api.publicShare.inspector[":tenant"][":slug"].$get({
+    const res = await api.publicReport.inspector[":tenant"][":slug"].$get({
       param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
     });
     const body = res.ok ? await res.json() : {};
