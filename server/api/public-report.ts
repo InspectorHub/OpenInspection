@@ -141,11 +141,19 @@ export const publicReportRoutes = createApiRouter()
     .openapi(reportRoute, async (c) => {
         const { id } = c.req.valid('param');
         const { token } = c.req.valid('query');
-        const access = await resolvePortalAccess(c.var.services.portalAccess, token, id);
-        if (!access) {
+        let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
+        if (!tenantId && token) {
+            // Bridge: existing customer share links carry the KV agent-view-token
+            // (`?view=agent&token=`) until persistent per-recipient token issuance
+            // is wired (see plan 2026-06-01-core-esign-redesign). Validate it the
+            // same way: token must resolve to THIS inspection; tenantId from the token.
+            const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
+            if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
+        }
+        if (!tenantId) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
-        const data = await c.var.services.inspection.getReportData(id, access.tenantId);
+        const data = await c.var.services.inspection.getReportData(id, tenantId);
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(inspectorRoute, async (c) => {

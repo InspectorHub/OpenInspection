@@ -14,10 +14,14 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         revokedAt: null, expiresAt: null, ...over,
     });
 
-    function buildApp(resolveToken: ReturnType<typeof vi.fn>, getReportData = vi.fn().mockResolvedValue({ inspectionId: 'insp1' })) {
+    function buildApp(
+        resolveToken: ReturnType<typeof vi.fn>,
+        getReportData = vi.fn().mockResolvedValue({ inspectionId: 'insp1' }),
+        resolveAgentViewToken = vi.fn().mockResolvedValue(null),
+    ) {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            c.set('services', { portalAccess: { resolveToken }, inspection: { getReportData } } as unknown as HonoConfig['Variables']['services']);
+            c.set('services', { portalAccess: { resolveToken }, inspection: { getReportData, resolveAgentViewToken } } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/public', publicReportRoutes);
@@ -34,6 +38,15 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         const { app } = buildApp(vi.fn().mockResolvedValue(tokenRow({ inspectionId: 'other' })));
         const res = await app.request('/api/public/report/t/insp1?token=tok');
         expect(res.status).toBe(404);
+    });
+
+    it('200 via the legacy KV agent-view-token fallback (existing share links)', async () => {
+        const getReportData = vi.fn().mockResolvedValue({ inspectionId: 'insp1' });
+        const legacy = vi.fn().mockResolvedValue({ inspectionId: 'insp1', tenantId: 't9' });
+        const { app } = buildApp(vi.fn().mockResolvedValue(null), getReportData, legacy);
+        const res = await app.request('/api/public/report/t/insp1?token=kvtok');
+        expect(res.status).toBe(200);
+        expect(getReportData).toHaveBeenCalledWith('insp1', 't9');
     });
 
     it('200 with report data + queries by the token tenantId (not the URL)', async () => {
