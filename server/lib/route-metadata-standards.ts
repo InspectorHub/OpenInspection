@@ -41,7 +41,15 @@ export const PRIMARY_TIER_CAP = 45;
  * `x-tier` keys, which Phase 4's generator + the route-metadata vitest gate
  * both read.
  */
-export function withMcpMetadata<T extends Record<string, unknown>>(
+// `const T`: a const type parameter (TS 5.0+) preserves the literal type of the
+// createRoute() config the caller passes — crucially the `path`/`method` string
+// LITERALS. Without `const`, the `extends Record<string, unknown>` constraint
+// widens `path` to `string`, which makes hono/client unable to key routes by
+// path → it merges every sibling route into one node and collapses the typed
+// client to a `ClientRequest<string, string, …>` leaf (root cause of C-10: the
+// typed-hono client degradation on large modules like inspections). See backlog
+// C-10. The runtime spread below is unchanged; this only sharpens the type.
+export function withMcpMetadata<const T extends Record<string, unknown>>(
     route: T,
     meta: { scopes: readonly ValidScope[]; tier: ValidTier }
 ): T & { 'x-scopes': readonly ValidScope[]; 'x-tier': ValidTier } {

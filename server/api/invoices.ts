@@ -99,7 +99,9 @@ export const invoiceRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         await c.var.services.invoice.markSent(id, tenantId);
         if (c.env.QBO_CLIENT_ID) {
-            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(i => i.id === id);
+            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(
+                (i: Awaited<ReturnType<typeof c.var.services.invoice.listInvoices>>[number]) => i.id === id,
+            );
             if (inv) {
                 c.executionCtx.waitUntil(
                     c.var.services.qbo.upsertInvoice(tenantId, {
@@ -119,7 +121,9 @@ export const invoiceRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         await c.var.services.invoice.markPaid(id, tenantId, 'oi');
         if (c.env.QBO_CLIENT_ID) {
-            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(i => i.id === id);
+            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(
+                (i: Awaited<ReturnType<typeof c.var.services.invoice.listInvoices>>[number]) => i.id === id,
+            );
             if (inv) {
                 c.executionCtx.waitUntil(
                     c.var.services.qbo.recordPayment(tenantId, id, inv.amountCents / 100),

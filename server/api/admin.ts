@@ -1270,7 +1270,7 @@ export const adminRoutes = createApiRouter()
         // Map Date to string for schema compatibility
         const formattedResult = {
             ...result,
-            items: result.logs.map(log => ({
+            items: result.logs.map((log: (typeof result.logs)[number]) => ({
                 ...log,
                 createdAt: safeISODate(log.createdAt)
             }))
@@ -1397,7 +1397,7 @@ export const adminRoutes = createApiRouter()
         }
 
         await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c))
-            .catch(e => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+            .catch((e: unknown) => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
 
         // Append request.sent only after email is dispatched (or attempted)
         try {
@@ -2107,8 +2107,9 @@ export const adminRoutes = createApiRouter()
             const res = await browser.quickAction('pdf', { url: probedUrl });
             status = res.status;
             contentType = res.headers.get('content-type');
-            body = await res.arrayBuffer();
-            contentLength = Math.min(body.byteLength, 1_048_576);
+            const buf = await res.arrayBuffer();
+            body = buf;
+            contentLength = Math.min(buf.byteLength, 1_048_576);
         } catch (e) {
             error = (e as Error).message;
         }
