@@ -37,6 +37,7 @@ import type {
     PlacesApi,
     ProfileApi,
     PublicShareApi,
+    PublicReportApi,
     PublicSlugApi,
     RatingSystemsApi,
     RecommendationsApi,
@@ -135,6 +136,7 @@ export interface Api {
     places:             ReturnType<typeof hc<PlacesApi>>;
     profile:            ReturnType<typeof hc<ProfileApi>>;
     publicShare:        ReturnType<typeof hc<PublicShareApi>>;
+    publicReport:       ReturnType<typeof hc<PublicReportApi>>;
     publicSlug:         ReturnType<typeof hc<PublicSlugApi>>;
     ratingSystems:      ReturnType<typeof hc<RatingSystemsApi>>;
     recommendations:    ReturnType<typeof hc<RecommendationsApi>>;
@@ -193,6 +195,7 @@ const MOUNT: Record<keyof Api, string> = {
     places:             "/api/places",
     profile:            "/api/profile",
     publicShare:        "/api/public",
+    publicReport:       "/api/public",
     publicSlug:         "/api/public",
     ratingSystems:      "/api/rating-systems",
     recommendations:    "/api/recommendations",
@@ -269,6 +272,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         places:             mk<PlacesApi>(MOUNT.places),
         profile:            mk<ProfileApi>(MOUNT.profile),
         publicShare:        mk<PublicShareApi>(MOUNT.publicShare),
+        publicReport:       mk<PublicReportApi>(MOUNT.publicReport),
         publicSlug:         mk<PublicSlugApi>(MOUNT.publicSlug),
         ratingSystems:      mk<RatingSystemsApi>(MOUNT.ratingSystems),
         recommendations:    mk<RecommendationsApi>(MOUNT.recommendations),

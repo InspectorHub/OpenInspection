@@ -132,6 +132,7 @@ import { TemplateService } from '../services/template.service';
 import { AgreementService } from '../services/agreement.service';
 import { ContactService } from '../services/contact.service';
 import { InvoiceService } from '../services/invoice.service';
+import { PortalAccessService } from '../services/portal-access.service';
 import { ServiceService } from '../services/service.service';
 import { AutomationService } from '../services/automation.service';
 import { MarketplaceService } from '../services/marketplace.service';
@@ -178,6 +179,7 @@ export interface AppServices {
     ai: AIService;
     contact: ContactService;
     invoice: InvoiceService;
+    portalAccess: PortalAccessService;
     service: ServiceService;
     automation: AutomationService;
     marketplace: MarketplaceService;

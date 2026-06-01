@@ -78,6 +78,7 @@ import repairRequestRoutes from './api/repair-requests';
 import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
+import publicReportRoutes from './api/public-report';
 import profileRoutes from './api/profile';
 import conciergeRoutes from './api/concierge';
 import sessionContextRoutes from './api/session-context';
@@ -423,6 +424,9 @@ const routes = app
   .route('/api/tags', tagsRoutes)
   .route('/api/inspection-requests', inspectionRequestsRoutes)
   .route('/api/ai', aiRoutes)
+  // C-10 residual ③-A — public token-gated report/observe/invoice/inspector
+  // endpoints. Mounted first so its static paths win over the other public routers.
+  .route('/api/public', publicReportRoutes)
   .route('/api/public', bookingsRoutes)
   .route('/api/public/widget', widgetRoutes)
   // Booking #7 Sprint A — slug availability check; lives under /api/public so

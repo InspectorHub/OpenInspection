@@ -57,3 +57,5 @@ export { userIdentityLinks } from './identity-links';
 export { conciergeInvites, conciergeBookings } from './concierge';
 // Inspection sync conflicts (Tasks 12-14 of typed-hono-dead-routes-cleanup)
 export { inspectionConflicts } from './inspection-conflicts';
+
+export { inspectionAccessTokens } from './portal-access';

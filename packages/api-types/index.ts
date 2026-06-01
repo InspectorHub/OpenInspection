@@ -41,6 +41,7 @@ export type { NotificationsApi }      from '../../server/api/notifications';
 export type { PlacesApi }             from '../../server/api/places';
 export type { ProfileApi }            from '../../server/api/profile';
 export type { PublicShareApi }        from '../../server/api/public-share';
+export type { PublicReportApi }       from '../../server/api/public-report';
 export type { PublicSlugApi }         from '../../server/api/public-slug';
 export type { RatingSystemsApi }      from '../../server/api/rating-systems';
 export type { RecommendationsApi }    from '../../server/api/recommendations';

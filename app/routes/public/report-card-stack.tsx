@@ -59,11 +59,13 @@ interface LoaderResult {
 /* Loader */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
  try {
  const api = createApi(context);
- const res = await api.publicShare.report[":tenant"][":id"].$get({
+ const token = new URL(request.url).searchParams.get("token") ?? undefined;
+ const res = await api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
+ query: { token },
  });
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;
