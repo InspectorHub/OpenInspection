@@ -19,8 +19,10 @@ interface AgreementData {
 export async function loader({ params, context }: Route.LoaderArgs) {
  try {
  const api = createApi(context);
- const res = await api.publicShare.agreements.sign[":tenant"][":token"].$get({
- param: { tenant: params.tenant ?? "", token: params.token ?? "" },
+ // The public agreement fetch lives on the bookings router (GET
+ // /api/public/agreements/:token); tenant resolves from the subdomain server-side.
+ const res = await api.bookings.agreements[":token"].$get({
+ param: { token: params.token ?? "" },
  });
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
