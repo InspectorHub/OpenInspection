@@ -47,7 +47,7 @@ After deploying (see [`developers/02_deploy.md`](developers/02_deploy.md)), visi
 
 ```
 workers/app.ts        Single-worker entry: Hono mounts API in-process + delegates pages to RR SSR
-src/                  Hono API (business logic, D1, R2)
+server/               Hono API (business logic, D1, R2)
 app/                  React Router v7 web UI (React SSR on CF Workers)
 packages/shared-ui/   Design System 0523 components (Button, Card, Pill, etc.)
 packages/api-types/   Hono app type re-export for end-to-end type safety
@@ -72,7 +72,7 @@ npm run dev                    # build-based; http://localhost:8788 (serves API 
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Build + run the single worker locally (port 8788) |
-| `npm run build` | `react-router build` — bundle `src/` API + `app/` SSR into one worker |
+| `npm run build` | `react-router build` — bundle `server/` API + `app/` SSR into one worker |
 | `npm run db:migrate` | Apply D1 migrations locally |
 | `npm run db:generate` | Generate a forward migration from schema changes |
 | `npm run deploy` | Build + `wrangler deploy` (single worker) |

@@ -76,7 +76,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         // Step 3 — assemble evidence.zip (best-effort; gracefully tolerated)
         const evidenceZipMeta = await step.do('build-evidence-pack', async () => {
             try {
-                if (!env.REPORTS) return null;
+                if (!env.PHOTOS) return null;
                 const signing = new SigningKeyService(env.DB, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET);
                 const pubKey = await signing.getPublicKey(tenantId);
                 if (!pubKey) return null;
@@ -104,7 +104,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                     })),
                 };
                 const zipBuf = await buildEvidencePack({
-                    r2: env.REPORTS,
+                    r2: env.PHOTOS,
                     auditTrailJson: JSON.stringify(auditPayload, null, 2),
                     publicKeyPem: pubKey.pem,
                     tenantId,
@@ -114,7 +114,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                 const bytes = new Uint8Array(zipBuf);
                 const hashBuf = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer));
                 const sha256 = Array.from(hashBuf).map((b) => b.toString(16).padStart(2, '0')).join('');
-                await env.REPORTS.put(r2Key, bytes, {
+                await env.PHOTOS.put(r2Key, bytes, {
                     httpMetadata: { contentType: 'application/zip' },
                     customMetadata: { sha256 },
                 });
@@ -148,14 +148,14 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
             try {
                 if (!evidenceZipMeta || !signedPdfMeta) return;
                 if (!env.RESEND_API_KEY) return;
-                if (!env.REPORTS) return;
+                if (!env.PHOTOS) return;
                 const db = drizzle(env.DB, { schema });
                 const req = await db.select().from(schema.agreementRequests)
                     .where(eq(schema.agreementRequests.id, requestId)).get();
                 if (!req) return;
                 const [signedObj, evidenceObj] = await Promise.all([
-                    env.REPORTS.get(signedPdfMeta.r2Key),
-                    env.REPORTS.get(evidenceZipMeta.r2Key),
+                    env.PHOTOS.get(signedPdfMeta.r2Key),
+                    env.PHOTOS.get(evidenceZipMeta.r2Key),
                 ]);
                 if (!signedObj || !evidenceObj) return;
                 const signedBytes = new Uint8Array(await new Response(signedObj.body).arrayBuffer());
@@ -189,7 +189,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
  * Browser Run does not reliably forward custom headers).
  */
 async function renderPdfToR2(env: AppEnv, opts: { renderUrl: string; r2Key: string }): Promise<{ r2Key: string; sha256: string; sizeBytes: number }> {
-    if (!env.REPORTS) throw new Error('REPORTS R2 bucket not configured');
+    if (!env.PHOTOS) throw new Error('storage R2 bucket not configured');
     if (!env.BROWSER) throw new Error('BROWSER binding not configured');
 
     console.info('[sign-workflow] BR quickAction("pdf")', { renderUrl: opts.renderUrl });
@@ -203,7 +203,7 @@ async function renderPdfToR2(env: AppEnv, opts: { renderUrl: string; r2Key: stri
     const bytes = new Uint8Array(pdfBuffer);
     const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer));
     const sha256 = Array.from(hash).map((b) => b.toString(16).padStart(2, '0')).join('');
-    await env.REPORTS.put(opts.r2Key, bytes, {
+    await env.PHOTOS.put(opts.r2Key, bytes, {
         httpMetadata: { contentType: 'application/pdf' },
         customMetadata: { sha256 },
     });

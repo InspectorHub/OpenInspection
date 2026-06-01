@@ -1,6 +1,8 @@
 # Architecture
 
-OpenInspection is a multi-tenant home inspection app deployed as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full API in-process and delegates page routes to React Router v7 SSR. This doc covers the high-level architecture for self-hosters, contributors, and reviewers.
+OpenInspection is a home inspection app deployed as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full API in-process and delegates page routes to React Router v7 SSR. This doc covers the high-level architecture for self-hosters, contributors, and reviewers.
+
+> Self-hosted instances run **standalone** (single-tenant) — the default in `wrangler.jsonc`. The engine is tenant-aware under the hood (every table carries `tenant_id`), but you don't manage tenants or subdomains; one fixed tenant holds all your data.
 
 ## Stack at a glance
 
@@ -24,7 +26,7 @@ OpenInspection is a multi-tenant home inspection app deployed as a single Cloudf
 
 ## Single-Worker Architecture
 
-OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app that is the worker entry: it mounts the full API (`src/`) for API-owned paths and delegates everything else (page routes) to the React Router v7 SSR handler.
+OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app that is the worker entry: it mounts the full API (`server/`) for API-owned paths and delegates everything else (page routes) to the React Router v7 SSR handler.
 
 ```
                     ┌──────────────────────────────────────────┐
@@ -34,7 +36,7 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
                     │  ┌──────────────────┐  ┌────────────────┐ │
                     │  │ /api/*, /status, │  │ everything else│ │
                     │  │ /sign/*, … →     │  │ → React Router │ │
-                    │  │ API app (src/)   │  │ v7 SSR (app/)  │ │
+                    │  │ API app (server/)│  │ v7 SSR (app/)  │ │
                     │  │ in-process       │◄─┤ in-process     │ │
                     │  │ Hono+Drizzle+D1  │  │ API_WORKER     │ │
                     │  └──────────────────┘  └────────────────┘ │
@@ -44,7 +46,7 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
 ```
 
 - **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, ICS/observe feeds) to the API app and sends everything else to the React Router v7 SSR handler. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
-- **`src/`** — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
+- **`server/`** — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
 - **`app/`** — React Router v7 + React 18 + Tailwind v4. Server-side renders the React UI on the edge.
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.).
 - **API Types** (`packages/api-types/`) — Re-exports the Hono app type so the web layer's `hono/client` gets full end-to-end type safety.
@@ -65,7 +67,7 @@ The web layer uses a **Token Relay BFF** pattern: the React Router v7 server hol
 apps/core/
 ├── workers/
 │   └── app.ts                     # Single-worker entry: Hono mounts API in-process + delegates pages to RR SSR
-├── src/                           # API (Hono + Drizzle + D1)
+├── server/                        # API (Hono + Drizzle + D1)
 │   ├── index.ts                   # Hono app entry, middleware order, route registration
 │   ├── api/                       # Route handlers (one file per resource)
 │   │   ├── auth.ts                # /api/auth/{login,register,reset-password,...}
@@ -74,8 +76,8 @@ apps/core/
 │   │   ├── booking.ts             # /public/* (no auth) + /api/book
 │   │   └── ...
 │   ├── services/                  # Business logic, DB queries (Drizzle)
-│   ├── features/                  # Feature-scoped modules (per-strategy splits)
-│   │   └── tenant-routing/        # Tenant resolution: path-param → subdomain → fixed
+│   ├── features/                  # Feature-scoped modules
+│   │   └── tenant-routing/        # Tenant resolution (standalone pins one fixed tenant)
 │   ├── lib/
 │   │   ├── middleware/            # Hono middleware (auth, RBAC, branding, DI)
 │   │   ├── db/                    # Drizzle schema + utils
@@ -83,7 +85,8 @@ apps/core/
 │   │   ├── errors.ts              # AppError + ErrorCode + Errors factory
 │   │   ├── logger.ts              # Structured JSON logger (use this, not console)
 │   │   └── ics.ts                 # iCalendar string builder
-│   └── workflows/                 # Cloudflare Workflow durable steps
+│   ├── workflows/                 # Cloudflare Workflow durable steps (e-sign completion)
+│   └── portal/                    # SaaS-only portal integration (unused in standalone)
 ├── app/                           # Web (React Router v7 + React 18 + Tailwind v4)
 │   ├── root.tsx                   # React Router v7 root layout
 │   ├── routes.ts                  # Route configuration
@@ -133,7 +136,7 @@ Cloudflare edge → single Worker (workers/app.ts) → Hono routes API-owned pat
 Hono middleware stack (in order):
    1. CSP / security headers
    2. Branding resolver (KV → D1 fallback)
-   3. Tenant router (subdomain → tenant ID)
+   3. Tenant router (standalone: pins the one fixed tenant)
    4. JWT auth (skip on /api/auth, /api/public, /api/setup)
    5. Bot protection (Turnstile + threat score)
    6. Tier guard (subscription check, no-op in standalone)
@@ -148,19 +151,17 @@ Service queries D1 (Drizzle) / R2 / KV / external API
 Response via sendSuccess() / sendError() (canonical envelope)
 ```
 
-## Multi-tenancy model
+## Tenancy model
 
-Every D1 table includes `tenant_id` (NOT NULL). Three deployment modes:
+Every D1 table includes `tenant_id` (NOT NULL) so the data model is tenant-aware, but a
+self-hosted instance runs **standalone**: `SINGLE_TENANT_ID` pins all data to one fixed
+tenant. You never manage tenants or subdomains. Tenant resolution lives in
+`server/features/tenant-routing/`; in standalone the `tenantRouter` middleware simply pins
+the request to `profile.fixedTenantId` (`resolve-by-fixed-tenant.ts`).
 
-- **Standalone** (default for self-hosters): single tenant. `SINGLE_TENANT_ID` env var pins all data to one tenant. The tenant subdomain is irrelevant.
-- **Shared SaaS**: one Worker, many tenants, each on a subdomain (`acme.app.com`, `xyz.app.com`).
-- **Silo SaaS**: per-tenant dedicated D1 (provisioned via Cloudflare API).
-
-Tenant resolution lives in `src/features/tenant-routing/` (entry point `index.ts`, with per-strategy resolvers in sibling files). The `tenantRouter` middleware tries three strategies in order:
-
-1. **Path-param resolution** (`resolve-by-path-param.ts`) — matches URL patterns like `/book/:tenant/:slug` first so public routes work uniformly across all deploy modes
-2. **Subdomain resolution** (`resolve-by-subdomain.ts`) — silo / shared SaaS: extracts the subdomain from the `Host` header, looks up the tenant via KV (5-minute TTL) with D1 fallback, then writes the result back to KV
-3. **Fixed-tenant fallback** (`resolve-by-fixed-tenant.ts`) — standalone: pins the request to `profile.fixedTenantId`
+> The same engine also powers a multi-tenant SaaS (subdomain/silo routing, portal SSO, billing
+> tiers) when `APP_MODE=saas`. Those modes are out of scope for self-hosting and not documented
+> here.
 
 ## Authentication
 
@@ -240,12 +241,12 @@ The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on 
 ## Storage
 
 - **D1**: structured data (tenants, users, inspections, templates, comments, agreements, audit logs, ...)
-- **R2**: blobs (photos, logos, future PDFs). Bucket bindings: `PHOTOS`. Photos accessed via signed URL or pass-through endpoint.
+- **R2**: blobs. Bucket bindings: `PHOTOS` (field photos, logos) and `REPORTS` (pre-rendered report + e-sign PDFs). Accessed via signed URL or a Worker pass-through endpoint.
 - **KV**: short-lived signed tokens (agent share, password reset, magic link), tenant config cache, rate-limit counters.
 
 ## Background work
 
-- **Onboarding workflow** (`server/workflows/onboarding-workflow.ts`): provision DNS → activate tenant → sync to core → send welcome email. Cloudflare Workflow guarantees retries and persistence across Worker restarts.
+- **Sign-completion workflow** (`server/workflows/`): renders the signed PDF + Certificate of Completion, assembles the evidence pack, and emails the client — see [E-signature](#e-signature-spec-5h). Cloudflare Workflow guarantees retries and persistence across Worker restarts.
 - **Cron triggers**: notification reminder sweeps (hourly), report-ready automations.
 
 ## Cost model (Cloudflare Free tier)

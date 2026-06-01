@@ -83,7 +83,6 @@ export interface AppEnv {
 
     // Report PDF storage (Spec 5A) — pre-rendered Summary + Full Report PDFs.
     // Optional during local dev so the worker boots without the binding.
-    REPORTS?: R2Bucket;
 
     // Spec 5H P1 — async sign-completion pipeline (signed.pdf + cert.pdf + audit append)
     SIGN_COMPLETION_WORKFLOW?: Workflow;

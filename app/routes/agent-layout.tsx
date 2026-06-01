@@ -49,7 +49,7 @@ export default function AgentLayout() {
               href="/logout"
               className="px-3 py-1.5 rounded-md text-[13px] font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors ml-2"
             >
-              Sign out
+              Log out
             </a>
           </nav>
         </div>

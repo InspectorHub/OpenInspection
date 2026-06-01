@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-sign";
 import { createApi } from "~/lib/api-client.server";
+import { SanitizedHtml } from "~/components/SanitizedHtml";
 
 export function meta() {
  return [{ title: "Sign Agreement - OpenInspection" }];
@@ -205,9 +206,9 @@ export default function AgreementSignPage() {
 
  {/* Agreement content */}
  <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-slate-100 dark:border-slate-700 max-h-96 overflow-y-auto">
- <div
+ <SanitizedHtml
  className="prose prose-sm dark:prose-invert max-w-none text-ih-fg-3 leading-relaxed"
- dangerouslySetInnerHTML={{ __html: agreement.body }}
+ html={agreement.body}
  />
  </div>
 

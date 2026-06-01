@@ -2,43 +2,39 @@
 
 `TENANT_CACHE` is a Cloudflare KV namespace used to avoid repeated D1 queries on hot paths.
 
-## Tenant Routing Cache (`tenant:{subdomain}`)
+## Tenant resolution cache (`global_tenant:{tenantId}`)
 
-Every request needs to know which tenant it belongs to. Without caching, that's a D1 query on every request.
+Every request needs to know which tenant it belongs to. In a standalone (self-hosted)
+deploy there is exactly one tenant — pinned by `SINGLE_TENANT_ID` — so the fixed-tenant
+resolver caches that profile under `global_tenant:{tenantId}` instead of hitting D1 on every
+request.
 
-KV reads are served from the nearest edge location — effectively zero latency. A 1-hour TTL balances freshness with efficiency. When tenant state changes (e.g., Stripe webhook activates/suspends), the cache is explicitly invalidated.
-
-### Cache invalidation
-
-`POST /api/admin/tenant-status` (called by portal after Stripe events) deletes the KV key:
-
-```typescript
-await c.env.TENANT_CACHE.delete(`tenant:${subdomain}`);
-```
+KV reads are served from the nearest edge location — effectively zero latency. A 1-hour TTL
+balances freshness with efficiency.
 
 ### Data stored
 
 ```
-Key:   "tenant:john"
-Value: { "id": "uuid", "subdomain": "john", "tier": "pro", "status": "active" }
+Key:   "global_tenant:00000000-0000-0000-0000-000000000000"
+Value: { "id": "uuid", "tier": "...", "status": "active", ... }
 TTL:   3600 seconds (1 hour)
 ```
 
 Written non-blocking via `c.executionCtx.waitUntil()`.
 
-## All KV Key Patterns
+## All KV Key Patterns (standalone)
 
 | Key pattern | Written by | Read by | TTL |
 |---|---|---|---|
-| `tenant:{subdomain}` | Tenant router on cache miss | Tenant router (every request) | 3600s |
-| `global_tenant:{tenantId}` | Fixed-tenant resolver (standalone mode) | Fixed-tenant resolver | 3600s |
-| `silo:{tenantId}` | `POST /api/admin/silo` (portal m2m) | Silo middleware | None |
+| `global_tenant:{tenantId}` | Fixed-tenant resolver | Fixed-tenant resolver (every request) | 3600s |
 | `pwchanged:{userId}` | Password change/reset handlers | Auth middleware (JWT validation) | None |
 | `setup_verification_code` | Setup wizard | Setup endpoint | 3600s |
-| `sso:{code}` | Portal SSO handoff | `GET /sso?code=` | Short |
 | `qbo_oauth_state:{state}` | QBO OAuth initiation | QBO OAuth callback | 600s |
 | `google_token:{tenantId}:{userId}` | Google Calendar OAuth | Calendar API calls | 3500s |
 | `places:{hash}` | Google Places proxy | Address autocomplete | 3600s |
+
+> SaaS mode adds subdomain/silo routing keys (`tenant:{subdomain}`, `silo:{tenantId}`,
+> `sso:{code}`); those are not used by a standalone deploy.
 
 ## Why Not Alternatives?
 

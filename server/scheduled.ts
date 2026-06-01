@@ -124,7 +124,9 @@ export async function scheduled(
     // 4. Drain user-sync outbox to portal (no-op for standalone)
     if (env.PORTAL_SERVICE) {
         try {
-            await flushOutboxOnce(env.DB, env.PORTAL_SERVICE, 50);
+            const { signM2mHeader } = await import('./lib/m2m-auth');
+            const m2m = await signM2mHeader(env as unknown as Record<string, string | undefined>);
+            await flushOutboxOnce(env.DB, env.PORTAL_SERVICE, m2m, 50);
         } catch (err) {
             logger.error('[cron:outbox] flush threw', {}, err instanceof Error ? err : undefined);
         }

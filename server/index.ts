@@ -8,7 +8,6 @@ import { verifyJwt } from './lib/jwt-keyring';
 import { classifyJwtPayload } from './lib/auth/jwt-claims';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, asc } from 'drizzle-orm';
-import { users } from './lib/db/schema';
 import * as schema from './lib/db/schema';
 
 import { brandingMiddleware } from './lib/middleware/branding';

@@ -32,8 +32,7 @@
     { "binding": "TENANT_CACHE", "id": "00000000000000000000000000000000" }
   ],
   "r2_buckets": [
-    { "binding": "PHOTOS", "bucket_name": "openinspection-photos" },
-    { "binding": "REPORTS", "bucket_name": "openinspection-reports" }
+    { "binding": "PHOTOS", "bucket_name": "openinspection-photos" }
   ],
   "browser": { "binding": "BROWSER" },
   "workflows": [

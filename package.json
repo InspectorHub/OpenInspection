@@ -13,8 +13,12 @@
   },
   "cloudflare": {
     "label": "OpenInspection",
-    "products": ["Workers"],
-    "categories": ["starter"],
+    "products": [
+      "Workers"
+    ],
+    "categories": [
+      "starter"
+    ],
     "docs_url": "https://github.com/InspectorHub/OpenInspection#readme",
     "publish": true
   },
@@ -55,6 +59,7 @@
     "@conform-to/zod": "^1.19.3",
     "@react-router/cloudflare": "^7.6.0",
     "dexie": "^4.0.10",
+    "dompurify": "^3.4.7",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.3",
     "hono": "^4.12.18",

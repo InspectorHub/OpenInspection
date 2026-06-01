@@ -1,5 +1,6 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-printable";
+import { SanitizedHtml } from "~/components/SanitizedHtml";
 
 export function meta() {
   return [{ title: "Signed Agreement - OpenInspection" }];
@@ -77,9 +78,9 @@ export default function AgreementPrintablePage() {
       </div>
 
       {/* Agreement body */}
-      <div
+      <SanitizedHtml
         className="text-[13px] leading-[1.7] [&_p]:mb-3 [&_strong]:font-semibold [&_ol]:pl-6 [&_ul]:pl-6 [&_ol]:mb-3 [&_ul]:mb-3"
-        dangerouslySetInnerHTML={{ __html: agreement.bodyHtml }}
+        html={agreement.bodyHtml}
       />
 
       {/* Signature block */}

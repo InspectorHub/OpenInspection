@@ -19,7 +19,7 @@
 
 ## What it is
 
-A complete home inspection software stack: inspector dashboard, public booking widget, mobile field form, professional HTML reports with e-signatures, AI assistance, multi-tenant routing, and PWA offline support — all running on Cloudflare's edge.
+A complete home inspection software stack: inspector dashboard, public booking widget, mobile field form, professional HTML reports with e-signatures, AI assistance, and PWA offline support — all running on Cloudflare's edge, self-hosted on a single Worker.
 
 ### Architecture
 
@@ -45,17 +45,17 @@ A complete home inspection software stack: inspector dashboard, public booking w
 - "Share with buyer" link generation
 - Recommendations export
 
-### Multi-tenant
-- Subdomain routing
-- Branded UI per tenant
-- Tenant-scoped D1 data isolation
+### Self-host friendly
+- Runs **standalone** (single-tenant) by default — one fixed tenant holds all your data, no subdomains to manage
+- Branded UI (logo, colors) configurable in Settings
+- Tenant-scoped D1 data isolation baked into every table
 
 ## Why OpenInspection
 
 - **Free to run**: Cloudflare Workers Free tier covers a solo inspector's full year. Pay only for a domain (~$10).
 - **Yours**: fork it, change templates, add integrations. No vendor lock-in.
 - **Fast**: edge-deployed, < 100 ms response times globally
-- **Compliant**: PBKDF2-SHA256 password hashing, hash-chained Ed25519 audit log on e-signatures (ESIGN Act + UETA), server-rendered PDF + Certificate of Completion via Browser Run, offline-verifiable evidence pack, multi-tenant data isolation
+- **Compliant**: PBKDF2-SHA256 password hashing, hash-chained Ed25519 audit log on e-signatures (ESIGN Act + UETA), server-rendered PDF + Certificate of Completion via Browser Run, offline-verifiable evidence pack, tenant-scoped data isolation
 - **Modern**: React Router v7 + React 18 + Hono API + Drizzle + Tailwind v4 — small surface, easy to read
 
 ## Quick start

@@ -702,26 +702,8 @@ Returns `404` if the agreement does not exist or does not belong to the caller's
 
 ---
 
-#### `POST /api/admin/tenant-status` *(machine-to-machine)*
-Sync a tenant's billing tier and status. Called by the portal after every Stripe subscription event. Invalidates the tenant's KV cache entry so the updated record is applied on the next request.
-
-**Auth:** `Authorization: Bearer {JWT_SECRET}` (shared secret, not a user JWT)
-
-**Request body:**
-```json
-{ "subdomain": "smith", "status": "active", "tier": "pro" }
-```
-
-- `subdomain` (required) — identifies the tenant
-- `status` (required) — one of `pending`, `trialing`, `active`, `past_due`, `suspended`
-- `tier` (optional) — one of `free`, `pro`, `enterprise`; omit to leave tier unchanged
-
-**Response:**
-```json
-{ "success": true }
-```
-
-Returns `404` if no tenant matches the given subdomain.
+> Portal ↔ core machine-to-machine endpoints (e.g. `POST /api/admin/tenant-status`,
+> `POST /api/admin/silo`) are SaaS-only and not used by a standalone self-hosted deploy.
 
 ---
 

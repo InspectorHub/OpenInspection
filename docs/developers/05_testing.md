@@ -81,8 +81,6 @@ npx playwright test --config playwright.api.config.ts
 | Agent Referral Booking | Create inspection with `referredByAgentId`, verify in `my-reports` and leaderboard |
 | Agent CRM | `GET /api/agent/my-reports` (agent-scoped), `GET /api/agent/leaderboard` (admin-scoped) |
 | Google Calendar | Auth enforcement on connect/disconnect/sync |
-| Admin M2M Endpoints | `POST /api/admin/silo`, `POST /api/admin/connect` auth + field validation |
-| Tenant Tier/Status (M2M) | `POST /api/admin/tenant-status` auth + validation + tier/status update lifecycle |
 | AI Comment Assist | Auth enforcement; 500 without `GEMINI_API_KEY` |
 
 ## Key Flows
@@ -108,13 +106,6 @@ npx playwright test --config playwright.api.config.ts
 3. Admin calls `GET /api/agent/leaderboard` — referral counts grouped by agent
 4. Public booking via `POST /public/book` with `agentId` body field also stores the referral
    (Note: dev-mode tenantId is the subdomain string `'dev'`, not the UUID — verified separately via authenticated endpoint)
-
-### Tenant Tier/Status Sync
-
-1. Portal sends `POST /api/admin/tenant-status` with `Authorization: Bearer {JWT_SECRET}`
-2. Core updates D1 and deletes the `tenant:{subdomain}` KV cache entry
-3. Next request reads fresh tenant record from D1 (no stale cache)
-4. The `dev` subdomain always bypasses tier enforcement — GET requests remain accessible regardless of status
 
 ### Password Change Flow
 

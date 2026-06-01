@@ -7,7 +7,7 @@ import { createApi } from "~/lib/api-client.server";
 import { loginSchema } from "~/lib/forms/auth.schema";
 
 export function meta() {
-  return [{ title: "Sign In - OpenInspection" }];
+  return [{ title: "Log In - OpenInspection" }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -88,7 +88,7 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
-          Sign in to your workspace
+          Log in to your workspace
         </h1>
         <p className="text-sm text-ih-fg-3 mb-6">
           Enter your credentials to access inspections, reports, and team tools.
@@ -144,7 +144,7 @@ export default function LoginPage() {
             disabled={isSubmitting}
             className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Signing in…" : "Sign In"}
+            {isSubmitting ? "Logging in…" : "Log In"}
           </button>
         </Form>
       </div>

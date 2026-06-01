@@ -2,7 +2,7 @@
 
 Every `createRoute()` call under `server/api/` must declare metadata used by the
 MCP server + Skill generator. The vitest gate at
-`src/__tests__/route-metadata.test.ts` enforces this on CI; missing or
+`tests/unit/route-metadata.spec.ts` enforces this on CI; missing or
 malformed metadata fails the build.
 
 This document codifies the standard. See the design spec at

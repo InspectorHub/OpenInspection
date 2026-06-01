@@ -8,7 +8,7 @@ This guide covers self-hosted production deploys — what every adopter does to 
 
 OpenInspection deploys as a single Cloudflare Worker (the cloudflare/react-router-hono-fullstack-template shape):
 
-- **`workers/app.ts`** — a Hono entry that mounts the full API (`src/`, Hono + Drizzle + D1) in-process for API-owned paths and delegates all other (page) routes to React Router v7 SSR (`app/`, React 18 + Tailwind v4).
+- **`workers/app.ts`** — a Hono entry that mounts the full API (`server/`, Hono + Drizzle + D1) in-process for API-owned paths and delegates all other (page) routes to React Router v7 SSR (`app/`, React 18 + Tailwind v4).
 - React Router loaders/actions call the API DIRECTLY through an injected in-process `API_WORKER` self-binding — no network hop, no second worker, no Service Binding between workers.
 
 One deployable; `npm run deploy` builds and ships it.
@@ -57,11 +57,10 @@ Set them via `wrangler secret put SECRET_NAME` or through the Cloudflare dashboa
 ```bash
 npm install
 npm run setup:cloudflare   # provisions D1/KV/R2 + writes real IDs to wrangler.local.jsonc
-npm run deploy             # standalone: build + wrangler deploy (uses wrangler.local.jsonc)
-# npm run deploy:saas      # saas: uses the gitignored wrangler.saas.jsonc
+npm run deploy             # build + wrangler deploy (uses wrangler.local.jsonc)
 ```
 
-`npm run deploy` runs `react-router build` (bundling `src/` API + `app/` SSR into one worker) then `wrangler deploy` against the built `build/server/wrangler.json`. The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`). Apply remote D1 migrations with `npm run db:migrate:remote`.
+`npm run deploy` runs `react-router build` (bundling `server/` API + `app/` SSR into one worker) then `wrangler deploy` against the built `build/server/wrangler.json`. The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`). Apply remote D1 migrations with `npm run db:migrate:remote`.
 
 > **One-click**: the committed `wrangler.jsonc` carries placeholder IDs; the README's *Deploy to Cloudflare* button provisions resources and injects real IDs automatically — no manual `setup:cloudflare` needed for that path.
 
@@ -74,7 +73,7 @@ That bootstraps your first admin account.
 
 ### How the single worker is wired
 
-The Worker entry at `workers/app.ts` is a Hono app. It routes API-owned paths (`/api/*`, `/status`, `/sign/*`, …) to the API app (`src/`) in-process, and sends every other path to React Router via `createRequestHandler` with `import("virtual:react-router/server-build")`, passing `{ cloudflare: { env, ctx } }` as the `AppLoadContext`. Before delegating to SSR it injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app directly — no network hop, no second worker. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline ships everything.
+The Worker entry at `workers/app.ts` is a Hono app. It routes API-owned paths (`/api/*`, `/status`, `/sign/*`, …) to the API app (`server/`) in-process, and sends every other path to React Router via `createRequestHandler` with `import("virtual:react-router/server-build")`, passing `{ cloudflare: { env, ctx } }` as the `AppLoadContext`. Before delegating to SSR it injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app directly — no network hop, no second worker. `@cloudflare/vite-plugin` integrates the React Router SSR build with wrangler, so the standard `wrangler deploy` pipeline ships everything.
 
 ### Local development
 

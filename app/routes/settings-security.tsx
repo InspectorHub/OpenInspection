@@ -201,7 +201,7 @@ export default function SettingsSecurityPage() {
             <div>
               <p className="font-bold text-ih-fg-1 text-[13px]">Two-factor authentication</p>
               <p className="text-[11px] text-ih-fg-3">
-                {user.totpEnabled ? "Enabled. Required at every sign in." : "Not enabled."}
+                {user.totpEnabled ? "Enabled. Required at every log in." : "Not enabled."}
               </p>
               {user.totpEnabled && user.recoveryCodesRemaining != null && (
                 <p className="text-[11px] text-ih-fg-3 mt-1">{user.recoveryCodesRemaining} recovery codes remaining</p>
