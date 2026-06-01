@@ -3,7 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
-import { resolvePortalAccess } from '../lib/public-access';
+import { resolvePortalAccess, resolveObserverAccess } from '../lib/public-access';
 import { loadVerifyData } from '../lib/verify-data';
 
 /**
@@ -88,6 +88,76 @@ const invoiceRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getPublicInvoice',
     description: 'Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from subdomain; tenant-scoped query.',
+}, { scopes: [], tier: 'extended' }));
+
+// Public live-observer view (③-A.4). Gated by an OBSERVER-link token (distinct
+// from the portal token) carried in `?token=`; tenantId resolves from the
+// claimed link, never the URL. Returns read-only section progress.
+const ObserveResponseSchema = z.object({
+    address: z.string(),
+    date: z.string().nullable(),
+    inspectorName: z.string(),
+    status: z.string(),
+    sections: z.array(z.object({
+        name: z.string(),
+        completedItems: z.number(),
+        totalItems: z.number(),
+    })),
+});
+
+const observeRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/observe/inspections/{id}',
+    tags: ['public'],
+    summary: 'Public live observer progress (token-gated)',
+    request: {
+        params: z.object({ id: z.string().describe('Inspection id.') }),
+        query: z.object({ token: z.string().optional().describe('Observer-link token.') }),
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(ObserveResponseSchema) } }, description: 'Live section progress' },
+        404: { description: 'Observer link missing/expired/revoked or inspection mismatch' },
+    },
+    operationId: 'getPublicObserve',
+    description: 'Public, no-login live progress for an in-flight inspection, gated by an observer-link token. 404 when the link is invalid/expired/revoked or does not grant access to the requested inspection.',
+}, { scopes: [], tier: 'extended' }));
+
+// Public report-gate (③-A.2). The "report blocked, here's why + CTA" page,
+// resolved by tenant subdomain + id (no token — pre-report). Returns only
+// non-sensitive gate fields (reason + branding + inspector contact + amount).
+const ReportGateResponseSchema = z.object({
+    reason: z.enum(['payment', 'agreement']),
+    companyName: z.string(),
+    primaryColor: z.string(),
+    actionUrl: z.string(),
+    actionLabel: z.string(),
+    propertyAddress: z.string().nullable(),
+    inspectorName: z.string().nullable(),
+    inspectorEmail: z.string().nullable(),
+    inspectorPhone: z.string().nullable(),
+    inspectorLicense: z.string().nullable(),
+    scheduledDate: z.string().nullable(),
+    amountCents: z.number().nullable(),
+    currency: z.string().nullable(),
+}).nullable();
+
+const reportGateRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/report-gate/{tenant}/{id}',
+    tags: ['public'],
+    summary: 'Public report-gate status (why the report is blocked + CTA)',
+    request: {
+        params: z.object({
+            tenant: z.string().describe('Tenant subdomain (display + CTA-URL building; tenant is resolved from the subdomain).'),
+            id: z.string().describe('Inspection id.'),
+        }),
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(ReportGateResponseSchema) } }, description: 'Gate payload (or null when the report is not gated)' },
+        404: { description: 'Tenant not resolved' },
+    },
+    operationId: 'getPublicReportGate',
+    description: 'Public, no-login report-gate status resolved by tenant subdomain + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
@@ -179,6 +249,21 @@ export const publicReportRoutes = createApiRouter()
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
         const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
         return c.json({ success: true as const, data: inv }, 200);
+    })
+    .openapi(observeRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const { token } = c.req.valid('query');
+        const access = await resolveObserverAccess(c.var.services.observerLink, token, id);
+        if (!access) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Inspection not found' } }, 404);
+        const data = await c.var.services.inspection.getObserveProgress(id, access.tenantId);
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(reportGateRoute, async (c) => {
+        const { tenant, id } = c.req.valid('param');
+        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+        const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant);
+        return c.json({ success: true as const, data: gate }, 200);
     });
 
 export type PublicReportApi = typeof publicReportRoutes;

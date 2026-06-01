@@ -30,10 +30,10 @@ interface GateData {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params, request, context }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context);
-    const res = await api.publicShare["report-gate"][":tenant"][":id"].$get({
+    const res = await api.publicReport["report-gate"][":tenant"][":id"].$get({
       param: { tenant: params.tenant ?? "", id: params.id ?? "" },
     });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};

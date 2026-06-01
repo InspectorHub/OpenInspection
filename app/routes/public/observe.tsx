@@ -14,11 +14,13 @@ interface ObserveData {
   sections: { name: string; completedItems: number; totalItems: number }[];
 }
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context);
-    const res = await api.publicShare.observe.inspections[":id"].$get({
+    const token = new URL(request.url).searchParams.get("token") ?? undefined;
+    const res = await api.publicReport.observe.inspections[":id"].$get({
       param: { id: params.id ?? "" },
+      query: { token },
     });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
