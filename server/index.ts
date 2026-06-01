@@ -7,7 +7,7 @@ import { signObserverCookie } from './lib/observer-cookie';
 import { verifyJwt } from './lib/jwt-keyring';
 import { classifyJwtPayload } from './lib/auth/jwt-claims';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, asc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import * as schema from './lib/db/schema';
 
 import { brandingMiddleware } from './lib/middleware/branding';
@@ -30,6 +30,7 @@ import { setupWizardRoutes } from './features/setup-wizard';
 
 import { OBSERVER_EXPIRED_PATH } from './lib/middleware/observer-cookie';
 import { agreementSignPath } from './lib/public-urls';
+import { loadVerifyData } from './lib/verify-data';
 
 
 import coreAuthRoutes from './api/auth';
@@ -621,48 +622,10 @@ app.get('/sign/:tenant/:id', async (c) => {
 
 
 
-// Spec 5H P2 — Public verifier (no-auth, court-friendly).
-// HTML page at /verify/{envelopeId} + JSON API at /api/public/verify/*
-async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string) {
-    const db = drizzle(c.env.DB, { schema });
-    const reqRow = await db.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, envelopeId)).get();
-    if (!reqRow) return null;
-    const agreement = await db.select().from(schema.agreements).where(eq(schema.agreements.id, reqRow.agreementId)).get();
-    const auditRows = await db.select().from(schema.esignAuditLogs)
-        .where(and(eq(schema.esignAuditLogs.tenantId, reqRow.tenantId), eq(schema.esignAuditLogs.requestId, envelopeId)))
-        .orderBy(asc(schema.esignAuditLogs.createdAt))
-        .all();
-    const verify = await c.var.services.auditLog.verifyChain(reqRow.tenantId, envelopeId);
-    const pubKey = await c.var.services.signingKey.getPublicKey(reqRow.tenantId);
-    const tenantRow = await db.select({ subdomain: schema.tenants.subdomain })
-        .from(schema.tenants)
-        .where(eq(schema.tenants.id, reqRow.tenantId))
-        .get();
-    const tenantSubdomain = tenantRow?.subdomain ?? '';
-    return { reqRow, agreement, auditRows, verify, pubKey, tenantSubdomain };
-}
-
-
-app.get('/api/public/verify/:envelopeId', async (c) => {
-    const envelopeId = c.req.param('envelopeId') as string;
-    const data = await loadVerifyData(c, envelopeId);
-    if (!data) return c.json({ success: false, error: { message: 'Envelope not found', code: 'NOT_FOUND' } }, 404);
-    return c.json({
-        success: true,
-        data: {
-            envelopeId,
-            documentTitle: data.agreement?.name ?? null,
-            clientName: data.reqRow.clientName,
-            clientEmail: data.reqRow.clientEmail,
-            chainValid: data.verify.valid,
-            chainReason: data.verify.valid ? null : (data.verify.reason as string),
-            keyFingerprint: data.pubKey?.fingerprint ?? null,
-            keyAlgorithm: 'Ed25519',
-            eventCount: data.auditRows.length,
-        },
-    });
-});
-
+// Spec 5H P2 — Public verifier (no-auth, court-friendly). The base JSON route
+// `GET /api/public/verify/:envelopeId` is now the typed route in
+// server/api/public-report.ts; these siblings stay raw (not consumed via hc).
+// `loadVerifyData` moved to server/lib/verify-data.ts.
 app.get('/api/public/verify/:envelopeId/public-key', async (c) => {
     const envelopeId = c.req.param('envelopeId') as string;
     const data = await loadVerifyData(c, envelopeId);

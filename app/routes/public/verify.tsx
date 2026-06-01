@@ -18,7 +18,7 @@ interface VerifyData {
 export async function loader({ params, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context);
-    const res = await api.publicShare.verify[":envelopeId"].$get({
+    const res = await api.publicReport.verify[":envelopeId"].$get({
       param: { envelopeId: params.envelopeId ?? "" },
     });
     const body = res.ok ? await res.json() : {};

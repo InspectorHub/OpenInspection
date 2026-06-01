@@ -4,6 +4,7 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
 import { resolvePortalAccess } from '../lib/public-access';
+import { loadVerifyData } from '../lib/verify-data';
 
 /**
  * Public, no-login portal endpoints (`/api/public/*`). Access is gated by the
@@ -89,7 +90,54 @@ const invoiceRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from subdomain; tenant-scoped query.',
 }, { scopes: [], tier: 'extended' }));
 
+// Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
+// loadVerifyData; this is the base JSON route the verify page consumes.
+const VerifyResponseSchema = z.object({
+    envelopeId: z.string(),
+    documentTitle: z.string().nullable(),
+    clientName: z.string().nullable(),
+    clientEmail: z.string().nullable(),
+    chainValid: z.boolean(),
+    chainReason: z.string().nullable(),
+    keyFingerprint: z.string().nullable(),
+    keyAlgorithm: z.string(),
+    eventCount: z.number(),
+});
+
+const verifyRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/verify/{envelopeId}',
+    tags: ['public'],
+    summary: 'Public e-signature verification (court-friendly)',
+    request: { params: z.object({ envelopeId: z.string() }) },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(VerifyResponseSchema) } }, description: 'Verification result' },
+        404: { description: 'Envelope not found' },
+    },
+    operationId: 'getPublicVerify',
+    description: 'Public, no-login signature-chain verification for a signed agreement envelope. Returns chain validity + key fingerprint for independent verification.',
+}, { scopes: [], tier: 'extended' }));
+
 export const publicReportRoutes = createApiRouter()
+    .openapi(verifyRoute, async (c) => {
+        const { envelopeId } = c.req.valid('param');
+        const data = await loadVerifyData(c, envelopeId);
+        if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
+        return c.json({
+            success: true as const,
+            data: {
+                envelopeId,
+                documentTitle: data.agreement?.name ?? null,
+                clientName: data.reqRow.clientName,
+                clientEmail: data.reqRow.clientEmail,
+                chainValid: data.verify.valid,
+                chainReason: data.verify.valid ? null : (data.verify.reason as string),
+                keyFingerprint: data.pubKey?.fingerprint ?? null,
+                keyAlgorithm: 'Ed25519',
+                eventCount: data.auditRows.length,
+            },
+        }, 200);
+    })
     .openapi(reportRoute, async (c) => {
         const { id } = c.req.valid('param');
         const { token } = c.req.valid('query');
