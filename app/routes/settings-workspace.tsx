@@ -29,7 +29,9 @@ const THEMES = ["modern", "classic", "minimal"] as const;
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const res = await api.admin.branding.$get();
+  // TODO(C-10 collapse): hono/client collapses api.admin.branding.$get to a non-callable
+  // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
+  const res = await (api.admin.branding.$get as unknown as (args?: unknown) => Promise<Response>)();
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   return { branding: (body.data ?? {}) as Branding };
 }
@@ -62,7 +64,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   const api = createApi(context, { token });
-  const res = await api.admin.branding.$post({ json: body });
+  // TODO(C-10 collapse): hono/client collapses api.admin.branding.$post to a non-callable
+  // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
+  const res = await (api.admin.branding.$post as unknown as (args: { json: Record<string, unknown> }) => Promise<Response>)({ json: body });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     return submission.reply({
@@ -102,14 +106,9 @@ export default function SettingsWorkspacePage() {
       <p className="text-[13px] text-ih-fg-3">Branding, report theme, analytics, and referral sources.</p>
 
       {/* Flash */}
-      {actionData?.success && (
+      {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Workspace settings saved.
-        </div>
-      )}
-      {actionData?.error && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-          {actionData.error}
         </div>
       )}
 

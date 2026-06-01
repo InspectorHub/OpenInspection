@@ -51,7 +51,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!signatureBase64) {
       return { success: false, error: "No signature data provided", intent };
     }
-    const res = await api.users.me.signature.$post({
+    // TODO(C-10 collapse): hono/client collapses api.users.me so .signature is not
+    // accessible; localized assertion until the typed-hono spike resolves it. Binding preserved.
+    const usersClient = api.users as unknown as { me: { signature: { $post: (args: { json: { signatureBase64: string } }) => Promise<Response> } } };
+    const res = await usersClient.me.signature.$post({
       json: { signatureBase64 },
     });
     if (!res.ok) {
@@ -104,12 +107,19 @@ export default function SettingsProfilePage() {
     shouldRevalidate: "onInput",
   });
 
+  // Conform narrowing helpers (cat-7): actionData may be SubmissionResult or {success,error,...}
+  const flashSuccess = actionData && "success" in actionData && actionData.success;
+  const flashError = actionData && "error" in actionData && typeof actionData.error === "string" ? actionData.error : null;
+
   // Signature pad state
   const sigFetcher = useFetcher<typeof action>();
   const [showSigPad, setShowSigPad] = useState(false);
-  const sigSaved = sigFetcher.data?.success && sigFetcher.data?.intent === "save-signature";
-  const sigError = sigFetcher.data?.error && sigFetcher.data?.intent === "save-signature"
-    ? sigFetcher.data.error : null;
+  const sigSaved = sigFetcher.data && "success" in sigFetcher.data && sigFetcher.data.success
+    && "intent" in sigFetcher.data && sigFetcher.data.intent === "save-signature";
+  const sigError = sigFetcher.data && "error" in sigFetcher.data
+    && typeof sigFetcher.data.error === "string" && sigFetcher.data.error
+    && "intent" in sigFetcher.data && sigFetcher.data.intent === "save-signature"
+    ? (sigFetcher.data.error as string) : null;
 
   return (
     <div className="space-y-[18px]">
@@ -123,16 +133,16 @@ export default function SettingsProfilePage() {
       <p className="text-[13px] text-ih-fg-3">Inspector identity that appears on every report you generate.</p>
 
       {/* Flash */}
-      {actionData?.success && (
+      {flashSuccess && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Profile saved.
         </div>
       )}
-      {actionData?.error && (
+      {flashError ? (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-          {actionData.error}
+          {flashError}
         </div>
-      )}
+      ) : null}
 
       <Form
         method="post"

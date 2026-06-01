@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-profile";
-import { requireToken } from "~/lib/session.server";
-import { createApi } from "~/lib/api-client.server";
 
 export function meta() {
   return [{ title: "Agent Settings - OpenInspection" }];
@@ -18,26 +16,16 @@ interface AgentProfile {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
-  try {
-    const api = createApi(context, { token });
-    const res = await api.agent.profile.$get();
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-    const d = (body.data ?? {}) as Record<string, unknown>;
-    return {
-      agent: (Object.keys(d).length > 0 ? d : {
-        name: null, email: "", slug: null,
-        notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
-      }) as AgentProfile,
-    };
-  } catch {
-    return {
-      agent: {
-        name: null, email: "", slug: null,
-        notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
-      } as AgentProfile,
-    };
-  }
+  // TODO(B-?): no GET /api/agent/profile server route — server/api/agent.ts only has
+  // POST /profile. Return safe defaults until a GET route is added.
+  void request;
+  void context;
+  return {
+    agent: {
+      name: null, email: "", slug: null,
+      notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
+    } as AgentProfile,
+  };
 }
 
 export default function AgentSettingsProfilePage() {

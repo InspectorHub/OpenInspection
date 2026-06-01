@@ -31,7 +31,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const res = await api.admin.services.$get();
+    const res = await api.services.index.$get({});
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
     const d = (body.data ?? {}) as Record<string, unknown>;
     return {
@@ -55,7 +55,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       return submission.reply();
     }
     const { name, description, price } = submission.value;
-    const res = await api.admin.services.$post({
+    // TODO(C-10 collapse): hono/client collapses api.services.index.$post to a non-callable
+    // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
+    const res = await (api.services.index.$post as unknown as (args: { json: Record<string, unknown> }) => Promise<Response>)({
       json: {
         name,
         description: description || null,
@@ -72,7 +74,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   } else if (intent === "toggle-service") {
     const id = String(form.get("id") ?? "");
     const active = form.get("active") === "true";
-    await api.admin.services[":id"].$patch({
+    await api.services[":id"].$put({
       param: { id },
       json: { active: !active },
     });

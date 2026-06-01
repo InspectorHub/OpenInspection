@@ -25,9 +25,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
 
+  // TODO(C-10 collapse): hono/client collapses api.auth.me.$get and api.admin.secrets.$get
+  // to non-callable unions; localized assertions until the typed-hono spike resolves it. Binding preserved.
   const [meRes, secretsRes] = await Promise.all([
-    api.auth.me.$get(),
-    api.secrets.secrets.$get().catch(() => null),
+    (api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>)(),
+    (api.admin.secrets.$get as unknown as (args?: unknown) => Promise<Response>)().catch(() => null),
   ]);
 
   const meBody = meRes.ok ? ((await meRes.json()) as Record<string, unknown>) : {};
@@ -57,10 +59,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (submission.status !== "success") {
       return submission.reply();
     }
-    const { currentPassword, newPassword, confirmPassword } = submission.value;
+    const { currentPassword, newPassword } = submission.value;
+    // confirmPassword is client-only validation; the server schema only accepts currentPassword + newPassword.
 
-    const res = await api.auth["change-password"].$post({
-      json: { currentPassword, newPassword, confirmPassword },
+    // TODO(C-10 collapse): hono/client collapses api.auth["change-password"].$post body type;
+    // localized assertion keeps the in-process binding. Binding preserved.
+    const res = await (api.auth["change-password"].$post as unknown as (args: { json: { currentPassword: string; newPassword: string } }) => Promise<Response>)({
+      json: { currentPassword, newPassword },
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -74,7 +79,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "save-turnstile") {
     const val = fd.get("TURNSTILE_SECRET_KEY");
     if (val && typeof val === "string" && val.trim()) {
-      const res = await api.secrets.secrets.$put({
+      // TODO(C-10 collapse): hono/client collapses api.admin.secrets.$put body type;
+      // localized assertion keeps the in-process binding. Binding preserved.
+      const res = await (api.admin.secrets.$put as unknown as (args: { json: Record<string, string> }) => Promise<Response>)({
         json: { TURNSTILE_SECRET_KEY: val },
       });
       if (!res.ok) {
@@ -121,16 +128,16 @@ export default function SettingsSecurityPage() {
       <p className="text-[13px] text-ih-fg-3">Password, two-factor authentication, and active sessions.</p>
 
       {/* Flash */}
-      {actionData?.success && (
+      {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Password changed successfully.
         </div>
       )}
-      {actionData?.error && (
+      {actionData && "error" in actionData && typeof actionData.error === "string" && actionData.error ? (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
-      )}
+      ) : null}
 
       {/* Change password */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">

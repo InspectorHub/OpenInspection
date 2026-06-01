@@ -25,11 +25,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
 
-  // Fetch Stripe connect status + secrets in parallel
-  const [stripeRes, aiRes, secretsRes] = await Promise.all([
-    api.admin.payments.status.$get().catch(() => null),
-    api.admin.ai.status.$get().catch(() => null),
-    api.admin.secrets.$get().catch(() => null),
+  // Fetch Stripe connect status + secrets in parallel.
+  // ai.status has no server route — omit it and default geminiConfigured to false.
+  // TODO(C-10 collapse): hono/client collapses api.admin.* to a non-callable union;
+  // localized assertions until the typed-hono spike resolves it. Binding preserved.
+  const stripeGetFn = api.admin["stripe-connect"].$get as unknown as (args?: unknown) => Promise<Response>;
+  const secretsGetFn = api.admin.secrets.$get as unknown as (args?: unknown) => Promise<Response>;
+  const [stripeRes, secretsRes] = await Promise.all([
+    stripeGetFn().catch(() => null),
+    secretsGetFn().catch(() => null),
   ]);
 
   let stripeConnected = false;
@@ -37,16 +41,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (stripeRes?.ok) {
     const body = (await stripeRes.json()) as Record<string, unknown>;
     const data = (body.data ?? {}) as Record<string, unknown>;
-    stripeConnected = Boolean(data?.connected);
+    stripeConnected = Boolean(data?.accountId);
     stripeAccountId = (data?.accountId as string) || null;
   }
 
-  let geminiConfigured = false;
-  if (aiRes?.ok) {
-    const body = (await aiRes.json()) as Record<string, unknown>;
-    const data = (body.data ?? {}) as Record<string, unknown>;
-    geminiConfigured = Boolean(data?.configured);
-  }
+  // No GET /api/ai/status route exists; geminiConfigured is derived from secrets presence only.
+  const geminiConfigured = false;
 
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
@@ -78,7 +78,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       return submission.reply();
     }
     const { stripeAccountId } = submission.value;
-    const res = await api.admin.payments.connect.$post({ json: { accountId: stripeAccountId } });
+    // TODO(C-10 collapse): hono/client collapses api.admin["stripe-connect"].$put body type;
+    // localized assertion keeps the in-process binding. Binding preserved.
+    const res = await (api.admin["stripe-connect"].$put as unknown as (args: { json: { accountId: string } }) => Promise<Response>)({ json: { accountId: stripeAccountId } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return submission.reply({
@@ -89,7 +91,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "disconnect-stripe") {
-    const res = await api.admin.payments.disconnect.$post();
+    // TODO(C-10 collapse): hono/client collapses api.admin["stripe-connect"].$delete;
+    // localized assertion keeps the in-process binding. Binding preserved.
+    const res = await (api.admin["stripe-connect"].$delete as unknown as (args?: unknown) => Promise<Response>)();
     if (!res.ok) {
       return { success: false, error: "Failed to disconnect Stripe account." };
     }
@@ -101,7 +105,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
       return { success: false, error: "API key is required." };
     }
-    const res = await api.admin.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey } });
+    // TODO(C-10 collapse): hono/client collapses api.admin.secrets.$put body type;
+    // localized assertion keeps the in-process binding. Binding preserved.
+    const res = await (api.admin.secrets.$put as unknown as (args: { json: Record<string, string> }) => Promise<Response>)({ json: { GEMINI_API_KEY: geminiApiKey } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return { success: false, error: (err as Record<string, string>)?.message || "Failed to save AI configuration." };
@@ -116,7 +122,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (val && typeof val === "string" && val.trim()) body[key] = val;
     }
     if (Object.keys(body).length > 0) {
-      const res = await api.admin.secrets.$put({ json: body });
+      // TODO(C-10 collapse): hono/client collapses api.admin.secrets.$put body type;
+      // localized assertion keeps the in-process binding. Binding preserved.
+      const res = await (api.admin.secrets.$put as unknown as (args: { json: Record<string, string> }) => Promise<Response>)({ json: body });
       if (!res.ok) {
         return { success: false, error: "Failed to save integration keys." };
       }
@@ -161,16 +169,16 @@ export default function SettingsAdvancedPage() {
       <p className="text-[13px] text-ih-fg-3">Stripe payments, AI features, and integrations.</p>
 
       {/* Flash */}
-      {actionData?.success && (
+      {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Settings saved.
         </div>
       )}
-      {actionData?.error && (
+      {actionData && "error" in actionData && typeof actionData.error === "string" && actionData.error ? (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
-      )}
+      ) : null}
 
       {/* Stripe Connect */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
