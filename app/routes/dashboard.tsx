@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useLoaderData, Link, useNavigate, useFetcher, useSearchParams } from "react-router";
+import { useLoaderData, Link, useFetcher, useSearchParams } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -277,7 +277,6 @@ export default function DashboardPage() {
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const fetcher = useFetcher();
 
   /* ---- State ---- */
@@ -443,7 +442,7 @@ export default function DashboardPage() {
   const toggleBucket = (key: string) =>
     setCollapsedBuckets((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
 
@@ -451,7 +450,7 @@ export default function DashboardPage() {
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 
