@@ -57,7 +57,10 @@ const inspectorRoute = createRoute(withMcpMetadata({
     path: '/inspector/{tenant}/{slug}',
     tags: ['public'],
     summary: 'Public inspector marketing profile',
-    request: { params: z.object({ tenant: z.string(), slug: z.string() }) },
+    request: { params: z.object({
+        tenant: z.string().describe('Tenant subdomain that scopes the inspector lookup.'),
+        slug: z.string().describe('Public inspector profile slug.'),
+    }) },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(PublicInspectorProfileSchema) } }, description: 'Public profile + bookable services' },
         404: { description: 'Tenant or inspector not found' },
@@ -81,7 +84,7 @@ const invoiceRoute = createRoute(withMcpMetadata({
     path: '/r/{id}/invoice',
     tags: ['public'],
     summary: 'Public invoice for an inspection (pay-link landing)',
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }) },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(PublicInvoiceSchema) } }, description: 'Invoice (or null if none)' },
         404: { description: 'Tenant not resolved' },
