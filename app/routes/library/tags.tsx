@@ -12,7 +12,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const res = await api.tags.$get();
+    const res = await api.tags.index.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
     return { tags: (body.data ?? []) as unknown[] };
   } catch {

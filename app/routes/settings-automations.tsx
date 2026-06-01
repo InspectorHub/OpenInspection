@@ -38,7 +38,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const res = await api.admin.automations.$get();
+    const res = await api.automations.index.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
     return { rules: (body.data ?? []) as AutomationRule[] };
   } catch {
@@ -55,7 +55,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const id = String(form.get("id") ?? "");
     const active = form.get("active") === "true";
     const api = createApi(context, { token });
-    await api.admin.automations[":id"].$patch({
+    await api.automations[":id"].$patch({
       param: { id },
       json: { active: !active },
     });

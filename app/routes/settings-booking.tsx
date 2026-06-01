@@ -32,17 +32,11 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  // TODO(C-10 collapse): hono/client collapses these routes to non-callable unions;
-  // localized assertions until the typed-hono spike resolves it. Binding preserved.
-  const availGetFn = api.availability.index.$get as unknown as (args?: unknown) => Promise<Response>;
-  const overridesGetFn = api.availability.overrides.$get as unknown as (args?: unknown) => Promise<Response>;
-  const configGetFn = api.admin["tenant-config"].$get as unknown as (args?: unknown) => Promise<Response>;
-  const originsGetFn = api.admin["widget/origins"].$get as unknown as (args?: unknown) => Promise<Response>;
   const [availRes, overridesRes, configRes, originsRes] = await Promise.all([
-    availGetFn().catch(() => null),
-    overridesGetFn().catch(() => null),
-    configGetFn().catch(() => null),
-    originsGetFn().catch(() => null),
+    api.availability.index.$get({ query: {} }).catch(() => null),
+    api.availability.overrides.$get({ query: {} }).catch(() => null),
+    api.admin["tenant-config"].$get().catch(() => null),
+    api.admin.widget.origins.$get().catch(() => null),
   ]);
 
   let slots: AvailabilitySlot[] = [];
