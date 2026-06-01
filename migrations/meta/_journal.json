@@ -15,6 +15,13 @@
       "when": 1780313609126,
       "tag": "0001_handy_ozymandias",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1780327142586,
+      "tag": "0002_unknown_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

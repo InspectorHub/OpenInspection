@@ -1184,6 +1184,56 @@ const deleteEventTypeRoute = createRoute(withMcpMetadata({
     description: 'Deletes a scheduling event type when unused, or soft-deactivates it (active=false) when existing inspection events reference it, preserving history.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
+/* ---- C-10 ③-D (B-4 / A-7) — Communication config (sender email / reply-to) ---- */
+const CommunicationResponseSchema = z.object({
+    senderEmail:             z.string().nullable().describe('From: address for tenant transactional email.'),
+    replyTo:                 z.string().nullable().describe('Reply-To: header for tenant transactional email.'),
+    resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
+    templates:               z.array(z.object({
+        id:      z.string().describe('Template id.'),
+        name:    z.string().describe('Template name.'),
+        trigger: z.string().describe('Automation trigger the template fires on.'),
+        active:  z.boolean().describe('Whether the template is active.'),
+    })).describe('Email templates (empty until template management ships).'),
+    icsUrl:                  z.string().nullable().describe('Calendar subscription (ICS) URL, when a token exists.'),
+    googleCalendarConnected: z.boolean().describe('Whether a Google Calendar refresh token is stored.'),
+});
+const CommunicationPatchSchema = z.object({
+    senderEmail: z.string().nullable().describe('From: address, or null to clear.'),
+    replyTo:     z.string().nullable().describe('Reply-To: address, or null to clear.'),
+}).openapi('CommunicationPatch');
+
+const getCommunicationRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/communication',
+    tags: ['admin'],
+    summary: 'Get tenant communication settings',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(CommunicationResponseSchema) } }, description: 'Communication config' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'getCommunicationConfig',
+    description: 'Returns the tenant transactional-email identity (sender + reply-to) plus delivery/integration status flags (Resend configured, ICS URL, Google Calendar connected) for the Settings → Communication page.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const patchCommunicationRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/communication',
+    tags: ['admin'],
+    summary: 'Update tenant communication settings',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { body: { content: { 'application/json': { schema: CommunicationPatchSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ ok: z.literal(true) })) } }, description: 'Saved' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'updateCommunicationConfig',
+    description: 'Persists the tenant From: (senderEmail) and Reply-To: (replyTo) addresses — fixes the B-4/A-7 "Reply-To unsaveable" bug. Either value may be null to clear it.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
 export const adminRoutes = createApiRouter()
     .openapi(exportDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -2285,6 +2335,36 @@ export const adminRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         await c.var.services.event.deactivateEventType(tenantId, id);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(getCommunicationRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const cfg = await c.var.services.branding.getBranding(tenantId, { siteName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
+        // Resend is "configured" if a key is in env OR stored in tenant secrets.
+        let resendConfigured = !!c.env.RESEND_API_KEY;
+        if (!resendConfigured) {
+            try {
+                const secrets = await c.var.services.branding.getDecryptedSecrets(tenantId, c.env.JWT_SECRET);
+                resendConfigured = !!secrets.resendApiKey;
+            } catch { /* no decryptable secrets — leave false */ }
+        }
+        const icsToken = cfg.icsToken as string | null | undefined;
+        return c.json({
+            success: true as const,
+            data: {
+                senderEmail: (cfg.senderEmail as string | null) ?? null,
+                replyTo: (cfg.replyTo as string | null) ?? null,
+                resendConfigured,
+                templates: [],
+                icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
+                googleCalendarConnected: !!cfg.googleRefreshToken,
+            },
+        }, 200);
+    })
+    .openapi(patchCommunicationRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        await c.var.services.branding.updateBranding(tenantId, { senderEmail: body.senderEmail, replyTo: body.replyTo });
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 
