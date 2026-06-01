@@ -17,7 +17,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const [contactsRes, agentsRes] = await Promise.all([
       api.contacts.index.$get({ query: filterType === "agent" || filterType === "client" ? { type: filterType } : {} }),
-      api.agents.index.$get(),
+      api.agents.links.$get(),
     ]);
     const contactsBody = contactsRes.ok ? ((await contactsRes.json()) as Record<string, unknown>) : { data: [] };
     const agentsBody = agentsRes.ok ? ((await agentsRes.json()) as Record<string, unknown>) : { data: [] };
