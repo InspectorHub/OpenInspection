@@ -240,18 +240,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.inspections[":id"].$delete({ param: { id } });
     return { ok: res.ok, intent: "delete" };
   }
-  if (intent === "archive") {
-    const ids = (formData.get("ids") as string).split(",");
-    const results = await Promise.all(
-      ids.map((id) =>
-        api.inspections[":id"].$patch({
-          param: { id },
-          json: { status: "cancelled" },
-        }),
-      ),
-    );
-    return { ok: results.every((r) => r.ok), intent: "archive" };
-  }
   if (intent === "status") {
     const id = formData.get("id") as string;
     const status = formData.get("status") as "draft" | "completed" | "delivered";
@@ -475,15 +463,6 @@ export default function DashboardPage() {
   const clearSelection = () => setSelectedIds(new Set());
 
   /* ---- Batch actions ---- */
-  const batchArchive = () => {
-    if (selectedIds.size === 0) return;
-    fetcher.submit(
-      { intent: "archive", ids: [...selectedIds].join(",") },
-      { method: "post" },
-    );
-    clearSelection();
-  };
-
   const batchDelete = () => {
     if (selectedIds.size === 0) return;
     for (const id of selectedIds) {
@@ -748,7 +727,6 @@ export default function DashboardPage() {
           <span className="text-[13px] font-bold text-ih-primary">
             {selectedIds.size} selected
           </span>
-          <Button variant="ghost" size="sm" onClick={batchArchive}>Archive</Button>
           <Button variant="danger" size="sm" onClick={batchDelete}>Delete</Button>
           <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>Select all</Button>
           <Button variant="ghost" size="sm" onClick={clearSelection}>Clear</Button>
