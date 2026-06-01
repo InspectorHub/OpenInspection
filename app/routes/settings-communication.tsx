@@ -146,7 +146,7 @@ export default function SettingsCommunication() {
       </p>
 
       {/* Flash */}
-      {actionData && !actionData.ok && actionData.error && (
+      {actionData && "ok" in actionData && !actionData.ok && actionData.error && (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
