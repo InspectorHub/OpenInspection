@@ -17,6 +17,7 @@ import {
     ConciergeBookResponseSchema,
 } from '../lib/validations/agent.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { createApiResponseSchema } from '../lib/validations/shared.schema';
 
 /**
  * GET /api/agents/my-reports
@@ -174,6 +175,63 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createAgentConciergeBook (POST /concierge-book, agents domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['agent'], tier: 'extended' }));
 
+/**
+ * C-10 ③-C — GET /api/agent/referrals
+ * The signed-in agent's referred inspections (across every tenant they're
+ * linked to). Thin wrapper over AgentService.listReferrals; agent_tenant_links
+ * scoping happens in the service.
+ */
+const AgentReferralRowSchema = z.object({
+    id:              z.string().describe('Inspection id.'),
+    tenantName:      z.string().describe('Inspecting company name.'),
+    propertyAddress: z.string().nullable().describe('Property address of the referred inspection.'),
+    clientName:      z.string().nullable().describe('Client (buyer) name on the referral.'),
+    date:            z.string().nullable().describe('Scheduled inspection date.'),
+    status:          z.string().describe('Inspection lifecycle status.'),
+    inspectorName:   z.string().nullable().describe('Assigned inspector name.'),
+});
+const referralsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/referrals',
+    tags: ["agents"],
+    summary: 'List referrals for the signed-in agent',
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.array(AgentReferralRowSchema)) } }, description: 'Success' },
+        401: { description: 'Unauthorized' },
+        403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "listAgentReferrals",
+    description: "Lists the signed-in agent's referred inspections across every tenant they have an active agent_tenant_link with, newest first, for the agent-portal dashboard.",
+}, { scopes: ['agent'], tier: 'extended' }));
+
+/**
+ * C-10 ③-C — GET /api/agent/inspectors
+ * Every inspecting team the agent partners with (for the booking-link cards).
+ * Thin wrapper over AgentService.listInspectors.
+ */
+const AgentInspectorRowSchema = z.object({
+    inspectorName:     z.string().nullable().describe('Inspector display name.'),
+    inspectorSlug:     z.string().nullable().describe('Inspector public profile slug.'),
+    inspectorPhotoUrl: z.string().nullable().describe('Inspector avatar URL.'),
+    tenantName:        z.string().describe('Inspecting company name.'),
+    tenantSubdomain:   z.string().describe('Tenant subdomain for the booking link.'),
+});
+const inspectorsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/inspectors',
+    tags: ["agents"],
+    summary: 'List inspectors the agent partners with',
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.array(AgentInspectorRowSchema)) } }, description: 'Success' },
+        401: { description: 'Unauthorized' },
+        403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "listAgentInspectors",
+    description: "Lists every inspecting team the signed-in agent has an active link with, with the public profile slug + subdomain needed to build shareable booking links for clients.",
+}, { scopes: ['agent'], tier: 'extended' }));
+
 export const agentRoutes = createApiRouter()
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
@@ -276,6 +334,18 @@ export const agentRoutes = createApiRouter()
             paymentRequired: body.paymentRequired,
         });
         return c.json({ success: true as const, data: result }, 200);
+    })
+    .openapi(referralsRoute, async (c) => {
+        await requireRole(['agent'])(c, async () => {});
+        const user = c.get('user');
+        const data = await c.var.services.agent.listReferrals(user.sub, { limit: 100 });
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(inspectorsRoute, async (c) => {
+        await requireRole(['agent'])(c, async () => {});
+        const user = c.get('user');
+        const data = await c.var.services.agent.listInspectors(user.sub);
+        return c.json({ success: true as const, data }, 200);
     });
 
 export type AgentApi = typeof agentRoutes;
