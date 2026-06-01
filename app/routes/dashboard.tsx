@@ -254,7 +254,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   if (intent === "status") {
     const id = formData.get("id") as string;
-    const status = formData.get("status") as string;
+    const status = formData.get("status") as "draft" | "completed" | "delivered";
     const res = await api.inspections[":id"].$patch({
       param: { id },
       json: { status },

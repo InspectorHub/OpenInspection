@@ -80,7 +80,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
  messageToken: d?.messageToken ?? null,
  isDelivered: d?.isDelivered ?? false,
  error: res.ok ? null : "Report not found",
- reportTheme: (d as Record<string, unknown>)?.reportTheme as string | undefined,
+ reportTheme: (d as unknown as Record<string, unknown>)?.reportTheme as string | undefined,
  } satisfies LoaderResult;
  } catch {
  return {

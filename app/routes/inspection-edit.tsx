@@ -190,7 +190,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  }
 
  if (intent === "publish") {
- await api.inspections[":id"].publish.$post({ param: { id: params.id } });
+ await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
  }
 
  if (intent === "toggle-auto-sign") {
@@ -206,7 +206,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  if (signatureBase64) {
  await api.inspectionSync[":id"]["inspector-signature"].$post({
  param: { id: params.id },
- json: { signatureBase64, signedAt: new Date().toISOString() },
+ json: { signatureBase64, signedAt: Date.now() },
  });
  }
  }

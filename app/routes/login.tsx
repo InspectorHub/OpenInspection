@@ -28,10 +28,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   try {
     const api = createApi(context);
-    const res = await api.auth.login.$post({
-      json: { email, password },
-      header: { "x-token-relay": "1" },
-    });
+    const res = await api.auth.login.$post(
+      { json: { email, password } },
+      { headers: { "x-token-relay": "1" } },
+    );
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

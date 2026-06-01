@@ -105,6 +105,10 @@ export const UpdateInspectionSchema = z.object({
     // round-trip without a separate enum.
     referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('TODO describe referralSource field for the OpenInspection MCP integration'),
     reportThemeOverride: z.enum(['modern', 'classic', 'minimal']).nullable().optional().openapi({ example: 'classic' }).describe('TODO describe reportThemeOverride field for the OpenInspection MCP integration'),
+    // Per-inspection override of the tenant's auto-sign-on-publish default
+    // (maps to inspections.auto_sign_on_publish). Toggled from the editor's
+    // "toggle-auto-sign" action via PATCH /{id}.
+    autoSignOnPublish: z.boolean().optional().openapi({ example: true }).describe('Whether the inspector signature is auto-applied when the report is published.'),
 }).openapi('UpdateInspection');
 
 /**

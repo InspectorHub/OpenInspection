@@ -25,12 +25,18 @@ interface DiffEntry {
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
- const { id, n } = params;
+ const { id } = params;
+ const url = new URL(request.url);
+ // `version-diff/:id` carries only the inspection id; the target version (`n`)
+ // and the baseline to diff against (`from`) ride in the query string.
+ const n = url.searchParams.get("n") ?? "";
+ const from = url.searchParams.get("from") ?? "";
 
  try {
  const api = createApi(context, { token });
  const res = await api.inspections[":id"].versions[":n"].diff.$get({
  param: { id, n },
+ query: { from },
  });
  if (!res.ok) {
  return { inspectionId: id, version: n, diffs: [] as DiffEntry[], error: "Version not found" };

@@ -22,9 +22,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const res = await api.inspections.index.$get({ query: { status: "completed,delivered" } });
+    // The list `status` query is a single enum; the page tab-filters by status
+    // client-side, so fetch unfiltered and keep only finished inspections here.
+    const res = await api.inspections.index.$get({ query: {} });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { reports: (body.data ?? []) as Report[] };
+    const all = (body.data ?? []) as Report[];
+    return { reports: all.filter((r) => ["completed", "delivered", "signed"].includes(r.status)) };
   } catch {
     return { reports: [] as Report[] };
   }

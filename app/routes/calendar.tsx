@@ -85,7 +85,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context, { token });
     const res = await api.calendarEvents.index.$get({ query: { start, end } });
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    const body = res.ok ? ((await res.json()) as unknown as Record<string, unknown>) : { data: [] };
     const events = (body.data ?? []) as CalendarEvent[];
     return { events };
   } catch {
