@@ -41,7 +41,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "create" || intent === "update") {
     const id = form.get("id") as string | null;
     const rawType = form.get("type");
-    const contactType = rawType === "agent" || rawType === "client" ? rawType : "client";
+    const contactType: "agent" | "client" = rawType === "agent" || rawType === "client" ? rawType : "client";
     const body = {
       name: form.get("name") as string,
       email: (form.get("email") as string) || null,
@@ -75,7 +75,14 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "csv-preview") {
     const csvText = form.get("csvText") as string;
-    const res = await api.contactsImport.import.preview.$post({ json: { csv: csvText } });
+    // TODO(C-10): hono/client leaf+branch collision — `/import` (endpoint) and
+    // `/import/preview` share a prefix, so `.preview` drops off the intersected
+    // ClientRequest type. Localized assertion keeps the API_WORKER binding; revisit
+    // if the import sub-router is restructured to avoid the prefix collision.
+    const importClient = api.contactsImport.import as unknown as {
+      preview: { $post: (a: { json: { csv: string } }) => Promise<Response> };
+    };
+    const res = await importClient.preview.$post({ json: { csv: csvText } });
     const data = res.ok ? await res.json() : {};
     return { ok: res.ok, preview: data };
   }
