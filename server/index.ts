@@ -56,6 +56,7 @@ import calendarRoutes from './api/calendar';
 import calendarEventsRoutes from './api/calendar-events';
 import teamRoutes from './api/team';
 import contactRoutes from './api/contacts';
+import contactsImportRoutes from './api/contacts/import';
 import invoiceRoutes from './api/invoices';
 import servicesRoutes from './api/services';
 import automationsRoutes from './api/automations';
@@ -460,6 +461,8 @@ const routes = app
   .route('/api/calendar', calendarRoutes)
   .route('/api/team', teamRoutes)
   .route('/api/contacts', contactRoutes)
+  // Import sub-router — extracted to fix hono/client type-collapse (C-10)
+  .route('/api/contacts', contactsImportRoutes)
   .route('/api/recommendations', recommendationsRoutes)
   .route('/api/rating-systems', ratingSystemsRoutes)
   .route('/api', eventsRoutes)

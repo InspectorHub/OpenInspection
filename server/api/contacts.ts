@@ -1,14 +1,10 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import {
     CreateContactSchema, UpdateContactSchema,
     ContactResponseSchema, ContactListQuerySchema,
-    ContactImportPreviewSchema, ContactImportPreviewResponseSchema,
-    ContactImportSchema, ContactImportResponseSchema,
 } from '../lib/validations/contact.schema';
-import { parseCsvPreview, importContacts } from '../services/contacts-import.service';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 const listContactsRoute = createRoute(withMcpMetadata({
@@ -78,43 +74,6 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteContact (DELETE /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'primary' }));
 
-// ─── CSV bulk import (preview + commit) ─────────────────────────────────────
-const importPreviewRoute = createRoute(withMcpMetadata({
-    method: 'post', path: '/import/preview',
-    tags: ['contacts'], summary: 'Preview parsed CSV rows for the contact-import mapping UI',
-    middleware: [requireRole(['owner', 'admin'])],
-    request: {
-        body: { content: { 'application/json': { schema: ContactImportPreviewSchema } } },
-    },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: ContactImportPreviewResponseSchema } },
-            description: 'Preview parsed rows',
-        },
-    },
-    security: [{ bearerAuth: [] }],
-    operationId: 'previewContactImport',
-    description: 'Parses the first 20 rows of an uploaded CSV blob without writing to the DB so the frontend can render a column-mapping UI before commit.',
-}, { scopes: ['write'], tier: 'extended' }));
-
-const importRoute = createRoute(withMcpMetadata({
-    method: 'post', path: '/import',
-    tags: ['contacts'], summary: 'Bulk-insert contacts from a CSV blob + mapping',
-    middleware: [requireRole(['owner', 'admin'])],
-    request: {
-        body: { content: { 'application/json': { schema: ContactImportSchema } } },
-    },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: ContactImportResponseSchema } },
-            description: 'Import complete',
-        },
-    },
-    security: [{ bearerAuth: [] }],
-    operationId: 'importContacts',
-    description: 'Bulk-inserts contacts from a previously-previewed CSV blob using the user-confirmed column mapping. Per-row errors are returned in the response without aborting the batch.',
-}, { scopes: ['write'], tier: 'extended' }));
-
 export const contactRoutes = createApiRouter()
     .openapi(listContactsRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -165,18 +124,6 @@ export const contactRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         await c.var.services.contact.deleteContact(id as string, tenantId);
         return c.json({ success: true }, 200);
-    })
-    .openapi(importPreviewRoute, async (c) => {
-        const { csv } = c.req.valid('json');
-        const data = parseCsvPreview(csv);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(importRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { csv, mapping } = c.req.valid('json');
-        const db = drizzle<any>(c.env.DB as any);
-        const data = await importContacts(db, tenantId, csv, mapping);
-        return c.json({ success: true as const, data }, 200);
     });
 
 export type ContactsApi = typeof contactRoutes;

@@ -20,6 +20,7 @@ export type { CalendarApi }           from '../../server/api/calendar';
 export type { CalendarEventsApi }     from '../../server/api/calendar-events';
 export type { ConciergeApi }          from '../../server/api/concierge';
 export type { ContactsApi }           from '../../server/api/contacts';
+export type { ContactsImportApi }     from '../../server/api/contacts/import';
 export type { CoreAuthApi }           from '../../server/api/auth';
 export type { DataApi }               from '../../server/api/data';
 export type { EventsApi }             from '../../server/api/events';
