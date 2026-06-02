@@ -16,8 +16,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context, { token });
     const [contactsRes, agentsRes] = await Promise.all([
-      api.contacts.index.$get({ query: filterType ? { type: filterType } : {} }),
-      api.agents.index.$get(),
+      api.contacts.index.$get({ query: filterType === "agent" || filterType === "client" ? { type: filterType } : {} }),
+      api.agents.links.$get(),
     ]);
     const contactsBody = contactsRes.ok ? ((await contactsRes.json()) as Record<string, unknown>) : { data: [] };
     const agentsBody = agentsRes.ok ? ((await agentsRes.json()) as Record<string, unknown>) : { data: [] };
@@ -40,12 +40,14 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "create" || intent === "update") {
     const id = form.get("id") as string | null;
+    const rawType = form.get("type");
+    const contactType: "agent" | "client" = rawType === "agent" || rawType === "client" ? rawType : "client";
     const body = {
       name: form.get("name") as string,
-      email: form.get("email") as string,
-      phone: form.get("phone") as string,
-      agency: form.get("agency") as string,
-      type: form.get("type") as string,
+      email: (form.get("email") as string) || null,
+      phone: (form.get("phone") as string) || null,
+      agency: (form.get("agency") as string) || null,
+      type: contactType,
     };
     const res = id
       ? await api.contacts[":id"].$put({ param: { id }, json: body })
@@ -66,14 +68,21 @@ export async function action({ request, context }: Route.ActionArgs) {
     // Customers picking custom column names can be supported by a future
     // mapping picker — the typed backend already accepts arbitrary mappings.
     const mapping = inferMappingFromCsv(csvText);
-    const res = await api.contacts.import.$post({ json: { csv: csvText, mapping } });
+    const res = await api.contactsImport.import.$post({ json: { csv: csvText, mapping } });
     const data = res.ok ? await res.json() : {};
     return { ok: res.ok, result: data };
   }
 
   if (intent === "csv-preview") {
     const csvText = form.get("csvText") as string;
-    const res = await api.contacts.import.preview.$post({ json: { csv: csvText } });
+    // TODO(C-10): hono/client leaf+branch collision — `/import` (endpoint) and
+    // `/import/preview` share a prefix, so `.preview` drops off the intersected
+    // ClientRequest type. Localized assertion keeps the API_WORKER binding; revisit
+    // if the import sub-router is restructured to avoid the prefix collision.
+    const importClient = api.contactsImport.import as unknown as {
+      preview: { $post: (a: { json: { csv: string } }) => Promise<Response> };
+    };
+    const res = await importClient.preview.$post({ json: { csv: csvText } });
     const data = res.ok ? await res.json() : {};
     return { ok: res.ok, preview: data };
   }

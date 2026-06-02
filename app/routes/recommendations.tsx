@@ -13,9 +13,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const res = await api.recommendations.index.$get();
+    const res = await api.recommendations.index.$get({ query: {} });
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { items: (body.data ?? []) as unknown[] };
+    return { items: (body.data ?? []) as Array<{ id: string; title?: string; name?: string; description?: string; category?: string }> };
   } catch {
     return { items: [] };
   }
@@ -54,7 +54,7 @@ export default function RecommendationsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.map((item: any) => (
+          {items.map((item) => (
             <Card key={item.id} className="p-4">
               <p className="text-[13px] font-semibold text-ih-fg-1">{item.title || item.name}</p>
               {item.description && (

@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, or, lt, gte, lte, sql, inArray } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants } from '../lib/db/schema';
+import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
+import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, type RatingLevel } from '../lib/report-utils';
@@ -1875,6 +1875,143 @@ export class InspectionService {
     }
 
     /**
+     * C-10 ③-A.4 — live progress for the public observer view
+     * (`/observe/inspections/:id`). Derives per-section completion from the same
+     * resolved report shape getReportData builds, so the section/item structure
+     * (templateSnapshot-aware) stays in one place. An item counts as "done" once
+     * the inspector has captured a rating (rich items) or a value (data points).
+     */
+    async getObserveProgress(inspectionId: string, tenantId: string) {
+        const report = await this.getReportData(inspectionId, tenantId);
+        const insp = report.inspection;
+        return {
+            address: insp.propertyAddress,
+            date: insp.date ?? null,
+            inspectorName: insp.inspectorName ?? '',
+            status: insp.status,
+            sections: report.sections.map((s) => ({
+                name: s.title,
+                totalItems: s.items.length,
+                completedItems: s.items.filter(
+                    (it) => it.rating != null || (it as { value?: unknown }).value != null,
+                ).length,
+            })),
+        };
+    }
+
+    /**
+     * C-10 ③-A.2 — the public report-gate payload ("your report is almost ready,
+     * here's what's blocking it + the CTA"). Mirrors the report double-gate used
+     * by /report/:id and repair-requests: agreement-signed first (chronologically
+     * first gate), then invoice-paid. Returns null when the inspection does not
+     * exist OR is not actually gated (nothing to show). The `tenantSlug` is only
+     * used to build the agreement-sign URL — authority is always `tenantId`.
+     */
+    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string): Promise<{
+        reason: 'payment' | 'agreement';
+        companyName: string;
+        primaryColor: string;
+        actionUrl: string;
+        actionLabel: string;
+        propertyAddress: string | null;
+        inspectorName: string | null;
+        inspectorEmail: string | null;
+        inspectorPhone: string | null;
+        inspectorLicense: string | null;
+        scheduledDate: string | null;
+        amountCents: number | null;
+        currency: string | null;
+    } | null> {
+        const db = this.getDrizzle();
+        const insp = await db.select({
+            id:                inspections.id,
+            propertyAddress:   inspections.propertyAddress,
+            date:              inspections.date,
+            inspectorId:       inspections.inspectorId,
+            paymentRequired:   inspections.paymentRequired,
+            paymentStatus:     inspections.paymentStatus,
+            agreementRequired: inspections.agreementRequired,
+        }).from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!insp) return null;
+
+        // Resolve the outstanding gate. Agreement before payment (signed first).
+        let reason: 'payment' | 'agreement' | null = null;
+        let agreementToken: string | null = null;
+        if (insp.agreementRequired === true) {
+            const signed = await db.select({ id: agreementRequests.id })
+                .from(agreementRequests)
+                .where(and(
+                    eq(agreementRequests.inspectionId, inspectionId),
+                    eq(agreementRequests.tenantId, tenantId),
+                    eq(agreementRequests.status, 'signed'),
+                ))
+                .limit(1);
+            if (signed.length === 0) {
+                reason = 'agreement';
+                const pending = await db.select({ token: agreementRequests.token })
+                    .from(agreementRequests)
+                    .where(and(
+                        eq(agreementRequests.inspectionId, inspectionId),
+                        eq(agreementRequests.tenantId, tenantId),
+                    ))
+                    .orderBy(desc(agreementRequests.createdAt))
+                    .limit(1)
+                    .get();
+                agreementToken = pending?.token ?? null;
+            }
+        }
+        if (!reason && insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
+            reason = 'payment';
+        }
+        if (!reason) return null;   // not gated — nothing to surface
+
+        const branding = await db.select({ siteName: tenantConfigs.siteName, primaryColor: tenantConfigs.primaryColor })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+
+        let inspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
+        if (insp.inspectorId) {
+            inspector = await db.select({
+                name: users.name, email: users.email, phone: users.phone, licenseNumber: users.licenseNumber,
+            }).from(users)
+                .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId)))
+                .get();
+        }
+
+        let amountCents: number | null = null;
+        if (reason === 'payment') {
+            const invoice = await db.select({ amountCents: invoices.amountCents })
+                .from(invoices)
+                .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
+                .orderBy(desc(invoices.createdAt))
+                .limit(1)
+                .get();
+            amountCents = invoice?.amountCents ?? null;
+        }
+
+        const actionUrl = reason === 'payment'
+            ? `/r/${inspectionId}/invoice`
+            : (agreementToken ? `/agreements/sign/${tenantSlug}/${agreementToken}` : `/report-gate/${tenantSlug}/${inspectionId}`);
+
+        return {
+            reason,
+            companyName: branding?.siteName ?? 'OpenInspection',
+            primaryColor: branding?.primaryColor ?? '#2563eb',
+            actionUrl,
+            actionLabel: reason === 'payment' ? 'Pay invoice' : 'Sign agreement',
+            propertyAddress: insp.propertyAddress ?? null,
+            inspectorName: inspector?.name ?? null,
+            inspectorEmail: inspector?.email ?? null,
+            inspectorPhone: inspector?.phone ?? null,
+            inspectorLicense: inspector?.licenseNumber ?? null,
+            scheduledDate: insp.date ?? null,
+            amountCents,
+            currency: amountCents != null ? 'USD' : null,
+        };
+    }
+
+    /**
      * Track E1 (ITB §11, UC-ITB-07) — Repair List aggregation.
      *
      * Walks every section of the published report (via getReportData so we
@@ -2027,6 +2164,29 @@ export class InspectionService {
             defects: entries,
             totals,
             showEstimates: report.showEstimates,
+        };
+    }
+
+    /**
+     * C-10 ③-D — flattened payload for the public customer repair-request page
+     * (`/r/:id/repair-request`). Reuses the repair-list aggregator and adds the
+     * client email (so the page can prefill the "email me a copy" field).
+     */
+    async getRepairRequestData(inspectionId: string, tenantId: string) {
+        const rl = await this.getRepairList(inspectionId, tenantId);
+        const insp = await this.getDrizzle()
+            .select({ clientEmail: inspections.clientEmail })
+            .from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        return {
+            inspectionId:    rl.inspection.id,
+            propertyAddress: rl.inspection.propertyAddress,
+            inspectionDate:  rl.inspection.date,
+            inspectorName:   rl.inspection.inspectorName,
+            clientEmail:     insp?.clientEmail ?? null,
+            defects:         rl.defects,
+            showEstimates:   rl.showEstimates,
         };
     }
 
@@ -2350,6 +2510,19 @@ export class InspectionService {
             cancelReason: null,
             cancelNotes:  null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
+     * Stripe webhook — flips the inspection's payment gate to paid so the
+     * report unlocks (getReportGate reads inspections.paymentStatus). Idempotent
+     * and tenant-scoped; a no-op when the inspection doesn't exist (the invoice
+     * may be standalone, not linked to an inspection).
+     */
+    async markPaymentReceived(tenantId: string, inspectionId: string): Promise<void> {
+        const db = this.getDrizzle();
+        await db.update(inspections)
+            .set({ paymentStatus: 'paid' })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
     }
 
     /**

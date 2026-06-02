@@ -57,10 +57,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (submission.status !== "success") {
       return submission.reply();
     }
-    const { currentPassword, newPassword, confirmPassword } = submission.value;
+    const { currentPassword, newPassword } = submission.value;
+    // confirmPassword is client-only validation; the server schema only accepts currentPassword + newPassword.
 
-    const res = await api.auth["change-password"].$post({
-      json: { currentPassword, newPassword, confirmPassword },
+    // TODO(C-10 collapse): hono/client collapses api.auth["change-password"].$post body type;
+    // localized assertion keeps the in-process binding. Binding preserved.
+    const res = await (api.auth["change-password"].$post as unknown as (args: { json: { currentPassword: string; newPassword: string } }) => Promise<Response>)({
+      json: { currentPassword, newPassword },
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -121,16 +124,16 @@ export default function SettingsSecurityPage() {
       <p className="text-[13px] text-ih-fg-3">Password, two-factor authentication, and active sessions.</p>
 
       {/* Flash */}
-      {actionData?.success && (
+      {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Password changed successfully.
         </div>
       )}
-      {actionData?.error && (
+      {actionData && "error" in actionData && typeof actionData.error === "string" && actionData.error ? (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
-      )}
+      ) : null}
 
       {/* Change password */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">

@@ -169,6 +169,42 @@ const revokeRoute = createRoute(withMcpMetadata({
     operationId: "revokeAgent"
 }, { scopes: ['write'], tier: 'extended' }));
 
+/**
+ * C-10 ③-C — GET /api/agents/invite-info?token=
+ * Anonymous (like /accept): resolves an agent-invite token into the metadata
+ * the public accept page renders (inspector name + tenant + invited email).
+ * 404 when the token is unknown, expired, or already used so the page shows
+ * its friendly recovery state. Returns whitelisted fields only.
+ */
+const InviteInfoResponseSchema = z
+    .object({
+        success: z.literal(true).describe('Always true on the 200 path.'),
+        data: z.object({
+            token:       z.string().describe('The invite token (echoed back for the form hidden field).'),
+            inspector:   z.object({
+                name:     z.string().describe('Inviting inspector display name.'),
+                photoUrl: z.string().optional().describe('Inviting inspector avatar URL, when available.'),
+            }).describe('Inviting inspector summary (public fields only).'),
+            tenantName:  z.string().describe('Inviting company name.'),
+            inviteEmail: z.string().describe('Email address the invite was sent to (read-only on the form).'),
+        }).describe('Resolved invite metadata for the accept page.'),
+    })
+    .openapi('AgentInviteInfoResponse');
+
+const inviteInfoRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/invite-info',
+    tags: ["agents"],
+    summary: 'Resolve a partner-agent invite token',
+    description: "Public, no-login resolution of an agent-invite token into the inspector + tenant + email metadata the accept page renders. Returns 404 for unknown/expired/used tokens so the page can show its recovery state.",
+    request: { query: z.object({ token: z.string().describe('The agent-invite token from the invite email.') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: InviteInfoResponseSchema } }, description: 'Invite resolved' },
+        404: { description: 'Invite not found, expired, or already used' },
+    },
+    operationId: "getAgentInviteInfo",
+}, { scopes: [], tier: 'extended' }));
+
 export const agentsRoutes = createApiRouter()
     .openapi(inviteRoute, async (c) => {
         // RBAC moved inside to keep OpenAPIHono context typing happy. Owners, admins,
@@ -263,6 +299,22 @@ export const agentsRoutes = createApiRouter()
         const { linkId } = c.req.valid('param');
         await c.var.services.agent.revokeLink(linkId, tenantId);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(inviteInfoRoute, async (c) => {
+        const { token } = c.req.valid('query');
+        const invite = await c.var.services.agent.resolveInvite(token);
+        if (!invite || invite.expired || invite.used) {
+            return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
+        }
+        return c.json({
+            success: true as const,
+            data: {
+                token: invite.token,
+                inspector: { name: invite.inspector.name },
+                tenantName: invite.tenantName,
+                inviteEmail: invite.email,
+            },
+        }, 200);
     });
 
 export type AgentsApi = typeof agentsRoutes;

@@ -43,7 +43,7 @@ describe('agent tables schema — A1', () => {
         expect(() => insert.run('link2', 'agent1', 't1', 'active', Date.now())).toThrow(/UNIQUE constraint/);
     });
 
-    it('agent_invites table accepts a row + status CHECK rejects invalid value via agent_tenant_links CHECK constraint', () => {
+    it('agent_invites table accepts a row + agent_tenant_links enforces tenant_id FK', () => {
         sqlite.prepare(`INSERT INTO tenants (id, name, subdomain, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`).run(
             't1', 'Acme', 'acme', 'free', 'active', 5, 'shared', Date.now(),
         );
@@ -56,13 +56,20 @@ describe('agent tables schema — A1', () => {
         );
         expect(() => insert.run('tok-abc', 't1', 'jane@realty.com', 'inspector1', Date.now() + 86400000, Date.now())).not.toThrow();
 
-        // Status CHECK on agent_tenant_links rejects invalid values
-        const badInsert = sqlite.prepare(
-            `INSERT INTO agent_tenant_links (id, agent_user_id, tenant_id, status, created_at) VALUES (?,?,?,?,?)`,
-        );
+        // The `status` enum (pending | active | revoked) is enforced at the
+        // application layer (Zod: server/api/agents.ts) — the DB schema carries
+        // no CHECK constraint (this codebase uses none), so a bogus status is
+        // accepted by SQLite. The DB-level invariant we *can* assert here is the
+        // tenant_id FK: linking to a non-existent tenant must be rejected.
         sqlite.prepare(`INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES (?, NULL, ?, ?, 'agent', ?)`).run(
             'agent2', 'jane2@realty.com', 'h', Date.now(),
         );
-        expect(() => badInsert.run('linkX', 'agent2', 't1', 'bogus-status', Date.now())).toThrow(/CHECK constraint/);
+
+        // FK enforcement is off by default in SQLite; enable it for this check.
+        sqlite.pragma('foreign_keys = ON');
+        const badInsert = sqlite.prepare(
+            `INSERT INTO agent_tenant_links (id, agent_user_id, tenant_id, status, created_at) VALUES (?,?,?,?,?)`,
+        );
+        expect(() => badInsert.run('linkX', 'agent2', 'no-such-tenant', 'active', Date.now())).toThrow(/FOREIGN KEY constraint/);
     });
 });

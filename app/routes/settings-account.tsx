@@ -24,7 +24,9 @@ interface AccountInfo {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const res = await api.auth.me.$get();
+  // TODO(C-10 collapse): hono/client collapses api.auth.me.$get to a non-callable
+  // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
+  const res = await (api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>)();
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   return { account: (body.data ?? {}) as AccountInfo };
 }
@@ -41,7 +43,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "export-data") {
-    const res = await api.identity.account.export.$post();
+    // TODO(C-10 collapse): hono/client collapses api.identity.account path;
+    // localized assertion until the typed-hono spike resolves it. Binding preserved.
+    const identityClient = api.identity as unknown as { account: { export: { $post: (args?: unknown) => Promise<Response> }; delete: { $post: (args: { json: { confirmEmail: string } }) => Promise<Response> } } };
+    const res = await identityClient.account.export.$post();
     if (!res.ok) {
       return { success: false, error: "Data export failed. Please try again." };
     }
@@ -54,7 +59,8 @@ export async function action({ request, context }: Route.ActionArgs) {
       return submission.reply();
     }
     const confirmEmail = submission.value.confirmEmail.trim();
-    const res = await api.identity.account.delete.$post({ json: { confirmEmail } });
+    const identityClient2 = api.identity as unknown as { account: { export: { $post: (args?: unknown) => Promise<Response> }; delete: { $post: (args: { json: { confirmEmail: string } }) => Promise<Response> } } };
+    const res = await identityClient2.account.delete.$post({ json: { confirmEmail } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       const msg = (err as { error?: { message?: string } })?.error?.message
@@ -104,16 +110,16 @@ export default function SettingsAccountPage() {
       <p className="text-[13px] text-ih-fg-3">Account information, data export, and account deletion.</p>
 
       {/* Flash */}
-      {actionData?.success && (
+      {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           {(actionData as Record<string, unknown>).message as string || "Done."}
         </div>
       )}
-      {actionData?.error && (
+      {actionData && "error" in actionData && typeof actionData.error === "string" && actionData.error ? (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
-      )}
+      ) : null}
 
       {/* Account info */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">

@@ -33,8 +33,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
   const [availRes, overridesRes, configRes, originsRes] = await Promise.all([
-    api.availability.$get().catch(() => null),
-    api.availability.overrides.$get().catch(() => null),
+    api.availability.index.$get({ query: {} }).catch(() => null),
+    api.availability.overrides.$get({ query: {} }).catch(() => null),
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.widget.origins.$get().catch(() => null),
   ]);

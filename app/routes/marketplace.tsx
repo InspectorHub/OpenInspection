@@ -67,7 +67,7 @@ export default function MarketplacePage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {templates.map((raw) => {
-              const t = raw as { id: string; name?: string; title?: string; description?: string; category?: string; author?: string };
+              const t = raw as unknown as { id: string; name?: string; title?: string; description?: string; category?: string; author?: string };
               return (
               <Card key={t.id} className="p-4">
                 <p className="text-[13px] font-semibold text-ih-fg-1">{t.name || t.title}</p>

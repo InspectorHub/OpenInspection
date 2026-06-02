@@ -26,7 +26,9 @@ export default function DocsPage() {
       }
     };
     document.body.appendChild(script);
-    return () => script.remove();
+    return () => {
+      script.remove();
+    };
   }, []);
 
   return <div id="swagger-ui" />;

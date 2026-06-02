@@ -17,13 +17,20 @@ import type { HonoConfig } from '../../../server/types/hono';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import adminRoutes from '../../../server/api/admin';
+import { signM2mHeader, M2M_HEADER } from '../../../server/lib/m2m-auth';
+
+// Portal→core M2M auth is the `x-portal-m2m` HMAC derived (via HKDF) from the
+// shared JWT_PRIVATE_KEY_V<N> — NOT the old non-existent `cf-worker` header.
+// Any base64 PEM body works as HKDF input keying material; sign + verify use
+// the same env so the derived HMAC key matches.
+const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
+const M2M_ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
 
 describe('POST /api/admin/seed-starter-content', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sqlite: any;
     const tenantId = '00000000-0000-0000-0000-000000000001';
-    const CF_WORKER_HEADER = 'portal-api';
 
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
@@ -63,16 +70,16 @@ describe('POST /api/admin/seed-starter-content', () => {
         vi.clearAllMocks();
     });
 
-    it('seeds starter content with valid cf-worker header (Service Binding)', async () => {
+    it('seeds starter content with a valid x-portal-m2m header (Service Binding)', async () => {
         const app = buildApp();
         const res = await app.request('/api/admin/seed-starter-content', {
             method: 'POST',
             headers: {
-                'content-type': 'application/json',
-                'cf-worker':    CF_WORKER_HEADER,
+                'content-type':  'application/json',
+                [M2M_HEADER]:    await signM2mHeader(M2M_ENV as Record<string, string | undefined>),
             },
             body: JSON.stringify({ tenantId }),
-        }, { DB: {} } as Record<string, unknown>);
+        }, M2M_ENV);
 
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
@@ -84,13 +91,13 @@ describe('POST /api/admin/seed-starter-content', () => {
         expect(body.data.cannedCommentsSeeded).toBe(250);
     });
 
-    it('returns 401 when cf-worker header is missing', async () => {
+    it('returns 401 when the M2M header is missing', async () => {
         const app = buildApp();
         const res = await app.request('/api/admin/seed-starter-content', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ tenantId }),
-        }, { DB: {} } as Record<string, unknown>);
+        }, M2M_ENV);
 
         expect(res.status).toBe(401);
     });
@@ -100,11 +107,11 @@ describe('POST /api/admin/seed-starter-content', () => {
         const res = await app.request('/api/admin/seed-starter-content', {
             method: 'POST',
             headers: {
-                'content-type': 'application/json',
-                'cf-worker':    CF_WORKER_HEADER,
+                'content-type':  'application/json',
+                [M2M_HEADER]:    await signM2mHeader(M2M_ENV as Record<string, string | undefined>),
             },
             body: JSON.stringify({ tenantId: '00000000-0000-0000-0000-999999999999' }),
-        }, { DB: {} } as Record<string, unknown>);
+        }, M2M_ENV);
 
         expect(res.status).toBe(404);
     });

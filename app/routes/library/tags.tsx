@@ -12,9 +12,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const res = await api.tags.$get();
+    const res = await api.tags.index.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { tags: (body.data ?? []) as unknown[] };
+    return { tags: (body.data ?? []) as Array<{ id: string; name: string; color?: string | null; count?: number }> };
   } catch {
     return { tags: [] };
   }
@@ -53,7 +53,7 @@ export default function TagsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-ih-border">
-              {tags.map((tag: any) => (
+              {tags.map((tag) => (
                 <tr key={tag.id} className="hover:bg-ih-bg-muted/50 transition-colors">
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-ih-fg-1">

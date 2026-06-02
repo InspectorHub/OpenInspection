@@ -49,7 +49,7 @@ const setOnboardingRoute = createRoute(withMcpMetadata({
  */
 const saveSignatureRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/me/signature',
-    tags: ['users'],
+    tags: ['profile'],
     summary: 'Save the authenticated user\'s default signature image',
     middleware: [requireRole(['owner', 'admin', 'inspector', 'lead'])],
     request: {

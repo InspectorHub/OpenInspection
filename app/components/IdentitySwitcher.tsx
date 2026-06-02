@@ -15,7 +15,7 @@ export function IdentitySwitcher() {
   useEffect(() => {
     fetch("/api/identities", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setIdentities(d.data ?? []))
+      .then((d) => setIdentities((d as { data?: Identity[] }).data ?? []))
       .catch(() => {});
   }, []);
 
@@ -32,7 +32,7 @@ export function IdentitySwitcher() {
         body: JSON.stringify({ linkedUserId }),
       });
       if (!res.ok) throw new Error("Switch failed");
-      const data = await res.json();
+      const data = (await res.json()) as { redirect?: string };
       window.location.href = data.redirect ?? "/dashboard";
     } catch {
       setError("Could not switch identity");

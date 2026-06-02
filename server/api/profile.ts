@@ -53,11 +53,11 @@ const SlugConflictResponseSchema = z.object({
 });
 
 const PatchProfileSchema = z.object({
-    name: z.string().max(100).optional(),
-    phone: z.string().max(30).optional(),
-    licenseNumber: z.string().max(50).optional(),
-    slug: z.string().min(3).max(32).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).optional(),
-    bio: z.string().max(600).nullable().optional(),
+    name: z.string().max(100).optional().describe('Display name shown on reports and the booking page'),
+    phone: z.string().max(30).optional().describe('Contact phone number for the inspector profile'),
+    licenseNumber: z.string().max(50).optional().describe('Professional inspector license or certification number'),
+    slug: z.string().min(3).max(32).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).optional().describe('Public booking-page slug used in /book/<slug> URLs'),
+    bio: z.string().max(600).nullable().optional().describe('Short inspector biography shown on the public booking page'),
 });
 
 const patchProfileRoute = createRoute(withMcpMetadata({

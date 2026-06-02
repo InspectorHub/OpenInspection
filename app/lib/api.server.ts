@@ -7,6 +7,6 @@ export function getApiUrl(context?: AppLoadContext): string {
     if (typeof process !== "undefined" && process?.env?.API_URL) {
       return process.env.API_URL;
     }
-  } catch {}
+  } catch { /* env not available in this runtime */ }
   return "http://localhost:8788";
 }

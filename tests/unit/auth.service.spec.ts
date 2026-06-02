@@ -125,6 +125,53 @@ describe('AuthService', () => {
         expect(dbUser).toBeDefined();
     });
 
+    it('joinTeam persists the member display name when provided (C-10 ③-B)', async () => {
+        const token = 'invite-name';
+        await testDb.insert(tenantInvites).values({
+            id: token, tenantId: 't1', email: 'named@example.com', role: 'inspector',
+            status: 'pending', expiresAt: new Date(Date.now() + 1000000), invitedBy: 'u1',
+        } as any);
+
+        await authService.joinTeam(token, 'password', 'Jamie Rivera');
+
+        const dbUser = await testDb.select().from(users).where(eq(users.email as any, 'named@example.com')).get();
+        expect(dbUser?.name).toBe('Jamie Rivera');
+    });
+
+    it('getInviteInfo returns email + workspace name for a live invite, null otherwise (C-10 ③-B)', async () => {
+        await testDb.insert(tenantInvites).values({
+            id: 'inv-live', tenantId: 't1', email: 'peek@example.com', role: 'inspector',
+            status: 'pending', expiresAt: new Date(Date.now() + 1000000), invitedBy: 'u1',
+        } as any);
+
+        const info = await authService.getInviteInfo('inv-live');
+        expect(info).toEqual({ email: 'peek@example.com', workspaceName: 'Test Tenant' });
+
+        expect(await authService.getInviteInfo('nope')).toBeNull();
+    });
+
+    it('getInviteInfo returns null for an expired or already-used invite (C-10 ③-B)', async () => {
+        await testDb.insert(tenantInvites).values({
+            id: 'inv-exp', tenantId: 't1', email: 'x@example.com', role: 'inspector',
+            status: 'pending', expiresAt: new Date(Date.now() - 1000), invitedBy: 'u1',
+        } as any);
+        await testDb.insert(tenantInvites).values({
+            id: 'inv-used', tenantId: 't1', email: 'y@example.com', role: 'inspector',
+            status: 'accepted', expiresAt: new Date(Date.now() + 1000000), invitedBy: 'u1',
+        } as any);
+        expect(await authService.getInviteInfo('inv-exp')).toBeNull();
+        expect(await authService.getInviteInfo('inv-used')).toBeNull();
+    });
+
+    it('isSetUp reflects whether any tenant-scoped user exists (C-10 ③-B)', async () => {
+        expect(await authService.isSetUp()).toBe(false);
+        await testDb.insert(users).values({
+            id: 'u-owner', tenantId: 't1', email: 'owner@example.com',
+            passwordHash: 'x', role: 'owner', createdAt: new Date(),
+        });
+        expect(await authService.isSetUp()).toBe(true);
+    });
+
     it('should handle password reset flow via KV', async () => {
         const email = 'reset@example.com';
         await testDb.insert(users).values({

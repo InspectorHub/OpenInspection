@@ -29,7 +29,7 @@ const THEMES = ["modern", "classic", "minimal"] as const;
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const res = await api.admin.branding.$get();
+  const res = await api.adminBranding.branding.$get({});
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
   return { branding: (body.data ?? {}) as Branding };
 }
@@ -62,7 +62,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   const api = createApi(context, { token });
-  const res = await api.admin.branding.$post({ json: body });
+  // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
+  // cast through unknown to satisfy the strict hono/client intersection type. (C-10)
+  const res = await api.adminBranding.branding.$post({ json: body } as unknown as Parameters<typeof api.adminBranding.branding.$post>[0]);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     return submission.reply({
@@ -102,14 +104,9 @@ export default function SettingsWorkspacePage() {
       <p className="text-[13px] text-ih-fg-3">Branding, report theme, analytics, and referral sources.</p>
 
       {/* Flash */}
-      {actionData?.success && (
+      {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Workspace settings saved.
-        </div>
-      )}
-      {actionData?.error && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-          {actionData.error}
         </div>
       )}
 

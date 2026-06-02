@@ -14,7 +14,6 @@ import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { isServiceBindingCall } from '../portal/service-binding-guard';
 import {
-    UpdateBrandingSchema,
     InviteMemberSchema,
     DataErasureSchema,
     AgreementSchema,
@@ -22,7 +21,6 @@ import {
     AdminExportResponseSchema,
     MemberListResponseSchema,
     AuditLogResponseSchema,
-    BrandingResponseSchema,
     InviteResponseSchema,
     ImportResponseSchema,
     AgreementListResponseSchema,
@@ -46,7 +44,7 @@ import {
 import { applyInspectorPreSign } from '../services/agreement.service';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
-import { SuccessResponseSchema } from '../lib/validations/shared.schema';
+import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validations/shared.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
 import { commentUsage } from '../lib/db/schema/inspection';
@@ -386,98 +384,6 @@ const eraseDataRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-/**
- * GET /api/admin/branding
- */
-const getBrandingRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/branding',
-    tags: ["admin"],
-    summary: "List tenant branding for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: BrandingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-            description: 'Success',
-        },
-    },
-    operationId: "listTenantBranding",
-    description: "Auto-generated placeholder for listTenantBranding (GET /branding, admin domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['admin'], tier: 'extended' }));
-
-
-/**
- * POST /api/admin/branding
- */
-const updateBrandingRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/branding',
-    tags: ["admin"],
-    summary: "Create tenant branding for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
-    request: {
-        body: {
-            content: {
-                'application/json': {
-                    schema: UpdateBrandingSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-        },
-    },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: BrandingResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-            description: 'Success',
-        },
-    },
-    operationId: "createTenantBranding",
-    description: "Auto-generated placeholder for createTenantBranding (POST /branding, admin domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['admin'], tier: 'extended' }));
-
-
-/**
- * POST /api/admin/branding/logo
- */
-const uploadLogoRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/branding/logo',
-    tags: ["admin"],
-    summary: "Create tenant branding logo",
-    middleware: [requireRole(['owner', 'admin'])],
-    request: {
-        body: {
-            content: {
-                'multipart/form-data': {
-                    schema: z.object({
-                        logo: z.any().openapi({ type: 'string', format: 'binary' }).describe('TODO describe logo field for the OpenInspection MCP integration'),
-                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-        },
-    },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ logoUrl: z.string().describe('TODO describe logoUrl field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-            description: 'Success',
-        },
-    },
-    operationId: "createTenantBrandingLogo",
-    description: "Auto-generated placeholder for createTenantBrandingLogo (POST /branding/logo, admin domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['admin'], tier: 'extended' }));
-
-
 // ─── Integration Config & Secrets ────────────────────────────────────────────
 
 const IntegrationConfigSchema = z.object({
@@ -712,7 +618,7 @@ const touchCommentRoute = createRoute(withMcpMetadata({
     tags:   ['admin'],
     summary: "Record an inspector's use of a snippet (per-user counter)",
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ id: z.string().min(1) }) },
+    request: { params: z.object({ id: z.string().min(1).describe('Comment library entry identifier') }) },
     responses: {
         200: {
             description: 'Updated usage row',
@@ -1182,7 +1088,7 @@ const inspectorSignRoute = createRoute(withMcpMetadata({
     summary: 'Inspector pre-signs an agreement before sending to client',
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
     request: {
-        params: z.object({ id: z.string() }),
+        params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }),
         body: { content: { 'application/json': { schema: InspectorSignSchema } } },
     },
     responses: {
@@ -1193,7 +1099,140 @@ const inspectorSignRoute = createRoute(withMcpMetadata({
     description: 'Spec 5H D1 — optional inspector pre-sign. Allowed only while envelope is pending.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
+/* ---- C-10 ③-D — Scheduling event-types CRUD (over EventService) ---- */
+const EventTypeRowSchema = z.object({
+    id:                 z.string().describe('Event-type id.'),
+    name:               z.string().describe('Display name.'),
+    slug:               z.string().describe('URL/identifier slug (unique per tenant).'),
+    defaultDurationMin: z.number().nullable().describe('Default duration in minutes.'),
+    defaultPriceCents:  z.number().nullable().describe('Default price in cents.'),
+    color:              z.string().nullable().describe('Calendar color hex.'),
+    sortOrder:          z.number().nullable().describe('Display sort order.'),
+    active:             z.boolean().describe('Whether the type is selectable.'),
+});
+const EventTypeCreateSchema = z.object({
+    name:               z.string().min(1).describe('Display name.'),
+    slug:               z.string().min(1).describe('URL/identifier slug (unique per tenant).'),
+    defaultDurationMin: z.number().int().optional().describe('Default duration in minutes.'),
+    defaultPriceCents:  z.number().int().optional().describe('Default price in cents.'),
+    color:              z.string().optional().describe('Calendar color hex.'),
+    sortOrder:          z.number().int().optional().describe('Display sort order.'),
+}).openapi('EventTypeCreate');
+const EventTypeUpdateSchema = EventTypeCreateSchema.partial().openapi('EventTypeUpdate');
+const EventTypeIdParam = z.object({ id: z.string().describe('Event-type id.') });
 
+const listEventTypesRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/event-types',
+    tags: ['admin'],
+    summary: 'List scheduling event types',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.array(EventTypeRowSchema)) } }, description: 'Event types' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'listEventTypes',
+    description: 'Lists the tenant scheduling event types (Radon, Sewer Scope, etc.) used by the calendar + booking flow, ordered by sortOrder.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const createEventTypeRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/event-types',
+    tags: ['admin'],
+    summary: 'Create a scheduling event type',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { body: { content: { 'application/json': { schema: EventTypeCreateSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(EventTypeRowSchema) } }, description: 'Created event type' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'createEventType',
+    description: 'Creates a scheduling event type for the tenant. The slug must be unique per tenant; defaults are applied for omitted duration/price/color/sortOrder.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const updateEventTypeRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/event-types/{id}',
+    tags: ['admin'],
+    summary: 'Update a scheduling event type',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: EventTypeIdParam, body: { content: { 'application/json': { schema: EventTypeUpdateSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(EventTypeRowSchema) } }, description: 'Updated event type' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' }, 404: { description: 'Not found' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'updateEventType',
+    description: 'Partially updates a scheduling event type by id (tenant-scoped) and returns the fresh row for the settings list.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const deleteEventTypeRoute = createRoute(withMcpMetadata({
+    method: 'delete',
+    path: '/event-types/{id}',
+    tags: ['admin'],
+    summary: 'Delete or deactivate a scheduling event type',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { params: EventTypeIdParam },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ ok: z.literal(true) })) } }, description: 'Deleted/deactivated' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'deleteEventType',
+    description: 'Deletes a scheduling event type when unused, or soft-deactivates it (active=false) when existing inspection events reference it, preserving history.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+/* ---- C-10 ③-D (B-4 / A-7) — Communication config (sender email / reply-to) ---- */
+const CommunicationResponseSchema = z.object({
+    senderEmail:             z.string().nullable().describe('From: address for tenant transactional email.'),
+    replyTo:                 z.string().nullable().describe('Reply-To: header for tenant transactional email.'),
+    resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
+    templates:               z.array(z.object({
+        id:      z.string().describe('Template id.'),
+        name:    z.string().describe('Template name.'),
+        trigger: z.string().describe('Automation trigger the template fires on.'),
+        active:  z.boolean().describe('Whether the template is active.'),
+    })).describe('Email templates (empty until template management ships).'),
+    icsUrl:                  z.string().nullable().describe('Calendar subscription (ICS) URL, when a token exists.'),
+    googleCalendarConnected: z.boolean().describe('Whether a Google Calendar refresh token is stored.'),
+});
+const CommunicationPatchSchema = z.object({
+    senderEmail: z.string().nullable().describe('From: address, or null to clear.'),
+    replyTo:     z.string().nullable().describe('Reply-To: address, or null to clear.'),
+}).openapi('CommunicationPatch');
+
+const getCommunicationRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/communication',
+    tags: ['admin'],
+    summary: 'Get tenant communication settings',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(CommunicationResponseSchema) } }, description: 'Communication config' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'getCommunicationConfig',
+    description: 'Returns the tenant transactional-email identity (sender + reply-to) plus delivery/integration status flags (Resend configured, ICS URL, Google Calendar connected) for the Settings → Communication page.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const patchCommunicationRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/communication',
+    tags: ['admin'],
+    summary: 'Update tenant communication settings',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    request: { body: { content: { 'application/json': { schema: CommunicationPatchSchema } } } },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ ok: z.literal(true) })) } }, description: 'Saved' },
+        401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: 'updateCommunicationConfig',
+    description: 'Persists the tenant From: (senderEmail) and Reply-To: (replyTo) addresses — fixes the B-4/A-7 "Reply-To unsaveable" bug. Either value may be null to clear it.',
+}, { scopes: ['admin'], tier: 'extended' }));
 
 export const adminRoutes = createApiRouter()
     .openapi(exportDataRoute, async (c) => {
@@ -1364,7 +1403,7 @@ export const adminRoutes = createApiRouter()
         // Map Date to string for schema compatibility
         const formattedResult = {
             ...result,
-            items: result.logs.map(log => ({
+            items: result.logs.map((log: (typeof result.logs)[number]) => ({
                 ...log,
                 createdAt: safeISODate(log.createdAt)
             }))
@@ -1393,52 +1432,6 @@ export const adminRoutes = createApiRouter()
         });
 
         return c.json({ success: true, data: { message: 'Client data erased successfully.', ...counts } }, 200);
-    })
-    .openapi(getBrandingRoute, async (c) => {
-        const brandingService = c.var.services.branding;
-        const branding = await brandingService.getBranding(c.get('tenantId'), {
-            siteName: c.env.APP_NAME || 'OpenInspection',
-            primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
-            supportEmail: c.env.SENDER_EMAIL || 'support@example.com'
-        });
-        
-        const formattedBranding = {
-            ...branding,
-            siteName: branding.siteName || c.env.APP_NAME || 'OpenInspection',
-            primaryColor: branding.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
-            supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
-            logoUrl: branding.logoUrl || null,
-            billingUrl: branding.billingUrl || null,
-            gaMeasurementId: branding.gaMeasurementId || null
-        };
-
-        return c.json({ success: true, data: { branding: formattedBranding } }, 200);
-    })
-    .openapi(updateBrandingRoute, async (c) => {
-        const body = c.req.valid('json');
-        const brandingService = c.var.services.branding;
-        const result = await brandingService.updateBranding(c.get('tenantId'), body);
-        
-        const formattedResult = {
-            ...result,
-            siteName: result.siteName || c.env.APP_NAME || 'OpenInspection',
-            primaryColor: result.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
-            supportEmail: result.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
-            logoUrl: result.logoUrl || null,
-            billingUrl: result.billingUrl || null,
-            gaMeasurementId: result.gaMeasurementId || null
-        };
-
-        return c.json({ success: true, data: { branding: formattedResult } }, 200);
-    })
-    .openapi(uploadLogoRoute, async (c) => {
-        const formData = await c.req.formData();
-        const file = formData.get('logo') as File;
-        if (!file || !(file instanceof File)) throw Errors.BadRequest('No logo file provided.');
-
-        const brandingService = c.var.services.branding;
-        const logoUrl = await brandingService.uploadLogo(c.get('tenantId'), file);
-        return c.json({ success: true, data: { logoUrl } }, 200);
     })
     .openapi(getConfigRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -1537,7 +1530,7 @@ export const adminRoutes = createApiRouter()
         }
 
         await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c))
-            .catch(e => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+            .catch((e: unknown) => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
 
         // Append request.sent only after email is dispatched (or attempted)
         try {
@@ -2247,8 +2240,9 @@ export const adminRoutes = createApiRouter()
             const res = await browser.quickAction('pdf', { url: probedUrl });
             status = res.status;
             contentType = res.headers.get('content-type');
-            body = await res.arrayBuffer();
-            contentLength = Math.min(body.byteLength, 1_048_576);
+            const buf = await res.arrayBuffer();
+            body = buf;
+            contentLength = Math.min(buf.byteLength, 1_048_576);
         } catch (e) {
             error = (e as Error).message;
         }
@@ -2316,6 +2310,62 @@ export const adminRoutes = createApiRouter()
             tsMs: Date.now(),
         });
         return c.json({ success: true as const }, 200);
+    })
+    .openapi(listEventTypesRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const data = await c.var.services.event.listEventTypes(tenantId);
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(createEventTypeRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        const data = await c.var.services.event.createEventType(tenantId, body);
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(updateEventTypeRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const body = c.req.valid('json');
+        await c.var.services.event.updateEventType(tenantId, id, body);
+        const fresh = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id);
+        if (!fresh) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Event type not found' } }, 404);
+        return c.json({ success: true as const, data: fresh }, 200);
+    })
+    .openapi(deleteEventTypeRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        await c.var.services.event.deactivateEventType(tenantId, id);
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(getCommunicationRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const cfg = await c.var.services.branding.getBranding(tenantId, { siteName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
+        // Resend is "configured" if a key is in env OR stored in tenant secrets.
+        let resendConfigured = !!c.env.RESEND_API_KEY;
+        if (!resendConfigured) {
+            try {
+                const secrets = await c.var.services.branding.getDecryptedSecrets(tenantId, c.env.JWT_SECRET);
+                resendConfigured = !!secrets.resendApiKey;
+            } catch { /* no decryptable secrets — leave false */ }
+        }
+        const icsToken = cfg.icsToken as string | null | undefined;
+        return c.json({
+            success: true as const,
+            data: {
+                senderEmail: (cfg.senderEmail as string | null) ?? null,
+                replyTo: (cfg.replyTo as string | null) ?? null,
+                resendConfigured,
+                templates: [],
+                icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
+                googleCalendarConnected: !!cfg.googleRefreshToken,
+            },
+        }, 200);
+    })
+    .openapi(patchCommunicationRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const body = c.req.valid('json');
+        await c.var.services.branding.updateBranding(tenantId, { senderEmail: body.senderEmail, replyTo: body.replyTo });
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 
 export type AdminApi = typeof adminRoutes;

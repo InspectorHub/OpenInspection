@@ -16,6 +16,9 @@ export const invoices = sqliteTable('invoices', {
     notes: text('notes'),
     sentAt: integer('sent_at', { mode: 'timestamp' }),
     paidAt: integer('paid_at', { mode: 'timestamp' }),
+    // How the invoice was paid — 'card' (online Stripe) or an offline method
+    // (check / cash / offline) recorded by the inspector via "Mark as paid".
+    paymentMethod: text('payment_method', { enum: ['card', 'check', 'cash', 'offline', 'other'] }),
     partialPaidAt: integer('partial_paid_at', { mode: 'timestamp' }),
     qboSyncStatus: text('qbo_sync_status', { enum: ['synced', 'pending', 'failed'] }),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),

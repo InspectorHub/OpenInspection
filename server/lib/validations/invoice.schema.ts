@@ -17,6 +17,11 @@ export const CreateInvoiceSchema = z.object({
 
 export const UpdateInvoiceSchema = CreateInvoiceSchema.partial().openapi('UpdateInvoice');
 
+export const MarkInvoicePaidSchema = z.object({
+    method: z.enum(['card', 'check', 'cash', 'offline', 'other']).optional()
+        .describe('How the invoice was paid: card (online) or an offline method recorded by the inspector — check, cash, offline, or other.'),
+}).openapi('MarkInvoicePaid');
+
 export const InvoiceResponseSchema = z.object({
     id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
     tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),

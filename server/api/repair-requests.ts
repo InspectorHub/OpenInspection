@@ -64,6 +64,49 @@ const sendEmailRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createRepairRequestRepairRequestEmail (POST /repair-request/email, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: [], tier: 'extended' }));
 
+// C-10 ③-D — GET /api/public/repair-request/:id — the data the public
+// repair-request page renders (property + defects + estimates + prefill email).
+// Tenant resolved from subdomain; the unguessable inspection id is the key.
+const RepairDefectSchema = z.object({
+    sectionId:           z.string().describe('Report section id.'),
+    sectionTitle:        z.string().describe('Report section title.'),
+    itemId:              z.string().describe('Inspection item id.'),
+    itemLabel:           z.string().describe('Inspection item label.'),
+    comment:             z.string().describe('Defect comment text.'),
+    location:            z.string().nullable().describe('Defect location, when set.'),
+    category:            z.enum(['safety', 'recommendation', 'maintenance']).describe('Defect severity bucket.'),
+    recommendationLabel: z.string().nullable().describe('Resolved recommendation label, when set.'),
+    estimateLow:         z.number().nullable().describe('Low repair estimate (cents).'),
+    estimateHigh:        z.number().nullable().describe('High repair estimate (cents).'),
+    photos:              z.array(z.object({ key: z.string(), url: z.string() })).describe('Defect photos.'),
+});
+const RepairRequestDataSchema = z.object({
+    success: z.literal(true).describe('Always true on the 200 path.'),
+    data: z.object({
+        inspectionId:    z.string().describe('Inspection id.'),
+        propertyAddress: z.string().describe('Property address.'),
+        inspectionDate:  z.string().nullable().describe('Scheduled inspection date.'),
+        inspectorName:   z.string().nullable().describe('Assigned inspector name.'),
+        clientEmail:     z.string().nullable().describe('Client email to prefill the "email me a copy" field.'),
+        defects:         z.array(RepairDefectSchema).describe('Flattened repair-list defects.'),
+        showEstimates:   z.boolean().describe('Whether the tenant exposes repair estimates.'),
+    }).describe('Repair-request page payload.'),
+});
+
+const getRepairRequestRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/repair-request/{id}',
+    tags: ["inspections", "public"],
+    summary: 'Public repair-request page data for an inspection',
+    request: { params: z.object({ id: z.string().describe('Inspection id.') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: RepairRequestDataSchema } }, description: 'Repair-request data' },
+        404: { description: 'Tenant not resolved' },
+    },
+    operationId: "getPublicRepairRequest",
+    description: "Public, no-login repair-request page data (property + flattened defect list + estimates) for an inspection, resolved by tenant subdomain + the unguessable inspection id.",
+}, { scopes: [], tier: 'extended' }));
+
 export const repairRequestRoutes = createApiRouter()
     .openapi(sendEmailRoute, async (c) => {
     await checkRateLimit(c, 'book');
@@ -190,7 +233,14 @@ export const repairRequestRoutes = createApiRouter()
     });
 
     return c.json({ success: true as const, data: { sent: true as const } }, 200);
-});
+    })
+    .openapi(getRepairRequestRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = (c.get('tenantId') || c.get('resolvedTenantId')) as string | null;
+        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+        const data = await c.var.services.inspection.getRepairRequestData(id, tenantId);
+        return c.json({ success: true as const, data }, 200);
+    });
 
 function escapeHtml(s: string): string {
     return s

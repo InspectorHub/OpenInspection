@@ -11,11 +11,14 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const secretsRes = await api.admin.secrets.$get().catch(() => null);
+  const secretsRes = await api.secrets.secrets.$get().catch(() => null);
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+  const webhookUrl = `${new URL(request.url).origin}/api/integrations/stripe/webhook`;
   return {
+    webhookUrl,
     secrets: {
+      STRIPE_PUBLISHABLE_KEY: secrets.STRIPE_PUBLISHABLE_KEY || "",
       STRIPE_SECRET_KEY: secrets.STRIPE_SECRET_KEY || "",
       STRIPE_WEBHOOK_SECRET: secrets.STRIPE_WEBHOOK_SECRET || "",
     },
@@ -29,13 +32,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "save-stripe-secrets") {
     const body: Record<string, string> = {};
-    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const) {
+    for (const key of ["STRIPE_PUBLISHABLE_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const) {
       const val = fd.get(key);
       if (val && typeof val === "string" && val.trim()) body[key] = val;
     }
     if (Object.keys(body).length > 0) {
       const api = createApi(context, { token });
-      const res = await api.admin.secrets.$put({ json: body });
+      const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
         return { success: false, error: "Failed to save Stripe keys." };
       }
@@ -46,7 +49,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { success: false, error: "Unknown action" };
 }
 
-const INTEGRATIONS = [
+type Integration = {
+  id: string;
+  name: string;
+  description: string;
+  status: "available" | "connected";
+  href?: string;
+  color: string;
+};
+
+const INTEGRATIONS: Integration[] = [
   {
     id: "qbo",
     name: "QuickBooks Online",
@@ -68,13 +80,6 @@ const INTEGRATIONS = [
     description: "Address autocomplete and property data enrichment.",
     status: "available" as const,
     color: "#34A853",
-  },
-  {
-    id: "stripe",
-    name: "Stripe",
-    description: "Accept online payments and manage billing.",
-    status: "available" as const,
-    color: "#635BFF",
   },
   {
     id: "resend",
@@ -107,7 +112,7 @@ const STATUS_STYLES = {
 };
 
 export default function SettingsIntegrations() {
-  const { secrets } = useLoaderData<typeof loader>();
+  const { secrets, webhookUrl } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
@@ -154,23 +159,40 @@ export default function SettingsIntegrations() {
             ST
           </div>
           <div>
-            <h3 className="text-[13px] font-bold text-ih-fg-1">Stripe API keys</h3>
-            <p className="text-[11px] text-ih-fg-3">Required for payment processing. Get keys at dashboard.stripe.com/apikeys.</p>
+            <h3 className="text-[13px] font-bold text-ih-fg-1">Stripe payments</h3>
+            <p className="text-[11px] text-ih-fg-3">Connect your own Stripe account to accept card payments on invoices.</p>
           </div>
         </div>
+
+        {/* Test-mode guidance — start in the Stripe sandbox */}
+        <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-3 leading-relaxed">
+          <span className="font-semibold text-ih-fg-2">Start in test mode.</span> Use your{" "}
+          <span className="font-mono">pk_test_…</span> / <span className="font-mono">sk_test_…</span> keys from{" "}
+          <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">
+            dashboard.stripe.com/test/apikeys
+          </a>{" "}
+          and pay with card <span className="font-mono">4242&nbsp;4242&nbsp;4242&nbsp;4242</span> (any future date / CVC) to verify the flow before going live.
+        </div>
+
         <Form method="post" className="space-y-4 max-w-xl">
           <input type="hidden" name="intent" value="save-stripe-secrets" />
           <SecretField
+            name="STRIPE_PUBLISHABLE_KEY"
+            label="Publishable Key"
+            value={secrets.STRIPE_PUBLISHABLE_KEY}
+            hint="Sent to the browser to render the card field. Starts with pk_test_ (test) or pk_live_ (live)."
+          />
+          <SecretField
             name="STRIPE_SECRET_KEY"
-            label="Stripe Secret Key"
+            label="Secret Key"
             value={secrets.STRIPE_SECRET_KEY}
-            hint="Enables online payment for inspections. Get at dashboard.stripe.com → Developers → API Keys"
+            hint="Server-side key that creates the charge. Starts with sk_test_ or sk_live_. Never shared with the browser."
           />
           <SecretField
             name="STRIPE_WEBHOOK_SECRET"
-            label="Stripe Webhook Secret"
+            label="Webhook Signing Secret"
             value={secrets.STRIPE_WEBHOOK_SECRET}
-            hint="Verifies payment event notifications. Found at dashboard.stripe.com → Developers → Webhooks → Signing secret"
+            hint="Verifies payment notifications. Found after you add the webhook endpoint below (starts with whsec_)."
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit"
@@ -179,6 +201,18 @@ export default function SettingsIntegrations() {
             </button>
           </div>
         </Form>
+
+        {/* Webhook endpoint to register in the Stripe dashboard */}
+        <div className="pt-1 space-y-1.5">
+          <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">Webhook endpoint</p>
+          <p className="text-[12px] text-ih-fg-3 leading-relaxed">
+            In Stripe → Developers → Webhooks, add an endpoint for the{" "}
+            <span className="font-semibold text-ih-fg-2">payment_intent.succeeded</span> event pointing at this URL, then paste its signing secret above:
+          </p>
+          <code className="block w-full px-3 py-2 rounded-md bg-ih-bg-muted border border-ih-border text-[12px] font-mono text-ih-fg-1 break-all select-all">
+            {webhookUrl}
+          </code>
+        </div>
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -21,8 +21,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const tplBody = tplRes.ok ? ((await tplRes.json()) as Record<string, unknown>) : { data: [] };
     const reqBody = reqRes.ok ? ((await reqRes.json()) as Record<string, unknown>) : { data: [] };
     return {
-      templates: (tplBody.data ?? []) as unknown[],
-      requests: (reqBody.data ?? []) as unknown[],
+      templates: (tplBody.data ?? []) as Array<{ id: string; name?: string; updatedAt?: string; createdAt?: string }>,
+      requests: (reqBody.data ?? []) as Array<{ id: string; agreementName?: string; clientName?: string; clientEmail?: string; status: string }>,
     };
   } catch {
     return { templates: [], requests: [] };
@@ -128,7 +128,7 @@ export default function AgreementsPage() {
             </thead>
             <tbody className="divide-y divide-ih-border">
               {showingTemplates
-                ? templates.map((t: any) => (
+                ? templates.map((t) => (
                     <tr key={t.id} className="hover:bg-ih-bg-muted/50 transition-colors">
                       <td className="px-4 py-3 text-[13px] font-semibold text-ih-fg-1">
                         {t.name || "Untitled"}
@@ -144,7 +144,7 @@ export default function AgreementsPage() {
                       </td>
                     </tr>
                   ))
-                : requests.map((r: any) => (
+                : requests.map((r) => (
                     <tr key={r.id} className="hover:bg-ih-bg-muted/50 transition-colors">
                       <td className="px-4 py-3 text-[13px] font-semibold text-ih-fg-1">
                         {r.agreementName || "Untitled"}

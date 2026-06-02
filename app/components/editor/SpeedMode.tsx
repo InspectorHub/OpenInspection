@@ -13,7 +13,7 @@ interface JumpToSection {
 interface SpeedModeProps {
   item: { id: string; label: string; type: string } | null;
   sectionTitle: string;
-  result: Record<string, any>;
+  result: Record<string, unknown>;
   onRating: (rating: string) => void;
   onPrev: () => void;
   onNext: () => void;

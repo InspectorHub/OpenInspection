@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useLoaderData, Link, useNavigate, useFetcher, useSearchParams } from "react-router";
+import { useLoaderData, Link, useFetcher, useSearchParams, redirect } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { buildCreateInspectionJson } from "~/lib/inspection-create";
 import { NewInspectionWizard } from "~/components/NewInspectionWizard";
 import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
@@ -235,26 +236,28 @@ export async function action({ request, context }: Route.ActionArgs) {
   const intent = formData.get("intent");
 
   const api = createApi(context, { token });
+  if (intent === "create") {
+    // The New Inspection wizard posts here with intent:"create". Map its
+    // fields to the create endpoint and bounce into the new inspection's
+    // editor on success (which also refreshes the dashboard list — B-8).
+    const res = await api.inspections.index.$post({
+      json: buildCreateInspectionJson(formData),
+    });
+    if (res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { data?: { inspection?: { id?: string } } };
+      const id = body?.data?.inspection?.id;
+      if (id) return redirect(`/inspections/${id}/edit`);
+    }
+    return { ok: false, intent: "create" };
+  }
   if (intent === "delete") {
     const id = formData.get("id") as string;
     const res = await api.inspections[":id"].$delete({ param: { id } });
     return { ok: res.ok, intent: "delete" };
   }
-  if (intent === "archive") {
-    const ids = (formData.get("ids") as string).split(",");
-    const results = await Promise.all(
-      ids.map((id) =>
-        api.inspections[":id"].$patch({
-          param: { id },
-          json: { status: "cancelled" },
-        }),
-      ),
-    );
-    return { ok: results.every((r) => r.ok), intent: "archive" };
-  }
   if (intent === "status") {
     const id = formData.get("id") as string;
-    const status = formData.get("status") as string;
+    const status = formData.get("status") as "draft" | "completed" | "delivered";
     const res = await api.inspections[":id"].$patch({
       param: { id },
       json: { status },
@@ -289,7 +292,6 @@ export default function DashboardPage() {
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const fetcher = useFetcher();
 
   /* ---- State ---- */
@@ -455,7 +457,7 @@ export default function DashboardPage() {
   const toggleBucket = (key: string) =>
     setCollapsedBuckets((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
 
@@ -463,7 +465,7 @@ export default function DashboardPage() {
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 
@@ -475,15 +477,6 @@ export default function DashboardPage() {
   const clearSelection = () => setSelectedIds(new Set());
 
   /* ---- Batch actions ---- */
-  const batchArchive = () => {
-    if (selectedIds.size === 0) return;
-    fetcher.submit(
-      { intent: "archive", ids: [...selectedIds].join(",") },
-      { method: "post" },
-    );
-    clearSelection();
-  };
-
   const batchDelete = () => {
     if (selectedIds.size === 0) return;
     for (const id of selectedIds) {
@@ -748,7 +741,6 @@ export default function DashboardPage() {
           <span className="text-[13px] font-bold text-ih-primary">
             {selectedIds.size} selected
           </span>
-          <Button variant="ghost" size="sm" onClick={batchArchive}>Archive</Button>
           <Button variant="danger" size="sm" onClick={batchDelete}>Delete</Button>
           <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>Select all</Button>
           <Button variant="ghost" size="sm" onClick={clearSelection}>Clear</Button>

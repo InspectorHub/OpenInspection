@@ -6,6 +6,7 @@ export type { CoreApiType } from '../../server/index';
 // Per-module typed-client surface. One client per module so `hc<TModule>`
 // stays under the TS structural check depth limit.
 export type { AdminApi }              from '../../server/api/admin';
+export type { AdminBrandingApi }      from '../../server/api/admin/branding';
 export type { AgentApi }              from '../../server/api/agent';
 export type { AgentsApi }             from '../../server/api/agents';
 export type { AgentSignupApi }        from '../../server/api/agent-signup';
@@ -19,6 +20,7 @@ export type { CalendarApi }           from '../../server/api/calendar';
 export type { CalendarEventsApi }     from '../../server/api/calendar-events';
 export type { ConciergeApi }          from '../../server/api/concierge';
 export type { ContactsApi }           from '../../server/api/contacts';
+export type { ContactsImportApi }     from '../../server/api/contacts/import';
 export type { CoreAuthApi }           from '../../server/api/auth';
 export type { DataApi }               from '../../server/api/data';
 export type { EventsApi }             from '../../server/api/events';
@@ -39,6 +41,7 @@ export type { NotificationsApi }      from '../../server/api/notifications';
 export type { PlacesApi }             from '../../server/api/places';
 export type { ProfileApi }            from '../../server/api/profile';
 export type { PublicShareApi }        from '../../server/api/public-share';
+export type { PublicReportApi }       from '../../server/api/public-report';
 export type { PublicSlugApi }         from '../../server/api/public-slug';
 export type { RatingSystemsApi }      from '../../server/api/rating-systems';
 export type { RecommendationsApi }    from '../../server/api/recommendations';

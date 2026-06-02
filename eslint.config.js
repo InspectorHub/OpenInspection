@@ -5,7 +5,11 @@ export default tseslint.config(
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     {
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.react-router/**', 'node_modules/**', '.wrangler/**', 'eslint.config.js', 'public/**', 'tests/**', 'scripts/**'],
+        // `*.config.ts` (vitest/playwright/drizzle/react-router) are build/tooling
+        // configs not included in tsconfig.json/tsconfig.api.json, so the
+        // type-aware parser can't resolve them. They don't need type-aware
+        // linting — ignore them rather than widen the tsconfig projects.
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.react-router/**', 'node_modules/**', '.wrangler/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],

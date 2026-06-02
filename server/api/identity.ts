@@ -151,22 +151,22 @@ export const identityRoutes = createApiRouter()
     })
     .openapi(accountExportRoute, async (c) => {
         const userId = getCallerUserId(c);
-        const db = drizzle<any>(c.env.DB as any);
+        const db = drizzle(c.env.DB);
         const data = await exportAccount(db, userId);
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(accountDeleteRoute, async (c) => {
         const userId = getCallerUserId(c);
         const { confirmEmail } = c.req.valid('json');
-        const db = drizzle<any>(c.env.DB as any);
+        const db = drizzle(c.env.DB);
         try {
             const data = await softDeleteAccount(db, userId, confirmEmail);
             return c.json({ success: true as const, data }, 200);
-        } catch (e: any) {
+        } catch (e) {
             if (e instanceof Error && /not found/i.test(e.message)) {
                 throw Errors.NotFound(e.message);
             }
-            throw Errors.BadRequest(e?.message ?? 'delete failed');
+            throw Errors.BadRequest(e instanceof Error ? e.message : 'delete failed');
         }
     });
 

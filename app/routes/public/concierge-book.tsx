@@ -144,7 +144,7 @@ export default function ConciergeBookPage() {
   }
 
   const inspectorName = data.inspector?.name || "your inspector";
-  const submitted = actionData?.success === true;
+  const submitted = actionData != null && "success" in actionData && actionData.success === true;
   const slots = data.availableSlots;
 
   return (

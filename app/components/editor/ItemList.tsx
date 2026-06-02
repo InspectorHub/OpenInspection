@@ -5,7 +5,7 @@ interface ItemListProps {
   sectionId: string;
   activeItemId: string | null;
   onSelect: (id: string) => void;
-  results: Record<string, any>;
+  results: Record<string, Record<string, unknown>>;
   batchMode?: boolean;
   batchSelected?: Record<string, boolean>;
   onBatchToggle?: (id: string) => void;
@@ -95,7 +95,7 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
                 {String(idx + 1).padStart(2, "0")}
               </span>
               <span className="flex-1 truncate">{item.label}</span>
-              {result.rating && (
+              {Boolean(result.rating) && (
                 <span
                   className={`w-2 h-2 rounded-full flex-shrink-0 ${ratingDotClass(result.rating as string)}`}
                 />

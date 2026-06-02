@@ -157,6 +157,11 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     primaryColor: text('primary_color'),
     logoUrl: text('logo_url'),
     supportEmail: text('support_email'),
+    // C-10 ③-D (B-4 / A-7) — tenant transactional-email identity. `senderEmail`
+    // is the From: address; `replyTo` is the Reply-To: header. Both null until
+    // the workspace configures them in Settings → Communication.
+    senderEmail: text('sender_email'),
+    replyTo: text('reply_to'),
     billingUrl: text('billing_url'),
     gaMeasurementId: text('ga_measurement_id'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}

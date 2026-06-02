@@ -563,9 +563,9 @@ export function useInspectionState(opts: UseInspectionOptions) {
     onCrossedSection?: (newSectionTitle: string) => void,
   ) => {
     if (!activeItemId || !currentSection) return;
-    const sIdx = sections.findIndex((s: any) => s.id === currentSection.id);
+    const sIdx = sections.findIndex((s) => s.id === currentSection.id);
     if (sIdx < 0) return;
-    const fromIdx = currentSectionItems.findIndex((i: any) => i.id === activeItemId);
+    const fromIdx = currentSectionItems.findIndex((i) => i.id === activeItemId);
     for (let i = fromIdx + 1; i < currentSectionItems.length; i++) {
       const r = getResult(currentSectionItems[i].id, currentSection.id);
       if (!r.rating) {

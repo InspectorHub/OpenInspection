@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-router";
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
@@ -32,9 +32,6 @@ type ViewMode = "month" | "week" | "day";
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
 
 function startOfWeek(d: Date) {
   const x = new Date(d);
@@ -85,7 +82,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context, { token });
     const res = await api.calendarEvents.index.$get({ query: { start, end } });
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    const body = res.ok ? ((await res.json()) as unknown as Record<string, unknown>) : { data: [] };
     const events = (body.data ?? []) as CalendarEvent[];
     return { events };
   } catch {
@@ -129,8 +126,7 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [createDate, setCreateDate] = useState<string | null>(null);
-  const [dragTarget, setDragTarget] = useState<string | null>(null);
+  const [, setDragTarget] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();

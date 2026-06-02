@@ -2,6 +2,7 @@ import { hc } from "hono/client";
 import type { AppLoadContext } from "react-router";
 import type {
     AdminApi,
+    AdminBrandingApi,
     AgentApi,
     AgentsApi,
     AgentSignupApi,
@@ -15,6 +16,7 @@ import type {
     CalendarEventsApi,
     ConciergeApi,
     ContactsApi,
+    ContactsImportApi,
     CoreAuthApi,
     DataApi,
     EventsApi,
@@ -35,6 +37,7 @@ import type {
     PlacesApi,
     ProfileApi,
     PublicShareApi,
+    PublicReportApi,
     PublicSlugApi,
     RatingSystemsApi,
     RecommendationsApi,
@@ -98,6 +101,7 @@ function buildFetch(context: AppLoadContext, token?: string): typeof fetch {
 
 export interface Api {
     admin:              ReturnType<typeof hc<AdminApi>>;
+    adminBranding:      ReturnType<typeof hc<AdminBrandingApi>>;
     agent:              ReturnType<typeof hc<AgentApi>>;
     agents:             ReturnType<typeof hc<AgentsApi>>;
     agentSignup:        ReturnType<typeof hc<AgentSignupApi>>;
@@ -112,6 +116,7 @@ export interface Api {
     calendarEvents:     ReturnType<typeof hc<CalendarEventsApi>>;
     concierge:          ReturnType<typeof hc<ConciergeApi>>;
     contacts:           ReturnType<typeof hc<ContactsApi>>;
+    contactsImport:     ReturnType<typeof hc<ContactsImportApi>>;
     data:               ReturnType<typeof hc<DataApi>>;
     events:             ReturnType<typeof hc<EventsApi>>;
     evidence:           ReturnType<typeof hc<EvidenceApi>>;
@@ -131,6 +136,7 @@ export interface Api {
     places:             ReturnType<typeof hc<PlacesApi>>;
     profile:            ReturnType<typeof hc<ProfileApi>>;
     publicShare:        ReturnType<typeof hc<PublicShareApi>>;
+    publicReport:       ReturnType<typeof hc<PublicReportApi>>;
     publicSlug:         ReturnType<typeof hc<PublicSlugApi>>;
     ratingSystems:      ReturnType<typeof hc<RatingSystemsApi>>;
     recommendations:    ReturnType<typeof hc<RecommendationsApi>>;
@@ -154,6 +160,7 @@ export interface Api {
  */
 const MOUNT: Record<keyof Api, string> = {
     admin:              "/api/admin",
+    adminBranding:      "/api/admin",
     agent:              "/api/agent",
     agents:             "/api/agents",
     agentSignup:        "/api/agent-signup",
@@ -168,6 +175,7 @@ const MOUNT: Record<keyof Api, string> = {
     calendarEvents:     "/api/calendar/events",
     concierge:          "/api/concierge",
     contacts:           "/api/contacts",
+    contactsImport:     "/api/contacts",
     data:               "/api/data",
     events:             "/api",
     evidence:           "/api/admin",
@@ -187,6 +195,7 @@ const MOUNT: Record<keyof Api, string> = {
     places:             "/api/places",
     profile:            "/api/profile",
     publicShare:        "/api/public",
+    publicReport:       "/api/public",
     publicSlug:         "/api/public",
     ratingSystems:      "/api/rating-systems",
     recommendations:    "/api/recommendations",
@@ -214,11 +223,21 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
     const baseUrl = getApiUrl(context);
     const fetcher = buildFetch(context, opts.token);
 
+    // `hc<T>` constrains `T extends Hono<...>`. Each per-module type (`AdminApi`,
+    // etc.) is `typeof <x>Routes` where `<x>Routes` is an `OpenAPIHono` instance —
+    // which extends `Hono` — so the conditional resolves to `T` at every call site
+    // below while satisfying the constraint (without it, `hc<T>` errors TS2344 and
+    // the whole typed client degrades to loose types — see backlog C-10).
     const mk = <T>(mount: string) =>
-        hc<T>(`${baseUrl}${mount}`, { fetch: fetcher });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        hc<T extends import("hono").Hono<any, any, any> ? T : never>(
+            `${baseUrl}${mount}`,
+            { fetch: fetcher },
+        );
 
     return {
         admin:              mk<AdminApi>(MOUNT.admin),
+        adminBranding:      mk<AdminBrandingApi>(MOUNT.adminBranding),
         agent:              mk<AgentApi>(MOUNT.agent),
         agents:             mk<AgentsApi>(MOUNT.agents),
         agentSignup:        mk<AgentSignupApi>(MOUNT.agentSignup),
@@ -233,6 +252,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         calendarEvents:     mk<CalendarEventsApi>(MOUNT.calendarEvents),
         concierge:          mk<ConciergeApi>(MOUNT.concierge),
         contacts:           mk<ContactsApi>(MOUNT.contacts),
+        contactsImport:     mk<ContactsImportApi>(MOUNT.contactsImport),
         data:               mk<DataApi>(MOUNT.data),
         events:             mk<EventsApi>(MOUNT.events),
         evidence:           mk<EvidenceApi>(MOUNT.evidence),
@@ -252,6 +272,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         places:             mk<PlacesApi>(MOUNT.places),
         profile:            mk<ProfileApi>(MOUNT.profile),
         publicShare:        mk<PublicShareApi>(MOUNT.publicShare),
+        publicReport:       mk<PublicReportApi>(MOUNT.publicReport),
         publicSlug:         mk<PublicSlugApi>(MOUNT.publicSlug),
         ratingSystems:      mk<RatingSystemsApi>(MOUNT.ratingSystems),
         recommendations:    mk<RecommendationsApi>(MOUNT.recommendations),

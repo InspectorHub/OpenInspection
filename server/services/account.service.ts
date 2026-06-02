@@ -10,6 +10,7 @@
  *    because auth checks the column.
  */
 import { eq } from 'drizzle-orm';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, agentTenantLinks, inspections } from '../lib/db/schema';
 
 export interface AccountExport {
@@ -24,7 +25,7 @@ export interface AccountDeleteResult {
     identityId: string;
 }
 
-export async function exportAccount(db: any, userId: string): Promise<AccountExport> {
+export async function exportAccount(db: DrizzleD1Database, userId: string): Promise<AccountExport> {
     const identity = await db.select().from(users).where(eq(users.id, userId)).get();
     const memberships = await db.select().from(agentTenantLinks)
         .where(eq(agentTenantLinks.agentUserId, userId)).all();
@@ -39,16 +40,16 @@ export async function exportAccount(db: any, userId: string): Promise<AccountExp
 }
 
 export async function softDeleteAccount(
-    db: any,
+    db: DrizzleD1Database,
     userId: string,
     confirmEmail: string,
 ): Promise<AccountDeleteResult> {
     const identity = await db.select().from(users).where(eq(users.id, userId)).get();
     if (!identity) throw new Error('Identity not found');
-    if ((identity as any).email !== confirmEmail) {
+    if (identity.email !== confirmEmail) {
         throw new Error('confirmEmail does not match identity email');
     }
     const deletedAt = new Date();
-    await db.update(users).set({ deletedAt } as any).where(eq(users.id, userId));
+    await db.update(users).set({ deletedAt }).where(eq(users.id, userId));
     return { deletedAt: deletedAt.toISOString(), identityId: userId };
 }

@@ -7,30 +7,35 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema/tenant';
 import { createApiRouter } from '../lib/openapi-router';
+import { withMcpMetadata } from '../lib/route-metadata-standards';
 import {
     InspectionPrefsSchema,
     InspectionPrefsPatchSchema,
     withDefaults,
 } from '../lib/validations/inspection-prefs.schema';
 
-const getRoute = createRoute({
+const getRoute = withMcpMetadata(createRoute({
     method: 'get',
     path: '/',
-    tags: ['Tenant'],
+    tags: ['inspections'],
+    operationId: 'getInspectionPrefs',
     summary: 'Get tenant inspection editor preferences',
+    description: 'Return the current tenant-level inspection editor preferences (clone defaults, auto-advance delay, pinned tag IDs), applying built-in defaults for any field not yet configured.',
     responses: {
         200: {
             description: 'Current prefs (defaults applied where unset)',
             content: { 'application/json': { schema: InspectionPrefsSchema } },
         },
     },
-});
+}), { scopes: ['read'], tier: 'extended' });
 
-const patchRoute = createRoute({
+const patchRoute = withMcpMetadata(createRoute({
     method: 'patch',
     path: '/',
-    tags: ['Tenant'],
-    summary: 'Update tenant inspection editor preferences (partial)',
+    tags: ['inspections'],
+    operationId: 'updateInspectionPrefs',
+    summary: 'Update tenant inspection editor preferences',
+    description: 'Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config.',
     request: {
         body: { content: { 'application/json': { schema: InspectionPrefsPatchSchema } }, required: true },
     },
@@ -40,7 +45,7 @@ const patchRoute = createRoute({
             content: { 'application/json': { schema: InspectionPrefsSchema } },
         },
     },
-});
+}), { scopes: ['write'], tier: 'extended' });
 
 export const inspectionPrefsRoutes = createApiRouter()
     .openapi(getRoute, async (c) => {

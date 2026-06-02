@@ -745,8 +745,8 @@ const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
  * always preserved.
  */
 const SwitchRatingSystemSchema = z.object({
-    ratingSystemId: z.string().uuid(),
-    mode:           z.enum(['remap', 'clear']).default('remap'),
+    ratingSystemId: z.string().uuid().describe('Target rating system ID to apply to this inspection'),
+    mode:           z.enum(['remap', 'clear']).default('remap').describe('How to handle existing ratings: remap by severity bucket or clear them'),
 });
 const SwitchRatingSystemResultSchema = z.object({
     remapped: z.number(),
@@ -1168,7 +1168,7 @@ const publishReadinessRoute = createRoute(withMcpMetadata({
     tags: ['inspections'],
     summary: 'Check whether an inspection is ready to publish (required defect fields filled)',
     request: {
-        params: z.object({ id: z.string().min(1) }),
+        params: z.object({ id: z.string().min(1).describe('Inspection identifier to evaluate for publish readiness') }),
     },
     responses: {
         200: {

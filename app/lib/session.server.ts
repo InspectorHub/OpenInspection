@@ -1,7 +1,10 @@
 import { createCookieSessionStorage, redirect } from "react-router";
-import type { AppLoadContext } from "react-router";
+import type { AppLoadContext, SessionStorage } from "react-router";
 
 const DEV_SECRET = "standalone-demo-session-secret-change-me";
+
+/** Fields stored in the React Router `__session` cookie. */
+type AppSessionData = { token: string };
 
 function getSessionSecret(context?: AppLoadContext): string {
   if (context?.cloudflare?.env?.SESSION_SECRET) return context.cloudflare.env.SESSION_SECRET as string;
@@ -9,18 +12,18 @@ function getSessionSecret(context?: AppLoadContext): string {
     if (typeof process !== "undefined" && process?.env?.SESSION_SECRET) {
       return process.env.SESSION_SECRET;
     }
-  } catch {}
+  } catch { /* env not available in this runtime */ }
   return DEV_SECRET;
 }
 
-let _storage: ReturnType<typeof createCookieSessionStorage> | null = null;
+let _storage: SessionStorage<AppSessionData> | null = null;
 let _storageSecret: string | null = null;
 
 function getStorage(context?: AppLoadContext) {
   const secret = getSessionSecret(context);
   if (!_storage || secret !== _storageSecret) {
     _storageSecret = secret;
-    _storage = createCookieSessionStorage({
+    _storage = createCookieSessionStorage<AppSessionData>({
       cookie: {
         name: "__session",
         httpOnly: true,

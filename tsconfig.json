@@ -6,7 +6,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "@cloudflare/workers-types"],
     "paths": {
       "~/*": ["./app/*"],
       "@core/shared-ui": ["./packages/shared-ui/src/index.ts"]
@@ -18,6 +18,6 @@
     "incremental": true,
     "tsBuildInfoFile": "./.tsbuildinfo.app"
   },
-  "include": ["app/**/*.ts", "app/**/*.tsx", "vite.config.ts"],
+  "include": [".react-router/types/**/*", "app/**/*.ts", "app/**/*.tsx", "workers/**/*.ts", "vite.config.ts"],
   "exclude": ["node_modules", "build", "dist"]
 }

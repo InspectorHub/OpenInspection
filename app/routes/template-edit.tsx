@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
@@ -200,7 +200,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function TemplateEditPage() {
-  const { id, name: initialName, version: initialVersion, schema: initial } = useLoaderData<typeof loader>();
+  const { name: initialName, version: initialVersion, schema: initial } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
 
   const [templateName, setTemplateName] = useState(initialName);

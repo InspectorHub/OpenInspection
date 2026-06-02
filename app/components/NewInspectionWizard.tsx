@@ -26,6 +26,7 @@ const SERVICES = [
 
 export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
   const fetcher = useFetcher();
+  const templatesFetcher = useFetcher<{ templates?: Array<{ id: string; name: string }> }>();
   const [step, setStep] = useState(0);
   const [propertyType, setPropertyType] = useState("single_family");
   const [address, setAddress] = useState("");
@@ -49,6 +50,13 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
     setInspectorId("");
   }, [open]);
 
+  // Load the tenant's templates for the picker the first time the wizard opens.
+  useEffect(() => {
+    if (open && templatesFetcher.state === "idle" && templatesFetcher.data === undefined) {
+      templatesFetcher.load("/templates");
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const toggleService = (s: string) =>
@@ -63,7 +71,7 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
     });
 
   const canNext =
-    step === 0 ? address.length > 0 :
+    step === 0 ? address.length > 0 && templateId.length > 0 :
     step === 1 ? services.size > 0 :
     step === 2 ? date.length > 0 :
     true;
@@ -115,8 +123,13 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
                 <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City, State" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
               </div>
               <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Template (optional)</label>
-                <input value={templateId} onChange={(e) => setTemplateId(e.target.value)} placeholder="Template ID or leave blank" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
+                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Template</label>
+                <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none">
+                  <option value="">{templatesFetcher.state === "loading" ? "Loading templates…" : "Select a template…"}</option>
+                  {(templatesFetcher.data?.templates ?? []).map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           )}

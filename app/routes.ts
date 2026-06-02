@@ -102,7 +102,6 @@ export default [
       route("settings/catalog/booking", "routes/settings-catalog-booking.tsx"),
       route("settings/billing", "routes/settings-billing.tsx"),
       route("settings/security", "routes/settings-security.tsx"),
-      route("settings/analytics", "routes/settings-analytics.tsx"),
     ]),
     route("comments", "routes/comments.tsx"),
     route("recommendations", "routes/recommendations.tsx"),

@@ -1,4 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspectionConflicts } from '../lib/db/schema';
 
 /**
@@ -42,7 +43,7 @@ function tryParse(s: string | null): unknown {
  * Returns an empty array when there are none.
  */
 export async function listPendingConflicts(
-    db: any,
+    db: DrizzleD1Database,
     inspectionId: string,
 ): Promise<{ conflicts: PendingConflict[] }> {
     const rows = await db
@@ -56,7 +57,7 @@ export async function listPendingConflicts(
         )
         .all();
 
-    const conflicts: PendingConflict[] = rows.map((r: any) => ({
+    const conflicts: PendingConflict[] = rows.map((r) => ({
         id:        r.id,
         itemId:    r.itemId,
         sectionId: r.sectionId ?? null,
@@ -78,7 +79,7 @@ export async function listPendingConflicts(
  * clearing them is the resolution.
  */
 export async function resolveConflicts(
-    db: any,
+    db: DrizzleD1Database,
     inspectionId: string,
     resolutions: ConflictResolution[],
 ): Promise<{ resolved: number; resolvedAt: string }> {
@@ -102,7 +103,7 @@ export async function resolveConflicts(
         for (const row of rows) {
             await db
                 .delete(inspectionConflicts)
-                .where(eq(inspectionConflicts.id, (row as any).id));
+                .where(eq(inspectionConflicts.id, row.id));
             resolved++;
         }
     }

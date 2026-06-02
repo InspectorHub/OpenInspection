@@ -1,7 +1,19 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking";
 import { createApi } from "~/lib/api-client.server";
+
+declare global {
+  interface Window {
+    onTurnstileLoad?: () => void;
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        opts: { sitekey: string; callback: (token: string) => void },
+      ) => void;
+    };
+  }
+}
 
 export function meta() {
   return [{ title: "Book an Inspection - OpenInspection" }];
@@ -58,7 +70,7 @@ const TIME_WINDOWS = [
 ] as const;
 
 export default function BookingPage() {
-  const { profile, error, tenant, slug, agentRefSlug } = useLoaderData<typeof loader>();
+  const { profile, error, agentRefSlug } = useLoaderData<typeof loader>();
   const [step, setStep] = useState(0);
 
   // Form state
@@ -85,16 +97,16 @@ export default function BookingPage() {
       s.async = true;
       document.head.appendChild(s);
     }
-    (window as any).onTurnstileLoad = () => {
-      if (turnstileRef.current && (window as any).turnstile) {
-        (window as any).turnstile.render(turnstileRef.current, {
+    window.onTurnstileLoad = () => {
+      if (turnstileRef.current && window.turnstile) {
+        window.turnstile.render(turnstileRef.current, {
           sitekey: siteKey,
           callback: (token: string) => setTurnstileToken(token),
         });
       }
     };
-    if ((window as any).turnstile && turnstileRef.current) {
-      (window as any).turnstile.render(turnstileRef.current, {
+    if (window.turnstile && turnstileRef.current) {
+      window.turnstile.render(turnstileRef.current, {
         sitekey: siteKey,
         callback: (token: string) => setTurnstileToken(token),
       });
@@ -104,7 +116,7 @@ export default function BookingPage() {
   const toggleService = (id: string) =>
     setSelectedServices((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 
@@ -147,7 +159,7 @@ export default function BookingPage() {
         setStep(3);
       } else {
         const d = await res.json().catch(() => ({}));
-        setMessage({ text: (d as any)?.error?.message || "Something went wrong. Please try again.", ok: false });
+        setMessage({ text: (d as { error?: { message?: string } })?.error?.message || "Something went wrong. Please try again.", ok: false });
       }
     } catch {
       setMessage({ text: "Network error. Please check your connection.", ok: false });

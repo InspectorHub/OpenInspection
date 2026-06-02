@@ -76,7 +76,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
  <label key={f.id} className="block">
  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">
  <span>{f.label}</span>
- {inspection[`_prefilled_${f.id}`] && (
+ {Boolean(inspection[`_prefilled_${f.id}`]) && (
  <span className="text-[9px] font-semibold text-ih-primary normal-case tracking-normal">Prefilled</span>
  )}
  </span>

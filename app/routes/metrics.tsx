@@ -21,7 +21,8 @@ interface MetricsData {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const url = new URL(request.url);
-  const period = url.searchParams.get("period") || "6m";
+  const periodParam = url.searchParams.get("period") ?? "6m";
+  const period = (["3m", "6m", "12m"].includes(periodParam) ? periodParam : "6m") as "3m" | "6m" | "12m";
   try {
     const api = createApi(context, { token });
     const res = await api.metrics.index.$get({ query: { period } });

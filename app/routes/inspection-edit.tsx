@@ -3,7 +3,7 @@ import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { useInspectionState } from "~/hooks/useInspection";
+import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { useFindings } from "~/hooks/useFindings";
 import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
@@ -190,7 +190,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  }
 
  if (intent === "publish") {
- await api.inspections[":id"].publish.$post({ param: { id: params.id } });
+ await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
  }
 
  if (intent === "toggle-auto-sign") {
@@ -206,7 +206,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  if (signatureBase64) {
  await api.inspectionSync[":id"]["inspector-signature"].$post({
  param: { id: params.id },
- json: { signatureBase64, signedAt: new Date().toISOString() },
+ json: { signatureBase64, signedAt: Date.now() },
  });
  }
  }
@@ -244,7 +244,7 @@ export default function InspectionEditPage() {
 
  const state = useInspectionState({
  inspection: loaderData.inspection,
- schema: loaderData.schema as { sections: Array<any> },
+ schema: loaderData.schema as unknown as InspectionSchema,
  results: loaderData.results,
  ratingLevels: loaderData.ratingLevels,
  });
@@ -1802,7 +1802,7 @@ export default function InspectionEditPage() {
  <PropertyInfoForm
  inspection={state.inspection}
  onSave={(fieldId, value) => {
- state.setInspection((prev: any) => ({
+ state.setInspection((prev) => ({
  ...prev,
  [fieldId]: value,
  }));

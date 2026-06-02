@@ -1,8 +1,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
-import { CreateInvoiceSchema, InvoiceResponseSchema } from '../lib/validations/invoice.schema';
+import { CreateInvoiceSchema, InvoiceResponseSchema, MarkInvoicePaidSchema } from '../lib/validations/invoice.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { normalizePaymentMethod } from '../lib/payment-method';
 
 const listInvoicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -52,13 +53,16 @@ const markPaidRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-paid',
     tags: ["invoices"], summary: 'Mark invoice as paid',
     middleware: [requireRole(['owner', 'admin'])],
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: {
+        params: z.object({ id: z.string().uuid().describe('Invoice id to mark as paid.') }).describe('Path params for the mark-paid endpoint.'),
+        body: { content: { 'application/json': { schema: MarkInvoicePaidSchema } } },
+    },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Success' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('Whether the invoice was marked paid.') }).describe('Mark-paid result.') } }, description: 'Success' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "markPaidInvoice",
-    description: "Auto-generated placeholder for markPaidInvoice (POST /{id}/mark-paid, invoices domain). TODO: replace with a real description sourced from the handler."
+    description: "Marks an invoice as paid and records the payment method. Manual offline/check payments flip the linked inspection's payment gate so the report unlocks; syncs the payment to QuickBooks when connected."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const deleteInvoiceRoute = createRoute(withMcpMetadata({
@@ -99,7 +103,9 @@ export const invoiceRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         await c.var.services.invoice.markSent(id, tenantId);
         if (c.env.QBO_CLIENT_ID) {
-            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(i => i.id === id);
+            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(
+                (i: Awaited<ReturnType<typeof c.var.services.invoice.listInvoices>>[number]) => i.id === id,
+            );
             if (inv) {
                 c.executionCtx.waitUntil(
                     c.var.services.qbo.upsertInvoice(tenantId, {
@@ -116,15 +122,23 @@ export const invoiceRoutes = createApiRouter()
     })
     .openapi(markPaidRoute, async (c) => {
         const id = c.req.valid('param').id as string;
+        const { method } = c.req.valid('json');
         const tenantId = c.get('tenantId');
-        await c.var.services.invoice.markPaid(id, tenantId, 'oi');
-        if (c.env.QBO_CLIENT_ID) {
-            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(i => i.id === id);
-            if (inv) {
-                c.executionCtx.waitUntil(
-                    c.var.services.qbo.recordPayment(tenantId, id, inv.amountCents / 100),
-                );
-            }
+        const paymentMethod = normalizePaymentMethod(method);
+        await c.var.services.invoice.markPaid(id, tenantId, 'oi', paymentMethod);
+
+        const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(
+            (i: Awaited<ReturnType<typeof c.var.services.invoice.listInvoices>>[number]) => i.id === id,
+        );
+        // Manual payment must also close the report's payment gate (markPaid only
+        // touches the invoice row; the gate reads inspections.paymentStatus).
+        if (inv?.inspectionId) {
+            await c.var.services.inspection.markPaymentReceived(tenantId, inv.inspectionId);
+        }
+        if (c.env.QBO_CLIENT_ID && inv) {
+            c.executionCtx.waitUntil(
+                c.var.services.qbo.recordPayment(tenantId, id, inv.amountCents / 100),
+            );
         }
         return c.json({ success: true }, 200);
     })

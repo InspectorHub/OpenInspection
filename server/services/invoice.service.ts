@@ -5,6 +5,7 @@ import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
+import type { PaymentMethod } from '../lib/payment-method';
 
 function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' {
     if (inv.paidAt) return 'paid';
@@ -98,12 +99,16 @@ export class InvoiceService {
         await db.update(invoices).set({ sentAt: new Date() }).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
     }
 
-    async markPaid(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi'): Promise<void> {
+    async markPaid(id: string, tenantId: string, source: 'oi' | 'qbo' = 'oi', method?: PaymentMethod): Promise<void> {
         const db = this.getDrizzle();
         const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Invoice not found');
-        await db.update(invoices).set({ paidAt: new Date(), partialPaidAt: null })
-            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+        await db.update(invoices).set({
+            paidAt: new Date(),
+            partialPaidAt: null,
+            // Record how it was paid; keep any existing value if the caller omits one.
+            paymentMethod: method ?? existing.paymentMethod ?? null,
+        }).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
         void source; // consumed by route handler to decide QBO sync
     }
 

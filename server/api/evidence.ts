@@ -95,13 +95,13 @@ const downloadAgreementRoute = createRoute(withMcpMetadata({
     tags: ['admin'],
     summary: 'Download signed agreement PDF (Worker-proxied from R2)',
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
         200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes' },
         404: { description: 'Not signed or missing object' },
     },
     operationId: 'downloadSignedAgreement',
-    description: 'Streams the workflow-rendered signed.pdf from R2.',
+    description: 'Streams the workflow-rendered signed.pdf for an agreement request from R2 storage to the caller.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const downloadCertRoute = createRoute(withMcpMetadata({
@@ -110,7 +110,7 @@ const downloadCertRoute = createRoute(withMcpMetadata({
     tags: ['admin'],
     summary: 'Download Certificate of Completion PDF',
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
         200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes' },
         404: { description: 'Cert not yet rendered or missing' },
@@ -125,7 +125,7 @@ const downloadEvidenceRoute = createRoute(withMcpMetadata({
     tags: ['admin'],
     summary: 'Download evidence pack zip',
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
-    request: { params: z.object({ id: z.string() }) },
+    request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
         200: { content: { 'application/zip': { schema: z.any() } }, description: 'evidence zip' },
         404: { description: 'Missing' },

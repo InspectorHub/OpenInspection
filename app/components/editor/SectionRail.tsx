@@ -1,10 +1,10 @@
 import { SectionDonut } from './SectionDonut';
 
 interface SectionRailProps {
- sections: Array<{ id: string; title: string; items: any[] }>;
+ sections: Array<{ id: string; title: string; items: Array<{ id: string }> }>;
  activeSection: string;
  onSelect: (id: string) => void;
- results: Record<string, any>;
+ results: Record<string, Record<string, unknown>>;
  sectionProgress?: (sectionId: string) => { total: number; rated: number; percent: number; hasDefect: boolean };
  sectionDefectCount?: (sectionId: string) => number;
 }
@@ -17,7 +17,7 @@ export function SectionRail({ sections, activeSection, onSelect, results, sectio
  // Calculate completion
  const progress = sectionProgress?.(section.id);
  const total = progress?.total ?? (section.items?.length || 0);
- const rated = progress?.rated ?? (section.items?.filter((i: any) => {
+ const rated = progress?.rated ?? (section.items?.filter((i) => {
  const r = results[`_default:${section.id}:${i.id}`] || results[i.id];
  return r?.rating;
  }).length || 0);

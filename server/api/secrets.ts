@@ -34,6 +34,7 @@ export const INTEGRATION_SECRET_KEYS = [
     'QBO_CLIENT_SECRET',
     'QBO_WEBHOOK_SECRET',
     'STRIPE_SECRET_KEY',
+    'STRIPE_PUBLISHABLE_KEY',
     'STRIPE_WEBHOOK_SECRET',
     'APP_BASE_URL',
 ] as const;
@@ -70,7 +71,7 @@ const putSecretsRoute = createRoute(withMcpMetadata({
     method: 'put',
     path: '/secrets',
     tags: ['admin'],
-    summary: 'Save integration secrets',
+    summary: 'Save tenant integration API secrets',
     middleware: [requireRole(['owner', 'admin'])],
     request: {
         body: { content: { 'application/json': { schema: SecretsInputSchema } } },
@@ -227,6 +228,7 @@ export const secretsRoutes = createApiRouter()
             qboClientSecret: 'QBO_CLIENT_SECRET',
             qboWebhookSecret: 'QBO_WEBHOOK_SECRET',
             stripeSecretKey: 'STRIPE_SECRET_KEY',
+            stripePublishableKey: 'STRIPE_PUBLISHABLE_KEY',
             stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',
             appBaseUrl: 'APP_BASE_URL',
         };

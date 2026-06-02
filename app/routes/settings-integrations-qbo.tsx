@@ -24,7 +24,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const [qboRes, secretsRes] = await Promise.all([
     fetch("/settings/integrations/qbo/status", { credentials: "include" }).catch(() => null),
-    api.admin.secrets.$get().catch(() => null),
+    api.secrets.secrets.$get().catch(() => null),
   ]);
 
   let status: QboStatus | null = null;
@@ -60,7 +60,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
     if (Object.keys(body).length > 0) {
       const api = createApi(context, { token });
-      const res = await api.admin.secrets.$put({ json: body });
+      const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
         return { success: false, error: "Failed to save QBO keys." };
       }

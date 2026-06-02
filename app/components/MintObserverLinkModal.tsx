@@ -24,7 +24,7 @@ export function MintObserverLinkModal({ open, inspectionId, onClose }: MintObser
  body: JSON.stringify({ durationSeconds }),
  });
  if (!res.ok) throw new Error("Failed to generate link");
- const data = await res.json();
+ const data = (await res.json()) as { url?: string };
  setGeneratedUrl(data.url ?? "");
  } catch {
  setError("Could not generate observer link");

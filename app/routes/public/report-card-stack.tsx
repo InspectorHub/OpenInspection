@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
@@ -59,11 +59,13 @@ interface LoaderResult {
 /* Loader */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
  try {
  const api = createApi(context);
- const res = await api.publicShare.report[":tenant"][":id"].$get({
+ const token = new URL(request.url).searchParams.get("token") ?? undefined;
+ const res = await api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
+ query: { token },
  });
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;
@@ -80,7 +82,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
  messageToken: d?.messageToken ?? null,
  isDelivered: d?.isDelivered ?? false,
  error: res.ok ? null : "Report not found",
- reportTheme: (d as Record<string, unknown>)?.reportTheme as string | undefined,
+ reportTheme: (d as unknown as Record<string, unknown>)?.reportTheme as string | undefined,
  } satisfies LoaderResult;
  } catch {
  return {

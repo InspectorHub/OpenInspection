@@ -4,7 +4,7 @@ import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } 
 
 interface SideRailProps {
   activeItem?: { id: string; label: string; type?: string } | null;
-  activeResult?: Record<string, any> | null;
+  activeResult?: Record<string, unknown> | null;
   ratingLevels?: Array<{ id: string; name?: string; label?: string; abbreviation?: string; color?: string }>;
   getRatingColor?: (id: string) => string;
   getRatingLabel?: (id: string) => string;
@@ -18,7 +18,7 @@ const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "library", label: "Library", icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" },
 ];
 
-export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColor, getRatingLabel, inspectionId }: SideRailProps) {
+export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId }: SideRailProps) {
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(false);
 
@@ -44,23 +44,20 @@ export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColo
             {activeTab === "preview" && (
               activeItem && activeResult ? (
                 <div className="space-y-3">
-                  {/* Item label */}
                   <h4 className="text-[13px] font-bold text-ih-fg-1">{activeItem.label}</h4>
 
-                  {/* Rating badge */}
-                  {activeResult.rating && (
+                  {Boolean(activeResult.rating) && (
                     <div>
                       <span
                         className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
                         style={{ backgroundColor: getRatingColor?.(activeResult.rating as string) || '#6b7280' }}
                       >
-                        {getRatingLabel?.(activeResult.rating as string) || activeResult.rating}
+                        {getRatingLabel?.(activeResult.rating as string) || (activeResult.rating as string)}
                       </span>
                     </div>
                   )}
 
-                  {/* Notes */}
-                  {activeResult.notes && (
+                  {Boolean(activeResult.notes) && (
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Notes</span>
                       <p className="text-[12px] text-ih-fg-2 mt-1 whitespace-pre-wrap leading-relaxed">{activeResult.notes as string}</p>
@@ -68,7 +65,7 @@ export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColo
                   )}
 
                   {/* Canned comments */}
-                  {activeResult.tabs && Array.isArray(activeResult.tabs) && (() => {
+                  {Array.isArray(activeResult.tabs) && (() => {
                     const included = (activeResult.tabs as Array<{ name?: string; comments?: Array<Record<string, unknown>> }>)
                       .flatMap(tab => (tab.comments || [])
                         .filter(c => c.included)
@@ -110,7 +107,7 @@ export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColo
                   })()}
 
                   {/* Photos */}
-                  {activeResult.photos && Array.isArray(activeResult.photos) && (activeResult.photos as string[]).length > 0 && (
+                  {Array.isArray(activeResult.photos) && (activeResult.photos as string[]).length > 0 && (
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Photos</span>
                       <div className="mt-1 grid grid-cols-3 gap-1">
