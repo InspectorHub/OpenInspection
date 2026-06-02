@@ -70,12 +70,15 @@ export async function action({ request, context }: Route.ActionArgs) {
       return submission.reply();
     }
     const { senderEmail, replyTo } = submission.value;
-    await api.admin.communication.$patch({
+    const res = await api.admin.communication.$patch({
       json: {
         senderEmail: senderEmail || null,
         replyTo: replyTo || null,
       },
     });
+    if (!res.ok) {
+      return { ok: false, error: "Failed to save email settings." };
+    }
     return { ok: true };
   }
 

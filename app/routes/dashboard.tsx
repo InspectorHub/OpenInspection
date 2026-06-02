@@ -41,6 +41,20 @@ interface Tag {
   color?: string;
 }
 
+/** Template option for the New Inspection wizard picker (B-6). */
+interface TemplateOption {
+  id: string;
+  name: string;
+  itemCount?: number;
+}
+
+/** Service option for the New Inspection wizard Services step (B-8). */
+interface ServiceOption {
+  id: string;
+  name: string;
+  price?: number | null;
+}
+
 interface DashboardData {
   needsAttention: Inspection[];
   today: Inspection[];
@@ -177,9 +191,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const [dashRes, tagsRes] = await Promise.all([
+    // Templates + services power the New Inspection wizard (B-6 picker + B-8
+    // service linking). They are best-effort: a failure must not break the
+    // dashboard, so each falls back to an empty list.
+    const [dashRes, tagsRes, templatesRes, servicesRes] = await Promise.all([
       api.inspections.dashboard.$get(),
       api.tags.index.$get().catch(() => null),
+      api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
+      api.services.index.$get().catch(() => null),
     ]);
     const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
     const d = (json.data ?? {}) as unknown as DashboardData | undefined;
@@ -187,6 +206,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (tagsRes && tagsRes.ok) {
       const tj = (await tagsRes.json()) as Record<string, unknown>;
       tags = (tj.data ?? []) as Tag[];
+    }
+    let templates: TemplateOption[] = [];
+    if (templatesRes && templatesRes.ok) {
+      const tj = (await templatesRes.json()) as { data?: TemplateOption[] };
+      templates = (tj.data ?? []).map((t) => ({ id: t.id, name: t.name, itemCount: t.itemCount }));
+    }
+    let svcOptions: ServiceOption[] = [];
+    if (servicesRes && servicesRes.ok) {
+      const sj = (await servicesRes.json()) as { data?: ServiceOption[] };
+      svcOptions = (sj.data ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price }));
     }
     return {
       buckets: {
@@ -200,6 +229,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       conciergePending: d?.conciergePending ?? 0,
       greeting: "Good morning",
       tags,
+      templates,
+      services: svcOptions,
     };
   } catch {
     return {
@@ -214,6 +245,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       conciergePending: 0,
       greeting: "Good morning",
       tags: [] as Tag[],
+      templates: [] as TemplateOption[],
+      services: [] as ServiceOption[],
     };
   }
 }
@@ -287,7 +320,7 @@ const BUCKET_META: Record<string, { label: string; hint: string }> = {
 const PAGE_SIZE = 25;
 
 export default function DashboardPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags } = useLoaderData<typeof loader>();
+  const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
@@ -814,7 +847,12 @@ export default function DashboardPage() {
       )}
 
       {/* Wizard modal */}
-      <NewInspectionWizard open={wizardOpen} onClose={() => setWizardOpen(false)} />
+      <NewInspectionWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        templates={templates}
+        services={services}
+      />
 
       {/* Command Palette */}
       <CommandPalette onNewInspection={() => setWizardOpen(true)} />

@@ -148,6 +148,29 @@ const publicUploadRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for uploadMessage (POST /public/{token}/upload, messages domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
+// ── B-5: public attachment download (token-scoped, no JWT) ──────────────────────
+// The public messages page links each attachment here. The route is scoped by
+// the conversation `token` (already in the /api/messages/public/ public
+// allowlist) + the attachment `id`, so it can only serve files attached to that
+// conversation — never an arbitrary R2 key. The original filename + MIME type
+// come from the stored attachment metadata.
+const publicAttachmentRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/public/{token}/attachments/{attachmentId}',
+    tags: ["messages"],
+    request: { params: z.object({
+        token: z.string().describe('Conversation token from the public messages link.'),
+        attachmentId: z.string().describe('Attachment id within the conversation.'),
+    }) },
+    responses: {
+        200: { content: { 'application/octet-stream': { schema: z.any() } }, description: 'Attachment bytes' },
+        404: { description: 'Not found' },
+    },
+    operationId: "downloadMessageAttachmentPublic",
+    summary: "Download a message attachment for public view",
+    description: "Streams a message attachment from R2 for the public (token-gated) conversation view. Scoped by conversation token + attachment id; sets Content-Disposition with the original filename.",
+}, { scopes: ['read'], tier: 'extended' }));
+
 export const messageRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const { inspectionId } = c.req.valid('param');
@@ -257,6 +280,25 @@ export const messageRoutes = createApiRouter()
         if (!c.env.PHOTOS) throw Errors.BadRequest('Storage not available');
         await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: detected ?? file.type } });
         return c.json({ success: true, data: { id, key, name: file.name, size: file.size, type: detected ?? file.type, uploadedAt: Date.now() } }, 200);
+    })
+    .openapi(publicAttachmentRoute, async (c) => {
+        const { token, attachmentId } = c.req.valid('param');
+        const svc = c.var.services.message;
+        const att = await svc.resolveAttachmentByToken(token, attachmentId);
+        if (!att) throw Errors.NotFound('Attachment not found');
+        if (!c.env.PHOTOS) throw Errors.NotFound('Storage not available');
+        const obj = await c.env.PHOTOS.get(att.key);
+        if (!obj) throw Errors.NotFound('Attachment not found');
+        // Sanitize the filename for the Content-Disposition header (strip quotes
+        // and control/path characters) so a crafted attachment name can't inject
+        // header tokens.
+        const safeName = (att.name || 'attachment').replace(/["\\\r\n]/g, '').replace(/[/\\]/g, '_').slice(0, 200);
+        const headers = new Headers();
+        headers.set('Content-Type', att.type || obj.httpMetadata?.contentType || 'application/octet-stream');
+        headers.set('Content-Disposition', `attachment; filename="${safeName}"`);
+        headers.set('Cache-Control', 'private, max-age=300');
+        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
+        return new Response(obj.body, { status: 200, headers });
     });
 
 export type MessagesApi = typeof messageRoutes;

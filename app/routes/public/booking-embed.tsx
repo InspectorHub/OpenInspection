@@ -36,15 +36,27 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
     });
     const body = res.ok ? await res.json() : {};
-    const d = ((body as Record<string, unknown>).data ?? {}) as Partial<EmbedData> | undefined;
+    // Shape returned by GET /api/public/book/:tenant/:slug — see server/api/bookings.ts:
+    //   { inspectorId, name, company, avatar, turnstileSiteKey, services }
+    // NOTE: the field names here (`name`, `turnstileSiteKey`) differ from this
+    // route's EmbedData; map them explicitly rather than relying on matching keys.
+    const d = res.ok
+      ? (((body as Record<string, unknown>).data ?? null) as
+          | {
+              inspectorId?: string;
+              name?: string;
+              turnstileSiteKey?: string | null;
+            }
+          | null)
+      : null;
     return {
       data: d
         ? ({
-            slug: d.slug ?? params.slug ?? "",
+            slug: params.slug ?? "",
             inspectorId: d.inspectorId ?? "",
-            inspectorName: d.inspectorName ?? "Inspector",
-            tenantSubdomain: d.tenantSubdomain ?? params.tenant ?? "",
-            siteKey: d.siteKey ?? "",
+            inspectorName: d.name ?? "Inspector",
+            tenantSubdomain: params.tenant ?? "",
+            siteKey: d.turnstileSiteKey ?? "",
             theme,
           } satisfies EmbedData)
         : null,

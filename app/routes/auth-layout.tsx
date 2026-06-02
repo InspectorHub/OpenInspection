@@ -1,8 +1,9 @@
-import { Outlet, useLoaderData } from "react-router";
+import { Outlet, useLoaderData, useLocation, useNavigation } from "react-router";
 import type { Route } from "./+types/auth-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Sidebar, MobileHeader } from "~/components/Sidebar";
+import { PageLoadingSkeleton } from "~/components/PageLoadingSkeleton";
 import type { SessionContext } from "~/hooks/useSessionContext";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -23,6 +24,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function AuthLayout() {
   const { context } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const location = useLocation();
+
+  // Show a content-pane skeleton only during a *real* page navigation:
+  // - navigation.state === "loading" (loader in flight, not a form submission)
+  // - navigation.location is set (guards against revalidation, which has no location)
+  // - the target path differs from the current path (ignore search-param-only
+  //   refetches / replace-in-place updates so we don't flash a skeleton over
+  //   the page the user is already on)
+  const isNavigatingToNewPage =
+    navigation.state === "loading" &&
+    navigation.location != null &&
+    navigation.location.pathname !== location.pathname;
 
   return (
     <>
@@ -41,7 +55,7 @@ export default function AuthLayout() {
         <Sidebar />
         <main className="flex-1 w-full bg-ih-bg-app overflow-y-auto">
           <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9">
-            <Outlet />
+            {isNavigatingToNewPage ? <PageLoadingSkeleton /> : <Outlet />}
           </div>
         </main>
       </div>

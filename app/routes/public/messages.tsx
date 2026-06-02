@@ -120,7 +120,7 @@ export default function MessagesPublicPage() {
                   {m.attachments.map((a) => (
                     <a
                       key={a.id}
-                      href={`/api/photos/${encodeURIComponent(a.key)}`}
+                      href={`/api/messages/public/${encodeURIComponent(token)}/attachments/${encodeURIComponent(a.id)}`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-xs bg-ih-bg-card border border-ih-border rounded-lg px-2 py-1 hover:bg-ih-bg-muted"

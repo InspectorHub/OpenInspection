@@ -32,9 +32,15 @@ describe("buildCreateInspectionJson", () => {
         expect("date" in json).toBe(false);
     });
 
-    it("includes inspectorId only when non-empty", () => {
+    it("includes inspectorId only when it is a valid UUID", () => {
+        // empty → omitted
         expect("inspectorId" in buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t", inspectorId: "" }))).toBe(false);
-        expect(buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t", inspectorId: "u9" })).inspectorId).toBe("u9");
+        // non-UUID free text (e.g. a typed name/id) → dropped, since the schema
+        // types inspectorId as z.string().uuid() — sending it would 400 the create.
+        expect("inspectorId" in buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t", inspectorId: "u9" }))).toBe(false);
+        // valid UUID → forwarded
+        const uuid = "625fb306-bde0-4fe9-a0e8-d8151296b23a";
+        expect(buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t", inspectorId: uuid })).inspectorId).toBe(uuid);
     });
 
     it("defaults the time to 09:00 when only a date is given", () => {
