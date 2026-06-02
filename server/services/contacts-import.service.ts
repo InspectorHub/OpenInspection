@@ -8,6 +8,7 @@
  *     20-row cap, applies the user-chosen column mapping, and bulk-inserts
  *     contacts with per-row error capture (one bad row doesn't fail the batch).
  */
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { contacts } from '../lib/db/schema';
 
 const MAX_PREVIEW_ROWS = 20;
@@ -75,7 +76,7 @@ export function parseCsvPreview(csv: string): CsvPreviewResult {
 }
 
 export async function importContacts(
-    db: any,
+    db: DrizzleD1Database,
     tenantId: string,
     csv: string,
     mapping: ImportMapping,
@@ -115,8 +116,8 @@ export async function importContacts(
                 createdAt: new Date(),
             } as any);
             inserted++;
-        } catch (e: any) {
-            errors.push({ row: i + 2, message: e?.message ?? 'insert failed' });
+        } catch (e) {
+            errors.push({ row: i + 2, message: e instanceof Error ? e.message : 'insert failed' });
         }
     }
 

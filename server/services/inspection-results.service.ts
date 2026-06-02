@@ -1,4 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionResults } from '../lib/db/schema';
 import { findingKey, DEFAULT_UNIT } from '../lib/finding-key';
 
@@ -33,7 +34,7 @@ export interface ResultsBatchOutcome {
 }
 
 export async function applyResultsBatch(
-    db: any,
+    db: DrizzleD1Database,
     inspectionId: string,
     patches: ResultPatch[],
     opts?: { tenantId?: string; userId?: string },

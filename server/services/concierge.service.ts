@@ -1,4 +1,4 @@
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
     inspections,
@@ -556,7 +556,7 @@ export interface ConfirmInfoResult {
  * integration is tracked in a separate plan. The route is wired and the
  * frontend renders so the customer can still submit a free-form slot.
  */
-export async function getBookInfo(db: any, token: string): Promise<BookInfoResult> {
+export async function getBookInfo(db: DrizzleD1Database, token: string): Promise<BookInfoResult> {
     const invite = (await db
         .select()
         .from(conciergeInvites)
@@ -589,7 +589,7 @@ export async function getBookInfo(db: any, token: string): Promise<BookInfoResul
  * confirmation token. Throws on missing/expired invite.
  */
 export async function createBooking(
-    db: any,
+    db: DrizzleD1Database,
     input: CreateBookingInput,
 ): Promise<CreateBookingResult> {
     const invite = (await db
@@ -626,7 +626,7 @@ export async function createBooking(
  * /confirm-info page. Throws on missing token.
  */
 export async function getConfirmInfo(
-    db: any,
+    db: DrizzleD1Database,
     confirmationToken: string,
 ): Promise<ConfirmInfoResult> {
     const booking = (await db

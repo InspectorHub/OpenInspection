@@ -164,48 +164,48 @@ export const conciergeRoutes = createApiRouter()
     })
     .openapi(bookInfoRoute, async (c) => {
         const { token } = c.req.valid('query');
-        const db = drizzle<any>(c.env.DB as any);
+        const db = drizzle(c.env.DB);
         try {
             const data = await getBookInfo(db, token);
             return c.json({ success: true as const, data }, 200);
-        } catch (e: any) {
+        } catch (e) {
             logger.warn('concierge.bookInfo.failed', {
                 error: e instanceof Error ? e.message : String(e),
             });
             return c.json(
-                { success: false as const, error: { code: 'INVITE_INVALID', message: e?.message ?? 'invalid' } },
+                { success: false as const, error: { code: 'INVITE_INVALID', message: e instanceof Error ? e.message : 'invalid' } },
                 400,
             ) as any;
         }
     })
     .openapi(bookRoute, async (c) => {
         const input = c.req.valid('json');
-        const db = drizzle<any>(c.env.DB as any);
+        const db = drizzle(c.env.DB);
         try {
             const data = await createBooking(db, input);
             return c.json({ success: true as const, data }, 200);
-        } catch (e: any) {
+        } catch (e) {
             logger.warn('concierge.book.failed', {
                 error: e instanceof Error ? e.message : String(e),
             });
             return c.json(
-                { success: false as const, error: { code: 'BOOKING_FAILED', message: e?.message ?? 'failed' } },
+                { success: false as const, error: { code: 'BOOKING_FAILED', message: e instanceof Error ? e.message : 'failed' } },
                 400,
             ) as any;
         }
     })
     .openapi(confirmInfoRoute, async (c) => {
         const { token } = c.req.valid('query');
-        const db = drizzle<any>(c.env.DB as any);
+        const db = drizzle(c.env.DB);
         try {
             const data = await getConfirmInfo(db, token);
             return c.json({ success: true as const, data }, 200);
-        } catch (e: any) {
+        } catch (e) {
             logger.warn('concierge.confirmInfo.failed', {
                 error: e instanceof Error ? e.message : String(e),
             });
             return c.json(
-                { success: false as const, error: { code: 'CONFIRMATION_INVALID', message: e?.message ?? 'invalid' } },
+                { success: false as const, error: { code: 'CONFIRMATION_INVALID', message: e instanceof Error ? e.message : 'invalid' } },
                 400,
             ) as any;
         }

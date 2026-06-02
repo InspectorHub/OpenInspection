@@ -55,7 +55,7 @@ export const contactsImportRoutes = createApiRouter()
     .openapi(importRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { csv, mapping } = c.req.valid('json');
-        const db = drizzle<any>(c.env.DB as any);
+        const db = drizzle(c.env.DB);
         const data = await importContacts(db, tenantId, csv, mapping);
         return c.json({ success: true as const, data }, 200);
     });
