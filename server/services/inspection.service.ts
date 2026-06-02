@@ -2513,6 +2513,19 @@ export class InspectionService {
     }
 
     /**
+     * Stripe webhook — flips the inspection's payment gate to paid so the
+     * report unlocks (getReportGate reads inspections.paymentStatus). Idempotent
+     * and tenant-scoped; a no-op when the inspection doesn't exist (the invoice
+     * may be standalone, not linked to an inspection).
+     */
+    async markPaymentReceived(tenantId: string, inspectionId: string): Promise<void> {
+        const db = this.getDrizzle();
+        await db.update(inspections)
+            .set({ paymentStatus: 'paid' })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
      * Spec 5B P2B — Compute defect category counts for a single inspection.
      *
      * Walks the resolved v2 tabs (template canned defects + per-inspection

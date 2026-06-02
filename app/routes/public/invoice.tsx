@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useSearchParams } from "react-router";
+import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import type { Route } from "./+types/invoice";
 import { createApi } from "~/lib/api-client.server";
 
@@ -27,9 +29,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     return {
       invoice: (Object.keys(d).length > 0 ? d : null) as InvoiceData | null,
       error: res.ok ? null : "Invoice not found",
+      id: params.id ?? "",
     };
   } catch {
-    return { invoice: null, error: "Service unavailable" };
+    return { invoice: null, error: "Service unavailable", id: params.id ?? "" };
   }
 }
 
@@ -54,8 +57,13 @@ const STATUS_PILL: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 export default function InvoicePage() {
-  const { invoice, error } = useLoaderData<typeof loader>();
-  const [payNote, setPayNote] = useState(false);
+  const { invoice, error, id } = useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
+  // After Stripe's confirmPayment redirect the page reloads with
+  // ?redirect_status=succeeded. The webhook flips the invoice to paid
+  // asynchronously, so show an optimistic "received" state until the
+  // loader picks up the settled invoice on a later visit.
+  const justPaid = searchParams.get("redirect_status") === "succeeded";
 
   if (error || !invoice) {
     return (
@@ -149,38 +157,19 @@ export default function InvoicePage() {
             </div>
           </div>
 
-          {/* Pay panel — Stripe Elements integration slot (not yet wired) */}
-          {payable && (
+          {/* Pay panel — Stripe Payment Element (bring-your-own-keys) */}
+          {payable && !justPaid && (
             <div className="px-7 pb-7 print:hidden">
-              <div className="rounded-xl border border-ih-border bg-slate-50 dark:bg-slate-800/40 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[13px] font-semibold text-ih-fg-1">Pay this invoice</span>
-                  <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(balanceDue)}</span>
-                </div>
-                {/* TODO(payments): mount Stripe Elements here once the tenant's
-                    Stripe Connect account is configured (bring-your-own-keys).
-                    The button below is the wired CTA slot. */}
-                <button
-                  type="button"
-                  onClick={() => setPayNote(true)}
-                  className="w-full h-11 rounded-lg bg-ih-primary text-white font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-sm"
-                >
-                  Pay {money(balanceDue)}
-                </button>
-                {payNote ? (
-                  <p className="mt-3 text-[12px] text-ih-fg-3 leading-relaxed">
-                    Secure online card payment is being set up for this inspector. In the meantime,
-                    contact <span className="font-semibold text-ih-fg-2">{invoice.inspectorName || "your inspector"}</span> to arrange payment.
-                  </p>
-                ) : (
-                  <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
-                    <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="7" width="10" height="6" rx="1" />
-                      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
-                    </svg>
-                    Secured by Stripe · No signature required
-                  </div>
-                )}
+              <PayPanel id={id} balanceDue={balanceDue} inspectorName={invoice.inspectorName} />
+            </div>
+          )}
+
+          {/* Optimistic post-redirect state — webhook settles the invoice async */}
+          {payable && justPaid && (
+            <div className="px-7 pb-7 print:hidden">
+              <div className="rounded-xl border border-ih-ok bg-ih-ok-bg p-4 text-center">
+                <p className="text-[13px] font-semibold text-ih-ok-fg">Payment received — thank you.</p>
+                <p className="text-[12px] text-ih-fg-3 mt-1">We&rsquo;re finalizing your receipt; your paid invoice will appear here shortly.</p>
               </div>
             </div>
           )}
@@ -220,6 +209,147 @@ export default function InvoicePage() {
 /* ------------------------------------------------------------------ */
 /*  Bits                                                               */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  Pay panel — Stripe Elements (client-only; rendered after a click)   */
+/* ------------------------------------------------------------------ */
+
+type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
+
+function PayPanel({ id, balanceDue, inspectorName }: { id: string; balanceDue: number; inspectorName: string }) {
+  const [phase, setPhase] = useState<PayPhase>("idle");
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
+
+  async function startPayment() {
+    setPhase("loading");
+    try {
+      const res = await fetch(`/api/public/r/${id}/pay-intent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        data?: { clientSecret?: string; publishableKey?: string };
+        error?: { code?: string };
+      };
+      if (res.ok && body.data?.clientSecret && body.data?.publishableKey) {
+        setStripePromise(loadStripe(body.data.publishableKey));
+        setClientSecret(body.data.clientSecret);
+        setPhase("ready");
+        return;
+      }
+      setPhase(body.error?.code === "INVOICE_NOT_PAYABLE" ? "paid_already" : "unavailable");
+    } catch {
+      setPhase("unavailable");
+    }
+  }
+
+  // The return target: back to this invoice page so the post-payment state shows.
+  const returnUrl =
+    typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?return=1` : "";
+
+  return (
+    <div className="rounded-xl border border-ih-border bg-slate-50 dark:bg-slate-800/40 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[13px] font-semibold text-ih-fg-1">Pay this invoice</span>
+        <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(balanceDue)}</span>
+      </div>
+
+      {(phase === "idle" || phase === "loading") && (
+        <>
+          <button
+            type="button"
+            onClick={startPayment}
+            disabled={phase === "loading"}
+            className="w-full h-11 rounded-lg bg-ih-primary text-white font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
+          >
+            {phase === "loading" ? "Starting secure checkout…" : `Pay ${money(balanceDue)}`}
+          </button>
+          <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
+            <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="7" width="10" height="6" rx="1" />
+              <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+            </svg>
+            Secured by Stripe · No signature required
+          </div>
+        </>
+      )}
+
+      {phase === "ready" && clientSecret && stripePromise && (
+        <Elements
+          stripe={stripePromise}
+          options={{
+            clientSecret,
+            appearance: {
+              theme: "flat",
+              variables: { colorPrimary: "#4f46e5", fontFamily: "inherit", borderRadius: "8px" },
+            },
+          }}
+        >
+          <CheckoutForm balanceDue={balanceDue} returnUrl={returnUrl} />
+        </Elements>
+      )}
+
+      {phase === "paid_already" && (
+        <p className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
+          This invoice has already been paid. Refresh the page to see your receipt.
+        </p>
+      )}
+
+      {phase === "unavailable" && (
+        <p className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
+          Secure online card payment isn&rsquo;t available right now. Please contact{" "}
+          <span className="font-semibold text-ih-fg-2">{inspectorName || "your inspector"}</span> to arrange payment.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CheckoutForm({ balanceDue, returnUrl }: { balanceDue: number; returnUrl: string }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setSubmitting(true);
+    setError(null);
+    const { error: payErr } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: returnUrl },
+    });
+    // On success Stripe redirects to return_url; we only reach here on error.
+    if (payErr) {
+      setError(payErr.message ?? "Payment could not be completed. Please try again.");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3">
+      <PaymentElement />
+      <button
+        type="submit"
+        disabled={!stripe || submitting}
+        className="w-full h-11 rounded-lg bg-ih-primary text-white font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
+      >
+        {submitting ? "Processing…" : `Pay ${money(balanceDue)}`}
+      </button>
+      {error && <p className="text-[12px] text-ih-bad-fg font-medium">{error}</p>}
+      <div className="flex items-center justify-center gap-1.5 text-[11px] text-ih-fg-4">
+        <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="7" width="10" height="6" rx="1" />
+          <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+        </svg>
+        Secured by Stripe
+      </div>
+    </form>
+  );
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

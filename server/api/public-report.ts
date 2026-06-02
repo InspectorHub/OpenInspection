@@ -5,6 +5,8 @@ import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
 import { resolvePortalAccess, resolveObserverAccess } from '../lib/public-access';
 import { loadVerifyData } from '../lib/verify-data';
+import { InvoiceNotPayableError } from '../lib/stripe-helpers';
+import { logger } from '../lib/logger';
 
 /**
  * Public, no-login portal endpoints (`/api/public/*`). Access is gated by the
@@ -91,6 +93,32 @@ const invoiceRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getPublicInvoice',
     description: 'Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from subdomain; tenant-scoped query.',
+}, { scopes: [], tier: 'extended' }));
+
+// Public Stripe PaymentIntent mint for the invoice pay-panel (bring-your-own-keys:
+// the tenant's OWN Stripe secret key is loaded per-request into c.env by the
+// integration-secrets middleware). Returns the client secret + the tenant's
+// publishable key so the browser can mount Stripe Elements inline.
+const PayIntentSchema = z.object({
+    clientSecret: z.string(),
+    publishableKey: z.string(),
+    amountCents: z.number(),
+});
+
+const payIntentRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/r/{id}/pay-intent',
+    tags: ['public'],
+    summary: 'Start a Stripe card payment for an inspection invoice',
+    request: { params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(PayIntentSchema) } }, description: 'PaymentIntent client secret + publishable key' },
+        404: { description: 'Tenant or invoice not found' },
+        409: { description: 'Invoice is not payable (already paid / $0)' },
+        503: { description: 'Stripe is not configured for this tenant, or the charge could not be started' },
+    },
+    operationId: 'createPublicPayIntent',
+    description: "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Public — the unguessable inspection id is the key; tenant resolved from subdomain.",
 }, { scopes: [], tier: 'extended' }));
 
 // Public live-observer view (③-A.4). Gated by an OBSERVER-link token (distinct
@@ -182,7 +210,7 @@ const verifyRoute = createRoute(withMcpMetadata({
     path: '/verify/{envelopeId}',
     tags: ['public'],
     summary: 'Public e-signature verification (court-friendly)',
-    request: { params: z.object({ envelopeId: z.string() }) },
+    request: { params: z.object({ envelopeId: z.string().describe('Signature envelope identifier to verify') }) },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(VerifyResponseSchema) } }, description: 'Verification result' },
         404: { description: 'Envelope not found' },
@@ -252,6 +280,40 @@ export const publicReportRoutes = createApiRouter()
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
         const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
         return c.json({ success: true as const, data: inv }, 200);
+    })
+    .openapi(payIntentRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+
+        // Bring-your-own-keys: the tenant's Stripe secret + publishable key are
+        // merged into c.env from their encrypted secrets. No keys → graceful 503
+        // (the pay panel shows the "contact your inspector" fallback).
+        const env = c.env as unknown as Record<string, string | undefined>;
+        const secretKey = env.STRIPE_SECRET_KEY;
+        const publishableKey = env.STRIPE_PUBLISHABLE_KEY;
+        if (!secretKey || !publishableKey) {
+            return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'Online payment is not set up for this inspector.' } }, 503);
+        }
+
+        const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
+        if (!inv) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invoice not found' } }, 404);
+
+        try {
+            const { StripeService } = await import('../services/stripe.service');
+            const svc = new StripeService(secretKey);
+            const { clientSecret } = await svc.createPaymentIntent(
+                { id: inv.id, amountCents: inv.amountCents, inspectionId: inv.inspectionId, status: inv.status, paidAt: inv.paidAt },
+                { tenantId, descriptionPrefix: 'Inspection invoice' },
+            );
+            return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: inv.amountCents } }, 200);
+        } catch (err) {
+            if (err instanceof InvoiceNotPayableError) {
+                return c.json({ success: false as const, error: { code: 'INVOICE_NOT_PAYABLE', message: err.message } }, 409);
+            }
+            logger.error('Stripe pay-intent failed', { inspectionId: id.slice(0, 8) }, err instanceof Error ? err : undefined);
+            return c.json({ success: false as const, error: { code: 'STRIPE_ERROR', message: 'Payment could not be started. Please try again.' } }, 503);
+        }
     })
     .openapi(observeRoute, async (c) => {
         const { id } = c.req.valid('param');
