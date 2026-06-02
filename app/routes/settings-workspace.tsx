@@ -16,7 +16,6 @@ interface Branding {
   primaryColor?: string | null;
   logoUrl?: string | null;
   reportTheme?: string | null;
-  gaMeasurementId?: string | null;
   customReferralSources?: string[];
 }
 
@@ -51,7 +50,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (v.siteName !== undefined) body.siteName = v.siteName;
   if (v.primaryColor !== undefined) body.primaryColor = v.primaryColor;
   if (v.reportTheme !== undefined) body.reportTheme = v.reportTheme;
-  if (v.gaMeasurementId !== undefined) body.gaMeasurementId = v.gaMeasurementId;
 
   // Custom referral sources: one label per line
   if (typeof v.customReferralSources === "string") {
@@ -101,7 +99,7 @@ export default function SettingsWorkspacePage() {
         <span className="text-ih-fg-1">Workspace</span>
       </div>
       <h2 className="text-[19px] font-bold text-ih-fg-1">Workspace</h2>
-      <p className="text-[13px] text-ih-fg-3">Branding, report theme, analytics, and referral sources.</p>
+      <p className="text-[13px] text-ih-fg-3">Branding, report theme, and referral sources.</p>
 
       {/* Flash */}
       {actionData && "success" in actionData && actionData.success && (
@@ -181,24 +179,6 @@ export default function SettingsWorkspacePage() {
                 </div>
               </label>
             ))}
-          </div>
-        </section>
-
-        {/* Telemetry */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Telemetry</h3>
-          <p className="text-[12px] text-ih-fg-3">Optional Google Analytics 4 tracking on client-facing pages. Leave blank to disable.</p>
-          <div className="space-y-2 max-w-md">
-            <label htmlFor={fields.gaMeasurementId.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">GA Measurement ID</label>
-            <input type="text" id={fields.gaMeasurementId.id} name={fields.gaMeasurementId.name}
-              defaultValue={branding.gaMeasurementId ?? ""} placeholder="G-XXXXXXXXXX"
-              aria-invalid={fields.gaMeasurementId.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1" />
-            {fields.gaMeasurementId.errors ? (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.gaMeasurementId.errors[0]}</p>
-            ) : (
-              <p className="text-[11px] text-ih-fg-3">Format: <code className="font-mono">G-XXXXXXXXXX</code>.</p>
-            )}
           </div>
         </section>
 

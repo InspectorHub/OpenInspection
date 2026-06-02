@@ -16,7 +16,7 @@ const BASE_ENV: Partial<HonoConfig['Bindings']> = {
     TURNSTILE_SITE_KEY: '', TURNSTILE_SECRET_KEY: '',
     GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '', GEMINI_API_KEY: '',
     RESEND_API_KEY: '', SENDER_EMAIL: '',
-    APP_NAME: '', PRIMARY_COLOR: '', GA_MEASUREMENT_ID: '',
+    APP_NAME: '', PRIMARY_COLOR: '',
 };
 
 describe('di middleware — profile injection', () => {

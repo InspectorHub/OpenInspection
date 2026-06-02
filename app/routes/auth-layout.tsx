@@ -26,26 +26,6 @@ export default function AuthLayout() {
 
   return (
     <>
-      {/* F5 — Google Analytics (auth-scoped, only when gaMeasurementId is set) */}
-      {context?.branding?.gaMeasurementId && (
-        <>
-          <script
-            async
-            src={`https://www.googletagmanager.com/gtag/js?id=${context.branding.gaMeasurementId}`}
-          />
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${context.branding.gaMeasurementId}');
-              `,
-            }}
-          />
-        </>
-      )}
-
       {/* F4 — Suspension banner */}
       {context?.branding?.tenantStatus === "suspended" && (
         <div className="bg-ih-watch-bg border-b border-ih-watch px-4 py-3 flex items-center justify-center gap-3 z-50">

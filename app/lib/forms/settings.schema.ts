@@ -113,10 +113,9 @@ export type ProfileInput = z.infer<typeof profileSchema>;
 
 /**
  * Workspace branding — mirrors the API's `UpdateBrandingSchema`
- * (siteName 1..50, primaryColor #hex, reportTheme enum, gaMeasurementId
- * G-XXXX or empty, customReferralSources is a textarea split per-line in the
- * action so it is NOT validated as an array here). gaMeasurementId accepts an
- * empty string (telemetry disabled).
+ * (siteName 1..50, primaryColor #hex, reportTheme enum, customReferralSources
+ * is a textarea split per-line in the action so it is NOT validated as an
+ * array here).
  */
 const THEMES = ["modern", "classic", "minimal"] as const;
 
@@ -130,13 +129,6 @@ export const workspaceSchema = z.object({
     .regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color")
     .optional(),
   reportTheme: z.enum(THEMES).optional(),
-  gaMeasurementId: z
-    .string()
-    .refine(
-      (v) => v === "" || /^G-[A-Z0-9]+$/.test(v),
-      "Invalid GA Measurement ID (format: G-XXXXXXXXXX)",
-    )
-    .optional(),
   customReferralSources: z.string().optional(),
 });
 
