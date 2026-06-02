@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useFetcher, Link } from "react-router";
+import { useLoaderData, useFetcher, Link, isRouteErrorResponse, useRouteError } from "react-router";
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -138,7 +138,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const id = params.id;
   const api = createApi(context, { token });
   const res = await api.inspections.templates[":id"].$get({ param: { id } });
-  const body = res.ok ? await res.json() : {};
+  // A non-OK response previously fell through to an empty `{}`, which rendered a
+  // section-less editor that looks blank ("the editor never opened"). Surface the
+  // failure to the ErrorBoundary instead so the user gets an actionable message.
+  if (!res.ok) {
+    // res.status is typed to the route's declared success code (200) by the
+    // hono client, but the runtime value is the real HTTP status — read it as
+    // a number to distinguish a permission failure from a missing template.
+    throw new Response("Template not found", { status: (res.status as number) === 403 ? 403 : 404 });
+  }
+  const body = await res.json();
   const raw = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
   const tpl = raw?.template ? (raw.template as Record<string, unknown>) : raw;
   const name = (tpl?.name as string) || "Untitled Template";
@@ -147,25 +156,29 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   if (typeof schema === "string") {
     try { schema = JSON.parse(schema); } catch { schema = { schemaVersion: 2, sections: [] }; }
   }
-  // Normalize name/title
-  if (schema.sections) {
-    schema.sections = schema.sections.map((sec) => {
-      const s = { ...sec };
-      if (!s.title && (s as unknown as Record<string, string>).name) {
-        s.title = (s as unknown as Record<string, string>).name;
-      }
-      if (s.items) {
-        s.items = s.items.map((item) => {
+  // Normalize name/title. Always coerce `items` to an array so the editor's
+  // `section.items.length` / `.map` calls can never crash on a section whose
+  // `items` key is absent (which renders as a blank screen via the root
+  // ErrorBoundary).
+  if (!Array.isArray(schema.sections)) {
+    schema.sections = [];
+  }
+  schema.sections = schema.sections.map((sec) => {
+    const s = { ...sec };
+    if (!s.title && (s as unknown as Record<string, string>).name) {
+      s.title = (s as unknown as Record<string, string>).name;
+    }
+    s.items = Array.isArray(s.items)
+      ? s.items.map((item) => {
           const it = { ...item };
           if (!it.label && (it as unknown as Record<string, string>).name) {
             it.label = (it as unknown as Record<string, string>).name;
           }
           return it;
-        });
-      }
-      return s;
-    });
-  }
+        })
+      : [];
+    return s;
+  });
   return { id, name, version, schema, token };
 }
 
@@ -826,6 +839,35 @@ export default function TemplateEditPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Error boundary                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Local boundary so a failed template fetch (404/403) or an unexpected render
+ * error surfaces an actionable message + a way back to the list, instead of a
+ * blank full-screen editor that looks like "the editor never opened".
+ */
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const status = isRouteErrorResponse(error) ? error.status : null;
+  const message =
+    status === 404
+      ? "This template could not be found. It may have been deleted."
+      : status === 403
+        ? "You do not have permission to edit this template."
+        : "Something went wrong while opening the template editor.";
+
+  return (
+    <div className="flex flex-col items-center justify-center h-screen bg-[#f8fafc] dark:bg-[#0f172a] gap-3 px-6 text-center">
+      <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
+      <Link to="/templates" className="h-8 px-4 inline-flex items-center rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600">
+        Back to Templates
+      </Link>
     </div>
   );
 }

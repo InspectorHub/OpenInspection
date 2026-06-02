@@ -106,4 +106,30 @@ export class MessageService {
         const [insp] = await this.db().select().from(inspections).where(eq(inspections.messageToken, token)).limit(1);
         return insp ?? null;
     }
+
+    /**
+     * Resolves a single message attachment for a conversation, scoped by the
+     * conversation `token` and the attachment `id`. Returns the stored
+     * attachment metadata (R2 `key`, original `name`, MIME `type`) only when
+     * the attachment belongs to a message on the token's inspection — never
+     * exposing arbitrary R2 keys. Returns null when the token is unknown or no
+     * attachment with that id exists on the conversation.
+     */
+    async resolveAttachmentByToken(
+        token: string,
+        attachmentId: string,
+    ): Promise<{ key: string; name: string; type: string; tenantId: string } | null> {
+        if (!attachmentId) return null;
+        const insp = await this.resolveByToken(token);
+        if (!insp) return null;
+        const rows = await this.listForInspection(insp.id, insp.tenantId);
+        for (const row of rows) {
+            for (const att of row.attachments ?? []) {
+                if (att.id === attachmentId) {
+                    return { key: att.key, name: att.name, type: att.type, tenantId: insp.tenantId };
+                }
+            }
+        }
+        return null;
+    }
 }

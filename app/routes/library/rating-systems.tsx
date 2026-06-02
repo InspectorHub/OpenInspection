@@ -80,15 +80,22 @@ export default function RatingSystemsPage() {
     setEditorOpen(true);
   }
   function openEdit(sys: System) {
+    // Guard `levels`: a system row may arrive without a `levels` array (the card
+    // render already defends with `?? []`). Without the same guard here, spreading
+    // `undefined` throws inside the click handler, so the Edit button silently does
+    // nothing — exactly the "unresponsive" symptom.
+    const levels = [...(sys.levels ?? [])]
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((l) => ({
+        id: l.id, abbr: l.abbr, label: l.label, color: l.color, bucket: l.bucket, hotkey: l.hotkey,
+      }));
     setEditing({
       id: sys.id,
       name: sys.name,
       slug: sys.slug,
       description: sys.description ?? "",
       isDefault: sys.isDefault,
-      levels: [...sys.levels].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => ({
-        id: l.id, abbr: l.abbr, label: l.label, color: l.color, bucket: l.bucket, hotkey: l.hotkey,
-      })),
+      levels,
     });
     setEditorOpen(true);
   }

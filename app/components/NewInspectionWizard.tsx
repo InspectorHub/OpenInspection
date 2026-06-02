@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
 
 const STEPS = ["Property", "Services", "Schedule", "Team"] as const;
@@ -9,33 +9,58 @@ const PROPERTY_TYPES = [
   { value: "commercial", label: "Commercial" },
 ] as const;
 
-const SERVICES = [
-  "General Home Inspection",
-  "Radon Testing",
-  "Mold Inspection",
-  "Termite / WDI",
-  "Sewer Scope",
-  "Pool & Spa",
-  "Sprinkler System",
-  "Well & Septic",
-] as const;
+export interface WizardTemplate {
+  id: string;
+  name: string;
+  itemCount?: number;
+}
+
+export interface WizardService {
+  id: string;
+  name: string;
+  price?: number | null;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NewInspectionWizard({
+  open,
+  onClose,
+  templates = [],
+  services: serviceCatalog = [],
+}: {
+  open: boolean;
+  onClose: () => void;
+  templates?: WizardTemplate[];
+  services?: WizardService[];
+}) {
   const fetcher = useFetcher();
-  const templatesFetcher = useFetcher<{ templates?: Array<{ id: string; name: string }> }>();
   const [step, setStep] = useState(0);
   const [propertyType, setPropertyType] = useState("single_family");
   const [address, setAddress] = useState("");
   const [templateId, setTemplateId] = useState("");
+  // Stores selected service IDs (matched against the tenant's services table).
   const [services, setServices] = useState<Set<string>>(new Set());
   const [date, setDate] = useState("");
   const [time, setTime] = useState("09:00");
   const [soloMode, setSoloMode] = useState(true);
   const [inspectorId, setInspectorId] = useState("");
+
+  const hasServiceCatalog = serviceCatalog.length > 0;
+
+  // Typeahead filter for the template picker (B-6).
+  const [templateQuery, setTemplateQuery] = useState("");
+  const filteredTemplates = useMemo(() => {
+    const q = templateQuery.trim().toLowerCase();
+    if (!q) return templates;
+    return templates.filter((t) => t.name.toLowerCase().includes(q));
+  }, [templates, templateQuery]);
+  const selectedTemplate = useMemo(
+    () => templates.find((t) => t.id === templateId),
+    [templates, templateId],
+  );
 
   useEffect(() => {
     if (open) return;
@@ -43,6 +68,7 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
     setPropertyType("single_family");
     setAddress("");
     setTemplateId("");
+    setTemplateQuery("");
     setServices(new Set());
     setDate("");
     setTime("09:00");
@@ -50,35 +76,42 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
     setInspectorId("");
   }, [open]);
 
-  // Load the tenant's templates for the picker the first time the wizard opens.
-  useEffect(() => {
-    if (open && templatesFetcher.state === "idle" && templatesFetcher.data === undefined) {
-      templatesFetcher.load("/templates");
-    }
-  }, [open]);
-
   if (!open) return null;
 
-  const toggleService = (s: string) =>
+  const toggleService = (id: string) =>
     setServices((prev) => {
       const next = new Set(prev);
-      if (next.has(s)) {
-        next.delete(s);
+      if (next.has(id)) {
+        next.delete(id);
       } else {
-        next.add(s);
+        next.add(id);
       }
       return next;
     });
 
   const canNext =
-    step === 0 ? address.length > 0 && templateId.length > 0 :
-    step === 1 ? services.size > 0 :
+    // propertyAddress has a min(5) server constraint — enforce it here so the
+    // wizard cannot advance into an inevitable 400.
+    step === 0 ? address.trim().length >= 5 && templateId.length > 0 :
+    // Services are optional when the tenant has no service catalog configured;
+    // otherwise require at least one so the inspection is meaningful.
+    step === 1 ? (!hasServiceCatalog || services.size > 0) :
     step === 2 ? date.length > 0 :
     true;
 
   function handleSubmit() {
     fetcher.submit(
-      { intent: "create", propertyType, address, templateId, services: [...services].join(","), date, time, soloMode: String(soloMode), inspectorId },
+      {
+        intent: "create",
+        propertyType,
+        address,
+        templateId,
+        serviceIds: [...services].join(","),
+        date,
+        time,
+        soloMode: String(soloMode),
+        inspectorId,
+      },
       { method: "post", action: "/dashboard" },
     );
     onClose();
@@ -124,12 +157,43 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
               </div>
               <div>
                 <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Template</label>
-                <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none">
-                  <option value="">{templatesFetcher.state === "loading" ? "Loading templates…" : "Select a template…"}</option>
-                  {(templatesFetcher.data?.templates ?? []).map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
+                {templates.length === 0 ? (
+                  <p className="text-[12px] text-ih-fg-4 px-1 py-2">
+                    No templates yet — create one under Templates first.
+                  </p>
+                ) : (
+                  <>
+                    {templates.length > 6 && (
+                      <input
+                        value={templateQuery}
+                        onChange={(e) => setTemplateQuery(e.target.value)}
+                        placeholder="Search templates…"
+                        className="w-full h-9 px-3 mb-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
+                      />
+                    )}
+                    <select
+                      value={templateId}
+                      onChange={(e) => setTemplateId(e.target.value)}
+                      className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none"
+                    >
+                      <option value="">Select a template…</option>
+                      {filteredTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                          {typeof t.itemCount === "number" ? ` (${t.itemCount} item${t.itemCount === 1 ? "" : "s"})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {templateQuery && filteredTemplates.length === 0 && (
+                      <p className="text-[11px] text-ih-fg-4 mt-1">No templates match “{templateQuery}”.</p>
+                    )}
+                    {selectedTemplate && (
+                      <p className="text-[11px] text-ih-fg-4 mt-1">
+                        Selected: {selectedTemplate.name}
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -137,13 +201,25 @@ export function NewInspectionWizard({ open, onClose }: { open: boolean; onClose:
           {step === 1 && (
             <div className="space-y-2">
               <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Select Services</label>
-              <div className="grid grid-cols-2 gap-2">
-                {SERVICES.map((s) => (
-                  <button key={s} onClick={() => toggleService(s)}
-                    className={`text-left px-3 py-2 rounded-md text-[12px] font-medium border transition-colors ${services.has(s) ? "border-indigo-600 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400" : "border-ih-border text-ih-fg-3"}`}
-                  >{services.has(s) ? "✓ " : ""}{s}</button>
-                ))}
-              </div>
+              {hasServiceCatalog ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {serviceCatalog.map((s) => (
+                    <button key={s.id} onClick={() => toggleService(s.id)}
+                      className={`text-left px-3 py-2 rounded-md text-[12px] font-medium border transition-colors ${services.has(s.id) ? "border-indigo-600 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400" : "border-ih-border text-ih-fg-3"}`}
+                    >
+                      {services.has(s.id) ? "✓ " : ""}{s.name}
+                      {typeof s.price === "number" && s.price > 0 ? (
+                        <span className="ml-1 text-ih-fg-4">${s.price}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] text-ih-fg-4 px-1 py-2">
+                  No services configured. You can add services under Settings, or continue and the
+                  inspection will be created from the template only.
+                </p>
+              )}
             </div>
           )}
 
