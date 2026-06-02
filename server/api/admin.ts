@@ -618,7 +618,7 @@ const touchCommentRoute = createRoute(withMcpMetadata({
     tags:   ['admin'],
     summary: "Record an inspector's use of a snippet (per-user counter)",
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
-    request: { params: z.object({ id: z.string().min(1) }) },
+    request: { params: z.object({ id: z.string().min(1).describe('Comment library entry identifier') }) },
     responses: {
         200: {
             description: 'Updated usage row',
@@ -1088,7 +1088,7 @@ const inspectorSignRoute = createRoute(withMcpMetadata({
     summary: 'Inspector pre-signs an agreement before sending to client',
     middleware: [requireRole(['owner', 'admin', 'inspector'])],
     request: {
-        params: z.object({ id: z.string() }),
+        params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }),
         body: { content: { 'application/json': { schema: InspectorSignSchema } } },
     },
     responses: {

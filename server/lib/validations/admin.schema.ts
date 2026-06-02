@@ -287,15 +287,15 @@ export const ListCommentsQuerySchema = z.object({
     triggerCode: z.string().max(64).optional().openapi({ example: 'NI' }).describe('Filter by trigger code'),
     search: z.string().max(200).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
     // Comments Library Upgrade — new sort + filter mode + context filters.
-    sort: z.enum(['relevance', 'recent', 'created', 'frequent', 'alpha']).optional().default('relevance'),
-    filterMode: z.enum(['auto', 'all']).optional().default('all'),
-    itemLabel: z.string().max(120).optional(),
+    sort: z.enum(['relevance', 'recent', 'created', 'frequent', 'alpha']).optional().default('relevance').describe('Sort order for results: relevance, recent, created, frequent, or alpha'),
+    filterMode: z.enum(['auto', 'all']).optional().default('all').describe('Filter mode: auto narrows to the inspection context, all shows everything'),
+    itemLabel: z.string().max(120).optional().describe('Inspection item label used to narrow results when filterMode is auto'),
     // List Pagination PR — replace the old single-`limit` knob with shared
     // pagination params. page is 1-indexed; pageSize ∈ {12,25,50,100}, default 50.
-    page: z.coerce.number().int().min(1).default(1),
+    page: z.coerce.number().int().min(1).default(1).describe('1-indexed page number for paginated results'),
     pageSize: z.coerce.number().int()
         .refine((n) => [12, 25, 50, 100].includes(n), { message: 'pageSize must be one of 12, 25, 50, 100' })
-        .default(50),
+        .default(50).describe('Number of results per page (one of 12, 25, 50, 100)'),
 }).openapi('ListCommentsQuery');
 
 export const CommentTouchResponseSchema = z.object({

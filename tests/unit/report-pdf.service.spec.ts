@@ -52,7 +52,10 @@ describe('ReportPdfService', () => {
             reportUrl: 'https://example.com/report/insp-1',
             sourceVersion: 1730000000,
         });
-        expect(rec.r2Key).toBe(`${TENANT_A}/${INSP_1}/full.pdf`);
+        // PHOTOS+REPORTS consolidated into one bucket (commit 1448871):
+        // report PDFs key under a reports/ subpath to avoid colliding with
+        // inspection photos in the shared bucket.
+        expect(rec.r2Key).toBe(`${TENANT_A}/${INSP_1}/reports/full.pdf`);
         expect(rec.status).toBe('ready');
         expect(rec.sizeBytes).toBe(2048);
         expect(mockR2.put).toHaveBeenCalledWith(rec.r2Key, expect.any(ArrayBuffer));
@@ -91,7 +94,7 @@ describe('ReportPdfService', () => {
         const noStore = new ReportPdfService({} as D1Database, mockBrowser, undefined);
         await expect(
             noStore.renderAndStore(INSP_1, TENANT_A, 'full', { reportUrl: 'u', sourceVersion: 1 })
-        ).rejects.toThrow(/REPORTS bucket/);
+        ).rejects.toThrow(/storage bucket binding not configured/);
     });
 
     it('markQueued creates placeholder when no record exists', async () => {
@@ -106,7 +109,7 @@ describe('ReportPdfService', () => {
         const row = await svc.getPdfRecord(INSP_1, TENANT_A, 'full');
         expect(row?.status).toBe('queued');
         // r2Key preserved across requeue (existing PDF still serveable)
-        expect(row?.r2Key).toBe(`${TENANT_A}/${INSP_1}/full.pdf`);
+        expect(row?.r2Key).toBe(`${TENANT_A}/${INSP_1}/reports/full.pdf`);
     });
 
     it('streamPdf returns R2 object body for ready PDF', async () => {

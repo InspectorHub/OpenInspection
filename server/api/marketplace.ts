@@ -27,8 +27,8 @@ export const marketplaceRoutes = createApiRouter()
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
         query: paginationQuerySchema.extend({
-            search:   z.string().optional(),
-            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction', 'standards_aligned']).optional(),
+            search:   z.string().optional().describe('Free-text search over marketplace template names'),
+            category: z.enum(['residential', 'commercial', 'trec', 'condo', 'new_construction', 'standards_aligned']).optional().describe('Filter marketplace templates by inspection category'),
         }),
     },
     responses: {

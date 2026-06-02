@@ -8,12 +8,13 @@ export const DEFAULT_PAGE_SIZE = 50;
  * restricted to a small enum so a query injection can't ask for unbounded rows.
  */
 export const paginationQuerySchema = z.object({
-    page: z.coerce.number().int().min(1).default(1),
+    page: z.coerce.number().int().min(1).default(1).describe('1-indexed page number for paginated results'),
     pageSize: z.coerce.number().int()
         .refine((n) => (PAGE_SIZES as readonly number[]).includes(n), {
             message: `pageSize must be one of ${PAGE_SIZES.join(', ')}`,
         })
-        .default(DEFAULT_PAGE_SIZE),
+        .default(DEFAULT_PAGE_SIZE)
+        .describe(`Number of results per page (one of ${PAGE_SIZES.join(', ')})`),
 });
 
 export const PaginatedMetaSchema = z.object({
