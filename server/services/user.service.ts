@@ -7,6 +7,27 @@ import { Errors } from '../lib/errors';
 const { users, slugReservations } = schema;
 
 /**
+ * Booking #7 Sprint A — reserved route names that customers may never claim as
+ * a `/book/<slug>` or `/inspector/<slug>` handle (they would shadow real app
+ * routes). This is the authoritative source of truth.
+ *
+ * It previously lived ONLY as an `INSERT INTO slug_reservations` seed in the
+ * standalone `0052_inspector_slug.sql` migration. When migrations were squashed
+ * into the drizzle schema-first `0000_baseline.sql`, `db:generate` captured the
+ * table DDL but dropped the seed rows — leaving the blacklist empty in every
+ * fresh deploy, so a customer could register `admin`, `login`, `api`, etc.
+ * Encoding the list in code keeps the guard authoritative regardless of whether
+ * the DB table happens to be seeded; the `slug_reservations` table is still
+ * consulted on top of this so runtime/per-deploy additions keep working.
+ */
+export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
+    'admin', 'api', 'book', 'r', 'report', 'settings', 'login', 'logout',
+    'dashboard', 'library', 'inspections', 'inspection', 'calendar', 'contacts',
+    'invoices', 'messages', 'sign', 'agreement-sign', 'not-found', 'sysadmin',
+    'health', 'embed', 'inspector', 'static', 'public',
+]);
+
+/**
  * Spec 5H D2 — persists the inspector's default signature image (data URI)
  * to users.default_signature_base64. Reused by auto-sign-on-publish (Task 3.4)
  * and pre-fills the SignaturePad in Settings → Profile.
@@ -124,6 +145,10 @@ export class UserService {
      */
     async checkSlug(tenantId: string, slug: string, excludeUserId?: string): Promise<SlugAvailability> {
         const db = this.getDrizzle();
+
+        if (RESERVED_SLUGS.has(slug.trim().toLowerCase())) {
+            return { available: false, reason: 'reserved' };
+        }
 
         const reserved = await db.select().from(slugReservations)
             .where(eq(slugReservations.slug, slug))
