@@ -64,6 +64,13 @@ const confirmRoute = createRoute(withMcpMetadata({
 /*  Public booking flow routes (Tasks 15-17 of dead-routes-cleanup)    */
 /* ------------------------------------------------------------------ */
 
+// Shared error body for the public concierge 400s so the handlers can return a
+// typed { success:false, error } payload without an `as any` cast.
+const ConciergeErrorSchema = z.object({
+    success: z.literal(false),
+    error: z.object({ code: z.string(), message: z.string() }),
+});
+
 const bookInfoRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/book-info',
@@ -75,7 +82,7 @@ const bookInfoRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: BookInfoResponseSchema } },
             description: 'Bootstrap payload — tenant brand, optional inspector, slot stubs, expiry',
         },
-        400: { description: 'Invite token missing, invalid, or expired' },
+        400: { content: { 'application/json': { schema: ConciergeErrorSchema } }, description: 'Invite token missing, invalid, or expired' },
     },
     operationId: 'getConciergeBookInfo',
     description:
@@ -95,7 +102,7 @@ const bookRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: BookResponseSchema } },
             description: 'Booking row created — returns id + confirmation token',
         },
-        400: { description: 'Invite token invalid/expired or form payload rejected' },
+        400: { content: { 'application/json': { schema: ConciergeErrorSchema } }, description: 'Invite token invalid/expired or form payload rejected' },
     },
     operationId: 'createConciergeBooking',
     description:
@@ -113,7 +120,7 @@ const confirmInfoRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: ConfirmInfoResponseSchema } },
             description: 'Booking summary — slot, address, contact, tenant',
         },
-        400: { description: 'Confirmation token missing or unknown' },
+        400: { content: { 'application/json': { schema: ConciergeErrorSchema } }, description: 'Confirmation token missing or unknown' },
     },
     operationId: 'getConciergeConfirmInfo',
     description:
@@ -175,7 +182,7 @@ export const conciergeRoutes = createApiRouter()
             return c.json(
                 { success: false as const, error: { code: 'INVITE_INVALID', message: e instanceof Error ? e.message : 'invalid' } },
                 400,
-            ) as any;
+            );
         }
     })
     .openapi(bookRoute, async (c) => {
@@ -191,7 +198,7 @@ export const conciergeRoutes = createApiRouter()
             return c.json(
                 { success: false as const, error: { code: 'BOOKING_FAILED', message: e instanceof Error ? e.message : 'failed' } },
                 400,
-            ) as any;
+            );
         }
     })
     .openapi(confirmInfoRoute, async (c) => {
@@ -207,7 +214,7 @@ export const conciergeRoutes = createApiRouter()
             return c.json(
                 { success: false as const, error: { code: 'CONFIRMATION_INVALID', message: e instanceof Error ? e.message : 'invalid' } },
                 400,
-            ) as any;
+            );
         }
     });
 

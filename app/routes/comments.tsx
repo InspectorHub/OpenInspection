@@ -22,12 +22,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? ((await res.json()) as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
       : { data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } };
     return {
-      comments: (body.data ?? []) as unknown[],
+      comments: (body.data ?? []) as Array<{ id: string; text: string; ratingBucket?: string; section?: string }>,
       meta: body.meta ?? { total: 0, page: 1, pageSize: 50, totalPages: 1 },
     };
   } catch {
     return {
-      comments: [] as unknown[],
+      comments: [] as Array<{ id: string; text: string; ratingBucket?: string; section?: string }>,
       meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
     };
   }
@@ -74,7 +74,7 @@ export default function CommentsPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {comments.map((c: any) => (
+            {comments.map((c) => (
               <Card key={c.id} className="p-4">
                 <p className="text-[13px] text-ih-fg-3 line-clamp-3">{c.text}</p>
                 <div className="flex items-center gap-2 mt-2">

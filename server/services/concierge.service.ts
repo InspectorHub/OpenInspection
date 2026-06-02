@@ -576,7 +576,7 @@ export async function getBookInfo(db: DrizzleD1Database, token: string): Promise
             name: tenant?.name ?? 'Unknown',
             // Tenant brand column is not yet on the schema; surface null until
             // the brand-on-tenant migration lands.
-            brand: (tenant as any)?.brand ?? null,
+            brand: null,
         },
         inspector: null,
         availableSlots: [],
@@ -616,7 +616,7 @@ export async function createBooking(
         address: input.address,
         notes: input.notes ?? null,
         createdAt: new Date().toISOString(),
-    } as any);
+    });
 
     return { bookingId, confirmationToken };
 }

@@ -114,7 +114,7 @@ export async function importContacts(
                 phone: mapping.phone ? row[mapping.phone]?.trim() || null : null,
                 agency: mapping.agency ? row[mapping.agency]?.trim() || null : null,
                 createdAt: new Date(),
-            } as any);
+            });
             inserted++;
         } catch (e) {
             errors.push({ row: i + 2, message: e instanceof Error ? e.message : 'insert failed' });

@@ -57,7 +57,7 @@ export async function listPendingConflicts(
         )
         .all();
 
-    const conflicts: PendingConflict[] = rows.map((r: any) => ({
+    const conflicts: PendingConflict[] = rows.map((r) => ({
         id:        r.id,
         itemId:    r.itemId,
         sectionId: r.sectionId ?? null,
@@ -103,7 +103,7 @@ export async function resolveConflicts(
         for (const row of rows) {
             await db
                 .delete(inspectionConflicts)
-                .where(eq(inspectionConflicts.id, (row as any).id));
+                .where(eq(inspectionConflicts.id, row.id));
             resolved++;
         }
     }

@@ -46,10 +46,10 @@ export async function softDeleteAccount(
 ): Promise<AccountDeleteResult> {
     const identity = await db.select().from(users).where(eq(users.id, userId)).get();
     if (!identity) throw new Error('Identity not found');
-    if ((identity as any).email !== confirmEmail) {
+    if (identity.email !== confirmEmail) {
         throw new Error('confirmEmail does not match identity email');
     }
     const deletedAt = new Date();
-    await db.update(users).set({ deletedAt } as any).where(eq(users.id, userId));
+    await db.update(users).set({ deletedAt }).where(eq(users.id, userId));
     return { deletedAt: deletedAt.toISOString(), identityId: userId };
 }

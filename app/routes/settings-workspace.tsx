@@ -64,7 +64,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
   // cast through unknown to satisfy the strict hono/client intersection type. (C-10)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res = await api.adminBranding.branding.$post({ json: body } as unknown as Parameters<typeof api.adminBranding.branding.$post>[0]);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

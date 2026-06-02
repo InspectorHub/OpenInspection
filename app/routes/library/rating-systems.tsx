@@ -14,7 +14,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const res = await api.ratingSystems.index.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { systems: (body.data ?? []) as unknown[] };
+    return { systems: (body.data ?? []) as Array<{ id: string; name: string; description?: string; ratings?: Array<{ color?: string; label?: string; name?: string }> }> };
   } catch {
     return { systems: [] };
   }
@@ -43,7 +43,7 @@ export default function RatingSystemsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {systems.map((sys: any) => (
+          {systems.map((sys) => (
             <Card key={sys.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -58,7 +58,7 @@ export default function RatingSystemsPage() {
               </div>
               {sys.ratings && Array.isArray(sys.ratings) && (
                 <div className="flex items-center gap-1.5 mt-3">
-                  {sys.ratings.map((r: any, idx: number) => (
+                  {sys.ratings.map((r, idx: number) => (
                     <span
                       key={idx}
                       className="inline-flex items-center h-6 px-2 rounded text-[11px] font-bold"

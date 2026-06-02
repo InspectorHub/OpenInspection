@@ -3,6 +3,18 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking";
 import { createApi } from "~/lib/api-client.server";
 
+declare global {
+  interface Window {
+    onTurnstileLoad?: () => void;
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        opts: { sitekey: string; callback: (token: string) => void },
+      ) => void;
+    };
+  }
+}
+
 export function meta() {
   return [{ title: "Book an Inspection - OpenInspection" }];
 }
@@ -85,16 +97,16 @@ export default function BookingPage() {
       s.async = true;
       document.head.appendChild(s);
     }
-    (window as any).onTurnstileLoad = () => {
-      if (turnstileRef.current && (window as any).turnstile) {
-        (window as any).turnstile.render(turnstileRef.current, {
+    window.onTurnstileLoad = () => {
+      if (turnstileRef.current && window.turnstile) {
+        window.turnstile.render(turnstileRef.current, {
           sitekey: siteKey,
           callback: (token: string) => setTurnstileToken(token),
         });
       }
     };
-    if ((window as any).turnstile && turnstileRef.current) {
-      (window as any).turnstile.render(turnstileRef.current, {
+    if (window.turnstile && turnstileRef.current) {
+      window.turnstile.render(turnstileRef.current, {
         sitekey: siteKey,
         callback: (token: string) => setTurnstileToken(token),
       });
@@ -147,7 +159,7 @@ export default function BookingPage() {
         setStep(3);
       } else {
         const d = await res.json().catch(() => ({}));
-        setMessage({ text: (d as any)?.error?.message || "Something went wrong. Please try again.", ok: false });
+        setMessage({ text: (d as { error?: { message?: string } })?.error?.message || "Something went wrong. Please try again.", ok: false });
       }
     } catch {
       setMessage({ text: "Network error. Please check your connection.", ok: false });

@@ -123,7 +123,7 @@ export default function AgreementSignPage() {
  setSigned(true);
  } else {
  const d = await res.json().catch(() => ({}));
- setErrorMsg((d as any)?.error?.message || "Signing failed. Please try again.");
+ setErrorMsg((d as { error?: { message?: string } })?.error?.message || "Signing failed. Please try again.");
  }
  } catch {
  setErrorMsg("Network error. Please try again.");
@@ -145,7 +145,7 @@ export default function AgreementSignPage() {
  setDeclined(true);
  } else {
  const d = await res.json().catch(() => ({}));
- setErrorMsg((d as any)?.error?.message || "Failed to decline. Please try again.");
+ setErrorMsg((d as { error?: { message?: string } })?.error?.message || "Failed to decline. Please try again.");
  }
  } catch {
  setErrorMsg("Network error. Please try again.");
