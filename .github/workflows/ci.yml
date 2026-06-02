@@ -1,0 +1,57 @@
+name: CI
+
+# Quality gate for pull requests. Every check below must pass before a PR is
+# merged — wire this up as a required status check in branch protection
+# (Settings → Branches → Require status checks → "verify").
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        # Full history so scripts/gen-version.js can read the commit/branch.
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (react-router typegen + tsc app + api)
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Migration drift gate (schema vs migrations)
+        run: npm run db:check
+
+      - name: API unit tests
+        run: npm run test:unit
+
+      - name: Web unit tests
+        run: npm run test:web
+
+      - name: Build (bundle the Worker)
+        run: npm run build
