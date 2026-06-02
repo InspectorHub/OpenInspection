@@ -38,6 +38,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # server/generated/version.ts is git-ignored and produced by the build;
+      # type-check imports it, so stamp it before type-check on a fresh checkout.
+      - name: Generate version stamp
+        run: npm run gen-version
+
       - name: Type-check (react-router typegen + tsc app + api)
         run: npm run type-check
 
