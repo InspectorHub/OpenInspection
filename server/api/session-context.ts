@@ -76,7 +76,6 @@ export const sessionContextRoutes = createApiRouter()
                     siteName: branding?.siteName || 'OpenInspection',
                     primaryColor: branding?.primaryColor || '#6366f1',
                     logoUrl: branding?.logoUrl || null,
-                    gaMeasurementId: branding?.gaMeasurementId || null,
                     reportTheme: branding?.reportTheme || 'modern',
                     isSaas: branding?.isSaas || false,
                     portalBaseUrl: branding?.portalBaseUrl || null,

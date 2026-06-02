@@ -10,7 +10,6 @@ export interface SessionContext {
     siteName: string;
     primaryColor: string;
     logoUrl: string | null;
-    gaMeasurementId: string | null;
     reportTheme: string;
     isSaas: boolean;
     portalBaseUrl: string | null;

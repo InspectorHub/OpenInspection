@@ -115,8 +115,7 @@ export const adminBrandingRoutes = createApiRouter()
             primaryColor: branding.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
             supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: branding.logoUrl || null,
-            billingUrl: branding.billingUrl || null,
-            gaMeasurementId: branding.gaMeasurementId || null
+            billingUrl: branding.billingUrl || null
         };
 
         return c.json({ success: true, data: { branding: formattedBranding } }, 200);
@@ -132,8 +131,7 @@ export const adminBrandingRoutes = createApiRouter()
             primaryColor: result.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
             supportEmail: result.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: result.logoUrl || null,
-            billingUrl: result.billingUrl || null,
-            gaMeasurementId: result.gaMeasurementId || null
+            billingUrl: result.billingUrl || null
         };
 
         return c.json({ success: true, data: { branding: formattedResult } }, 200);

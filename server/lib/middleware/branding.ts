@@ -29,7 +29,6 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         logoUrl: null,
         supportEmail: c.env.SENDER_EMAIL || 'support@openinspection.org',
         billingUrl: '/settings',
-        gaMeasurementId: c.env.GA_MEASUREMENT_ID || null,
         isSaas,
         portalBaseUrl,
         tenantStatus,
@@ -61,7 +60,6 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             logoUrl: tenantConfigs.logoUrl,
             supportEmail: tenantConfigs.supportEmail,
             billingUrl: tenantConfigs.billingUrl,
-            gaMeasurementId: tenantConfigs.gaMeasurementId,
             reportTheme: tenantConfigs.reportTheme
         })
         .from(tenantConfigs)
@@ -74,7 +72,6 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             logoUrl: config.logoUrl,
             supportEmail: config.supportEmail || defaultBranding.supportEmail,
             billingUrl: config.billingUrl || defaultBranding.billingUrl,
-            gaMeasurementId: config.gaMeasurementId || defaultBranding.gaMeasurementId,
             reportTheme: (config.reportTheme || 'modern') as 'modern' | 'classic' | 'minimal',
             // Deployment flags re-applied — these are intentionally NOT cached
             // because they depend on env (APP_MODE/PORTAL_API_URL)
@@ -97,7 +94,6 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
                     supportEmail: branding.supportEmail,
                     billingUrl:   branding.billingUrl,
                 };
-                if (branding.gaMeasurementId !== undefined) cacheable.gaMeasurementId = branding.gaMeasurementId;
                 if (branding.reportTheme !== undefined)     cacheable.reportTheme     = branding.reportTheme;
                 c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(cacheable), { expirationTtl: 3600 }));
             } catch {

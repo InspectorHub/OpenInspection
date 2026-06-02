@@ -23,7 +23,6 @@ export interface BrandingConfig {
     logoUrl: string | null;
     supportEmail: string;
     billingUrl: string;
-    gaMeasurementId?: string | null | undefined;
     reportTheme?: 'modern' | 'classic' | 'minimal' | undefined;
     /** Sprint B-1 — signed-in user's booking slug. Plumbed via the
      *  inspectorPaletteMiddleware so MainLayout can pass it to

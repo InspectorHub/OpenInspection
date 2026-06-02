@@ -163,7 +163,6 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     senderEmail: text('sender_email'),
     replyTo: text('reply_to'),
     billingUrl: text('billing_url'),
-    gaMeasurementId: text('ga_measurement_id'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
     secrets: text('secrets'),                      // AES-GCM encrypted JSON: {resendApiKey, turnstileSecretKey, geminiApiKey, googleClientSecret}
     // Secret UI化 (migration 0079) — AES-256-GCM encrypted JSON holding all
