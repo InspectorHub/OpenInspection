@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking";
 import { createApi } from "~/lib/api-client.server";
@@ -58,7 +58,7 @@ const TIME_WINDOWS = [
 ] as const;
 
 export default function BookingPage() {
-  const { profile, error, tenant, slug, agentRefSlug } = useLoaderData<typeof loader>();
+  const { profile, error, agentRefSlug } = useLoaderData<typeof loader>();
   const [step, setStep] = useState(0);
 
   // Form state
@@ -104,7 +104,7 @@ export default function BookingPage() {
   const toggleService = (id: string) =>
     setSelectedServices((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/form-renderer";
 import { requireToken } from "~/lib/session.server";
@@ -411,7 +411,7 @@ export default function FormRendererPage() {
  function toggleSection(id: string) {
  setOpenSections((prev) => {
  const next = new Set(prev);
- next.has(id) ? next.delete(id) : next.add(id);
+ if (next.has(id)) next.delete(id); else next.add(id);
  return next;
  });
  }
@@ -564,7 +564,7 @@ export default function FormRendererPage() {
 
  {/* Sections */}
  <div className="space-y-6">
- {sections.map((section, secIdx) => (
+ {sections.map((section) => (
  <fieldset
  key={section.id}
  className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden"

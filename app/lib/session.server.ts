@@ -12,7 +12,7 @@ function getSessionSecret(context?: AppLoadContext): string {
     if (typeof process !== "undefined" && process?.env?.SESSION_SECRET) {
       return process.env.SESSION_SECRET;
     }
-  } catch {}
+  } catch { /* env not available in this runtime */ }
   return DEV_SECRET;
 }
 

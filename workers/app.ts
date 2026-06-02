@@ -34,7 +34,6 @@ const requestHandler = createRequestHandler(
 const ssr = (c: any) => {
   const env = {
     ...c.env,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     API_WORKER: { fetch: (req: Request) => apiApp.fetch(req, c.env, c.executionCtx) },
   };
   return requestHandler(c.req.raw, { cloudflare: { env, ctx: c.executionCtx } });

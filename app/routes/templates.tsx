@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useLoaderData, useFetcher, useNavigate, Link } from "react-router";
 import type { Route } from "./+types/templates";
 import { requireToken } from "~/lib/session.server";
@@ -121,7 +121,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const payload = (formData.get("payload") as string)?.trim();
     if (!name || !payload) return { error: "Name and JSON are required" };
     let parsed: unknown;
-    try { parsed = JSON.parse(payload); } catch (e) { return { error: "Invalid JSON" }; }
+    try { parsed = JSON.parse(payload); } catch { return { error: "Invalid JSON" }; }
     const res = await api.inspections.templates["import-spectora"].$post({
       json: { name, spectora: parsed as Record<string, unknown> },
     });

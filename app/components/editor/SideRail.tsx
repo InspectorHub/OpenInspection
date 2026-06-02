@@ -18,7 +18,7 @@ const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "library", label: "Library", icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" },
 ];
 
-export function SideRail({ activeItem, activeResult, ratingLevels, getRatingColor, getRatingLabel, inspectionId }: SideRailProps) {
+export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId }: SideRailProps) {
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(false);
 

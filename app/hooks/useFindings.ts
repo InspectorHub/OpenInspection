@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { useFetcher } from "react-router";
-import type { ResultMap, SchemaItem, RatingLevel } from "./useInspection";
+import type { ResultMap } from "./useInspection";
 import { fKey } from "./useInspection";
 
 const DEFAULT_UNIT = "_default";
@@ -76,7 +76,7 @@ export function useFindings(
   },
 ) {
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
-  const { sectionIdForItem, setDirty, setSaveStatus, inspectionId } = options;
+  const { sectionIdForItem, setDirty, setSaveStatus } = options;
 
   /* ---------------------------------------------------------------- */
   /*  Read helpers                                                     */

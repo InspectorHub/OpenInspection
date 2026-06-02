@@ -48,7 +48,7 @@ export function useTheme() {
       } else {
         localStorage.setItem("oi-color-scheme", next);
       }
-    } catch {}
+    } catch { /* ignore persistence errors */ }
     applyScheme(next);
   }, []);
 
