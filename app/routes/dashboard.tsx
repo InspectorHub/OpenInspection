@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useLoaderData, Link, useFetcher, useSearchParams } from "react-router";
+import { useLoaderData, Link, useFetcher, useSearchParams, redirect } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { buildCreateInspectionJson } from "~/lib/inspection-create";
 import { NewInspectionWizard } from "~/components/NewInspectionWizard";
 import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
@@ -235,6 +236,20 @@ export async function action({ request, context }: Route.ActionArgs) {
   const intent = formData.get("intent");
 
   const api = createApi(context, { token });
+  if (intent === "create") {
+    // The New Inspection wizard posts here with intent:"create". Map its
+    // fields to the create endpoint and bounce into the new inspection's
+    // editor on success (which also refreshes the dashboard list — B-8).
+    const res = await api.inspections.index.$post({
+      json: buildCreateInspectionJson(formData),
+    });
+    if (res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { data?: { inspection?: { id?: string } } };
+      const id = body?.data?.inspection?.id;
+      if (id) return redirect(`/inspections/${id}/edit`);
+    }
+    return { ok: false, intent: "create" };
+  }
   if (intent === "delete") {
     const id = formData.get("id") as string;
     const res = await api.inspections[":id"].$delete({ param: { id } });
