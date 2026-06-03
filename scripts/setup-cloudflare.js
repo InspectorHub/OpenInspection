@@ -26,11 +26,12 @@ const PROJECT_TITLE = getArg('--app-name') || getArg('--title') || 'OpenInspecti
 // Dynamic Resource Naming
 const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
 const KV_NAME = getArg('--kv-name') || `${PROJECT_SLUG}-tenant-cache`;
-const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-reports`];
+// Single R2 bucket — PHOTOS holds photos + report/cert PDFs + e-sign evidence
+// (there is no separate REPORTS bucket; wrangler.jsonc binds only PHOTOS).
+const BUCKETS = [`${PROJECT_SLUG}-photos`];
 const WORKER_NAME = PROJECT_SLUG;
 
 const isForce = args.includes('--force') || args.includes('-y') || args.includes('--yes');
-const isRefreshCode = args.includes('--refresh-setup-code');
 const isLocal = args.includes('--local');
 
 // Metadata for automated resource provisioning
@@ -91,7 +92,10 @@ function run(cmd, options = {}) {
                 process.stdout.write(result.stdout || '');
                 process.stderr.write(result.stderr || '');
             }
-            return output;
+            // stdoutOnly: return clean stdout for `--json` calls. wrangler prints
+            // config warnings ("unsafe fields …") to stderr; merging them in
+            // would corrupt the JSON for any parser.
+            return options.stdoutOnly ? (result.stdout || '') : output;
         }
 
         // Specifically check for Cloudflare timeout / network errors
@@ -113,40 +117,40 @@ function run(cmd, options = {}) {
 }
 
 function extractJson(output) {
-    const firstBrace = output.indexOf('{');
-    const firstBracket = output.indexOf('[');
-    let start = -1;
-    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) start = firstBrace;
-    else start = firstBracket;
-
-    const lastBrace = output.lastIndexOf('}');
-    const lastBracket = output.lastIndexOf(']');
-    let end = -1;
-    if (lastBrace !== -1 && (lastBracket === -1 || lastBrace > lastBracket)) end = lastBrace;
-    else end = lastBracket;
-
-    if (start === -1 || end === -1 || end < start) return null;
-    
-    try {
-        return JSON.parse(output.substring(start, end + 1));
-    } catch (e) {
-        return null;
+    if (!output) return null;
+    // `run()` merges stderr into the output and wrangler prepends ANSI-colored
+    // banners (e.g. "▲ [WARNING] ... unsafe fields") whose literal "[WARNING]"
+    // and color codes contain '[' — a naive indexOf('[') grabs that, not the
+    // JSON array. Strip ANSI, then scan each '[' / '{' as a candidate start and
+    // return the first substring that actually parses.
+    const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
+    for (let i = 0; i < clean.length; i++) {
+        const ch = clean[i];
+        if (ch !== '[' && ch !== '{') continue;
+        const close = ch === '[' ? clean.lastIndexOf(']') : clean.lastIndexOf('}');
+        if (close <= i) continue;
+        try {
+            return JSON.parse(clean.slice(i, close + 1));
+        } catch (e) { /* try the next candidate start */ }
     }
+    return null;
 }
 
 function getCloudflareState() {
     if (isLocal) return { d1: [], kv: [], r2: [] };
     const state = { d1: [], kv: [], r2: [] };
     try {
-        const d1Output = run('npx wrangler d1 list --json', { silent: true, ignoreError: true });
-        state.d1 = extractJson(d1Output) || [];
+        const d1Output = run('npx wrangler d1 list --json', { silent: true, ignoreError: true, stdoutOnly: true });
+        const d1 = extractJson(d1Output);
+        state.d1 = Array.isArray(d1) ? d1 : [];
     } catch (e) {}
     try {
-        const kvOutput = run('npx wrangler kv namespace list', { silent: true, ignoreError: true });
-        state.kv = extractJson(kvOutput) || [];
+        const kvOutput = run('npx wrangler kv namespace list', { silent: true, ignoreError: true, stdoutOnly: true });
+        const kv = extractJson(kvOutput);
+        state.kv = Array.isArray(kv) ? kv : [];
     } catch (e) {}
     try {
-        const r2Output = run('npx wrangler r2 bucket list', { silent: true, ignoreError: true });
+        const r2Output = run('npx wrangler r2 bucket list', { silent: true, ignoreError: true, stdoutOnly: true });
         const lines = r2Output.split('\n');
         state.r2 = lines.filter(l => l.startsWith('name:')).map(l => l.replace('name:', '').trim());
     } catch (e) {}
@@ -186,20 +190,6 @@ console.log("╚═════════════════════�
 
 ensureTomlExists();
 
-if (isRefreshCode) {
-    step("Refreshing Setup Verification Code...");
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const refreshCmd = isLocal
-        ? `npx wrangler kv key put --binding=TENANT_CACHE "setup_verification_code" "${verificationCode}" --local`
-        : `npx wrangler kv key put --binding=TENANT_CACHE "setup_verification_code" "${verificationCode}" --ttl 86400 --remote -c ${TOML_PATH}`;
-    run(refreshCmd);
-    info(`New verification code generated and stored in ${isLocal ? 'local ' : ''}KV${isLocal ? '' : ' (expires in 24h)'}`);
-    console.log("\n╔══════════════════════════════════════════════════════╗");
-    console.log(`║  🔑 New Verification Code: ${verificationCode}               ║`);
-    console.log("╚══════════════════════════════════════════════════════╝\n");
-    process.exit(0);
-}
-
 // =============================================================================
 // LOCAL MODE — Skip all remote Cloudflare resource creation
 // =============================================================================
@@ -221,17 +211,27 @@ if (isLocal) {
     } else {
         vars = `JWT_SECRET=${jwtSecret}\n` + vars;
     }
+
+    // Ensure a usable SETUP_CODE in .dev.vars — the local /setup gate reads it
+    // from c.env.SETUP_CODE. Replace the placeholder (or add one if missing);
+    // leave a real operator-chosen value untouched.
+    const setupMatch = vars.match(/^SETUP_CODE=(.*)$/m);
+    let setupCode;
+    if (!setupMatch || setupMatch[1].trim() === '' || setupMatch[1].trim() === 'change-me-6-chars-min') {
+        setupCode = crypto.randomBytes(4).toString('hex');
+        vars = setupMatch
+            ? vars.replace(/^SETUP_CODE=.*$/m, `SETUP_CODE=${setupCode}`)
+            : `SETUP_CODE=${setupCode}\n` + vars;
+    } else {
+        setupCode = setupMatch[1].trim();
+    }
+
     fs.writeFileSync(varsPath, vars.trim() + '\n');
-    info(`.dev.vars ${fs.existsSync(varsPath) ? 'updated' : 'created'} with JWT_SECRET`);
+    info('.dev.vars written with JWT_SECRET + SETUP_CODE');
 
     step("Step 2: Applying local database migrations...");
     run('npx wrangler d1 migrations apply DB --local');
     info("Migrations applied locally");
-
-    step("Step 3: Generating setup verification code (local KV)...");
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    run(`npx wrangler kv key put --binding=TENANT_CACHE "setup_verification_code" "${verificationCode}" --local`);
-    info("Verification code stored in local KV");
 
     if (isAutoSeed) {
         seedDatabase();
@@ -239,10 +239,11 @@ if (isLocal) {
 
     console.log("\n╔══════════════════════════════════════════════════════╗");
     console.log("║  ✓ Local Setup Ready                                 ║");
-    console.log(`║  🔑 Verification Code: ${verificationCode}                   ║`);
+    console.log(`║  🔑 Setup code: ${setupCode.padEnd(38)}║`);
     console.log("╚══════════════════════════════════════════════════════╝");
     console.log("\n  Next steps:");
     console.log("    1. npm run dev");
+    console.log("    2. Open /setup and enter the setup code above");
     process.exit(0);
 }
 
@@ -284,18 +285,20 @@ info(`Account ID: ${accountId}`);
 // 3. Create D1 Database
 step(`Step 2: Preparing D1 database: ${DB_NAME}`);
 let d1Id;
+let d1Output = '';
 
 if (conflictD1) {
     info(`Using existing D1 database found in Step 0: ${conflictD1.uuid}`);
     d1Id = conflictD1.uuid;
 } else {
-    const d1Output = run(`npx wrangler d1 create ${DB_NAME}`, { ignoreError: true, silent: true });
-    
-    try {
-        const d1ListResult = run('npx wrangler d1 list --json', { silent: true, ignoreError: true });
-        d1Id = JSON.parse(d1ListResult).find(db => db.name === DB_NAME)?.uuid;
-    } catch (e) {}
-    
+    d1Output = run(`npx wrangler d1 create ${DB_NAME}`, { ignoreError: true, silent: true });
+
+    // Use extractJson (not raw JSON.parse) — `run()` merges stderr into the
+    // output and wrangler prepends a warning (e.g. the "unsafe fields" notice),
+    // which would break a bare JSON.parse.
+    const d1List = extractJson(run('npx wrangler d1 list --json', { silent: true, ignoreError: true, stdoutOnly: true }));
+    if (Array.isArray(d1List)) d1Id = d1List.find(db => db.name === DB_NAME)?.uuid;
+
     if (!d1Id) {
         d1Id = d1Output.match(/database_id\s*=\s*"([^"]*)"/)?.[1] || d1Output.match(/"uuid":\s*"([^"]*)"/)?.[1];
     }
@@ -323,12 +326,11 @@ if (conflictKV) {
     kvId = conflictKV.id;
 } else {
     const kvOutput = run(`npx wrangler kv namespace create ${KV_NAME}`, { ignoreError: true, silent: true });
-    
-    try {
-        const kvListOutput = run('npx wrangler kv namespace list', { silent: true, ignoreError: true });
-        kvId = JSON.parse(kvListOutput).find(ns => ns.title === KV_NAME)?.id;
-    } catch (e) {}
-    
+
+    // extractJson (not raw JSON.parse) — see the D1 note above.
+    const kvList = extractJson(run('npx wrangler kv namespace list', { silent: true, ignoreError: true, stdoutOnly: true }));
+    if (Array.isArray(kvList)) kvId = kvList.find(ns => ns.title === KV_NAME)?.id;
+
     if (!kvId) {
         kvId = kvOutput.match(/id\s*=\s*"([^"]*)"/)?.[1] || kvOutput.match(/"id":\s*"([^"]*)"/)?.[1];
     }
@@ -379,20 +381,17 @@ if (PROJECT_TITLE !== 'OpenInspection' && fs.existsSync(TOML_PATH)) {
     info("APP_NAME updated in wrangler.local.jsonc");
 }
 
-// 8. Generate Setup Verification Code
-step("Step 8: Generating Setup Verification Code...");
-const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-const kvNamespaceId = kvId; // We already have it from Step 3
-const kvPutOutput = run(`npx wrangler kv key put "setup_verification_code" "${verificationCode}" --namespace-id "${kvNamespaceId}" --ttl 86400 --remote`, { silent: true, ignoreError: true });
-if (kvPutOutput.includes('error') || kvPutOutput.includes('ERROR')) {
-    die(`Failed to store verification code in KV: ${kvPutOutput}`);
-}
-info("Verification code generated and stored in KV (expires in 24h)");
-
-// 9. Build and Deploy
-step("Step 9: Building CSS and deploying Worker...");
-run('npm run css:build', { silent: true });
-const deployOutput = run(`npx wrangler deploy -c ${TOML_PATH}`, { ignoreError: true });
+// 8. Build & Deploy via the canonical `npm run deploy` (react-router build →
+// wrangler deploy build/server/wrangler.json → jwt:ensure → setup-code:ensure).
+// The single-worker build needs the react-router bundle (virtual:react-router/
+// server-build), so a direct `wrangler deploy` cannot ship it. `npm run deploy`
+// resolves the wrangler config from WRANGLER_CONFIG — point it at the one we
+// just wrote — and its final setup-code:ensure step prints the first-run code.
+step("Step 8: Building and deploying Worker (npm run deploy)...");
+const deployOutput = run('npm run deploy', {
+    env: { ...process.env, CI: 'true', NON_INTERACTIVE: 'true', WRANGLER_SEND_METRICS: 'false', WRANGLER_CONFIG: TOML_PATH },
+    ignoreError: true,
+});
 
 // 10. Automated Database Seeding (Optional)
 if (isAutoSeed) {
@@ -412,12 +411,12 @@ if (verifiedD1 && verifiedKV && verifiedR2.length === BUCKETS.length) {
 
     console.log("\n╔══════════════════════════════════════════════════════╗");
     console.log("║  ✓ Setup Success: All resources verified.            ║");
-    console.log(`║  🔑 Verification Code: ${verificationCode}                   ║`);
     if (isAutoSeed) {
         console.log("║  ℹ Zero-Config enabled: Initial records created.     ║");
     }
     console.log("╚══════════════════════════════════════════════════════╝");
     console.log(`\n  Worker URL: ${workerUrl}`);
+    console.log("  Setup code: printed by the deploy step above — enter it at /setup.");
 } else {
     warn("Some resources could not be verified post-setup.");
 }
