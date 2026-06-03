@@ -29,7 +29,7 @@ test.beforeAll(async ({ request }) => {
   const res = await request.post(`${BASE}/setup`, {
     data: {
       companyName: 'Test Workspace',
-      subdomain: 'dev',
+      slug: 'dev',
       email: 'admin@example.com',
       password: 'testpassword123',
     },
@@ -385,7 +385,7 @@ test('GET /setup renders HTML (form or redirect to dashboard)', async ({ request
 
 test('POST /setup rejects missing fields', async ({ request }) => {
   const res = await request.post(`${BASE}/setup`, {
-    data: { companyName: 'Acme', subdomain: 'acme' }, // missing email + password
+    data: { companyName: 'Acme', slug: 'acme' }, // missing email + password
     headers: { 'Content-Type': 'application/json' },
   });
   expect(res.status()).toBe(400);
@@ -393,11 +393,11 @@ test('POST /setup rejects missing fields', async ({ request }) => {
   expect(body).toHaveProperty('error');
 });
 
-test('POST /setup rejects invalid subdomain characters', async ({ request }) => {
+test('POST /setup rejects invalid slug characters', async ({ request }) => {
   const res = await request.post(`${BASE}/setup`, {
     data: {
       companyName: 'Acme',
-      subdomain: 'INVALID SPACES!',
+      slug: 'INVALID SPACES!',
       email: 'admin@example.com',
       password: 'password123',
     },
@@ -405,7 +405,7 @@ test('POST /setup rejects invalid subdomain characters', async ({ request }) => 
   });
   expect(res.status()).toBe(400);
   const body = await res.json();
-  expect(body.error).toContain('Subdomain');
+  expect(body.error).toContain('Slug');
 });
 
 test('POST /setup returns 409 when setup is already complete', async ({ request }) => {
@@ -413,7 +413,7 @@ test('POST /setup returns 409 when setup is already complete', async ({ request 
   const res = await request.post(`${BASE}/setup`, {
     data: {
       companyName: 'Acme',
-      subdomain: 'acme',
+      slug: 'acme',
       email: 'admin2@example.com',
       password: 'password123',
     },
@@ -1026,7 +1026,7 @@ test('POST /api/admin/silo rejects missing tenantId with correct secret', async 
 
 test('POST /api/admin/connect rejects request with no Authorization header', async ({ request }) => {
   const res = await request.post(`${BASE}/api/admin/connect`, {
-    data: { subdomain: 'test', stripeConnectAccountId: 'acct_123' },
+    data: { slug: 'test', stripeConnectAccountId: 'acct_123' },
     headers: { 'Content-Type': 'application/json' },
   });
   expect(res.status()).toBe(401);
@@ -1034,7 +1034,7 @@ test('POST /api/admin/connect rejects request with no Authorization header', asy
 
 test('POST /api/admin/connect rejects request with wrong secret', async ({ request }) => {
   const res = await request.post(`${BASE}/api/admin/connect`, {
-    data: { subdomain: 'test', stripeConnectAccountId: 'acct_123' },
+    data: { slug: 'test', stripeConnectAccountId: 'acct_123' },
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer wrong-secret' },
   });
   expect(res.status()).toBe(401);
@@ -1042,7 +1042,7 @@ test('POST /api/admin/connect rejects request with wrong secret', async ({ reque
 
 test('POST /api/admin/connect rejects missing fields with correct secret', async ({ request }) => {
   const res = await request.post(`${BASE}/api/admin/connect`, {
-    data: { subdomain: 'test' }, // missing stripeConnectAccountId
+    data: { slug: 'test' }, // missing stripeConnectAccountId
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
   });
   expect(res.status()).toBe(400);
@@ -1563,7 +1563,7 @@ test.describe('agent referral booking end-to-end', () => {
     if (!agentUserId) return;
 
     // Create an inspection with referredByAgentId via the authenticated API so both
-    // use the same real tenantId (the public /book API uses 'dev' subdomain as tenantId
+    // use the same real tenantId (the public /book API uses 'dev' slug as tenantId
     // in local dev, which would mismatch the JWT-scoped tenantId in my-reports).
     const tmplRes = await request.get(`${BASE}/api/inspections/templates`, {
       headers: { Authorization: `Bearer ${setupToken}` },
@@ -1627,7 +1627,7 @@ test.describe('agent referral booking end-to-end', () => {
 
   test('POST /api/public/book with agentId param is accepted (dev tenant skips Turnstile)', async ({ request }) => {
     // Verifies the agentId field is accepted without error in the public booking payload.
-    // Note: in dev mode tenantId is the subdomain string 'dev'; agent lookups use the
+    // Note: in dev mode tenantId is the slug string 'dev'; agent lookups use the
     // real UUID from JWT, so cross-checking ownership requires authenticated endpoint (above).
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1659,7 +1659,7 @@ test.describe('agent referral booking end-to-end', () => {
 
 test('POST /api/admin/tenant-status rejects missing Authorization', async ({ request }) => {
   const res = await request.post(`${BASE}/api/admin/tenant-status`, {
-    data: { subdomain: 'dev', status: 'active' },
+    data: { slug: 'dev', status: 'active' },
     headers: { 'Content-Type': 'application/json' },
   });
   expect(res.status()).toBe(401);
@@ -1667,13 +1667,13 @@ test('POST /api/admin/tenant-status rejects missing Authorization', async ({ req
 
 test('POST /api/admin/tenant-status rejects wrong secret', async ({ request }) => {
   const res = await request.post(`${BASE}/api/admin/tenant-status`, {
-    data: { subdomain: 'dev', status: 'active' },
+    data: { slug: 'dev', status: 'active' },
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer wrong-secret' },
   });
   expect(res.status()).toBe(401);
 });
 
-test('POST /api/admin/tenant-status rejects missing subdomain', async ({ request }) => {
+test('POST /api/admin/tenant-status rejects missing slug', async ({ request }) => {
   const res = await request.post(`${BASE}/api/admin/tenant-status`, {
     data: { status: 'active' },
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
@@ -1689,7 +1689,7 @@ test.describe('tenant tier/status lifecycle (M2M)', () => {
 
     // Promote to pro tier
     const res = await request.post(`${BASE}/api/admin/tenant-status`, {
-      data: { subdomain: 'dev', status: 'active', tier: 'pro' },
+      data: { slug: 'dev', status: 'active', tier: 'pro' },
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
     });
     expect(res.status()).toBe(200);
@@ -1698,7 +1698,7 @@ test.describe('tenant tier/status lifecycle (M2M)', () => {
 
     // Restore to free/active so subsequent tests are unaffected
     await request.post(`${BASE}/api/admin/tenant-status`, {
-      data: { subdomain: 'dev', status: 'active', tier: 'free' },
+      data: { slug: 'dev', status: 'active', tier: 'free' },
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
     });
   });
@@ -1708,7 +1708,7 @@ test.describe('tenant tier/status lifecycle (M2M)', () => {
 
     // Set status only �?tier should remain as-is
     const res = await request.post(`${BASE}/api/admin/tenant-status`, {
-      data: { subdomain: 'dev', status: 'active' }, // no tier field
+      data: { slug: 'dev', status: 'active' }, // no tier field
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
     });
     expect(res.status()).toBe(200);
@@ -1717,20 +1717,20 @@ test.describe('tenant tier/status lifecycle (M2M)', () => {
   });
 
   // NOTE: The requireActiveSubscription 402 path cannot be exercised via localhost E2E tests
-  // because all requests fall back to the 'dev' subdomain which always bypasses enforcement.
+  // because all requests fall back to the 'dev' slug which always bypasses enforcement.
   // The 402 path is covered by the unit-level middleware logic and integration with real tenant
-  // subdomains in production. The M2M endpoint that drives state changes is tested above.
+  // slugs in production. The M2M endpoint that drives state changes is tested above.
   test('requireActiveSubscription: GET requests bypass enforcement even in past_due context', async ({ request }) => {
     test.skip(!setupToken, 'Skipping: requires fresh DB');
 
-    // The dev subdomain bypasses tier guard. We verify that read endpoints remain accessible
+    // The dev slug bypasses tier guard. We verify that read endpoints remain accessible
     // regardless �?this documents the read-only access guarantee.
     await request.post(`${BASE}/api/admin/tenant-status`, {
-      data: { subdomain: 'dev', status: 'past_due' },
+      data: { slug: 'dev', status: 'past_due' },
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
     });
 
-    // GET requests should succeed regardless (dev subdomain bypass)
+    // GET requests should succeed regardless (dev slug bypass)
     const getRes = await request.get(`${BASE}/api/inspections`, {
       headers: { Authorization: `Bearer ${setupToken}` },
     });
@@ -1738,7 +1738,7 @@ test.describe('tenant tier/status lifecycle (M2M)', () => {
 
     // Restore
     await request.post(`${BASE}/api/admin/tenant-status`, {
-      data: { subdomain: 'dev', status: 'active', tier: 'free' },
+      data: { slug: 'dev', status: 'active', tier: 'free' },
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fallback_secret_for_local_dev' },
     });
   });

@@ -80,8 +80,8 @@ async function resolveSignatureInspector(
             slug:            users.slug,
         }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
         if (!row) return undefined;
-        const tenantSubdomain = c.get('requestedSubdomain') ?? null;
-        return { ...row, tenantSubdomain };
+        const tenantSlug = c.get('requestedTenantSlug') ?? null;
+        return { ...row, tenantSlug };
     } catch (err) {
         logger.error('[email-signature] inspector lookup failed', { inspectorId }, err instanceof Error ? err : undefined);
         return undefined;
@@ -2178,7 +2178,7 @@ export const inspectionsRoutes = createApiRouter()
         await db.update(inspectionTable).set({ status: 'completed' }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         if (inspection.clientEmail) {
-            const tenantSlug = c.get('requestedSubdomain') ?? '';
+            const tenantSlug = c.get('requestedTenantSlug') ?? '';
             const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
             const clientEmail = inspection.clientEmail;
             const address = inspection.propertyAddress as string;
@@ -2233,7 +2233,7 @@ export const inspectionsRoutes = createApiRouter()
             throw Errors.BadRequest('No recipient email — set inspection.clientEmail or pass toEmail.');
         }
 
-        const tenantSlug = c.get('requestedSubdomain') ?? '';
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
         const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
         const address = inspection.propertyAddress as string;
 
@@ -2375,7 +2375,7 @@ export const inspectionsRoutes = createApiRouter()
         // remains the universal fallback.
         const reportPdf = c.var.services.reportPdf;
         if (await reportPdf.isPipelineEnabled(tenantId)) {
-            const tenantSlug = c.get('requestedSubdomain') ?? '';
+            const tenantSlug = c.get('requestedTenantSlug') ?? '';
             const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
             const sourceVersion = Date.now();
             const renderBoth = async () => {
@@ -2422,7 +2422,7 @@ export const inspectionsRoutes = createApiRouter()
         if (!(await reportPdf.isPipelineEnabled(tenantId))) {
             throw Errors.Forbidden('PDF pipeline is disabled for this workspace. Enable it in Settings → Reports.');
         }
-        const tenantSlug = c.get('requestedSubdomain') ?? '';
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
         const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
         const sourceVersion = Date.now();
 
@@ -2512,7 +2512,7 @@ export const inspectionsRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
         const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
-        const tenantSlug = c.get('requestedSubdomain') ?? '';
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
         const url = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?view=agent&token=${token}`;
         return c.json({ success: true, data: { token, url } });
     })
@@ -2557,7 +2557,7 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
-        const tenantSlug = c.get('requestedSubdomain') ?? '';
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
         const url = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?view=agent&token=${token}`;
 
         // Sprint B-4c — append the inspector's signature so the receiving agent

@@ -26,7 +26,7 @@ describe('applyResultsBatch', () => {
         await setupSchema(sqlite);
 
         await db.insert(tenants).values({
-            id: 't-1', name: 'Test', subdomain: 'test', createdAt: new Date(),
+            id: 't-1', name: 'Test', slug: 'test', createdAt: new Date(),
         } as any);
         await db.insert(inspections).values({
             id: 'i-1',

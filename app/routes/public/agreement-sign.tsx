@@ -20,7 +20,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
  try {
  const api = createApi(context);
  // The public agreement fetch lives on the bookings router (GET
- // /api/public/agreements/:token); tenant resolves from the subdomain server-side.
+ // /api/public/agreements/:token); tenant resolves from the slug server-side.
  const res = await api.bookings.agreements[":token"].$get({
  param: { token: params.token ?? "" },
  });

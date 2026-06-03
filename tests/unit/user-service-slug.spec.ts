@@ -30,8 +30,8 @@ describe('UserService — slug', () => {
         (mockDrizzle as any).mockReturnValue(testDb);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: OTHER_TENANT, name: 'Other', subdomain: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: OTHER_TENANT, name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
 
         svc = new UserService({} as unknown as D1Database);

@@ -21,10 +21,10 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
         .all();
     const verify = await c.var.services.auditLog.verifyChain(reqRow.tenantId, envelopeId);
     const pubKey = await c.var.services.signingKey.getPublicKey(reqRow.tenantId);
-    const tenantRow = await db.select({ subdomain: schema.tenants.subdomain })
+    const tenantRow = await db.select({ slug: schema.tenants.slug })
         .from(schema.tenants)
         .where(eq(schema.tenants.id, reqRow.tenantId))
         .get();
-    const tenantSubdomain = tenantRow?.subdomain ?? '';
-    return { reqRow, agreement, auditRows, verify, pubKey, tenantSubdomain };
+    const tenantSlug = tenantRow?.slug ?? '';
+    return { reqRow, agreement, auditRows, verify, pubKey, tenantSlug };
 }

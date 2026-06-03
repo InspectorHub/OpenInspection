@@ -182,16 +182,16 @@ export class StandaloneProvider implements IntegrationProvider {
 
     async handleTenantUpdate(params: TenantUpdateParams): Promise<void> {
         const db = this.getDrizzle();
-        const { id, subdomain, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash, adminName } = params;
+        const { id, slug, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash, adminName } = params;
 
         let tenantId = id || crypto.randomUUID();
-        const existingTenant = await db.select().from(tenants).where(eq(tenants.subdomain, subdomain)).get();
+        const existingTenant = await db.select().from(tenants).where(eq(tenants.slug, slug)).get();
 
         if (!existingTenant) {
             await db.insert(tenants).values({
                 id: tenantId,
-                name: name || subdomain,
-                subdomain,
+                name: name || slug,
+                slug,
                 tier: tier || 'free',
                 status: (adminEmail ? 'active' : status) || 'pending',
                 deploymentMode: deploymentMode || 'silo',
@@ -208,7 +208,7 @@ export class StandaloneProvider implements IntegrationProvider {
             if (name) update.name = name;
             if (maxUsers != null) update.maxUsers = maxUsers;
 
-            await db.update(tenants).set(update).where(eq(tenants.subdomain, subdomain));
+            await db.update(tenants).set(update).where(eq(tenants.slug, slug));
         }
 
         // Handle Admin User creation/sync
@@ -265,11 +265,11 @@ export class StandaloneProvider implements IntegrationProvider {
             }
         }
 
-        if (this.kv) await this.kv.delete(`tenant:${subdomain}`);
+        if (this.kv) await this.kv.delete(`tenant:${slug}`);
     }
 
-    async handleStripeConnect(subdomain: string, accountId: string): Promise<void> {
+    async handleStripeConnect(slug: string, accountId: string): Promise<void> {
         const db = this.getDrizzle();
-        await db.update(tenants).set({ stripeConnectAccountId: accountId }).where(eq(tenants.subdomain, subdomain));
+        await db.update(tenants).set({ stripeConnectAccountId: accountId }).where(eq(tenants.slug, slug));
     }
 }

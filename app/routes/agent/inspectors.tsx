@@ -12,7 +12,7 @@ interface Inspector {
   inspectorSlug: string | null;
   inspectorPhotoUrl: string | null;
   tenantName: string;
-  tenantSubdomain: string;
+  tenantSlug: string;
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -86,7 +86,7 @@ export default function AgentInspectorsPage() {
               {row.inspectorSlug ? (
                 <button
                   onClick={() => {
-                    const url = `https://${row.tenantSubdomain}.inspectorhub.io/book/${row.inspectorSlug}`;
+                    const url = `https://${row.tenantSlug}.inspectorhub.io/book/${row.inspectorSlug}`;
                     navigator.clipboard.writeText(url);
                   }}
                   className="w-full h-9 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors uppercase tracking-wide mt-auto"

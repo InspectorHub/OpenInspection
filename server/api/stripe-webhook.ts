@@ -8,10 +8,10 @@ import { extractSettledPayment } from '../lib/stripe-helpers';
  * index.ts `isPublic`); authenticity is proven by the `stripe-signature`
  * HMAC verified against the tenant's OWN webhook signing secret.
  *
- * Per-tenant routing: the tenant is resolved from the request subdomain by
+ * Per-tenant routing: the tenant is resolved from the request slug by
  * tenantRouter, and integration-secrets middleware loads THAT tenant's
  * STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET into c.env. So each inspector
- * points their Stripe dashboard webhook at their own subdomain and we verify
+ * points their Stripe dashboard webhook at their own slug and we verify
  * with their own secret.
  */
 const api = new Hono<HonoConfig>();

@@ -15,7 +15,7 @@ interface EmbedData {
   slug: string;
   inspectorId: string;
   inspectorName: string;
-  tenantSubdomain: string;
+  tenantSlug: string;
   siteKey: string;
   theme: "light" | "dark" | "branded";
 }
@@ -55,7 +55,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
             slug: params.slug ?? "",
             inspectorId: d.inspectorId ?? "",
             inspectorName: d.name ?? "Inspector",
-            tenantSubdomain: params.tenant ?? "",
+            tenantSlug: params.tenant ?? "",
             siteKey: d.turnstileSiteKey ?? "",
             theme,
           } satisfies EmbedData)

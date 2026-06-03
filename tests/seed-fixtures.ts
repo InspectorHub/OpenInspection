@@ -48,9 +48,9 @@ export function seedFixtures(appDir: string): void {
     const now = new Date().toISOString();
 
     // Two tenants so the IdentitySwitcher (E P4) has somewhere to land.
-    d1(`INSERT OR REPLACE INTO tenants (id, name, subdomain, status, deployment_mode, tier, max_users, created_at)
+    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
         VALUES ('${TENANT_A_ID}', 'Seed Tenant A', 'seed-a', 'active', 'shared', 'free', 5, '${now}')`, cwd);
-    d1(`INSERT OR REPLACE INTO tenants (id, name, subdomain, status, deployment_mode, tier, max_users, created_at)
+    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
         VALUES ('${TENANT_B_ID}', 'Seed Tenant B', 'seed-b', 'active', 'shared', 'free', 5, '${now}')`, cwd);
 
     // Tenant A users.
@@ -69,7 +69,7 @@ export function seedFixtures(appDir: string): void {
                 '${MENTOR_EMAIL}', '${SEED_PASSWORD_HASH}', 'Seed Mentor', 'inspector', '${now}')`, cwd);
 
     // Seat-quota / at-cap admin for the over-quota E2E.
-    d1(`INSERT OR REPLACE INTO tenants (id, name, subdomain, status, deployment_mode, tier, max_users, created_at)
+    d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
         VALUES ('00000000-0000-0000-0000-000000000cc1', 'Seed Full Tenant', 'seed-full',
                 'active', 'shared', 'free', 1, '${now}')`, cwd);
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)

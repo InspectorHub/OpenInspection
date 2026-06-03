@@ -45,7 +45,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
         testDb = setup.db;
         await setupSchema(setup.sqlite);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'T', subdomain: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
@@ -247,7 +247,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
     it('does not delete other tenants comments under replace', async () => {
         const otherTenant = '00000000-0000-0000-0000-000000000002';
         await testDb.insert(schema.tenants).values({
-            id: otherTenant, name: 'O', subdomain: 'o',
+            id: otherTenant, name: 'O', slug: 'o',
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         const libraryId = await seedLibrary({ semver: '2.0.0', entries: [{ text: 'X' }] });

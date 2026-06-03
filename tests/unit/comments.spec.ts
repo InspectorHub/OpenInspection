@@ -29,7 +29,7 @@ describe('comments table — rating bucket + section', () => {
         await testDb.insert(tenants).values({
             id: 't1',
             name: 'Test Tenant',
-            subdomain: 'test',
+            slug: 'test',
             createdAt: new Date(),
         });
     });
@@ -112,7 +112,7 @@ describe('comments table — rating bucket + section', () => {
         await testDb.insert(tenants).values({
             id: 't2',
             name: 'Other Tenant',
-            subdomain: 'other',
+            slug: 'other',
             createdAt: new Date(),
         });
         await testDb.insert(comments).values([

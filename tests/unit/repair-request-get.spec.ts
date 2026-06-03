@@ -5,8 +5,8 @@ import type { HonoConfig } from '../../server/types/hono';
 
 /**
  * C-10 ③-D — GET /api/public/repair-request/:id
- * Public (subdomain-resolved tenant, unguessable id) repair-request page data.
- * tenantId comes from the resolved subdomain, never the URL. Thin wrapper over
+ * Public (slug-resolved tenant, unguessable id) repair-request page data.
+ * tenantId comes from the resolved slug, never the URL. Thin wrapper over
  * inspection.getRepairRequestData.
  */
 describe('GET /api/public/repair-request/:id — ③-D', () => {
@@ -21,7 +21,7 @@ describe('GET /api/public/repair-request/:id — ③-D', () => {
         return app;
     }
 
-    it('404 when the tenant subdomain does not resolve', async () => {
+    it('404 when the tenant slug does not resolve', async () => {
         const res = await buildApp(null, vi.fn()).request('/api/public/repair-request/i1');
         expect(res.status).toBe(404);
     });

@@ -43,7 +43,7 @@ describe('BrandingService — Round-2 #10 persistence', () => {
         await testDb.insert(schema.tenants).values({
             id: TENANT,
             name: 'Acme',
-            subdomain: 'acme',
+            slug: 'acme',
             status: 'active',
             deploymentMode: 'shared',
             tier: 'free',

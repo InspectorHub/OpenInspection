@@ -23,7 +23,7 @@ describe('UserService.getProfileBySlug — Sprint C-1', () => {
         await setupSchema(sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.users).values([
             {
@@ -87,7 +87,7 @@ describe('UserService.getProfileBySlug — Sprint C-1', () => {
 
     it('enforces tenant scope (different tenant cannot read profile)', async () => {
         const OTHER_TENANT = '00000000-0000-0000-0000-000000000099';
-        await testDb.insert(schema.tenants).values({ id: OTHER_TENANT, name: 'Other', subdomain: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
+        await testDb.insert(schema.tenants).values({ id: OTHER_TENANT, name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
         const profile = await svc.getProfileBySlug(OTHER_TENANT, 'mike');
         expect(profile).toBeNull();
     });

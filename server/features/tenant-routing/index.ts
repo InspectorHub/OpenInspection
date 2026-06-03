@@ -15,11 +15,11 @@ import { resolveByPathParam } from './resolve-by-path-param';
  *
  * Path-param resolution runs first regardless of mode, so public
  * routes like `/book/:tenant/:slug` work uniformly across all
- * deploys. Subdomain-based resolution was retired with the
+ * deploys. DNS/host-based tenant resolution was retired with the
  * silo-deconvergence plan (2026-05-29) — silo + shared now share
- * the same path/JWT lookup; vanity subdomains, if any, are bound
- * by ops at the Cloudflare DNS + Worker-route layer and the tenant
- * row is identified by path or JWT inside the Worker either way.
+ * the same path/JWT lookup; the tenant row is always identified by
+ * the path slug or the JWT claim inside the Worker, never by the
+ * request's hostname.
  *
  * The 503 fallthrough fires ONLY in standalone mode when the fixed
  * tenant resolver failed AND the path isn't on the bypass list. In
@@ -70,7 +70,7 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
                 logger.info('[TenantRouter] Tenant resolution failed', {
                     path,
                     tenantId: c.get('tenantId'),
-                    subdomain: c.get('requestedSubdomain'),
+                    slug: c.get('requestedTenantSlug'),
                 });
                 return c.text('Tenant not found or system not initialized.', 503);
             }

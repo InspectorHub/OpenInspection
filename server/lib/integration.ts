@@ -4,7 +4,7 @@
  */
 export interface TenantUpdateParams {
     id?: string;
-    subdomain: string;
+    slug: string;
     status: string;
     tier?: 'free' | 'pro' | 'enterprise';
     name?: string;
@@ -27,5 +27,5 @@ export interface IntegrationProvider {
     /**
      * Called when a tenant connects their Stripe account.
      */
-    handleStripeConnect?(subdomain: string, accountId: string): Promise<void>;
+    handleStripeConnect?(slug: string, accountId: string): Promise<void>;
 }

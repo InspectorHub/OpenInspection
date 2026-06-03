@@ -12,7 +12,7 @@ const INSPECTION = '11111111-1111-1111-1111-111111111111';
 
 async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active',
+        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.inspections).values({

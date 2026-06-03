@@ -2462,9 +2462,9 @@ export class InspectionService {
             }
         }
 
-        const tenantRow = await db.select({ subdomain: tenants.subdomain })
+        const tenantRow = await db.select({ slug: tenants.slug })
             .from(tenants).where(eq(tenants.id, tenantId)).get();
-        const tenantSlug = tenantRow?.subdomain ?? '';
+        const tenantSlug = tenantRow?.slug ?? '';
         return {
             reportUrl: `/report/${tenantSlug}/${inspectionId}`,
             status: 'delivered',

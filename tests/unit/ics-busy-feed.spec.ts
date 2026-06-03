@@ -22,7 +22,7 @@ describe('IcsService.busyFeedForInspector — Sprint C-2', () => {
         await setupSchema(sqlite);
 
         await testDb.insert(schema.tenants).values([{
-            id: TENANT, name: 'A', subdomain: 'a', status: 'active',
+            id: TENANT, name: 'A', slug: 'a', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         }]);
         await testDb.insert(schema.users).values([{
@@ -81,7 +81,7 @@ describe('IcsService.busyFeedForInspector — Sprint C-2', () => {
     it('enforces tenant scope', async () => {
         const OTHER = '00000000-0000-0000-0000-000000000099';
         await testDb.insert(schema.tenants).values({
-            id: OTHER, name: 'O', subdomain: 'o', status: 'active',
+            id: OTHER, name: 'O', slug: 'o', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         const ics = await svc.busyFeedForInspector(OTHER, 'mike');

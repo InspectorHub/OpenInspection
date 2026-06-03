@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm';
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
-    subdomain: text('subdomain').unique().notNull(),
+    slug: text('slug').unique().notNull(),
     tier: text('tier').notNull().default('free'),
     stripeConnectAccountId: text('stripe_connect_account_id'),
     status: text('status').notNull().default('pending'),

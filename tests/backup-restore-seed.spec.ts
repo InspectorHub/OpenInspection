@@ -11,7 +11,7 @@ test.describe('Seeding Data for Backup Validation', () => {
         const setupRes = await request.post(`${BASE}/setup`, {
             data: {
                 companyName: 'Backup Restore Test Corp',
-                subdomain: 'br-test',
+                slug: 'br-test',
                 email: 'admin@example.com',
                 password: 'Testpassword!123',
             },

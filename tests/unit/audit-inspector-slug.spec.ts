@@ -21,7 +21,7 @@ describe('writeAuditLogWithSlug — Sprint B-3', () => {
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'A', subdomain: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.users).values([
             { id: USER, tenantId: TENANT, email: 'mike@test.com', name: 'Mike', role: 'inspector', slug: 'mike', createdAt: new Date(), passwordHash: 'x' },

@@ -32,9 +32,9 @@ export interface BrandingConfig {
     /** Sprint B-1 — host portion of the booking URL (e.g. "acme.inspectorhub.io").
      *  Used by the ⌘K palette action and any other slug-aware UI. */
     bookingHost?: string | undefined;
-    /** PR 2 — tenant subdomain (path segment). Needed for path-tenant booking
+    /** PR 2 — tenant slug (path segment). Needed for path-tenant booking
      *  URLs (`<host>/book/<tenant>/<slug>`). Populated by inspectorPaletteMiddleware. */
-    tenantSubdomain?: string | null | undefined;
+    tenantSlug?: string | null | undefined;
     /** SaaS mode flag — true when this worker runs as `APP_MODE=saas`.
      *  Plumbed via brandingMiddleware so layouts can render the "Switch
      *  workspace" affordance (the only way for a multi-workspace identity
@@ -65,7 +65,7 @@ export interface AuthVariables {
     // Mirrors `user.sub` but lets agent-only handlers stay narrowly typed
     // without re-deriving from the broader User payload.
     agentUserId?: string;
-    requestedSubdomain?: string;
+    requestedTenantSlug?: string;
     tenantTier?: string;
     tenantStatus?: string;
     branding?: BrandingConfig;

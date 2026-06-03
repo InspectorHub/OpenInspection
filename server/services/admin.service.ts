@@ -168,11 +168,11 @@ export class AdminService {
     /**
      * Connects a Stripe account for the tenant.
      */
-    async updateStripeConnect(subdomain: string, accountId: string) {
+    async updateStripeConnect(slug: string, accountId: string) {
         if (!this.integration?.handleStripeConnect) {
             throw new Error('IntegrationProvider not configured or does not support Stripe Connect');
         }
-        await this.integration.handleStripeConnect(subdomain, accountId);
+        await this.integration.handleStripeConnect(slug, accountId);
     }
 
     /**

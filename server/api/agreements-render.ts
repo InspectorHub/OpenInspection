@@ -45,9 +45,9 @@ export async function agreementRenderHandler(
   if (!reqRow || reqRow.status !== 'signed' || !reqRow.signatureBase64) {
     return new Response('Not Found', { status: 404 });
   }
-  const tenant = await db.select({ subdomain: schema.tenants.subdomain })
+  const tenant = await db.select({ slug: schema.tenants.slug })
     .from(schema.tenants).where(eq(schema.tenants.id, reqRow.tenantId)).get();
-  if (!tenant || tenant.subdomain !== tenantSlug) {
+  if (!tenant || tenant.slug !== tenantSlug) {
     return new Response('Not Found', { status: 404 });
   }
   const agreement = await db.select().from(schema.agreements)

@@ -20,7 +20,7 @@ describe('agreement-render handler', () => {
     db = fixture.db;
     await setupSchema(fixture.sqlite);
     await db.insert(schema.tenants).values({
-      id: TENANT_A, name: 'A', subdomain: 'acme', status: 'active',
+      id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.agreements).values({
@@ -119,7 +119,7 @@ describe('cert-render handler', () => {
     db = fixture.db;
     await setupSchema(fixture.sqlite);
     await db.insert(schema.tenants).values({
-      id: TENANT_A, name: 'A', subdomain: 'acme', status: 'active',
+      id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await db.insert(schema.agreements).values({

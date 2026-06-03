@@ -49,7 +49,7 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
         svc = new InspectionService({} as D1Database);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
     });
 

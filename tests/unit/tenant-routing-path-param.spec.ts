@@ -13,7 +13,7 @@ function makeApp(profile = SAAS_PROFILE) {
 
 describe('tenant-routing — path-param resolution', () => {
     it('extracts tenant from /book/:tenant/:slug path', async () => {
-        const fakeTenant = { id: 'tenant-uuid', subdomain: 'acme', tier: 'pro', status: 'active' };
+        const fakeTenant = { id: 'tenant-uuid', slug: 'acme', tier: 'pro', status: 'active' };
         const env: Partial<HonoConfig['Bindings']> = {
             DB: { } as never,
             TENANT_CACHE: { get: vi.fn().mockResolvedValue(fakeTenant), put: vi.fn() } as never,
@@ -25,9 +25,9 @@ describe('tenant-routing — path-param resolution', () => {
         expect(capturedTenantId).toBe('tenant-uuid');
     });
 
-    it('path-param wins over subdomain', async () => {
-        const aTenant = { id: 'tenant-a', subdomain: 'acme', tier: 'pro', status: 'active' };
-        const bTenant = { id: 'tenant-b', subdomain: 'bravo', tier: 'pro', status: 'active' };
+    it('path-param wins over slug', async () => {
+        const aTenant = { id: 'tenant-a', slug: 'acme', tier: 'pro', status: 'active' };
+        const bTenant = { id: 'tenant-b', slug: 'bravo', tier: 'pro', status: 'active' };
         const get = vi.fn((key: string) => Promise.resolve(key.endsWith('acme') ? aTenant : bTenant));
         const env: Partial<HonoConfig['Bindings']> = { DB: {} as never, TENANT_CACHE: { get, put: vi.fn() } as never };
         const app = makeApp();

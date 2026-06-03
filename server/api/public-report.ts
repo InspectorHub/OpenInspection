@@ -22,7 +22,7 @@ const reportRoute = createRoute(withMcpMetadata({
     summary: 'Public token-gated inspection report data',
     request: {
         params: z.object({
-            tenant: z.string().describe('Tenant subdomain (display only; tenant is resolved from the token).'),
+            tenant: z.string().describe('Tenant slug (display only; tenant is resolved from the token).'),
             id: z.string().describe('Inspection id.'),
         }),
         query: z.object({ token: z.string().optional().describe('Persistent portal access token.') }),
@@ -36,7 +36,7 @@ const reportRoute = createRoute(withMcpMetadata({
 }, { scopes: [], tier: 'extended' }));
 
 // Public inspector marketing profile (by slug). Tenant resolves from the
-// subdomain (no token — public page); returns whitelisted public fields only.
+// slug (no token — public page); returns whitelisted public fields only.
 const PublicInspectorProfileSchema = z.object({
     profile: z.object({
         name: z.string().nullable(),
@@ -60,7 +60,7 @@ const inspectorRoute = createRoute(withMcpMetadata({
     tags: ['public'],
     summary: 'Public inspector marketing profile',
     request: { params: z.object({
-        tenant: z.string().describe('Tenant subdomain that scopes the inspector lookup.'),
+        tenant: z.string().describe('Tenant slug that scopes the inspector lookup.'),
         slug: z.string().describe('Public inspector profile slug.'),
     }) },
     responses: {
@@ -68,11 +68,11 @@ const inspectorRoute = createRoute(withMcpMetadata({
         404: { description: 'Tenant or inspector not found' },
     },
     operationId: 'getPublicInspectorProfile',
-    description: 'Public, no-login inspector profile resolved by tenant subdomain + slug. Returns only public marketing fields (name/bio/photo/serviceAreas) + bookable services — never email/phone/license/ids.',
+    description: 'Public, no-login inspector profile resolved by tenant slug + slug. Returns only public marketing fields (name/bio/photo/serviceAreas) + bookable services — never email/phone/license/ids.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public invoice for the report-gate "Pay invoice" CTA (by inspection id;
-// tenant resolves from subdomain). The id is unguessable; tenant-scoped query.
+// tenant resolves from slug). The id is unguessable; tenant-scoped query.
 const PublicInvoiceSchema = z.object({
     id: z.string(),
     amountCents: z.number(),
@@ -92,7 +92,7 @@ const invoiceRoute = createRoute(withMcpMetadata({
         404: { description: 'Tenant not resolved' },
     },
     operationId: 'getPublicInvoice',
-    description: 'Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from subdomain; tenant-scoped query.',
+    description: 'Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from slug; tenant-scoped query.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public Stripe PaymentIntent mint for the invoice pay-panel (bring-your-own-keys:
@@ -118,7 +118,7 @@ const payIntentRoute = createRoute(withMcpMetadata({
         503: { description: 'Stripe is not configured for this tenant, or the charge could not be started' },
     },
     operationId: 'createPublicPayIntent',
-    description: "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Public — the unguessable inspection id is the key; tenant resolved from subdomain.",
+    description: "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Public — the unguessable inspection id is the key; tenant resolved from slug.",
 }, { scopes: [], tier: 'extended' }));
 
 // Public live-observer view (③-A.4). Gated by an OBSERVER-link token (distinct
@@ -154,7 +154,7 @@ const observeRoute = createRoute(withMcpMetadata({
 }, { scopes: [], tier: 'extended' }));
 
 // Public report-gate (③-A.2). The "report blocked, here's why + CTA" page,
-// resolved by tenant subdomain + id (no token — pre-report). Returns only
+// resolved by tenant slug + id (no token — pre-report). Returns only
 // non-sensitive gate fields (reason + branding + inspector contact + amount).
 const ReportGateResponseSchema = z.object({
     reason: z.enum(['payment', 'agreement']),
@@ -179,7 +179,7 @@ const reportGateRoute = createRoute(withMcpMetadata({
     summary: 'Public report-gate status (why the report is blocked + CTA)',
     request: {
         params: z.object({
-            tenant: z.string().describe('Tenant subdomain (display + CTA-URL building; tenant is resolved from the subdomain).'),
+            tenant: z.string().describe('Tenant slug (display + CTA-URL building; tenant is resolved from the slug).'),
             id: z.string().describe('Inspection id.'),
         }),
     },
@@ -188,7 +188,7 @@ const reportGateRoute = createRoute(withMcpMetadata({
         404: { description: 'Tenant not resolved' },
     },
     operationId: 'getPublicReportGate',
-    description: 'Public, no-login report-gate status resolved by tenant subdomain + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
+    description: 'Public, no-login report-gate status resolved by tenant slug + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'

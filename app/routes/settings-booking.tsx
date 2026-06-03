@@ -77,7 +77,7 @@ export default function SettingsBookingPage() {
   const data = useLoaderData<typeof loader>();
   const ctx = useSessionContext();
 
-  const tenant = ctx?.branding?.tenantSubdomain;
+  const tenant = ctx?.branding?.tenantSlug;
   const slug = ctx?.branding?.currentUserSlug;
 
   return (

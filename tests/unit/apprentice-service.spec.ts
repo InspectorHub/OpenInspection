@@ -15,7 +15,7 @@ const ORPHAN       = '44444444-4444-4444-4444-444444444444';
 
 async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active',
+        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     // Mentor first (apprentice references mentor_id).

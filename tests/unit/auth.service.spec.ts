@@ -34,7 +34,7 @@ describe('AuthService', () => {
         await testDb.insert(tenants).values({
             id: 't1',
             name: 'Test Tenant',
-            subdomain: 'test',
+            slug: 'test',
             createdAt: new Date(),
         });
         

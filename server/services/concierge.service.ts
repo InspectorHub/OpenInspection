@@ -53,7 +53,7 @@ export interface ConciergeTokenView {
     inspection: {
         id: string;
         tenantId: string;
-        tenantSubdomain: string;
+        tenantSlug: string;
         propertyAddress: string;
         date: string;
         clientName: string | null;
@@ -368,11 +368,11 @@ export class ConciergeService {
         if (!insp) return null;
 
         const tenantRow = await db
-            .select({ subdomain: tenants.subdomain })
+            .select({ slug: tenants.slug })
             .from(tenants)
             .where(eq(tenants.id, insp.tenantId))
             .get();
-        const tenantSubdomain = tenantRow?.subdomain ?? '';
+        const tenantSlug = tenantRow?.slug ?? '';
 
         let inspector: ConciergeTokenView['inspector'] = null;
         if (insp.inspectorId) {
@@ -395,7 +395,7 @@ export class ConciergeService {
             inspection: {
                 id: insp.id,
                 tenantId: insp.tenantId,
-                tenantSubdomain,
+                tenantSlug,
                 propertyAddress: insp.propertyAddress,
                 date: insp.date,
                 clientName: insp.clientName ?? null,

@@ -21,7 +21,7 @@ interface SeedOpts { reviewRequired?: boolean; agentLinkStatus?: 'active' | 'pen
 async function seedFixture(testDb: BetterSQLite3Database<typeof schema>, opts: SeedOpts = {}) {
     const { reviewRequired = false, agentLinkStatus = 'active' } = opts;
     await testDb.insert(schema.tenants).values({
-        id: T1, name: 'Acme', subdomain: T1_SUB, status: 'active',
+        id: T1, name: 'Acme', slug: T1_SUB, status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.tenantConfigs).values({

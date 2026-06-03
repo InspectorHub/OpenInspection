@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 export interface AgentCommandPaletteInspector {
   name: string | null;
   slug: string | null;
-  tenantSubdomain: string;
+  tenantSlug: string;
 }
 
 interface AgentCommandPaletteProps {
@@ -40,9 +40,9 @@ export function AgentCommandPalette({ inspectors, agentSlug, bookingHost }: Agen
     const ref = agentSlug ? `?ref=${encodeURIComponent(agentSlug)}` : "";
     for (const insp of inspectors) {
       if (!insp.slug) continue;
-      const url = `https://${bookingHost}/book/${insp.tenantSubdomain}/${insp.slug}${ref}`;
+      const url = `https://${bookingHost}/book/${insp.tenantSlug}/${insp.slug}${ref}`;
       const displayName = insp.name?.trim() || insp.slug;
-      list.push({ id: `copy-${insp.tenantSubdomain}-${insp.slug}`, group: "Actions", label: `Copy booking link — ${displayName}`, hint: "copy", action: "copy", payload: url });
+      list.push({ id: `copy-${insp.tenantSlug}-${insp.slug}`, group: "Actions", label: `Copy booking link — ${displayName}`, hint: "copy", action: "copy", payload: url });
     }
     return list;
   }, [inspectors, agentSlug, bookingHost]);

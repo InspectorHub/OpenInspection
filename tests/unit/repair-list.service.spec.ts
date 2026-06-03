@@ -73,7 +73,7 @@ const TEMPLATE_SCHEMA = {
 
 async function seedFixture(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.templates).values({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

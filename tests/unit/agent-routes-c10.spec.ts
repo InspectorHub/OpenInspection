@@ -45,7 +45,7 @@ describe('agent C-10 routes', () => {
 
     it('GET /api/agent/inspectors returns listInspectors data, called with userId', async () => {
         const listInspectors = vi.fn().mockResolvedValue([
-            { inspectorName: 'Pat', inspectorSlug: 'pat', inspectorPhotoUrl: null, tenantName: 'Acme', tenantSubdomain: 'acme' },
+            { inspectorName: 'Pat', inspectorSlug: 'pat', inspectorPhotoUrl: null, tenantName: 'Acme', tenantSlug: 'acme' },
         ]);
         const res = await agentApp({ agent: { listInspectors } }).request('/api/agent/inspectors');
         expect(res.status).toBe(200);

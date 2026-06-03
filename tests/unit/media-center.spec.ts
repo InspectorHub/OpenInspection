@@ -45,7 +45,7 @@ describe.skip('InspectionService — Media Center (Round-2 backlog #9)', () => {
         r2Mock.delete.mockClear();
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
 
         // Inspection with a frozen template snapshot so getMediaCenter can

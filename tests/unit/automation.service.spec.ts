@@ -14,7 +14,7 @@ const AGR    = '00000000-0000-0000-0000-000000000020';
 
 async function seedFor(testDb: BetterSQLite3Database<typeof schema>, agreementRequired: boolean) {
     await testDb.insert(schema.tenants).values([
-        { id: TENANT, name: 'T', subdomain: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await testDb.insert(schema.inspections).values([
         { id: INSP, tenantId: TENANT, propertyAddress: '1 St', clientName: 'J', clientEmail: 'j@t.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired, paymentRequired: false, createdAt: new Date() },

@@ -20,7 +20,7 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
         testDb = setup.db;
         await setupSchema(setup.sqlite);
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'T', subdomain: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);

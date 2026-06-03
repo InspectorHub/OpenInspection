@@ -11,7 +11,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
  * Booking #7 Sprint A — public slug-availability endpoint.
  *
  * Mounted at `/api/public/check/slug` inside the `/api/public/*` JWT
- * allowlist. tenantId resolves from subdomain via `tenantRouter`; an
+ * allowlist. tenantId resolves from slug via `tenantRouter`; an
  * unresolved tenant returns `{ available:false, reason:'invalid' }` so the
  * client can surface a friendly message instead of a 5xx.
  *

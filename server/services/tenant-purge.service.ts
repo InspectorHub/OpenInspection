@@ -30,13 +30,13 @@ export class TenantPurgeService {
         const d = drizzle(this.db);
 
         // 1. Collect KV keys before tables deleted
-        const t = await d.select({ subdomain: tenants.subdomain }).from(tenants).where(eq(tenants.id, tenantId)).get();
+        const t = await d.select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId)).get();
         const userIds = (await d.select({ id: users.id }).from(users).where(eq(users.tenantId, tenantId)).all())
             .map(u => u.id as string);
         const kvKeys: string[] = [];
-        if (t?.subdomain) {
-            kvKeys.push(`tenant:${t.subdomain}`);
-            kvKeys.push(`setup_code:${t.subdomain}`);
+        if (t?.slug) {
+            kvKeys.push(`tenant:${t.slug}`);
+            kvKeys.push(`setup_code:${t.slug}`);
         }
         userIds.forEach(uid => kvKeys.push(`pwchanged:${uid}`));
 

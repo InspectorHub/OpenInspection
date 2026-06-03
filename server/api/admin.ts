@@ -1465,7 +1465,7 @@ export const adminRoutes = createApiRouter()
             ...(body.clientName !== undefined ? { clientName: body.clientName } : {}),
             ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
         });
-        const tenantSlug = c.get('requestedSubdomain') ?? '';
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
         const signUrl = agreementSignUrl(getBookingHost(c), tenantSlug, request.token);
 
         // Spec 5H D-patch — fetch the agreement HTML at send-time to compute its

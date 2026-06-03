@@ -33,7 +33,7 @@ describe('concierge public flow', () => {
         await db.insert(tenants).values({
             id: 't-1',
             name: 'Acme Inspections',
-            subdomain: 'acme',
+            slug: 'acme',
             tier: 'free',
             status: 'active',
             maxUsers: 3,

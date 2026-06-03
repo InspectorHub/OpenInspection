@@ -24,7 +24,7 @@ describe('GuestInviteService.getInviteInfo — ③-B', () => {
         await setupSchema(sqlite);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
-        await testDb.insert(tenants).values({ id: 't1', name: 'Acme Inspections', subdomain: 'acme', createdAt: new Date() });
+        await testDb.insert(tenants).values({ id: 't1', name: 'Acme Inspections', slug: 'acme', createdAt: new Date() });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         svc = new GuestInviteService({} as any);
     });

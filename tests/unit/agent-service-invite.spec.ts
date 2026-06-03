@@ -24,7 +24,7 @@ describe('AgentService.invite — A1', () => {
         await testDb.insert(schema.tenants).values({
             id: TENANT,
             name: 'Acme Inspections',
-            subdomain: 'acme',
+            slug: 'acme',
             status: 'active',
             deploymentMode: 'shared',
             tier: 'free',
@@ -92,7 +92,7 @@ describe('AgentService.invite — A1', () => {
         const TENANT_B = '00000000-0000-0000-0000-000000000002';
         const INSPECTOR_B = '00000000-0000-0000-0000-000000000011';
         await testDb.insert(schema.tenants).values({
-            id: TENANT_B, name: 'Bob Co', subdomain: 'bobco', status: 'active',
+            id: TENANT_B, name: 'Bob Co', slug: 'bobco', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({
