@@ -28,7 +28,6 @@ Written non-blocking via `c.executionCtx.waitUntil()`.
 |---|---|---|---|
 | `global_tenant:{tenantId}` | Fixed-tenant resolver | Fixed-tenant resolver (every request) | 3600s |
 | `pwchanged:{userId}` | Password change/reset handlers | Auth middleware (JWT validation) | None |
-| `setup_verification_code` | Setup wizard | Setup endpoint | 3600s |
 | `qbo_oauth_state:{state}` | QBO OAuth initiation | QBO OAuth callback | 600s |
 | `google_token:{tenantId}:{userId}` | Google Calendar OAuth | Calendar API calls | 3500s |
 | `places:{hash}` | Google Places proxy | Address autocomplete | 3600s |

@@ -185,7 +185,12 @@ export class StandaloneProvider implements IntegrationProvider {
         const { id, slug, status, tier, name, deploymentMode, maxUsers, adminEmail, adminPasswordHash, adminName } = params;
 
         let tenantId = id || crypto.randomUUID();
-        const existingTenant = await db.select().from(tenants).where(eq(tenants.slug, slug)).get();
+        // Prefer the stable tenant id (slug can change — e.g. the 2026-06-03
+        // subdomain→slug migration); fall back to slug only when no id is given.
+        const existingTenant = (id
+            ? await db.select().from(tenants).where(eq(tenants.id, id)).get()
+            : undefined)
+            ?? await db.select().from(tenants).where(eq(tenants.slug, slug)).get();
 
         if (!existingTenant) {
             await db.insert(tenants).values({
@@ -201,6 +206,8 @@ export class StandaloneProvider implements IntegrationProvider {
         } else {
             tenantId = existingTenant.id;
             const update: Record<string, string | number | Date> = {
+                // Heal a stale slug when the row was matched by id.
+                slug,
                 status: (adminEmail ? 'active' : status) || 'pending'
             };
             if (tier) update.tier = tier;
@@ -208,7 +215,7 @@ export class StandaloneProvider implements IntegrationProvider {
             if (name) update.name = name;
             if (maxUsers != null) update.maxUsers = maxUsers;
 
-            await db.update(tenants).set(update).where(eq(tenants.slug, slug));
+            await db.update(tenants).set(update).where(eq(tenants.id, tenantId));
         }
 
         // Handle Admin User creation/sync

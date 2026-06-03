@@ -19,11 +19,16 @@ export class PortalProvider implements IntegrationProvider {
         const db = this.getDrizzle();
         const { id, slug, status, tier, name, maxUsers, adminEmail, adminPasswordHash } = params;
 
-        // Upsert tenant
-        const existingTenant = await db.select()
-            .from(tenants)
-            .where(eq(tenants.slug, slug))
-            .get();
+        // Upsert keyed on the STABLE tenant id (core's tenant id IS portal's
+        // tenantId — every provisioning sync passes it as `id`), falling back to
+        // slug only when no id is supplied. Keying on id lets an existing row
+        // self-heal its slug on the next sync (e.g. the 2026-06-03 subdomain→slug
+        // migration changed the public key from a UUID to a human slug) instead
+        // of inserting a duplicate.
+        const existingTenant = (id
+            ? await db.select().from(tenants).where(eq(tenants.id, id)).get()
+            : undefined)
+            ?? await db.select().from(tenants).where(eq(tenants.slug, slug)).get();
 
         if (!existingTenant) {
             const newTenantId = id || crypto.randomUUID();
@@ -46,12 +51,17 @@ export class PortalProvider implements IntegrationProvider {
         } else {
             await db.update(tenants)
                 .set({
+                    // Correct the slug too — heals a stale (e.g. legacy UUID) slug
+                    // when the row was matched by id.
+                    slug,
                     status: (status as 'active' | 'suspended' | 'trial') || existingTenant.status,
                     tier: (tier as 'free' | 'pro' | 'enterprise') || existingTenant.tier,
                     name: name || existingTenant.name,
                     ...(maxUsers != null ? { maxUsers } : {}),
                 })
-                .where(eq(tenants.slug, slug));
+                .where(eq(tenants.id, existingTenant.id));
+            // Drop the stale-slug cache entry too (the row may have just changed slug).
+            if (this.kv && existingTenant.slug !== slug) await this.kv.delete(`tenant:${existingTenant.slug}`);
         }
 
         // Handle Admin Sync if provided

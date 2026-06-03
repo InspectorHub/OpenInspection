@@ -149,7 +149,7 @@ export const SetupSchema = z.object({
         description: 'Initial admin password — min 8 chars with uppercase, digit, and special character.',
     }),
     verificationCode: z.string().min(6).optional().openapi({
-        example: '123456',
-        description: 'Optional 6-digit verification code from environment or KV; required when set by the operator.',
+        example: 'change-me-6-chars-min',
+        description: 'First-run setup code — must exactly equal the SETUP_CODE Worker secret. Any value >= 6 characters (no digit/charset constraint). Required: /setup fails closed when SETUP_CODE is unset.',
     }),
 });

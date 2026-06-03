@@ -31,20 +31,20 @@ For the manual flow, see the **Quick start** section in the [README](../../READM
 |------------------|-----------------|------------------------------------------------------------|
 | Worker           | (one worker)    | Single Worker (API in-process + React Router SSR).        |
 | D1 database      | `DB`            | All structured data (inspections, users, comments, ...).   |
-| R2 bucket        | `PHOTOS`        | Field-form photo uploads.                                  |
-| R2 bucket        | `REPORTS`       | Pre-rendered Summary + Full Report PDFs (Spec 5A).         |
+| R2 bucket        | `PHOTOS`        | All object storage — field-form photos, pre-rendered report/certificate PDFs, and e-sign evidence packs. |
 | KV namespace     | `TENANT_CACHE`  | Branding + tenant-config 1-hour cache.                     |
 | Browser binding  | `BROWSER`       | PDF rendering for reports + e-sign certificates.           |
 | Workflow         | `SIGN_COMPLETION_WORKFLOW` | Async e-sign pipeline (Spec 5H).                           |
 | Durable Objects  | `INSPECTION_PRESENCE`, `TENANT_PRESENCE` | Live presence for the editor.               |
 
-`npm run setup:cloudflare` provisions every binding listed above and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped from the committed placeholder `wrangler.jsonc`). Re-run with `--refresh-setup-code` to mint a new first-run setup code if you misplace yours.
+`npm run setup:cloudflare` provisions every binding listed above and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped from the committed placeholder `wrangler.jsonc`).
 
 ### Minimum secrets
 
 | Secret            | When required                                       |
 |-------------------|-----------------------------------------------------|
 | `JWT_SECRET`      | Always — must be >= 32 random characters.            |
+| `SETUP_CODE`      | First-run setup only — any value >= 6 characters; gates `/setup` (fail-closed if unset). |
 | `RESEND_API_KEY`  | Optional, only if you want outbound email.          |
 | `SENDER_EMAIL`    | Required when `RESEND_API_KEY` is set.              |
 | `GEMINI_API_KEY`  | Optional — enables AI comment-assist.               |
@@ -60,16 +60,18 @@ npm run setup:cloudflare   # provisions D1/KV/R2 + writes real IDs to wrangler.l
 npm run deploy             # build + wrangler deploy (uses wrangler.local.jsonc)
 ```
 
-`npm run deploy` runs `react-router build` (bundling `server/` API + `app/` SSR into one worker) then `wrangler deploy` against the built `build/server/wrangler.json`. The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`). Apply remote D1 migrations with `npm run db:migrate:remote`.
+`npm run deploy` runs `react-router build` (bundling `server/` API + `app/` SSR into one worker) then `wrangler deploy` against the built `build/server/wrangler.json`, and finally `jwt:ensure` + `setup-code:ensure` (provision missing secrets). The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`). Apply remote D1 migrations with `npm run db:migrate:remote`.
 
 > **One-click**: the committed `wrangler.jsonc` carries placeholder IDs; the README's *Deploy to Cloudflare* button provisions resources and injects real IDs automatically — no manual `setup:cloudflare` needed for that path.
 
-After the Worker boots, visit `https://<your-worker>.workers.dev/setup` and enter the 6-digit setup code. **The code itself is not printed in logs** — recover it with one of:
+### First-run setup code
 
-- **Recommended**: set `SETUP_CODE=<any 6-digit value>` as a Worker secret before deploying (`wrangler secret put SETUP_CODE`) and use that value at `/setup`.
-- Or read the auto-generated code from KV: `wrangler kv key get setup_verification_code --binding TENANT_CACHE` (1-hour TTL). Re-run `npm run setup:cloudflare -- --refresh-setup-code` to mint a fresh one if it expires.
+First-run `/setup` is gated **solely** on the `SETUP_CODE` secret — the server reads `c.env.SETUP_CODE` and refuses to proceed when it is unset, so an unprotected Worker can't be claimed. It is any value >= 6 characters (compared for exact equality — no digit/charset constraint). You get one of two ways depending on how you deployed:
 
-That bootstraps your first admin account.
+- **CLI** (`npm run deploy`): the final `setup-code:ensure` step (`scripts/ensure-setup-code.mjs`) generates a random `SETUP_CODE` and **prints it in the deploy output** — but only when the secret is MISSING. It never overwrites an existing value, so re-deploys keep your code. Provide your own first with `wrangler secret put SETUP_CODE` if you prefer.
+- **One-click**: the wizard reads `.dev.vars.example` and surfaces `SETUP_CODE` as a secret field you fill in during deploy.
+
+Then visit `https://<your-worker>.workers.dev/setup` and enter that value to bootstrap your first admin account.
 
 ### How the single worker is wired
 
