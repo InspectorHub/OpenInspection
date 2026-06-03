@@ -277,7 +277,7 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
 
 export const bookingsRoutes = createApiRouter()
     .openapi(listInspectorsRoute, async (c) => {
-        const tenantId = c.get('tenantId') || c.get('requestedSubdomain');
+        const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
         if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
 
         const service = c.var.services.booking;
@@ -285,7 +285,7 @@ export const bookingsRoutes = createApiRouter()
         return c.json({ success: true, data: inspectors }, 200);
     })
     .openapi(listPublicServicesRoute, async (c) => {
-        const tenantId = c.get('tenantId') || c.get('requestedSubdomain');
+        const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
         if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
         const db = drizzle(c.env.DB);
         const rows = await db.select({
@@ -315,7 +315,7 @@ export const bookingsRoutes = createApiRouter()
         }, 200);
     })
     .openapi(getAvailabilityRoute, async (c) => {
-        const tenantId = c.get('tenantId') || c.get('requestedSubdomain');
+        const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
         if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
 
         const { inspectorId } = c.req.valid('param');
@@ -332,7 +332,7 @@ export const bookingsRoutes = createApiRouter()
         await checkRateLimit(c, 'book');
 
         const body = c.req.valid('json');
-        const tenantId = c.get('tenantId') || c.get('requestedSubdomain');
+        const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
         if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
 
         const service = c.var.services.booking;
@@ -668,7 +668,7 @@ export const bookingsRoutes = createApiRouter()
         // + Certificate of Completion + appends 'workflow.complete' to audit chain).
         // Fire-and-forget: client doesn't wait. Workflow has its own retry policy.
         if (request && c.env.SIGN_COMPLETION_WORKFLOW) {
-            const tenantSlug = c.get('requestedSubdomain') ?? '';
+            const tenantSlug = c.get('requestedTenantSlug') ?? '';
             c.executionCtx.waitUntil((async () => {
                 try {
                     await c.env.SIGN_COMPLETION_WORKFLOW!.create({
@@ -870,9 +870,9 @@ export const bookingsRoutes = createApiRouter()
         const { tenant, slug } = c.req.param();
         const db = drizzle(c.env.DB);
 
-        // Resolve tenant by subdomain
+        // Resolve tenant by slug
         const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
-            .from(tenants).where(eq(tenants.subdomain, tenant)).get();
+            .from(tenants).where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
 
         // Find inspector by slug within tenant

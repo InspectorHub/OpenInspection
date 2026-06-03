@@ -26,8 +26,8 @@ const TENANT_B = '00000000-0000-0000-0000-000000000002';
 
 async function seedTenants(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values([
-        { id: TENANT_A, name: 'A', subdomain: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-        { id: TENANT_B, name: 'B', subdomain: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
 }
 

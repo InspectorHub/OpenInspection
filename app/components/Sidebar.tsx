@@ -237,7 +237,7 @@ export function Sidebar() {
   const siteName = ctx?.branding?.siteName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
   const userName = ctx?.user?.name || "Inspector";
-  const userSubline = ctx?.branding?.tenantSubdomain || "openinspection.dev";
+  const userSubline = ctx?.branding?.tenantSlug || "openinspection.dev";
   const userInitials = ctx?.user?.initials || "OI";
   const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
 

@@ -13,7 +13,7 @@ export interface SessionContext {
     reportTheme: string;
     isSaas: boolean;
     portalBaseUrl: string | null;
-    tenantSubdomain: string | null;
+    tenantSlug: string | null;
     tenantStatus: string;
     currentUserSlug: string | null;
     bookingHost: string | null;

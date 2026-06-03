@@ -59,7 +59,7 @@ export const publicShareRoutes = createApiRouter()
 
         const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
         const baseUrl = c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`;
-        const tenantSlug = c.get('requestedSubdomain') ?? '';
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
         const url = `${baseUrl}/report/${tenantSlug}/${id}?view=agent&token=${token}`;
         logger.info('Public share-token minted', { inspectionId: id, tenantId });
         return sendSuccess(c, { token, url });

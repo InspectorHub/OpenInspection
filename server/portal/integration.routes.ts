@@ -8,11 +8,11 @@ import { requireServiceBinding } from './service-binding-guard';
 const api = new Hono<HonoConfig>();
 
 /**
- * PATCH /api/integration/tenants/:subdomain
+ * PATCH /api/integration/tenants/:slug
  * Triggered by Portal when tenant information changes.
  */
-api.patch('/tenants/:subdomain', requireServiceBinding, async (c) => {
-    const subdomain = c.req.param('subdomain');
+api.patch('/tenants/:slug', requireServiceBinding, async (c) => {
+    const slug = c.req.param('slug');
     const parsed = TenantStatusBodySchema.safeParse(await c.req.json());
     if (!parsed.success) {
         return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
@@ -23,7 +23,7 @@ api.patch('/tenants/:subdomain', requireServiceBinding, async (c) => {
     try {
         await adminService.handleTenantUpdate({
             ...parsed.data,
-            subdomain,
+            slug,
         } as TenantUpdateParams);
 
         return c.json({ success: true });
@@ -34,11 +34,11 @@ api.patch('/tenants/:subdomain', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/integration/tenants/:subdomain/stripe-connect
+ * POST /api/integration/tenants/:slug/stripe-connect
  * Triggered by Portal when Stripe Connect is completed.
  */
-api.post('/tenants/:subdomain/stripe-connect', requireServiceBinding, async (c) => {
-    const subdomain = c.req.param('subdomain');
+api.post('/tenants/:slug/stripe-connect', requireServiceBinding, async (c) => {
+    const slug = c.req.param('slug');
     const parsed = StripeConnectBodySchema.safeParse(await c.req.json());
     if (!parsed.success) {
         return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
@@ -47,7 +47,7 @@ api.post('/tenants/:subdomain/stripe-connect', requireServiceBinding, async (c) 
     const adminService = c.var.services.admin;
 
     try {
-        await adminService.updateStripeConnect(subdomain as string, parsed.data.accountId);
+        await adminService.updateStripeConnect(slug as string, parsed.data.accountId);
         return c.json({ success: true });
     } catch (error: unknown) {
         logger.error('Failed to handle stripe connect', {}, error instanceof Error ? error : undefined);
@@ -56,16 +56,16 @@ api.post('/tenants/:subdomain/stripe-connect', requireServiceBinding, async (c) 
 });
 
 /**
- * POST /api/integration/tenants/:subdomain/data-export
+ * POST /api/integration/tenants/:slug/data-export
  * Triggered by Portal during offboarding workflow. Returns ZIP stream.
  */
-api.post('/tenants/:subdomain/data-export', requireServiceBinding, async (c) => {
-    const subdomain = c.req.param('subdomain');
+api.post('/tenants/:slug/data-export', requireServiceBinding, async (c) => {
+    const slug = c.req.param('slug');
     const { drizzle } = await import('drizzle-orm/d1');
     const { eq } = await import('drizzle-orm');
     const { tenants } = await import('../lib/db/schema');
     const d = drizzle(c.env.DB);
-    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.subdomain, subdomain as string)).get();
+    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug as string)).get();
     if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
 
     const { DataExportService } = await import('../services/data-export.service');
@@ -77,27 +77,27 @@ api.post('/tenants/:subdomain/data-export', requireServiceBinding, async (c) => 
         return new Response(blob, {
             headers: {
                 'content-type':        'application/zip',
-                'content-disposition': `attachment; filename="export-${subdomain}.zip"`,
+                'content-disposition': `attachment; filename="export-${slug}.zip"`,
                 'x-export-manifest':   JSON.stringify(manifest),
             },
         });
     } catch (error: unknown) {
-        logger.error('Data export failed', { subdomain }, error instanceof Error ? error : undefined);
+        logger.error('Data export failed', { slug }, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Export failed' } }, 500);
     }
 });
 
 /**
- * POST /api/integration/tenants/:subdomain/purge
+ * POST /api/integration/tenants/:slug/purge
  * Triggered by Portal at end of offboarding grace period. Cascade-deletes all tenant data.
  */
-api.post('/tenants/:subdomain/purge', requireServiceBinding, async (c) => {
-    const subdomain = c.req.param('subdomain');
+api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
+    const slug = c.req.param('slug');
     const { drizzle } = await import('drizzle-orm/d1');
     const { eq } = await import('drizzle-orm');
     const { tenants } = await import('../lib/db/schema');
     const d = drizzle(c.env.DB);
-    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.subdomain, subdomain as string)).get();
+    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug as string)).get();
     if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
 
     const { TenantPurgeService } = await import('../services/tenant-purge.service');
@@ -106,7 +106,7 @@ api.post('/tenants/:subdomain/purge', requireServiceBinding, async (c) => {
         const result = await svc.purge(t.id as string);
         return c.json({ success: true, data: result });
     } catch (error: unknown) {
-        logger.error('Tenant purge failed', { subdomain }, error instanceof Error ? error : undefined);
+        logger.error('Tenant purge failed', { slug }, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Purge failed' } }, 500);
     }
 });

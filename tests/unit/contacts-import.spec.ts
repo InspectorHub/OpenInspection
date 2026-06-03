@@ -62,7 +62,7 @@ describe('importContacts', () => {
         await testDb.insert(schema.tenants).values({
             id: TENANT_ID,
             name: 'Test Tenant',
-            subdomain: 'test',
+            slug: 'test',
             status: 'active',
             deploymentMode: 'shared',
             tier: 'free',

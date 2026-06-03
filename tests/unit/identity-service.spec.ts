@@ -36,8 +36,8 @@ const STRANGER   = 'cccccccc-cccc-cccc-cccc-cccccccccce0';
 
 async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values([
-        { id: TENANT_A, name: 'Acme A', subdomain: 'acme-a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-        { id: TENANT_B, name: 'Acme B', subdomain: 'acme-b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_A, name: 'Acme A', slug: 'acme-a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_B, name: 'Acme B', slug: 'acme-b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await testDb.insert(schema.users).values([
         { id: PRIMARY,  tenantId: TENANT_A, email: 'u@a.test', passwordHash: 'x', role: 'admin',     createdAt: new Date() },

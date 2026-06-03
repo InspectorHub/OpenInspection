@@ -29,7 +29,7 @@ describe('agent tables schema — A1', () => {
 
     it('agent_tenant_links table accepts a row + enforces unique (agent_user_id, tenant_id)', () => {
         // Seed a tenant + user so the FK references resolve.
-        sqlite.prepare(`INSERT INTO tenants (id, name, subdomain, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`).run(
+        sqlite.prepare(`INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`).run(
             't1', 'Acme', 'acme', 'free', 'active', 5, 'shared', Date.now(),
         );
         sqlite.prepare(`INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES (?, NULL, ?, ?, 'agent', ?)`).run(
@@ -44,7 +44,7 @@ describe('agent tables schema — A1', () => {
     });
 
     it('agent_invites table accepts a row + agent_tenant_links enforces tenant_id FK', () => {
-        sqlite.prepare(`INSERT INTO tenants (id, name, subdomain, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`).run(
+        sqlite.prepare(`INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at) VALUES (?,?,?,?,?,?,?,?)`).run(
             't1', 'Acme', 'acme', 'free', 'active', 5, 'shared', Date.now(),
         );
         sqlite.prepare(`INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, 'inspector', ?)`).run(

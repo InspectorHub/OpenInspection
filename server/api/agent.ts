@@ -215,7 +215,7 @@ const AgentInspectorRowSchema = z.object({
     inspectorSlug:     z.string().nullable().describe('Inspector public profile slug.'),
     inspectorPhotoUrl: z.string().nullable().describe('Inspector avatar URL.'),
     tenantName:        z.string().describe('Inspecting company name.'),
-    tenantSubdomain:   z.string().describe('Tenant subdomain for the booking link.'),
+    tenantSlug:   z.string().describe('Tenant slug for the booking link.'),
 });
 const inspectorsRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -229,7 +229,7 @@ const inspectorsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listAgentInspectors",
-    description: "Lists every inspecting team the signed-in agent has an active link with, with the public profile slug + subdomain needed to build shareable booking links for clients.",
+    description: "Lists every inspecting team the signed-in agent has an active link with, with the public profile slug + slug needed to build shareable booking links for clients.",
 }, { scopes: ['agent'], tier: 'extended' }));
 
 export const agentRoutes = createApiRouter()

@@ -14,8 +14,8 @@ const USER_2   = '00000000-0000-0000-0000-0000000000a2';
 
 async function seedTenantAndUsers(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values([
-        { id: TENANT_A, name: 'A', subdomain: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-        { id: TENANT_B, name: 'B', subdomain: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+        { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await testDb.insert(schema.users).values([
         { id: USER_1, tenantId: TENANT_A, email: 'u1@a.com', name: 'U1', passwordHash: 'x', role: 'admin', createdAt: new Date() },

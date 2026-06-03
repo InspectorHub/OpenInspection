@@ -84,8 +84,8 @@ describe('tenant-routing — saas mode', () => {
         // unresolved" describe with a positive path-param happy path —
         // the path-param resolver runs before the profile branch, so
         // /book/<slug>/<inspector> correctly populates tenantId in saas
-        // mode without needing any subdomain magic.
-        const fakeTenant = { id: 'tenant-uuid', subdomain: 'acme', tier: 'pro', status: 'active' };
+        // mode without needing any slug magic.
+        const fakeTenant = { id: 'tenant-uuid', slug: 'acme', tier: 'pro', status: 'active' };
         const { app, env } = makeApp(
             {
                 DB: {} as never,
@@ -103,7 +103,7 @@ describe('tenant-routing — saas mode', () => {
     });
 
     it('leaves tenantId unset on a non-public path so JWT middleware downstream can fill it', async () => {
-        // Section F rewrite. Replaces the old "silo subdomain" describe.
+        // Section F rewrite. Replaces the old "silo slug" describe.
         // In saas mode, tenantRouter's job for non-public paths is to do
         // nothing — JWT middleware downstream owns tenantId. We confirm
         // that contract: tenantId is undefined when the handler runs and

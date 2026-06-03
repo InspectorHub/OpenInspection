@@ -139,7 +139,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     const actions: PaletteItem[] = [];
     const slug = sessionCtx?.branding?.currentUserSlug;
     const host = sessionCtx?.branding?.bookingHost;
-    const tenant = sessionCtx?.branding?.tenantSubdomain;
+    const tenant = sessionCtx?.branding?.tenantSlug;
     if (slug && host && tenant) {
       const bookingUrl = `https://${host}/book/${tenant}/${slug}`;
       actions.push({

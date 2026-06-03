@@ -7,14 +7,14 @@ import type { HonoConfig } from '../../types/hono';
 /**
  * Path-param resolution: pulls the tenant slug from the URL's first
  * non-prefix segment for known public routes, then resolves via KV/D1
- * the same way subdomain resolution does.
+ * the same way slug resolution does.
  *
  * Pattern: /<prefix>/<tenant>/...
  *   prefix ∈ {book, embed/book, inspector, report, sign,
  *             agreements/sign, m2m/agreement-render}
  *
  * Returns true if a tenant was extracted + resolved; false otherwise
- * (caller should then try subdomain → fixed → leave-unset).
+ * (caller should then try slug → fixed → leave-unset).
  */
 const PUBLIC_PREFIXES = [
     '/book/',
@@ -43,7 +43,7 @@ export async function resolveByPathParam(c: Context<HonoConfig>, path: string): 
     if (!cachedTenant) {
         try {
             const db = drizzle(c.env.DB);
-            const tenantMatch = await db.select().from(tenants).where(eq(tenants.subdomain, tenantSlug)).get();
+            const tenantMatch = await db.select().from(tenants).where(eq(tenants.slug, tenantSlug)).get();
             if (tenantMatch) {
                 cachedTenant = tenantMatch;
                 if (c.env.TENANT_CACHE && c.executionCtx) {
@@ -61,7 +61,7 @@ export async function resolveByPathParam(c: Context<HonoConfig>, path: string): 
     const tenantId = cached.id as string;
     c.set('tenantId', tenantId);
     c.set('resolvedTenantId', tenantId);
-    c.set('requestedSubdomain', cached.subdomain as string);
+    c.set('requestedTenantSlug', cached.slug as string);
     c.set('tenantTier', (cached.tier as string) || 'free');
     c.set('tenantStatus', (cached.status as string) || 'active');
     return true;

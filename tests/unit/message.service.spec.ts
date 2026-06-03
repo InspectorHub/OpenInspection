@@ -18,7 +18,7 @@ describe('MessageService', () => {
         await setupSchema(setup.sqlite);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
-        await testDb.insert(tenants).values({ id: 't1', name: 'T', subdomain: 't1', createdAt: new Date() });
+        await testDb.insert(tenants).values({ id: 't1', name: 'T', slug: 't1', createdAt: new Date() });
         await testDb.insert(inspections).values({
             id: 'i1', tenantId: 't1', propertyAddress: '1 Main', date: '2026-05-01',
             createdAt: new Date(), price: 0,

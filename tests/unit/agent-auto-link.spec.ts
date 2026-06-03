@@ -22,9 +22,9 @@ describe('AgentService.autoLinkSameEmail — A1', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT_A, name: 'A', subdomain: 'aco', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_B, name: 'B', subdomain: 'bco', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_C, name: 'C', subdomain: 'cco', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_A, name: 'A', slug: 'aco', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_B, name: 'B', slug: 'bco', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_C, name: 'C', slug: 'cco', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);

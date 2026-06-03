@@ -8,7 +8,7 @@
  * (or to a contractor). Same gates as `/r/:id/repair-request`:
  *   - Tenant must opt in via tenant_configs.enable_customer_repair_export
  *   - Inspection's payment + agreement requirements must be satisfied
- *   - Tenant resolved from subdomain (or single-tenant default in standalone)
+ *   - Tenant resolved from slug (or single-tenant default in standalone)
  *
  * Audit log: writes 'repair_request.exported' on success.
  *
@@ -66,7 +66,7 @@ const sendEmailRoute = createRoute(withMcpMetadata({
 
 // C-10 ③-D — GET /api/public/repair-request/:id — the data the public
 // repair-request page renders (property + defects + estimates + prefill email).
-// Tenant resolved from subdomain; the unguessable inspection id is the key.
+// Tenant resolved from slug; the unguessable inspection id is the key.
 const RepairDefectSchema = z.object({
     sectionId:           z.string().describe('Report section id.'),
     sectionTitle:        z.string().describe('Report section title.'),
@@ -104,7 +104,7 @@ const getRepairRequestRoute = createRoute(withMcpMetadata({
         404: { description: 'Tenant not resolved' },
     },
     operationId: "getPublicRepairRequest",
-    description: "Public, no-login repair-request page data (property + flattened defect list + estimates) for an inspection, resolved by tenant subdomain + the unguessable inspection id.",
+    description: "Public, no-login repair-request page data (property + flattened defect list + estimates) for an inspection, resolved by tenant slug + the unguessable inspection id.",
 }, { scopes: [], tier: 'extended' }));
 
 export const repairRequestRoutes = createApiRouter()

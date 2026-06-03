@@ -26,8 +26,8 @@ describe('AgentService.listReferrals — A2', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: T1, name: 'Acme Inspections', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: T2, name: 'BobsInsp', subdomain: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T1, name: 'Acme Inspections', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T2, name: 'BobsInsp', slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
 
         await testDb.insert(schema.users).values([
@@ -121,8 +121,8 @@ describe('AgentService.listInspectors — A2', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: T1, name: 'Acme Inspections', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: T2, name: 'BobsInsp', subdomain: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T1, name: 'Acme Inspections', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: T2, name: 'BobsInsp', slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
 
         await testDb.insert(schema.users).values([
@@ -168,19 +168,19 @@ describe('AgentService.listInspectors — A2', () => {
         expect(rows[0]?.tenantId).toBe(T2);
     });
 
-    it('exposes inspector slug + photo + name + tenant subdomain', async () => {
+    it('exposes inspector slug + photo + name + tenant slug', async () => {
         const rows = await svc.listInspectors(AGENT_USER);
         const acme = rows.find((r) => r.tenantId === T1);
         expect(acme?.inspectorSlug).toBe('mike');
         expect(acme?.inspectorPhotoUrl).toBe('https://r2/me.jpg');
         expect(acme?.inspectorName).toBe('Mike');
-        expect(acme?.tenantSubdomain).toBe('acme');
+        expect(acme?.tenantSlug).toBe('acme');
     });
 
     it('falls back to null inspector fields when invitedByUserId missing', async () => {
         // Add a link with no invitedByUserId (auto-link path).
         await testDb.insert(schema.tenants).values({
-            id: 'T3', name: 'NoInspector', subdomain: 'no', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: 'T3', name: 'NoInspector', slug: 'no', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.agentTenantLinks).values({
             id: 'l3', agentUserId: AGENT_USER, tenantId: 'T3', status: 'active', createdAt: new Date(),
@@ -203,7 +203,7 @@ describe('AgentService.revokeLink — A2', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values({
-            id: T1, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: T1, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.users).values({
             id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h',

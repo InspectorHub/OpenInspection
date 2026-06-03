@@ -6,7 +6,7 @@ import type { HonoConfig } from '../../types/hono';
 
 /**
  * Standalone path: fixed tenant id from profile, with KV cache
- * for the row metadata (subdomain / tier / status).
+ * for the row metadata (slug / tier / status).
  */
 export async function resolveByFixedTenant(c: Context<HonoConfig>, tenantId: string): Promise<void> {
     c.set('tenantId', tenantId);
@@ -32,7 +32,7 @@ export async function resolveByFixedTenant(c: Context<HonoConfig>, tenantId: str
 
     if (cachedTenant) {
         const t = cachedTenant as Record<string, unknown>;
-        c.set('requestedSubdomain', t.subdomain as string);
+        c.set('requestedTenantSlug', t.slug as string);
         c.set('tenantTier', (t.tier as string) || 'free');
         c.set('tenantStatus', (t.status as string) || 'active');
     }

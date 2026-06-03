@@ -45,7 +45,7 @@ describe('getSeatUsage', () => {
         await testDb.insert(tenants).values({
             id,
             name: `Tenant ${id}`,
-            subdomain: id,
+            slug: id,
             maxUsers,
             createdAt: new Date(),
         });

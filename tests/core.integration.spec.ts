@@ -74,7 +74,7 @@ async function resetAndBootstrap(request: import('@playwright/test').APIRequestC
     const setupRes = await request.post(`${BASE_URL}/setup`, {
         data: {
             companyName: 'Integration Test Co',
-            subdomain: 'integration',
+            slug: 'integration',
             email: 'admin@integration.test',
             password: 'TestPass123!',
         },

@@ -54,7 +54,7 @@ describe('Track E2 — section disclaimer + alwaysPageBreak surfacing', () => {
         svc = new InspectionService({} as D1Database);
 
         await testDb.insert(schema.tenants).values({
-            id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.templates).values({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

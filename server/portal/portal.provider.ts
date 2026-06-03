@@ -17,20 +17,20 @@ export class PortalProvider implements IntegrationProvider {
 
     async handleTenantUpdate(params: TenantUpdateParams): Promise<void> {
         const db = this.getDrizzle();
-        const { id, subdomain, status, tier, name, maxUsers, adminEmail, adminPasswordHash } = params;
+        const { id, slug, status, tier, name, maxUsers, adminEmail, adminPasswordHash } = params;
 
         // Upsert tenant
         const existingTenant = await db.select()
             .from(tenants)
-            .where(eq(tenants.subdomain, subdomain))
+            .where(eq(tenants.slug, slug))
             .get();
 
         if (!existingTenant) {
             const newTenantId = id || crypto.randomUUID();
             await db.insert(tenants).values({
                 id: newTenantId,
-                subdomain,
-                name: name || subdomain,
+                slug,
+                name: name || slug,
                 status: (status as 'active' | 'suspended' | 'trial') || 'active',
                 tier: (tier as 'free' | 'pro' | 'enterprise') || 'free',
                 ...(maxUsers != null ? { maxUsers } : {}),
@@ -51,7 +51,7 @@ export class PortalProvider implements IntegrationProvider {
                     name: name || existingTenant.name,
                     ...(maxUsers != null ? { maxUsers } : {}),
                 })
-                .where(eq(tenants.subdomain, subdomain));
+                .where(eq(tenants.slug, slug));
         }
 
         // Handle Admin Sync if provided
@@ -89,18 +89,18 @@ export class PortalProvider implements IntegrationProvider {
         // Clear cache if KV exists
         if (this.kv) {
             // Standardized key matched with tenant-router.ts
-            await this.kv.delete(`tenant:${subdomain}`);
+            await this.kv.delete(`tenant:${slug}`);
         }
     }
 
-    async handleStripeConnect(subdomain: string, accountId: string): Promise<void> {
+    async handleStripeConnect(slug: string, accountId: string): Promise<void> {
         const db = this.getDrizzle();
         await db.update(tenants)
             .set({ stripeConnectAccountId: accountId })
-            .where(eq(tenants.subdomain, subdomain));
+            .where(eq(tenants.slug, slug));
 
         if (this.kv) {
-            await this.kv.delete(`tenant:${subdomain}`);
+            await this.kv.delete(`tenant:${slug}`);
         }
     }
 

@@ -60,7 +60,7 @@ describe('POST /api/admin/seed-starter-content', () => {
         await testDb.insert(schema.tenants).values({
             id:        tenantId,
             name:      'Test Tenant',
-            subdomain: 'test',
+            slug: 'test',
             createdAt: new Date(),
         });
     });

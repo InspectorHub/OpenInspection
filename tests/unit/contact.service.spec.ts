@@ -23,8 +23,8 @@ describe('ContactService.listContacts inspectionCount', () => {
         await setupSchema(fixture.sqlite);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT_A, name: 'A', subdomain: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_B, name: 'B', subdomain: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.contacts).values([
             { id: CLIENT_JANE, tenantId: TENANT_A, type: 'client', name: 'Jane', email: 'jane@test.com', createdAt: new Date() },

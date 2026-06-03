@@ -79,7 +79,7 @@ export const sessionContextRoutes = createApiRouter()
                     reportTheme: branding?.reportTheme || 'modern',
                     isSaas: branding?.isSaas || false,
                     portalBaseUrl: branding?.portalBaseUrl || null,
-                    tenantSubdomain: branding?.tenantSubdomain || null,
+                    tenantSlug: branding?.tenantSlug || null,
                     tenantStatus: branding?.tenantStatus || 'active',
                     currentUserSlug: branding?.currentUserSlug || null,
                     bookingHost: branding?.bookingHost || null,

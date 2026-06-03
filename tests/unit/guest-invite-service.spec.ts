@@ -20,7 +20,7 @@ const TENANT = '00000000-0000-0000-0000-000000000099';
 
 async function seedTenant(testDb: BetterSQLite3Database<typeof schema>, maxUsers = 5) {
     await testDb.insert(schema.tenants).values({
-        id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active',
+        id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     // Core tenants table doesn't carry max_users (that lives on the portal

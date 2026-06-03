@@ -18,8 +18,8 @@ export interface SignatureUser {
     phone?: string | null;
     licenseNumber?: string | null;
     slug?: string | null;
-    /** Tenant subdomain — required for path-tenant booking URLs (`/book/<tenant>/<slug>`). */
-    tenantSubdomain?: string | null;
+    /** Tenant slug — required for path-tenant booking URLs (`/book/<tenant>/<slug>`). */
+    tenantSlug?: string | null;
 }
 
 export interface SignatureOutput {
@@ -52,8 +52,8 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
     const email     = user.email         ? escapeHtml(user.email)         : null;
     const phoneRaw  = user.phone         ? escapeHtml(user.phone)         : null;
     const phoneE164 = phoneTel(user.phone ?? null);
-    const link      = (user.slug && user.tenantSubdomain)
-        ? `https://${host}/book/${escapeHtml(user.tenantSubdomain)}/${escapeHtml(user.slug)}`
+    const link      = (user.slug && user.tenantSlug)
+        ? `https://${host}/book/${escapeHtml(user.tenantSlug)}/${escapeHtml(user.slug)}`
         : null;
 
     const htmlLines: string[] = [];
@@ -75,8 +75,8 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
         if (user.email) cb.push(user.email);
         textLines.push(cb.join(' · '));
     }
-    if (user.slug && user.tenantSubdomain) {
-        textLines.push(`Book again: https://${host}/book/${user.tenantSubdomain}/${user.slug}`);
+    if (user.slug && user.tenantSlug) {
+        textLines.push(`Book again: https://${host}/book/${user.tenantSlug}/${user.slug}`);
     }
     const text = textLines.join('\n');
 

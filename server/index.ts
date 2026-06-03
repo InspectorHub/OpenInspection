@@ -343,7 +343,7 @@ app.use('*', async (c, next) => {
     }
 
     // --- Tenant Isolation Guard (Fail-Fast) ---
-    // In SaaS mode, strictly verify that the token's tenant matches the requested subdomain's tenant.
+    // In SaaS mode, strictly verify that the token's tenant matches the requested slug's tenant.
     if (c.var.profile.mode === 'saas') {
         const tokenTenantId = c.get('tenantId');
         const resolvedTenantId = c.get('resolvedTenantId');
@@ -566,7 +566,7 @@ app.get('/inspector/:tenant/:slug/calendar.ics', async (c) => {
     // Tenant slug from path must match what tenant-router resolved.
     // The middleware only sets resolvedTenantId on a successful match,
     // so an unresolved path tenant manifests as a 404 here.
-    if (!tenantId || c.get('requestedSubdomain') !== tenantSlugFromPath) {
+    if (!tenantId || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
         return c.text('Not found', 404);
     }
     const ics = await c.var.services.ics.busyFeedForInspector(tenantId, slug);
@@ -597,7 +597,7 @@ app.get('/agreements/sign', (c) => c.redirect('/not-found?from=agreement-sign', 
 // / never created), redirects to the friendly not-found page so the
 // customer at least sees branded copy instead of the bare 404.
 //
-// Public — no JWT required. tenantId resolves from the subdomain via
+// Public — no JWT required. tenantId resolves from the slug via
 // tenantRouter middleware (`resolvedTenantId`), the same way the public
 // `/report/:id` viewer is scoped.
 app.get('/sign/:tenant/:id', async (c) => {
@@ -609,7 +609,7 @@ app.get('/sign/:tenant/:id', async (c) => {
     // so an unresolved path tenant manifests as a 404 here. Use the
     // friendly not-found page to match the rest of this handler's
     // failure modes (token miss / no live request).
-    if (!tenantId || c.get('requestedSubdomain') !== tenantSlugFromPath) {
+    if (!tenantId || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
         return c.redirect('/not-found?from=agreement-sign', 302);
     }
 
@@ -646,7 +646,7 @@ app.get('/api/public/verify/:envelopeId/document', async (c) => {
     const envelopeId = c.req.param('envelopeId') as string;
     const data = await loadVerifyData(c, envelopeId);
     if (!data) return c.text('Not found', 404);
-    return c.redirect(agreementSignPath(data.tenantSubdomain, data.reqRow.token), 302);
+    return c.redirect(agreementSignPath(data.tenantSlug, data.reqRow.token), 302);
 });
 
 app.get('/api/public/verify-by-token/:token', async (c) => {

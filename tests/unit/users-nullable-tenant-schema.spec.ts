@@ -22,7 +22,7 @@ describe('users schema — A1', () => {
         // human can now hold one users row per tenant in core's shared D1,
         // matching the per-identity / per-membership model on the portal side.
         const row1 = sqlite.prepare(
-            `INSERT INTO tenants (id, name, subdomain, tier, status, max_users, deployment_mode, created_at)
+            `INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         );
         row1.run('t-a', 'A', 'aco', 'free', 'active', 5, 'shared', Date.now());

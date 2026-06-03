@@ -11,7 +11,7 @@ import type { HonoConfig } from '../../types/hono';
  * Agent JWTs intentionally carry no `tenantId` claim because a single agent can
  * be linked to multiple tenants (multi-to-multi via `agent_tenant_links`). Each
  * agent-scoped handler must therefore explicitly resolve the tenant from the
- * request (typically `?tenant=<subdomain>` or a path segment) and confirm that
+ * request (typically `?tenant=<slug>` or a path segment) and confirm that
  * the agent has an active link to it.
  *
  * Throws:

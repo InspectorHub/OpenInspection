@@ -7,7 +7,7 @@ const FULL_USER = {
     phone: '(303) 555-0142',
     licenseNumber: 'TX-INSP-9001',
     slug: 'mike',
-    tenantSubdomain: 'acme',
+    tenantSlug: 'acme',
 } as const;
 
 const HOST = 'app.inspectorhub.io';

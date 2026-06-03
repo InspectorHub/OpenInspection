@@ -36,8 +36,8 @@ describe('InspectionService.updatePropertyFacts (G1)', () => {
         svc = new InspectionService({} as D1Database);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT_A, name: 'Acme',   subdomain: 'acme',   status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-            { id: TENANT_B, name: 'Globex', subdomain: 'globex', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_A, name: 'Acme',   slug: 'acme',   status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT_B, name: 'Globex', slug: 'globex', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
         await testDb.insert(schema.inspections).values([
             { id: 'insp-A', tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'A', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date() },

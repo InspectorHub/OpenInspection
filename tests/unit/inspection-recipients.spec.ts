@@ -22,7 +22,7 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
         svc = new InspectionService({} as D1Database);
 
         await testDb.insert(schema.tenants).values([
-            { id: TENANT, name: 'Acme', subdomain: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+            { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
     });
 
@@ -130,7 +130,7 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
     it('throws NotFound for an inspection in another tenant', async () => {
         const OTHER = '00000000-0000-0000-0000-0000000000ff';
         await testDb.insert(schema.tenants).values({
-            id: OTHER, name: 'Other', subdomain: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            id: OTHER, name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER,

@@ -114,7 +114,7 @@ describe('GET /api/public/observe/inspections/:id — ③-A.4', () => {
 /**
  * C-10 ③-A.2 — GET /api/public/report-gate/:tenant/:id
  * Public "report blocked, here's why + CTA" page. tenantId resolves from the
- * subdomain (middleware), never the URL :tenant. No token (pre-report).
+ * slug (middleware), never the URL :tenant. No token (pre-report).
  */
 describe('GET /api/public/report-gate/:tenant/:id — ③-A.2', () => {
     function buildApp(
@@ -137,7 +137,7 @@ describe('GET /api/public/report-gate/:tenant/:id — ③-A.2', () => {
         return { app, getReportGate };
     }
 
-    it('404 when the tenant subdomain does not resolve', async () => {
+    it('404 when the tenant slug does not resolve', async () => {
         const { app } = buildApp(null);
         const res = await app.request('/api/public/report-gate/acme/insp1');
         expect(res.status).toBe(404);

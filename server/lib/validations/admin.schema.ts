@@ -76,7 +76,7 @@ export const AgreementSchema = z.object({
  */
 export const TenantStatusSchema = z.object({
     id: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
-    subdomain: z.string().min(1).openapi({ example: 'acme' }).describe('TODO describe subdomain field for the OpenInspection MCP integration'),
+    slug: z.string().min(1).openapi({ example: 'acme' }).describe('TODO describe slug field for the OpenInspection MCP integration'),
     status: z.string().min(1).openapi({ example: 'active' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     tier: z.string().optional().openapi({ example: 'pro' }).describe('TODO describe tier field for the OpenInspection MCP integration'),
     name: z.string().optional().openapi({ example: 'Acme Corp' }).describe('TODO describe name field for the OpenInspection MCP integration'),
@@ -98,13 +98,13 @@ export const SiloUpdateSchema = z.object({
  * Validation schema for Stripe Connect updates (M2M).
  */
 export const StripeConnectSchema = z.object({
-    subdomain: z.string().min(1).openapi({ example: 'acme' }).describe('TODO describe subdomain field for the OpenInspection MCP integration'),
+    slug: z.string().min(1).openapi({ example: 'acme' }).describe('TODO describe slug field for the OpenInspection MCP integration'),
     stripeConnectAccountId: z.string().min(1).openapi({ example: 'acct_12345' }).describe('TODO describe stripeConnectAccountId field for the OpenInspection MCP integration'),
 }).openapi('StripeConnect');
 
 /**
- * Body schema for PATCH /api/integration/tenants/:subdomain (M2M).
- * subdomain comes from URL param, not body.
+ * Body schema for PATCH /api/integration/tenants/:slug (M2M).
+ * slug comes from URL param, not body.
  */
 export const TenantStatusBodySchema = z.object({
     id: z.string().uuid().optional().describe('TODO describe id field for the OpenInspection MCP integration'),
@@ -119,7 +119,7 @@ export const TenantStatusBodySchema = z.object({
 });
 
 /**
- * Body schema for POST /api/integration/tenants/:subdomain/stripe-connect (M2M).
+ * Body schema for POST /api/integration/tenants/:slug/stripe-connect (M2M).
  */
 export const StripeConnectBodySchema = z.object({
     accountId: z.string().min(1).describe('TODO describe accountId field for the OpenInspection MCP integration'),

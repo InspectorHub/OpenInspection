@@ -19,7 +19,7 @@ wellKnownRoutes.get('/openinspection/tenant-keys/:slug', async (c) => {
     const db = drizzle(c.env.DB, { schema });
     const tenant = await db.select({ id: schema.tenants.id })
         .from(schema.tenants)
-        .where(eq(schema.tenants.subdomain, slug))
+        .where(eq(schema.tenants.slug, slug))
         .get();
     if (!tenant) return c.json({ error: 'tenant not found' }, 404);
     const signing = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);

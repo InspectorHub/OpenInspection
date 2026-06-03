@@ -43,7 +43,7 @@ describe('concierge schema — A3', () => {
         await fixture.db.insert(schema.tenants).values({
             id: TENANT,
             name: 'A3 Test Co',
-            subdomain: 'a3test',
+            slug: 'a3test',
             status: 'active',
             deploymentMode: 'shared',
             tier: 'free',

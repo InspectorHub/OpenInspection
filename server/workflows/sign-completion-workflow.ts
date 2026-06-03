@@ -12,7 +12,7 @@ import * as schema from '../lib/db/schema';
 export interface SignCompletionParams {
     requestId: string;
     tenantId: string;
-    tenantSlug: string;       // tenant subdomain, required for /m2m/agreement-render/<tenant>/<token>
+    tenantSlug: string;       // tenant slug, required for /m2m/agreement-render/<tenant>/<token>
     token: string;            // public agreement-request token (used for /m2m/* render routes)
 }
 

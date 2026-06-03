@@ -35,7 +35,7 @@ describe('seedStarterContent', () => {
         await testDb.insert(schema.tenants).values({
             id:        tenantId,
             name:      'Test Tenant',
-            subdomain: 'test',
+            slug: 'test',
             createdAt: new Date(),
         });
     });

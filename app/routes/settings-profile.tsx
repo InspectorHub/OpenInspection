@@ -93,7 +93,7 @@ export default function SettingsProfilePage() {
   const actionData = useActionData<typeof action>();
   const [bioLen, setBioLen] = useState((profile.bio ?? "").length);
   const ctx = useSessionContext();
-  const tenant = ctx?.branding?.tenantSubdomain;
+  const tenant = ctx?.branding?.tenantSlug;
 
   // Conform owns the main profile form (default intent). The save-signature
   // intent is handled by a separate useFetcher below, so guard against feeding

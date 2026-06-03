@@ -674,12 +674,12 @@ export const coreAuthRoutes = createApiRouter()
         // 3. Initialize Workspace
         const passwordHash = await c.var.services.auth.hashPassword(body.password);
         const tenantId = c.env.SINGLE_TENANT_ID || '00000000-0000-0000-0000-000000000000';
-        const subdomain = body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const slug = body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
         await c.var.services.admin.updateTenantStatus({
             id: tenantId,
             name: body.companyName,
-            subdomain,
+            slug,
             status: 'active',
             adminEmail: body.email,
             adminPasswordHash: passwordHash,

@@ -229,7 +229,7 @@ export class AutomationService {
                     property_address: inspection.propertyAddress,
                     scheduled_date:   inspection.date,
                     inspector_name:   '',
-                    report_url:       reportUrl(appHost, tenant.subdomain, inspection.id),
+                    report_url:       reportUrl(appHost, tenant.slug, inspection.id),
                     invoice_url:      `${appBaseUrl}/invoices`,
                     payment_url:      `${appBaseUrl}/invoices`,
                     company_name:     appName,

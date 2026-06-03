@@ -18,7 +18,7 @@ export interface AgentReferralRow {
     id: string;
     tenantId: string;
     tenantName: string;
-    tenantSubdomain: string;
+    tenantSlug: string;
     propertyAddress: string;
     clientName: string | null;
     date: string;
@@ -30,7 +30,7 @@ export interface AgentReferralRow {
 export interface AgentInspectorRow {
     tenantId: string;
     tenantName: string;
-    tenantSubdomain: string;
+    tenantSlug: string;
     contactId: string | null;
     inspectorName: string | null;
     inspectorPhotoUrl: string | null;
@@ -445,7 +445,7 @@ export class AgentService {
                 id:              inspections.id,
                 tenantId:        inspections.tenantId,
                 tenantName:      tenants.name,
-                tenantSubdomain: tenants.subdomain,
+                tenantSlug: tenants.slug,
                 propertyAddress: inspections.propertyAddress,
                 clientName:      inspections.clientName,
                 date:            inspections.date,
@@ -500,7 +500,7 @@ export class AgentService {
             id:              r.id,
             tenantId:        r.tenantId,
             tenantName:      r.tenantName,
-            tenantSubdomain: r.tenantSubdomain,
+            tenantSlug: r.tenantSlug,
             propertyAddress: r.propertyAddress,
             clientName:      r.clientName ?? null,
             date:            r.date,
@@ -592,7 +592,7 @@ export class AgentService {
             .select({
                 tenantId:          agentTenantLinks.tenantId,
                 tenantName:        tenants.name,
-                tenantSubdomain:   tenants.subdomain,
+                tenantSlug:   tenants.slug,
                 contactId:         agentTenantLinks.inspectorContactId,
                 inspectorName:     users.name,
                 inspectorPhotoUrl: users.photoUrl,
@@ -611,7 +611,7 @@ export class AgentService {
         return rows.map((r) => ({
             tenantId:          r.tenantId,
             tenantName:        r.tenantName,
-            tenantSubdomain:   r.tenantSubdomain,
+            tenantSlug:   r.tenantSlug,
             contactId:         r.contactId ?? null,
             inspectorName:     r.inspectorName ?? null,
             inspectorPhotoUrl: r.inspectorPhotoUrl ?? null,
