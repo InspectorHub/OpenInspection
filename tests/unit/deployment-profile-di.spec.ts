@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { diMiddleware } from '../../server/lib/middleware/di';
+// A-16 — profile/keyring injection moved from diMiddleware to contextBootstrap
+// (di now runs after the JWT middleware and only owns the service registry).
+import { contextBootstrap } from '../../server/lib/middleware/context-bootstrap';
 import type { HonoConfig } from '../../server/types/hono';
 import type { DeploymentProfile } from '../../server/lib/deployment-profile';
 
 function makeApp(env: Partial<HonoConfig['Bindings']>) {
     const app = new Hono<HonoConfig>();
-    app.use('*', diMiddleware);
+    app.use('*', contextBootstrap);
     return { app, env: env as HonoConfig['Bindings'] };
 }
 
@@ -19,7 +21,7 @@ const BASE_ENV: Partial<HonoConfig['Bindings']> = {
     APP_NAME: '', PRIMARY_COLOR: '',
 };
 
-describe('di middleware — profile injection', () => {
+describe('contextBootstrap middleware — profile injection', () => {
     it('sets c.var.profile to a saas DeploymentProfile when APP_MODE=saas', async () => {
         // Section F rewrite. Previously asserted a topology field on the
         // profile — that field was deleted by the silo-deconvergence

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { renderTemplate } from "../../lib/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
+import { photoDisplayName, withDownload } from "../../lib/photo-name";
 
 interface SideRailProps {
   activeItem?: { id: string; label: string; type?: string } | null;
@@ -111,14 +112,25 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Photos</span>
                       <div className="mt-1 grid grid-cols-3 gap-1">
-                        {(activeResult.photos as string[]).map((key, i) => (
-                          <img
-                            key={i}
-                            src={`/api/inspections/${inspectionId}/photos/${key}`}
-                            alt={`Photo ${i + 1}`}
-                            className="w-full aspect-square object-cover rounded border border-ih-border"
-                          />
-                        ))}
+                        {(activeResult.photos as string[]).map((key, i) => {
+                          const url = `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`;
+                          const name = photoDisplayName(key);
+                          return (
+                            <a
+                              key={i}
+                              href={withDownload(url)}
+                              download={name}
+                              title={`Download ${name}`}
+                              className="block"
+                            >
+                              <img
+                                src={url}
+                                alt={name}
+                                className="w-full aspect-square object-cover rounded border border-ih-border"
+                              />
+                            </a>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

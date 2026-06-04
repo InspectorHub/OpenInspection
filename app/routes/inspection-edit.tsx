@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { unwrapResultsResponse } from "~/lib/results";
 import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { useFindings } from "~/hooks/useFindings";
@@ -67,8 +68,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  propertyAddress: "Loading...",
  status: "draft",
  };
- const schema = ((data?.templateSnapshot ||
- (data?.template as Record<string, unknown>)?.schema) as {
+ // templateSnapshot may arrive as a JSON string (wizard-created inspections)
+ // — parse before use, mirroring form-renderer.tsx. Mutating a string here
+ // 500'd the whole editor.
+ const rawSchema = data?.templateSnapshot ||
+ (data?.template as Record<string, unknown>)?.schema;
+ const schema = ((typeof rawSchema === "string"
+ ? JSON.parse(rawSchema)
+ : rawSchema) as {
  sections: Array<Record<string, unknown>>;
  }) || { sections: [] };
 
@@ -91,10 +98,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  }
 
  const ratingLevels = ((rdData?.ratingLevels || []) as RatingLevel[]);
- const resultsObj = ((resultsBody as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
- const results = ((resultsObj as Record<string, Record<string, unknown>>)?.data ||
- resultsObj ||
- {}) as ResultMap;
+ // B-17: the endpoint nests the map under data.results — unwrap via the
+ // shared helper so persisted ratings survive a reload.
+ const results = unwrapResultsResponse(resultsBody) as ResultMap;
 
  return { inspection, schema, results, ratingLevels, token };
 }
@@ -108,25 +114,31 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const formData = await request.formData();
  const intent = formData.get("intent");
  const api = createApi(context, { token });
+ // B-17: every branch must record whether the API write actually landed —
+ // returning { ok: true } unconditionally turned failed PATCHes into silent
+ // data loss (the save pill said "Saved" either way).
+ let ok = true;
 
  if (intent === "rate") {
  const itemId = String(formData.get("itemId"));
  const sectionId = String(formData.get("sectionId"));
  const rating = String(formData.get("rating"));
- await api.inspections[":id"].items[":itemId"].$patch({
+ const res = await api.inspections[":id"].items[":itemId"].$patch({
  param: { id: params.id, itemId },
  json: { field: "rating", value: rating, sectionId, expectedVersion: 0, force: true },
  });
+ ok = res.ok;
  }
 
  if (intent === "notes") {
  const itemId = String(formData.get("itemId"));
  const sectionId = String(formData.get("sectionId"));
  const notes = String(formData.get("notes"));
- await api.inspections[":id"].items[":itemId"].$patch({
+ const res = await api.inspections[":id"].items[":itemId"].$patch({
  param: { id: params.id, itemId },
  json: { field: "notes", value: notes, sectionId, expectedVersion: 0, force: true },
  });
+ ok = res.ok;
  }
 
  if (intent === "toggle-canned") {
@@ -135,7 +147,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const tabName = String(formData.get("tabName"));
  const cannedId = String(formData.get("cannedId"));
  const included = formData.get("included") === "true";
- await api.inspections[":id"].items[":itemId"].$patch({
+ const res = await api.inspections[":id"].items[":itemId"].$patch({
  param: { id: params.id, itemId },
  json: {
  field: "cannedToggle",
@@ -145,6 +157,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  force: true,
  },
  });
+ ok = res.ok;
  }
 
  if (intent === "set-defect-fields") {
@@ -152,7 +165,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const sectionId = String(formData.get("sectionId"));
  const cannedId = String(formData.get("cannedId"));
  const patch = JSON.parse(String(formData.get("patch")));
- await api.inspections[":id"].items[":itemId"].$patch({
+ const res = await api.inspections[":id"].items[":itemId"].$patch({
  param: { id: params.id, itemId },
  json: {
  field: "defectFields",
@@ -162,13 +175,14 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  force: true,
  },
  });
+ ok = res.ok;
  }
 
  if (intent === "set-item-attribute") {
  const itemId = String(formData.get("itemId"));
  const attributeId = String(formData.get("attributeId"));
  const value = JSON.parse(String(formData.get("value")));
- await api.inspections[":id"].items[":itemId"].$patch({
+ const res = await api.inspections[":id"].items[":itemId"].$patch({
  param: { id: params.id, itemId },
  json: {
  field: "itemAttribute",
@@ -177,41 +191,46 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  force: true,
  },
  });
+ ok = res.ok;
  }
 
  if (intent === "save-all") {
  const data = formData.get("data");
  if (data) {
- await api.inspections[":id"].results.$patch({
+ const res = await api.inspections[":id"].results.$patch({
  param: { id: params.id },
  json: { data: JSON.parse(String(data)) },
  });
+ ok = res.ok;
  }
  }
 
  if (intent === "publish") {
- await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
+ const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
+ ok = res.ok;
  }
 
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
- await api.inspections[":id"].$patch({
+ const res = await api.inspections[":id"].$patch({
  param: { id: params.id },
  json: { autoSignOnPublish },
  });
+ ok = res.ok;
  }
 
  if (intent === "sign-inspector") {
  const signatureBase64 = String(formData.get("signatureBase64") ?? "");
  if (signatureBase64) {
- await api.inspectionSync[":id"]["inspector-signature"].$post({
+ const res = await api.inspectionSync[":id"]["inspector-signature"].$post({
  param: { id: params.id },
  json: { signatureBase64, signedAt: Date.now() },
  });
+ ok = res.ok;
  }
  }
 
- return { ok: true };
+ return { ok };
 }
 
 /* ------------------------------------------------------------------ */
@@ -234,6 +253,11 @@ function formatRelativeTime(epochSec: number): string {
 export default function InspectionEditPage() {
  const loaderData = useLoaderData<typeof loader>();
  const fetcher = useFetcher();
+ // B-17: notes commit on blur and rating click fire in the same gesture;
+ // sharing one fetcher made the rating submit CANCEL the in-flight notes
+ // submit (React Router aborts the previous submission on re-submit) — the
+ // note was silently lost. Notes get their own fetcher instance.
+ const notesFetcher = useFetcher();
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
@@ -258,6 +282,7 @@ export default function InspectionEditPage() {
  setDirty: state.setDirty,
  setSaveStatus: state.setSaveStatus,
  inspectionId: String(state.inspection.id),
+ notesFetcher,
  });
 
  /* ---------------------------------------------------------------- */
@@ -577,15 +602,29 @@ export default function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  useEffect(() => {
- if (fetcher.state === "submitting") {
+ // B-17: "fetcher went idle" is NOT "saved" — check the action's ok flag.
+ // A failed write keeps dirty=true so the unsaved-changes blocker still arms.
+ const submitting = fetcher.state !== "idle" || notesFetcher.state !== "idle";
+ const failed =
+ (fetcher.data as { ok?: boolean } | undefined)?.ok === false ||
+ (notesFetcher.data as { ok?: boolean } | undefined)?.ok === false;
+ if (submitting) {
  state.setSaveStatus("saving");
- } else if (fetcher.state === "idle" && state.saveStatus === "saving") {
+ } else if (state.saveStatus === "saving") {
+ if (failed) {
+ state.setSaveStatus("error");
+ pushToast({
+ message: "Save failed — your last change did NOT reach the server.",
+ durationMs: 8000,
+ });
+ } else {
  state.setSaveStatus("saved");
  state.setDirty(false);
  const timer = setTimeout(() => state.setSaveStatus("idle"), 2000);
  return () => clearTimeout(timer);
  }
- }, [fetcher.state]);
+ }
+ }, [fetcher.state, notesFetcher.state]);
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */
@@ -1904,7 +1943,7 @@ export default function InspectionEditPage() {
  const result = state.getResult(state.activeItemId);
  const photos = (result?.photos as string[]) || [];
  if (photos.length > 0) {
-  setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photos/${photos[0]}`);
+  setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(photos[0])}`);
   setPhotoStudioIndex(1);
   setPhotoStudioTotal(photos.length);
  } else {

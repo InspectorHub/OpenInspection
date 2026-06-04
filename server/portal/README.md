@@ -1,20 +1,40 @@
-# Portal Integration (SaaS Only)
+# Portal Integration (SaaS only)
 
-This directory contains code that integrates Core with the InspectorHub SaaS Portal.
-It is only active when deployed with `wrangler.saas.toml` (which declares the
-`PORTAL_SERVICE` Service Binding).
+Optional integration with the InspectorHub SaaS control plane. **Active only when
+`APP_MODE=saas`** (declared in `wrangler.saas.jsonc`). The worker entry
+(`workers/app.ts`) returns 404 for `/api/integration/*` otherwise, and the outbox
+publishes only when the `SYNC_QUEUE` producer binding is present. A self-host
+build (default `wrangler.jsonc`) executes none of this directory.
 
-**Self-hosted users: do not modify files in this directory.**
+Since 2026-06-04 core holds **no Service Binding to portal** (the old binding's
+last functional use — the outbox drain POST — was replaced by a Cloudflare Queue,
+`inspectorhub-sync-saas`). Direction of traffic today:
 
-In standalone deployments (the default `wrangler.jsonc`), none of this code
-executes — the Service Binding is absent and all portal-related code paths
-are guarded by `if (env.PORTAL_SERVICE)` checks.
+- **core → portal**: CloudEvents envelopes on the sync queue (outbox sweeper +
+  inline publish). The DLQ (`inspectorhub-sync-dlq-saas`) is consumed by this
+  worker to mark failed outbox rows.
+- **portal → core**: request/response M2M over portal's own `CORE_SERVICE`
+  binding into `integration.routes.ts`, guarded by the `x-portal-m2m` HMAC.
 
-## Files
+Core code depends only on abstractions — `IntegrationProvider`
+(`StandaloneProvider` is the self-host impl) and `UserSyncOutbox`
+(`server/lib/integration/user-sync.ts`). The concrete classes here are wired in at
+a single composition point, `server/lib/middleware/di.ts` — the outbox when
+`SYNC_QUEUE` is bound, the SaaS provider when `APP_MODE=saas`.
+
+To produce a portal-free build: delete this directory, the
+`registerPortalIntegration(app)` call in `server/index.ts`, the
+`drainPortalOutbox` call in `server/scheduled.ts`, the `PortalProvider` +
+`OutboxService` branches in `server/lib/middleware/di.ts` (fall back to
+`StandaloneProvider` + leave `outbox` undefined), and the `/api/integration/*`
+guard in `workers/app.ts`.
+
+Detailed integration docs live in the super-project `docs/saas-ops/`.
 
 | File | Purpose |
-|------|---------|
-| `service-binding-guard.ts` | Middleware that verifies requests arrive via Service Binding (`cf-worker` header) |
-| `integration.routes.ts` | Hono routes for portal→core M2M calls (tenant sync, SSO handoff, data export, purge) |
-| `outbox.service.ts` | Core→portal async event sync (user lifecycle events) |
-| `portal.provider.ts` | `IntegrationProvider` implementation for SaaS mode |
+|---|---|
+| `integration.module.ts` | The seam: `registerPortalIntegration` + the outbox sweeper + DLQ writeback |
+| `integration.routes.ts` | portal→core M2M routes (tenant sync/update, SSO handoff, data export, purge, seat-quota sync, starter-content seed, template backfill, sync-health/redrive) |
+| `outbox.service.ts` | core→portal async event sync over the queue (implements `UserSyncOutbox`) |
+| `portal.provider.ts` | `IntegrationProvider` impl for SaaS |
+| `service-binding-guard.ts` | `x-portal-m2m` HMAC guard for the M2M routes |

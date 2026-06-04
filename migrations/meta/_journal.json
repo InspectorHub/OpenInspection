@@ -36,6 +36,34 @@
       "when": 1780402250582,
       "tag": "0004_robust_punisher",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1780467136805,
+      "tag": "0005_rename_tenant_subdomain_to_slug",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1780467594497,
+      "tag": "0006_chunky_hellcat",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1780486504383,
+      "tag": "0007_curly_speed",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1780544860982,
+      "tag": "0008_perfect_doctor_strange",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import { auditFromContext } from '../lib/audit';
 import { getBookingHost } from '../lib/url';
 import { reportUrl as buildReportUrl } from '../lib/public-urls';
 import { Errors } from '../lib/errors';
+import { contentDisposition } from '../lib/content-disposition';
 import { logger } from '../lib/logger';
 import { generatePdfFromUrl } from '../lib/pdf';
 import { getCookie } from 'hono/cookie';
@@ -901,6 +902,36 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
     operationId: "uploadInspection",
     description: "Auto-generated placeholder for uploadInspection (POST /{id}/upload, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
+
+/* ── A-9 — Inspection photo serve ─────────────────────────────────────────
+ * Item + pool photos are referenced across the editor (SideRail, PhotoStudio)
+ * and media center, but no handler existed (every such <img> 404'd). This
+ * authenticated route streams the R2 object scoped to the caller's tenant +
+ * inspection (via the key prefix) and sets Content-Disposition from the stored
+ * original filename (`?download=1` forces an attachment). The R2 key — which
+ * contains '/' — travels as a query param to avoid path-segment splitting.
+ * The public report viewer has its own token-scoped twin in public-report.ts.
+ */
+const servePhotoRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{id}/photo',
+    tags: ["inspections"],
+    summary: 'Serve an inspection photo (tenant-scoped)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string().uuid().describe('Inspection id that scopes the photo.') }),
+        query: z.object({
+            key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
+            download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
+        }),
+    },
+    responses: {
+        200: { content: { 'image/*': { schema: z.any() } }, description: 'Photo bytes' },
+        404: { description: 'Not found' },
+    },
+    operationId: "serveInspectionPhoto",
+    description: "Streams an inspection item/pool photo from R2, scoped to the caller's tenant + inspection via the key prefix. Sets Content-Disposition from the stored original filename; ?download=1 forces an attachment.",
+}, { scopes: ['read'], tier: 'extended' }));
 
 
 /* ── Round-2 backlog #9 (Spectora §E.3) — Media Center ─────────────────────
@@ -2108,6 +2139,23 @@ export const inspectionsRoutes = createApiRouter()
         const key = await service.uploadPhoto(id, c.get('tenantId'), itemId, file);
         return c.json({ success: true, data: { key, targetType, itemId, customId } }, 200);
     })
+    .openapi(servePhotoRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        const { key, download } = c.req.valid('query');
+        if (!c.env.PHOTOS) return c.notFound();
+        // Ownership: keys are `${tenantId}/${inspectionId}/...`; reject anything
+        // outside this caller's tenant + the inspection in the path.
+        if (!key.startsWith(`${tenantId}/${id}/`)) return c.notFound();
+        const obj = await c.env.PHOTOS.get(key);
+        if (!obj) return c.notFound();
+        const headers = new Headers();
+        headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+        headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download === '1'));
+        headers.set('Cache-Control', 'private, max-age=300');
+        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
+        return new Response(obj.body, { status: 200, headers });
+    })
     .openapi(mediaCenterRoute, async (c) => {
         const { id } = c.req.valid('param');
         const data = await c.var.services.inspection.getMediaCenter(id, c.get('tenantId'));
@@ -2767,7 +2815,7 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         const db = drizzle(c.env.DB);
-        const data = await listPendingConflicts(db, id);
+        const data = await listPendingConflicts(db, tenantId, id);
         return c.json({ success: true as const, data }, 200);
     })
     // Typed-Hono dead-routes cleanup Task 13 — clear adjudicated conflicts.
@@ -2786,7 +2834,7 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         const db = drizzle(c.env.DB);
-        const data = await resolveConflicts(db, id, resolutions);
+        const data = await resolveConflicts(db, tenantId, id, resolutions);
         auditFromContext(c, 'inspection.conflicts_resolved', 'inspection', {
             entityId: id, metadata: { resolved: data.resolved, by: userId },
         });

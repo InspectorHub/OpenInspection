@@ -44,8 +44,8 @@ export interface BrandingConfig {
      *  `(tenantId, email)` row to authenticate against. */
     isSaas?: boolean | undefined;
     /** Portal base URL exposed to the browser for the "Switch workspace"
-     *  link and login bounce. Resolved from `PORTAL_API_URL` at request
-     *  time. Null when running standalone or when `PORTAL_API_URL` is
+     *  link and login bounce. Resolved from the portal base URL at request
+     *  time. Null when running standalone or when the portal URL is
      *  unset (in which case the bounce/switch UI degrades to a no-op). */
     portalBaseUrl?: string | null | undefined;
     /** Current tenant lifecycle status. Used by MainLayout to show a

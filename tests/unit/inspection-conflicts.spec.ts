@@ -14,6 +14,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
+const TENANT_ID = 't-1';
 const INSPECTION_ID = 'i-1';
 
 describe('listPendingConflicts', () => {
@@ -26,13 +27,14 @@ describe('listPendingConflicts', () => {
     });
 
     it('returns empty when no conflicts stored', async () => {
-        const result = await listPendingConflicts(db as any, INSPECTION_ID);
+        const result = await listPendingConflicts(db as any, TENANT_ID, INSPECTION_ID);
         expect(result.conflicts).toEqual([]);
     });
 
     it('returns stored conflicts and JSON-parses persisted values', async () => {
         await db.insert(inspectionConflicts).values({
             id:           'c-1',
+            tenantId:     TENANT_ID,
             inspectionId: INSPECTION_ID,
             itemId:       'item-a',
             sectionId:    null,
@@ -43,7 +45,7 @@ describe('listPendingConflicts', () => {
             createdAt:    new Date().toISOString(),
         } as any);
 
-        const result = await listPendingConflicts(db as any, INSPECTION_ID);
+        const result = await listPendingConflicts(db as any, TENANT_ID, INSPECTION_ID);
         expect(result.conflicts).toHaveLength(1);
         expect(result.conflicts[0].itemId).toBe('item-a');
         expect(result.conflicts[0].field).toBe('notes');
@@ -56,6 +58,7 @@ describe('listPendingConflicts', () => {
     it('excludes already-resolved conflicts', async () => {
         await db.insert(inspectionConflicts).values({
             id:           'c-resolved',
+            tenantId:     TENANT_ID,
             inspectionId: INSPECTION_ID,
             itemId:       'item-b',
             sectionId:    null,
@@ -67,13 +70,14 @@ describe('listPendingConflicts', () => {
             resolvedAt:   new Date().toISOString(),
         } as any);
 
-        const result = await listPendingConflicts(db as any, INSPECTION_ID);
+        const result = await listPendingConflicts(db as any, TENANT_ID, INSPECTION_ID);
         expect(result.conflicts).toEqual([]);
     });
 
     it('scopes conflicts to the requested inspection', async () => {
         await db.insert(inspectionConflicts).values({
             id:           'c-other',
+            tenantId:     TENANT_ID,
             inspectionId: 'i-2',
             itemId:       'item-z',
             sectionId:    null,
@@ -84,7 +88,25 @@ describe('listPendingConflicts', () => {
             createdAt:    new Date().toISOString(),
         } as any);
 
-        const result = await listPendingConflicts(db as any, INSPECTION_ID);
+        const result = await listPendingConflicts(db as any, TENANT_ID, INSPECTION_ID);
+        expect(result.conflicts).toEqual([]);
+    });
+
+    it('A-17 — never returns another tenant\'s conflicts even for the same inspection id', async () => {
+        await db.insert(inspectionConflicts).values({
+            id:           'c-foreign',
+            tenantId:     't-other',
+            inspectionId: INSPECTION_ID,
+            itemId:       'item-a',
+            sectionId:    null,
+            field:        'notes',
+            base:         null,
+            local:        null,
+            remote:       null,
+            createdAt:    new Date().toISOString(),
+        } as any);
+
+        const result = await listPendingConflicts(db as any, TENANT_ID, INSPECTION_ID);
         expect(result.conflicts).toEqual([]);
     });
 });
@@ -98,6 +120,7 @@ describe('resolveConflicts', () => {
         await setupSchema(fix.sqlite);
         await db.insert(inspectionConflicts).values({
             id:           'c-1',
+            tenantId:     TENANT_ID,
             inspectionId: INSPECTION_ID,
             itemId:       'item-a',
             sectionId:    null,
@@ -110,7 +133,7 @@ describe('resolveConflicts', () => {
     });
 
     it('clears resolved conflicts', async () => {
-        const result = await resolveConflicts(db as any, INSPECTION_ID, [
+        const result = await resolveConflicts(db as any, TENANT_ID, INSPECTION_ID, [
             { itemId: 'item-a', sectionId: null, field: 'notes', chosen: 'local' },
         ]);
         expect(result.resolved).toBe(1);
@@ -120,8 +143,17 @@ describe('resolveConflicts', () => {
     });
 
     it('returns resolved=0 when nothing matches', async () => {
-        const result = await resolveConflicts(db as any, INSPECTION_ID, [
+        const result = await resolveConflicts(db as any, TENANT_ID, INSPECTION_ID, [
             { itemId: 'no-such-item', sectionId: null, field: 'notes', chosen: 'remote' },
+        ]);
+        expect(result.resolved).toBe(0);
+        const remaining = await db.select().from(inspectionConflicts).all();
+        expect(remaining).toHaveLength(1);
+    });
+
+    it('A-17 — never clears another tenant\'s conflicts even for the same inspection id', async () => {
+        const result = await resolveConflicts(db as any, 't-other', INSPECTION_ID, [
+            { itemId: 'item-a', sectionId: null, field: 'notes', chosen: 'local' },
         ]);
         expect(result.resolved).toBe(0);
         const remaining = await db.select().from(inspectionConflicts).all();

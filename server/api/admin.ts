@@ -12,7 +12,6 @@ import { escapeLikePattern } from '../lib/db/like-escape';
 import { agreementSignUrl } from '../lib/public-urls';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
-import { isServiceBindingCall } from '../portal/service-binding-guard';
 import {
     InviteMemberSchema,
     DataErasureSchema,
@@ -37,15 +36,12 @@ import {
     ATTENTION_THRESHOLDS_DEFAULTS,
     DashboardColumnPrefsSchema,
     DashboardColumnPrefsResponseSchema,
-    SeedStarterContentBodySchema,
-    SeedStarterContentResponseSchema,
     InspectorSignSchema,
 } from '../lib/validations/admin.schema';
 import { applyInspectorPreSign } from '../services/agreement.service';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validations/shared.schema';
-import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
 import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -779,15 +775,6 @@ const icsTokenRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-/**
- * POST /api/admin/backfill-default-templates — Spec 4F polish backfill.
- * One-shot M2M endpoint: loops through every tenant and seeds the 7 default templates
- * (idempotent — TemplateSeedService.bulkSeed skips existing names per tenant).
- *
- * Auth: Service Binding (cf-worker header).
- * Use case: existing tenants that pre-date Spec 4F's auto-seed-on-tenant-init hook.
- */
-
 // --- Attention Thresholds (handoff-decisions §1) ---
 //
 // Configurable per-team thresholds (in hours) applied to the dashboard
@@ -932,30 +919,6 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for patchTenantTenantConfig (PATCH /tenant-config, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
-
-/**
- * Design System 0520 subsystem C P8 T8.2 — portal → core seat-quota sync.
- *
- * Called by `apps/portal/server/services/billing.service.ts#syncSeatQuota`
- * after a Stripe `customer.subscription.{created,updated,deleted}` event.
- * Updates `tenants.max_users` so the seat-guard middleware + Guest-
- * InviteService.claim see the new cap on the next request.
- *
- * Auth: Service Binding (cf-worker header).
- */
-
-/**
- * POST /api/admin/seed-starter-content — Trial Sample-Data Mode spec (2026-05-20).
- *
- * Portal calls this from OnboardingWorkflow step 2.5 once a new tenant is
- * provisioned, populating it with starter content (3 templates / 1 agreement /
- * 250 canned comments / 3 event_types / 4 tags / recommendations /
- * rating-systems / marketplace defaults). Idempotent — safe to retry on
- * workflow re-run.
- *
- * Auth: Service Binding (cf-worker header);
- * matches the other portal → core M2M endpoints in this file.
- */
 
 // --- Finding Key Migration (one-time data migration) ---
 //
@@ -1188,6 +1151,9 @@ const deleteEventTypeRoute = createRoute(withMcpMetadata({
 const CommunicationResponseSchema = z.object({
     senderEmail:             z.string().nullable().describe('From: address for tenant transactional email.'),
     replyTo:                 z.string().nullable().describe('Reply-To: header for tenant transactional email.'),
+    emailMode:               z.enum(['platform', 'own']).describe('platform = shared Resend; own = tenant Resend.'),
+    senderDisplayName:       z.string().nullable().describe('From: display name.'),
+    useInspectorFromName:    z.boolean().describe("Use the sending inspector's name as the From display name."),
     resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
     templates:               z.array(z.object({
         id:      z.string().describe('Template id.'),
@@ -1199,8 +1165,11 @@ const CommunicationResponseSchema = z.object({
     googleCalendarConnected: z.boolean().describe('Whether a Google Calendar refresh token is stored.'),
 });
 const CommunicationPatchSchema = z.object({
-    senderEmail: z.string().nullable().describe('From: address, or null to clear.'),
-    replyTo:     z.string().nullable().describe('Reply-To: address, or null to clear.'),
+    senderEmail:          z.string().nullable().describe('From: address, or null to clear.'),
+    replyTo:              z.string().nullable().describe('Reply-To: address, or null to clear.'),
+    emailMode:            z.enum(['platform', 'own']),
+    senderDisplayName:    z.string().nullable(),
+    useInspectorFromName: z.boolean(),
 }).openapi('CommunicationPatch');
 
 const getCommunicationRoute = createRoute(withMcpMetadata({
@@ -1920,42 +1889,6 @@ export const adminRoutes = createApiRouter()
         const baseUrl = getBaseUrl(c);
         return c.json({ success: true as const, data: { url: `${baseUrl}/api/ics/${token}` } }, 200);
     })
-    .openapi(withMcpMetadata({
-        method: 'post',
-        path: '/backfill-default-templates',
-        operationId: 'backfillDefaultTemplates',
-        tags: ['sysadmin'],
-        summary: 'Backfill default templates across all tenants',
-        description: 'M2M one-shot endpoint that seeds the default 7 templates for every tenant. Idempotent — TemplateSeedService.bulkSeed skips templates that already exist by name per tenant.',
-        responses: {
-            200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
-            401: { description: 'Unauthorized' },
-        },
-    }, { scopes: [], tier: 'excluded' }), async (c) => {
-        if (!(await isServiceBindingCall(c))) {
-            throw Errors.Unauthorized();
-        }
-
-        const { tenants } = await import('../lib/db/schema');
-        const { TemplateSeedService } = await import('../services/template-seed.service');
-        const db = drizzle(c.env.DB);
-        const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).all();
-        const svc = new TemplateSeedService(c.env.DB);
-
-        const results: { tenantId: string; name: string; seeded: number; skipped: number }[] = [];
-        for (const t of allTenants) {
-            try {
-                const r = await svc.bulkSeed(t.id as string);
-                results.push({ tenantId: t.id as string, name: (t.name as string) ?? '', ...r });
-            } catch (err) {
-                logger.error('Backfill failed for tenant', { tenantId: t.id }, err instanceof Error ? err : undefined);
-            }
-        }
-        const totalSeeded = results.reduce((sum, r) => sum + r.seeded, 0);
-        const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
-        logger.info('Backfill complete', { tenantCount: results.length, totalSeeded, totalSkipped });
-        return c.json({ success: true as const }, 200);
-    })
     .openapi(getAttentionThresholdsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
@@ -2030,75 +1963,6 @@ export const adminRoutes = createApiRouter()
             metadata: update,
         });
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(withMcpMetadata({
-        method: 'post',
-        path: '/sync-quota',
-        operationId: 'syncTenantSeatQuota',
-        tags: ['sysadmin'],
-        summary: 'Sync tenant seat quota from portal',
-        description: 'M2M endpoint called by the portal whenever a tenant\'s subscription seat count changes. Updates the tenant\'s max_users column so InviteService.claim sees the new cap on the next request.',
-        request: { body: { content: { 'application/json': { schema: SyncQuotaSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-        responses: {
-            200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
-            401: { description: 'Unauthorized' },
-            404: { description: 'Tenant not found' },
-        },
-    }, { scopes: [], tier: 'excluded' }), async (c) => {
-        if (!(await isServiceBindingCall(c))) {
-            throw Errors.Unauthorized();
-        }
-
-        const { tenantId, maxUsers } = c.req.valid('json');
-        const { tenants } = await import('../lib/db/schema');
-        const db = drizzle(c.env.DB);
-
-        const result = await db.update(tenants)
-            .set({ maxUsers })
-            .where(eq(tenants.id, tenantId))
-            .returning({ id: tenants.id });
-        if (result.length === 0) throw Errors.NotFound('Tenant not found');
-
-        // Invalidate the per-tenant KV cache so the next request reads the
-        // fresh maxUsers value rather than the stale snapshot.
-        try {
-            await c.env.TENANT_CACHE.delete(`tenant:${tenantId}`);
-        } catch { /* cache miss is fine — read-through repopulates */ }
-
-        logger.info('sync-quota applied', { tenantId, maxUsers });
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(withMcpMetadata({
-        method: 'post',
-        path: '/seed-starter-content',
-        operationId: 'seedStarterContentForTenant',
-        tags: ['sysadmin'],
-        summary: 'Seed starter content into newly-provisioned tenant',
-        description: 'M2M endpoint invoked by the portal\'s OnboardingWorkflow once a tenant is provisioned. Seeds initial templates, agreements, rating-systems, and marketplace defaults. Idempotent — safe to retry.',
-        request: { body: { content: { 'application/json': { schema: SeedStarterContentBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-        responses: {
-            200: {
-                content: { 'application/json': { schema: SeedStarterContentResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
-                description: 'Seed counts (zero on idempotent re-run)',
-            },
-            401: { description: 'Unauthorized' },
-            404: { description: 'Tenant not found' },
-        },
-    }, { scopes: [], tier: 'excluded' }), async (c) => {
-        if (!(await isServiceBindingCall(c))) {
-            throw Errors.Unauthorized();
-        }
-
-        const { tenantId } = c.req.valid('json');
-        const { tenants } = await import('../lib/db/schema');
-        const db = drizzle(c.env.DB);
-        const existing = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, tenantId)).get();
-        if (!existing) throw Errors.NotFound('Tenant not found');
-
-        const { seedStarterContent } = await import('../services/starter-content.service');
-        const result = await seedStarterContent(c.env.DB, tenantId);
-
-        return c.json({ success: true as const, data: result }, 200);
     })
     .openapi(migrateFindingKeysRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -2354,6 +2218,9 @@ export const adminRoutes = createApiRouter()
             data: {
                 senderEmail: (cfg.senderEmail as string | null) ?? null,
                 replyTo: (cfg.replyTo as string | null) ?? null,
+                emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
+                senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
+                useInspectorFromName: Boolean(cfg.useInspectorFromName),
                 resendConfigured,
                 templates: [],
                 icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
@@ -2364,7 +2231,13 @@ export const adminRoutes = createApiRouter()
     .openapi(patchCommunicationRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
-        await c.var.services.branding.updateBranding(tenantId, { senderEmail: body.senderEmail, replyTo: body.replyTo });
+        await c.var.services.branding.updateBranding(tenantId, {
+            senderEmail: body.senderEmail,
+            replyTo: body.replyTo,
+            emailMode: body.emailMode,
+            senderDisplayName: body.senderDisplayName,
+            useInspectorFromName: body.useInspectorFromName,
+        });
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 

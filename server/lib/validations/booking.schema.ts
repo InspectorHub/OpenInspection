@@ -9,6 +9,12 @@ import { createApiResponseSchema } from './shared.schema';
  * requires a paired `customTime` (HH:mm) — see bookings.ts for the mapping.
  */
 export const PublicBookingSchema = z.object({
+    // B-16 — the tenant slug from the booking page URL. The submit endpoint
+    // has no tenant in its path, and context resolution (SINGLE_TENANT_ID /
+    // JWT) does not apply to a public cross-mode endpoint — the slug is the
+    // public tenant identifier, resolved server-side exactly like the
+    // GET /book/:tenant/:slug page data.
+    tenant: z.string().min(1, 'Tenant is required').openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
     address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }).describe('TODO describe address field for the OpenInspection MCP integration'),
     clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),

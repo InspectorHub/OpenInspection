@@ -15,6 +15,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, qboConnections } from '../lib/db/schema';
 import type { AppEnv } from '../types/hono';
+import { BrandingService } from './branding.service';
 
 export interface IntegrationRow {
     id:        string;
@@ -39,6 +40,11 @@ export class IntegrationsService {
         );
         const qbo = await this._safeGet(() =>
             db.select().from(qboConnections).where(eq(qboConnections.tenantId, tenantId)).get(),
+        );
+        // Gemini is bring-your-own-key (per-tenant). "Connected" reflects the
+        // tenant's own bound key in encrypted secrets, never a platform env key.
+        const dbSecrets = await this._safeGet(() =>
+            new BrandingService(this.db, this.env.TENANT_CACHE).getDecryptedSecrets(tenantId, this.env.JWT_SECRET),
         );
 
         const integrations: IntegrationRow[] = [
@@ -80,7 +86,7 @@ export class IntegrationsService {
             {
                 id:        'gemini',
                 name:      'Gemini AI',
-                connected: !!this.env.GEMINI_API_KEY,
+                connected: !!dbSecrets?.geminiApiKey,
                 lastSync:  null,
                 action:    null,
             },

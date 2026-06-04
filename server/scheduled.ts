@@ -4,9 +4,9 @@ import { AutomationService } from './services/automation.service';
 import { AgreementService } from './services/agreement.service';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
-import { flushOutboxOnce } from './portal/outbox.service';
 import { qboConnections } from './lib/db/schema/qbo';
 import { logger } from './lib/logger';
+import type { SyncEnvelope } from './lib/sync-events/envelope';
 
 export interface ScheduledEnv {
     DB: D1Database;
@@ -19,9 +19,10 @@ export interface ScheduledEnv {
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
     QBO_WEBHOOK_SECRET?: string;
-    // Multi-workspace sync: Service Binding to portal for the outbox
-    // flush worker. Optional — flush is a no-op when missing.
-    PORTAL_SERVICE?: Fetcher;
+    // Core -> portal user-sync transport (A-13/A-14). Producer binding to the
+    // sync queue; the outbox sweeper republishes pending rows through it.
+    // Optional — sweeper is a no-op when missing (standalone).
+    SYNC_QUEUE?: Queue<SyncEnvelope>;
 }
 
 async function runQBOCDC(env: ScheduledEnv): Promise<void> {
@@ -121,14 +122,14 @@ export async function scheduled(
         }
     }
 
-    // 4. Drain user-sync outbox to portal (no-op for standalone)
-    if (env.PORTAL_SERVICE) {
+    // 4. Sweep the user-sync outbox onto the sync queue (no-op for standalone —
+    //    gated on SYNC_QUEUE, the producer binding present only in saas).
+    if (env.SYNC_QUEUE) {
         try {
-            const { signM2mHeader } = await import('./lib/m2m-auth');
-            const m2m = await signM2mHeader(env as unknown as Record<string, string | undefined>);
-            await flushOutboxOnce(env.DB, env.PORTAL_SERVICE, m2m, 50);
+            const { drainPortalOutbox } = await import('./portal/integration.module');
+            await drainPortalOutbox(env);
         } catch (err) {
-            logger.error('[cron:outbox] flush threw', {}, err instanceof Error ? err : undefined);
+            logger.error('[cron:outbox] sweeper threw', {}, err instanceof Error ? err : undefined);
         }
     }
 

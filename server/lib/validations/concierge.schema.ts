@@ -25,9 +25,13 @@ export const BookInfoResponseSchema = z.object({
         tenant: z.object({
             name: z.string().describe('Inspection-business display name surfaced on the public booking page.'),
             brand: z
-                .record(z.string(), z.any())
+                .object({
+                    siteName: z.string().nullable().describe('Tenant site/company display name, when configured.'),
+                    primaryColor: z.string().nullable().describe('Tenant accent color hex, when configured.'),
+                    logoUrl: z.string().nullable().describe('Tenant logo URL, when uploaded.'),
+                })
                 .nullable()
-                .describe('Optional tenant brand JSON (colors, logo) — null until the brand-on-tenant migration ships.'),
+                .describe('Canonical tenant brand (A-10) from tenant_configs — null when the tenant has no config row.'),
         }).describe('Tenant snapshot used to brand the public booking page header and CTAs.'),
         inspector: z
             .object({

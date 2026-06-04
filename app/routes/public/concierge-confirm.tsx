@@ -99,7 +99,7 @@ export default function ConciergeConfirmPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-9">
-          <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center text-2xl font-bold mb-4">
+          <div className="w-12 h-12 rounded-xl bg-ih-primary-tint text-ih-primary flex items-center justify-center text-2xl font-bold mb-4">
             !
           </div>
           <h1 className="font-serif text-2xl font-bold mb-2 text-ih-fg-1">
@@ -121,7 +121,7 @@ export default function ConciergeConfirmPage() {
       <main className="max-w-[640px] mx-auto px-5 py-10">
         {/* Brand */}
         <div className="flex items-center gap-2.5 font-serif text-lg font-bold mb-10 text-ih-fg-1">
-          <span className="w-8 h-8 rounded-lg bg-[#F55A1A] text-white flex items-center justify-center font-bold text-sm">
+          <span className="w-8 h-8 rounded-lg bg-ih-primary text-white flex items-center justify-center font-bold text-sm">
             O
           </span>
           <span>OpenInspection</span>
@@ -139,7 +139,7 @@ export default function ConciergeConfirmPage() {
         {/* Summary card */}
         <article className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden mb-6">
           <div className="flex items-center gap-4 p-7 border-b border-ih-border">
-            <span className="w-[72px] h-[72px] rounded-full bg-orange-50 dark:bg-orange-900/20 text-[#F55A1A] flex items-center justify-center font-serif font-bold text-2xl shrink-0">
+            <span className="w-[72px] h-[72px] rounded-full bg-ih-primary-tint text-ih-primary flex items-center justify-center font-serif font-bold text-2xl shrink-0">
               {initials(booking.tenant.name)}
             </span>
             <div>

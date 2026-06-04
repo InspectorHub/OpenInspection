@@ -2,8 +2,15 @@
  * Secret UI化 — runtime middleware to load encrypted integration secrets
  * from tenant_configs.encrypted_secrets and merge them into c.env.
  *
- * Worker env vars ALWAYS take precedence (backwards compat). DB secrets
- * are the fallback for self-hosted tenants configuring keys via Settings UI.
+ * Precedence (A-8 secret-resolution matrix):
+ *  - Platform-shared keys (default): Worker env wins; the tenant DB value is a
+ *    fallback for self-hosted tenants configuring keys via the Settings UI.
+ *  - TENANT_OWNED_KEYS (Stripe Connect): the tenant DB value WINS over env. These
+ *    are strictly per-tenant — each inspector collects payments into THEIR OWN
+ *    Stripe account, and the platform never registers as a payment entity. If a
+ *    stray platform STRIPE_SECRET_KEY env were ever set on the core worker, the
+ *    env-wins default would silently route EVERY tenant's homebuyer payments to
+ *    the platform account; DB-wins prevents that money-misrouting.
  *
  * Performance: decryption happens once per request and only if the tenant
  * has a non-null encrypted_secrets value. The result is cached on the
@@ -11,13 +18,46 @@
  * don't re-decrypt.
  */
 import { MiddlewareHandler } from 'hono';
-import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import { tenantConfigs } from '../db/schema';
 import { decryptSecrets } from '../config-crypto';
+import { loadEncryptedSecretsBlob } from '../secrets-cache';
 import { HonoConfig } from '../../types/hono';
 import { logger } from '../logger';
 import { INTEGRATION_SECRET_KEYS } from '../../api/secrets';
+
+/**
+ * Strictly per-tenant keys: the tenant's stored value takes precedence over any
+ * platform env binding. Stripe is bring-your-own-account (Connect) — a platform
+ * env key must never override a tenant's own. See the A-8 matrix.
+ */
+const TENANT_OWNED_KEYS = new Set<string>([
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_PUBLISHABLE_KEY',
+]);
+
+/**
+ * Merges a tenant's decrypted DB secrets into the Worker env object IN PLACE,
+ * applying the A-8 precedence rule per key. Pure (no I/O) so the precedence
+ * policy is unit-testable without D1/Hono. Only known `INTEGRATION_SECRET_KEYS`
+ * are considered; empty DB values are ignored.
+ */
+export function applyIntegrationSecrets(
+    env: Record<string, string | undefined>,
+    decrypted: Record<string, string | undefined>,
+): void {
+    for (const key of INTEGRATION_SECRET_KEYS) {
+        const dbValue = decrypted[key];
+        if (!dbValue) continue;
+
+        const envValue = env[key];
+        const envEmpty = !envValue || (typeof envValue === 'string' && envValue.trim() === '');
+        // TENANT_OWNED_KEYS: DB wins (the tenant's own Stripe key must beat any
+        // platform env). Everyone else: env wins, DB is the self-host fallback.
+        if (TENANT_OWNED_KEYS.has(key) || envEmpty) {
+            env[key] = dbValue;
+        }
+    }
+}
 
 export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
@@ -30,29 +70,12 @@ export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async
     if (!path.startsWith('/api/')) return next();
 
     try {
-        const db = drizzle(c.env.DB);
-        const row = await db
-            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-
-        if (row?.encryptedSecrets) {
-            const decrypted = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
-
-            // Merge into c.env — Worker env takes precedence
+        // A-16 — blob is KV-cached (ciphertext only); see lib/secrets-cache.ts.
+        const blob = await loadEncryptedSecretsBlob(c.env.DB, c.env.TENANT_CACHE, tenantId);
+        if (blob) {
+            const decrypted = await decryptSecrets(blob, c.env.JWT_SECRET);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const env = c.env as any;
-            for (const key of INTEGRATION_SECRET_KEYS) {
-                const dbValue = decrypted[key];
-                if (!dbValue) continue;
-
-                // Only fill in if the Worker env binding is empty/undefined
-                const envValue = env[key];
-                if (!envValue || (typeof envValue === 'string' && envValue.trim() === '')) {
-                    env[key] = dbValue;
-                }
-            }
+            applyIntegrationSecrets(c.env as any, decrypted as Record<string, string | undefined>);
         }
     } catch (err) {
         // Non-fatal: if decryption fails (key rotation, corrupt data),

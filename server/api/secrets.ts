@@ -14,6 +14,7 @@ import { tenantConfigs } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { encryptSecrets, decryptSecrets, maskSecret, isMasked } from '../lib/config-crypto';
+import { secretsCacheKey } from '../lib/secrets-cache';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 
 /**
@@ -23,7 +24,9 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
  */
 export const INTEGRATION_SECRET_KEYS = [
     'RESEND_API_KEY',
-    'SENDER_EMAIL',
+    // SENDER_EMAIL removed (B-14): the From address is not a secret — it lives
+    // in the plaintext `tenant_configs.sender_email` column set via the
+    // Communication settings form, never in the encrypted secrets store.
     'GEMINI_API_KEY',
     'TURNSTILE_SECRET_KEY',
     'GOOGLE_CLIENT_ID',
@@ -189,6 +192,9 @@ export const secretsRoutes = createApiRouter()
             });
         }
 
+        // A-16 — drop the cached encrypted blob so the next request re-reads D1.
+        await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
+
         auditFromContext(c, 'config.secrets.update', 'tenant_config', {
             metadata: { keysUpdated: Object.keys(body).filter(k => allowedKeys.has(k) && body[k] && !isMasked(body[k])) },
         });
@@ -217,7 +223,6 @@ export const secretsRoutes = createApiRouter()
         // Also accept camelCase variants that the existing settings-advanced page sends
         const camelToEnv: Record<string, string> = {
             resendApiKey: 'RESEND_API_KEY',
-            senderEmail: 'SENDER_EMAIL',
             geminiApiKey: 'GEMINI_API_KEY',
             turnstileSecretKey: 'TURNSTILE_SECRET_KEY',
             googleClientId: 'GOOGLE_CLIENT_ID',
@@ -263,6 +268,9 @@ export const secretsRoutes = createApiRouter()
                 updatedAt: new Date(),
             });
         }
+
+        // A-16 — drop the cached encrypted blob so the next request re-reads D1.
+        await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
 
         auditFromContext(c, 'config.secrets.update', 'tenant_config');
         return c.json({ success: true as const }, 200);

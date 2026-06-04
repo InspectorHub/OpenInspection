@@ -1,9 +1,13 @@
 import { createRoute, z } from '@hono/zod-openapi';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { tenants } from '../lib/db/schema';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
 import { resolvePortalAccess, resolveObserverAccess } from '../lib/public-access';
+import { contentDisposition } from '../lib/content-disposition';
 import { loadVerifyData } from '../lib/verify-data';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
@@ -33,6 +37,35 @@ const reportRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getPublicReport',
     description: 'Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing/expired/revoked or does not match the requested inspection.',
+}, { scopes: [], tier: 'extended' }));
+
+// A-9 — Public token-scoped photo serve for the no-login report viewer. Mirrors
+// the authed editor serve route, but resolves the tenant from the portal/share
+// token (NEVER the `:tenant` path segment) and confirms the photo key belongs to
+// that tenant + inspection before streaming. The R2 key (which contains '/')
+// travels as a query param to avoid path-segment splitting.
+const reportPhotoRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/report/{tenant}/{id}/photo',
+    tags: ['public'],
+    summary: 'Public token-gated inspection photo',
+    request: {
+        params: z.object({
+            tenant: z.string().describe('Tenant slug (display only; tenant is resolved from the token).'),
+            id: z.string().describe('Inspection id.'),
+        }),
+        query: z.object({
+            key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
+            token: z.string().optional().describe('Persistent portal access token.'),
+            download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
+        }),
+    },
+    responses: {
+        200: { content: { 'image/*': { schema: z.any() } }, description: 'Photo bytes' },
+        404: { description: 'Not found or token invalid/expired' },
+    },
+    operationId: 'getPublicReportPhoto',
+    description: 'Public, no-login inspection photo gated by the same portal token as the report data. 404 when the token is invalid or the key is outside the token\'s tenant + inspection.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public inspector marketing profile (by slug). Tenant resolves from the
@@ -71,14 +104,58 @@ const inspectorRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login inspector profile resolved by tenant slug + slug. Returns only public marketing fields (name/bio/photo/serviceAreas) + bookable services — never email/phone/license/ids.',
 }, { scopes: [], tier: 'extended' }));
 
+// A-10 — the canonical tenant brand every public surface paints with.
+// Fields are nullable verbatim from tenant_configs; null primaryColor means
+// "keep the platform design tokens" (no per-surface fallback drift).
+const PublicBrandSchema = z.object({
+    siteName: z.string().nullable(),
+    primaryColor: z.string().nullable(),
+    logoUrl: z.string().nullable(),
+});
+
+const brandRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/brand/{tenant}',
+    tags: ['public'],
+    summary: 'Public tenant brand (site name / accent color / logo)',
+    request: { params: z.object({ tenant: z.string().describe('Tenant slug that scopes the brand lookup.') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(PublicBrandSchema) } }, description: 'Tenant brand (nullable fields when unset)' },
+        404: { description: 'Tenant not found' },
+    },
+    operationId: 'getPublicBrand',
+    description: 'Public, no-login tenant branding (siteName / primaryColor / logoUrl) resolved by tenant slug. Powers the consistent brand overlay on profile, booking, report, and invoice surfaces.',
+}, { scopes: [], tier: 'extended' }));
+
+// A-10 — public brand-asset serve (tenant logos). Logos are public marketing
+// assets embedded in emails and public pages; only the `branding/` R2 prefix
+// is reachable here. The key contains '/', so it travels as a query param
+// (mounted routers don't match multi-segment path params — see A-9).
+const brandAssetRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/brand-asset',
+    tags: ['public'],
+    summary: 'Public brand asset (tenant logo) bytes',
+    request: { query: z.object({ key: z.string().describe('R2 object key under the branding/ prefix.') }) },
+    responses: {
+        200: { content: { 'image/*': { schema: z.any() } }, description: 'Asset bytes' },
+        404: { description: 'Key outside branding/ or object missing' },
+    },
+    operationId: 'getPublicBrandAsset',
+    description: 'Streams a tenant brand asset (logo) from R2. Only keys under the public `branding/` prefix are servable; everything else in the bucket stays scoped to its own routes.',
+}, { scopes: [], tier: 'extended' }));
+
 // Public invoice for the report-gate "Pay invoice" CTA (by inspection id;
 // tenant resolves from slug). The id is unguessable; tenant-scoped query.
 const PublicInvoiceSchema = z.object({
     id: z.string(),
     amountCents: z.number(),
     status: z.string(),
+    createdAt: z.string().nullable().optional(),
     dueDate: z.string().nullable().optional(),
+    clientName: z.string().nullable().optional(),
     lineItems: z.array(z.object({ description: z.string(), amountCents: z.number() })).optional(),
+    brand: PublicBrandSchema.optional(),
 }).nullable();
 
 const invoiceRoute = createRoute(withMcpMetadata({
@@ -159,7 +236,7 @@ const observeRoute = createRoute(withMcpMetadata({
 const ReportGateResponseSchema = z.object({
     reason: z.enum(['payment', 'agreement']),
     companyName: z.string(),
-    primaryColor: z.string(),
+    primaryColor: z.string().nullable(),
     actionUrl: z.string(),
     actionLabel: z.string(),
     propertyAddress: z.string().nullable(),
@@ -240,7 +317,7 @@ export const publicReportRoutes = createApiRouter()
         }, 200);
     })
     .openapi(reportRoute, async (c) => {
-        const { id } = c.req.valid('param');
+        const { tenant, id } = c.req.valid('param');
         const { token } = c.req.valid('query');
         let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
         if (!tenantId && token) {
@@ -254,12 +331,45 @@ export const publicReportRoutes = createApiRouter()
         if (!tenantId) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
-        const data = await c.var.services.inspection.getReportData(id, tenantId);
+        // A-9: render photo URLs against the public token-scoped serve route so
+        // the no-login viewer can fetch them (the default authed URL would 401).
+        const tk = token ?? '';
+        const makePhotoUrl = (key: string) =>
+            `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
+        const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl);
         return c.json({ success: true as const, data }, 200);
     })
+    .openapi(reportPhotoRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const { key, token, download } = c.req.valid('query');
+        let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
+        if (!tenantId && token) {
+            const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
+            if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
+        }
+        if (!tenantId) return c.notFound();
+        if (!c.env.PHOTOS) return c.notFound();
+        // Ownership: keys are `${tenantId}/${inspectionId}/...` — reject anything
+        // outside the token's tenant + the requested inspection.
+        if (!key.startsWith(`${tenantId}/${id}/`)) return c.notFound();
+        const obj = await c.env.PHOTOS.get(key);
+        if (!obj) return c.notFound();
+        const headers = new Headers();
+        headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+        headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download === '1'));
+        headers.set('Cache-Control', 'private, max-age=300');
+        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
+        return new Response(obj.body, { status: 200, headers });
+    })
     .openapi(inspectorRoute, async (c) => {
-        const { slug } = c.req.valid('param');
-        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+        const { tenant, slug } = c.req.valid('param');
+        // A-10 — resolve by the URL slug directly (same pattern as
+        // GET /book/:tenant/:slug and /brand/:tenant): the slug IS the public
+        // tenant identifier, and context resolution doesn't run for in-process
+        // /api/public/* calls.
+        const db = drizzle(c.env.DB);
+        const row = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, tenant)).get();
+        const tenantId = row?.id ?? ((c.get('resolvedTenantId') || c.get('tenantId')) as string | null);
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Inspector not found' } }, 404);
         const profile = await c.var.services.user.getProfileBySlug(tenantId, slug);
         const services = await c.var.services.service.listServices(tenantId);
@@ -274,12 +384,38 @@ export const publicReportRoutes = createApiRouter()
             },
         }, 200);
     })
+    .openapi(brandRoute, async (c) => {
+        const { tenant } = c.req.valid('param');
+        // Resolve by slug directly (works in every deploy mode — the slug is
+        // the public tenant identifier; same pattern as GET /book/:tenant/:slug).
+        const db = drizzle(c.env.DB);
+        const row = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, tenant)).get();
+        if (!row) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404);
+        const brand = await c.var.services.branding.getBrand(row.id);
+        return c.json({ success: true as const, data: brand }, 200);
+    })
+    .openapi(brandAssetRoute, async (c) => {
+        const { key } = c.req.valid('query');
+        if (!c.env.PHOTOS) return c.notFound();
+        if (!key.startsWith('branding/')) return c.notFound();
+        const obj = await c.env.PHOTOS.get(key);
+        if (!obj) return c.notFound();
+        const headers = new Headers();
+        headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+        headers.set('Cache-Control', 'public, max-age=3600');
+        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
+        return new Response(obj.body, { status: 200, headers });
+    })
     .openapi(invoiceRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
         const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
-        return c.json({ success: true as const, data: inv }, 200);
+        if (!inv) return c.json({ success: true as const, data: null }, 200);
+        // A-10 — ship the tenant brand with the invoice so the public pay page
+        // renders the inspector's branding (no tenant slug in /r/:id URLs).
+        const brand = await c.var.services.branding.getBrand(tenantId);
+        return c.json({ success: true as const, data: { ...inv, brand } }, 200);
     })
     .openapi(payIntentRoute, async (c) => {
         const { id } = c.req.valid('param');

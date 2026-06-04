@@ -4,7 +4,7 @@ import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { m2mAgreementRenderUrl } from '../lib/public-urls';
 import { buildEvidencePack } from '../services/evidence-pack.service';
-import { EmailService } from '../services/email.service';
+import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
@@ -163,7 +163,10 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                 const verifyUrl = req.verificationToken
                     ? `${baseUrl(env)}/v/${req.verificationToken}`
                     : `${baseUrl(env)}/api/public/verify/${requestId}`;
-                const email = new EmailService(env.RESEND_API_KEY, env.SENDER_EMAIL || 'noreply@openinspection.io', env.APP_NAME || 'OpenInspection');
+                // B-13: resolve the tenant's sender identity + branded renderer
+                // (own/platform Resend, display name, reply-to, template overrides)
+                // even though Workflows run outside diMiddleware.
+                const email = await buildTenantEmailService(env, req.tenantId);
                 await email.sendEvidencePack({
                     to: req.clientEmail,
                     clientName: req.clientName ?? 'Customer',

@@ -4,6 +4,7 @@ import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import type { Route } from "./+types/invoice";
 import { createApi } from "~/lib/api-client.server";
+import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 
 export function meta() {
   return [{ title: "Invoice - OpenInspection" }];
@@ -20,19 +21,44 @@ interface InvoiceData {
   total: number;
 }
 
+/** Wire shape of GET /api/public/r/:id/invoice (cents + ISO dates + brand). */
+interface RawInvoice {
+  id: string;
+  amountCents: number;
+  status: string;
+  createdAt?: string | null;
+  dueDate?: string | null;
+  clientName?: string | null;
+  lineItems?: { description: string; amountCents: number }[];
+  brand?: TenantBrand;
+}
+
 export async function loader({ params, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context);
     const res = await api.publicReport.r[":id"].invoice.$get({ param: { id: params.id ?? "" } });
     const body = res.ok ? await res.json() : {};
-    const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+    const d = ((body as Record<string, unknown>).data ?? null) as RawInvoice | null;
+    const invoice: InvoiceData | null = d
+      ? {
+          number: `INV-${d.id.slice(0, 8).toUpperCase()}`,
+          date: d.createdAt?.slice(0, 10) ?? "",
+          dueDate: d.dueDate ?? null,
+          status: (d.status as InvoiceData["status"]) ?? "draft",
+          clientName: d.clientName ?? "",
+          inspectorName: "",
+          lineItems: (d.lineItems ?? []).map((li) => ({ description: li.description, amount: li.amountCents / 100 })),
+          total: d.amountCents / 100,
+        }
+      : null;
     return {
-      invoice: (Object.keys(d).length > 0 ? d : null) as InvoiceData | null,
+      invoice,
+      brand: d?.brand ?? EMPTY_BRAND,
       error: res.ok ? null : "Invoice not found",
       id: params.id ?? "",
     };
   } catch {
-    return { invoice: null, error: "Service unavailable", id: params.id ?? "" };
+    return { invoice: null, brand: EMPTY_BRAND, error: "Service unavailable", id: params.id ?? "" };
   }
 }
 
@@ -57,7 +83,7 @@ const STATUS_PILL: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 export default function InvoicePage() {
-  const { invoice, error, id } = useLoaderData<typeof loader>();
+  const { invoice, brand, error, id } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   // After Stripe's confirmPayment redirect the page reloads with
   // ?redirect_status=succeeded. The webhook flips the invoice to paid
@@ -91,8 +117,18 @@ export default function InvoicePage() {
   const payable = !isPaid && !isVoid && balanceDue > 0;
 
   return (
-    <div className="min-h-screen bg-ih-bg-app py-8 px-4 print:bg-white print:py-0">
+    <div className="min-h-screen bg-ih-bg-app py-8 px-4 print:bg-white print:py-0" style={brandTokens(brand.primaryColor)}>
       <div className="max-w-[560px] mx-auto">
+        {/* Tenant brand bar */}
+        {(brand.logoUrl || brand.siteName) && (
+          <div className="mb-4 flex items-center gap-2.5">
+            {brand.logoUrl ? (
+              <img src={brand.logoUrl} alt={brand.siteName ?? "Logo"} className="h-8 w-auto" />
+            ) : (
+              <span className="font-serif text-[16px] font-semibold text-ih-fg-2">{brand.siteName}</span>
+            )}
+          </div>
+        )}
         {/* Document */}
         <div className="relative bg-ih-bg-card border border-ih-border rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
           {/* PAID stamp */}
@@ -160,7 +196,7 @@ export default function InvoicePage() {
           {/* Pay panel — Stripe Payment Element (bring-your-own-keys) */}
           {payable && !justPaid && (
             <div className="px-7 pb-7 print:hidden">
-              <PayPanel id={id} balanceDue={balanceDue} inspectorName={invoice.inspectorName} />
+              <PayPanel id={id} balanceDue={balanceDue} inspectorName={invoice.inspectorName} brandColor={brand.primaryColor} />
             </div>
           )}
 
@@ -216,7 +252,7 @@ export default function InvoicePage() {
 
 type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 
-function PayPanel({ id, balanceDue, inspectorName }: { id: string; balanceDue: number; inspectorName: string }) {
+function PayPanel({ id, balanceDue, inspectorName, brandColor }: { id: string; balanceDue: number; inspectorName: string; brandColor: string | null }) {
   const [phase, setPhase] = useState<PayPhase>("idle");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
@@ -283,7 +319,9 @@ function PayPanel({ id, balanceDue, inspectorName }: { id: string; balanceDue: n
             clientSecret,
             appearance: {
               theme: "flat",
-              variables: { colorPrimary: "#4f46e5", fontFamily: "inherit", borderRadius: "8px" },
+              // Stripe Elements render in an iframe — CSS vars don't reach it,
+              // so the resolved brand hex (or the platform token default) goes in.
+              variables: { colorPrimary: brandColor ?? "#6366f1", fontFamily: "inherit", borderRadius: "8px" },
             },
           }}
         >

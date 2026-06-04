@@ -50,6 +50,9 @@ export const communicationEmailSchema = z.object({
     .email("Enter a valid email address")
     .or(z.literal(""))
     .optional(),
+  emailMode: z.enum(["platform", "own"]).default("platform"),
+  senderDisplayName: z.string().trim().max(120).optional(),
+  useInspectorFromName: z.preprocess((v) => v === "on" || v === true, z.boolean()).default(false),
 });
 
 export type CommunicationEmailInput = z.infer<typeof communicationEmailSchema>;

@@ -1,6 +1,8 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/inspector-profile";
 import { createApi } from "~/lib/api-client.server";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 
 export function meta({ data }: Route.MetaArgs) {
   const d = data as LoaderResult | undefined;
@@ -36,6 +38,7 @@ interface LoaderResult {
   profile: InspectorData | null;
   services: ServiceItem[];
   tenantSlug: string;
+  brand: TenantBrand;
   error: string | null;
 }
 
@@ -46,19 +49,23 @@ interface LoaderResult {
 export async function loader({ params, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context);
-    const res = await api.publicReport.inspector[":tenant"][":slug"].$get({
-      param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
-    });
+    const [res, brand] = await Promise.all([
+      api.publicReport.inspector[":tenant"][":slug"].$get({
+        param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
+      }),
+      resolveTenantBrand(context, params.tenant),
+    ]);
     const body = res.ok ? await res.json() : {};
     const data = ((body as Record<string, unknown>).data ?? {}) as { profile?: InspectorData; services?: ServiceItem[] };
     return {
       profile: data?.profile ?? null,
       services: Array.isArray(data?.services) ? data.services : [],
       tenantSlug: params.tenant ?? "",
+      brand,
       error: res.ok ? null : "Inspector not found",
     } satisfies LoaderResult;
   } catch {
-    return { profile: null, services: [], tenantSlug: "", error: "Service unavailable" } satisfies LoaderResult;
+    return { profile: null, services: [], tenantSlug: "", brand: EMPTY_BRAND, error: "Service unavailable" } satisfies LoaderResult;
   }
 }
 
@@ -85,7 +92,7 @@ function fmtDuration(min: number | null): string {
 /* ------------------------------------------------------------------ */
 
 export default function InspectorProfilePage() {
-  const { profile, services, tenantSlug, error } =
+  const { profile, services, tenantSlug, brand, error } =
     useLoaderData<typeof loader>() as LoaderResult;
 
   if (error || !profile) {
@@ -113,7 +120,17 @@ export default function InspectorProfilePage() {
     .toUpperCase();
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={brandTokens(brand.primaryColor)}>
+      {/* Tenant brand bar */}
+      {(brand.logoUrl || brand.siteName) && (
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-16 pt-6 flex items-center gap-2.5">
+          {brand.logoUrl ? (
+            <img src={brand.logoUrl} alt={brand.siteName ?? "Logo"} className="h-8 w-auto" />
+          ) : (
+            <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{brand.siteName}</span>
+          )}
+        </div>
+      )}
       {/* Hero */}
       <header className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end max-w-[1200px] mx-auto px-6 lg:px-16 pt-24 pb-12">
         <div>

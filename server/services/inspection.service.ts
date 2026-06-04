@@ -981,7 +981,10 @@ export class InspectionService {
 
         const key = `${tenantId}/${id}/${itemId}_${crypto.randomUUID()}_${file.name}`;
         await this.r2.put(key, await file.arrayBuffer(), {
-            httpMetadata: { contentType: file.type }
+            httpMetadata: { contentType: file.type },
+            // A-9: preserve the original upload filename so the serve route can
+            // set Content-Disposition without parsing it back out of the key.
+            customMetadata: { originalName: file.name || 'photo' },
         });
         return key;
     }
@@ -1094,7 +1097,7 @@ export class InspectionService {
                 const displayKey = p.annotatedKey || p.key;
                 attached.push({
                     key:          displayKey,
-                    url:          `/api/inspections/${inspectionId}/photos/${encodeURIComponent(displayKey)}`,
+                    url:          `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(displayKey)}`,
                     itemId,
                     itemLabel:    meta.itemLabel,
                     sectionId:    meta.sectionId,
@@ -1155,11 +1158,14 @@ export class InspectionService {
         const key = `${tenantId}/${inspectionId}/_pool_${id}_${safeName}`;
         await this.r2.put(key, await file.arrayBuffer(), {
             httpMetadata: { contentType: file.type || 'image/jpeg' },
+            // A-9: keep the real original filename (the key only carries a
+            // sanitized variant) for the download Content-Disposition.
+            customMetadata: { originalName: file.name || 'photo' },
         });
 
         const uploadedAt = Date.now();
         const takenAt = (opts?.takenAt && Number.isFinite(opts.takenAt) && opts.takenAt > 0) ? opts.takenAt : null;
-        const url = `/api/inspections/${inspectionId}/photos/${encodeURIComponent(key)}`;
+        const url = `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`;
         const exifData = takenAt !== null ? { takenAt } : null;
 
         const db = this.getDrizzle();
@@ -1532,8 +1538,18 @@ export class InspectionService {
 
     /**
      * Builds structured report data for a given inspection.
+     *
+     * `makePhotoUrl` lets the caller control how each photo key is turned into
+     * a fetchable URL. The default points at the authenticated editor serve
+     * route; the public report endpoint passes a token-scoped public URL so the
+     * no-login report viewer can load images (A-9).
      */
-    async getReportData(inspectionId: string, tenantId: string) {
+    async getReportData(
+        inspectionId: string,
+        tenantId: string,
+        makePhotoUrl: (key: string) => string =
+            (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
+    ) {
         const db = this.getDrizzle();
 
         const inspection = await db.select().from(inspections)
@@ -1694,7 +1710,7 @@ export class InspectionService {
                     return {
                         key: displayKey,
                         originalKey: p.key,
-                        url: `/api/inspections/${inspectionId}/photos/${encodeURIComponent(displayKey)}`,
+                        url: makePhotoUrl(displayKey),
                     };
                 });
 
@@ -1720,7 +1736,7 @@ export class InspectionService {
                             return {
                                 key: displayKey,
                                 originalKey: p.key,
-                                url: `/api/inspections/${inspectionId}/photos/${encodeURIComponent(displayKey)}`,
+                                url: makePhotoUrl(displayKey),
                             };
                         }),
                         // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +
@@ -1910,7 +1926,7 @@ export class InspectionService {
     async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
-        primaryColor: string;
+        primaryColor: string | null;
         actionUrl: string;
         actionLabel: string;
         propertyAddress: string | null;
@@ -1997,7 +2013,9 @@ export class InspectionService {
         return {
             reason,
             companyName: branding?.siteName ?? 'OpenInspection',
-            primaryColor: branding?.primaryColor ?? '#2563eb',
+            // A-10 — nullable: null means "tenant set no accent", the page
+            // keeps the platform design tokens (no per-surface fallback hex).
+            primaryColor: branding?.primaryColor ?? null,
             actionUrl,
             actionLabel: reason === 'payment' ? 'Pay invoice' : 'Sign agreement',
             propertyAddress: insp.propertyAddress ?? null,

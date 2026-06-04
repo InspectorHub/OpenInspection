@@ -2,6 +2,9 @@ import { AppError, ErrorCode } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { buildIcs, type IcsEvent } from '../lib/ics';
 import { inspectorSignature, type SignatureUser } from '../lib/inspector-signature';
+import { resolveSenderIdentity, type EmailIdentityConfig, type SenderInspector } from '../lib/email/sender-identity';
+import { EmailTemplateRenderer } from '../lib/email-templates/renderer';
+import type { RenderResult } from '../lib/email-templates/types';
 
 /**
  * Sprint B-4 — when callers pass `inspector` + `host`, every customer-facing
@@ -24,7 +27,20 @@ function appendSignature(html: string, inspector?: SignatureUser, host?: string)
  * Centralizes all email logic and formatting across the application.
  */
 export class EmailService {
-    constructor(private apiKey: string, private senderEmail: string, private appName: string) {}
+    constructor(
+        private apiKey: string,
+        private senderEmail: string,
+        private appName: string,
+        private identity?: EmailIdentityConfig,
+        private renderer?: EmailTemplateRenderer,
+    ) {}
+
+    /** Render `trigger` via the template registry when a renderer is injected;
+     *  otherwise use the provided fallback (keeps no-renderer unit tests working). */
+    private renderOr(trigger: string, data: Record<string, unknown>, fallback: { subject: string; html: string }, opts?: { signatureHtml?: string }): RenderResult {
+        if (this.renderer) return this.renderer.render(trigger, data, opts);
+        return { subject: fallback.subject, html: fallback.html, enabled: true };
+    }
 
     /**
      * Sends a transactional email. Optionally includes binary attachments
@@ -38,18 +54,28 @@ export class EmailService {
         subject: string,
         html: string,
         attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
+        opts?: { inspector?: SenderInspector | undefined },
     ) {
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
             logger.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);
             return;
         }
 
+        const resolved = this.identity
+            ? resolveSenderIdentity(this.identity, opts?.inspector)
+            : {};
+        const baseFrom = this.senderEmail || `${this.appName} <noreply@example.com>`;
+        const from = resolved.fromName && this.senderEmail
+            ? `${resolved.fromName} <${this.senderEmail}>`
+            : baseFrom;
+
         const payload: Record<string, unknown> = {
-            from: this.senderEmail || `${this.appName} <noreply@example.com>`,
+            from,
             to,
             subject,
             html,
         };
+        if (resolved.replyTo) payload.reply_to = resolved.replyTo;
 
         if (attachments && attachments.length > 0) {
             payload.attachments = attachments.map(a => {
@@ -90,13 +116,15 @@ export class EmailService {
      * Sends a password reset email.
      */
     async sendPasswordReset(to: string, resetLink: string) {
-        await this.sendEmail(
-            [to],
-            'Reset your password',
-            `<p>Click the link below to reset your ${this.appName} password. This link expires in 1 hour.</p>
+        const fallbackBody = `<p>Click the link below to reset your ${this.appName} password. This link expires in 1 hour.</p>
              <p><a href="${resetLink}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Reset Password</a></p>
-             <p style="font-size:12px;color:#999;">If you didn't request this, ignore this email. Link: ${resetLink}</p>`
-        );
+             <p style="font-size:12px;color:#999;">If you didn't request this, ignore this email. Link: ${resetLink}</p>`;
+        const rendered = this.renderOr('password-reset', { resetLink }, {
+            subject: 'Reset your password',
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
     }
 
     /**
@@ -112,10 +140,7 @@ export class EmailService {
         const inspector = escape(params.inspectorName);
         const tenant = escape(params.tenantName);
         const url = params.acceptUrl;
-        await this.sendEmail(
-            [to],
-            `${params.inspectorName} invited you to be a partner agent`,
-            `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
+        const fallbackBody = `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
                 <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;">You're invited</h1>
                 <p style="font-size:15px;line-height:1.5;color:#334155;">
                     <strong>${inspector}</strong> at <strong>${tenant}</strong>
@@ -135,21 +160,28 @@ export class EmailService {
                     This link expires in 7 days. If the button doesn't work, copy and paste:
                     <br>${url}
                 </p>
-            </div>`,
-        );
+            </div>`;
+        const rendered = this.renderOr('agent-invite', { inspectorName: params.inspectorName, tenantName: params.tenantName, acceptUrl: params.acceptUrl }, {
+            subject: `${params.inspectorName} invited you to be a partner agent`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
     }
 
     /**
      * Sends a workspace invitation email.
      */
     async sendInvitation(to: string, inviteLink: string) {
-        await this.sendEmail(
-            [to],
-            "You've been invited to join a workspace",
-            `<p>You've been invited to join an ${this.appName} workspace.</p>
+        const fallbackBody = `<p>You've been invited to join an ${this.appName} workspace.</p>
              <p><a href="${inviteLink}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Accept Invitation</a></p>
-             <p style="font-size:12px;color:#999;">Link expires in 7 days. If the button doesn't work: ${inviteLink}</p>`
-        );
+             <p style="font-size:12px;color:#999;">Link expires in 7 days. If the button doesn't work: ${inviteLink}</p>`;
+        const rendered = this.renderOr('workspace-invitation', { inviteLink, tenantName: this.appName }, {
+            subject: "You've been invited to join a workspace",
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
     }
 
     /**
@@ -163,7 +195,7 @@ export class EmailService {
      * inspector.
      */
     async sendAgentShareLink(to: string, address: string, reportUrl: string, inspector?: SignatureUser, host?: string) {
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                <h1 style="color: #4f46e5;">Inspection Report Shared</h1>
                <p>The inspector has shared the inspection report for <strong>${address}</strong> with you.</p>
                <div style="margin: 32px 0;">
@@ -172,10 +204,18 @@ export class EmailService {
                <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link: ${reportUrl}</p>
                <p style="font-size: 12px; color: #999;">This link expires in 30 days.</p>
              </div>`;
+        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const rendered = this.renderOr('agent-share-link', { address, reportUrl }, {
+            subject: `Inspection report shared: ${address}`,
+            html: appendSignature(fallbackBody, inspector, host),
+        }, signatureHtml ? { signatureHtml } : undefined);
+        if (!rendered.enabled) return;
         await this.sendEmail(
             [to],
-            `Inspection report shared: ${address}`,
-            appendSignature(body, inspector, host),
+            rendered.subject,
+            rendered.html,
+            undefined,
+            { inspector },
         );
     }
 
@@ -186,7 +226,7 @@ export class EmailService {
      * `inspector` + `host`.
      */
     async sendReportReady(to: string, address: string, reportUrl: string, inspector?: SignatureUser, host?: string) {
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                <h1 style="color: #4f46e5;">Report Ready</h1>
                <p>The inspection for <strong>${address}</strong> has been completed and the report is now available.</p>
                <div style="margin: 32px 0;">
@@ -194,10 +234,18 @@ export class EmailService {
                </div>
                <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link: ${reportUrl}</p>
              </div>`;
+        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const rendered = this.renderOr('report-ready', { address, reportUrl }, {
+            subject: `Property Inspection Report: ${address}`,
+            html: appendSignature(fallbackBody, inspector, host),
+        }, signatureHtml ? { signatureHtml } : undefined);
+        if (!rendered.enabled) return;
         await this.sendEmail(
             [to],
-            `Property Inspection Report: ${address}`,
-            appendSignature(body, inspector, host),
+            rendered.subject,
+            rendered.html,
+            undefined,
+            { inspector },
         );
     }
 
@@ -218,7 +266,7 @@ export class EmailService {
         host?: string,
     ) {
         const safeAddress = address.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                 <h1 style="color: #4f46e5;">Your Inspection Report</h1>
                 <p>The inspection for <strong>${address}</strong> is complete. The full report is attached as a PDF and also available online.</p>
                 <div style="margin: 32px 0;">
@@ -227,11 +275,18 @@ export class EmailService {
                 <p style="font-size: 14px; color: #666;">PDF attachment: <strong>${safeAddress}-report.pdf</strong></p>
                 <p style="font-size: 12px; color: #999;">Online link: ${reportUrl}</p>
             </div>`;
+        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const rendered = this.renderOr('report-ready-pdf', { address, reportUrl }, {
+            subject: `Property Inspection Report: ${address}`,
+            html: appendSignature(fallbackBody, inspector, host),
+        }, signatureHtml ? { signatureHtml } : undefined);
+        if (!rendered.enabled) return;
         await this.sendEmail(
             [to],
-            `Property Inspection Report: ${address}`,
-            appendSignature(body, inspector, host),
+            rendered.subject,
+            rendered.html,
             [{ filename: `${safeAddress}-report.pdf`, content: pdfBytes }],
+            { inspector },
         );
     }
 
@@ -243,7 +298,7 @@ export class EmailService {
      */
     async sendAgreementRequest(to: string, clientName: string | null, agreementName: string, signUrl: string, inspector?: SignatureUser, host?: string) {
         const name = escapeHtml(clientName || 'Client');
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
                 <h2 style="color: #4f46e5;">Document Ready to Sign</h2>
                 <p>Hi ${name},</p>
                 <p>You have been asked to review and sign the following agreement:</p>
@@ -256,10 +311,18 @@ export class EmailService {
                     Thank you,<br>${this.appName} Team
                 </p>
             </div>`;
+        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const rendered = this.renderOr('agreement-request', { clientName: clientName ?? 'Client', agreementName, signUrl }, {
+            subject: `Please sign: ${agreementName}`,
+            html: appendSignature(fallbackBody, inspector, host),
+        }, signatureHtml ? { signatureHtml } : undefined);
+        if (!rendered.enabled) return;
         await this.sendEmail(
             [to],
-            `Please sign: ${agreementName}`,
-            appendSignature(body, inspector, host),
+            rendered.subject,
+            rendered.html,
+            undefined,
+            { inspector },
         );
     }
 
@@ -308,12 +371,17 @@ export class EmailService {
         const escape = escapeHtml;
         const fromName = (message.fromName ?? (recipient === 'client' ? 'your inspector' : (insp.clientName ?? 'your client'))).toString();
         const snippet = message.body.length > 200 ? message.body.slice(0, 197) + '...' : message.body;
-        const html = `
+        const fallbackBody = `
             <p>New message from <strong>${escape(fromName)}</strong> regarding <strong>${escape(insp.propertyAddress ?? '')}</strong>:</p>
             <blockquote style="border-left:3px solid #ccc;padding-left:12px;color:#555">${escape(snippet)}</blockquote>
             <p><a href="${viewUrl}">View conversation</a></p>
         `;
-        await this.sendEmail([to], `New message — ${insp.propertyAddress ?? 'inspection'}`, html);
+        const rendered = this.renderOr('message-notification', { fromName, propertyAddress: insp.propertyAddress ?? '', snippet, viewUrl }, {
+            subject: `New message — ${insp.propertyAddress ?? 'inspection'}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
         if (deps.kv) await deps.kv.put(throttleKey, '1', { expirationTtl: 300 });
     }
 
@@ -345,7 +413,7 @@ export class EmailService {
         host?:            string,
     ) {
         const escape = escapeHtml;
-        const html = `<!DOCTYPE html>
+        const fallbackHtml = `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;color:#0f172a;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 16px;">
@@ -390,11 +458,19 @@ export class EmailService {
 </body>
 </html>`;
 
+        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const rendered = this.renderOr('agreement-signed', { clientName, propertyAddress, verifyUrl, confirmationId, signedAtUtc, ipAddress: ipAddress ?? 'recorded' }, {
+            subject: `Agreement signed — ${propertyAddress}`,
+            html: appendSignature(fallbackHtml, inspector, host),
+        }, signatureHtml ? { signatureHtml } : undefined);
+        if (!rendered.enabled) return;
         const recipients = [to, ...ccs.filter(Boolean).filter(e => e && e !== to)];
         await this.sendEmail(
             recipients,
-            `Agreement signed — ${propertyAddress}`,
-            appendSignature(html, inspector, host),
+            rendered.subject,
+            rendered.html,
+            undefined,
+            { inspector },
         );
     }
 
@@ -433,7 +509,7 @@ export class EmailService {
         const calendarHint = icsEvent
             ? '<p style="margin: 5px 0; color:#64748b; font-size:13px;">A calendar invite (<strong>inspection.ics</strong>) is attached — open it to add this inspection to your calendar.</p>'
             : '';
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
                 <h2 style="color: #4f46e5;">Inspection Scheduled</h2>
                 <p>Hi ${clientName},</p>
                 <p>Your property inspection has been successfully scheduled. Here are the details:</p>
@@ -448,11 +524,18 @@ export class EmailService {
                     Thank you,<br>${this.appName} Team
                 </p>
             </div>`;
+        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const rendered = this.renderOr('booking-confirmation', { clientName, address, date, time, icsAttached: !!icsEvent }, {
+            subject: `Inspection Scheduled: ${address}`,
+            html: appendSignature(fallbackBody, inspector, host),
+        }, signatureHtml ? { signatureHtml } : undefined);
+        if (!rendered.enabled) return;
         await this.sendEmail(
             [to],
-            `Inspection Scheduled: ${address}`,
-            appendSignature(body, inspector, host),
+            rendered.subject,
+            rendered.html,
             attachments,
+            { inspector },
         );
     }
 
@@ -469,10 +552,9 @@ export class EmailService {
             logger.debug('email.sendNewReferral.skipped', { agentId: agent.id, reason: 'preference_off' });
             return;
         }
-        const subject = `New referral booked: ${params.propertyAddress}`;
         const greet = agent.name ? `Hi ${agent.name},` : 'Hi,';
         const client = params.clientName ? ` for <strong>${params.clientName}</strong>` : '';
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
             <h1 style="color: #4f46e5;">New referral booked</h1>
             <p>${greet}</p>
             <p>An inspection at <strong>${params.propertyAddress}</strong>${client} has been booked under your referral. We'll let you know again when the report is ready.</p>
@@ -480,7 +562,12 @@ export class EmailService {
               <a href="${params.dashboardUrl}" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Open dashboard</a>
             </div>
         </div>`;
-        await this.sendEmail([agent.email], subject, body);
+        const rendered = this.renderOr('agent-new-referral', { agentName: agent.name ?? '', propertyAddress: params.propertyAddress, clientName: params.clientName ?? '', dashboardUrl: params.dashboardUrl }, {
+            subject: `New referral booked: ${params.propertyAddress}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([agent.email], rendered.subject, rendered.html);
     }
 
     /**
@@ -497,9 +584,8 @@ export class EmailService {
             logger.debug('email.sendAgentReportReady.skipped', { agentId: agent.id, reason: 'preference_off' });
             return;
         }
-        const subject = `Report ready: ${params.propertyAddress}`;
         const greet = agent.name ? `Hi ${agent.name},` : 'Hi,';
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
             <h1 style="color: #4f46e5;">Report ready to read</h1>
             <p>${greet}</p>
             <p>The inspection report for <strong>${params.propertyAddress}</strong> has been published. You can read it at the link below.</p>
@@ -507,7 +593,12 @@ export class EmailService {
               <a href="${params.reportUrl}" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View report</a>
             </div>
         </div>`;
-        await this.sendEmail([agent.email], subject, body);
+        const rendered = this.renderOr('agent-report-ready', { agentName: agent.name ?? '', propertyAddress: params.propertyAddress, reportUrl: params.reportUrl }, {
+            subject: `Report ready: ${params.propertyAddress}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([agent.email], rendered.subject, rendered.html);
     }
 
     /**
@@ -524,14 +615,18 @@ export class EmailService {
             return;
         }
         const dollars = (params.amountCents / 100).toFixed(2);
-        const subject = `Invoice paid: ${params.propertyAddress}`;
         const greet = agent.name ? `Hi ${agent.name},` : 'Hi,';
-        const body = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
             <h1 style="color: #15803d;">Invoice paid</h1>
             <p>${greet}</p>
             <p>The invoice for the inspection at <strong>${params.propertyAddress}</strong> has been paid in full ($${dollars}).</p>
         </div>`;
-        await this.sendEmail([agent.email], subject, body);
+        const rendered = this.renderOr('agent-invoice-paid', { agentName: agent.name ?? '', propertyAddress: params.propertyAddress, amount: '$' + (params.amountCents/100).toFixed(2) }, {
+            subject: `Invoice paid: ${params.propertyAddress}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([agent.email], rendered.subject, rendered.html);
     }
 
     // -------------------------------------------------------------------------
@@ -559,10 +654,7 @@ export class EmailService {
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
         const url = params.confirmUrl;
-        await this.sendEmail(
-            [to],
-            `Confirm your home inspection at ${params.propertyAddress}`,
-            `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
+        const fallbackBody = `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
                 <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;">Confirm your inspection</h1>
                 <p style="font-size:15px;line-height:1.5;color:#334155;">
                     <strong>${inspector}</strong> has scheduled an inspection for
@@ -582,8 +674,13 @@ export class EmailService {
                     This link expires in 7 days. If the button doesn't work, copy and paste:
                     <br>${url}
                 </p>
-            </div>`,
-        );
+            </div>`;
+        const rendered = this.renderOr('concierge-client-confirm', { inspectorName: params.inspectorName, propertyAddress: params.propertyAddress, date: params.date, confirmUrl: params.confirmUrl }, {
+            subject: `Confirm your home inspection at ${params.propertyAddress}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
     }
 
     /**
@@ -606,10 +703,7 @@ export class EmailService {
         const client = escape(params.clientName);
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
-        await this.sendEmail(
-            [to],
-            `Concierge booking awaiting your review: ${params.propertyAddress}`,
-            `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
+        const fallbackBody = `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
                 <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;">A booking needs your review</h1>
                 <p style="font-size:15px;line-height:1.5;color:#334155;">
                     A partner agent has submitted an inspection booking on behalf of
@@ -626,8 +720,13 @@ export class EmailService {
                         Open Dashboard
                     </a>
                 </div>
-            </div>`,
-        );
+            </div>`;
+        const rendered = this.renderOr('concierge-inspector-review', { clientName: params.clientName, propertyAddress: params.propertyAddress, date: params.date, reviewUrl: params.reviewUrl }, {
+            subject: `Concierge booking awaiting your review: ${params.propertyAddress}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
     }
 
     /**
@@ -643,10 +742,7 @@ export class EmailService {
         const client = escape(params.clientName);
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
-        await this.sendEmail(
-            [to],
-            `Concierge booking confirmed: ${params.propertyAddress}`,
-            `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
+        const fallbackBody = `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
                 <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;">Your client confirmed</h1>
                 <p style="font-size:15px;line-height:1.5;color:#334155;">
                     <strong>${client}</strong> has confirmed the inspection for
@@ -655,8 +751,13 @@ export class EmailService {
                 <p style="font-size:14px;line-height:1.5;color:#334155;">
                     The inspector will reach out directly with day-of details.
                 </p>
-            </div>`,
-        );
+            </div>`;
+        const rendered = this.renderOr('concierge-confirmed-agent', { clientName: params.clientName, propertyAddress: params.propertyAddress, date: params.date }, {
+            subject: `Concierge booking confirmed: ${params.propertyAddress}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
     }
 
     /**
@@ -671,10 +772,7 @@ export class EmailService {
         const address = escape(params.propertyAddress);
         const date = escape(params.date);
         const reason = params.reason ? `<p style="font-size:14px;line-height:1.5;color:#334155;">Reason: ${escape(params.reason)}</p>` : '';
-        await this.sendEmail(
-            [to],
-            `Concierge booking cancelled: ${params.propertyAddress}`,
-            `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
+        const fallbackBody = `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
                 <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;">A booking was cancelled</h1>
                 <p style="font-size:15px;line-height:1.5;color:#334155;">
                     The inspector cancelled the inspection scheduled for
@@ -684,8 +782,13 @@ export class EmailService {
                 <p style="font-size:14px;line-height:1.5;color:#334155;">
                     You can submit a new concierge booking from your dashboard.
                 </p>
-            </div>`,
-        );
+            </div>`;
+        const rendered = this.renderOr('concierge-cancelled-agent', { propertyAddress: params.propertyAddress, date: params.date, reason: params.reason ?? '' }, {
+            subject: `Concierge booking cancelled: ${params.propertyAddress}`,
+            html: fallbackBody,
+        });
+        if (!rendered.enabled) return;
+        await this.sendEmail([to], rendered.subject, rendered.html);
     }
 
     /**
@@ -715,7 +818,7 @@ export class EmailService {
         const { to, clientName, envelopeId, verifyUrl, signedPdfBytes, evidenceZipBytes } = params;
         const escape = escapeHtml;
         const name = escape(clientName);
-        const html = `<!DOCTYPE html>
+        const fallbackHtml = `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;color:#0f172a;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 16px;">
@@ -756,10 +859,15 @@ export class EmailService {
   </table>
 </body>
 </html>`;
+        const rendered = this.renderOr('evidence-pack', { clientName, envelopeId, verifyUrl }, {
+            subject: 'Your signed agreement',
+            html: fallbackHtml,
+        });
+        if (!rendered.enabled) return;
         await this.sendEmail(
             [to],
-            'Your signed agreement',
-            html,
+            rendered.subject,
+            rendered.html,
             [
                 { filename: 'signed-agreement.pdf', content: signedPdfBytes.buffer as ArrayBuffer, contentType: 'application/pdf' },
                 { filename: 'evidence-pack.zip',    content: evidenceZipBytes.buffer as ArrayBuffer, contentType: 'application/zip' },

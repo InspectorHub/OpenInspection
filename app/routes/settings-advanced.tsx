@@ -41,11 +41,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     stripeAccountId = (data?.accountId as string) || null;
   }
 
-  // No GET /api/ai/status route exists; geminiConfigured is derived from secrets presence only.
-  const geminiConfigured = false;
-
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
+
+  // Gemini is bring-your-own-key: "configured" reflects the tenant's own bound
+  // key in encrypted secrets (no GET /api/ai/status route — derive from presence).
+  const geminiConfigured = !!secrets.GEMINI_API_KEY;
 
   return {
     config: { stripeConnected, stripeAccountId, geminiConfigured } as AdvancedConfig,

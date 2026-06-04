@@ -1,0 +1,9 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-000000000003",
+  "type": "io.inspectorhub.user.deleted",
+  "source": "core",
+  "time": "2026-06-04T00:00:00.000Z",
+  "dataschema": "user-deleted/v1",
+  "data": { "tenantId": "tenant-fixture-1", "email": "member@example.com" }
+}

@@ -27,6 +27,9 @@ export interface DeploymentProfile {
     hasBilling: boolean;
     hasSeatQuota: boolean;
     billingPortalUrl: string | null;
+    /** Base URL the browser is sent to for saas login-bounce + "Switch workspace".
+     *  Derived from PORTAL_API_URL (trailing slash stripped); null in standalone. */
+    loginRedirectBase: string | null;
 
     hasSetupWizard: boolean;
 
@@ -41,6 +44,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     mode: 'standalone',
     fixedTenantId: FIXED_TENANT_FALLBACK,
     hasBilling: false, hasSeatQuota: false, billingPortalUrl: null,
+    loginRedirectBase: null,
     hasSetupWizard: true,
     aiDevMockFallback: true,
     brandingSource: 'env',
@@ -50,6 +54,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     mode: 'saas',
     fixedTenantId: null,
     hasBilling: true, hasSeatQuota: true, billingPortalUrl: null,
+    loginRedirectBase: null,
     hasSetupWizard: false,
     aiDevMockFallback: false,
     brandingSource: 'tenant-config',
@@ -65,7 +70,8 @@ export const SAAS_PROFILE: DeploymentProfile = {
  */
 export function getDeploymentProfile(env: AppEnv): DeploymentProfile {
     if (env.APP_MODE === 'saas') {
-        return { ...SAAS_PROFILE, billingPortalUrl: env.PORTAL_API_URL ?? null };
+        const base = env.PORTAL_API_URL ? env.PORTAL_API_URL.replace(/\/$/, '') : null;
+        return { ...SAAS_PROFILE, billingPortalUrl: base, loginRedirectBase: base };
     }
     return { ...STANDALONE_PROFILE, fixedTenantId: env.SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK };
 }

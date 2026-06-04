@@ -48,7 +48,10 @@ describe('iter-2 #4 — logout cookie deletion contract', () => {
         }
     });
 
-    it('production logout helper deletes BOTH __Host-inspector_token AND __Host-csrf_token', async () => {
+    // C-13 — importing the real auth module pulls a large module graph; under
+    // CPU contention (parallel tsc/build) the import alone can exceed the 5s
+    // default, flapping the suite. The generous timeout keeps the gate honest.
+    it('production logout helper deletes BOTH __Host-inspector_token AND __Host-csrf_token', { timeout: 30_000 }, async () => {
         // Pin the production behavior by importing the actual helper used by
         // the logout handler. If somebody removes the second deleteCookie
         // call, this test breaks immediately.

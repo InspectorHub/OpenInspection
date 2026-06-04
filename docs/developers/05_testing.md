@@ -1,4 +1,4 @@
-# Testing — apps/core
+# Testing — apps/openinspection
 
 The single Worker serves both the API and the React Router v7 UI, so tests cover both surfaces against one running worker. API tests live in `tests/`; web tests live in `tests/web/`.
 

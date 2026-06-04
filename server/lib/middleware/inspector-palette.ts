@@ -14,11 +14,18 @@ import { logger } from '../logger';
  * is missing (un-authed page, no tenant resolved, branding still default),
  * the middleware no-ops — the palette renders without the booking action.
  *
- * Slug lookup is per-request and uncached because users.slug rarely reads
- * but the value must be authoritative when it does (a stale slug → broken
- * link in the user's clipboard). If this becomes hot, swap to a 5-min KV
- * cache keyed by user id.
+ * A-16 — the slug lookup is now behind a 5-min KV cache keyed by user id
+ * (the "if this becomes hot" plan from the original note): it ran an uncached
+ * D1 read on every authenticated request. A slug change can serve the stale
+ * value for up to the TTL — acceptable for a copy-link affordance.
  */
+const SLUG_CACHE_TTL_S = 300;
+
+/** Cache key for a user's booking slug — writers delete it on slug change. */
+export function userSlugCacheKey(userId: string): string {
+    return `uslug:${userId}`;
+}
+
 export const inspectorPaletteMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const branding = c.get('branding');
     const user = c.get('user');
@@ -28,13 +35,20 @@ export const inspectorPaletteMiddleware: MiddlewareHandler<HonoConfig> = async (
     }
 
     try {
-        const row = await drizzle(c.env.DB).select({ slug: users.slug })
-            .from(users)
-            .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
-            .get();
+        const cacheKey = userSlugCacheKey(user.sub);
+        // KV stores '' for "user has no slug" so the absence is cached too.
+        let slug = await c.env.TENANT_CACHE?.get(cacheKey);
+        if (slug === null || slug === undefined) {
+            const row = await drizzle(c.env.DB).select({ slug: users.slug })
+                .from(users)
+                .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
+                .get();
+            slug = row?.slug ?? '';
+            await c.env.TENANT_CACHE?.put(cacheKey, slug, { expirationTtl: SLUG_CACHE_TTL_S });
+        }
         const enriched = {
             ...branding,
-            currentUserSlug: row?.slug ?? null,
+            currentUserSlug: slug || null,
             bookingHost:     getBookingHost(c),
             tenantSlug: c.get('requestedTenantSlug') ?? null,
         };

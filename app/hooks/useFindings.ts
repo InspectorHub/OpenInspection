@@ -73,10 +73,18 @@ export function useFindings(
     setDirty: (v: boolean) => void;
     setSaveStatus: (s: "idle" | "saving" | "saved" | "error") => void;
     inspectionId: string;
+    /**
+     * B-17: notes commit (textarea blur) and the next mutation (rating click)
+     * fire in the same gesture. On a shared fetcher, React Router aborts the
+     * in-flight notes submission when the rating submits — the note is lost.
+     * Callers should pass a dedicated fetcher for notes commits.
+     */
+    notesFetcher?: ReturnType<typeof useFetcher>;
   },
 ) {
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
   const { sectionIdForItem, setDirty, setSaveStatus } = options;
+  const notesFetcher = options.notesFetcher ?? fetcher;
 
   /* ---------------------------------------------------------------- */
   /*  Read helpers                                                     */
@@ -171,13 +179,13 @@ export function useFindings(
 
   const commitNotes = useCallback(
     (sectionId: string, itemId: string, notes: string) => {
-      fetcher.submit(
+      notesFetcher.submit(
         { intent: "notes", itemId, sectionId, notes },
         { method: "POST" },
       );
       setDirty(true);
     },
-    [fetcher, setDirty],
+    [notesFetcher, setDirty],
   );
 
   const setItemValue = useCallback(

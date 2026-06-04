@@ -9,9 +9,10 @@ import { GuestInviteService } from '../../services/guest-invite.service';
 import { AIService } from '../../services/ai.service';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
+import { publishRow } from '../../portal/outbox.service';
 import { BookingService } from '../../services/booking.service';
 import { BrandingService } from '../../services/branding.service';
-import { EmailService } from '../../services/email.service';
+import { assembleTenantEmailService, loadTenantEmailConfig, type LoadedEmailConfig } from '../email/build-email-service';
 import { InspectionService } from '../../services/inspection.service';
 import { TeamService } from '../../services/team.service';
 import { TemplateService } from '../../services/template.service';
@@ -48,39 +49,61 @@ import { QBOService } from '../../services/qbo.service';
 import { IdentityService } from '../../services/identity.service';
 import { IntegrationsService } from '../../services/integrations.service';
 import { AnalyticsService } from '../../services/analytics.service';
-
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
-import { getDeploymentProfile } from '../deployment-profile';
-import { buildKeyring } from '../jwt-keyring';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
  * When env vars for email/AI are absent, falls back to AES-GCM-decrypted DB secrets.
+ *
+ * ORDERING (A-16): registered AFTER the JWT middleware. The tenant-scoped
+ * email/AI config below reads `c.get('tenantId')`, which the JWT middleware
+ * (authed API) or tenantRouter (standalone / public slug paths) sets — when
+ * this middleware ran first, the gate never opened and per-tenant email
+ * identity + Gemini BYOK silently fell back to platform defaults on every
+ * request. The profile/keyring bootstrap that earlier middlewares need lives
+ * in `contextBootstrap` now.
  */
 export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
-    c.set('profile', getDeploymentProfile(c.env));
-    // Per-request ES256 keyring. PEM → CryptoKey imports happen at most once
-    // per request; downstream sign/verify call sites share the same Promise.
-    // .catch() suppresses the "unhandled rejection" diagnostic for requests
-    // that never touch JWTs (webhooks, healthchecks). Real awaiters still see
-    // the original rejection — the .catch() returns a separate, swallowed
-    // chain that never sees an `await`.
-    const keyringPromise = buildKeyring(c.env as unknown as Record<string, string | undefined>);
-    keyringPromise.catch(() => { /* defer reporting to the first awaiter */ });
-    c.set('keyringPromise', keyringPromise);
-    // Pre-load DB secrets only when env vars are absent and tenant is known.
-    // Env vars always take priority over DB-stored config.
-    let dbSecrets: { resendApiKey?: string; senderEmail?: string; geminiApiKey?: string } = {};
     const tenantId = c.get('tenantId');
-    if (tenantId && (!c.env.RESEND_API_KEY || !c.env.GEMINI_API_KEY)) {
-        try {
-            const bSvc = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
-            dbSecrets = await bSvc.getDecryptedSecrets(tenantId, c.env.JWT_SECRET);
-        } catch {
-            // Secrets not yet configured — proceed without them
-        }
+
+    // A-16 — one parallel batch (identity / brand / secrets / overrides)
+    // replacing four serial awaits. Only API requests consume these (email
+    // sends + AI), so page/asset requests skip the D1 reads entirely. The
+    // root-mounted auth duplicates (/forgot-password) send platform-branded
+    // mail by design, so the /api/ gate loses nothing there.
+    let emailCfg: LoadedEmailConfig = { dbSecrets: {} };
+    if (tenantId && c.req.path.startsWith('/api/')) {
+        emailCfg = await loadTenantEmailConfig(c.env, tenantId);
     }
+
+    // One place decides own-vs-platform Resend + branded renderer, shared with
+    // non-request contexts (workflows/scheduled) via assembleTenantEmailService.
+    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg);
+
+    // Build the core->portal outbox sink, gated on the SYNC_QUEUE producer
+    // binding — the transport itself. No queue → no sink → append() no-ops:
+    // standalone never accumulates dead rows, and a misconfigured saas deploy
+    // (queue binding missing) fails loudly-by-absence instead of silently
+    // queueing rows nothing will ever publish. (The portal Service Binding was
+    // retired after the queue migration — the old drain POST was its last
+    // functional use; saas-mode detection now reads APP_MODE.)
+    // On every append() the freshly-inserted row is pushed to the queue via
+    // executionCtx.waitUntil (zero user-facing latency). A send failure is
+    // swallowed — the row stays `pending` and the cron sweeper republishes it.
+    // AuthService / TeamService stay ignorant of the queue: they only see the
+    // UserSyncOutbox.append seam.
+    const buildOutbox = (): OutboxService | undefined => {
+        const queue = c.env.SYNC_QUEUE;
+        if (!queue) return undefined;
+        return new OutboxService(c.env.DB, (row) => {
+            c.executionCtx.waitUntil(
+                publishRow(c.env.DB, queue, row).catch(() => {
+                    /* send failed — row stays pending; the sweeper handles it */
+                }),
+            );
+        });
+    };
 
     const services = {} as AppServices;
 
@@ -91,7 +114,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
             switch (prop) {
                 case 'admin':
                     {
-                        const provider = c.env.PORTAL_SERVICE
+                        // Provider selection is a deployment-MODE decision
+                        // (PortalProvider never fetched the retired binding —
+                        // it only encodes saas semantics over DB+KV).
+                        const provider = c.env.APP_MODE === 'saas'
                             ? new PortalProvider(c.env.DB, c.env.TENANT_CACHE)
                             : new StandaloneProvider(c.env.DB, c.env.TENANT_CACHE);
                         target.admin = new AdminService(c.env.DB, provider);
@@ -100,7 +126,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                 case 'ai':
                     target.ai = new AIService(
                         c.env.DB,
-                        c.env.GEMINI_API_KEY || dbSecrets.geminiApiKey || '',
+                        // Bring-your-own-key: the Gemini key comes solely from the
+                        // tenant's own bound key (Settings → Advanced → AI), never a
+                        // shared platform env key — applies to SaaS and standalone.
+                        emailCfg.dbSecrets.geminiApiKey || '',
                         // Sprint 1 A-4: pass effective deployment mode so the
                         // service can return dev-mock suggestions when the
                         // active profile permits it (standalone) and
@@ -109,10 +138,21 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     );
                     break;
                 case 'auth':
-                    target.auth = new AuthService(c.env.DB, c.env.TENANT_CACHE, new OutboxService(c.env.DB));
+                    // Outbox forwarding to portal is SaaS-only: buildOutbox
+                    // returns undefined when SYNC_QUEUE is absent (standalone)
+                    // → AuthService.append no-ops (guarded by `if (this.outbox)`),
+                    // so no portal code runs and no dead sync_outbox rows accumulate.
+                    target.auth = new AuthService(
+                        c.env.DB,
+                        c.env.TENANT_CACHE,
+                        buildOutbox(),
+                    );
                     break;
                 case 'outbox':
-                    target.outbox = new OutboxService(c.env.DB);
+                    // SaaS-only: concrete sink exists only when SYNC_QUEUE is
+                    // bound. Standalone leaves it undefined (keeps standalone
+                    // free of server/portal/ code by construction, not by accident).
+                    target.outbox = buildOutbox();
                     break;
                 case 'booking':
                     target.booking = new BookingService(c.env.DB);
@@ -121,17 +161,15 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
                     break;
                 case 'email':
-                    target.email = new EmailService(
-                        c.env.RESEND_API_KEY || dbSecrets.resendApiKey || '',
-                        c.env.SENDER_EMAIL || dbSecrets.senderEmail || '',
-                        c.env.APP_NAME || 'OpenInspection'
-                    );
+                    target.email = buildEmailService();
                     break;
                 case 'inspection':
                     target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE);
                     break;
                 case 'team':
-                    target.team = new TeamService(c.env.DB);
+                    // Member removal emits `user.deleted` through the same
+                    // SaaS-only outbox sink (undefined in standalone → no-op).
+                    target.team = new TeamService(c.env.DB, buildOutbox());
                     break;
                 case 'template':
                     target.template = new TemplateService(c.env.DB);
@@ -241,11 +279,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         // (through the same lazy proxy) and the public app base URL
                         // for accept-link minting.
                         if (!target.email) {
-                            target.email = new EmailService(
-                                c.env.RESEND_API_KEY || dbSecrets.resendApiKey || '',
-                                c.env.SENDER_EMAIL || dbSecrets.senderEmail || '',
-                                c.env.APP_NAME || 'OpenInspection',
-                            );
+                            target.email = buildEmailService();
                         }
                         target.agent = new AgentService(
                             c.env.DB,
@@ -260,11 +294,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         // Depends on EmailService (for client/inspector/agent
                         // notifications) + APP_BASE_URL for the magic-link target.
                         if (!target.email) {
-                            target.email = new EmailService(
-                                c.env.RESEND_API_KEY || dbSecrets.resendApiKey || '',
-                                c.env.SENDER_EMAIL || dbSecrets.senderEmail || '',
-                                c.env.APP_NAME || 'OpenInspection',
-                            );
+                            target.email = buildEmailService();
                         }
                         target.concierge = new ConciergeService(
                             c.env.DB,

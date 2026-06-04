@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const tenants = sqliteTable('tenants', {
@@ -162,6 +162,15 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // the workspace configures them in Settings → Communication.
     senderEmail: text('sender_email'),
     replyTo: text('reply_to'),
+    // Phase 1 (B-4/A-7) — sender identity. `email_mode` switches between the
+    // platform Resend account ('platform', default) and the tenant's own
+    // ('own'). `sender_display_name` is the From: display name; when
+    // `use_inspector_from_name` is on and a send carries an inspector, that
+    // inspector's name overrides the display name and their email becomes the
+    // default Reply-To.
+    emailMode: text('email_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
+    senderDisplayName: text('sender_display_name'),
+    useInspectorFromName: integer('use_inspector_from_name', { mode: 'boolean' }).notNull().default(false),
     billingUrl: text('billing_url'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
     secrets: text('secrets'),                      // AES-GCM encrypted JSON: {resendApiKey, turnstileSecretKey, geminiApiKey, googleClientSecret}
@@ -232,6 +241,25 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     guestInvitesEnabled:      integer('guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
+
+/**
+ * Email-template Phase 3 — sparse per-tenant overrides for transactional
+ * email templates. One row per (tenant, trigger) the tenant has customized;
+ * absence = pure registry default. `subject`/`blocks` null = use default for
+ * that field; `blocks` is a partial { blockKey: value } map (only overridden
+ * keys). `enabled=false` stops that email being sent (ignored for `required`
+ * templates, which the API refuses to disable).
+ */
+export const emailTemplates = sqliteTable('email_templates', {
+    tenantId:  text('tenant_id').notNull().references(() => tenants.id),
+    trigger:   text('trigger').notNull(),
+    subject:   text('subject'),
+    blocks:    text('blocks', { mode: 'json' }).$type<Record<string, string>>(),
+    enabled:   integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (t) => ({
+    pk: primaryKey({ columns: [t.tenantId, t.trigger] }),
+}));
 
 export const auditLogs = sqliteTable('audit_logs', {
     id: text('id').primaryKey(),

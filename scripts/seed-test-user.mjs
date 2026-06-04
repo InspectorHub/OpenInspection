@@ -38,7 +38,8 @@ const userId = "test-admin-0000-0000-0000-000000000001";
 
 const sql = [
   // Tenant (standalone single tenant) — created once, ignored thereafter.
-  `INSERT OR IGNORE INTO tenants (id, name, subdomain, created_at) VALUES ('${sq(TENANT_ID)}', 'Test Tenant', 'test', ${now});`,
+  // (column renamed subdomain → slug in migration 0005)
+  `INSERT OR IGNORE INTO tenants (id, name, slug, created_at) VALUES ('${sq(TENANT_ID)}', 'Test Tenant', 'test', ${now});`,
   // Owner user — delete+insert so the password resets to a known value each run.
   `DELETE FROM users WHERE email = '${sq(EMAIL)}';`,
   `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at) VALUES ('${userId}', '${sq(TENANT_ID)}', '${sq(EMAIL)}', '${pw}', 'owner', ${now});`,
@@ -47,11 +48,14 @@ const sql = [
 const sqlFile = join(process.cwd(), ".seed-test-user.tmp.sql");
 writeFileSync(sqlFile, sql, "utf8");
 try {
-  // execFileSync with an argv array (no shell) — env-derived CONFIG can't inject
-  // shell metacharacters. npx is npx.cmd on Windows.
-  const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-  execFileSync(npx, ["wrangler", "d1", "execute", "DB", "--local", "-c", CONFIG, "--file", sqlFile], {
+  // Run through scripts/wrangler.mjs with the current node binary — spawning
+  // npx.cmd directly fails on Node >= 18.20/20.12/22 Windows (EINVAL: .cmd
+  // files require shell:true after the CVE-2024-27980 fix), and wrangler.mjs
+  // already owns the config-resolution logic.
+  const wranglerShim = join(import.meta.dirname, "wrangler.mjs");
+  execFileSync(process.execPath, [wranglerShim, "d1", "execute", "DB", "--local", "--file", sqlFile], {
     stdio: ["ignore", "ignore", "inherit"],
+    env: { ...process.env, WRANGLER_CONFIG: CONFIG },
   });
   // Do not log the password (clear-text logging of sensitive data).
   console.log(`✓ seeded test account: ${EMAIL} (tenant ${TENANT_ID})`);

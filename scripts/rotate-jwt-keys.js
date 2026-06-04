@@ -2,8 +2,8 @@
 /**
  * Rotate JWT signing keys for the OpenInspection ES256 keyring.
  *
- * Generates a new ES256 keypair, deploys to all worker targets in both
- * apps/core and apps/portal, bumps JWT_CURRENT_KID. The old key version
+ * Generates a new ES256 keypair, deploys it to the Worker, and bumps
+ * JWT_CURRENT_KID. The old key version
  * remains in the keyring for the overlap window (controlled by max JWT
  * TTL); use --prune-old-kid=v<N> to remove a specific previous version
  * after its tokens have all expired.
@@ -17,7 +17,7 @@
  *                                                   from all workers
  *
  * Requires: wrangler authenticated for the target account. Run from
- * D:/Code/inspectorhub/apps/core.
+ * D:/Code/inspectorhub/apps/openinspection.
  */
 
 import { execSync } from 'child_process';
@@ -28,15 +28,16 @@ import { generateKeyPairSync, randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CORE_ROOT = join(__dirname, '..');
-const PORTAL_ROOT = join(CORE_ROOT, '..', 'portal');
+const ROOT = join(__dirname, '..');
 
-// [label, cwd, wrangler-config-flag, env-flag]
+// [label, cwd, wrangler-config-flag] — the worker is resolved from the config.
+// OpenInspection self-hosts as a single Worker; the keyring lives on it.
+// wrangler resolves the config in ROOT (wrangler.local.jsonc if present, else
+// the committed wrangler.jsonc — both name the same `openinspection` worker),
+// so no explicit `-c` is needed. Post single-worker flatten there is no `-api`
+// worker and no `--env` split.
 const TARGETS = [
-    ['openinspection-api',         CORE_ROOT,   '',                          ''],
-    ['openinspection-saas-api',    CORE_ROOT,   '',                          '--env saas'],
-    ['openinspection-saas-api',    CORE_ROOT,   '-c wrangler.saas.toml',     ''],
-    ['inspectorhub-portal',        PORTAL_ROOT, '',                          ''],
+    ['openinspection', ROOT, ''],
 ];
 
 function color(text, code) {
@@ -60,7 +61,7 @@ function pemBodyOneLine(pem) {
 }
 
 function discoverCurrentKid() {
-    const devVarsPath = join(CORE_ROOT, '.dev.vars');
+    const devVarsPath = join(ROOT, '.dev.vars');
     if (!existsSync(devVarsPath)) return null;
     const content = readFileSync(devVarsPath, 'utf8');
     const m = content.match(/^JWT_CURRENT_KID=(.+)$/m);
@@ -75,9 +76,8 @@ function nextKid(currentKid) {
 }
 
 function pushSecret(target, name, value, dryRun) {
-    const [label, cwd, configFlag, envFlag] = target;
-    const flagArgs = [configFlag, envFlag].filter(Boolean).join(' ');
-    const cmd = `npx wrangler secret put ${name} ${flagArgs}`.trim();
+    const [label, cwd, configFlag] = target;
+    const cmd = `npx wrangler secret put ${name} ${configFlag || ''}`.trim();
     console.log(`${color('→', '36')} [${label}] ${cmd}`);
     if (dryRun) return;
     execSync(cmd, {
@@ -88,9 +88,8 @@ function pushSecret(target, name, value, dryRun) {
 }
 
 function deleteSecret(target, name, dryRun) {
-    const [label, cwd, configFlag, envFlag] = target;
-    const flagArgs = [configFlag, envFlag].filter(Boolean).join(' ');
-    const cmd = `npx wrangler secret delete ${name} ${flagArgs}`.trim();
+    const [label, cwd, configFlag] = target;
+    const cmd = `npx wrangler secret delete ${name} ${configFlag || ''}`.trim();
     console.log(`${color('×', '31')} [${label}] ${cmd}`);
     if (dryRun) return;
     try {
@@ -155,19 +154,14 @@ function main() {
     }
 
     if (!dryRun) {
-        updateLocalDevVars(CORE_ROOT, newKid, privBody, pubBody);
-        if (existsSync(PORTAL_ROOT)) {
-            updateLocalDevVars(PORTAL_ROOT, newKid, privBody, pubBody);
-        }
+        updateLocalDevVars(ROOT, newKid, privBody, pubBody);
     }
 
     console.log(`\n${color('✓', '32')} Rotation complete. New current kid: ${color(newKid, '32')}`);
     console.log(`\nNext steps:`);
-    console.log(`  1. Redeploy core (standalone + saas):`);
-    console.log(`     cd ${CORE_ROOT} && npm run deploy && npm run deploy:saas`);
-    console.log(`  2. Redeploy portal:`);
-    console.log(`     cd ${PORTAL_ROOT} && npm run deploy`);
-    console.log(`  3. After max-JWT-TTL has elapsed since rotation (default 24h),`);
+    console.log(`  1. Redeploy the Worker:`);
+    console.log(`     cd ${ROOT} && npm run deploy`);
+    console.log(`  2. After max-JWT-TTL has elapsed since rotation (default 24h),`);
     console.log(`     prune the previous kid:`);
     if (currentKid) {
         console.log(`       node scripts/rotate-jwt-keys.js --prune-old-kid=${currentKid}`);

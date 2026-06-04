@@ -46,7 +46,8 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         const { app } = buildApp(vi.fn().mockResolvedValue(null), getReportData, legacy);
         const res = await app.request('/api/public/report/t/insp1?token=kvtok');
         expect(res.status).toBe(200);
-        expect(getReportData).toHaveBeenCalledWith('insp1', 't9');
+        // Third arg: the makePhotoUrl factory added by A-9 (photo serve routes).
+        expect(getReportData).toHaveBeenCalledWith('insp1', 't9', expect.any(Function));
     });
 
     it('200 with report data + queries by the token tenantId (not the URL)', async () => {
@@ -55,7 +56,8 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: unknown };
         expect(body.success).toBe(true);
-        expect(getReportData).toHaveBeenCalledWith('insp1', 't1');
+        // Third arg: the makePhotoUrl factory added by A-9 (photo serve routes).
+        expect(getReportData).toHaveBeenCalledWith('insp1', 't1', expect.any(Function));
     });
 });
 

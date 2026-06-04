@@ -516,7 +516,7 @@ interface TenantRow {
 }
 
 export interface BookInfoResult {
-    tenant: { name: string; brand: Record<string, unknown> | null };
+    tenant: { name: string; brand: { siteName: string | null; primaryColor: string | null; logoUrl: string | null } | null };
     inspector: { id: string; name: string } | null;
     availableSlots: Array<{ start: string; end: string }>;
     expiresAt: string;
@@ -569,14 +569,21 @@ export async function getBookInfo(db: DrizzleD1Database, token: string): Promise
         .select()
         .from(tenants)
         .where(eq(tenants.id, invite.tenantId))
-        .get()) as (TenantRow & { brand?: Record<string, unknown> }) | undefined;
+        .get()) as TenantRow | undefined;
+
+    // A-10 — the canonical tenant brand lives in tenant_configs.
+    const cfg = await db
+        .select({ siteName: tenantConfigs.siteName, primaryColor: tenantConfigs.primaryColor, logoUrl: tenantConfigs.logoUrl })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, invite.tenantId))
+        .get();
 
     return {
         tenant: {
             name: tenant?.name ?? 'Unknown',
-            // Tenant brand column is not yet on the schema; surface null until
-            // the brand-on-tenant migration lands.
-            brand: null,
+            brand: cfg
+                ? { siteName: cfg.siteName ?? null, primaryColor: cfg.primaryColor ?? null, logoUrl: cfg.logoUrl ?? null }
+                : null,
         },
         inspector: null,
         availableSlots: [],

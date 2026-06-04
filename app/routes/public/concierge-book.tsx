@@ -4,6 +4,7 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/concierge-book";
 import { createApi } from "~/lib/api-client.server";
 import { conciergeBookSchema } from "~/lib/forms/public.schema";
+import { brandTokens, type TenantBrand } from "~/lib/brand";
 
 export function meta() {
   return [{ title: "Book your inspection - OpenInspection" }];
@@ -15,7 +16,7 @@ export function meta() {
 
 interface ConciergeBookData {
   token: string;
-  tenant: { name: string; brand: Record<string, unknown> | null };
+  tenant: { name: string; brand: TenantBrand | null };
   inspector: { id: string; name: string } | null;
   availableSlots: Array<{ start: string; end: string }>;
   expiresAt: string;
@@ -148,15 +149,18 @@ export default function ConciergeBookPage() {
   const slots = data.availableSlots;
 
   return (
-    <div className="min-h-screen bg-ih-bg-card">
+    <div className="min-h-screen bg-ih-bg-card" style={brandTokens(data.tenant.brand?.primaryColor)}>
       {/* Mode bar */}
-      <div className="sticky top-0 z-50 bg-orange-50 dark:bg-orange-900/30 border-b border-orange-200 dark:border-orange-800/40 px-6 py-3 flex items-center justify-between text-sm font-semibold text-orange-800 dark:text-orange-300">
+      <div className="sticky top-0 z-50 bg-ih-watch-bg border-b border-ih-border px-6 py-3 flex items-center justify-between text-sm font-semibold text-ih-watch-fg">
         <span className="flex items-center gap-2">
           <span className="text-lg" aria-hidden="true">🔔</span>
           <span>Book your inspection</span>
         </span>
-        <span className="text-[13px] text-orange-700 dark:text-orange-400">
-          {data.tenant.name}
+        <span className="flex items-center gap-2 text-[13px] text-ih-watch-fg">
+          {data.tenant.brand?.logoUrl && (
+            <img src={data.tenant.brand.logoUrl} alt="" className="h-5 w-auto" />
+          )}
+          {data.tenant.brand?.siteName ?? data.tenant.name}
         </span>
       </div>
 
@@ -192,7 +196,7 @@ export default function ConciergeBookPage() {
                   maxLength={200}
                   placeholder="Sarah Buyer"
                   aria-invalid={fields.contactName.errors ? true : undefined}
-                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
                 />
                 {fields.contactName.errors && (
                   <p className="mt-1 text-xs text-ih-bad-fg">{fields.contactName.errors[0]}</p>
@@ -209,7 +213,7 @@ export default function ConciergeBookPage() {
                   maxLength={200}
                   placeholder="sarah@example.com"
                   aria-invalid={fields.contactEmail.errors ? true : undefined}
-                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
                 />
                 {fields.contactEmail.errors && (
                   <p className="mt-1 text-xs text-ih-bad-fg">{fields.contactEmail.errors[0]}</p>
@@ -231,7 +235,7 @@ export default function ConciergeBookPage() {
                 maxLength={40}
                 placeholder="(555) 123-4567"
                 aria-invalid={fields.contactPhone.errors ? true : undefined}
-                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
               />
               {fields.contactPhone.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.contactPhone.errors[0]}</p>
@@ -249,7 +253,7 @@ export default function ConciergeBookPage() {
                 maxLength={500}
                 placeholder="1 Main St, Springfield"
                 aria-invalid={fields.address.errors ? true : undefined}
-                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
               />
               {fields.address.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.address.errors[0]}</p>
@@ -270,7 +274,7 @@ export default function ConciergeBookPage() {
                     (document.getElementsByName(fields.slotStart.name)[0] as HTMLInputElement).value = slot.start;
                     (document.getElementsByName(fields.slotEnd.name)[0] as HTMLInputElement).value = slot.end;
                   }}
-                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                  className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
                 >
                   <option value="">Select a slot</option>
                   {slots.map((slot, idx) => (
@@ -298,7 +302,7 @@ export default function ConciergeBookPage() {
                     name={fields.slotStart.name}
                     id={fields.slotStart.id}
                     aria-invalid={fields.slotStart.errors ? true : undefined}
-                    className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                    className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
                   />
                   {fields.slotStart.errors && (
                     <p className="mt-1 text-xs text-ih-bad-fg">{fields.slotStart.errors[0]}</p>
@@ -313,7 +317,7 @@ export default function ConciergeBookPage() {
                     name={fields.slotEnd.name}
                     id={fields.slotEnd.id}
                     aria-invalid={fields.slotEnd.errors ? true : undefined}
-                    className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                    className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
                   />
                   {fields.slotEnd.errors && (
                     <p className="mt-1 text-xs text-ih-bad-fg">{fields.slotEnd.errors[0]}</p>
@@ -334,7 +338,7 @@ export default function ConciergeBookPage() {
                 id={fields.notes.id}
                 rows={3}
                 placeholder="Anything your inspector should know."
-                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500"
+                className="w-full px-3 py-2.5 border border-ih-border rounded-lg bg-ih-bg-card text-base text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
               />
             </label>
 
@@ -342,7 +346,7 @@ export default function ConciergeBookPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full px-6 py-3.5 bg-[#F55A1A] text-white rounded-lg font-bold text-base hover:brightness-95 disabled:bg-slate-400 disabled:cursor-wait transition-all"
+                className="w-full px-6 py-3.5 bg-ih-primary text-white rounded-lg font-bold text-base hover:brightness-95 disabled:bg-slate-400 disabled:cursor-wait transition-all"
               >
                 {submitting ? "Sending..." : "Send booking"}
               </button>
@@ -364,7 +368,7 @@ export default function ConciergeBookPage() {
                     step.done
                       ? "bg-green-500 text-white"
                       : step.active
-                        ? "bg-[#F55A1A] text-white animate-pulse"
+                        ? "bg-ih-primary text-white animate-pulse"
                         : "bg-ih-bg-muted text-ih-fg-3"
                   }`}
                 >

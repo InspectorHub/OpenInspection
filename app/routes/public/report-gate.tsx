@@ -1,6 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-gate";
 import { createApi } from "~/lib/api-client.server";
+import { brandTokens } from "~/lib/brand";
 
 export function meta() {
   return [{ title: "Report access - OpenInspection" }];
@@ -13,7 +14,7 @@ export function meta() {
 interface GateData {
   reason: "payment" | "agreement";
   companyName: string;
-  primaryColor: string;
+  primaryColor: string | null;
   actionUrl: string;
   actionLabel: string;
   propertyAddress?: string | null;
@@ -105,7 +106,7 @@ export default function ReportGatePage() {
   const hasContact = !!(gate.inspectorEmail || gate.inspectorPhone || gate.inspectorLicense);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-app">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-app" style={brandTokens(gate.primaryColor)}>
       <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-8 shadow-sm">
         {/* Pill */}
         <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-semibold tracking-wide bg-ih-watch-bg text-ih-watch-fg mb-4">
@@ -174,8 +175,7 @@ export default function ReportGatePage() {
         {/* CTA */}
         <a
           href={gate.actionUrl}
-          className="inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-white hover:opacity-95 hover:-translate-y-px transition-all shadow-sm"
-          style={{ backgroundColor: gate.primaryColor }}
+          className="inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-white bg-ih-primary hover:opacity-95 hover:-translate-y-px transition-all shadow-sm"
         >
           {ctaLabel}
         </a>

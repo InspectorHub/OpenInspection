@@ -55,6 +55,9 @@ jobs:
       - name: API unit tests
         run: npm run test:unit
 
+      - name: Worker-runtime tests (queues)
+        run: npm run test:workers
+
       - name: Web unit tests
         run: npm run test:web
 

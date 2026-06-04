@@ -309,7 +309,7 @@ function deriveScopes(method: string, routePath: string, fileBase: string): stri
 
 // Files whose routes are always 'excluded' (M2M, webhook receivers, presence).
 const EXCLUDED_FILES = new Set([
-    'integration.ts',           // M2M endpoint group from portal
+    'integration.ts',           // M2M endpoint group (machine-to-machine)
     'qbo-webhook.ts',           // QBO webhook receiver
     'widget.ts',                // public widget tracker, webhook-like
     'tenant-presence.ts',       // WebSocket presence

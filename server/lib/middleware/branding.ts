@@ -19,7 +19,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
     // freely append paths like `${portalBaseUrl}/workspace/switch`.
     const profile = c.var.profile;
     const isSaas = profile?.mode === 'saas';
-    const portalBaseUrl = c.env.PORTAL_API_URL ? c.env.PORTAL_API_URL.replace(/\/$/, '') : null;
+    const portalBaseUrl = c.var.profile.loginRedirectBase;
     const tenantStatus = c.get('tenantStatus') ?? 'active';
 
     // Default system branding (fallback)
@@ -74,7 +74,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             billingUrl: config.billingUrl || defaultBranding.billingUrl,
             reportTheme: (config.reportTheme || 'modern') as 'modern' | 'classic' | 'minimal',
             // Deployment flags re-applied — these are intentionally NOT cached
-            // because they depend on env (APP_MODE/PORTAL_API_URL)
+            // because they depend on the deployment profile (mode + login redirect base)
             // rather than on per-tenant config, so a tenant moving between
             // standalone and shared during a deploy should pick up the new
             // value on the next request without waiting for the KV TTL.

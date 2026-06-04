@@ -10,6 +10,7 @@ import {
     conciergeInvites,
     conciergeBookings,
     tenants,
+    tenantConfigs,
 } from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -56,6 +57,22 @@ describe('concierge public flow', () => {
         expect(r.inspector).toBeNull();
         expect(r.availableSlots).toEqual([]);
         expect(typeof r.expiresAt).toBe('string');
+    });
+
+    it('getBookInfo returns the canonical tenant brand when configured (A-10)', async () => {
+        await db.insert(tenantConfigs).values({
+            tenantId: 't-1',
+            siteName: 'Acme Home Pros',
+            primaryColor: '#ff5500',
+            logoUrl: '/api/public/brand-asset?key=branding%2Ft-1%2Flogo.png',
+            updatedAt: new Date(),
+        } as any);
+        const r = await getBookInfo(db, 'tok-abc-valid');
+        expect(r.tenant.brand).toEqual({
+            siteName: 'Acme Home Pros',
+            primaryColor: '#ff5500',
+            logoUrl: '/api/public/brand-asset?key=branding%2Ft-1%2Flogo.png',
+        });
     });
 
     it('getBookInfo throws on unknown token', async () => {

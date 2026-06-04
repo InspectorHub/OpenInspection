@@ -94,6 +94,7 @@ export const syncRoutes = createApiRouter()
         for (const cf of conflicts) {
             await db.insert(inspectionConflicts).values({
                 id:           crypto.randomUUID(),
+                tenantId,
                 inspectionId: id,
                 itemId:       cf.itemId,
                 sectionId:    null,

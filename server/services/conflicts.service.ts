@@ -41,9 +41,13 @@ function tryParse(s: string | null): unknown {
 /**
  * Lists the currently-pending (unresolved) conflicts for an inspection.
  * Returns an empty array when there are none.
+ *
+ * A-17 — tenant-scoped: the callers' inspection-ownership pre-check remains,
+ * but the query itself also filters on tenant_id (defense in depth).
  */
 export async function listPendingConflicts(
     db: DrizzleD1Database,
+    tenantId: string,
     inspectionId: string,
 ): Promise<{ conflicts: PendingConflict[] }> {
     const rows = await db
@@ -51,6 +55,7 @@ export async function listPendingConflicts(
         .from(inspectionConflicts)
         .where(
             and(
+                eq(inspectionConflicts.tenantId, tenantId),
                 eq(inspectionConflicts.inspectionId, inspectionId),
                 isNull(inspectionConflicts.resolvedAt),
             ),
@@ -80,6 +85,7 @@ export async function listPendingConflicts(
  */
 export async function resolveConflicts(
     db: DrizzleD1Database,
+    tenantId: string,
     inspectionId: string,
     resolutions: ConflictResolution[],
 ): Promise<{ resolved: number; resolvedAt: string }> {
@@ -92,6 +98,7 @@ export async function resolveConflicts(
             .from(inspectionConflicts)
             .where(
                 and(
+                    eq(inspectionConflicts.tenantId, tenantId),
                     eq(inspectionConflicts.inspectionId, inspectionId),
                     eq(inspectionConflicts.itemId, r.itemId),
                     eq(inspectionConflicts.field, r.field),

@@ -53,8 +53,9 @@ export const billingRoutes = createApiRouter()
         // Portal Customer Portal redirect URL — surfaced for the "Manage
         // billing" CTA on the page. Omitted when the portal isn't wired
         // (standalone deployments) so the UI hides the button.
-        const data = c.env.PORTAL_API_URL
-            ? { ...summary, portalUrl: `${c.env.PORTAL_API_URL}/api/billing/portal` }
+        const base = c.var.profile.billingPortalUrl;
+        const data = base
+            ? { ...summary, portalUrl: `${base}/api/billing/portal` }
             : summary;
 
         return c.json({ success: true as const, data }, 200);

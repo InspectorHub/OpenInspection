@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/form-renderer";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { unwrapResultsResponse } from "~/lib/results";
 
 export function meta() {
  return [{ title: "Inspection Form - OpenInspection" }];
@@ -111,7 +112,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  let existingResults: Record<string, ItemResult> = {};
  if (resultsRes && resultsRes.ok) {
  const rj = await resultsRes.json();
- existingResults = ((rj as Record<string, unknown>).data ?? {}) as Record<string, ItemResult>;
+ // B-17: the endpoint nests the map under data.results — unwrap properly.
+ existingResults = unwrapResultsResponse(rj) as Record<string, ItemResult>;
  }
 
  return {

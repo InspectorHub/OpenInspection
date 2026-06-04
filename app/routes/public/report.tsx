@@ -1,6 +1,8 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report";
 import { createApi } from "~/lib/api-client.server";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 
 export function meta() {
  return [{ title: "Inspection Report - OpenInspection" }];
@@ -35,10 +37,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  try {
  const api = createApi(context);
  const token = new URL(request.url).searchParams.get("token") ?? undefined;
- const res = await api.publicReport.report[":tenant"][":id"].$get({
+ const [res, brand] = await Promise.all([
+ api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
  query: { token },
- });
+ }),
+ resolveTenantBrand(context, params.tenant),
+ ]);
  const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
  const d = (body.data ?? {}) as Record<string, unknown>;
  // Extract _inspector_signature if the API embeds it in the response
@@ -48,15 +53,16 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  : null;
  return {
  report: reportData,
+ brand,
  error: res.ok ? null : "Report not found",
  };
  } catch {
- return { report: null, error: "Service unavailable" };
+ return { report: null, brand: EMPTY_BRAND as TenantBrand, error: "Service unavailable" };
  }
 }
 
 export default function ReportPage() {
- const { report, error } = useLoaderData<typeof loader>();
+ const { report, brand, error } = useLoaderData<typeof loader>();
 
  if (error || !report) {
  return (
@@ -80,9 +86,18 @@ export default function ReportPage() {
  .signature-block { page-break-inside: avoid; }
  }
  `}</style>
- <div className="max-w-3xl mx-auto p-6" data-theme={report.reportTheme || undefined}>
+ <div className="max-w-3xl mx-auto p-6" data-theme={report.reportTheme || undefined} style={brandTokens(brand.primaryColor)}>
  {/* Header */}
  <div className="mb-8">
+ {(brand.logoUrl || brand.siteName) && (
+ <div className="mb-4 flex items-center gap-2.5">
+ {brand.logoUrl ? (
+ <img src={brand.logoUrl} alt={brand.siteName ?? "Logo"} className="h-8 w-auto" />
+ ) : (
+ <span className="font-serif text-[16px] font-semibold text-ih-fg-2">{brand.siteName}</span>
+ )}
+ </div>
+ )}
  <h1 className="text-2xl font-bold">{report.address}</h1>
  <p className="text-[13px] text-ih-fg-3 mt-1">
  Inspected by {report.inspectorName}

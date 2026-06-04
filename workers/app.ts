@@ -51,6 +51,12 @@ const app = new Hono();
 
 // --- API-owned paths → the API app (with its middleware). Routing audit done. ---
 // Bulk API surface + genuine non-/api endpoints with no React Router page:
+// SaaS-Portal M2M integration: reachable ONLY in saas. Standalone gets 404 —
+// no machine-to-machine surface (no perceived backdoor). See server/portal/.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.all("/api/integration/*", (c: any) =>
+    c.env.APP_MODE === "saas" ? toApi(c) : c.notFound(),
+);
 app.all("/api/*", toApi);
 app.all("/status", toApi);
 app.all("/m2m/*", toApi);
@@ -71,10 +77,15 @@ app.get("/observe/:token", toApi); // 1-seg observe — RR owns /observe/inspect
 // Cloudflare assets layer from build/client before the worker runs.
 app.all("*", ssr);
 
-// fetch from the merged Hono app; scheduled (cron) reused from the API handler.
+// fetch from the merged Hono app; scheduled (cron) + queue (sync DLQ consumer)
+// reused from the API handler. The queue handler is defined in server/index.ts
+// (the allowed portal-import composition point) so this entry never imports
+// server/portal/* directly — it just forwards the runtime invocation.
 export default {
   fetch: app.fetch,
   scheduled: apiHandler.scheduled,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  queue: (batch: any, env: any, ctx: any) => apiHandler.queue(batch, env, ctx),
 };
 
 // Re-export Durable Objects + Workflow so wrangler can bind them on the single

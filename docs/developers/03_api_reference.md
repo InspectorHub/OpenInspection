@@ -32,15 +32,24 @@ List all inspectors for the current tenant (used by the booking page).
 
 ---
 
-### `GET /public/availability/:inspectorId?date=YYYY-MM-DD`
-Get available time slots for an inspector on a given date. Slots are 1-hour blocks derived from base weekly availability, minus any overrides and existing bookings.
+### `GET /public/availability/:inspectorId?tenant=<slug>&start=YYYY-MM-DD&end=YYYY-MM-DD`
+Get an inspector's raw availability for a date range: base weekly windows, date overrides, and already-booked dates. Rate-limited per IP.
 
 **Query params:**
-- `date` (required) — ISO date string, e.g., `2025-06-15`
+- `tenant` (required) — the tenant slug from the booking page URL; resolved server-side (404 if unknown)
+- `start` (optional) — ISO date string; defaults to today
+- `end` (optional) — ISO date string; defaults to 14 days from now
 
 **Response:**
 ```json
-{ "slots": ["09:00", "11:00", "14:00"] }
+{
+  "success": true,
+  "data": {
+    "baseAvailability": [{ "dayOfWeek": 1, "startTime": "09:00", "endTime": "17:00" }],
+    "overrides": [{ "date": "2025-06-15", "isAvailable": false }],
+    "bookedSlots": ["2025-06-16"]
+  }
+}
 ```
 
 ---

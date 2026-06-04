@@ -6,6 +6,7 @@ import { ErrorCode, Errors } from '../lib/errors';
 import { SetSlugRequestSchema } from '../lib/validations/profile.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { users } from '../lib/db/schema/tenant';
+import { userSlugCacheKey } from '../lib/middleware/inspector-palette';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 
@@ -254,6 +255,10 @@ export const profileRoutes = createApiRouter()
             await drizzle(c.env.DB as never).update(users)
                 .set(updates)
                 .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+            if (updates.slug !== undefined) {
+                // A-16 — drop the cached palette slug so the new value serves immediately.
+                await c.env.TENANT_CACHE?.delete(userSlugCacheKey(userId)).catch(() => {});
+            }
         }
 
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
@@ -283,6 +288,8 @@ export const profileRoutes = createApiRouter()
             );
         }
         await userService.setSlug(userId, tenantId, slug);
+        // A-16 — drop the cached palette slug so the new value serves immediately.
+        await c.env.TENANT_CACHE?.delete(userSlugCacheKey(userId)).catch(() => {});
         return c.json({ success: true as const, data: { slug } }, 200);
     })
     .openapi(photoUploadRoute, async (c) => {

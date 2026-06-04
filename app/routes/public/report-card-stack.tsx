@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
+import { photoDisplayName, withDownload } from "~/lib/photo-name";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 
 export function meta({ data }: Route.MetaArgs) {
  const d = data as LoaderResult | undefined;
@@ -51,6 +54,7 @@ interface LoaderResult {
  enableCustomerRepairExport: boolean;
  messageToken: string | null;
  isDelivered: boolean;
+ brand: TenantBrand;
  error: string | null;
  reportTheme?: string;
 }
@@ -63,10 +67,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  try {
  const api = createApi(context);
  const token = new URL(request.url).searchParams.get("token") ?? undefined;
- const res = await api.publicReport.report[":tenant"][":id"].$get({
+ const [res, brand] = await Promise.all([
+ api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
  query: { token },
- });
+ }),
+ resolveTenantBrand(context, params.tenant),
+ ]);
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;
  return {
@@ -81,6 +88,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  enableCustomerRepairExport: d?.enableCustomerRepairExport ?? false,
  messageToken: d?.messageToken ?? null,
  isDelivered: d?.isDelivered ?? false,
+ brand,
  error: res.ok ? null : "Report not found",
  reportTheme: (d as unknown as Record<string, unknown>)?.reportTheme as string | undefined,
  } satisfies LoaderResult;
@@ -97,6 +105,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  enableCustomerRepairExport: false,
  messageToken: null,
  isDelivered: false,
+ brand: EMPTY_BRAND,
  error: "Service unavailable",
  } satisfies LoaderResult;
  }
@@ -173,7 +182,7 @@ export default function ReportCardStackPage() {
  : data.sections;
 
  return (
- <div className="min-h-screen bg-ih-bg-card" data-theme={data.reportTheme || undefined}>
+ <div className="min-h-screen bg-ih-bg-card" data-theme={data.reportTheme || undefined} style={brandTokens(data.brand.primaryColor)}>
  {/* Download PDF FAB */}
  <button
  type="button"
@@ -190,13 +199,17 @@ export default function ReportCardStackPage() {
  <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-6">
  <div className="flex items-start justify-between mb-6">
  <div className="flex items-center gap-3">
+ {data.brand.logoUrl ? (
+ <img src={data.brand.logoUrl} alt={data.brand.siteName ?? "Logo"} className="h-10 w-auto" />
+ ) : (
  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
  </svg>
  </div>
+ )}
  <span className="text-xs font-semibold tracking-widest uppercase text-ih-fg-4">
- Certified Inspection Report
+ {data.brand.siteName ? `${data.brand.siteName} · Certified Inspection Report` : "Certified Inspection Report"}
  </span>
  </div>
  <div className="flex items-center gap-2 print:hidden">
@@ -383,16 +396,30 @@ export default function ReportCardStackPage() {
 
  {item.photos.length > 0 && (
  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
- {item.photos.map((photo, idx) => (
+ {item.photos.map((photo) => {
+ const name = photoDisplayName(photo.key);
+ return (
+ <div key={photo.key} className="group relative">
  <img
- key={photo.key}
  src={photo.url}
- alt={`${item.label} photo ${idx + 1}`}
+ alt={name}
+ title={name}
  className="w-full h-32 object-cover rounded cursor-pointer"
  loading="lazy"
  onClick={() => setLightboxUrl(photo.url)}
  />
- ))}
+ <a
+ href={withDownload(photo.url)}
+ download={name}
+ title={`Download ${name}`}
+ onClick={(e) => e.stopPropagation()}
+ className="absolute top-1 right-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+ >
+ ↓
+ </a>
+ </div>
+ );
+ })}
  </div>
  )}
 

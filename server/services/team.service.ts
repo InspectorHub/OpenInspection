@@ -3,9 +3,17 @@ import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { UserRole } from '../types/auth';
 import { Errors } from '../lib/errors';
+import type { UserSyncOutbox } from '../lib/integration/user-sync';
 
 export class TeamService {
-    constructor(private db: D1Database) {}
+    /**
+     * @param outbox Optional core->portal user-sync sink (SaaS-only; wired in
+     *   di.ts when the portal binding is present, undefined in standalone). Used
+     *   to emit `user.deleted` when a member is removed so the portal identity's
+     *   membership for this workspace is dropped. Guarded by `if (this.outbox)`,
+     *   so standalone never touches portal code.
+     */
+    constructor(private db: D1Database, private outbox?: UserSyncOutbox) {}
 
     private getDB() {
         return drizzle(this.db);
@@ -92,6 +100,16 @@ export class TeamService {
         if (!user) throw Errors.NotFound('Member not found');
 
         await db.delete(users).where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+
+        // Mirror the removal to portal so the matching identity loses its
+        // membership for this workspace. Email is captured from the row read
+        // above (before the delete). SaaS-only — no-op when outbox is undefined.
+        if (this.outbox) {
+            await this.outbox.append({
+                type: 'user.deleted',
+                payload: { tenantId, email: user.email },
+            });
+        }
         return user;
     }
 

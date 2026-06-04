@@ -190,3 +190,5 @@ html[data-color-scheme="dark"], .dark {
   transition: width 200ms ease-out;
 }
 html[data-sidebar-collapsed="1"] .ih-sidebar { width: var(--width-sidebar-collapsed); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }

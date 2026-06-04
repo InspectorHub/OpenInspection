@@ -20,6 +20,7 @@ import type {
     CoreAuthApi,
     DataApi,
     EventsApi,
+    EmailTemplatesApi,
     EvidenceApi,
     GuestApi,
     IdentityApi,
@@ -119,6 +120,7 @@ export interface Api {
     contactsImport:     ReturnType<typeof hc<ContactsImportApi>>;
     data:               ReturnType<typeof hc<DataApi>>;
     events:             ReturnType<typeof hc<EventsApi>>;
+    emailTemplates:     ReturnType<typeof hc<EmailTemplatesApi>>;
     evidence:           ReturnType<typeof hc<EvidenceApi>>;
     guest:              ReturnType<typeof hc<GuestApi>>;
     identity:           ReturnType<typeof hc<IdentityApi>>;
@@ -178,6 +180,7 @@ const MOUNT: Record<keyof Api, string> = {
     contactsImport:     "/api/contacts",
     data:               "/api/data",
     events:             "/api",
+    emailTemplates:     "/api/admin",
     evidence:           "/api/admin",
     guest:              "/api/guest",
     identity:           "/api/identities",
@@ -255,6 +258,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         contactsImport:     mk<ContactsImportApi>(MOUNT.contactsImport),
         data:               mk<DataApi>(MOUNT.data),
         events:             mk<EventsApi>(MOUNT.events),
+        emailTemplates:     mk<EmailTemplatesApi>(MOUNT.emailTemplates),
         evidence:           mk<EvidenceApi>(MOUNT.evidence),
         guest:              mk<GuestApi>(MOUNT.guest),
         identity:           mk<IdentityApi>(MOUNT.identity),

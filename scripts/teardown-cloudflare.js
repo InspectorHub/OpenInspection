@@ -16,7 +16,7 @@ const getArg = (key) => {
 };
 
 // Configuration Paths & Naming
-const TOML_PATH = path.resolve(getArg('--config') || 'wrangler.local.jsonc');
+const CONFIG_PATH = path.resolve(getArg('--config') || 'wrangler.local.jsonc');
 const PROJECT_SLUG = getArg('--name') || 'openinspection';
 
 // Project Context (Initialized via Args or Fallback)
@@ -29,49 +29,36 @@ const discovered = {
     databases: [],    // { name, uuid, found: false }
     kvNamespaces: [], // { title, id, found: false }
     buckets: [],       // { name, found: false }
-    isSaaS: fs.existsSync(TOML_PATH)
+    hasConfig: fs.existsSync(CONFIG_PATH)
 };
 
-// Step 0: Intelligent Discovery — Parse TOML if it exists
-if (discovered.isSaaS) {
+// Step 0: Discover ids from the JSONC config (JSON-with-comments — strip
+// /* */ and // comments, then JSON.parse the object). The old TOML-syntax
+// regexes (`key = "value"`, `[[kv_namespaces]]`) never matched the jsonc
+// config, so D1/KV were silently skipped during teardown.
+if (discovered.hasConfig) {
     try {
-        const toml = fs.readFileSync(TOML_PATH, 'utf8');
-        const getVal = (regex) => {
-            const match = toml.match(regex);
-            return match ? match[1] : null;
-        };
-        
-        // 0.1 Worker Name
-        const configWorker = getVal(/name\s*=\s*"([^"]+)"/);
-        if (configWorker) discovered.worker = configWorker;
+        const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
+        const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '');
+        const cfg = JSON.parse(stripped);
 
-        // 0.2 D1 Databases (All)
-        const d1Matches = [...toml.matchAll(/database_name\s*=\s*"([^"]+)"/g)];
-        const d1Ids = [...toml.matchAll(/database_id\s*=\s*"([^"]+)"/g)];
-        d1Matches.forEach((m, i) => {
-            discovered.databases.push({ name: m[1], uuid: d1Ids[i] ? d1Ids[i][1] : null });
-        });
-
-        // 0.3 KV Namespaces (All - looking for ID inside blocks)
-        const kvBlocks = toml.split('[[kv_namespaces]]').slice(1);
-        kvBlocks.forEach(block => {
-            const idMatch = block.match(/id\s*=\s*"([^"]+)"/);
-            const bindingMatch = block.match(/binding\s*=\s*"([^"]+)"/);
-            if (idMatch && idMatch[1] !== '00000000000000000000000000000000') {
-                discovered.kvNamespaces.push({ id: idMatch[1], binding: bindingMatch ? bindingMatch[1] : 'Unknown' });
+        if (cfg.name) discovered.worker = cfg.name;
+        for (const db of cfg.d1_databases || []) {
+            if (db.database_name) discovered.databases.push({ name: db.database_name, uuid: db.database_id });
+        }
+        for (const kv of cfg.kv_namespaces || []) {
+            if (kv.id && kv.id !== '00000000000000000000000000000000') {
+                discovered.kvNamespaces.push({ id: kv.id, binding: kv.binding || 'Unknown' });
             }
-        });
-
-        // 0.4 R2 Buckets (All)
-        const bucketMatches = [...toml.matchAll(/bucket_name\s*=\s*"([^"]+)"/g)];
-        bucketMatches.forEach(m => discovered.buckets.push({ name: m[1] }));
-
+        }
+        const cfgBuckets = (cfg.r2_buckets || []).map(b => b.bucket_name).filter(Boolean);
+        if (cfgBuckets.length) discovered.buckets = cfgBuckets.map(name => ({ name }));
     } catch (e) {
-        console.warn(`  ⚠ Failed to parse ${TOML_PATH}: ${e.message}. Falling back to naming conventions.`);
+        console.warn(`  ⚠ Failed to parse ${CONFIG_PATH}: ${e.message}. Falling back to naming conventions.`);
     }
 }
 
-// Fallback logic if nothing found in TOML or TOML missing
+// Fallback logic if nothing found in the config (or config missing)
 if (discovered.databases.length === 0) discovered.databases.push({ name: `${PROJECT_SLUG}-db` });
 if (discovered.kvNamespaces.length === 0) discovered.kvNamespaces.push({ title: `${PROJECT_SLUG}-tenant-cache` });
 if (discovered.buckets.length === 0) discovered.buckets = [{ name: `${PROJECT_SLUG}-photos` }, { name: `${PROJECT_SLUG}-photos-preview` }];
@@ -114,7 +101,9 @@ function run(cmd, options = {}) {
                 process.stdout.write(result.stdout || '');
                 process.stderr.write(result.stderr || '');
             }
-            return output;
+            // stdoutOnly: clean stdout for `--json` calls — wrangler prints config
+            // warnings ("unsafe fields …") to stderr, which would corrupt the JSON.
+            return options.stdoutOnly ? (result.stdout || '') : output;
         }
 
         // Specifically check for Cloudflare timeout / network errors
@@ -157,25 +146,44 @@ function run(cmd, options = {}) {
     }
 }
 
+// Robust JSON extraction from `wrangler --json` output: strip ANSI, then scan
+// each '[' / '{' as a candidate start (wrangler may prepend warning banners
+// whose literal "[WARNING]" and color codes contain '[') and return the first
+// substring that parses. Used with stdoutOnly so stderr warnings are excluded.
+function extractJson(output) {
+    if (!output) return null;
+    const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
+    for (let i = 0; i < clean.length; i++) {
+        const ch = clean[i];
+        if (ch !== '[' && ch !== '{') continue;
+        const close = ch === '[' ? clean.lastIndexOf(']') : clean.lastIndexOf('}');
+        if (close <= i) continue;
+        try {
+            return JSON.parse(clean.slice(i, close + 1));
+        } catch (e) { /* try the next candidate start */ }
+    }
+    return null;
+}
+
 function getCloudflareState() {
     if (isLocal) return { d1: [], kv: [], r2: [] };
     const state = { d1: [], kv: [], r2: [] };
-    
+
     // D1
     try {
-        const d1Output = run('npx wrangler d1 list --json', { silent: true, ignoreError: true });
-        state.d1 = JSON.parse(d1Output);
+        const d1 = extractJson(run('npx wrangler d1 list --json', { silent: true, ignoreError: true, stdoutOnly: true }));
+        state.d1 = Array.isArray(d1) ? d1 : [];
     } catch (e) {}
 
     // KV
     try {
-        const kvOutput = run('npx wrangler kv namespace list', { silent: true, ignoreError: true });
-        state.kv = JSON.parse(kvOutput);
+        const kv = extractJson(run('npx wrangler kv namespace list', { silent: true, ignoreError: true, stdoutOnly: true }));
+        state.kv = Array.isArray(kv) ? kv : [];
     } catch (e) {}
 
     // R2
     try {
-        const r2Output = run('npx wrangler r2 bucket list', { silent: true, ignoreError: true });
+        const r2Output = run('npx wrangler r2 bucket list', { silent: true, ignoreError: true, stdoutOnly: true });
         const lines = r2Output.split('\n');
         state.r2 = lines.filter(l => l.startsWith('name:')).map(l => l.replace('name:', '').trim());
     } catch (e) {}
@@ -249,8 +257,8 @@ if (!isForce) {
 }
 
 async function executeTeardown() {
-    const backupPath = TOML_PATH + '.bak';
-    const hasToml = fs.existsSync(TOML_PATH);
+    const backupPath = CONFIG_PATH + '.bak';
+    const hasConfigFile = fs.existsSync(CONFIG_PATH);
 
     if (isLocal) {
         step("Step 1: Removing local state...");
@@ -273,8 +281,8 @@ async function executeTeardown() {
     }
 
     try {
-        if (hasToml) {
-            fs.renameSync(TOML_PATH, backupPath);
+        if (hasConfigFile) {
+            fs.renameSync(CONFIG_PATH, backupPath);
             info("Temporarily bypassing wrangler.local.jsonc to avoid ID conflicts");
         }
 
@@ -312,7 +320,7 @@ async function executeTeardown() {
 
     } finally {
         if (fs.existsSync(backupPath)) {
-            fs.renameSync(backupPath, TOML_PATH);
+            fs.renameSync(backupPath, CONFIG_PATH);
         }
     }
 
@@ -320,8 +328,8 @@ async function executeTeardown() {
     // the committed placeholder wrangler.jsonc on the next `npm run setup:cloudflare`,
     // so we don't need to scrub IDs in-place anymore.
     step("Step 5: Removing wrangler.local.jsonc...");
-    if (fs.existsSync(TOML_PATH)) {
-        fs.unlinkSync(TOML_PATH);
+    if (fs.existsSync(CONFIG_PATH)) {
+        fs.unlinkSync(CONFIG_PATH);
         info("wrangler.local.jsonc removed (re-bootstrapped from wrangler.jsonc on next setup)");
     }
 

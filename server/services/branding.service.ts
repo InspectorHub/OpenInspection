@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { encryptSecrets, decryptSecrets, maskSecret, isMasked } from '../lib/config-crypto';
+import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 
 export interface IntegrationConfig {
     appBaseUrl?: string;
@@ -42,6 +43,61 @@ export class BrandingService {
             supportEmail: defaults.supportEmail,
             billingUrl: ''
         };
+    }
+
+    /**
+     * Phase 1 (B-4/A-7) — load just the email-identity columns for a tenant.
+     * Returns platform defaults when no config row exists.
+     */
+    async getEmailIdentity(tenantId: string): Promise<EmailIdentityConfig> {
+        const db = this.getDrizzle();
+        const row = await db
+            .select({
+                emailMode: tenantConfigs.emailMode,
+                senderEmail: tenantConfigs.senderEmail,
+                replyTo: tenantConfigs.replyTo,
+                senderDisplayName: tenantConfigs.senderDisplayName,
+                useInspectorFromName: tenantConfigs.useInspectorFromName,
+                siteName: tenantConfigs.siteName,
+            })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        return {
+            mode: row?.emailMode ?? 'platform',
+            senderEmail: row?.senderEmail ?? null,
+            replyTo: row?.replyTo ?? null,
+            senderDisplayName: row?.senderDisplayName ?? null,
+            useInspectorFromName: row?.useInspectorFromName ?? false,
+            siteName: row?.siteName ?? null,
+        };
+    }
+
+    /**
+     * A-10 — the canonical tenant brand projection every tenant-facing surface
+     * (profile / booking / report / invoice / email) paints with.
+     * Returns nulls when no config row exists; callers apply platform fallbacks.
+     */
+    async getBrand(tenantId: string): Promise<{ siteName: string | null; logoUrl: string | null; primaryColor: string | null }> {
+        const db = this.getDrizzle();
+        const row = await db
+            .select({ siteName: tenantConfigs.siteName, logoUrl: tenantConfigs.logoUrl, primaryColor: tenantConfigs.primaryColor })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        return {
+            siteName: row?.siteName ?? null,
+            logoUrl: row?.logoUrl ?? null,
+            primaryColor: row?.primaryColor ?? null,
+        };
+    }
+
+    /**
+     * Email-template Phase 2 — the brand the email layout paints with.
+     * Same projection as getBrand (kept as the email-path entry point).
+     */
+    async getEmailBrand(tenantId: string): Promise<{ siteName: string | null; logoUrl: string | null; primaryColor: string | null }> {
+        return this.getBrand(tenantId);
     }
 
     /**
@@ -90,7 +146,11 @@ export class BrandingService {
             httpMetadata: { contentType: file.type },
         });
 
-        const logoUrl = `/api/inspections/photo/${key}`;
+        // A-10 — point at the public brand-asset serve route (the previous
+        // `/api/inspections/photo/${key}` path never had a handler). The R2
+        // key contains '/', so it travels as a query param (Hono mounted
+        // routers don't match multi-segment path params).
+        const logoUrl = `/api/public/brand-asset?key=${encodeURIComponent(key)}`;
         await this.updateBranding(tenantId, { logoUrl });
 
         return logoUrl;

@@ -4,7 +4,7 @@ import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { logger } from '../lib/logger';
-import { OutboxService } from '../portal/outbox.service';
+import type { UserSyncOutbox } from '../lib/integration/user-sync';
 
 /** Dummy PBKDF2 hash used to equalize verify() timing when the email lookup misses. */
 const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000';
@@ -19,7 +19,7 @@ const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:00000000000000000000
  * intervention.
  */
 export class AuthService {
-    constructor(private db: D1Database, private kv?: KVNamespace, private outbox?: OutboxService) {}
+    constructor(private db: D1Database, private kv?: KVNamespace, private outbox?: UserSyncOutbox) {}
 
     private getDrizzle() {
         return drizzle(this.db);

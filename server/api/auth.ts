@@ -476,7 +476,7 @@ export const coreAuthRoutes = createApiRouter()
         // a per-(tenant_id,email) row they can't disambiguate.
         const profile = c.var.profile;
         if (profile?.mode === 'saas') {
-            const portal = c.env.PORTAL_API_URL?.replace(/\/$/, '') ?? null;
+            const portal = c.var.profile.loginRedirectBase;
             return c.json({
                 success: false,
                 error: {

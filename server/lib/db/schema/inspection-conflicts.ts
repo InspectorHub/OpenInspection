@@ -17,6 +17,10 @@ import { sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
  */
 export const inspectionConflicts = sqliteTable('inspection_conflicts', {
     id:           text('id').primaryKey(),
+    // A-17 — physical tenant isolation. Previously this was the only tenant-data
+    // table without tenant_id (guarded solely by the callers' inspection-ownership
+    // pre-check); every query now filters on it directly.
+    tenantId:     text('tenant_id').notNull(),
     inspectionId: text('inspection_id').notNull(),
     itemId:       text('item_id').notNull(),
     sectionId:    text('section_id'),

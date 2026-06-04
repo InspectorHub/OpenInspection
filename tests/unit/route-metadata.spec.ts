@@ -103,7 +103,9 @@ function eachOperation(): Array<{ method: string; path: string; op: OperationLik
     return results;
 }
 
-describe('route metadata', () => {
+// C-13 — each test regenerates the full OpenAPI document over the whole app;
+// under CPU contention that exceeds the 5s default and flaps the suite.
+describe('route metadata', { timeout: 30_000 }, () => {
     it('every route has an operationId', () => {
         const missing = eachOperation()
             .filter(({ op }) => !op.operationId)

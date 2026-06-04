@@ -23,7 +23,7 @@ There is no business reason to rotate on a fixed cron — these aren't access to
 ### Procedure
 
 ```bash
-cd apps/core
+cd apps/openinspection
 
 # 1. Mint a new keypair, push the secrets to the Worker, bump JWT_CURRENT_KID
 npm run rotate:jwt

@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { Context } from 'hono';
+import { Context, MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/cloudflare-workers';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 import * as schema from './lib/db/schema';
 
 import { brandingMiddleware } from './lib/middleware/branding';
+import { contextBootstrap } from './lib/middleware/context-bootstrap';
 import { integrationSecretsMiddleware } from './lib/middleware/integration-secrets';
 import { enforceTenantActive } from './lib/middleware/tenant-status-guard';
 import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
@@ -39,7 +40,7 @@ import integrationsApiRoutes from './api/integrations';
 import analyticsRoutes from './api/analytics';
 import guestRoutes from './api/guest';
 import billingRoutes from './api/billing';
-import integrationRoutes from './portal/integration.routes';
+import { registerPortalIntegration } from './portal/integration.module';
 import inspectionsRoutes from './api/inspections';
 import tenantPresenceRoutes from './api/tenant-presence';
 import inspectionPrefsRoutes from './api/inspection-prefs';
@@ -48,6 +49,7 @@ import bookingsRoutes from './api/bookings';
 import adminRoutes from './api/admin';
 import adminBrandingRoutes from './api/admin/branding';
 import secretsRoutes from './api/secrets';
+import emailTemplateRoutes from './api/email-templates';
 import agentRoutes from './api/agent';
 import agentsRoutes from './api/agents';
 import agentSignupRoutes from './api/agent-signup';
@@ -208,14 +210,21 @@ app.get('/photos/tenants/:tenantId/inspector-photos/:filename', async (c) => {
     return new Response(obj.body, { headers });
 });
 
-// Global Middlewares
+// Global Middlewares.
+//
+// ORDERING (A-16): the chain is two-phase around the JWT middleware.
+//   Before JWT: contextBootstrap (profile + keyring — JWT awaits the keyring),
+//   tenantRouter / branding / tenant-active (host- and slug-derived context).
+//   After JWT:  integrationSecretsMiddleware + diMiddleware — both are
+//   tenant-scoped and must see the JWT's `tenantId`. They used to run BEFORE
+//   the JWT middleware, so on authed API requests the tenant was still unknown:
+//   di's email/AI preloads never loaded (per-tenant sender identity + Gemini
+//   BYOK silently fell back to platform defaults) and, in saas mode, the
+//   tenant's integration secrets never merged into c.env.
 app.use('*', securityHeaders);
-app.use('*', diMiddleware);
+app.use('*', contextBootstrap);
 app.use('*', tenantRouter);
 app.use('*', brandingMiddleware);
-// Secret UI化 — load encrypted integration secrets from DB and merge into
-// c.env after branding resolves the tenant. Worker env vars take precedence.
-app.use('*', integrationSecretsMiddleware);
 app.use('*', enforceTenantActive);
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
@@ -224,7 +233,9 @@ app.use('*', enforceTenantActive);
 const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|otf|json|txt|pdf)$/i;
 
 // Global JWT Middleware — extracts tenantId / userRole from Bearer token or cookie.
-app.use('*', async (c, next) => {
+// Named + exported so the middleware-order regression test can pin its position
+// relative to the tenant-scoped middlewares that must run after it (A-16).
+export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
     // Agent Accounts A1 — both /agent-invite/* (HTML) and /api/agents/accept +
@@ -370,7 +381,18 @@ app.use('*', async (c, next) => {
     }
 
     return next();
-});
+};
+app.use('*', jwtAuthMiddleware);
+
+// Secret UI化 — load encrypted integration secrets from DB and merge into
+// c.env. Tenant comes from the JWT (authed API) or tenantRouter (standalone /
+// public slug paths) — see the ORDERING note above. Worker env vars take
+// precedence except for the tenant-owned Stripe trio.
+app.use('*', integrationSecretsMiddleware);
+
+// Service registry + tenant email/AI config (see the ORDERING note above —
+// must run after the JWT middleware so `tenantId` is resolved).
+app.use('*', diMiddleware);
 
 // Sprint B-1 — after auth + branding, hydrate the booking-palette context
 // (slug + booking host) into branding so MainLayout's <CommandPalette/> can
@@ -451,6 +473,8 @@ const routes = app
   .route('/api/admin', evidenceRoutes)
   // Secret UI化 — GET/PUT/POST /api/admin/secrets for all 14 integration keys
   .route('/api/admin', secretsRoutes)
+  // Email-template CRUD + preview — GET/PUT/POST /api/admin/email-templates
+  .route('/api/admin', emailTemplateRoutes)
   .route('/api/agent', agentRoutes)
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)
@@ -481,7 +505,6 @@ const routes = app
   // Mounted at /api/templates so the path is /api/templates/:oldId/migrate-to/:newId.
   .route('/api/templates', templateMigrationRoutes)
   .route('/api/data', dataRoutes)
-  .route('/api/integration', integrationRoutes)
   .route('/api/ics', icsRoutes)
   .route('/api/users', userRoutes)
   .route('/api/messages', messageRoutes)
@@ -498,6 +521,11 @@ const routes = app
   // Profile-gated setup wizard — 404s in saas modes (see features/setup-wizard).
   .route('/setup', setupWizardRoutes())
 ;
+
+// Mount the SaaS portal M2M integration routes (the one composition seam).
+// No-op surface for standalone. The worker entry 404s these in standalone
+// (APP_MODE ≠ saas).
+registerPortalIntegration(app);
 
 // Design System 0520 subsystem D phase 4/5 — anonymous observer claim.
 // Public route — exchanges a one-time token for a __Host-observer_session
@@ -699,10 +727,17 @@ app.notFound((c) => {
 // without this `Handler does not export a scheduled() function` fires
 // on every cron tick and the automation flush never runs.
 import { scheduled as baseScheduled } from './scheduled';
+import { handleSyncDlqBatch } from './portal/integration.module';
 export default {
     fetch: app.fetch.bind(app),
     scheduled: async (event: ScheduledEvent, env: HonoConfig['Bindings'], ctx: ExecutionContext) => {
         await baseScheduled(event, env, ctx);
+    },
+    // Queue consumer: this worker consumes ONLY the sync DLQ
+    // (`inspectorhub-sync-dlq-saas`). Each dead message's outbox row is marked
+    // `failed` so the failure is durable + visible in the console. Never throws.
+    queue: async (batch: MessageBatch<unknown>, env: HonoConfig['Bindings'], _ctx: ExecutionContext) => {
+        await handleSyncDlqBatch(env.DB, batch);
     },
 };
 export { SignCompletionWorkflow } from './workflows/sign-completion-workflow';
