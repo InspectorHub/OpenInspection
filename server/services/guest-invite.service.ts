@@ -39,6 +39,8 @@ export interface ClaimIdentity {
 export interface ClaimContext {
     /** Tenant's seat quota — passed in by the route via portal M2M sync. */
     maxUsers: number;
+    /** Optional terms-acceptance blob (env-gated: set only when TERMS_URL/PRIVACY_URL configured). */
+    termsAccepted?: { at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string };
 }
 
 export type ClaimResult =
@@ -144,6 +146,7 @@ export class GuestInviteService {
             role:         invite.role,
             expiresAt:    invite.expiresAt,
             createdAt:    new Date(),
+            termsAccepted: ctx.termsAccepted ?? null,
         });
 
         // Mark invite as claimed.

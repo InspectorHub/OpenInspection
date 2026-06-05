@@ -38,8 +38,8 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
       {open && (
         <div className="w-64 border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-ih-border">
-            <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400 capitalize">{activeTab}</span>
-            <button onClick={() => setOpen(false)} className="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-600">&#x2715;</button>
+            <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4 capitalize">{activeTab}</span>
+            <button onClick={() => setOpen(false)} className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2">&#x2715;</button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             {activeTab === "preview" && (
@@ -60,7 +60,7 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
 
                   {Boolean(activeResult.notes) && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Notes</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">Notes</span>
                       <p className="text-[12px] text-ih-fg-2 mt-1 whitespace-pre-wrap leading-relaxed">{activeResult.notes as string}</p>
                     </div>
                   )}
@@ -86,7 +86,7 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
                     }
                     return included.length > 0 ? (
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Comments</span>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">Comments</span>
                         <ul className="mt-1 space-y-1">
                           {included.map((c, i) => {
                             const isDefect = c.tabName === "defects";
@@ -110,7 +110,7 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
                   {/* Photos */}
                   {Array.isArray(activeResult.photos) && (activeResult.photos as string[]).length > 0 && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Photos</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">Photos</span>
                       <div className="mt-1 grid grid-cols-3 gap-1">
                         {(activeResult.photos as string[]).map((key, i) => {
                           const url = `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`;
@@ -157,8 +157,8 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
             onClick={() => toggle(tab.id)}
             className={`relative w-10 flex flex-col items-center gap-0.5 py-2.5 rounded-r-md transition-all ${
               activeTab === tab.id && open
-                ? "bg-ih-bg-card text-ih-primary shadow-sm border-l-2 border-indigo-600 dark:border-indigo-400 -ml-px"
-                : "text-ih-fg-4 hover:text-slate-600 dark:hover:text-slate-400"
+                ? "bg-ih-bg-card text-ih-primary shadow-ih-card border-l-2 border-ih-primary -ml-px"
+                : "text-ih-fg-4 hover:text-ih-fg-2"
             }`}
             title={tab.label}
           >

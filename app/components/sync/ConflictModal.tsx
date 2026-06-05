@@ -31,10 +31,10 @@ export function ConflictModal({ conflicts, open, onClose, onResolve, onResetLoca
  }
 
  return (
- <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-labelledby="conflict-modal-title">
- <div className="bg-ih-bg-card rounded-lg shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
- <header className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-4">
- <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-ih-watch-bg0 text-white flex-shrink-0" aria-hidden="true">
+ <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-labelledby="conflict-modal-title">
+ <div className="bg-ih-bg-card rounded-lg shadow-ih-popover w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
+ <header className="px-6 py-4 border-b border-ih-border flex items-center gap-4">
+ <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-ih-watch text-white flex-shrink-0" aria-hidden="true">
  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
  </span>
  <div className="flex-1 min-w-0">
@@ -45,16 +45,16 @@ export function ConflictModal({ conflicts, open, onClose, onResolve, onResetLoca
  </header>
 
  <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[260px_1fr]">
- <aside className="border-r border-slate-100 dark:border-slate-700 overflow-y-auto bg-slate-50/50 dark:bg-slate-900/40 flex flex-col">
- <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-700">
+ <aside className="border-r border-ih-border overflow-y-auto bg-ih-bg-muted flex flex-col">
+ <div className="px-4 py-3 flex items-center justify-between border-b border-ih-border">
  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Queue</span>
  <span className="text-[10px] font-mono text-ih-fg-4">{index + 1} / {conflicts.length}</span>
  </div>
- <ul className="flex-1 divide-y divide-slate-100 dark:divide-slate-700">
+ <ul className="flex-1 divide-y divide-ih-border">
  {conflicts.map((c, i) => (
  <li key={c.id}>
- <button type="button" onClick={() => setIndex(i)} className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-l-[2px] ${i === index ? "bg-ih-primary-tint border-indigo-500" : "border-transparent hover:bg-white dark:hover:bg-slate-700/50"}`}>
- <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-mono font-bold flex-shrink-0 mt-0.5 ${i === index ? "bg-indigo-500 text-white" : "bg-ih-bg-muted text-ih-fg-2"}`}>{i + 1}</span>
+ <button type="button" onClick={() => setIndex(i)} className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-l-[2px] ${i === index ? "bg-ih-primary-tint border-ih-primary" : "border-transparent hover:bg-ih-bg-muted"}`}>
+ <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-mono font-bold flex-shrink-0 mt-0.5 ${i === index ? "bg-ih-primary text-white" : "bg-ih-bg-muted text-ih-fg-2"}`}>{i + 1}</span>
  <div className="flex-1 min-w-0">
  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-ih-fg-4">{c.field}</div>
  <div className={`text-[12px] mt-0.5 truncate ${i === index ? "text-ih-primary font-bold" : "text-ih-fg-1 font-semibold"}`}>{c.itemId}</div>
@@ -64,7 +64,7 @@ export function ConflictModal({ conflicts, open, onClose, onResolve, onResetLoca
  ))}
  </ul>
  <div className="border-t border-ih-border p-3">
- <button type="button" onClick={handleReset} disabled={resetting} className="w-full px-3 py-2 rounded-md text-[11px] font-bold uppercase tracking-[0.14em] border border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg dark:hover:bg-rose-900/20 disabled:opacity-50 transition-colors">
+ <button type="button" onClick={handleReset} disabled={resetting} className="w-full px-3 py-2 rounded-md text-[11px] font-bold uppercase tracking-[0.14em] border border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg disabled:opacity-50 transition-colors">
  {resetting ? "Resetting..." : "Reset local copy & reload"}
  </button>
  <p className="text-[10px] text-ih-fg-4 mt-1.5 leading-snug">Use only if you are stuck. Discards every offline edit on this device.</p>
@@ -73,7 +73,7 @@ export function ConflictModal({ conflicts, open, onClose, onResolve, onResetLoca
 
  {current && (
  <section className="flex flex-col overflow-hidden">
- <header className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+ <header className="px-6 py-4 border-b border-ih-border">
  <div className="flex items-center gap-3 mb-1">
  <span className="text-[10px] font-mono font-bold text-ih-fg-4">Conflict {index + 1} of {conflicts.length}</span>
  <span className="ih-pill ih-pill--monitor">{current.field === "rating" ? "Rating disagreement" : "Note divergence"}</span>
@@ -93,14 +93,14 @@ export function ConflictModal({ conflicts, open, onClose, onResolve, onResetLoca
  </div>
  <div>
  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-bad-fg mb-1.5">Theirs - server</div>
- <pre className="bg-ih-bad-bg border border-ih-bad rounded-md p-3 text-[12px] text-rose-900 dark:text-rose-100 whitespace-pre-wrap leading-relaxed">{current.theirs}</pre>
+ <pre className="bg-ih-bad-bg border border-ih-bad rounded-md p-3 text-[12px] text-ih-bad-fg whitespace-pre-wrap leading-relaxed">{current.theirs}</pre>
  </div>
  </div>
  </div>
- <footer className="border-t border-slate-100 dark:border-slate-700 px-6 py-4 flex items-center gap-2 flex-wrap">
+ <footer className="border-t border-ih-border px-6 py-4 flex items-center gap-2 flex-wrap">
  <p className="text-[11px] text-ih-fg-3 flex-1 leading-snug max-w-[260px]">Pick a winner per field. Edit merged opens a free-form editor when both sides are partially correct.</p>
  <button type="button" onClick={() => onResolve(current.id, "edit")} className="px-3 py-2 rounded-md text-[12px] font-bold border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-1.5">Edit merged</button>
- <button type="button" onClick={() => onResolve(current.id, "theirs")} className="px-3 py-2 rounded-md text-[12px] font-bold border border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg dark:hover:bg-rose-900/20 transition-colors">Take theirs</button>
+ <button type="button" onClick={() => onResolve(current.id, "theirs")} className="px-3 py-2 rounded-md text-[12px] font-bold border border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg transition-colors">Take theirs</button>
  <button type="button" onClick={() => onResolve(current.id, "ours")} className="px-4 py-2 rounded-md text-[12px] font-bold bg-ih-primary hover:bg-ih-primary-600 text-white transition-colors">Keep mine</button>
  </footer>
  </section>

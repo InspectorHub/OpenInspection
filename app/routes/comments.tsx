@@ -7,7 +7,7 @@ import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from
 import { usePagination } from "~/hooks/usePagination";
 
 export function meta() {
-  return [{ title: "Comments Library - OpenInspection" }];
+  return [{ title: "Canned Comments - OpenInspection" }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -54,8 +54,8 @@ export default function CommentsPage() {
   return (
     <div className="space-y-[18px]">
       <PageHeader
-        eyebrow="Library · Comments"
-        title="Comments Library"
+        eyebrow="Library · Canned Comments"
+        title="Canned Comments"
         meta={`${meta.total} in library`}
         actions={
           <Button variant="primary">+ Add comment</Button>

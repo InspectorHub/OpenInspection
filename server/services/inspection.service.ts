@@ -3,7 +3,8 @@ import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
-import { computeReportStats, getRatingColor, getRatingBucket, type RatingLevel } from '../lib/report-utils';
+import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
+import { mapRatingSystemLevels } from '../lib/map-rating-levels';
 import { z } from 'zod';
 import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../lib/validations/inspection.schema';
 
@@ -95,40 +96,8 @@ function fireAutomation(db: D1Database, tenantId: string, inspectionId: string, 
         .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
 }
 
-/**
- * Sprint 2 S2-1 — Translate a rating_systems.levels[] payload into the
- * legacy `RatingLevel` shape consumed by computeReportStats / getRatingColor.
- *
- *   `bucket: 'satisfactory'` → severity: 'good'  / isDefect: false
- *   `bucket: 'monitor'`      → severity: 'marginal' / isDefect: false
- *   `bucket: 'defect'`       → severity: 'significant' / isDefect: true
- *   `bucket: 'na'`           → severity: 'minor' / isDefect: false
- */
-function mapRatingSystemLevels(levels: Array<Record<string, unknown>>): RatingLevel[] {
-    const sevByBucket: Record<string, RatingLevel['severity']> = {
-        satisfactory: 'good',
-        monitor:      'marginal',
-        defect:       'significant',
-        na:           'minor',
-    };
-    return levels
-        .slice()
-        .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
-        .map((lvl) => {
-            const bucket = String(lvl.bucket ?? 'na');
-            const severity = sevByBucket[bucket] ?? 'minor';
-            const id = String(lvl.id ?? lvl.label ?? lvl.abbr ?? crypto.randomUUID());
-            return {
-                id,
-                label:        String(lvl.label ?? lvl.abbr ?? id),
-                abbreviation: String(lvl.abbr ?? lvl.label ?? id),
-                color:        String(lvl.color ?? '#9ca3af'),
-                severity,
-                isDefect:     bucket === 'defect',
-                ...(typeof lvl.description === 'string' ? { description: lvl.description } : {}),
-            };
-        });
-}
+// mapRatingSystemLevels moved to ../lib/map-rating-levels (B-18: pure +
+// unit-tested so the pausesAdvance passthrough can't silently regress).
 
 /**
  * Resolve a defect-state row into the variables consumed by the Mustache
@@ -466,7 +435,7 @@ export class InspectionService {
     /**
      * Creates a new inspection.
      */
-    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string }): Promise<Inspection> {
+    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
         if (!this.sdb) throw new Error('ScopedDB session missing');
         const id = crypto.randomUUID();
         const createdAt = new Date();
@@ -512,6 +481,8 @@ export class InspectionService {
             clientName: data.clientName || 'Private Client',
             clientEmail: (data.clientEmail as string | null) || null,
             clientPhone: data.clientPhone ?? null,
+            // IA-1: FK to contacts.id for the client (app-layer integrity).
+            clientContactId: (data as { clientContactId?: string }).clientContactId ?? null,
             templateId: data.templateId,
             templateSnapshot,
             templateSnapshotVersion,
@@ -569,18 +540,29 @@ export class InspectionService {
             }
         }
 
-        // Link selected services
-        if (data.serviceIds && data.serviceIds.length > 0) {
+        // Link selected services.
+        // serviceSelections (IA-1 superset) takes precedence when present; otherwise
+        // fall back to the legacy flat serviceIds list. The two may coexist — the
+        // handler already merges them so only one branch fires here.
+        const serviceSelectionsInput = (data as { serviceSelections?: Array<{ serviceId: string; priceOverrideCents?: number }> }).serviceSelections;
+        const effectiveServiceIds: string[] = serviceSelectionsInput && serviceSelectionsInput.length > 0
+            ? serviceSelectionsInput.map(s => s.serviceId)
+            : (data.serviceIds ?? []);
+        if (effectiveServiceIds.length > 0) {
             const db2 = this.getDrizzle();
             const svcRows = await db2.select().from(services)
-                .where(and(eq(services.tenantId, tenantId), inArray(services.id, data.serviceIds)));
+                .where(and(eq(services.tenantId, tenantId), inArray(services.id, effectiveServiceIds)));
             if (svcRows.length > 0) {
+                // Build a map from serviceId → priceOverrideCents for fast lookup.
+                const overrideMap = new Map<string, number | undefined>(
+                    (serviceSelectionsInput ?? []).map(s => [s.serviceId, s.priceOverrideCents]),
+                );
                 await db2.insert(inspectionServices).values(svcRows.map(s => ({
                     id:            crypto.randomUUID(),
                     tenantId,
                     inspectionId:  id,
                     serviceId:     s.id,
-                    priceOverride: null,
+                    priceOverride: overrideMap.get(s.id) ?? null,
                     nameSnapshot:  s.name,
                     priceSnapshot: s.price,
                 })));
@@ -593,6 +575,34 @@ export class InspectionService {
             inspectorId: newInspection.inspectorId as string | null,
             createdAt: safeISODate(newInspection.createdAt)
         } as Inspection;
+    }
+
+    /**
+     * IA-1: Post-create hook — write priceOverride onto inspection_services rows
+     * that were already inserted by createInspection. Called by the handler AFTER
+     * createInspection returns so it can use the resolved inspection id.
+     * Only rows whose serviceId appears in selections AND carry a priceOverrideCents
+     * value are updated; rows without an override are left with priceOverride=null.
+     */
+    async applyServicePriceOverrides(
+        inspectionId: string,
+        tenantId: string,
+        selections: Array<{ serviceId: string; priceOverrideCents?: number }>,
+    ): Promise<void> {
+        const db = this.getDrizzle();
+        for (const sel of selections) {
+            if (sel.priceOverrideCents !== undefined) {
+                await db.update(inspectionServices)
+                    .set({ priceOverride: sel.priceOverrideCents })
+                    .where(
+                        and(
+                            eq(inspectionServices.inspectionId, inspectionId),
+                            eq(inspectionServices.tenantId, tenantId),
+                            eq(inspectionServices.serviceId, sel.serviceId),
+                        ),
+                    );
+            }
+        }
     }
 
     /**
@@ -1196,7 +1206,7 @@ export class InspectionService {
         sectionId?: string,
     ): Promise<{ key: string; itemId: string; photoIndex: number }> {
         if (!itemId) throw Errors.BadRequest('itemId is required');
-        await this.getInspection(inspectionId, tenantId); // ownership check
+        const { inspection } = await this.getInspection(inspectionId, tenantId); // ownership check
         const db = this.getDrizzle();
 
         const poolRow = await db.select().from(inspectionMediaPool)
@@ -1240,11 +1250,19 @@ export class InspectionService {
             });
         }
 
-        await db.delete(inspectionMediaPool)
-            .where(and(
-                eq(inspectionMediaPool.id, poolId),
-                eq(inspectionMediaPool.tenantId, tenantId),
-            ));
+        // DB-6: skip the DELETE when this pool row is the report cover.
+        // The pool row stays alive so coverPhotoId remains a valid reference
+        // and the preflight gate + report renderer can still resolve the R2 key.
+        // The photo key has already been written to results.data, so the item
+        // still gets the photo — only the pool row lives on as a cover anchor.
+        const isCover = (inspection.coverPhotoId as string | null) === poolId;
+        if (!isCover) {
+            await db.delete(inspectionMediaPool)
+                .where(and(
+                    eq(inspectionMediaPool.id, poolId),
+                    eq(inspectionMediaPool.tenantId, tenantId),
+                ));
+        }
 
         return { key: poolRow.r2Key, itemId, photoIndex };
     }
@@ -1452,7 +1470,16 @@ export class InspectionService {
         tenantId: string,
         poolId: string,
     ): Promise<void> {
-        await this.getInspection(inspectionId, tenantId); // ownership check
+        // DB-6 (symmetric guard): fetch inspection for ownership check AND cover check.
+        const { inspection } = await this.getInspection(inspectionId, tenantId);
+
+        // Refuse hard-delete when the pool row is the current report cover.
+        // The user explicitly asked to delete, so rejecting is correct (not silently keeping).
+        // They must pick a different cover first, mirroring the attachPoolPhoto strategy-A guard.
+        if ((inspection.coverPhotoId as string | null) === poolId) {
+            throw Errors.BadRequest('This photo is the report cover — choose a different cover before deleting it');
+        }
+
         const db = this.getDrizzle();
 
         const row = await db.select().from(inspectionMediaPool)
@@ -1747,6 +1774,14 @@ export class InspectionService {
                     };
                 });
 
+                // FE-3/B-20 — field-authored custom defects join the resolved
+                // list (they previously reached only the repair list + stats;
+                // the published report silently dropped them).
+                const customDefects = mapCustomDefectsForReport(
+                    (res as { customComments?: { defects?: Array<{ id: string }> } }).customComments,
+                    makePhotoUrl,
+                );
+
                 // Sprint 2 S2-3 / S2-4 — when the inspector left the legacy
                 // top-level recommendation / estimate empty but tagged the
                 // included canned defects with per-defect values, surface
@@ -1819,7 +1854,9 @@ export class InspectionService {
                     resolvedTabs: {
                         information,
                         limitations,
-                        defects,
+                        // Canned first, then custom — single list for renderers
+                        // (custom rows carry isCustom: true).
+                        defects: [...defects, ...customDefects],
                     },
                 };
             }),
@@ -2106,10 +2143,14 @@ export class InspectionService {
 
         for (const section of report.sections) {
             for (const item of section.items) {
-                // Canned defects from the resolved tabs.
+                // Canned defects from the resolved tabs. FE-3: the resolved
+                // list now also carries custom rows (isCustom) — skip them
+                // here, the dedicated custom pass below already emits them
+                // (with their richer per-row fields).
                 const cannedDefects = item.resolvedTabs?.defects ?? [];
                 for (const d of cannedDefects) {
-                    if (!d.included) continue;
+                    if (!d.included || ('isCustom' in d && d.isCustom)) continue;
+                    if (!('recommendationId' in d)) continue; // type guard: canned shape only
                     const cat = (d.effectiveCategory ?? 'maintenance') as RepairListEntry['category'];
                     const slug = d.recommendationId ?? null;
                     entries.push({

@@ -60,31 +60,31 @@ export function KeyboardHud() {
 
   return (
     <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div className="absolute inset-0 bg-slate-900/85 backdrop-blur-sm" onClick={() => setOpen(false)} />
-      <div className="relative bg-white rounded-lg shadow-md border border-slate-200 max-w-4xl w-full max-h-[85vh] overflow-y-auto">
-        <header className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="absolute inset-0 bg-[rgba(15,23,42,0.85)] backdrop-blur-sm" onClick={() => setOpen(false)} />
+      <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover border border-ih-border max-w-4xl w-full max-h-[85vh] overflow-y-auto">
+        <header className="px-6 py-4 border-b border-ih-border flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Keyboard shortcuts</h2>
-            <p className="text-xs text-ih-fg-3 mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono">?</kbd> to toggle, <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono">Esc</kbd> to close</p>
+            <h2 className="text-base font-bold text-ih-fg-1">Keyboard shortcuts</h2>
+            <p className="text-xs text-ih-fg-3 mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">?</kbd> to toggle, <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">Esc</kbd> to close</p>
           </div>
-          <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Close">&times;</button>
+          <button onClick={() => setOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-xl leading-none" aria-label="Close">&times;</button>
         </header>
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">{col.title}</h3>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-3">{col.title}</h3>
               <ul className="space-y-2">
                 {col.rows.map((row) => (
                   <li key={row.key} className="flex items-center justify-between gap-3 text-xs">
-                    <span className="text-slate-600 leading-tight">{row.label}</span>
-                    <kbd className="shrink-0 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-[11px] font-mono text-slate-700 min-w-[28px] text-center">{row.key}</kbd>
+                    <span className="text-ih-fg-2 leading-tight">{row.label}</span>
+                    <kbd className="shrink-0 px-2 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[11px] font-mono text-ih-fg-2 min-w-[28px] text-center">{row.key}</kbd>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
-        <footer className="px-6 py-3 border-t border-slate-100 text-[10px] text-slate-400 italic">
+        <footer className="px-6 py-3 border-t border-ih-border text-[10px] text-ih-fg-4 italic">
           Shortcuts marked with Cmd require platform meta key on Mac. Some shortcuts may be inactive until that feature ships.
         </footer>
       </div>

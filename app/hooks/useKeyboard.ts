@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { singleKeyShortcutsAllowed } from "../lib/shortcut-scope";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -78,6 +79,7 @@ export function useKeyboard(
     }
 
     function handle(e: KeyboardEvent) {
+      if (e.defaultPrevented || e.isComposing) return;
       const h = handlersRef.current;
       const inField = isInField();
       const meta = e.metaKey || e.ctrlKey;
@@ -231,6 +233,10 @@ export function useKeyboard(
         }, 1500);
         return;
       }
+
+      // Single-key shortcuts are scoped: only fire when focus is on <body>
+      // or inside a container with data-shortcut-scope (B-19a).
+      if (!singleKeyShortcutsAllowed(document.activeElement, e.isComposing)) return;
 
       // ? = toggle cheatsheet
       if (e.key === "?") {

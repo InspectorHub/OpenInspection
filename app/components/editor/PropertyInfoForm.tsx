@@ -58,7 +58,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
  Property Info &middot; {filled} of {metaFields.length} fields complete
  </p>
  {filled === metaFields.length && (
- <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-ih-ok-bg text-ih-ok-fg ring-1 ring-inset ring-emerald-200 dark:ring-emerald-700">
+ <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-ih-ok-bg text-ih-ok-fg ring-1 ring-inset ring-ih-ok/30">
  Complete
  </span>
  )}
@@ -107,7 +107,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
  type="checkbox"
  checked={!!inspection[f.id]}
  onChange={(e) => handleChange(f, e.target.checked)}
- className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
+ className="h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
  />
  </div>
  )}

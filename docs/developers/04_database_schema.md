@@ -44,6 +44,7 @@ Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `driz
 | `availability` / `availability_overrides` | Inspector scheduling (weekly + date overrides) |
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
+| `tenant_destruction_records` | Durable, non-personal proof a tenant was purged during offboarding (no FK to `tenants` so it outlives the deletion) |
 
 For the complete schema (all tables with columns, indexes, and constraints), see `migrations/0000_baseline.sql` — or the Drizzle definitions in `server/lib/db/schema/`, which are the source of truth.
 

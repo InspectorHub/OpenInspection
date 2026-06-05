@@ -64,68 +64,68 @@ export default function ApprenticeReviewPage() {
       {/* Status banner */}
       <div className={`flex items-center gap-3 px-4 py-3 rounded-md border ${
         pendingCount === 0
-          ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
-          : "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
+          ? "bg-ih-ok-bg border-ih-ok/30"
+          : "bg-ih-primary-tint border-ih-primary/30"
       }`}>
         <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-white shrink-0 ${
-          pendingCount === 0 ? "bg-emerald-500" : "bg-indigo-500"
+          pendingCount === 0 ? "bg-ih-ok" : "bg-ih-primary"
         }`}>
           {pendingCount === 0 ? <CheckIcon /> : <InfoIcon />}
         </span>
         <div>
-          <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+          <p className="text-sm font-bold text-ih-fg-1">
             {pendingCount === 0 ? "All caught up" : `${pendingCount} apprentice ${pendingCount === 1 ? "rating" : "ratings"} awaiting review`}
           </p>
-          <p className="text-[12px] text-slate-500 dark:text-slate-400">
+          <p className="text-[12px] text-ih-fg-3">
             Items flow through here before they appear in the published report.
           </p>
         </div>
       </div>
 
       {items.length === 0 ? (
-        <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-          <p className="font-semibold text-slate-700 dark:text-slate-200">Nothing to review</p>
-          <p className="text-[13px] text-slate-500 mt-1">Apprentice ratings appear here when they are submitted.</p>
+        <div className="text-center py-16 bg-ih-bg-card rounded-lg border border-ih-border">
+          <p className="font-semibold text-ih-fg-2">Nothing to review</p>
+          <p className="text-[13px] text-ih-fg-3 mt-1">Apprentice ratings appear here when they are submitted.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 min-h-[480px]">
           {/* Queue list */}
-          <aside className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden flex flex-col">
-            <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-700">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Queue</span>
-              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+          <aside className="bg-ih-bg-card border border-ih-border rounded-md overflow-hidden flex flex-col">
+            <div className="px-4 py-3 flex items-center justify-between border-b border-ih-border">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Queue</span>
+              <span className="text-[10px] font-mono text-ih-fg-4">
                 {items.filter((i) => i.decision).length} / {items.length}
               </span>
             </div>
-            <ul className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+            <ul className="flex-1 overflow-y-auto divide-y divide-ih-border">
               {items.map((q) => (
                 <li key={q.id}>
                   <button
                     onClick={() => setActiveId(q.id)}
                     className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors ${
                       q.id === activeId
-                        ? "bg-indigo-50 dark:bg-indigo-900/30 border-l-[2px] border-indigo-500"
-                        : "border-l-[2px] border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                        ? "bg-ih-primary-tint border-l-[2px] border-ih-primary"
+                        : "border-l-[2px] border-transparent hover:bg-ih-bg-muted"
                     }`}
                   >
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-[10px] font-bold shrink-0">
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-ih-bad-bg text-ih-bad-fg text-[10px] font-bold shrink-0">
                       {initials(q.apprenticeName)}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">
                         {q.field === "rating" ? "Rating" : q.field === "notes" ? "Notes" : "Value"}
                       </p>
                       <p className={`text-[13px] mt-0.5 leading-tight ${
-                        q.id === activeId ? "text-indigo-700 dark:text-indigo-300 font-bold" : "text-slate-900 dark:text-slate-100 font-semibold"
+                        q.id === activeId ? "text-ih-primary font-bold" : "text-ih-fg-1 font-semibold"
                       }`}>{q.itemId}</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">
+                      <p className="text-[10px] text-ih-fg-3 mt-1 truncate">
                         {shortAddress(q.inspectionAddress)}
                       </p>
                       {q.decision && (
                         <span className={`mt-1 inline-flex items-center gap-1 text-[10px] font-bold ${
-                          q.decision === "approved" ? "text-emerald-600 dark:text-emerald-400"
-                          : q.decision === "rejected" ? "text-rose-600 dark:text-rose-400"
-                          : "text-indigo-600 dark:text-indigo-400"
+                          q.decision === "approved" ? "text-ih-ok-fg"
+                          : q.decision === "rejected" ? "text-ih-bad-fg"
+                          : "text-ih-primary"
                         }`}>
                           <CheckSmallIcon /> {q.decision === "approved" ? "Approved" : q.decision === "rejected" ? "Rejected" : "Edited"}
                         </span>
@@ -139,23 +139,23 @@ export default function ApprenticeReviewPage() {
 
           {/* Review pane */}
           {active ? (
-            <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden flex flex-col">
-              <header className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-                <div className="flex items-center gap-2 text-[12px] text-slate-600 dark:text-slate-300 mb-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+            <section className="bg-ih-bg-card border border-ih-border rounded-md overflow-hidden flex flex-col">
+              <header className="px-6 py-4 border-b border-ih-border">
+                <div className="flex items-center gap-2 text-[12px] text-ih-fg-2 mb-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-ih-bad-bg text-ih-bad-fg text-[10px] font-bold">
                     {initials(active.apprenticeName)}
                   </span>
                   <span className="font-semibold">{active.apprenticeName}</span>
-                  <span className="text-slate-400">submitted {active.submittedAt}</span>
+                  <span className="text-ih-fg-4">submitted {active.submittedAt}</span>
                 </div>
-                <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">{active.itemId}</h2>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Field: {active.field}</p>
+                <h2 className="text-lg font-bold tracking-tight text-ih-fg-1">{active.itemId}</h2>
+                <p className="text-[12px] text-ih-fg-3 mt-1">Field: {active.field}</p>
               </header>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-md p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500 mb-2">Apprentice proposed</p>
-                  <pre className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
+                <div className="bg-ih-bg-muted border border-ih-border rounded-md p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-ih-fg-4 mb-2">Apprentice proposed</p>
+                  <pre className="whitespace-pre-wrap text-sm text-ih-fg-2 leading-relaxed">
                     {active.proposedValue || "—"}
                   </pre>
                 </div>
@@ -163,8 +163,8 @@ export default function ApprenticeReviewPage() {
                 {active.decision && (
                   <div className={`px-4 py-3 rounded-md text-sm border ${
                     active.decision === "approved"
-                      ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
-                      : "bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300"
+                      ? "bg-ih-ok-bg border-ih-ok/30 text-ih-ok-fg"
+                      : "bg-ih-bad-bg border-ih-bad/30 text-ih-bad-fg"
                   }`}>
                     Decision recorded: <span className="font-bold">{active.decision}</span>
                   </div>
@@ -172,22 +172,22 @@ export default function ApprenticeReviewPage() {
               </div>
 
               {!active.decision && (
-                <div className="border-t border-slate-100 dark:border-slate-700 px-6 py-4 flex items-center gap-3">
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 flex-1 max-w-[300px]">
+                <div className="border-t border-ih-border px-6 py-4 flex items-center gap-3">
+                  <p className="text-[11px] text-ih-fg-3 flex-1 max-w-[300px]">
                     Approve to publish as-is. Reject sends back to the apprentice.
                   </p>
-                  <button className="px-3 py-2 rounded-md text-[12px] font-bold border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
+                  <button className="px-3 py-2 rounded-md text-[12px] font-bold border border-ih-bad/30 text-ih-bad-fg hover:bg-ih-bad-bg transition-colors">
                     Reject
                   </button>
-                  <button className="px-4 py-2 rounded-md text-[12px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white transition-colors inline-flex items-center gap-1.5">
+                  <button className="px-4 py-2 rounded-md text-[12px] font-bold bg-ih-ok hover:bg-ih-ok/85 text-white transition-colors inline-flex items-center gap-1.5">
                     <CheckSmallIcon /> Approve
                   </button>
                 </div>
               )}
             </section>
           ) : (
-            <div className="flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
-              <p className="text-[13px] text-slate-500">Select an item from the queue.</p>
+            <div className="flex items-center justify-center bg-ih-bg-card border border-ih-border rounded-md">
+              <p className="text-[13px] text-ih-fg-3">Select an item from the queue.</p>
             </div>
           )}
         </div>

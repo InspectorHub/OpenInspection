@@ -5,9 +5,9 @@ export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     slug: text('slug').unique().notNull(),
-    tier: text('tier').notNull().default('free'),
+    tier: text('tier', { enum: ['free','pro','enterprise'] }).notNull().default('free'),
     stripeConnectAccountId: text('stripe_connect_account_id'),
-    status: text('status').notNull().default('pending'),
+    status: text('status', { enum: ['pending','active','suspended','trial'] }).notNull().default('pending'),
     maxUsers: integer('max_users').notNull().default(5),
     deploymentMode: text('deployment_mode').notNull().default('shared'), // shared, silo
     // Design System 0520 subsystem E P8 — optional InterNACHI inspector
@@ -45,6 +45,9 @@ export const users = sqliteTable('users', {
     // Nullable until the inspector picks one. Per-tenant uniqueness enforced via
     // partial index `idx_users_slug_per_tenant` (migrations/0052_inspector_slug.sql).
     slug: text('slug'),
+    // DDL default 'admin' is FROZEN (D1 cannot alter column defaults without a
+    // table rebuild and users is FK-referenced). Every insert path MUST pass an
+    // explicit role — audited 2026-06-05; enforced by review, not DDL.
     role: text('role').notNull().default('admin'),
     googleRefreshToken: text('google_refresh_token'),
     googleCalendarId: text('google_calendar_id'),
@@ -92,9 +95,18 @@ export const users = sqliteTable('users', {
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
     deletedAt:            integer('deleted_at', { mode: 'timestamp' }),
+    // Legal-links feature — set when the account was created through a public
+    // form (agent signup / agent invite / guest join) while the operator had
+    // TERMS_URL/PRIVACY_URL configured. JSON: {at, ip, country, termsUrl, privacyUrl}.
+    // Nullable: absent for accounts created before the feature or when the
+    // operator runs without configured legal docs.
+    termsAccepted: text('terms_accepted', { mode: 'json' }).$type<{
+        at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string;
+    } | null>(),
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
-    uniqueIndex('users_tenant_email_unique').on(t.tenantId, t.email),
+    // DB-2: soft-deleted rows must not block re-inviting the same email.
+    uniqueIndex('users_tenant_email_unique').on(t.tenantId, t.email).where(sql`deleted_at IS NULL`),
     index('idx_users_tenant').on(t.tenantId),
     uniqueIndex('idx_users_slug_per_tenant').on(t.tenantId, t.slug),
     index('idx_users_email').on(t.email),
@@ -134,6 +146,30 @@ export const slugReservations = sqliteTable('slug_reservations', {
     reason: text('reason').notNull(),
     blockedAt: integer('blocked_at').notNull(),
 });
+
+// Privacy & Compliance P3 (§3.2) — durable, non-personal proof that a tenant's
+// data was physically destroyed during offboarding purge. Deliberately a
+// PLATFORM-LEVEL table with NO foreign key to `tenants`: the tenant row is
+// deleted in the same purge pass, so an audit_logs row (NOT NULL FK ->
+// tenants.id, and tenant-scoped → cascade-deleted by the purge filter) cannot
+// survive. The spec text names `audit_logs`, but the spec itself documents
+// (§1.5) that audit_logs is infeasible for records that must OUTLIVE the
+// tenant; this standalone table — like `slug_reservations`, never listed in
+// TenantPurgeService.TENANT_TABLES — is the durable equivalent. Stores only
+// non-personal aggregates (id string snapshot + counts + byte totals + ts).
+export const tenantDestructionRecords = sqliteTable('tenant_destruction_records', {
+    id:          text('id').primaryKey(),
+    tenantId:    text('tenant_id').notNull(),   // string snapshot — intentionally NOT an FK (tenant row is gone)
+    tenantSlug:  text('tenant_slug'),           // non-personal label for the destroyed tenant
+    rowsDeleted: integer('rows_deleted').notNull().default(0),
+    r2Objects:   integer('r2_objects').notNull().default(0),
+    r2Bytes:     integer('r2_bytes').notNull().default(0),
+    kvKeys:      integer('kv_keys').notNull().default(0),
+    destroyedAt: integer('destroyed_at', { mode: 'timestamp' }).notNull(),
+}, (t) => [
+    index('idx_destruction_tenant').on(t.tenantId),
+    index('idx_destruction_destroyed_at').on(t.destroyedAt),
+]);
 
 export const tenantInvites = sqliteTable('tenant_invites', {
     id: text('id').primaryKey(),

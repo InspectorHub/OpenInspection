@@ -129,7 +129,7 @@ export default function SettingsInspectionTypes() {
                 <span
                   className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${
  pt.enabled
- ? "border-ih-ok-fg/20 bg-emerald-50 dark:bg-emerald-900/30 text-ih-ok-fg"
+ ? "border-ih-ok-fg/20 bg-ih-ok-bg text-ih-ok-fg"
  : "border-ih-border bg-ih-bg-muted text-ih-fg-3"
  }`}
                 >
@@ -212,10 +212,10 @@ export default function SettingsInspectionTypes() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover w-full max-w-md mx-4 p-6 space-y-4">
             <h3 className="text-[16px] font-bold text-ih-fg-1">
               {editingId ? "Edit custom subtype" : "Add custom subtype"}
             </h3>

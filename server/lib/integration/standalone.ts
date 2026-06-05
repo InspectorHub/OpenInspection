@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants, users, templates } from '../db/schema';
+import { tenants, users, templates, tenantConfigs } from '../db/schema';
 import { IntegrationProvider, TenantUpdateParams } from '../integration';
 import { logger } from '../logger';
 
@@ -216,6 +216,25 @@ export class StandaloneProvider implements IntegrationProvider {
             if (maxUsers != null) update.maxUsers = maxUsers;
 
             await db.update(tenants).set(update).where(eq(tenants.id, tenantId));
+        }
+
+        // IA-27: initialize tenant_configs.siteName from the company name so the
+        // brand never boots as the platform default. Initialize-only — never
+        // overwrites a name the tenant has already chosen.
+        if (name) {
+            const cfg = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+            if (!cfg) {
+                await db.insert(tenantConfigs).values({
+                    tenantId,
+                    siteName: name,
+                    updatedAt: new Date(),
+                });
+            } else if (!cfg.siteName) {
+                await db.update(tenantConfigs)
+                    .set({ siteName: name, updatedAt: new Date() })
+                    .where(eq(tenantConfigs.tenantId, tenantId));
+            }
+            // siteName already set → leave it (initialize-only, never overwrite)
         }
 
         // Handle Admin User creation/sync

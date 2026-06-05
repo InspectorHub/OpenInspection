@@ -106,7 +106,7 @@ const INTEGRATIONS: Integration[] = [
 
 const STATUS_STYLES = {
   connected:
-    "bg-emerald-50 dark:bg-emerald-900/30 text-ih-ok-fg",
+    "bg-ih-ok-bg text-ih-ok-fg",
   available:
     "bg-ih-bg-muted text-ih-fg-3",
 };

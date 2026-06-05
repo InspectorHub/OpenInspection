@@ -13,10 +13,10 @@ interface ItemListProps {
 
 /** Map rating to dot color for the item list */
 function ratingDotClass(rating: string): string {
-  if (rating === "Satisfactory" || rating === "SAT") return "bg-ih-ok-bg0";
-  if (rating === "Monitor" || rating === "MON") return "bg-ih-watch-bg0";
-  if (rating === "Defect" || rating === "DEF") return "bg-ih-bad-bg0";
-  return "bg-slate-300";
+  if (rating === "Satisfactory" || rating === "SAT") return "bg-ih-ok";
+  if (rating === "Monitor" || rating === "MON") return "bg-ih-watch";
+  if (rating === "Defect" || rating === "DEF") return "bg-ih-bad";
+  return "bg-ih-border-strong";
 }
 
 export function ItemList({ items, sectionId, activeItemId, onSelect, results, batchMode, batchSelected, onBatchToggle }: ItemListProps) {
@@ -38,7 +38,7 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
   });
 
   return (
-    <div className="w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col">
+    <div data-shortcut-scope className="w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col">
       {/* Filter chips */}
       <div className="px-2 py-1.5 flex gap-1 border-b border-ih-border">
         {filters.map((f) => (
@@ -47,8 +47,8 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
             onClick={() => setFilter(f.id)}
             className={`px-2 py-1 rounded text-[11px] font-bold ${
               filter === f.id
-                ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400"
-                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                ? "bg-ih-primary-tint text-ih-primary"
+                : "text-ih-fg-4 hover:text-ih-fg-2"
             }`}
           >
             {f.label}
@@ -72,16 +72,16 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
               }}
               className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all flex items-center gap-2 ${
                 activeItemId === item.id
-                  ? "bg-ih-bg-card shadow-sm border-l-[3px] border-indigo-600 font-medium"
-                  : "text-ih-fg-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  ? "bg-ih-bg-card shadow-ih-card border-l-[3px] border-ih-primary font-medium"
+                  : "text-ih-fg-3 hover:bg-ih-bg-muted"
               }`}
             >
               {batchMode && (
                 <span
                   className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
                     batchSelected?.[item.id]
-                      ? "bg-indigo-600 border-indigo-600"
-                      : "border-slate-300 dark:border-slate-600"
+                      ? "bg-ih-primary border-ih-primary"
+                      : "border-ih-border-strong"
                   }`}
                 >
                   {batchSelected?.[item.id] && (
@@ -91,7 +91,7 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
                   )}
                 </span>
               )}
-              <span className="text-[10px] text-slate-400 font-mono w-5">
+              <span className="text-[10px] text-ih-fg-4 font-mono w-5">
                 {String(idx + 1).padStart(2, "0")}
               </span>
               <span className="flex-1 truncate">{item.label}</span>

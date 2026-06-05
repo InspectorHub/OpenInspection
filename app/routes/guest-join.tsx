@@ -5,6 +5,8 @@ import type { Route } from "./+types/guest-join";
 import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 import { guestJoinSchema } from "~/lib/forms/auth.schema";
+import { readLegalLinks } from "~/lib/legal-links.server";
+import { LegalCheckbox } from "~/components/LegalCheckbox";
 
 export function meta() {
   return [{ title: "Join as Guest - OpenInspection" }];
@@ -14,8 +16,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") || "";
 
+  const legal = readLegalLinks(context);
+
   if (!token) {
-    return { valid: false, error: "Missing invite token", invite: null };
+    return { valid: false, error: "Missing invite token", invite: null, legal };
   }
 
   try {
@@ -23,7 +27,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context);
     const res = await api.guest["invite-info"].$get({ query: { token } });
     if (!res.ok) {
-      return { valid: false, error: "Invalid or expired guest link", invite: null };
+      return { valid: false, error: "Invalid or expired guest link", invite: null, legal };
     }
     const body = await res.json();
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
@@ -31,9 +35,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       valid: true,
       error: null,
       invite: (Object.keys(d).length > 0 ? d : null) as { workspaceName: string; role: string; expiresAt: number } | null,
+      legal,
     };
   } catch {
-    return { valid: false, error: "Service unavailable", invite: null };
+    return { valid: false, error: "Service unavailable", invite: null, legal };
   }
 }
 
@@ -52,7 +57,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     const api = createApi(context);
     const res = await api.guest.claim.$post({
-      json: { token, name, email, password },
+      json: { token, name, email, password, termsAccepted: formData.get("termsAccepted") === "on" },
     });
 
     if (!res.ok) {
@@ -82,7 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function GuestJoinPage() {
-  const { valid, error: loaderError, invite } = useLoaderData<typeof loader>();
+  const { valid, error: loaderError, invite, legal } = useLoaderData<typeof loader>();
   const lastResult = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -141,7 +146,7 @@ export default function GuestJoinPage() {
               autoFocus
               placeholder="Jane Smith"
               aria-invalid={fields.name.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.name.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.name.errors[0]}</p>
@@ -159,7 +164,7 @@ export default function GuestJoinPage() {
               autoComplete="email"
               placeholder="jane@example.com"
               aria-invalid={fields.email.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.email.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
@@ -177,7 +182,7 @@ export default function GuestJoinPage() {
               autoComplete="new-password"
               placeholder="At least 8 characters"
               aria-invalid={fields.password.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.password.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
@@ -189,6 +194,8 @@ export default function GuestJoinPage() {
               {form.errors[0]}
             </div>
           )}
+
+          {legal && <LegalCheckbox legal={legal} />}
 
           <button
             type="submit"

@@ -43,6 +43,12 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 # Optional: Public base URL for this worker (used to build OAuth redirect URIs)
 APP_BASE_URL=http://localhost:8788
 
+# Optional: Legal document links (self-host operators). When either URL is set, account-creating
+# public forms (agent signup, guest join) require an acceptance checkbox, and the acceptance blob
+# (URL + timestamp + IP + country) is stored on the user row. Unset = feature is entirely off.
+# TERMS_URL=https://yourdomain.com/terms
+# PRIVACY_URL=https://yourdomain.com/privacy
+
 # Optional: Cloudflare account credentials — required for silo mode (per-tenant D1 databases)
 # Create an API token at dash.cloudflare.com → My Profile → API Tokens with D1:Edit permission
 CF_ACCOUNT_ID=your_cloudflare_account_id_here

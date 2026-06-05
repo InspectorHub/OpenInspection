@@ -15,6 +15,17 @@ export function meta({ data }: Route.MetaArgs) {
 /* Types */
 /* ------------------------------------------------------------------ */
 
+interface ResolvedDefect {
+ id: string;
+ title: string;
+ included: boolean;
+ isCustom?: boolean;
+ effectiveComment: string;
+ effectiveCategory?: string;
+ effectiveLocation?: string | null;
+ defectPhotos?: Array<{ key: string; url: string }>;
+}
+
 interface ReportItem {
  id: string;
  label: string;
@@ -30,6 +41,10 @@ interface ReportItem {
  estimateMax?: number | null;
  value?: unknown;
  unit?: string | null;
+ /** FE-3/B-20 — resolved canned + custom defects (server emits both). */
+ resolvedTabs?: {
+ defects?: ResolvedDefect[];
+ };
 }
 
 interface ReportSection {
@@ -187,7 +202,7 @@ export default function ReportCardStackPage() {
  <button
  type="button"
  onClick={() => window.print()}
- className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-slate-900 text-white text-xs font-bold uppercase tracking-widest shadow-2xl hover:bg-ih-primary transition-all flex items-center gap-2"
+ className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2"
  >
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -202,8 +217,8 @@ export default function ReportCardStackPage() {
  {data.brand.logoUrl ? (
  <img src={data.brand.logoUrl} alt={data.brand.siteName ?? "Logo"} className="h-10 w-auto" />
  ) : (
- <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
- <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+ <div className="w-10 h-10 rounded-full bg-ih-ok/10 flex items-center justify-center">
+ <svg className="w-5 h-5 text-ih-ok" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
  </svg>
  </div>
@@ -216,7 +231,7 @@ export default function ReportCardStackPage() {
  {data.messageToken && (
  <a
  href={`/messages/${data.messageToken}`}
- className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+ className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
  >
  Message Inspector
  </a>
@@ -224,7 +239,7 @@ export default function ReportCardStackPage() {
  {data.enableRepairList && (
  <a
  href={`/inspections/${data.inspectionId}/repair-list`}
- className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+ className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
  >
  View Repair List
  </a>
@@ -232,7 +247,7 @@ export default function ReportCardStackPage() {
  {data.enableCustomerRepairExport && (
  <a
  href={`/r/${data.inspectionId}/repair-request`}
- className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+ className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
  >
  Generate repair request
  </a>
@@ -240,7 +255,7 @@ export default function ReportCardStackPage() {
  <button
  type="button"
  onClick={() => window.print()}
- className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+ className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
  >
  PDF
  </button>
@@ -266,7 +281,7 @@ export default function ReportCardStackPage() {
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
  {[
  { label: "Total", value: data.stats.total, color: "text-ih-fg-1" },
- { label: "Satisfactory", value: data.stats.satisfactory, color: "text-green-600 dark:text-green-400" },
+ { label: "Satisfactory", value: data.stats.satisfactory, color: "text-ih-ok-fg" },
  { label: "Monitor", value: data.stats.monitor, color: "text-ih-watch-fg" },
  { label: "Defects", value: data.stats.defect, color: "text-ih-bad-fg" },
  ].map((s) => (
@@ -378,9 +393,73 @@ export default function ReportCardStackPage() {
  </p>
  )}
 
+ {/* FE-3/B-20 — findings: included canned + custom defects with their
+ own photos. Previously the viewer rendered neither (field-authored
+ defects never appeared in the published report at all). */}
+ {(item.resolvedTabs?.defects ?? []).filter((d) => d.included).length > 0 && (
+ <div className="mt-3 space-y-2">
+ {(item.resolvedTabs?.defects ?? [])
+ .filter((d) => d.included)
+ .map((d) => (
+ <div
+ key={d.id}
+ className="rounded-md border border-ih-border bg-ih-bg-app/60 px-3 py-2"
+ >
+ <div className="flex items-center gap-1.5 flex-wrap">
+ <span className="text-[13px] font-bold text-ih-fg-1">{d.title}</span>
+ {d.effectiveCategory && (
+ <span
+ className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+ d.effectiveCategory === "safety"
+ ? "bg-ih-bad-bg text-ih-bad-fg"
+ : d.effectiveCategory === "recommendation"
+ ? "bg-ih-watch-bg text-ih-watch-fg"
+ : "bg-ih-bg-muted text-ih-fg-2"
+ }`}
+ >
+ {d.effectiveCategory}
+ </span>
+ )}
+ {d.isCustom && (
+ <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
+ inspector-added
+ </span>
+ )}
+ {d.effectiveLocation && (
+ <span className="text-[11px] text-ih-fg-4">@ {d.effectiveLocation}</span>
+ )}
+ </div>
+ {d.effectiveComment && (
+ <p className="text-[13px] text-ih-fg-3 mt-1 leading-relaxed">
+ {d.effectiveComment}
+ </p>
+ )}
+ {(d.defectPhotos ?? []).length > 0 && (
+ <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+ {(d.defectPhotos ?? []).map((photo) => {
+ const name = photoDisplayName(photo.key);
+ return (
+ <img
+ key={photo.key}
+ src={photo.url}
+ alt={name}
+ title={name}
+ className="w-full h-20 object-cover rounded cursor-pointer"
+ loading="lazy"
+ onClick={() => setLightboxUrl(photo.url)}
+ />
+ );
+ })}
+ </div>
+ )}
+ </div>
+ ))}
+ </div>
+ )}
+
  {item.recommendation && (
  <div className="mt-2 flex items-center gap-2 flex-wrap">
- <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 uppercase">
+ <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg uppercase">
  Recommend: {item.recommendation}
  </span>
  {data.showEstimates &&
@@ -413,7 +492,7 @@ export default function ReportCardStackPage() {
  download={name}
  title={`Download ${name}`}
  onClick={(e) => e.stopPropagation()}
- className="absolute top-1 right-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+ className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
  >
  ↓
  </a>
@@ -430,7 +509,7 @@ export default function ReportCardStackPage() {
  type="checkbox"
  checked={!!repairItems[item.id]}
  onChange={() => toggleRepairItem(item.id)}
- className="rounded border-gray-300"
+ className="rounded border-ih-border-strong"
  />
  Add to repair request
  </label>
@@ -487,7 +566,7 @@ export default function ReportCardStackPage() {
  <button
  type="button"
  onClick={() => setRepairPanel(false)}
- className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+ className="text-ih-fg-4 hover:text-ih-fg-2"
  >
  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -552,7 +631,7 @@ export default function ReportCardStackPage() {
  {/* Lightbox */}
  {lightboxUrl && (
  <div
- className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 cursor-pointer"
+ className="fixed inset-0 z-[60] bg-[rgba(15,23,42,0.9)] flex items-center justify-center p-4 cursor-pointer"
  onClick={() => setLightboxUrl(null)}
  >
  <img

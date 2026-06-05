@@ -58,10 +58,11 @@ const STATUS_COLORS: Record<string, string> = {
   draft: "bg-ih-bg-muted",
   scheduled: "bg-ih-primary-600",
   confirmed: "bg-ih-primary",
-  in_progress: "bg-amber-500",
-  delivered: "bg-emerald-500",
-  published: "bg-emerald-600",
-  cancelled: "bg-red-400",
+  in_progress: "bg-ih-watch",
+  delivered: "bg-ih-ok",
+  published: "bg-ih-ok",
+  cancelled: "bg-ih-bad",
+  // ds-allow: Google-source events keep Google Calendar's violet brand hue
   google: "bg-violet-400",
 };
 
@@ -444,8 +445,8 @@ export default function CalendarPage() {
 
       {/* Event detail modal */}
       {eventModalOpen && selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEventModalOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setEventModalOpen(false)}>
+          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-[16px] font-bold text-ih-fg-1">{selectedEvent.title}</h2>
               <button onClick={() => setEventModalOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>

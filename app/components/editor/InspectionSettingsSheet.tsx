@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useFetcher } from "react-router";
 
 interface SettingsForm {
   date: string;
@@ -28,11 +29,13 @@ interface InspectionSettingsSheetProps {
   onClose: () => void;
   inspectionId: string;
   referralSources?: string[];
+  /** Called after a successful save where the template selection changed. */
+  onTemplateApplied?: () => void;
 }
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-export function InspectionSettingsSheet({ open, onClose, inspectionId, referralSources = [] }: InspectionSettingsSheetProps) {
+export function InspectionSettingsSheet({ open, onClose, inspectionId, referralSources = [], onTemplateApplied }: InspectionSettingsSheetProps) {
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [inspectors, setInspectors] = useState<Inspector[]>([]);
@@ -48,6 +51,17 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     paymentRequired: false,
     agreementRequired: false,
   });
+  // Tracks the templateId that was loaded when the sheet opened, so we can
+  // detect whether the user changed it before saving.
+  const templateIdAtOpen = useRef<string>("");
+  // B-22 follow-up (C-12): saves go through the inspection-edit route action
+  // ("save-settings" intent) on a DEDICATED fetcher — the old raw client-side
+  // fetch('/api/inspections/:id', PATCH) could never pass requireCsrfToken, so
+  // every save silently 401/403'd. A dedicated fetcher (not shared) avoids the
+  // B-17 shared-fetcher abort hazard. templateChanged is captured at submit so
+  // the response effect knows whether to fire onTemplateApplied.
+  const saveFetcher = useFetcher<{ ok: boolean; intent?: string }>();
+  const templateChangedAtSubmit = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,13 +73,15 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
       ]);
       if (inspRes.ok) {
         const { data } = (await inspRes.json()) as { data: Record<string, unknown> };
+        const loadedTemplateId = (data.templateId as string) || "";
+        templateIdAtOpen.current = loadedTemplateId;
         setForm({
           date: (data.date as string) || "",
           closingDate: (data.closingDate as string) || "",
           inspectorId: (data.inspectorId as string) || "",
           orderId: (data.orderId as string) || "",
           referralSource: (data.referralSource as string) || "",
-          templateId: (data.templateId as string) || "",
+          templateId: loadedTemplateId,
           price: (data.price as number) || 0,
           paymentRequired: !!data.paymentRequired,
           agreementRequired: !!data.agreementRequired,
@@ -90,46 +106,58 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     if (open) load();
   }, [open, load]);
 
+  // Drive saveState from the dedicated fetcher's lifecycle. submitting → saving;
+  // response ok → saved (+ onTemplateApplied if the template changed); not ok →
+  // error. B-17 lesson: "idle" alone is not "saved" — gate on the action's ok.
+  useEffect(() => {
+    if (saveFetcher.state !== "idle") {
+      setSaveState("saving");
+      return;
+    }
+    const data = saveFetcher.data;
+    if (!data || data.intent !== "save-settings") return;
+    if (data.ok) {
+      setSaveState("saved");
+      if (templateChangedAtSubmit.current) onTemplateApplied?.();
+      templateChangedAtSubmit.current = false;
+      const timer = setTimeout(() => setSaveState("idle"), 2000);
+      return () => clearTimeout(timer);
+    }
+    setSaveState("error");
+  }, [saveFetcher.state, saveFetcher.data, onTemplateApplied]);
+
   if (!open) return null;
 
   function updateForm<K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSave(e: React.FormEvent) {
+  function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaveState("saving");
-    try {
-      const res = await fetch(`/api/inspections/${inspectionId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 2000);
-    } catch {
-      setSaveState("error");
-    }
+    templateChangedAtSubmit.current = form.templateId !== templateIdAtOpen.current;
+    saveFetcher.submit(
+      { intent: "save-settings", payload: JSON.stringify(form) },
+      { method: "post" },
+    );
   }
 
-  const inputClass = "mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[14px] font-medium focus:border-indigo-500 focus:shadow-ih-focus outline-none";
+  const inputClass = "mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[14px] font-medium focus:border-ih-primary focus:shadow-ih-focus outline-none";
   const labelClass = "text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3";
 
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 z-[60] bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
       {/* Slide-over panel */}
-      <aside className="fixed top-0 right-0 bottom-0 w-full max-w-xl z-[61] bg-ih-bg-card border-l border-ih-border shadow-2xl flex flex-col" role="dialog" aria-modal="true" aria-label="Inspection settings">
+      <aside className="fixed top-0 right-0 bottom-0 w-full max-w-xl z-[61] bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col" role="dialog" aria-modal="true" aria-label="Inspection settings">
         <header className="flex items-center justify-between gap-3 px-5 py-3 border-b border-ih-border">
           <div className="min-w-0">
             <h2 className="text-[14px] font-bold text-ih-fg-1">Inspection settings</h2>
             <p className="text-[11px] text-ih-fg-3">Schedule, people, template, pricing & gates</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-md text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </header>
@@ -137,8 +165,8 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
             <div className="space-y-2 py-4" aria-busy="true">
-              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" style={{ width: "50%" }} />
-              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" style={{ width: "75%" }} />
+              <div className="h-4 bg-ih-bg-muted rounded animate-pulse" style={{ width: "50%" }} />
+              <div className="h-4 bg-ih-bg-muted rounded animate-pulse" style={{ width: "75%" }} />
             </div>
           ) : (
             <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
@@ -202,11 +230,11 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                   </label>
                   <div className="flex flex-col gap-2 pt-5">
                     <label className="inline-flex items-center gap-2 text-[13px] text-ih-fg-3">
-                      <input type="checkbox" checked={form.paymentRequired} onChange={(e) => updateForm("paymentRequired", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20" />
+                      <input type="checkbox" checked={form.paymentRequired} onChange={(e) => updateForm("paymentRequired", e.target.checked)} className="h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30" />
                       Payment required to view report
                     </label>
                     <label className="inline-flex items-center gap-2 text-[13px] text-ih-fg-3">
-                      <input type="checkbox" checked={form.agreementRequired} onChange={(e) => updateForm("agreementRequired", e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20" />
+                      <input type="checkbox" checked={form.agreementRequired} onChange={(e) => updateForm("agreementRequired", e.target.checked)} className="h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30" />
                       Agreement signature required
                     </label>
                   </div>
@@ -217,7 +245,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                 {saveState === "saving" && <span className="text-[12px] text-ih-watch-fg font-bold">Saving...</span>}
                 {saveState === "saved" && <span className="text-[12px] text-ih-ok-fg font-bold">Saved</span>}
                 {saveState === "error" && <span className="text-[12px] text-ih-bad-fg font-bold">Error -- try again</span>}
-                <button type="submit" disabled={saveState === "saving"} className="h-10 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:bg-slate-300">
+                <button type="submit" disabled={saveState === "saving"} className="h-10 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:bg-ih-border-strong">
                   Save changes
                 </button>
               </div>

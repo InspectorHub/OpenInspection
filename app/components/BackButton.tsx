@@ -12,7 +12,7 @@ export function BackButton({ items, fallbackHref }: BackButtonProps) {
   return (
     <a
       href={href}
-      className="inline-flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md text-[13px] font-medium text-ih-fg-3 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:shadow-ih-focus"
+      className="inline-flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md text-[13px] font-medium text-ih-fg-3 hover:text-ih-fg-1 hover:bg-ih-bg-muted transition-colors focus:outline-none focus:shadow-ih-focus"
       aria-label={`Back to ${label}`}
     >
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

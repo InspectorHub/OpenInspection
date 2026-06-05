@@ -2,7 +2,7 @@ import { Outlet } from "react-router";
 
 export default function PublicLayout() {
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+    <div className="min-h-screen bg-ih-bg-card text-ih-fg-1">
       <Outlet />
     </div>
   );

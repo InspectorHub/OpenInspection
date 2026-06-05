@@ -236,10 +236,10 @@ export default function SettingsEventTypes() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
             onClick={() => setModalOpen(false)}
           />
-          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover w-full max-w-md mx-4 p-6 space-y-4">
             <h3 className="text-[16px] font-bold text-ih-fg-1">
               {editingId ? "Edit event type" : "New event type"}
             </h3>

@@ -124,11 +124,11 @@ export default function SettingsAutomations() {
                   <button
                     type="submit"
                     className={`w-10 h-6 rounded-full relative transition-colors ${
- rule.active ? "bg-ih-primary" : "bg-slate-200 dark:bg-slate-600"
+ rule.active ? "bg-ih-primary" : "bg-ih-border-strong"
  }`}
                     aria-label={rule.active ? "Disable automation" : "Enable automation"}
                   >
-                    <span className={`absolute w-4 h-4 bg-white rounded-full top-1 transition-all ${
+                    <span className={`absolute w-4 h-4 bg-ih-bg-card rounded-full top-1 transition-all ${
  rule.active ? "right-1" : "left-1"
  }`} />
                   </button>

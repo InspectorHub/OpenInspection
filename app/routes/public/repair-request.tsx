@@ -67,17 +67,17 @@ const CATEGORY_TONE: Record<
   safety: {
     bg: "bg-ih-bad-bg",
     text: "text-ih-bad-fg",
-    ring: "ring-rose-200 dark:ring-rose-800",
+    ring: "ring-ih-bad/30",
     label: "Safety",
   },
   recommendation: {
     bg: "bg-ih-watch-bg",
     text: "text-ih-watch-fg",
-    ring: "ring-amber-200 dark:ring-amber-800",
+    ring: "ring-ih-watch/30",
     label: "Recommend",
   },
   maintenance: {
-    bg: "bg-slate-50 dark:bg-slate-700/50",
+    bg: "bg-ih-bg-muted",
     text: "text-ih-fg-3",
     ring: "ring-ih-border",
     label: "Maintain",
@@ -162,7 +162,7 @@ export default function CustomerRepairRequestPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
       <header className="mb-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">
           Repair Request
         </p>
         <h1 className="text-[24px] sm:text-[28px] font-semibold tracking-tight text-ih-fg-1 leading-tight">
@@ -200,7 +200,7 @@ export default function CustomerRepairRequestPage() {
         <button
           type="button"
           onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-slate-900 text-white text-[12px] font-bold hover:bg-slate-700 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-ih-bg-inverse text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-bg-inverse/90 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -218,13 +218,13 @@ export default function CustomerRepairRequestPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="flex-1 h-9 px-3 rounded-md border border-ih-border text-[13px] text-ih-fg-1 placeholder-slate-400 bg-ih-bg-card focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="flex-1 h-9 px-3 rounded-md border border-ih-border text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 bg-ih-bg-card focus:outline-none focus:ring-2 focus:ring-ih-border-strong"
           />
           <button
             type="button"
             onClick={sendEmail}
             disabled={sending || !email}
-            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-blue-600 text-white text-[12px] font-bold hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md bg-ih-info text-white text-[12px] font-bold hover:bg-ih-info/85 disabled:bg-ih-bg-muted disabled:cursor-not-allowed transition-colors"
           >
             {sending ? "Sending..." : "Email this list to me"}
           </button>
@@ -300,7 +300,7 @@ export default function CustomerRepairRequestPage() {
                       )}
                     </div>
                     {d.recommendationLabel && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200 dark:ring-blue-800">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-ih-info-bg text-ih-info-fg ring-1 ring-inset ring-ih-info/30">
                         {d.recommendationLabel}
                       </span>
                     )}
@@ -336,14 +336,14 @@ export default function CustomerRepairRequestPage() {
                   <div className="mt-3">
                     <label
                       htmlFor={`crr-note-${d.itemId}-${idx}`}
-                      className="block text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1"
+                      className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1"
                     >
                       Your notes for the contractor
                     </label>
                     <textarea
                       id={`crr-note-${d.itemId}-${idx}`}
                       rows={2}
-                      className="w-full px-3 py-2 rounded-md border border-ih-border text-[13px] text-ih-fg-1 placeholder-slate-400 bg-slate-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                      className="w-full px-3 py-2 rounded-md border border-ih-border text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 bg-ih-bg-muted focus:outline-none focus:ring-2 focus:ring-ih-border-strong"
                       placeholder="Optional comment (e.g. preferred quote scope, timing, access details)"
                       onChange={(e) =>
                         setItemNotes((prev) => ({

@@ -5,6 +5,7 @@ import type { Route } from "./+types/concierge-book";
 import { createApi } from "~/lib/api-client.server";
 import { conciergeBookSchema } from "~/lib/forms/public.schema";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
+import { readLegalLinks } from "~/lib/legal-links.server";
 
 export function meta() {
   return [{ title: "Book your inspection - OpenInspection" }];
@@ -29,22 +30,23 @@ interface ConciergeBookData {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") ?? "";
+  const privacyUrl = readLegalLinks(context)?.privacyUrl ?? null;
   if (!token) {
-    return { data: null, error: "no-token" as const };
+    return { data: null, error: "no-token" as const, privacyUrl };
   }
   try {
     const api = createApi(context);
     const res = await api.concierge["book-info"].$get({ query: { token } });
     if (!res.ok) {
-      return { data: null, error: "expired" as const };
+      return { data: null, error: "expired" as const, privacyUrl };
     }
     const body = (await res.json()) as { success: boolean; data?: Omit<ConciergeBookData, "token"> };
     if (!body.success || !body.data) {
-      return { data: null, error: "expired" as const };
+      return { data: null, error: "expired" as const, privacyUrl };
     }
-    return { data: { ...body.data, token }, error: null };
+    return { data: { ...body.data, token }, error: null, privacyUrl };
   } catch {
-    return { data: null, error: "unknown" as const };
+    return { data: null, error: "unknown" as const, privacyUrl };
   }
 }
 
@@ -102,7 +104,7 @@ const TIMELINE_STEPS = [
 /* ------------------------------------------------------------------ */
 
 export default function ConciergeBookPage() {
-  const { data, error: loaderError } = useLoaderData<typeof loader>();
+  const { data, error: loaderError, privacyUrl } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -343,10 +345,14 @@ export default function ConciergeBookPage() {
             </label>
 
             <div className="pt-2">
+              <p className="mb-2 text-xs text-ih-fg-3">
+                Your information is shared with {data.tenant.brand?.siteName ?? data.tenant.name} to schedule your inspection.
+                {privacyUrl && <> See our <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>.</>}
+              </p>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full px-6 py-3.5 bg-ih-primary text-white rounded-lg font-bold text-base hover:brightness-95 disabled:bg-slate-400 disabled:cursor-wait transition-all"
+                className="w-full px-6 py-3.5 bg-ih-primary text-white rounded-lg font-bold text-base hover:brightness-95 disabled:bg-ih-bg-muted disabled:cursor-wait transition-all"
               >
                 {submitting ? "Sending..." : "Send booking"}
               </button>
@@ -366,7 +372,7 @@ export default function ConciergeBookPage() {
                 <span
                   className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                     step.done
-                      ? "bg-green-500 text-white"
+                      ? "bg-ih-ok text-white"
                       : step.active
                         ? "bg-ih-primary text-white animate-pulse"
                         : "bg-ih-bg-muted text-ih-fg-3"
@@ -385,6 +391,11 @@ export default function ConciergeBookPage() {
               </div>
             ))}
           </div>
+        )}
+        {privacyUrl && (
+          <p className="mt-8 text-center text-xs text-ih-fg-3">
+            <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">Privacy Policy</a>
+          </p>
         )}
       </main>
     </div>

@@ -86,13 +86,13 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  }
 
  return (
- <div className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-6" onClick={onClose} role="dialog" aria-modal="true" aria-label="Invite seat">
- <div className="max-w-md w-full bg-ih-bg-card rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+ <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] flex items-center justify-center p-6" onClick={onClose} role="dialog" aria-modal="true" aria-label="Invite seat">
+ <div className="max-w-md w-full bg-ih-bg-card rounded-xl shadow-ih-popover" onClick={(e) => e.stopPropagation()}>
  <header className="px-6 py-4 border-b border-ih-border flex items-center gap-4">
  <h2 className="text-lg font-bold flex-1 text-ih-fg-1">Invite</h2>
  <div className="flex gap-1">
  {(["permanent", "guest"] as const).map((m) => (
- <button key={m} onClick={() => setMode(m)} className={`px-3 py-1 rounded-md text-sm font-semibold transition-colors ${mode === m ? "bg-ih-primary text-white" : "text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-700"}`}>
+ <button key={m} onClick={() => setMode(m)} className={`px-3 py-1 rounded-md text-sm font-semibold transition-colors ${mode === m ? "bg-ih-primary text-white" : "text-ih-fg-3 hover:bg-ih-bg-muted"}`}>
  {m.charAt(0).toUpperCase() + m.slice(1)}
  </button>
  ))}
@@ -137,9 +137,9 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  {role === "specialist" && (
  <div>
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Assigned sections</span>
- <div className="p-3 max-h-40 overflow-y-auto space-y-1 bg-slate-50 dark:bg-slate-700 rounded-md border border-ih-border">
+ <div className="p-3 max-h-40 overflow-y-auto space-y-1 bg-ih-bg-muted rounded-md border border-ih-border">
  {sections.length === 0 ? (
- <p className="text-xs text-slate-400">No template sections loaded yet.</p>
+ <p className="text-xs text-ih-fg-4">No template sections loaded yet.</p>
  ) : sections.map((s) => (
  <label key={s.id} className="flex items-center gap-2 text-sm text-ih-fg-3">
  <input type="checkbox" checked={sectionIds.includes(s.id)} onChange={() => toggleSection(s.id)} />
@@ -158,7 +158,7 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  {DURATIONS.map((d) => (
  <label key={d.seconds} className="flex items-center gap-1 text-sm text-ih-fg-3">
  <input type="radio" checked={durationSeconds === d.seconds} onChange={() => setDurationSeconds(d.seconds)} />
- <span>{d.label} <span className="text-xs text-slate-400">{d.price}</span></span>
+ <span>{d.label} <span className="text-xs text-ih-fg-4">{d.price}</span></span>
  </label>
  ))}
  </div>

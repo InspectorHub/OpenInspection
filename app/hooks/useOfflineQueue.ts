@@ -1,161 +1,188 @@
+/**
+ * useOfflineQueue — React binding for the OfflineQueue core.
+ *
+ * Module-level singleton: one OfflineQueue instance shared across the app
+ * for the lifetime of the page.  Built from:
+ *   - IDB storage when IndexedDB is available (browser)
+ *   - In-memory storage when it is not (SSR / test envs)
+ *   - ActionTransport: submits queued writes through the inspection-edit
+ *     route action's `replay-write` / `replay-photo` intent branches.
+ *
+ * Hook return shape (stable across re-renders):
+ *   online        — current navigator.onLine status
+ *   pendingCount  — count of pending queue entries
+ *   failedCount   — count of permanently-failed queue entries
+ *   syncing       — true while a replay() run is in progress
+ *   replayNow     — trigger an immediate replay (idempotent / single-flight)
+ *
+ * Wire-up:
+ *   - window 'online'  event → replayNow() (auto-drain on reconnect)
+ *   - queue subscription    → re-read counts on every queue mutation
+ *   - SW 'message' event with data.type === 'drain-queue' → replayNow()
+ *     (service worker can prod the queue after a background sync)
+ *
+ * The exported hook name `useOfflineQueue` is kept stable so existing import
+ * sites continue to work without changes.
+ */
+
 import { useState, useEffect, useCallback, useRef } from "react";
+import { idbAvailable, createIdbQueueStorage } from "~/lib/offline/queue-storage.idb";
+import { createMemoryQueueStorage } from "~/lib/offline/queue-storage.memory";
+import { OfflineQueue } from "~/lib/offline/offline-queue";
+import type { ReplayResult } from "~/lib/offline/offline-queue";
+import { createActionTransport } from "~/lib/offline/action-transport";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-export interface OfflineState {
-  online: boolean;
-  pendingCount: number;
-  syncing: boolean;
-  lastSyncedAt: number | null;
-  conflicts: Array<Record<string, unknown>>;
-}
-
-export interface QueuedRequest {
-  url: string;
-  method: string;
-  body: string;
-  inspectionId: string;
-  timestamp: number;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Hook                                                               */
-/* ------------------------------------------------------------------ */
+// ── Module-level singleton ────────────────────────────────────────────────────
 
 /**
- * React-side offline queue. Tracks connectivity, queues failed requests
- * in IndexedDB (via the global OfflineQueue adapter), and provides replay.
- *
- * For the React Router v7 migration this is a thin adapter around navigator.onLine
- * state; the full Dexie-based sync engine from the Alpine side is not
- * ported yet. The save path goes through useFetcher (React Router v7 BFF) which
- * handles retries via the browser's native fetch queue.
+ * Lazily created on first hook call (deferred so SSR renders do not attempt
+ * to access indexedDB / navigator).
  */
-export function useOfflineQueue() {
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
-  const [syncing, setSyncing] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
-  const queueRef = useRef<QueuedRequest[]>([]);
+let _queue: OfflineQueue | null = null;
 
-  // Listen for online/offline events
-  useEffect(() => {
-    function goOnline() {
-      setOnline(true);
-      // Auto-replay when connectivity returns
-      replay();
+function getQueue(): OfflineQueue {
+    if (!_queue) {
+        const storage = idbAvailable()
+            ? createIdbQueueStorage()
+            : createMemoryQueueStorage();
+        const transport = createActionTransport();
+        _queue = new OfflineQueue(storage, transport);
     }
-    function goOffline() {
-      setOnline(false);
-    }
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
-    return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
-    };
-  }, []);
-
-  /** Enqueue a failed request for later replay */
-  const enqueue = useCallback(
-    (req: Omit<QueuedRequest, "timestamp">) => {
-      const entry: QueuedRequest = { ...req, timestamp: Date.now() };
-      queueRef.current.push(entry);
-      setPendingCount(queueRef.current.length);
-
-      // Persist to localStorage as a lightweight offline store
-      try {
-        localStorage.setItem(
-          "oi:offlineQueue",
-          JSON.stringify(queueRef.current),
-        );
-      } catch {
-        /* quota exceeded — silent */
-      }
-    },
-    [],
-  );
-
-  /** Replay all queued requests */
-  const replay = useCallback(async () => {
-    if (queueRef.current.length === 0) return;
-    if (syncing) return;
-    setSyncing(true);
-
-    const queue = [...queueRef.current];
-    const remaining: QueuedRequest[] = [];
-
-    for (const entry of queue) {
-      try {
-        const res = await fetch(entry.url, {
-          method: entry.method,
-          headers: { "Content-Type": "application/json" },
-          body: entry.body,
-          credentials: "include",
-        });
-        if (!res.ok && res.status >= 500) {
-          // Server error — keep in queue for retry
-          remaining.push(entry);
-        }
-        // 4xx = permanent failure, drop from queue
-      } catch {
-        // Network error — keep
-        remaining.push(entry);
-      }
-    }
-
-    queueRef.current = remaining;
-    setPendingCount(remaining.length);
-    setSyncing(false);
-    setLastSyncedAt(Date.now());
-
-    try {
-      if (remaining.length > 0) {
-        localStorage.setItem(
-          "oi:offlineQueue",
-          JSON.stringify(remaining),
-        );
-      } else {
-        localStorage.removeItem("oi:offlineQueue");
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [syncing]);
-
-  // Load persisted queue on mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("oi:offlineQueue");
-      if (raw) {
-        const parsed = JSON.parse(raw) as QueuedRequest[];
-        queueRef.current = parsed;
-        setPendingCount(parsed.length);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const state: OfflineState = {
-    online,
-    pendingCount,
-    syncing,
-    lastSyncedAt,
-    conflicts: [],
-  };
-
-  return {
-    state,
-    online,
-    syncing,
-    pendingCount,
-    lastSyncedAt,
-    enqueue,
-    replay,
-  };
+    return _queue;
 }
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+// Re-export so callers can type the result without importing from offline-queue directly.
+export type { ReplayResult };
+
+export interface OfflineQueueState {
+    online: boolean;
+    pendingCount: number;
+    failedCount: number;
+    syncing: boolean;
+    /** Trigger an immediate replay. Resolves with the ReplayResult when the run
+     * completes, or null when a replay is already in progress (single-flight). */
+    replayNow: () => Promise<ReplayResult | null>;
+}
+
+/**
+ * SSR-safe initial state. The server has no navigator / IndexedDB, so it
+ * always renders `{ online: true, pendingCount: 0, failedCount: 0,
+ * syncing: false }`. The client's FIRST render MUST produce the exact same
+ * values or React throws hydration-mismatch errors (#418 → #423, then a forced
+ * client re-render that dropped the live event listeners). Real values
+ * (navigator.onLine, storage counts) are read post-mount in the effect below.
+ */
+export const OFFLINE_QUEUE_INITIAL_STATE = {
+    online: true,
+    pendingCount: 0,
+    failedCount: 0,
+    syncing: false,
+} as const;
+
+export function useOfflineQueue(): OfflineQueueState {
+    // Initialize to the SSR-safe constants — never read navigator.onLine here,
+    // or the first client render diverges from the server HTML (React #418).
+    const [online, setOnline] = useState<boolean>(OFFLINE_QUEUE_INITIAL_STATE.online);
+    const [pendingCount, setPendingCount] = useState<number>(OFFLINE_QUEUE_INITIAL_STATE.pendingCount);
+    const [failedCount, setFailedCount] = useState<number>(OFFLINE_QUEUE_INITIAL_STATE.failedCount);
+    const [syncing, setSyncing] = useState<boolean>(OFFLINE_QUEUE_INITIAL_STATE.syncing);
+    const syncingRef = useRef(false);
+
+    // ── Queue counts refresh ──────────────────────────────────────────────────
+
+    const refreshCounts = useCallback(async () => {
+        try {
+            const { pending, failed } = await getQueue().counts();
+            setPendingCount(pending);
+            setFailedCount(failed);
+        } catch {
+            /* storage unavailable — leave counts unchanged */
+        }
+    }, []);
+
+    // ── replayNow ─────────────────────────────────────────────────────────────
+
+    const replayNow = useCallback((): Promise<ReplayResult | null> => {
+        // Single-flight guard: if a replay is already running, return null immediately.
+        if (syncingRef.current) return Promise.resolve(null);
+        syncingRef.current = true;
+        setSyncing(true);
+        return getQueue()
+            .replay()
+            .then((result) => {
+                void refreshCounts();
+                return result;
+            })
+            .catch((): ReplayResult => {
+                // Network error — counts will refresh on next online event.
+                return { synced: 0, conflicts: 0, failed: 0 };
+            })
+            .finally(() => {
+                syncingRef.current = false;
+                setSyncing(false);
+            });
+    }, [refreshCounts]);
+
+    // ── Effects ───────────────────────────────────────────────────────────────
+
+    useEffect(() => {
+        // Post-mount reconciliation: now that we're on the client, read the
+        // REAL connectivity status. This runs after hydration, so updating
+        // state here is a normal commit, not a hydration mismatch.
+        if (typeof navigator !== "undefined") {
+            setOnline(navigator.onLine);
+        }
+
+        // Read initial counts from storage.
+        void refreshCounts();
+
+        // Subscribe to queue mutations so counts stay live.
+        const unsub = getQueue().subscribe(() => {
+            void refreshCounts();
+        });
+
+        // Auto-drain when connectivity returns.
+        function handleOnline() {
+            setOnline(true);
+            replayNow();
+        }
+        function handleOffline() {
+            setOnline(false);
+        }
+
+        window.addEventListener("online", handleOnline);
+        window.addEventListener("offline", handleOffline);
+
+        // Service worker can prod the queue after a Background Sync event.
+        function handleSwMessage(event: MessageEvent) {
+            if (
+                event.data &&
+                typeof event.data === "object" &&
+                (event.data as { type?: string }).type === "drain-queue"
+            ) {
+                replayNow();
+            }
+        }
+
+        if (typeof navigator !== "undefined" && navigator.serviceWorker) {
+            navigator.serviceWorker.addEventListener("message", handleSwMessage);
+        }
+
+        return () => {
+            unsub();
+            window.removeEventListener("online", handleOnline);
+            window.removeEventListener("offline", handleOffline);
+            if (typeof navigator !== "undefined" && navigator.serviceWorker) {
+                navigator.serviceWorker.removeEventListener("message", handleSwMessage);
+            }
+        };
+    }, [refreshCounts, replayNow]);
+
+    return { online, pendingCount, failedCount, syncing, replayNow };
+}
+
+// ── Re-export the singleton for use outside React (e.g. useFindings) ─────────
+
+export { getQueue as getOfflineQueue };

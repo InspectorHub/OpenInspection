@@ -1,12 +1,23 @@
-import { Form, Link, useActionData, useNavigation } from "react-router";
+import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/signup";
 import { createApi } from "~/lib/api-client.server";
 import { agentSignupSchema } from "~/lib/forms/auth.schema";
+import { readLegalLinks } from "~/lib/legal-links.server";
+import { LegalCheckbox } from "~/components/LegalCheckbox";
 
 export function meta() {
   return [{ title: "Become a partner agent - OpenInspection" }];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Loader                                                             */
+/* ------------------------------------------------------------------ */
+
+export async function loader({ context }: Route.LoaderArgs) {
+  const legal = readLegalLinks(context);
+  return { legal };
 }
 
 /* ------------------------------------------------------------------ */
@@ -27,6 +38,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     email,
     password,
     ...(turnstileTokenRaw ? { turnstileToken: String(turnstileTokenRaw) } : {}),
+    termsAccepted: fd.get("termsAccepted") === "on",
   };
 
   const api = createApi(context);
@@ -74,6 +86,7 @@ const VALUE_PROPS = [
 /* ------------------------------------------------------------------ */
 
 export default function AgentSignupPage() {
+  const { legal } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -102,6 +115,7 @@ export default function AgentSignupPage() {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
       {/* Left: editorial value-prop */}
+      {/* ds-allow: fixed-dark marketing panel */}
       <aside className="relative flex flex-col justify-center px-8 py-12 lg:px-12 bg-slate-900 text-white overflow-hidden">
         <div className="absolute w-[480px] h-[480px] -right-[120px] -top-[160px] bg-ih-primary blur-[140px] opacity-35 pointer-events-none" />
         <div className="relative z-10 max-w-[460px] mx-auto">
@@ -114,6 +128,7 @@ export default function AgentSignupPage() {
           <h1 className="font-serif font-bold text-[2.75rem] leading-[1.05] tracking-tight mb-5">
             Become a partner agent
           </h1>
+          {/* ds-allow: light tint text on the fixed-dark marketing panel */}
           <p className="text-base leading-relaxed text-stone-300 mb-8">
             The free way for real-estate agents to track every inspection
             their inspectors completed for clients they referred.
@@ -127,6 +142,7 @@ export default function AgentSignupPage() {
                 <span className="w-7 h-7 rounded-full bg-ih-primary text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
                   {v.num}
                 </span>
+                {/* ds-allow: light tint text on the fixed-dark marketing panel */}
                 <span className="text-[15px] leading-relaxed text-stone-200">
                   <strong className="text-white font-semibold">{v.bold}</strong>{" "}
                   {v.text}
@@ -163,7 +179,7 @@ export default function AgentSignupPage() {
                   name={fields.name.name}
                   placeholder="Jane Smith"
                   aria-invalid={fields.name.errors ? true : undefined}
-                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
                 {fields.name.errors && (
                   <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.name.errors[0]}</p>
@@ -182,7 +198,7 @@ export default function AgentSignupPage() {
                   name={fields.email.name}
                   placeholder="jane@realty.com"
                   aria-invalid={fields.email.errors ? true : undefined}
-                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
                 {fields.email.errors && (
                   <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.email.errors[0]}</p>
@@ -201,13 +217,15 @@ export default function AgentSignupPage() {
                   name={fields.password.name}
                   placeholder="At least 12 characters"
                   aria-invalid={fields.password.errors ? true : undefined}
-                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                  className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
                 {fields.password.errors && (
                   <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.password.errors[0]}</p>
                 )}
               </div>
             </div>
+
+            {legal && <LegalCheckbox legal={legal} />}
 
             <button
               type="submit"

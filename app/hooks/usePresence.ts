@@ -11,6 +11,9 @@ export interface PresenceUser {
   focusItemId?: string | null;
 }
 
+/** FE-5 — tri-state so the UI can distinguish "still connecting" from "lost". */
+export type PresenceStatus = "connecting" | "connected" | "reconnecting";
+
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
@@ -37,6 +40,10 @@ export function usePresence(options: {
   const { inspectionId, userId, userName, photoUrl, enabled = true } = options;
   const [roster, setRoster] = useState<PresenceUser[]>([]);
   const [connected, setConnected] = useState(false);
+  // FE-5: a fresh page used to flash "Disconnected" until the first WS open —
+  // read as data loss by field users. Track connecting/connected/reconnecting.
+  const [status, setStatus] = useState<PresenceStatus>("connecting");
+  const everConnectedRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const backoffRef = useRef(1000);
@@ -61,6 +68,8 @@ export function usePresence(options: {
 
       ws.addEventListener("open", () => {
         backoffRef.current = 1000;
+        everConnectedRef.current = true;
+        setStatus("connected");
         setConnected(true);
         send({
           type: "hello",
@@ -88,6 +97,7 @@ export function usePresence(options: {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
         setConnected(false);
+        setStatus(everConnectedRef.current ? "reconnecting" : "connecting");
         // Schedule reconnect
         if (!closedRef.current) {
           setTimeout(() => connect(), backoffRef.current);
@@ -157,6 +167,7 @@ export function usePresence(options: {
   return {
     roster,
     connected,
+    status,
     setFocus,
     close,
   };

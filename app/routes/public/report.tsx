@@ -3,6 +3,7 @@ import type { Route } from "./+types/report";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
+import { readLegalLinks } from "~/lib/legal-links.server";
 
 export function meta() {
  return [{ title: "Inspection Report - OpenInspection" }];
@@ -34,6 +35,7 @@ interface ReportData {
 }
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
+ const privacyUrl = readLegalLinks(context)?.privacyUrl ?? null;
  try {
  const api = createApi(context);
  const token = new URL(request.url).searchParams.get("token") ?? undefined;
@@ -55,14 +57,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  report: reportData,
  brand,
  error: res.ok ? null : "Report not found",
+ privacyUrl,
  };
  } catch {
- return { report: null, brand: EMPTY_BRAND as TenantBrand, error: "Service unavailable" };
+ return { report: null, brand: EMPTY_BRAND as TenantBrand, error: "Service unavailable", privacyUrl };
  }
 }
 
 export default function ReportPage() {
- const { report, brand, error } = useLoaderData<typeof loader>();
+ const { report, brand, error, privacyUrl } = useLoaderData<typeof loader>();
 
  if (error || !report) {
  return (
@@ -119,7 +122,7 @@ export default function ReportPage() {
  </span>
  )}
  {ds.maintenance > 0 && (
- <span className="text-[11px] font-bold px-2 py-1 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+ <span className="text-[11px] font-bold px-2 py-1 rounded bg-ih-info-bg text-ih-info-fg">
  {ds.maintenance} Maintenance
  </span>
  )}
@@ -154,7 +157,7 @@ export default function ReportPage() {
  <img
  src={inspectorSig.signatureBase64}
  alt="Inspector signature"
- className="max-w-[240px] max-h-[80px] border border-ih-border bg-white p-1"
+ className="max-w-[240px] max-h-[80px] border border-ih-border bg-ih-bg-card p-1"
  />
  <p className="text-xs text-ih-fg-3 mt-1">
  {report.inspectorName || "Inspector"} &middot;{" "}
@@ -164,6 +167,11 @@ export default function ReportPage() {
  )}
  </p>
  </section>
+ )}
+ {privacyUrl && (
+ <p className="mt-8 text-center text-xs text-ih-fg-3">
+ <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">Privacy Policy</a>
+ </p>
  )}
  </div>
  </>

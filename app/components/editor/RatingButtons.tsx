@@ -32,7 +32,7 @@ export function RatingButtons({ levels, value, size = "md", onChange }: RatingBu
             key={level.id}
             type="button"
             onClick={() => onChange?.(level.id)}
-            className={`${btnSize} font-semibold rounded-lg border transition-all duration-150 cursor-pointer ${isActive ? "text-white border-transparent shadow-sm" : "border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600"}`}
+            className={`${btnSize} font-semibold rounded-lg border transition-all duration-150 cursor-pointer ${isActive ? "text-white border-transparent shadow-ih-card" : "border-ih-border text-ih-fg-4 hover:border-ih-border-strong hover:text-ih-fg-2"}`}
             style={isActive ? { background: level.color } : undefined}
             aria-label={level.label}
             title={level.label}

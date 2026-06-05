@@ -17,6 +17,8 @@ export interface SessionContext {
     tenantStatus: string;
     currentUserSlug: string | null;
     bookingHost: string | null;
+    /** PRIVACY_URL env value (operator-configured), or null when unset. */
+    privacyUrl: string | null;
   };
   user: {
     name: string | null;

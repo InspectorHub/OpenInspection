@@ -27,9 +27,9 @@ export function LiveConflictModal({ conflict, open, onResolve }: LiveConflictMod
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Resolve concurrent edit">
-      <div className="ih-card max-w-3xl w-full max-h-[90vh] overflow-y-auto bg-white">
-        <header className="px-6 py-4 border-b border-slate-200">
+    <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] backdrop-blur-sm flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Resolve concurrent edit">
+      <div className="ih-card max-w-3xl w-full max-h-[90vh] overflow-y-auto bg-ih-bg-card">
+        <header className="px-6 py-4 border-b border-ih-border">
           <h2 className="ih-h2">Resolve concurrent edit</h2>
           <p className="ih-meta mt-1">
             {conflict.field} on {conflict.itemId} — last edited by <strong>{conflict.theirs.by || "another inspector"}</strong>
@@ -37,25 +37,25 @@ export function LiveConflictModal({ conflict, open, onResolve }: LiveConflictMod
           </p>
         </header>
 
-        <div className="grid grid-cols-2 gap-0 border-b border-slate-200">
-          <div className="p-4 border-r border-slate-200 bg-ih-watch-bg">
-            <div className="ih-eyebrow mb-2 text-amber-800">Yours</div>
+        <div className="grid grid-cols-2 gap-0 border-b border-ih-border">
+          <div className="p-4 border-r border-ih-border bg-ih-watch-bg">
+            <div className="ih-eyebrow mb-2 text-ih-watch-fg">Yours</div>
             <pre className="text-sm whitespace-pre-wrap">{String(conflict.yours.value ?? "")}</pre>
           </div>
-          <div className="p-4 bg-sky-50">
-            <div className="ih-eyebrow mb-2 text-sky-800">Theirs (server)</div>
+          <div className="p-4 bg-ih-info-bg">
+            <div className="ih-eyebrow mb-2 text-ih-info-fg">Theirs (server)</div>
             <pre className="text-sm whitespace-pre-wrap">{String(conflict.theirs.value ?? "")}</pre>
           </div>
         </div>
 
         {action === "merge" && (
-          <div className="p-4 border-b border-slate-200">
+          <div className="p-4 border-b border-ih-border">
             <label className="ih-eyebrow block mb-2">Merged value</label>
             <textarea className="ih-input w-full h-32" value={mergedValue} onChange={(e) => setMergedValue(e.target.value)} aria-label="Merged value" />
           </div>
         )}
 
-        <footer className="px-6 py-4 flex justify-end gap-2 bg-slate-50">
+        <footer className="px-6 py-4 flex justify-end gap-2 bg-ih-bg-muted">
           <button type="button" className="ih-btn ih-btn--ghost" onClick={() => handleResolve("keep-theirs")}>Keep theirs</button>
           {action !== "merge" ? (
             <>

@@ -40,7 +40,7 @@ export default function AgentInspectorsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white">Your Inspectors</h1>
+        <h1 className="text-[28px] font-bold tracking-tight text-ih-fg-1">Your Inspectors</h1>
         <p className="text-[14px] text-ih-fg-3 mt-1">
           Every team you partner with. Copy a booking link to share with clients.
         </p>
@@ -48,7 +48,7 @@ export default function AgentInspectorsPage() {
 
       {inspectors.length === 0 ? (
         <div className="bg-ih-bg-card border border-dashed border-ih-border-strong rounded-xl p-8 text-center">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">No inspectors linked yet</h3>
+          <h3 className="text-lg font-bold text-ih-fg-1 mb-2">No inspectors linked yet</h3>
           <p className="text-[13px] text-ih-fg-3 max-w-md mx-auto">
             Inspectors who invite you, or whose contact list already has your email,
             will appear here automatically.
@@ -59,7 +59,7 @@ export default function AgentInspectorsPage() {
           {inspectors.map((row, i) => (
             <article
               key={row.inspectorSlug || i}
-              className="bg-ih-bg-card border border-ih-border rounded-xl p-5 flex flex-col gap-4 hover:-translate-y-0.5 hover:shadow-lg transition-all"
+              className="bg-ih-bg-card border border-ih-border rounded-xl p-5 flex flex-col gap-4 hover:-translate-y-0.5 hover:shadow-ih-popover transition-all"
             >
               <div className="flex items-center gap-3">
                 {row.inspectorPhotoUrl ? (
@@ -77,7 +77,7 @@ export default function AgentInspectorsPage() {
                   <p className="text-[15px] font-bold text-ih-fg-1 truncate">
                     {row.inspectorName || row.tenantName}
                   </p>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                  <p className="text-[11px] font-semibold text-ih-fg-4 uppercase tracking-widest">
                     {row.tenantName}
                   </p>
                 </div>
@@ -94,7 +94,7 @@ export default function AgentInspectorsPage() {
                   Copy Booking Link
                 </button>
               ) : (
-                <p className="text-[12px] text-slate-400 mt-auto">
+                <p className="text-[12px] text-ih-fg-4 mt-auto">
                   This inspector has not published a booking slug yet.
                 </p>
               )}

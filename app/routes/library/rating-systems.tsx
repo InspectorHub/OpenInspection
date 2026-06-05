@@ -62,10 +62,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 const BUCKET_RING: Record<RatingBucket, string> = {
-  satisfactory: "ring-emerald-500/30",
-  monitor: "ring-amber-500/30",
-  defect: "ring-rose-500/30",
-  na: "ring-slate-400/30",
+  satisfactory: "ring-ih-ok/30",
+  monitor: "ring-ih-watch/30",
+  defect: "ring-ih-bad/30",
+  na: "ring-ih-border-strong/30",
 };
 
 export default function RatingSystemsPage() {
@@ -158,7 +158,7 @@ export default function RatingSystemsPage() {
                     {levels.map((l) => (
                       <span
                         key={l.id || l.abbr}
-                        className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold ring-1 ${BUCKET_RING[l.bucket] ?? "ring-slate-400/30"}`}
+                        className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold ring-1 ${BUCKET_RING[l.bucket] ?? "ring-ih-border-strong/30"}`}
                         style={{ backgroundColor: l.color ? `${l.color}1a` : undefined, color: l.color || undefined }}
                         title={`${l.label} · ${l.bucket}`}
                       >

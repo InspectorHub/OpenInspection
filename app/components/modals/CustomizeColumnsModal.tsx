@@ -53,8 +53,8 @@ export function CustomizeColumnsModal({ open, onClose, columns, onChange }: Cust
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="max-w-lg w-full bg-ih-bg-card rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] flex items-center justify-center p-6" onClick={onClose}>
+      <div className="max-w-lg w-full bg-ih-bg-card rounded-xl shadow-ih-popover" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-ih-border">
           <h2 className="text-xl font-bold text-ih-fg-1">Customize Columns</h2>
           <p className="text-xs text-ih-fg-3 mt-1">Pick what shows in your inspection list. Saved as the team default.</p>
@@ -66,8 +66,8 @@ export function CustomizeColumnsModal({ open, onClose, columns, onChange }: Cust
               key={col.id}
               className={`flex items-start gap-3 p-3 rounded-md border transition-all ${
                 col.alwaysOn
-                  ? "bg-slate-50 dark:bg-slate-700/50 border-ih-border cursor-not-allowed"
-                  : "bg-ih-bg-card border-ih-border hover:border-indigo-300 dark:hover:border-indigo-500 cursor-pointer"
+                  ? "bg-ih-bg-muted border-ih-border cursor-not-allowed"
+                  : "bg-ih-bg-card border-ih-border hover:border-ih-primary cursor-pointer"
               }`}
             >
               <input
@@ -75,13 +75,13 @@ export function CustomizeColumnsModal({ open, onClose, columns, onChange }: Cust
                 checked={selected.has(col.id)}
                 disabled={col.alwaysOn}
                 onChange={() => !col.alwaysOn && toggle(col.id)}
-                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:shadow-ih-focus disabled:opacity-50"
+                className="mt-0.5 w-4 h-4 rounded border-ih-border-strong text-ih-primary focus:shadow-ih-focus disabled:opacity-50"
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-ih-fg-1">{col.label}</span>
-                  {col.alwaysOn && <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded">Required</span>}
-                  {col.mobileVisible === false && <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded" title="Hidden on mobile">Desktop only</span>}
+                  {col.alwaysOn && <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 bg-ih-bg-muted px-1.5 py-0.5 rounded">Required</span>}
+                  {col.mobileVisible === false && <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 bg-ih-bg-muted px-1.5 py-0.5 rounded" title="Hidden on mobile">Desktop only</span>}
                 </div>
                 {col.description && <p className="text-xs text-ih-fg-3 mt-0.5">{col.description}</p>}
               </div>

@@ -75,7 +75,7 @@ export default function VerifyPage() {
             key={i}
             className="flex items-start gap-3 text-[13px] p-3 rounded-lg border border-ih-border"
           >
-            <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 mt-1.5" />
+            <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-ih-fg-4 mt-1.5" />
             <div>
               <p className="font-medium">{entry.action}</p>
               <p className="text-[11px] text-ih-fg-3">

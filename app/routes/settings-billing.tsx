@@ -81,7 +81,7 @@ export default function SettingsBillingPage() {
           {!hasBilling && (
             <section className="bg-ih-ok-bg border border-ih-ok-fg/20 rounded-md p-6">
               <div className="flex items-start gap-3">
-                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-500 text-white flex-shrink-0">
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-ih-ok text-white flex-shrink-0">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4.5 12.75l6 6 9-13.5" /></svg>
                 </span>
                 <div className="flex-1">

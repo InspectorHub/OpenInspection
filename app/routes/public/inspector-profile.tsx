@@ -3,6 +3,7 @@ import type { Route } from "./+types/inspector-profile";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
+import { readLegalLinks } from "~/lib/legal-links.server";
 
 export function meta({ data }: Route.MetaArgs) {
   const d = data as LoaderResult | undefined;
@@ -40,6 +41,7 @@ interface LoaderResult {
   tenantSlug: string;
   brand: TenantBrand;
   error: string | null;
+  privacyUrl: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -47,6 +49,8 @@ interface LoaderResult {
 /* ------------------------------------------------------------------ */
 
 export async function loader({ params, context }: Route.LoaderArgs) {
+  const legal = readLegalLinks(context);
+  const privacyUrl = legal?.privacyUrl ?? null;
   try {
     const api = createApi(context);
     const [res, brand] = await Promise.all([
@@ -63,9 +67,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       tenantSlug: params.tenant ?? "",
       brand,
       error: res.ok ? null : "Inspector not found",
+      privacyUrl,
     } satisfies LoaderResult;
   } catch {
-    return { profile: null, services: [], tenantSlug: "", brand: EMPTY_BRAND, error: "Service unavailable" } satisfies LoaderResult;
+    return { profile: null, services: [], tenantSlug: "", brand: EMPTY_BRAND, error: "Service unavailable", privacyUrl } satisfies LoaderResult;
   }
 }
 
@@ -92,7 +97,7 @@ function fmtDuration(min: number | null): string {
 /* ------------------------------------------------------------------ */
 
 export default function InspectorProfilePage() {
-  const { profile, services, tenantSlug, brand, error } =
+  const { profile, services, tenantSlug, brand, error, privacyUrl } =
     useLoaderData<typeof loader>() as LoaderResult;
 
   if (error || !profile) {
@@ -200,6 +205,7 @@ export default function InspectorProfilePage() {
       )}
 
       {/* Trust strip */}
+      {/* ds-allow: fixed-dark marketing panel */}
       <div className="bg-slate-900 dark:bg-slate-800 text-white dark:text-slate-300 py-6 px-6 lg:px-16 mt-12 flex flex-wrap justify-center gap-12 text-[13px] tracking-wide">
         <span>Insured</span>
         <span>
@@ -232,6 +238,11 @@ export default function InspectorProfilePage() {
         )}
         {profile.phone && (
           <span className="ml-4">{profile.phone}</span>
+        )}
+        {privacyUrl && (
+          <p className="mt-8 text-center text-xs text-ih-fg-3">
+            <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">Privacy Policy</a>
+          </p>
         )}
       </footer>
     </div>

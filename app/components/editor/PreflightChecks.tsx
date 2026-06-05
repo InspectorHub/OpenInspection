@@ -22,16 +22,16 @@ function CheckRow({ check }: { check: PreflightCheck }) {
       <span>
         {check.label}
         {!check.passed && check.detail && (
-          <span className="text-slate-400"> ({check.detail})</span>
+          <span className="text-ih-fg-4"> ({check.detail})</span>
         )}
       </span>
       {!check.passed && (
         check.action.kind === "callback" ? (
-          <button className="ml-auto px-2 h-7 rounded-md text-xs text-indigo-600 hover:bg-indigo-50" onClick={check.action.onAction}>
+          <button className="ml-auto px-2 h-7 rounded-md text-xs text-ih-primary hover:bg-ih-primary-tint" onClick={check.action.onAction}>
             {check.action.label}
           </button>
         ) : (
-          <a className="ml-auto px-2 h-7 rounded-md text-xs text-indigo-600 hover:bg-indigo-50 flex items-center" href={check.action.href}>
+          <a className="ml-auto px-2 h-7 rounded-md text-xs text-ih-primary hover:bg-ih-primary-tint flex items-center" href={check.action.href}>
             {check.action.label}
           </a>
         )
@@ -42,8 +42,8 @@ function CheckRow({ check }: { check: PreflightCheck }) {
 
 export function PreflightChecks({ checks, loading, error }: PreflightChecksProps) {
   return (
-    <div className="border-t border-slate-200 px-6 py-4">
-      <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Pre-flight checks</h3>
+    <div className="border-t border-ih-border px-6 py-4">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-3">Pre-flight checks</h3>
       <ul className="space-y-2 text-sm">
         {checks.map((check) => (
           <CheckRow key={check.id} check={check} />

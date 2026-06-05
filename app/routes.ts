@@ -66,6 +66,7 @@ export default [
   // Standalone agent pages — no agent-layout chrome
   route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
   route("agent-invite-expired", "routes/agent/invite-expired.tsx"),
+  route("agent-signup", "routes/agent/signup.tsx"),
   // Error / utility pages (bare, outside auth)
   route("not-found", "routes/not-found.tsx"),
   route("feature-disabled", "routes/feature-disabled.tsx"),
@@ -105,7 +106,8 @@ export default [
       route("settings/security", "routes/settings-security.tsx"),
     ]),
     route("comments", "routes/comments.tsx"),
-    route("recommendations", "routes/recommendations.tsx"),
+    route("repair-items", "routes/repair-items.tsx"),
+    route("recommendations", "routes/recommendations-redirect.tsx"),
     route("library/tags", "routes/library/tags.tsx"),
     route("agreements", "routes/agreements.tsx"),
     route("library/rating-systems", "routes/library/rating-systems.tsx"),
@@ -116,6 +118,5 @@ export default [
     route("agent-settings/profile", "routes/agent/settings-profile.tsx"),
     route("agent-inspectors", "routes/agent/inspectors.tsx"),
     route("agent-recommendations", "routes/agent/recommendations.tsx"),
-    route("agent-signup", "routes/agent/signup.tsx"),
   ]),
 ] satisfies RouteConfig;

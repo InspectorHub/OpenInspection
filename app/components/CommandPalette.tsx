@@ -26,30 +26,32 @@ const PAGES: PaletteItem[] = [
   { id: "p-templates", label: "Templates", group: "Pages", icon: "page", to: "/templates", hint: "G then T" },
   { id: "p-marketplace", label: "Marketplace", group: "Pages", icon: "page", to: "/marketplace" },
   { id: "p-agreements", label: "Agreements", group: "Pages", icon: "page", to: "/agreements" },
-  { id: "p-comments", label: "Comments", group: "Pages", icon: "page", to: "/comments" },
-  { id: "p-repair", label: "Repair Items", group: "Pages", icon: "page", to: "/recommendations" },
+  { id: "p-comments", label: "Canned Comments", group: "Pages", icon: "page", to: "/comments" },
+  { id: "p-repair", label: "Repair Items", group: "Pages", icon: "page", to: "/repair-items" },
   { id: "p-contacts", label: "Contacts", group: "Pages", icon: "page", to: "/contacts", hint: "G then C" },
   { id: "p-calendar", label: "Calendar", group: "Pages", icon: "page", to: "/calendar" },
   { id: "p-invoices", label: "Invoices", group: "Pages", icon: "page", to: "/invoices" },
   { id: "p-ratings", label: "Rating Systems", group: "Pages", icon: "page", to: "/library/rating-systems" },
   { id: "p-metrics", label: "Metrics", group: "Pages", icon: "page", to: "/metrics" },
+  { id: "p-team", label: "Team", group: "Pages", icon: "page", to: "/team" },
   { id: "p-notifications", label: "Notifications", group: "Pages", icon: "page", to: "/notifications" },
 ];
 
 const SETTINGS: PaletteItem[] = [
   { id: "s-main", label: "Settings", group: "Settings", icon: "gear", to: "/settings" },
   { id: "s-profile", label: "Settings - Profile", group: "Settings", icon: "gear", to: "/settings/profile" },
-  { id: "s-branding", label: "Settings - Branding", group: "Settings", icon: "gear", to: "/settings/workspace/branding" },
-  { id: "s-theme", label: "Settings - Report Theme", group: "Settings", icon: "gear", to: "/settings/workspace/theme" },
-  { id: "s-services", label: "Settings - Services & Pricing", group: "Settings", icon: "gear", to: "/settings/catalog/services" },
-  { id: "s-email", label: "Settings - Email", group: "Settings", icon: "gear", to: "/settings/communication/email" },
-  { id: "s-automations", label: "Settings - Automations", group: "Settings", icon: "gear", to: "/settings/communication/automations" },
-  { id: "s-integrations", label: "Settings - Integrations", group: "Settings", icon: "gear", to: "/settings/communication/integrations" },
-  { id: "s-password", label: "Settings - Change Password", group: "Settings", icon: "gear", to: "/settings/account/password" },
-  { id: "s-2fa", label: "Settings - Two-factor (2FA)", group: "Settings", icon: "gear", to: "/settings/account/security" },
-  { id: "s-payments", label: "Settings - Payments", group: "Settings", icon: "gear", to: "/settings/advanced/payments" },
-  { id: "s-ai", label: "Settings - AI", group: "Settings", icon: "gear", to: "/settings/advanced/ai" },
-  { id: "s-data", label: "Settings - Data Import / Export", group: "Settings", icon: "gear", to: "/settings/advanced/data" },
+  { id: "s-company", label: "Settings - Company", group: "Settings", icon: "gear", to: "/settings/workspace" },
+  { id: "s-theme", label: "Settings - Report Theme", group: "Settings", icon: "gear", to: "/settings/workspace" },
+  { id: "s-services", label: "Settings - Services & Pricing", group: "Settings", icon: "gear", to: "/settings/services" },
+  { id: "s-email", label: "Settings - Email", group: "Settings", icon: "gear", to: "/settings/communication" },
+  { id: "s-automations", label: "Settings - Automations", group: "Settings", icon: "gear", to: "/settings/automations" },
+  { id: "s-integrations", label: "Settings - Integrations", group: "Settings", icon: "gear", to: "/settings/integrations" },
+  { id: "s-password", label: "Settings - Change Password", group: "Settings", icon: "gear", to: "/settings/security" },
+  { id: "s-2fa", label: "Settings - Two-factor (2FA)", group: "Settings", icon: "gear", to: "/settings/security" },
+  { id: "s-account", label: "Settings - Account & Security", group: "Settings", icon: "gear", to: "/settings/security" },
+  { id: "s-payments", label: "Settings - Payments", group: "Settings", icon: "gear", to: "/settings/advanced" },
+  { id: "s-ai", label: "Settings - AI", group: "Settings", icon: "gear", to: "/settings/advanced" },
+  { id: "s-data", label: "Settings - Data Import / Export", group: "Settings", icon: "gear", to: "/settings/data" },
 ];
 
 const QUICK_ACTIONS: PaletteItem[] = [
@@ -273,8 +275,8 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] bg-black/30 backdrop-blur-sm" onClick={() => setOpen(false)}>
-      <div className="w-full max-w-md bg-ih-bg-card rounded-xl shadow-2xl border border-ih-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] bg-[rgba(15,23,42,0.3)] backdrop-blur-sm" onClick={() => setOpen(false)}>
+      <div className="w-full max-w-md bg-ih-bg-card rounded-xl shadow-ih-popover border border-ih-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-ih-border">
           <SearchIcon />
@@ -284,14 +286,14 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
             onChange={(e) => { setQuery(e.target.value); setActiveIdx(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Type a command or search..."
-            className="flex-1 bg-transparent text-[14px] text-ih-fg-1 outline-none placeholder:text-slate-400"
+            className="flex-1 bg-transparent text-[14px] text-ih-fg-1 outline-none placeholder:text-ih-fg-4"
           />
-          <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-ih-bg-muted text-[10px] font-bold text-slate-400">ESC</kbd>
+          <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-ih-bg-muted text-[10px] font-bold text-ih-fg-4">ESC</kbd>
         </div>
 
         {/* Prefix hints */}
         {!query && (
-          <div className="flex gap-3 px-4 py-1.5 border-b border-slate-100 dark:border-slate-700 text-[10px] text-slate-400">
+          <div className="flex gap-3 px-4 py-1.5 border-b border-ih-border text-[10px] text-ih-fg-4">
             <span><kbd className="font-bold">&gt;</kbd> actions</span>
             <span><kbd className="font-bold">@</kbd> people</span>
           </div>
@@ -300,11 +302,11 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
         {/* Results */}
         <div className="max-h-[300px] overflow-y-auto py-2">
           {flatFiltered.length === 0 ? (
-            <p className="px-4 py-6 text-center text-[13px] text-slate-400">No results found</p>
+            <p className="px-4 py-6 text-center text-[13px] text-ih-fg-4">No results found</p>
           ) : (
             [...groups.entries()].map(([group, actions]) => (
               <div key={group}>
-                <p className="px-4 py-1 text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-400">{group}</p>
+                <p className="px-4 py-1 text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4">{group}</p>
                 {actions.map((action) => {
                   const idx = flatFiltered.indexOf(action);
                   return (
@@ -312,12 +314,12 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
                       key={action.id}
                       onClick={() => executeAction(action)}
                       onMouseEnter={() => setActiveIdx(idx)}
-                      className={`w-full flex items-center gap-3 px-4 py-2 text-[13px] transition-colors ${idx === safeIdx ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400" : "text-ih-fg-3"}`}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-[13px] transition-colors ${idx === safeIdx ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3"}`}
                     >
                       <PaletteIcon type={action.icon} />
                       <span className="font-medium flex-1 text-left truncate">{action.label}</span>
                       {action.hint && (
-                        <span className="text-[10px] text-slate-400 shrink-0">{action.hint}</span>
+                        <span className="text-[10px] text-ih-fg-4 shrink-0">{action.hint}</span>
                       )}
                     </button>
                   );
@@ -328,7 +330,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
         </div>
 
         {/* Footer hint */}
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-ih-border text-[10px] text-slate-400">
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-ih-border text-[10px] text-ih-fg-4">
           <span><kbd className="font-bold">&uarr;&darr;</kbd> navigate</span>
           <span><kbd className="font-bold">Enter</kbd> select</span>
           <span><kbd className="font-bold">Esc</kbd> close</span>
@@ -340,7 +342,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
 
 function SearchIcon() {
   return (
-    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-4 h-4 text-ih-fg-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
     </svg>
   );

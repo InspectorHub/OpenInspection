@@ -96,7 +96,7 @@ export function PropertyFactsCard({ inspectionId, initialFacts, onSaved }: Prope
     }
   }
 
-  const inputClass = "mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[14px] font-medium tabular-nums focus:border-indigo-500 focus:shadow-ih-focus outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 text-ih-fg-1";
+  const inputClass = "mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[14px] font-medium tabular-nums focus:border-ih-primary focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4 text-ih-fg-1";
   const labelClass = "text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3";
 
   return (
@@ -113,10 +113,10 @@ export function PropertyFactsCard({ inspectionId, initialFacts, onSaved }: Prope
 
       {autofillMessage && (
         <p className={`text-[12px] px-3 py-2 rounded-md ring-1 ring-inset ${
-          autofillState === "success" ? "text-ih-ok-fg bg-ih-ok-bg ring-emerald-200" :
-          autofillState === "no_key" ? "text-slate-700 bg-slate-50 ring-slate-200" :
-          autofillState === "not_found" ? "text-ih-watch-fg bg-ih-watch-bg ring-amber-200" :
-          "text-ih-bad-fg bg-ih-bad-bg ring-rose-200"
+          autofillState === "success" ? "text-ih-ok-fg bg-ih-ok-bg ring-ih-ok/30" :
+          autofillState === "no_key" ? "text-ih-fg-2 bg-ih-bg-muted ring-ih-border" :
+          autofillState === "not_found" ? "text-ih-watch-fg bg-ih-watch-bg ring-ih-watch/30" :
+          "text-ih-bad-fg bg-ih-bad-bg ring-ih-bad/30"
         }`} data-testid="property-facts-autofill-message">{autofillMessage}</p>
       )}
 

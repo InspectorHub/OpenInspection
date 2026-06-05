@@ -116,7 +116,7 @@ export default function AgentInviteExpiredPage() {
 
         <Link
           to="/agent-signup"
-          className="block mt-5 text-[14px] text-ih-fg-4 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          className="block mt-5 text-[14px] text-ih-fg-4 hover:text-ih-fg-2 transition-colors"
         >
           Or sign up directly without an invite
         </Link>

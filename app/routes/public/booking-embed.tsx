@@ -4,6 +4,7 @@ import type { Route } from "./+types/booking-embed";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
+import { readLegalLinks } from "~/lib/legal-links.server";
 
 export function meta() {
   return [{ title: "Book inspection" }];
@@ -22,6 +23,7 @@ interface EmbedData {
   theme: "light" | "dark" | "branded";
   brand: TenantBrand | null;
   bookingOpen: boolean;
+  privacyUrl: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -57,6 +59,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
             }
           | null)
       : null;
+    const legal = readLegalLinks(context);
     return {
       data: d
         ? ({
@@ -68,6 +71,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
             theme,
             brand,
             bookingOpen: d.bookingOpen !== false,
+            privacyUrl: legal?.privacyUrl ?? null,
           } satisfies EmbedData)
         : null,
       error: res.ok ? null : "Not found",
@@ -124,7 +128,7 @@ export default function BookingEmbedPage() {
             <p className="text-[13px] text-ih-fg-3 mb-4">
               Pick a date and we'll confirm by email.
             </p>
-            <BookingForm data={data} />
+            <BookingForm data={data} privacyUrl={data.privacyUrl} />
           </>
         ) : (
           // B-16 — no working hours configured: honest not-open state.
@@ -141,7 +145,7 @@ export default function BookingEmbedPage() {
 /*  Booking form fragment                                              */
 /* ------------------------------------------------------------------ */
 
-function BookingForm({ data }: { data: EmbedData }) {
+function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string | null }) {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -259,6 +263,10 @@ function BookingForm({ data }: { data: EmbedData }) {
         </div>
       </div>
 
+      <p className="mb-2 text-xs text-ih-fg-3">
+        Your information is shared with {data.inspectorName} to schedule your inspection.
+        {privacyUrl && <> See our <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>.</>}
+      </p>
       <button
         type="submit"
         disabled={submitting}
@@ -270,7 +278,7 @@ function BookingForm({ data }: { data: EmbedData }) {
       {status && (
         <div
           className={`mt-3 text-[13px] ${
-            status.ok ? "text-green-700 dark:text-green-400" : "text-ih-bad-fg"
+            status.ok ? "text-ih-ok-fg" : "text-ih-bad-fg"
           }`}
         >
           {status.text}

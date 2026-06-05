@@ -44,7 +44,10 @@ export function EmailPreview({ subject, blocks }: { trigger: string; subject: st
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Preview</p>
         <span className={`text-[10px] uppercase tracking-widest ${loading ? "text-ih-watch-fg" : "text-ih-fg-4"}`}>{loading ? "Updating…" : "Sample data"}</span>
       </div>
-      <div className="rounded-lg border border-ih-border overflow-hidden shadow-sm bg-white">
+      {/* ds-allow: email surface — the simulated client window and iframe body
+          stay white in both themes because real email clients render light with
+          no CSS-var theming. Only the surrounding chrome uses tokens. */}
+      <div className="rounded-lg border border-ih-border overflow-hidden shadow-ih-card bg-white">
         <div className="flex items-center gap-1.5 px-3 h-8 bg-ih-bg-muted border-b border-ih-border">
           <span className="h-2.5 w-2.5 rounded-full bg-ih-border" />
           <span className="h-2.5 w-2.5 rounded-full bg-ih-border" />

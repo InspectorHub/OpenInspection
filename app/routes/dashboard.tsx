@@ -5,9 +5,12 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
 import { NewInspectionWizard } from "~/components/NewInspectionWizard";
+import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
 import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { formatInspectionDateTime } from "~/lib/format-date";
+import { computeOnboardingSteps } from "~/lib/onboarding-progress";
 import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
 
 export function meta() {
@@ -194,11 +197,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // Templates + services power the New Inspection wizard (B-6 picker + B-8
     // service linking). They are best-effort: a failure must not break the
     // dashboard, so each falls back to an empty list.
-    const [dashRes, tagsRes, templatesRes, servicesRes] = await Promise.all([
+    // meRes: best-effort fetch for onboardingState.checklistDismissed (IA-12).
+    // The TODO(C-10) cast mirrors settings-account.tsx — hono/client collapses
+    // the typed union; assertion is localized here and does not affect safety.
+    const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
+    const [dashRes, tagsRes, templatesRes, servicesRes, meRes] = await Promise.all([
       api.inspections.dashboard.$get(),
       api.tags.index.$get().catch(() => null),
       api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
       api.services.index.$get().catch(() => null),
+      meGet().catch(() => null),
     ]);
     const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
     const d = (json.data ?? {}) as unknown as DashboardData | undefined;
@@ -217,6 +225,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       const sj = (await servicesRes.json()) as { data?: ServiceOption[] };
       svcOptions = (sj.data ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price }));
     }
+    // IA-12: read checklistDismissed from onboardingState. Best-effort: if the
+    // call fails we show the checklist (safe default — the user can dismiss again).
+    let checklistDismissed = false;
+    if (meRes && meRes.ok) {
+      const meBody = (await meRes.json().catch(() => ({}))) as {
+        data?: { user?: { onboardingState?: Record<string, boolean> | null } };
+      };
+      checklistDismissed = meBody.data?.user?.onboardingState?.checklistDismissed === true;
+    }
     return {
       buckets: {
         needsAttention: d?.needsAttention ?? [],
@@ -231,6 +248,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       tags,
       templates,
       services: svcOptions,
+      checklistDismissed,
+      // Pass raw template/service counts for the onboarding checklist. The
+      // dashboard buckets already have the inspection counts we need.
+      templateCount: templates.length,
+      serviceCount: svcOptions.length,
     };
   } catch {
     return {
@@ -247,6 +269,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       tags: [] as Tag[],
       templates: [] as TemplateOption[],
       services: [] as ServiceOption[],
+      checklistDismissed: false,
+      templateCount: 0,
+      serviceCount: 0,
     };
   }
 }
@@ -281,7 +306,39 @@ export async function action({ request, context }: Route.ActionArgs) {
       const id = body?.data?.inspection?.id;
       if (id) return redirect(`/inspections/${id}/edit`);
     }
+    // Surface the API rejection in the worker log — silent { ok:false }
+    // responses have repeatedly cost full debugging rounds (see save-settings).
+    console.error("[create] POST /api/inspections failed", res.status, await res.text().catch(() => ""));
     return { ok: false, intent: "create" };
+  }
+  if (intent === "search-agents") {
+    // IA-1 People step — agent typeahead. Posted by a dedicated useFetcher in
+    // NewInspectionWizard with { intent:"search-agents", search }. Returns up
+    // to 8 contacts of type=agent matching the query. BFF pattern: no
+    // client-side fetch (C-12 rule).
+    const search = String(formData.get("search") || "").trim();
+    if (search.length < 2) {
+      return { intent: "search-agents" as const, agents: [] };
+    }
+    const res = await api.contacts.index.$get({
+      query: { type: "agent", search, limit: "8" },
+    }).catch(() => null);
+    if (res && res.ok) {
+      const body = (await res.json().catch(() => ({ data: [] }))) as { data?: { id: string; name: string; email: string | null }[] };
+      return {
+        intent: "search-agents" as const,
+        agents: (body.data ?? []).map((c) => ({ id: c.id, name: c.name, email: c.email })),
+      };
+    }
+    return { intent: "search-agents" as const, agents: [] };
+  }
+  if (intent === "dismiss-checklist") {
+    // IA-12: write checklistDismissed: true into onboardingState.
+    // Mirrors the skipSetupRoute pattern in auth.ts (same table/field shape).
+    // TODO(C-10): same hono/client collapse as auth.me — localized cast.
+    const dismissPost = api.auth.checklist.dismiss.$post as unknown as (args?: unknown) => Promise<Response>;
+    const res = await dismissPost().catch(() => null);
+    return { ok: res?.ok ?? false, intent: "dismiss-checklist" as const };
   }
   if (intent === "delete") {
     const id = formData.get("id") as string;
@@ -320,12 +377,18 @@ const BUCKET_META: Record<string, { label: string; hint: string }> = {
 const PAGE_SIZE = 25;
 
 export default function DashboardPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services } = useLoaderData<typeof loader>();
+  const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services, checklistDismissed: loaderDismissed, templateCount, serviceCount } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
   const [searchParams] = useSearchParams();
   const fetcher = useFetcher();
+
+  /* ---- IA-12 Onboarding checklist ---- */
+  // Optimistic dismiss: hide immediately on click, persist via BFF.
+  const [checklistDismissedOptimistic, setChecklistDismissedOptimistic] = useState(false);
+  const dismissFetcher = useFetcher();
+  const checklistDismissed = loaderDismissed || checklistDismissedOptimistic;
 
   /* ---- State ---- */
   const [activeTab, setActiveTab] = useState<TabKey>(
@@ -457,6 +520,24 @@ export default function DashboardPage() {
 
   // Reset page when filters change
   useEffect(() => { setVisiblePage(1); }, [activeTab, activeFilter, activeTagFilter, searchQuery, filterDateFrom, filterDateTo, filterAgentId]);
+
+  /* ---- IA-12: Onboarding steps ---- */
+  // siteNameSet: the session context always returns a non-null siteName
+  // (falling back to 'OpenInspection' when not configured). If the value
+  // differs from the system default, the user has deliberately set a name.
+  // This is correct for virtually all real tenants; someone who names their
+  // company exactly "OpenInspection" would still need the other three steps.
+  const onboardingSteps = useMemo(() => {
+    const siteName = sessionCtx?.branding?.siteName ?? 'OpenInspection';
+    const siteNameSet = siteName !== 'OpenInspection';
+    const inspectionCount = allInspections.length;
+    return computeOnboardingSteps({
+      siteNameSet,
+      templateCount,
+      serviceCount,
+      inspectionCount,
+    });
+  }, [sessionCtx, templateCount, serviceCount, allInspections]);
 
   /* ---- Stats ---- */
   const counts = useMemo(() => ({
@@ -596,7 +677,7 @@ export default function DashboardPage() {
               )}
               {isColumnVisible("date") && insp.date && (
                 <span className="text-[11px] text-ih-fg-3">
-                  &middot; {insp.date}
+                  &middot; {formatInspectionDateTime(insp.date)}
                 </span>
               )}
               {isColumnVisible("agent") && insp.agentName && (
@@ -625,6 +706,9 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
+            {/* P-4: dashboard rows only carry inspections.price (cache tier 3).
+                Invoices and service-snapshot tiers are not loaded here — out of scope.
+                Use getEffectivePriceCents() when a full authority-chain read is needed. */}
             {isColumnVisible("price") && insp.price != null && (
               <span className="text-[11px] font-medium text-ih-fg-3">
                 ${insp.price}
@@ -720,7 +804,7 @@ export default function DashboardPage() {
           { label: "Needs Attention", value: counts.needsAttention, icon: "zap" as const, color: "text-ih-bad-fg bg-ih-bad-bg" },
           { label: "Recent Reports", value: counts.recent, icon: "check" as const, color: "text-ih-ok-fg bg-ih-ok-bg" },
         ].map((stat) => (
-          <Card key={stat.label} className="p-[14px] cursor-pointer hover:shadow-md transition-all">
+          <Card key={stat.label} className="p-[14px] cursor-pointer hover:shadow-ih-popover transition-all">
             <div className={`w-10 h-10 rounded-md flex items-center justify-center mb-3 ${stat.color}`}>
               <Icon name={stat.icon} size={20} />
             </div>
@@ -729,6 +813,20 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* IA-12 — Onboarding checklist (hidden when dismissed or allDone) */}
+      <OnboardingChecklist
+        steps={onboardingSteps}
+        dismissed={checklistDismissed}
+        onDismiss={() => {
+          setChecklistDismissedOptimistic(true);
+          dismissFetcher.submit(
+            { intent: "dismiss-checklist" },
+            { method: "post" },
+          );
+        }}
+        onOpenWizard={() => setWizardOpen(true)}
+      />
 
       {/* Workflow tabs */}
       <TabStrip
@@ -859,8 +957,8 @@ export default function DashboardPage() {
 
       {/* Filters modal */}
       {filtersOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setFiltersOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setFiltersOpen(false)}>
+          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[16px] font-bold text-ih-fg-1">Filters</h2>
               <button onClick={() => setFiltersOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
@@ -893,8 +991,8 @@ export default function DashboardPage() {
 
       {/* Columns modal */}
       {columnsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setColumnsOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setColumnsOpen(false)}>
+          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[16px] font-bold text-ih-fg-1">Customize Columns</h2>
               <button onClick={() => setColumnsOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>

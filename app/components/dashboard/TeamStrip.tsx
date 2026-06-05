@@ -52,13 +52,13 @@ export function TeamStrip({ members: propMembers }: TeamStripProps) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {members.map((m) => (
-          <div key={m.id} className="flex items-center gap-3 p-2 rounded border border-slate-100 dark:border-slate-700">
+          <div key={m.id} className="flex items-center gap-3 p-2 rounded border border-ih-border">
             <div className="relative shrink-0">
               <div className="w-9 h-9 rounded-full bg-ih-bg-muted flex items-center justify-center text-xs font-bold text-ih-fg-2">
                 {(m.name || m.email || "?").slice(0, 2).toUpperCase()}
               </div>
               <span
-                className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${m.online ? "bg-ih-ok-bg0" : "bg-slate-300 dark:bg-slate-500"}`}
+                className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-ih-bg-card ${m.online ? "bg-ih-ok" : "bg-ih-fg-4"}`}
                 aria-hidden="true"
               />
             </div>

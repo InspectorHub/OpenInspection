@@ -1,8 +1,10 @@
 import { useState } from "react";
-import type { PresenceUser } from "~/hooks/usePresence";
+import type { PresenceUser, PresenceStatus } from "~/hooks/usePresence";
 
 interface FooterBarProps {
   connected?: boolean;
+  /** FE-5 — distinguishes "still connecting" from "lost an open connection". */
+  status?: PresenceStatus;
   roster?: PresenceUser[];
 }
 
@@ -21,7 +23,8 @@ const SHORTCUTS = [
   { keys: ["?"], desc: "This help" },
 ];
 
-export function FooterBar({ connected = false, roster = [] }: FooterBarProps) {
+export function FooterBar({ connected = false, status, roster = [] }: FooterBarProps) {
+  const effectiveStatus: PresenceStatus = status ?? (connected ? "connected" : "connecting");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
@@ -29,15 +32,15 @@ export function FooterBar({ connected = false, roster = [] }: FooterBarProps) {
       <div className="relative">
         <button
           onClick={() => setShortcutsOpen(!shortcutsOpen)}
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-ih-border font-bold text-[10px] hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-ih-border font-bold text-[10px] hover:bg-ih-bg-muted"
         >
           <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">?</kbd>
           Shortcuts
         </button>
 
         {shortcutsOpen && (
-          <div className="absolute bottom-full left-0 mb-2 w-[320px] bg-ih-bg-card border border-ih-border rounded-lg shadow-lg z-50 p-3">
-            <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">Keyboard shortcuts</h4>
+          <div className="absolute bottom-full left-0 mb-2 w-[320px] bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover z-50 p-3">
+            <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-2">Keyboard shortcuts</h4>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
               {SHORTCUTS.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -74,10 +77,21 @@ export function FooterBar({ connected = false, roster = [] }: FooterBarProps) {
         </div>
       )}
 
-      {/* Sync status */}
+      {/* Sync status — FE-5: a fresh page shows neutral "Connecting…", not a
+          scary "Disconnected"; a lost connection shows amber "Reconnecting…". */}
       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-ih-border font-bold text-[10px]">
-        <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-ih-ok-bg0' : 'bg-ih-fg-4'}`} />
-        {connected ? 'Connected' : 'Disconnected'}
+        <span className={`w-1.5 h-1.5 rounded-full ${
+          effectiveStatus === 'connected'
+            ? 'bg-ih-ok'
+            : effectiveStatus === 'reconnecting'
+            ? 'bg-ih-watch'
+            : 'bg-ih-fg-4 animate-pulse'
+        }`} />
+        {effectiveStatus === 'connected'
+          ? 'Connected'
+          : effectiveStatus === 'reconnecting'
+          ? 'Reconnecting…'
+          : 'Connecting…'}
       </span>
     </div>
   );

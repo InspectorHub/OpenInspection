@@ -84,3 +84,28 @@ npm run dev          # build-based: react-router build + wrangler dev (one worke
 ```
 
 `npm run dev` is build-based (no HMR): it runs `react-router build` and then `wrangler dev` against the bundled worker. `npm run dev:hmr` (`react-router dev`) is currently broken by the in-process API module graph, so use `npm run dev`. Apply local D1 migrations first with `npm run db:migrate`.
+
+## Data retention & R2 lifecycle
+
+OpenInspection is designed as a long-term evidence archive for inspectors — there is **no automatic deletion** of inspection data. Physical deletion happens only when an operator/integration explicitly purges a tenant (see *Tenant offboarding* below). To keep long-tail storage cheap without losing data, configure an R2 **lifecycle rule** on the `PHOTOS` bucket that transitions objects to the **Infrequent Access** storage class once they age past 365 days. This is a deploy-time/dashboard operation — no application code is involved.
+
+- **Effect**: objects ≥ 365 days old move to Infrequent Access (~⅓ the storage cost). Reads still work transparently (a per-GB retrieval fee applies, latency is unchanged).
+- **No expiry rule**: do NOT add a delete/expiry lifecycle action — that would erase evidence. Only the *transition* action is wanted.
+- **D1 is untouched**: D1 has no storage classes and the row volume is small, so no lifecycle is needed there.
+
+Configure it once per environment:
+
+```bash
+# Dashboard: R2 → PHOTOS bucket → Settings → Object lifecycle rules → Add rule
+#   Action: "Transition to Infrequent Access", Age: 365 days, scope: whole bucket.
+
+# Or via Wrangler:
+wrangler r2 bucket lifecycle add PHOTOS ia-after-365d \
+  --ia-transition-days 365
+```
+
+> A hosted/managed deployment runs the same rule on its own `PHOTOS` bucket. Self-hosters who do not want Infrequent Access can simply skip this step — it is a cost optimization, not a correctness requirement.
+
+### Tenant offboarding (export then purge)
+
+When a tenant is offboarded, the platform first builds a **full data export** ZIP (CSV/JSON of inspections, templates and agreements **plus the photo bytes themselves** under `photos/`, size-bounded so large tenants stay within Worker memory limits; any object beyond the budget is listed in `photos-manifest.json` with `included: false`), then purges all tenant rows, R2 objects and KV keys. The purge writes a durable, non-personal **destruction record** (`tenant_destruction_records`: tenant id, row/object/byte counts, timestamp) that intentionally has no foreign key to `tenants` so it survives the deletion as compliance proof. These run via the integration endpoints `POST /api/integration/tenants/:slug/data-export` and `.../purge`.

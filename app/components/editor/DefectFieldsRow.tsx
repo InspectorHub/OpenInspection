@@ -37,8 +37,8 @@ export function DefectFieldsRow({
         <div className="mt-2 grid grid-cols-12 gap-2 text-[11px]" data-defect-id={cannedId}>
             {/* Location text */}
             <div className="col-span-12 md:col-span-5">
-                <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">
-                    Location {locationRequired && <span className="text-red-500">*</span>}
+                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
+                    Location {locationRequired && <span className="text-ih-bad-fg">*</span>}
                 </label>
                 <input
                     type="text"
@@ -47,7 +47,7 @@ export function DefectFieldsRow({
                     onChange={e => onChange(cannedId, { location: e.target.value || null })}
                     placeholder="e.g. master bathroom, NE corner of basement"
                     className={`w-full px-2 py-1 rounded border bg-ih-bg-app text-ih-fg-1 ${
-                        locationRequired && !value.location ? 'border-red-400' : 'border-ih-border'
+                        locationRequired && !value.location ? 'border-ih-bad' : 'border-ih-border'
                     }`}
                 />
                 <datalist id={DATALIST_ID}>
@@ -57,14 +57,14 @@ export function DefectFieldsRow({
 
             {/* Trade select */}
             <div className="col-span-12 md:col-span-3">
-                <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">
-                    Trade {tradeRequired && <span className="text-red-500">*</span>}
+                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
+                    Trade {tradeRequired && <span className="text-ih-bad-fg">*</span>}
                 </label>
                 <select
                     value={value.trade ?? ''}
                     onChange={e => onChange(cannedId, { trade: (e.target.value || null) as DefectTrade | null })}
                     className={`w-full px-2 py-1 rounded border bg-ih-bg-app text-ih-fg-1 ${
-                        tradeRequired && !value.trade ? 'border-red-400' : 'border-ih-border'
+                        tradeRequired && !value.trade ? 'border-ih-bad' : 'border-ih-border'
                     }`}
                 >
                     <option value="">— select —</option>
@@ -76,7 +76,7 @@ export function DefectFieldsRow({
 
             {/* Deadline select */}
             <div className="col-span-6 md:col-span-2">
-                <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">Deadline</label>
+                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Deadline</label>
                 <select
                     value={value.deadline ?? ''}
                     onChange={e => onChange(cannedId, { deadline: (e.target.value || null) as DefectDeadline | null })}
@@ -91,7 +91,7 @@ export function DefectFieldsRow({
 
             {/* Timeframe select */}
             <div className="col-span-6 md:col-span-2">
-                <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">Timeframe</label>
+                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Timeframe</label>
                 <select
                     value={value.timeframe ?? ''}
                     onChange={e => onChange(cannedId, { timeframe: (e.target.value || null) as DefectTimeframe | null })}

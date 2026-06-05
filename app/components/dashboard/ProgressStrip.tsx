@@ -33,9 +33,9 @@ function WorkflowChipInline({ label, state }: { label: string; state?: WorkflowS
  "border-ih-border bg-ih-bg-app text-ih-fg-3";
 
  const dotClass =
- state.tone === "ok" ? "bg-ih-ok-bg0" :
- state.tone === "watch" ? "bg-ih-watch-bg0" :
- state.tone === "bad" ? "bg-ih-bad-bg0" :
+ state.tone === "ok" ? "bg-ih-ok" :
+ state.tone === "watch" ? "bg-ih-watch" :
+ state.tone === "bad" ? "bg-ih-bad" :
  "bg-ih-bg-muted";
 
  return (
@@ -64,7 +64,7 @@ export function ProgressStrip({ completion, tally, etaMin, agreement, payment }:
  strokeLinecap="round"
  strokeDasharray={`${dashValue}, 100`}
  transform="rotate(-90 18 18)"
- className="text-indigo-500"
+ className="text-ih-primary"
  />
  </svg>
  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-ih-fg-1 font-mono">

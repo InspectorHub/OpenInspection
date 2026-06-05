@@ -27,10 +27,10 @@ export interface EditorSystem {
 }
 
 const BUCKETS: { value: RatingBucket; label: string; dot: string }[] = [
-  { value: "satisfactory", label: "Satisfactory", dot: "bg-emerald-500" },
-  { value: "monitor", label: "Monitor", dot: "bg-amber-500" },
-  { value: "defect", label: "Defect", dot: "bg-rose-500" },
-  { value: "na", label: "N/A", dot: "bg-slate-400" },
+  { value: "satisfactory", label: "Satisfactory", dot: "bg-ih-ok" },
+  { value: "monitor", label: "Monitor", dot: "bg-ih-watch" },
+  { value: "defect", label: "Defect", dot: "bg-ih-bad" },
+  { value: "na", label: "N/A", dot: "bg-ih-fg-4" },
 ];
 
 const PRESETS: { name: string; levels: EditorLevel[] }[] = [

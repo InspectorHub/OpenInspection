@@ -147,7 +147,7 @@ export default function VerifyOffline() {
         <div
           className={
             "mt-6 p-4 rounded " +
-            (result.valid ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200")
+            (result.valid ? "bg-ih-ok-bg border border-ih-ok" : "bg-ih-bad-bg border border-ih-bad")
           }
         >
           <p className="font-semibold">

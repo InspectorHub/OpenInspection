@@ -39,6 +39,13 @@
   --color-ih-bad: var(--ih-status-bad);
   --color-ih-bad-bg: var(--ih-status-bad-bg);
   --color-ih-bad-fg: var(--ih-status-bad-fg);
+  --color-ih-info: var(--ih-status-info);
+  --color-ih-info-bg: var(--ih-status-info-bg);
+  --color-ih-info-fg: var(--ih-status-info-fg);
+
+  /* ── Agent portal sub-brand accent ── */
+  --color-ih-agent-accent: var(--ih-agent-accent);
+  --color-ih-agent-accent-fg: var(--ih-agent-accent-fg);
 
   /* ── Borders / shadows ── */
   --color-ih-border: var(--ih-border-color, #e2e8f0);
@@ -88,6 +95,13 @@
   --ih-status-bad: #ef4444;
   --ih-status-bad-bg: #fef2f2;
   --ih-status-bad-fg: #be123c;
+  --ih-status-info: #0ea5e9;
+  --ih-status-info-bg: #f0f9ff;
+  --ih-status-info-fg: #0369a1;
+
+  /* Agent portal sub-brand accent (sanctioned; replaces raw amber-400/amber-950) */
+  --ih-agent-accent: #fbbf24;
+  --ih-agent-accent-fg: #451a03;
 
   --ih-border-color: #e2e8f0;
   --ih-border-strong-color: #cbd5e1;
@@ -119,6 +133,8 @@ html[data-color-scheme="dark"], .dark {
   --ih-status-watch-fg: #fbbf24;
   --ih-status-bad-bg: rgba(239, 68, 68, 0.10);
   --ih-status-bad-fg: #f87171;
+  --ih-status-info-bg: rgba(14, 165, 233, 0.10);
+  --ih-status-info-fg: #38bdf8;
 
   --ih-border-color: #334155;
   --ih-border-strong-color: #475569;

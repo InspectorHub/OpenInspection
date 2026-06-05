@@ -69,6 +69,8 @@ export const sessionContextRoutes = createApiRouter()
             }
         }
 
+        const privacyUrl = (c.env as unknown as Record<string, string | undefined>).PRIVACY_URL?.trim() || null;
+
         return c.json({
             success: true,
             data: {
@@ -83,6 +85,7 @@ export const sessionContextRoutes = createApiRouter()
                     tenantStatus: branding?.tenantStatus || 'active',
                     currentUserSlug: branding?.currentUserSlug || null,
                     bookingHost: branding?.bookingHost || null,
+                    privacyUrl,
                 },
                 user: {
                     name: userName,

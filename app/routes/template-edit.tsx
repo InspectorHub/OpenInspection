@@ -518,7 +518,7 @@ export default function TemplateEditPage() {
                 value={section.disclaimerText || ""}
                 onChange={(e) => updateSections((s) => { s[activeSection].disclaimerText = e.target.value; return s; })}
                 placeholder="Section disclaimer (optional)"
-                className="w-full text-[12px] text-ih-fg-4 bg-transparent border-b border-transparent focus:border-slate-300 outline-none"
+                className="w-full text-[12px] text-ih-fg-4 bg-transparent border-b border-transparent focus:border-ih-border-strong outline-none"
               />
 
               {/* Items */}
@@ -757,8 +757,8 @@ export default function TemplateEditPage() {
 
       {/* Rating system modal */}
       {ratingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setRatingModalOpen(false)}>
-          <div className="w-full max-w-lg bg-ih-bg-card rounded-xl shadow-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setRatingModalOpen(false)}>
+          <div className="w-full max-w-lg bg-ih-bg-card rounded-xl shadow-ih-popover p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[16px] font-bold text-ih-fg-1">Rating System</h2>
               <button onClick={() => setRatingModalOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>

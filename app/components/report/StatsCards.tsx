@@ -17,10 +17,10 @@ function StatCard({ label, value, borderClass, textClass }: { label: string; val
 export function StatsCards({ total, satisfactory, monitor, defects }: StatsCardsProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <StatCard label="TOTAL ITEMS" value={total} borderClass="border-gray-300" textClass="theme-text-muted" />
-      <StatCard label="SATISFACTORY" value={satisfactory} borderClass="border-green-400" textClass="text-green-600" />
-      <StatCard label="MONITOR" value={monitor} borderClass="border-amber-400" textClass="text-ih-watch-fg" />
-      <StatCard label="DEFECTS" value={defects} borderClass="border-rose-400" textClass="text-ih-bad-fg" />
+      <StatCard label="TOTAL ITEMS" value={total} borderClass="border-ih-border-strong" textClass="theme-text-muted" />
+      <StatCard label="SATISFACTORY" value={satisfactory} borderClass="border-ih-ok" textClass="text-ih-ok-fg" />
+      <StatCard label="MONITOR" value={monitor} borderClass="border-ih-watch" textClass="text-ih-watch-fg" />
+      <StatCard label="DEFECTS" value={defects} borderClass="border-ih-bad" textClass="text-ih-bad-fg" />
     </div>
   );
 }

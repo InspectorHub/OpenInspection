@@ -31,7 +31,7 @@ export function PhotoStrip({ photos, onAdd, onRemove, onExpand }: PhotoStripProp
             <button
               type="button"
               onClick={() => handleExpand(photo)}
-              className="block w-16 h-16 rounded-md overflow-hidden border-2 border-ih-border hover:border-indigo-400 transition-colors"
+              className="block w-16 h-16 rounded-md overflow-hidden border-2 border-ih-border hover:border-ih-primary transition-colors"
             >
               <img src={photo.url} alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
             </button>
@@ -39,7 +39,7 @@ export function PhotoStrip({ photos, onAdd, onRemove, onExpand }: PhotoStripProp
               <button
                 type="button"
                 onClick={() => onRemove(photo.id)}
-                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-ih-bad-bg0 text-white text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-600"
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-ih-bad text-white text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-ih-bad/85"
                 aria-label="Remove photo"
               >
                 x
@@ -52,7 +52,7 @@ export function PhotoStrip({ photos, onAdd, onRemove, onExpand }: PhotoStripProp
           <button
             type="button"
             onClick={onAdd}
-            className="flex-shrink-0 w-16 h-16 rounded-md border-2 border-dashed border-ih-border-strong flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors"
+            className="flex-shrink-0 w-16 h-16 rounded-md border-2 border-dashed border-ih-border-strong flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary transition-colors"
             aria-label="Add photo"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,9 +68,10 @@ export function PhotoStrip({ photos, onAdd, onRemove, onExpand }: PhotoStripProp
 
       {/* Expanded view */}
       {expanded && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setExpandedId(null)}>
+        <div className="fixed inset-0 z-50 bg-[rgba(0,0,0,0.8)] flex items-center justify-center p-4" onClick={() => setExpandedId(null)}>
           <div className="relative max-w-3xl max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
             <img src={expanded.url} alt={expanded.caption || "Photo"} className="max-w-full max-h-[80vh] rounded-lg object-contain" />
+            {/* ds-allow: fixed-dark photo lightbox overlay (light-on-dark over image) */}
             <button
               type="button"
               onClick={() => setExpandedId(null)}
@@ -81,6 +82,7 @@ export function PhotoStrip({ photos, onAdd, onRemove, onExpand }: PhotoStripProp
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            {/* ds-allow: fixed-dark photo lightbox caption (light-on-dark over image) */}
             {expanded.caption && (
               <p className="mt-2 text-center text-sm text-white/80">{expanded.caption}</p>
             )}

@@ -101,10 +101,10 @@ export default function SetupPage() {
         </div>
 
         <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
-          Set up your workspace
+          Set up your account
         </h1>
         <p className="text-sm text-ih-fg-3 mb-6">
-          Create the first admin account and configure your inspection workspace.
+          Create the first admin account and configure your inspection company.
         </p>
 
         <Form
@@ -116,7 +116,7 @@ export default function SetupPage() {
         >
           <div>
             <label htmlFor={fields.workspaceName.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              Workspace name
+              Company name
             </label>
             <input
               id={fields.workspaceName.id}
@@ -125,7 +125,7 @@ export default function SetupPage() {
               autoFocus
               placeholder="Acme Home Inspections"
               aria-invalid={fields.workspaceName.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.workspaceName.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.workspaceName.errors[0]}</p>
@@ -142,7 +142,7 @@ export default function SetupPage() {
               autoComplete="name"
               placeholder="Mike Reynolds"
               aria-invalid={fields.adminName.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.adminName.errors ? (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.adminName.errors[0]}</p>
@@ -161,7 +161,7 @@ export default function SetupPage() {
               name={fields.email.name}
               type="email"
               aria-invalid={fields.email.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.email.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
@@ -176,7 +176,7 @@ export default function SetupPage() {
               name={fields.password.name}
               type="password"
               aria-invalid={fields.password.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.password.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
@@ -192,7 +192,7 @@ export default function SetupPage() {
               type="text"
               placeholder="Setup verification code"
               aria-invalid={fields.setupCode.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none font-mono"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none font-mono"
             />
             {fields.setupCode.errors ? (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.setupCode.errors[0]}</p>
@@ -203,7 +203,7 @@ export default function SetupPage() {
                   href="https://developers.cloudflare.com/workers/configuration/environment-variables/#add-environment-variables-via-the-dashboard"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-500 hover:text-indigo-600 underline underline-offset-2"
+                  className="text-ih-primary hover:text-ih-primary-600 underline underline-offset-2"
                 >
                   How to add a secret →
                 </a>
@@ -222,7 +222,7 @@ export default function SetupPage() {
             disabled={isSubmitting}
             className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Creating workspace…" : "Create Workspace"}
+            {isSubmitting ? "Creating your account…" : "Create Account"}
           </button>
         </Form>
       </div>

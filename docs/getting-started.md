@@ -4,7 +4,7 @@ A quick walkthrough of OpenInspection — for inspectors using the product and d
 
 ## Setup
 
-After deploying (see [`developers/02_deploy.md`](developers/02_deploy.md)), visit `/setup` to create your admin account. A 6-digit verification code is logged on first boot.
+After deploying (see [`developers/02_deploy.md`](developers/02_deploy.md)), visit `/setup` to create your admin account, entering your `SETUP_CODE` (any value of at least 6 characters, set at deploy time — the CLI deploy generates and prints one if you didn't set it; the one-click wizard asks for it as a secret field).
 
 ---
 

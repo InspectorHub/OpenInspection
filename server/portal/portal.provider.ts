@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants, users } from '../lib/db/schema';
+import { tenants, users, tenantConfigs } from '../lib/db/schema';
 import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { logger } from '../lib/logger';
 
@@ -62,6 +62,28 @@ export class PortalProvider implements IntegrationProvider {
                 .where(eq(tenants.id, existingTenant.id));
             // Drop the stale-slug cache entry too (the row may have just changed slug).
             if (this.kv && existingTenant.slug !== slug) await this.kv.delete(`tenant:${existingTenant.slug}`);
+        }
+
+        // IA-27: initialize tenant_configs.siteName from the company name so the
+        // brand never boots as the platform default. This is initialize-only —
+        // if the tenant has already chosen a site name we leave it untouched.
+        if (name) {
+            const finalTenantId = id || existingTenant?.id;
+            if (finalTenantId) {
+                const cfg = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, finalTenantId)).get();
+                if (!cfg) {
+                    await db.insert(tenantConfigs).values({
+                        tenantId: finalTenantId,
+                        siteName: name,
+                        updatedAt: new Date(),
+                    });
+                } else if (!cfg.siteName) {
+                    await db.update(tenantConfigs)
+                        .set({ siteName: name, updatedAt: new Date() })
+                        .where(eq(tenantConfigs.tenantId, finalTenantId));
+                }
+                // siteName already set → leave it (initialize-only, never overwrite)
+            }
         }
 
         // Handle Admin Sync if provided

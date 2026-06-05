@@ -107,10 +107,10 @@ export default function ReportGatePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-app" style={brandTokens(gate.primaryColor)}>
-      <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-8 shadow-sm">
+      <div className="max-w-[480px] w-full bg-ih-bg-card border border-ih-border rounded-xl p-8 shadow-ih-card">
         {/* Pill */}
         <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-semibold tracking-wide bg-ih-watch-bg text-ih-watch-fg mb-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-ih-watch-bg0 animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-ih-watch animate-pulse" />
           {title}
         </span>
 
@@ -123,7 +123,7 @@ export default function ReportGatePage() {
 
         {/* Meta card */}
         {(formattedAmount || gate.propertyAddress || gate.inspectorName || formattedDate || hasContact) && (
-          <div className="bg-slate-50 dark:bg-slate-700/50 border border-ih-border rounded-lg p-4 mb-6 text-[13px] text-ih-fg-3">
+          <div className="bg-ih-bg-muted border border-ih-border rounded-lg p-4 mb-6 text-[13px] text-ih-fg-3">
             {formattedAmount && (
               <div className="flex justify-between items-baseline pb-3 mb-3 border-b border-ih-border">
                 <span className="text-[11px] uppercase tracking-wide text-ih-fg-4">
@@ -175,7 +175,7 @@ export default function ReportGatePage() {
         {/* CTA */}
         <a
           href={gate.actionUrl}
-          className="inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-white bg-ih-primary hover:opacity-95 hover:-translate-y-px transition-all shadow-sm"
+          className="inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-white bg-ih-primary hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card"
         >
           {ctaLabel}
         </a>

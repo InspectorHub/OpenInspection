@@ -102,7 +102,7 @@ describe('ConciergeService — A3', () => {
             const insp = await testDb.select().from(schema.inspections)
                 .where(eq(schema.inspections.id, result.inspectionId)).get();
             expect(insp?.conciergeStatus).toBe('awaiting_inspector');
-            expect(insp?.status).toBe('pending');
+            expect(insp?.status).toBe('scheduled');
             expect(insp?.tenantId).toBe(T1);
             expect(insp?.inspectorId).toBe(INSPECTOR);
             // No client token minted yet — inspector hasn't approved.

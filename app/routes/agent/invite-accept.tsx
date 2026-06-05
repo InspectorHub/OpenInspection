@@ -4,6 +4,8 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/invite-accept";
 import { createApi } from "~/lib/api-client.server";
 import { agentInviteAcceptSchema } from "~/lib/forms/auth.schema";
+import { readLegalLinks } from "~/lib/legal-links.server";
+import { LegalCheckbox } from "~/components/LegalCheckbox";
 
 export function meta() {
   return [{ title: "You're invited - OpenInspection" }];
@@ -27,23 +29,27 @@ interface InviteData {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") ?? "";
+
+  const legal = readLegalLinks(context);
+
   if (!token) {
-    return { invite: null, error: "no-token" as const };
+    return { invite: null, error: "no-token" as const, legal };
   }
   try {
     const api = createApi(context);
     const res = await api.agents["invite-info"].$get({ query: { token } });
     const body = res.ok ? await res.json() : {};
     if (!res.ok) {
-      return { invite: null, error: "expired" as const };
+      return { invite: null, error: "expired" as const, legal };
     }
     const data = ((body as Record<string, unknown>).data ?? {}) as unknown as InviteData | undefined;
     return {
       invite: data && Object.keys(data).length > 0 ? { ...data, token } : null,
       error: null,
+      legal,
     };
   } catch {
-    return { invite: null, error: "unknown" as const };
+    return { invite: null, error: "unknown" as const, legal };
   }
 }
 
@@ -63,7 +69,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const { name, password } = submission.value;
 
   const api = createApi(context);
-  const res = await api.agents.accept.$post({ json: { token, password, name } });
+  const res = await api.agents.accept.$post({ json: { token, password, name, termsAccepted: fd.get("termsAccepted") === "on" } });
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || !json.success) {
@@ -94,7 +100,7 @@ function getInitials(name: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function AgentInviteAcceptPage() {
-  const { invite, error: loaderError } = useLoaderData<typeof loader>();
+  const { invite, error: loaderError, legal } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -247,7 +253,7 @@ export default function AgentInviteAcceptPage() {
                 name={fields.name.name}
                 placeholder="Jane Smith"
                 aria-invalid={fields.name.errors ? true : undefined}
-                className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
               />
               {fields.name.errors && (
                 <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.name.errors[0]}</p>
@@ -266,13 +272,15 @@ export default function AgentInviteAcceptPage() {
                 name={fields.password.name}
                 placeholder="At least 12 characters"
                 aria-invalid={fields.password.errors ? true : undefined}
-                className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-indigo-500 focus:shadow-ih-focus transition-all text-ih-fg-1"
+                className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
               />
               {fields.password.errors && (
                 <p className="mt-1.5 text-[13px] text-ih-bad-fg">{fields.password.errors[0]}</p>
               )}
             </div>
           </div>
+
+          {legal && <LegalCheckbox legal={legal} />}
 
           <button
             type="submit"

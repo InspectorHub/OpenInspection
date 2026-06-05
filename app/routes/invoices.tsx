@@ -59,7 +59,7 @@ function money(cents: number): string {
 const STATUS_PILL: Record<string, string> = {
   paid: "bg-ih-ok-bg text-ih-ok-fg",
   partial: "bg-ih-watch-bg text-ih-watch-fg",
-  sent: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
+  sent: "bg-ih-info-bg text-ih-info-fg",
   draft: "bg-ih-bg-muted text-ih-fg-3",
 };
 

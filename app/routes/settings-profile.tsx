@@ -159,7 +159,7 @@ export default function SettingsProfilePage() {
               <input type="text" id={fields.name.id} name={fields.name.name} defaultValue={profile.name ?? ""}
                 placeholder="John Smith"
                 aria-invalid={fields.name.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1" />
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
               {fields.name.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.name.errors[0]}</p>
               ) : (
@@ -171,7 +171,7 @@ export default function SettingsProfilePage() {
               <input type="tel" id={fields.phone.id} name={fields.phone.name} defaultValue={profile.phone ?? ""}
                 placeholder="(555) 123-4567"
                 aria-invalid={fields.phone.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1" />
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
               {fields.phone.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.phone.errors[0]}</p>
               )}
@@ -181,7 +181,7 @@ export default function SettingsProfilePage() {
               <input type="text" id={fields.licenseNumber.id} name={fields.licenseNumber.name} defaultValue={profile.licenseNumber ?? ""}
                 placeholder="HI-12345"
                 aria-invalid={fields.licenseNumber.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1" />
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
               {fields.licenseNumber.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.licenseNumber.errors[0]}</p>
               ) : (
@@ -271,7 +271,7 @@ export default function SettingsProfilePage() {
               onChange={(e) => setBioLen(e.target.value.length)}
               aria-invalid={fields.bio.errors ? true : undefined}
               placeholder="Tell customers a bit about your background, certifications, and inspection style."
-              className="block w-full rounded-md border border-ih-border bg-ih-bg-card px-3 py-2 text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-colors text-ih-fg-1 placeholder:text-slate-300 dark:placeholder:text-slate-500"
+              className="block w-full rounded-md border border-ih-border bg-ih-bg-card px-3 py-2 text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-colors text-ih-fg-1 placeholder:text-ih-fg-4"
             />
             {fields.bio.errors ? (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.bio.errors[0]}</p>

@@ -15,12 +15,32 @@ step() { echo "\n  →  $1"; }
 
 echo "${BOLD}── OpenInspection (Pre-commit Checks) ───────────────────────────${NC}"
 
-# 1. Type check
+# 1. Type check — SCOPED to what the staged changes can actually affect.
+#    CI's required "verify" check is the authoritative full gate; this hook is
+#    a fast local guard. Tiers:
+#      - no staged .ts/.tsx or ts-config files  → skip tsc entirely
+#        (docs, assets, hooks, fixtures — a markdown edit must not cost minutes)
+#      - staged TS confined to server/          → api pass only (type-check:api)
+#      - anything touching app/ workers/ packages/ or ts-config files → full
+STAGED=$(git diff --cached --name-only --diff-filter=ACMRD)
+TS_STAGED=$(echo "$STAGED" | grep -E '\.(ts|tsx)$' || true)
+CONFIG_STAGED=$(echo "$STAGED" | grep -E '^(tsconfig|package\.json|package-lock\.json|vite\.config|react-router\.config|worker-configuration)' || true)
+
 step "Type check"
-if npm run type-check > /dev/null 2>&1; then
-    pass "Type check passed"
+if [ -z "$TS_STAGED" ] && [ -z "$CONFIG_STAGED" ]; then
+    pass "Skipped — no staged TypeScript/config changes (CI verify remains the full gate)"
+elif [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -vE '^(server|tests)/')" ]; then
+    if npm run type-check:api > /dev/null 2>&1; then
+        pass "Type check passed (api pass only — staged TS confined to server/ and tests/)"
+    else
+        fail "Type check failed  →  npm run type-check:api"
+    fi
 else
-    fail "Type check failed  →  npm run type-check"
+    if npm run type-check > /dev/null 2>&1; then
+        pass "Type check passed"
+    else
+        fail "Type check failed  →  npm run type-check"
+    fi
 fi
 
 # 2. Lint & Fix
@@ -29,6 +49,14 @@ if npx lint-staged; then
     pass "Lint & Fix passed"
 else
     fail "Lint failed  →  npx lint-staged"
+fi
+
+# 3. Design System token conformance (fast full-repo scan; also gated in CI via npm run lint)
+step "DS token conformance"
+if node scripts/check-ds-tokens.mjs > /dev/null 2>&1; then
+    pass "DS token conformance passed"
+else
+    fail "DS token check failed  →  npm run lint:ds"
 fi
 
 if [ "$FAILED" -eq 1 ]; then

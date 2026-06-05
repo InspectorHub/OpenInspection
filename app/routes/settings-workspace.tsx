@@ -96,15 +96,15 @@ export default function SettingsWorkspacePage() {
       <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
         <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Workspace</span>
+        <span className="text-ih-fg-1">Company</span>
       </div>
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Workspace</h2>
+      <h2 className="text-[19px] font-bold text-ih-fg-1">Company</h2>
       <p className="text-[13px] text-ih-fg-3">Branding, report theme, and referral sources.</p>
 
       {/* Flash */}
       {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Workspace settings saved.
+          Company settings saved.
         </div>
       )}
 
@@ -120,7 +120,7 @@ export default function SettingsWorkspacePage() {
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Branding</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label htmlFor={fields.siteName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Workspace Name</label>
+              <label htmlFor={fields.siteName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Company name</label>
               <input type="text" id={fields.siteName.id} name={fields.siteName.name} defaultValue={branding.siteName ?? "OpenInspection"}
                 aria-invalid={fields.siteName.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] text-ih-fg-1" />
@@ -198,7 +198,7 @@ export default function SettingsWorkspacePage() {
             <textarea id={fields.customReferralSources.id} name={fields.customReferralSources.name} rows={6}
               defaultValue={(branding.customReferralSources ?? []).join("\n")}
               placeholder={"Magazine ad\nTrade show\nReferral partner"}
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1" />
+              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
             <p className="text-[11px] text-ih-fg-3">One label per line. Maximum 32 entries; duplicates are ignored.</p>
           </div>
         </section>
@@ -213,7 +213,7 @@ export default function SettingsWorkspacePage() {
         <div className="flex justify-end">
           <button type="submit"
             className="px-4 py-2 bg-ih-primary text-white rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-            Save Workspace
+            Save Company
           </button>
         </div>
       </Form>

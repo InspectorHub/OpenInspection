@@ -37,7 +37,7 @@ export default function VerifyToken() {
     <main className="max-w-2xl mx-auto p-8">
       <header className="mb-8">
         <h1 className="text-2xl font-bold">Document Verification</h1>
-        <p className={"mt-2 text-sm " + (valid ? "text-green-700" : "text-red-700")}>
+        <p className={"mt-2 text-sm " + (valid ? "text-ih-ok-fg" : "text-ih-bad-fg")}>
           {valid
             ? "✓ Audit chain is intact and Ed25519 signatures are valid."
             : `✗ Chain failed: ${status.chainReason ?? "unknown reason"}`}

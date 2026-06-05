@@ -35,7 +35,7 @@ export function PdfDropdown({ onPrintAs }: PdfDropdownProps) {
         <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-64 rounded-md bg-ih-bg-card border border-ih-border shadow-lg overflow-hidden z-10" role="menu">
+        <div className="absolute right-0 mt-1 w-64 rounded-md bg-ih-bg-card border border-ih-border shadow-ih-popover overflow-hidden z-10" role="menu">
           <button type="button" onClick={() => print("full")} role="menuitem" className="block w-full px-4 py-2.5 text-left hover:bg-ih-bg-muted transition-colors">
             <div className="text-[13px] font-bold text-ih-fg-1">Print Full Report</div>
             <div className="text-[11px] text-ih-fg-3 mt-0.5">All sections, items, photos</div>
@@ -48,8 +48,8 @@ export function PdfDropdown({ onPrintAs }: PdfDropdownProps) {
             <div className="text-[13px] font-bold text-ih-fg-1">Print Safety Hazards</div>
             <div className="text-[11px] text-ih-fg-3 mt-0.5">Only safety category</div>
           </button>
-          <div className="border-t border-slate-100 dark:border-slate-700" />
-          <p className="px-4 py-2 text-[10px] text-slate-400">
+          <div className="border-t border-ih-border" />
+          <p className="px-4 py-2 text-[10px] text-ih-fg-4">
             Tip: select <span className="font-mono">Save as PDF</span> in your browser&apos;s print dialog.
           </p>
         </div>

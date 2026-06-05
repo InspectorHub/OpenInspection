@@ -5,7 +5,7 @@
 export interface TenantUpdateParams {
     id?: string;
     slug: string;
-    status: string;
+    status: 'pending' | 'active' | 'suspended' | 'trial';
     tier?: 'free' | 'pro' | 'enterprise';
     name?: string;
     deploymentMode?: string;

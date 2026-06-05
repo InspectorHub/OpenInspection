@@ -21,8 +21,8 @@ const GROUPS = [
   },
   {
     to: "/settings/workspace",
-    title: "Workspace",
-    desc: "Branding, report theme, analytics.",
+    title: "Company",
+    desc: "Company name, logo, brand color, report theme.",
     icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
   },
   {
@@ -50,10 +50,16 @@ const GROUPS = [
     icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
   },
   {
-    to: "/settings/account",
+    to: "/settings/security",
     title: "Account",
     desc: "Password, two-factor, security.",
     icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+  },
+  {
+    to: "/settings/integrations",
+    title: "Integrations",
+    desc: "QuickBooks, Stripe keys, calendar & API connections.",
+    icon: "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1",
   },
   {
     to: "/settings/advanced",
@@ -70,7 +76,7 @@ export default function SettingsHub() {
         <Link
           key={g.to}
           to={g.to}
-          className="group p-4 bg-ih-bg-card border border-ih-border rounded-lg hover:shadow-md hover:border-ih-border transition-all"
+          className="group p-4 bg-ih-bg-card border border-ih-border rounded-lg hover:shadow-ih-popover hover:border-ih-border transition-all"
         >
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-ih-primary-tint text-ih-primary flex items-center justify-center flex-shrink-0">

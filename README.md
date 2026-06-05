@@ -60,47 +60,35 @@ A complete home inspection software stack: inspector dashboard, public booking w
 
 ## Quick start
 
-### Option 0: Try it hosted (fastest)
+There are three ways to run OpenInspection, from zero effort to full control. Pick one.
 
-Not ready to commit to running infrastructure? Spin up a managed workspace at [**inspectorhub.io/register**](https://inspectorhub.io/register) — 30-day free trial, no card. Useful for evaluating the editor, report viewer, and booking flow before you decide to self-host. You can export your data and move to a self-hosted deploy at any time.
+### 1. Try the hosted service (no deployment)
 
-### Option 1: One-Click Deploy
+Want to evaluate the product without running any infrastructure? Register at [**inspectorhub.io/register**](https://inspectorhub.io/register) with your email, click the activation link, and a workspace is created for you — the app lives at `app.inspectorhub.io`. This is the managed edition of this exact codebase (30-day free trial, no card), pre-loaded with starter templates so you can click through a real inspection immediately. You can export your data and switch to a self-hosted deploy at any time.
 
-1. Click the **Deploy to Cloudflare** button above — this deploys the Worker
-2. Follow the dashboard prompts. Cloudflare reads the committed `wrangler.jsonc` (placeholder IDs) and **auto-provisions + binds** the resources: one D1 database, one R2 bucket (`PHOTOS`), one KV namespace (`TENANT_CACHE`), the `BROWSER` binding, two Durable Object classes and one Workflow — no manual ID entry.
-3. Or deploy from the CLI:
-   ```bash
-   npm install
-   npm run setup:cloudflare   # provisions D1/KV/R2 + writes real IDs to a gitignored wrangler.local.jsonc
-   npm run deploy             # build + wrangler deploy
-   ```
-4. Get your **`SETUP_CODE`** (any value >= 6 characters — the code you'll enter at `/setup`):
-   - **One-click**: the wizard reads `.dev.vars.example` and surfaces `SETUP_CODE` as a secret field — just type a value there.
-   - **CLI**: `npm run deploy` auto-generates one and prints it in the deploy output (set your own first with `wrangler secret put SETUP_CODE` if you prefer). It is never regenerated once set, so re-deploys keep your code.
-   - Add or change it any time in the dashboard under **Settings → Variables and Secrets** (type Secret).
-5. Visit your Worker URL → `/setup` (e.g., `https://openinspection.your-account.workers.dev/setup`) and enter that same value to create your first admin account. Setup is gated solely on this secret: if `SETUP_CODE` is unset the `/setup` endpoint refuses to proceed, so an unprotected Worker can't be claimed.
+### 2. Deploy to Cloudflare (one-click)
 
-> React Router loaders/actions call the API in-process through an injected `API_WORKER` self-binding (zero-latency, no network hop, no second worker). The single Worker is configured by the committed `wrangler.jsonc` (placeholder IDs — CF fills real ones on one-click; or `npm run setup:cloudflare` writes a gitignored `wrangler.local.jsonc`) with `main = "./workers/app.ts"` — `npm run deploy` builds and ships it.
+1. Click the **Deploy to Cloudflare** button above and follow the wizard. This was verified end-to-end on the Cloudflare Workers **Free** plan (2026-05-31). The wizard may surface a "Workers Paid" notice banner — it is **non-blocking**; the deploy completes on the free plan.
+2. Cloudflare reads the committed `wrangler.jsonc` (which carries **placeholder IDs only**) and **auto-provisions and binds** the required resources — D1 (`DB`), KV (`TENANT_CACHE`), R2 (`PHOTOS`), the `BROWSER` binding, the Durable Objects and the Workflow — injecting the real resource IDs for you. There is no manual ID editing.
+3. After the deploy finishes, visit `/setup` on your new Worker URL and enter your **`SETUP_CODE`** to create the first admin account. For the one-click path, the wizard reads [`.dev.vars.example`](.dev.vars.example) and surfaces `SETUP_CODE` as a secret field you fill in **during** the deploy — that is the value you type at `/setup`. It must be any value of at least 6 characters. `/setup` is gated solely on this secret: if `SETUP_CODE` is unset the endpoint refuses to proceed, so an unprovisioned Worker can't be claimed. You can change it later in the dashboard under **Settings → Variables and Secrets**.
 
-### Option 2: CLI-First
+Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md).
+
+### 3. Deploy with the CLI
+
 ```bash
 git clone https://github.com/InspectorHub/OpenInspection
 cd OpenInspection
 npm install
-npm run setup:cloudflare    # provisions D1 / R2 / KV automatically
-npm run dev                 # http://localhost:8788
+npm run setup:cloudflare    # provisions D1/KV/R2 + writes real IDs to a gitignored wrangler.local.jsonc
+npm run deploy              # full react-router build, then wrangler deploy
 ```
 
-### Option 3: Local development
-```bash
-git clone https://github.com/InspectorHub/OpenInspection
-cd OpenInspection
-npm install
-npm run setup:cloudflare -- --local    # provisions a local dev environment
-npm run dev
-```
+- `npm run setup:cloudflare` (`scripts/setup-cloudflare.js`) provisions the Cloudflare resources and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped from the committed placeholder `wrangler.jsonc`).
+- Use `npm run deploy`, **not** raw `wrangler deploy` — the npm script runs the full `react-router build` (bundling `server/` API + `app/` SSR into one worker) before deploying. Its tail then runs idempotent ensure-steps that provision the JWT keypair and **print the `SETUP_CODE` in the deploy output** if one is not already set (it never overwrites an existing value). Visit `/setup` with that code for your first login.
+- For local development, use `npm run dev` (build-based, no HMR — it runs `react-router build` then `wrangler dev` on port 8788; `npm run dev:hmr` is currently broken by the in-process API module graph).
 
-Detailed setup: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Architecture overview: [`docs/developers/01_architecture.md`](docs/developers/01_architecture.md).
+Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Architecture overview: [`docs/developers/01_architecture.md`](docs/developers/01_architecture.md).
 
 ## Documentation
 

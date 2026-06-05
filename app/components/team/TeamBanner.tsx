@@ -14,11 +14,11 @@ export function TeamBanner({ show, members, onManage }: TeamBannerProps) {
   if (!show) return null;
 
   return (
-    <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center gap-3">
-      <span className="ih-eyebrow text-indigo-700">Team mode</span>
+    <div className="px-4 py-2 bg-ih-primary-tint border-b border-ih-primary flex items-center gap-3">
+      <span className="ih-eyebrow text-ih-primary">Team mode</span>
       <div className="flex -space-x-1.5">
         {members.map((m) => (
-          <div key={m.id} className="w-7 h-7 rounded-full ring-2 ring-indigo-50 bg-slate-300 flex items-center justify-center text-xs font-bold text-slate-700" title={`${m.name || m.id}${m.role === "lead" ? " (lead)" : ""}`}>
+          <div key={m.id} className="w-7 h-7 rounded-full ring-2 ring-ih-bg-card bg-ih-bg-muted flex items-center justify-center text-xs font-bold text-ih-fg-2" title={`${m.name || m.id}${m.role === "lead" ? " (lead)" : ""}`}>
             {(m.name || m.id || "?").slice(0, 2).toUpperCase()}
           </div>
         ))}

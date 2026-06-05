@@ -185,7 +185,7 @@ export default function AgreementSignPage() {
  <div className="max-w-2xl mx-auto">
  {/* Header */}
  <div className="flex items-center gap-3 mb-6">
- <div className="w-10 h-10 bg-ih-primary rounded-2xl flex items-center justify-center shadow-lg">
+ <div className="w-10 h-10 bg-ih-primary rounded-2xl flex items-center justify-center shadow-ih-popover">
  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
  </svg>
@@ -195,9 +195,9 @@ export default function AgreementSignPage() {
  </span>
  </div>
 
- <div className="bg-ih-bg-card rounded-lg shadow-md overflow-hidden">
+ <div className="bg-ih-bg-card rounded-lg shadow-ih-popover overflow-hidden">
  {/* Title bar */}
- <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-slate-100 dark:border-slate-700">
+ <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border">
  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary mb-2">Document for Signature</p>
  <h1 className="text-xl font-bold text-ih-fg-1 tracking-tight">{agreement.title}</h1>
  <p className="text-[13px] text-ih-fg-3 mt-1">
@@ -207,7 +207,7 @@ export default function AgreementSignPage() {
  </div>
 
  {/* Agreement content */}
- <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-slate-100 dark:border-slate-700 max-h-96 overflow-y-auto">
+ <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border max-h-96 overflow-y-auto">
  <SanitizedHtml
  className="prose prose-sm dark:prose-invert max-w-none text-ih-fg-3 leading-relaxed"
  html={agreement.body}
@@ -287,7 +287,7 @@ export default function AgreementSignPage() {
  </div>
 
  {/* Decline section */}
- <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
+ <div className="border-t border-ih-border pt-4">
  <button
  onClick={() => setShowDecline(!showDecline)}
  className="text-xs text-ih-bad-fg hover:underline font-semibold"
@@ -295,19 +295,19 @@ export default function AgreementSignPage() {
  {showDecline ? "Cancel decline" : "Decline this agreement"}
  </button>
  {showDecline && (
- <div className="mt-3 p-4 bg-ih-bad-bg rounded-lg border border-rose-100 dark:border-rose-800">
+ <div className="mt-3 p-4 bg-ih-bad-bg rounded-lg border border-ih-bad/30">
  <label className="block text-[10px] font-bold text-ih-bad-fg uppercase tracking-widest mb-2">Reason (optional)</label>
  <textarea
  value={declineReason}
  onChange={(e) => setDeclineReason(e.target.value)}
  rows={3}
- className="w-full px-3 py-2 rounded-lg border border-ih-bad bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-rose-500/20 outline-none"
+ className="w-full px-3 py-2 rounded-lg border border-ih-bad bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-bad/30 outline-none"
  placeholder="Let the inspector know why..."
  />
  <button
  onClick={submitDecline}
  disabled={submitting}
- className="mt-3 px-5 py-2 rounded-lg bg-rose-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-rose-700 transition disabled:opacity-50"
+ className="mt-3 px-5 py-2 rounded-lg bg-ih-bad text-white text-[10px] font-bold uppercase tracking-widest hover:bg-ih-bad/85 transition disabled:opacity-50"
  >
  {submitting ? "Submitting..." : "Decline Agreement"}
  </button>

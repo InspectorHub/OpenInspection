@@ -25,20 +25,20 @@ export function MarketplaceDuplicateBanner({ groups, onCompare, onUseNew, onKeep
  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
  </svg>
  <div className="flex-1 min-w-0">
- <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-200">
+ <p className="text-[13px] font-semibold text-ih-watch-fg">
  You have {g.copies.length} copies of <span className="font-bold">{g.copies[0]?.name}</span>.
  </p>
  <p className="text-[12px] text-ih-watch-fg mt-0.5">
  Older version <span className="font-mono">{g.copies[g.copies.length - 1]?.version ?? "?"}</span> may be outdated.
  </p>
  <div className="mt-2 flex items-center gap-2 flex-wrap">
- <button type="button" onClick={() => onCompare?.(g)} className="h-7 px-3 rounded-md bg-ih-bg-card border border-ih-watch text-ih-watch-fg text-[12px] font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+ <button type="button" onClick={() => onCompare?.(g)} className="h-7 px-3 rounded-md bg-ih-bg-card border border-ih-watch text-ih-watch-fg text-[12px] font-bold hover:bg-ih-watch-bg transition-colors focus:outline-none focus:ring-2 focus:ring-ih-watch/30">
  Compare versions
  </button>
- <button type="button" onClick={() => onUseNew?.(g)} className="h-7 px-3 rounded-md bg-amber-600 text-white text-[12px] font-bold hover:bg-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/30">
+ <button type="button" onClick={() => onUseNew?.(g)} className="h-7 px-3 rounded-md bg-ih-watch text-white text-[12px] font-bold hover:bg-ih-watch/85 transition-colors focus:outline-none focus:ring-2 focus:ring-ih-watch/30">
  Use new only
  </button>
- <button type="button" onClick={() => { onKeepBoth?.(g); setDismissed(true); }} className="h-7 px-3 rounded-md text-ih-watch-fg text-[12px] font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/20">
+ <button type="button" onClick={() => { onKeepBoth?.(g); setDismissed(true); }} className="h-7 px-3 rounded-md text-ih-watch-fg text-[12px] font-medium hover:bg-ih-watch-bg transition-colors focus:outline-none focus:ring-2 focus:ring-ih-watch/30">
  Keep both
  </button>
  </div>

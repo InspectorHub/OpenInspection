@@ -18,6 +18,15 @@ npx playwright test --config playwright.api.config.ts
 
 API unit tests run with `npm run test:unit` (vitest, `vitest.api.config.ts`).
 
+### Worker-runtime tests (queues)
+
+`npm run test:workers` runs `tests/workers/**` against real workerd via
+`@cloudflare/vitest-pool-workers` (`vitest.workers.config.ts` — the vitest-v4
+`cloudflareTest` Vite-plugin shape; miniflare bindings are declared inline, so no
+wrangler config is needed). It covers the sync-outbox queue paths: publish,
+sweeper republish, and DLQ writeback, including a real queue traversal to a test
+consumer. CI runs this after the unit suites.
+
 ### Web Tests
 
 Web unit + E2E tests live in `tests/web/`. They test the React Router v7 React UI against the same running worker.

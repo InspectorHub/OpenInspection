@@ -82,7 +82,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
         ref={canvasRef}
         width={400}
         height={150}
-        className="border border-ih-border bg-white rounded cursor-crosshair touch-none"
+        className="border border-ih-border bg-ih-bg-card rounded cursor-crosshair touch-none"
         onMouseDown={start}
         onMouseMove={move}
         onMouseUp={end}
@@ -91,7 +91,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
         onTouchMove={move}
         onTouchEnd={end}
       />
-      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+      {error && <p className="text-sm text-ih-bad-fg mt-2">{error}</p>}
       <div className="flex gap-2 mt-3">
         <button
           type="button"

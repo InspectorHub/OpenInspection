@@ -31,6 +31,8 @@ Written non-blocking via `c.executionCtx.waitUntil()`.
 | `qbo_oauth_state:{state}` | QBO OAuth initiation | QBO OAuth callback | 600s |
 | `google_token:{tenantId}:{userId}` | Google Calendar OAuth | Calendar API calls | 3500s |
 | `places:{hash}` | Google Places proxy | Address autocomplete | 3600s |
+| `intsecrets:{tenantId}` | Integration-secrets middleware (on D1 read) | Every /api request (decrypted tenant secrets) | 300s — invalidated on PUT/POST /api/admin/secrets |
+| `branding:{tenantId}` | Branding middleware (on D1 read) | Page renders / email pipeline | 3600s — invalidated on branding update |
 
 > SaaS mode adds subdomain/silo routing keys (`tenant:{subdomain}`, `silo:{tenantId}`,
 > `sso:{code}`); those are not used by a standalone deploy.

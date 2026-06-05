@@ -55,7 +55,7 @@ export function CloneLastButton({ defaultScope, onClone, disabled }: CloneLastBu
                 <span className="text-[10px]">▾</span>
             </button>
             {open && (
-                <div className="absolute z-10 mt-1 min-w-[160px] bg-ih-bg-card border border-ih-border rounded shadow-lg py-1">
+                <div className="absolute z-10 mt-1 min-w-[160px] bg-ih-bg-card border border-ih-border rounded shadow-ih-popover py-1">
                     {(['rating', 'rating_notes', 'all'] as const).map(s => (
                         <button
                             key={s}

@@ -52,7 +52,7 @@ export default function ObservePage() {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <h1 className="text-xl font-bold">{inspection.address}</h1>
-          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-ih-info-bg text-ih-info-fg">
             {inspection.status}
           </span>
         </div>
@@ -87,7 +87,7 @@ export default function ObservePage() {
               </div>
               <div className="h-1.5 rounded-full bg-ih-bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-indigo-500 transition-all"
+                  className="h-full rounded-full bg-ih-primary transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>

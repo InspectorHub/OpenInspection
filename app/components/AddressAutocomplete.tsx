@@ -105,12 +105,12 @@ export function AddressAutocomplete({
           aria-autocomplete="list"
           aria-controls="address-listbox"
           aria-expanded={results.length > 0}
-          className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-indigo-500 focus:shadow-ih-focus outline-none text-[14px] font-medium text-ih-fg-1 transition-colors"
+          className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium text-ih-fg-1 transition-colors"
         />
       </label>
 
       {results.length > 0 && (
-        <ul id="address-listbox" role="listbox" className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-md bg-ih-bg-card border border-ih-border shadow-lg">
+        <ul id="address-listbox" role="listbox" className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-md bg-ih-bg-card border border-ih-border shadow-ih-popover">
           {results.map((r, idx) => (
             <li
               key={`${r.placeId}-${idx}`}

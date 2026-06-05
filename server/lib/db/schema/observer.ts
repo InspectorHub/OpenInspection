@@ -22,6 +22,5 @@ export const observerLinks = sqliteTable('observer_links', {
     revokedAt:       integer('revoked_at'),
     lastViewedAt:    integer('last_viewed_at'),
 }, (t) => [
-    index('observer_links_token_idx').on(t.token),
     index('observer_links_inspection_idx').on(t.inspectionId),
 ]);

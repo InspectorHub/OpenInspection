@@ -202,15 +202,15 @@ export default function AgreementsPage() {
       )}
 
       {signingId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-[rgba(15,23,42,0.4)] flex items-center justify-center z-50">
+          <div className="bg-ih-bg-card rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-3">Inspector signature</h3>
             <p className="text-sm text-ih-fg-3 mb-4">
               Draw your signature below. This will pre-sign the agreement; the client signs separately after you send it.
             </p>
             <SignaturePad onSubmit={submitSignature} onCancel={() => setSigningId(null)} label="Save signature" />
             {fetcher.data?.ok === false && (
-              <p className="text-sm text-red-600 mt-3">{fetcher.data.error}</p>
+              <p className="text-sm text-ih-bad-fg mt-3">{fetcher.data.error}</p>
             )}
           </div>
         </div>

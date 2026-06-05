@@ -162,28 +162,28 @@ export default function ConflictResolverPage() {
                   <p className="text-[13px] font-semibold text-ih-fg-1">
                     {c.item}
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-ih-fg-4 mt-0.5">
                     {c.section} / {c.field}
                   </p>
                 </div>
 
                 {/* Three columns */}
-                <div className="grid grid-cols-3 divide-x divide-slate-200 dark:divide-slate-700">
+                <div className="grid grid-cols-3 divide-x divide-ih-border">
                   {/* Base */}
                   <button
                     type="button"
                     onClick={() => setResolved((p) => ({ ...p, [c.id]: "base" }))}
                     className={`p-4 text-left transition-colors ${
                       choice === "base"
-                        ? "bg-ih-primary-tint ring-2 ring-inset ring-indigo-500"
+                        ? "bg-ih-primary-tint ring-2 ring-inset ring-ih-primary"
                         : "hover:bg-ih-bg-muted/30"
                     }`}
                   >
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">
                       Base
                     </p>
                     <p className="text-[13px] text-ih-fg-3">
-                      {c.base ?? <span className="italic text-slate-400">empty</span>}
+                      {c.base ?? <span className="italic text-ih-fg-4">empty</span>}
                     </p>
                   </button>
 
@@ -193,7 +193,7 @@ export default function ConflictResolverPage() {
                     onClick={() => setResolved((p) => ({ ...p, [c.id]: "yours" }))}
                     className={`p-4 text-left transition-colors ${
                       choice === "yours"
-                        ? "bg-ih-ok-bg ring-2 ring-inset ring-emerald-500"
+                        ? "bg-ih-ok-bg ring-2 ring-inset ring-ih-ok"
                         : "hover:bg-ih-bg-muted/30"
                     }`}
                   >
@@ -201,7 +201,7 @@ export default function ConflictResolverPage() {
                       Yours
                     </p>
                     <p className="text-[13px] text-ih-fg-3">
-                      {c.yours ?? <span className="italic text-slate-400">empty</span>}
+                      {c.yours ?? <span className="italic text-ih-fg-4">empty</span>}
                     </p>
                   </button>
 
@@ -211,7 +211,7 @@ export default function ConflictResolverPage() {
                     onClick={() => setResolved((p) => ({ ...p, [c.id]: "theirs" }))}
                     className={`p-4 text-left transition-colors ${
                       choice === "theirs"
-                        ? "bg-ih-watch-bg ring-2 ring-inset ring-amber-500"
+                        ? "bg-ih-watch-bg ring-2 ring-inset ring-ih-watch"
                         : "hover:bg-ih-bg-muted/30"
                     }`}
                   >
@@ -219,7 +219,7 @@ export default function ConflictResolverPage() {
                       Theirs
                     </p>
                     <p className="text-[13px] text-ih-fg-3">
-                      {c.theirs ?? <span className="italic text-slate-400">empty</span>}
+                      {c.theirs ?? <span className="italic text-ih-fg-4">empty</span>}
                     </p>
                   </button>
                 </div>

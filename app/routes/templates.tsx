@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, Link } from "react-router";
 import type { Route } from "./+types/templates";
 import { requireToken } from "~/lib/session.server";
@@ -43,18 +43,32 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const page     = url.searchParams.get("page")     ?? "1";
     const pageSize = url.searchParams.get("pageSize") ?? "50";
     const api = createApi(context, { token });
-    const res = await api.inspections.templates.$get({ query: { page, pageSize } });
+    // Best-effort /api/auth/me to read spectoraMappingSeen (same pattern as dashboard IA-12).
+    // TODO(C-10): same hono/client collapse as auth.me — localized cast.
+    const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
+    const [res, meRes] = await Promise.all([
+      api.inspections.templates.$get({ query: { page, pageSize } }),
+      meGet().catch(() => null),
+    ]);
     const body = res.ok
       ? ((await res.json()) as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
       : { data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } };
     const templates = (body.data ?? []) as Template[];
     const meta = body.meta ?? { total: 0, page: 1, pageSize: 50, totalPages: 1 };
-    return { templates, meta, token };
+    let spectoraMappingSeen = false;
+    if (meRes && meRes.ok) {
+      const meBody = (await meRes.json().catch(() => ({}))) as {
+        data?: { user?: { onboardingState?: Record<string, boolean> | null } };
+      };
+      spectoraMappingSeen = meBody.data?.user?.onboardingState?.spectoraMappingSeen === true;
+    }
+    return { templates, meta, token, spectoraMappingSeen };
   } catch {
     return {
       templates: [] as Template[],
       meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
       token: "",
+      spectoraMappingSeen: false,
     };
   }
 }
@@ -136,6 +150,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { error: (err as Record<string, unknown>)?.message || "Import failed" };
   }
 
+  if (intent === "mark-spectora-mapping-seen") {
+    // Persist spectoraMappingSeen flag via the generic onboarding-flag endpoint.
+    // TODO(C-10): same hono/client collapse as dashboard dismiss — localized cast.
+    const flagPost = api.auth.onboarding.flag.$post as unknown as (args?: unknown) => Promise<Response>;
+    await flagPost({ json: { flag: "spectoraMappingSeen" } }).catch(() => null);
+    return { ok: true, intent: "mark-spectora-mapping-seen" as const };
+  }
+
   return { ok: false };
 }
 
@@ -157,8 +179,9 @@ function countItems(t: Template): number {
 /* ------------------------------------------------------------------ */
 
 export default function TemplatesPage() {
-  const { templates, meta } = useLoaderData<typeof loader>();
+  const { templates, meta, spectoraMappingSeen: loaderMappingSeen } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
+  const mappingFetcher = useFetcher();
   const navigate = useNavigate();
   const { setPage, setPageSize } = usePagination();
 
@@ -171,12 +194,34 @@ export default function TemplatesPage() {
   const [newName, setNewName] = useState("");
   const [importName, setImportName] = useState("");
   const [importPayload, setImportPayload] = useState("");
+  // Concept-mapping modal: shown once after a successful Spectora import.
+  const [mappingModalOpen, setMappingModalOpen] = useState(false);
+  // Optimistic seen state — hide immediately once the user clicks "Got it".
+  const [mappingSeenOptimistic, setMappingSeenOptimistic] = useState(false);
+  const spectoraMappingSeen = loaderMappingSeen || mappingSeenOptimistic;
 
-  // Navigate to newly created/duplicated template
+  // Navigate to newly created/duplicated template.
   const fetcherData = fetcher.data as Record<string, unknown> | undefined;
   if (fetcherData?.ok && fetcherData?.newId && typeof fetcherData.newId === "string") {
-    navigate(`/templates/${fetcherData.newId}/edit`);
+    if (fetcherData?.intent !== "import-spectora") {
+      navigate(`/templates/${fetcherData.newId}/edit`);
+    }
   }
+
+  // Show the concept-mapping card once after a successful Spectora import (if not already seen).
+  const prevImportIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      fetcherData?.ok &&
+      fetcherData?.intent === "import-spectora" &&
+      typeof fetcherData.newId === "string" &&
+      fetcherData.newId !== prevImportIdRef.current &&
+      !spectoraMappingSeen
+    ) {
+      prevImportIdRef.current = fetcherData.newId as string;
+      setMappingModalOpen(true);
+    }
+  }, [fetcherData, spectoraMappingSeen]);
 
   /* ---- Filter + Sort ---- */
   const filtered = useMemo(() => {
@@ -239,6 +284,17 @@ export default function TemplatesPage() {
     setImportPayload("");
   };
 
+  const handleMappingDismiss = () => {
+    // Navigate to the imported template if we have its id, then mark seen.
+    setMappingModalOpen(false);
+    setMappingSeenOptimistic(true);
+    mappingFetcher.submit({ intent: "mark-spectora-mapping-seen" }, { method: "post" });
+    // Navigate to the newly imported template after dismissing the modal.
+    if (fetcherData?.newId && typeof fetcherData.newId === "string") {
+      navigate(`/templates/${fetcherData.newId}/edit`);
+    }
+  };
+
   /* ---- Meta text ---- */
   const metaParts: string[] = [`${templates.length} template${templates.length === 1 ? "" : "s"}`];
   if (imported > 0) metaParts.push(`${imported} imported from Marketplace`);
@@ -268,7 +324,7 @@ export default function TemplatesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search templates..."
-              className="h-9 w-44 pl-8 pr-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-2 focus:border-ih-primary focus:shadow-ih-focus outline-none placeholder:text-slate-400"
+              className="h-9 w-44 pl-8 pr-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-2 focus:border-ih-primary focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
             />
             <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ih-fg-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -288,13 +344,13 @@ export default function TemplatesPage() {
           <div className="flex bg-ih-bg-muted rounded-md p-0.5">
             <button
               onClick={() => setView("card")}
-              className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "card" ? "bg-ih-bg-card text-ih-primary shadow-sm" : "text-ih-fg-3"}`}
+              className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "card" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
             >
               Cards
             </button>
             <button
               onClick={() => setView("list")}
-              className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "list" ? "bg-ih-bg-card text-ih-primary shadow-sm" : "text-ih-fg-3"}`}
+              className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "list" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
             >
               List
             </button>
@@ -323,8 +379,36 @@ export default function TemplatesPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center text-[13px] text-ih-fg-3">
-                    {searchQuery ? "No templates match your search." : "No templates yet. Create one or import from Spectora."}
+                  <td colSpan={4}>
+                    {searchQuery ? (
+                      <p className="py-12 text-center text-[13px] text-ih-fg-3">No templates match your search.</p>
+                    ) : (
+                      <div className="py-14 flex flex-col items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary">
+                          <TemplateIcon size="lg" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[15px] font-bold text-ih-fg-1">Start with a template</p>
+                          <p className="text-[13px] text-ih-fg-3 mt-1 max-w-xs">
+                            Your workspace ships with starter templates — but if you&apos;re migrating, bring your own.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setImportOpen(true)}
+                            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
+                          >
+                            &darr; Import from Spectora
+                          </button>
+                          <button
+                            onClick={() => setCreateOpen(true)}
+                            className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
+                          >
+                            + New template
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -342,7 +426,7 @@ export default function TemplatesPage() {
                               {t.name}
                             </Link>
                             {t.source === "marketplace" && (
-                              <span className="ml-2 text-[9px] font-bold uppercase tracking-widest text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">Marketplace</span>
+                              <span className="ml-2 text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1.5 py-0.5 rounded">Marketplace</span>
                             )}
                             {t.description && (
                               <p className="text-[11px] text-ih-fg-4 mt-0.5 line-clamp-1">{t.description}</p>
@@ -384,13 +468,39 @@ export default function TemplatesPage() {
       {view === "card" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.length === 0 ? (
-            <div className="col-span-full text-center py-16 bg-ih-bg-card rounded-lg border border-ih-border">
-              <p className="font-semibold text-ih-fg-2">
-                {searchQuery ? "No matching templates" : "No templates yet"}
-              </p>
-              <p className="text-[13px] text-ih-fg-3 mt-1">
-                Create one or import from Spectora.
-              </p>
+            <div className="col-span-full py-16 bg-ih-bg-card rounded-lg border border-ih-border flex flex-col items-center gap-4">
+              {searchQuery ? (
+                <>
+                  <p className="font-semibold text-ih-fg-2">No matching templates</p>
+                  <p className="text-[13px] text-ih-fg-3">Try a different search term.</p>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary">
+                    <TemplateIcon size="lg" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[15px] font-bold text-ih-fg-1">Start with a template</p>
+                    <p className="text-[13px] text-ih-fg-3 mt-1 max-w-xs">
+                      Your workspace ships with starter templates — but if you&apos;re migrating, bring your own.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setImportOpen(true)}
+                      className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
+                    >
+                      &darr; Import from Spectora
+                    </button>
+                    <button
+                      onClick={() => setCreateOpen(true)}
+                      className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
+                    >
+                      + New template
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             filtered.map((t) => {
@@ -415,7 +525,7 @@ export default function TemplatesPage() {
                     <span>{items} items</span>
                     <span>used {t.usageCount || 0}&times;</span>
                     {t.source === "marketplace" && (
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-violet-700 bg-violet-100 px-1 py-0.5 rounded">MP</span>
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1 py-0.5 rounded">MP</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 pt-1 border-t border-ih-border mt-auto">
@@ -447,8 +557,8 @@ export default function TemplatesPage() {
 
       {/* Create modal */}
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setCreateOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setCreateOpen(false)}>
+          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[16px] font-bold text-ih-fg-1">New Template</h2>
               <button onClick={() => setCreateOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
@@ -482,8 +592,8 @@ export default function TemplatesPage() {
 
       {/* Import Spectora modal */}
       {importOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setImportOpen(false)}>
-          <div className="w-full max-w-lg bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setImportOpen(false)}>
+          <div className="w-full max-w-lg bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[16px] font-bold text-ih-fg-1">Import from Spectora</h2>
               <button onClick={() => setImportOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
@@ -527,8 +637,8 @@ export default function TemplatesPage() {
 
       {/* Delete confirmation modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
-          <div className="w-full max-w-xs bg-ih-bg-card rounded-xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
+          <div className="w-full max-w-xs bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-[16px] font-bold text-ih-fg-1 mb-2">Delete Template</h2>
             <p className="text-[13px] text-ih-fg-3 mb-5">
               Are you sure you want to delete this template? This cannot be undone.
@@ -544,6 +654,79 @@ export default function TemplatesPage() {
           </div>
         </div>
       )}
+
+      {/* Concept-mapping modal — shown once after first Spectora import */}
+      {mappingModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm"
+          onClick={handleMappingDismiss}
+        >
+          <div
+            className="w-full max-w-md bg-ih-bg-card rounded-xl shadow-ih-popover p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-[17px] font-bold text-ih-fg-1">Coming from Spectora?</h2>
+              <button onClick={handleMappingDismiss} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none">&times;</button>
+            </div>
+            <p className="text-[12px] text-ih-fg-3 mb-4">Here&apos;s how Spectora concepts map to OpenInspection.</p>
+
+            <div className="divide-y divide-ih-border rounded-lg border border-ih-border overflow-hidden">
+              {/* Row 1 */}
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[12px] font-bold text-ih-fg-3 line-through">Comments</span>
+                  <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
+                  <span className="text-[12px] font-bold text-ih-primary">Defects</span>
+                  <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
+                  <span className="text-[12px] font-bold text-ih-primary">Notes</span>
+                </div>
+                <p className="text-[12px] text-ih-fg-3">Your comment library becomes canned defects; free text lives in Notes.</p>
+              </div>
+              {/* Row 2 */}
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[12px] font-bold text-ih-fg-3 line-through">Rating icons</span>
+                  <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
+                  <span className="text-[12px] font-bold text-ih-good-fg">Satisfactory</span>
+                  <span className="text-ih-fg-4 text-[10px]">&middot;</span>
+                  <span className="text-[12px] font-bold text-ih-warn-fg">Monitor</span>
+                  <span className="text-ih-fg-4 text-[10px]">&middot;</span>
+                  <span className="text-[12px] font-bold text-ih-bad-fg">Defect</span>
+                </div>
+                <p className="text-[12px] text-ih-fg-3">Ratings are full-word buttons with semantic colors.</p>
+              </div>
+              {/* Row 3 */}
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[12px] font-bold text-ih-fg-3 line-through">Orders</span>
+                  <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
+                  <span className="text-[12px] font-bold text-ih-primary">Inspections</span>
+                  <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
+                  <span className="text-[12px] font-bold text-ih-primary">Invoices</span>
+                </div>
+                <p className="text-[12px] text-ih-fg-3">One order = an inspection plus its invoice and agreement.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-5">
+              <Link
+                to="/settings/inspection"
+                className="text-[12px] text-ih-fg-3 hover:text-ih-primary underline underline-offset-2"
+                onClick={handleMappingDismiss}
+              >
+                Review editor settings
+              </Link>
+              <button
+                onClick={handleMappingDismiss}
+                className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -552,9 +735,10 @@ export default function TemplatesPage() {
 /*  Icons                                                              */
 /* ------------------------------------------------------------------ */
 
-function TemplateIcon() {
+function TemplateIcon({ size = "sm" }: { size?: "sm" | "lg" }) {
+  const cls = size === "lg" ? "w-6 h-6" : "w-4 h-4";
   return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
     </svg>
   );

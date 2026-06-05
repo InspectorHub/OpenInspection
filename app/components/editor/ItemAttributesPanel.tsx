@@ -17,7 +17,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'number') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
                                 {attr.name}{attr.unit ? ` (${attr.unit})` : ''}
                             </label>
                             <input
@@ -32,7 +32,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 if (attr.type === 'select') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">{attr.name}</label>
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
                             <select
                                 value={typeof v === 'string' ? v : ''}
                                 onChange={e => onChange(itemId, attr.id, e.target.value || null)}
@@ -51,16 +51,16 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                                 type="checkbox"
                                 checked={v === true}
                                 onChange={e => onChange(itemId, attr.id, e.target.checked)}
-                                className="w-4 h-4 rounded border-ih-border-strong text-indigo-600 focus:ring-indigo-500/30"
+                                className="w-4 h-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
                             />
-                            <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">{attr.name}</label>
+                            <label className="text-[11px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">{attr.name}</label>
                         </div>
                     );
                 }
                 if (attr.type === 'date') {
                     return (
                         <div key={key} className="col-span-6 md:col-span-3">
-                            <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">{attr.name}</label>
+                            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
                             <input
                                 type="date"
                                 value={typeof v === 'string' ? v : ''}
@@ -73,7 +73,7 @@ export function ItemAttributesPanel({ itemId, attributes, values, onChange }: It
                 // text / fallback (text + multi_select default to text input for v1)
                 return (
                     <div key={key} className="col-span-6 md:col-span-3">
-                        <label className="block font-bold uppercase tracking-[0.1em] text-slate-400 mb-0.5">{attr.name}</label>
+                        <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{attr.name}</label>
                         <input
                             type="text"
                             value={typeof v === 'string' ? v : ''}

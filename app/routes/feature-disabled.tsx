@@ -10,7 +10,7 @@ export default function FeatureDisabledPage() {
       <div className="text-center">
         <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-ih-watch-bg flex items-center justify-center">
           <svg
-            className="w-8 h-8 text-ih-watch dark:text-amber-400"
+            className="w-8 h-8 text-ih-watch"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

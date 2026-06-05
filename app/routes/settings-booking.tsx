@@ -499,6 +499,7 @@ function EmbedWidget({ tenant, slug }: { tenant: string | null | undefined; slug
             {copied ? "Copied!" : "Copy snippet"}
           </button>
         </div>
+        {/* ds-allow: fixed-dark terminal/code block — stays dark in both themes */}
         <pre className="bg-slate-900 text-emerald-300 dark:bg-slate-950 p-4 rounded-md overflow-x-auto text-[12px] font-mono leading-relaxed whitespace-pre-wrap break-all">
           {snippet}
         </pre>

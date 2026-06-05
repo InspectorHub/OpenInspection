@@ -88,8 +88,8 @@ export function PublishModal({ open, onClose, inspectionId, onPublished }: Publi
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="max-w-md w-full bg-ih-bg-card rounded-xl shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] flex items-center justify-center p-6" onClick={onClose}>
+      <div className="max-w-md w-full bg-ih-bg-card rounded-xl shadow-ih-popover max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-ih-border">
           <h2 className="text-xl font-bold text-ih-fg-1">Publish Report</h2>
         </div>
@@ -134,7 +134,7 @@ export function PublishModal({ open, onClose, inspectionId, onPublished }: Publi
                   <span className="w-12 text-center">Text</span>
                 </div>
                 {recipients.map((r, idx) => (
-                  <div key={`${r.contactId}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center px-3 py-2 rounded-xl border border-ih-border bg-slate-50 dark:bg-slate-700/40">
+                  <div key={`${r.contactId}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center px-3 py-2 rounded-xl border border-ih-border bg-ih-bg-muted">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold truncate text-ih-fg-1">{r.name}</span>

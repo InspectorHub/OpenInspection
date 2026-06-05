@@ -47,8 +47,8 @@ export function CancelModal({ open, onClose, onConfirm, inspectionId }: CancelMo
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="max-w-md w-full p-6 bg-ih-bg-card rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] flex items-center justify-center p-6" onClick={onClose}>
+      <div className="max-w-md w-full p-6 bg-ih-bg-card rounded-xl shadow-ih-popover" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold mb-4 text-ih-fg-1">Cancel inspection</h2>
         <div className="space-y-3">
           <div>
@@ -64,7 +64,7 @@ export function CancelModal({ open, onClose, onConfirm, inspectionId }: CancelMo
         </div>
         <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-ih-border">
           <button onClick={onClose} className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted">Back</button>
-          <button onClick={handleSubmit} disabled={busy} className="px-4 h-10 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50">
+          <button onClick={handleSubmit} disabled={busy} className="px-4 h-10 rounded-xl bg-ih-bad text-white text-sm font-semibold hover:bg-ih-bad/85 disabled:opacity-50">
             {busy ? "Cancelling..." : "Cancel inspection"}
           </button>
         </div>

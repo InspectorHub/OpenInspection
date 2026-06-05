@@ -252,6 +252,7 @@ export function PhotoStudio({
         : "cursor-crosshair";
 
   return (
+    /* ds-allow: fixed-dark photo-studio chrome (white/* neutrals + amber-400 hints stay dark in both themes) */
     <div
       className="fixed inset-0 z-[100] flex flex-col"
       style={{ background: "rgba(0,0,0,0.92)" }}
@@ -323,7 +324,7 @@ export function PhotoStudio({
         {/* Save */}
         <button
           onClick={handleSave}
-          className="h-8 px-4 rounded-md bg-ih-primary text-white text-[12px] font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+          className="h-8 px-4 rounded-md bg-ih-primary text-white text-[12px] font-bold hover:bg-ih-primary-600 transition-colors flex items-center gap-1.5"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -506,7 +507,7 @@ export function PhotoStudio({
                 }}
               >
                 <div
-                  className="bg-slate-800 rounded-lg border border-white/20 p-2 shadow-xl"
+                  className="bg-slate-800 rounded-lg border border-white/20 p-2 shadow-ih-popover"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <input
@@ -527,7 +528,7 @@ export function PhotoStudio({
                       e.stopPropagation();
                     }}
                     placeholder="Enter label..."
-                    className="w-40 h-7 px-2 rounded bg-slate-700 text-white text-[12px] border border-white/10 outline-none focus:border-indigo-500 placeholder-white/30"
+                    className="w-40 h-7 px-2 rounded bg-slate-700 text-white text-[12px] border border-white/10 outline-none focus:border-ih-primary placeholder-white/30"
                   />
                   <div className="flex justify-end gap-1 mt-1.5">
                     <button
@@ -541,7 +542,7 @@ export function PhotoStudio({
                     </button>
                     <button
                       onClick={commitLabel}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700"
+                      className="px-2 py-0.5 rounded text-[10px] font-bold text-white bg-ih-primary hover:bg-ih-primary-600"
                     >
                       Add
                     </button>
@@ -658,7 +659,7 @@ export function PhotoStudio({
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder="Add a caption..."
-            className="w-full h-8 px-3 rounded-md bg-white/5 border border-white/10 text-white text-[12px] placeholder-white/30 outline-none focus:border-indigo-500 transition-colors"
+            className="w-full h-8 px-3 rounded-md bg-white/5 border border-white/10 text-white text-[12px] placeholder-white/30 outline-none focus:border-ih-primary transition-colors"
           />
         </div>
       </div>

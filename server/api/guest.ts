@@ -18,6 +18,7 @@ import { guestInvites, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { sendSuccess } from '../lib/response';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getLegalLinks, buildTermsAcceptedBlob } from '../lib/legal-links';
 
 const claimRoute = createRoute(withMcpMetadata({
     method:  'post',
@@ -30,6 +31,9 @@ const claimRoute = createRoute(withMcpMetadata({
             name:     z.string().min(1).max(100).describe('TODO describe name field for the OpenInspection MCP integration'),
             email:    z.string().email().describe('TODO describe email field for the OpenInspection MCP integration'),
             password: z.string().min(8).max(128).describe('TODO describe password field for the OpenInspection MCP integration'),
+            // Legal-links feature — required (true) only when the operator configured
+            // TERMS_URL/PRIVACY_URL; enforced in the handler, optional on the wire.
+            termsAccepted: z.boolean().optional().describe('Acceptance of operator Terms of Service and Privacy Policy; required when the operator has configured TERMS_URL/PRIVACY_URL'),
         }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
@@ -85,6 +89,11 @@ export const guestRoutes = createApiRouter()
         const body = c.req.valid('json');
         const db   = drizzle(c.env.DB);
 
+        const links = getLegalLinks(c.env);
+        if (links && body.termsAccepted !== true) {
+            throw Errors.BadRequest('You must accept the terms to create an account.');
+        }
+
         // Look up the invite to discover which tenant it belongs to. We do
         // this before the service call so the 404 path stays cheap and so we
         // can fetch the tenant's seat cap without touching ScopedDB (which
@@ -101,6 +110,10 @@ export const guestRoutes = createApiRouter()
 
         const out = await c.var.services.guestInvite.claim(body.token, body, {
             maxUsers: tenant.maxUsers,
+            ...(links ? { termsAccepted: buildTermsAcceptedBlob(links, {
+                ip: c.req.header('CF-Connecting-IP'),
+                country: (c.req.raw.cf?.country as string | undefined),
+            }) } : {}),
         });
 
         switch (out.kind) {

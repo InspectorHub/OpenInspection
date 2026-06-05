@@ -24,7 +24,7 @@ export function SpeedModeUndoToast({ pending, onDismiss, durationMs = 3000 }: Sp
 
     if (!pending) return null;
     return (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-20 z-50 px-4 py-2.5 bg-ih-bg-card border border-ih-border rounded-lg shadow-xl flex items-center gap-3 text-[13px]">
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-20 z-50 px-4 py-2.5 bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover flex items-center gap-3 text-[13px]">
             <span>{pending.message}</span>
             <button
                 onClick={() => { pending.onUndo(); onDismiss(); }}

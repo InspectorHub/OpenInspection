@@ -19,7 +19,7 @@ export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: Mobile
                 aria-label="Back"
             >←</button>
             <div className="flex-1 min-w-0">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400 truncate">{sectionTitle}</div>
+                <div className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4 truncate">{sectionTitle}</div>
                 <div className="text-[13px] font-bold truncate">{itemLabel}</div>
             </div>
             <button

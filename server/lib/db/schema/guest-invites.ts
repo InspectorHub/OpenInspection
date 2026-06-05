@@ -24,6 +24,5 @@ export const guestInvites = sqliteTable('guest_invites', {
     createdBy:         text('created_by').notNull(),
     createdAt:         text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
-    index('guest_invites_token_idx').on(t.token),
     index('guest_invites_tenant_idx').on(t.tenantId),
 ]);

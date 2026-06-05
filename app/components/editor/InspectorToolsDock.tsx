@@ -46,12 +46,12 @@ export function InspectorToolsDock({
     <div className="hidden md:block fixed bottom-6 right-6 z-40">
       {dockOpen && <div className="fixed inset-0 z-[-1]" onClick={() => setDockOpen(false)} aria-hidden="true" />}
       {dockOpen && (
-        <div className="absolute bottom-16 right-0 mb-2 ih-card p-2 min-w-[200px] bg-ih-bg-card border border-ih-border rounded-lg shadow-lg" role="menu" aria-label="Inspector tools">
+        <div className="absolute bottom-16 right-0 mb-2 ih-card p-2 min-w-[200px] bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover" role="menu" aria-label="Inspector tools">
           {TILES.map((t) => (
             <button
               key={t.id}
               type="button"
-              className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-ih-bg-muted"
               onClick={handlers[t.id]}
               role="menuitem"
             >
@@ -59,14 +59,14 @@ export function InspectorToolsDock({
                 <path d={t.iconPath} />
               </svg>
               <span className="flex-1 text-left text-sm">{t.label}</span>
-              {t.hotkey && <span className="ih-kbd text-[11px] text-slate-400 bg-ih-bg-muted px-1.5 py-0.5 rounded font-mono">{t.hotkey}</span>}
+              {t.hotkey && <span className="ih-kbd text-[11px] text-ih-fg-4 bg-ih-bg-muted px-1.5 py-0.5 rounded font-mono">{t.hotkey}</span>}
             </button>
           ))}
         </div>
       )}
       <button
         type="button"
-        className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg flex items-center justify-center text-white active:scale-95 transition-transform"
+        className="w-14 h-14 rounded-full bg-gradient-to-br from-ih-primary to-ih-primary-600 shadow-ih-popover flex items-center justify-center text-white active:scale-95 transition-transform"
         onClick={() => setDockOpen(!dockOpen)}
         aria-label="Open inspector tools"
         aria-expanded={dockOpen}

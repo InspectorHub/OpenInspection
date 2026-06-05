@@ -111,7 +111,7 @@ export default function LoginPage() {
               type="email"
               autoFocus
               aria-invalid={fields.email.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.email.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
@@ -126,7 +126,7 @@ export default function LoginPage() {
               name={fields.password.name}
               type="password"
               aria-invalid={fields.password.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {fields.password.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>

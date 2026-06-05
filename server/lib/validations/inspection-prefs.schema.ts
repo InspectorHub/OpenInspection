@@ -9,6 +9,10 @@ import { z } from '@hono/zod-openapi';
 
 export const InspectionPrefsSchema = z.object({
     cloneDefault:       z.enum(['rating', 'rating_notes', 'all']),
+    /** B-18 — 'keyboard' (default) advances only on keyboard rating; pointer
+     *  clicks stay put. Defaulted so pre-existing rows / full-object payloads
+     *  without the field stay valid. */
+    autoAdvance:        z.enum(['always', 'keyboard', 'off']).default('keyboard'),
     autoAdvanceDelayMs: z.number().int().min(0).max(2000),
     pinnedTagIds:       z.array(z.string().min(1)).max(5),
 }).openapi('InspectionPrefs');
@@ -21,6 +25,7 @@ export type InspectionPrefsPatch = z.infer<typeof InspectionPrefsPatchSchema>;
 
 export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     cloneDefault:       'rating_notes',
+    autoAdvance:        'keyboard',
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
 };

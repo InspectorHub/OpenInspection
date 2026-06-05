@@ -1,9 +1,12 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import type { Route } from "./+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { unwrapResultsResponse } from "~/lib/results";
+import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
+import { makeCustomDefect } from "~/lib/custom-defects";
+import { sanitizeSettingsPatch } from "~/lib/settings-patch";
 import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { useFindings } from "~/hooks/useFindings";
@@ -11,7 +14,16 @@ import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
 import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "~/hooks/useKeyboard";
 import { useCannedComments } from "~/hooks/useCannedComments";
-import { useOfflineQueue } from "~/hooks/useOfflineQueue";
+import { useOfflineQueue, getOfflineQueue } from "~/hooks/useOfflineQueue";
+import { shouldQueue } from "~/lib/offline/should-queue";
+import { formatReplayToasts } from "~/lib/offline/replay-toasts";
+import { NetworkPill } from "~/components/sync/NetworkPill";
+import {
+ addQueuedPreview,
+ clearQueuedPreviews,
+ collectObjectUrls,
+ type QueuedPreviewMap,
+} from "~/lib/offline/queued-photo-previews";
 import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
 import { usePresence } from "~/hooks/usePresence";
 import { useTheme } from "~/hooks/useTheme";
@@ -210,6 +222,28 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  ok = res.ok;
  }
 
+ // B-22 follow-up (C-12 class): the settings sheet's "Save changes" used to
+ // do a raw client-side fetch('/api/inspections/:id', PATCH) which could never
+ // pass requireCsrfToken (the __Host-csrf cookie can't be set by client JS and
+ // the pair is attached server-side only) — every save 401/403'd silently.
+ // Route it through the BFF relay like every other mutation.
+ if (intent === "save-settings") {
+ const payload = JSON.parse(String(formData.get("payload") ?? "{}"));
+ // The sheet forwards its WHOLE form; sanitize at the BFF boundary so
+ // empty-string "unchanged" fields and date-only <input type=date> values
+ // pass UpdateInspectionSchema (date wants ISO datetime, price a number).
+ const res = await api.inspections[":id"].$patch({
+ param: { id: params.id },
+ json: sanitizeSettingsPatch(payload),
+ });
+ if (!res.ok) {
+ // Surface the API rejection in the worker log — a silent { ok:false }
+ // already cost two debugging rounds on this path.
+ console.error("[save-settings] PATCH failed", res.status, await res.text().catch(() => ""));
+ }
+ return { ok: res.ok, intent: "save-settings" };
+ }
+
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
  const res = await api.inspections[":id"].$patch({
@@ -228,6 +262,170 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  });
  ok = res.ok;
  }
+ }
+
+ // FE-2: photo upload rides the BFF relay like every other mutation —
+ // the old client-side fetch('/api/…/upload') was unauthenticated in saas
+ // (C-12 class). Accepts one or many files (burst camera) per submission.
+ // FE-3: optional targetType='defect' + customId pins the photo to a
+ // specific defect row; defectKind ('canned' | 'custom') is a client-side
+ // routing hint echoed back so the effect attaches the key to the right
+ // store (it never reaches the API).
+ if (intent === "upload-photo") {
+ const itemId = String(formData.get("itemId"));
+ const targetType = formData.get("targetType") === "defect" ? ("defect" as const) : ("item" as const);
+ const customId = String(formData.get("customId") ?? "");
+ const defectKind = formData.get("defectKind") === "custom" ? ("custom" as const) : ("canned" as const);
+ const files = formData.getAll("file").filter((f): f is File => f instanceof File);
+ const keys: string[] = [];
+ ok = files.length > 0 && Boolean(itemId);
+ for (const file of files) {
+ const res = await api.inspections[":id"].upload.$post({
+ param: { id: params.id },
+ form: {
+ file,
+ itemId,
+ ...(targetType === "defect" ? { targetType, customId } : {}),
+ },
+ });
+ if (res.ok) {
+ const j = (await res.json()) as { data?: { key?: string } };
+ if (j.data?.key) keys.push(j.data.key);
+ else ok = false;
+ } else {
+ ok = false;
+ }
+ }
+ return { ok, keys, itemId, targetType, customId, defectKind };
+ }
+
+ // ── Offline replay intents ────────────────────────────────────────────────
+ //
+ // The offline ActionTransport cannot parse React Router's turbo-stream body,
+ // so it can't distinguish a plain 200 from an {ok:false} result buried in the
+ // stream.  These two dedicated intents return Response.json() with an explicit
+ // HTTP status code so the transport can read res.status directly.
+ //
+ // replay-write: forwards the original intent payload through the same API
+ // call as if it had been submitted online.  Returns:
+ //   200 → success
+ //   409 → field-version conflict (pass through to the conflict-resolver UI)
+ //   4xx/5xx → active error (OfflineQueue will retry up to MAX_ATTEMPTS)
+ //
+ // replay-photo: forwards a single file upload (blob) to the photo upload API.
+
+ if (intent === "replay-write") {
+  const replayIntent = String(formData.get("replayIntent") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+  let sectionId = String(formData.get("sectionId") ?? "");
+  let payload: Record<string, unknown> = {};
+  try {
+   payload = JSON.parse(String(formData.get("payload") ?? "{}"));
+  } catch {
+   return Response.json({ ok: false, apiStatus: 400 }, { status: 400 });
+  }
+
+  // The transport carries sectionId inside the JSON payload (not as a top-level
+  // form field) — fall back to it so replays don't 400 with an empty sectionId.
+  if (!sectionId && typeof payload.sectionId === "string") sectionId = payload.sectionId;
+
+  // Collect status/ok from whichever API call fires — extracted immediately
+  // so we never hold a ClientResponse<...> in a wider-typed variable.
+  let apiStatus = 500;
+  let apiOk = false;
+
+  // Optimistic-concurrency on replay: unlike the ONLINE single-field path
+  // (which deliberately force-writes — pre-existing, out of scope here), an
+  // offline write is replayed against state that may have moved while we were
+  // offline. useFindings froze the field's last-known version into the
+  // payload at enqueue time, so we forward it as a REAL check (force:false).
+  // The server returns 409 on a stale version, which propagates below via the
+  // explicit-status Response.json so the conflict path can pick it up. A
+  // missing version (legacy entry / older queued write) defaults to 0, which
+  // decideFieldWrite treats as the initial counter.
+  const expectedVersion =
+   typeof payload.expectedVersion === "number" ? payload.expectedVersion : 0;
+
+  if (replayIntent === "rate") {
+   const rating = String(payload.rating ?? "");
+   const r = await api.inspections[":id"].items[":itemId"].$patch({
+    param: { id: params.id, itemId },
+    json: { field: "rating", value: rating, sectionId, expectedVersion, force: false },
+   });
+   apiStatus = r.status; apiOk = r.ok;
+  } else if (replayIntent === "notes") {
+   const notes = String(payload.notes ?? "");
+   const r = await api.inspections[":id"].items[":itemId"].$patch({
+    param: { id: params.id, itemId },
+    json: { field: "notes", value: notes, sectionId, expectedVersion, force: false },
+   });
+   apiStatus = r.status; apiOk = r.ok;
+  } else if (replayIntent === "toggle-canned") {
+   const tabName = String(payload.tabName ?? "");
+   const cannedId = String(payload.cannedId ?? "");
+   const included = Boolean(payload.included);
+   const r = await api.inspections[":id"].items[":itemId"].$patch({
+    param: { id: params.id, itemId },
+    json: {
+     field: "cannedToggle",
+     value: { tabName, cannedId, included },
+     sectionId,
+     expectedVersion,
+     force: false,
+    },
+   });
+   apiStatus = r.status; apiOk = r.ok;
+  } else if (replayIntent === "set-defect-fields") {
+   const cannedId = String(payload.cannedId ?? "");
+   // payload was validated when originally dispatched; the enum fields were
+   // already type-safe at the call site. Use `as any` at the API boundary
+   // since the replay path cannot re-run the original runtime type narrowing.
+   // Strip transport-only keys (sectionId is a separate json field;
+   // expectedVersion is the concurrency control, not a defect attribute) so
+   // they don't leak into the defectFields value object.
+   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   const { sectionId: _sid, expectedVersion: _ev, ...defectPatch } = payload;
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   const defectValue = { cannedId, ...(defectPatch as any) } as any;
+   const r = await api.inspections[":id"].items[":itemId"].$patch({
+    param: { id: params.id, itemId },
+    json: { field: "defectFields", value: defectValue, sectionId, expectedVersion, force: false },
+   });
+   apiStatus = r.status; apiOk = r.ok;
+  } else if (replayIntent === "save-all") {
+   const r = await api.inspections[":id"].results.$patch({
+    param: { id: params.id },
+    json: { data: payload },
+   });
+   apiStatus = r.status; apiOk = r.ok;
+  } else {
+   // Unknown replayIntent — reject so the entry doesn't loop.
+   return Response.json({ ok: false, apiStatus: 400 }, { status: 400 });
+  }
+
+  return Response.json({ ok: apiOk, apiStatus }, { status: apiStatus });
+ }
+
+ if (intent === "replay-photo") {
+  const itemId = String(formData.get("itemId") ?? "");
+  const file = formData.get("file");
+  if (!file || !(file instanceof File) || !itemId) {
+   return Response.json({ ok: false, apiStatus: 400 }, { status: 400 });
+  }
+  const apiRes = await api.inspections[":id"].upload.$post({
+   param: { id: params.id },
+   form: { file, itemId },
+  });
+  const apiStatus = apiRes.status;
+  const apiOk = apiRes.ok;
+  let key: string | undefined;
+  if (apiOk) {
+   try {
+    const j = (await apiRes.json()) as { data?: { key?: string } };
+    key = j.data?.key;
+   } catch { /* ignore */ }
+  }
+  return Response.json({ ok: apiOk && Boolean(key), apiStatus, key }, { status: apiStatus });
  }
 
  return { ok };
@@ -258,6 +456,9 @@ export default function InspectionEditPage() {
  // submit (React Router aborts the previous submission on re-submit) — the
  // note was silently lost. Notes get their own fetcher instance.
  const notesFetcher = useFetcher();
+ // FE-2: photo uploads also get a dedicated fetcher — sharing the mutation
+ // fetcher would let an autosave abort an in-flight upload (and vice versa).
+ const uploadFetcher = useFetcher();
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
@@ -283,6 +484,8 @@ export default function InspectionEditPage() {
  setSaveStatus: state.setSaveStatus,
  inspectionId: String(state.inspection.id),
  notesFetcher,
+    // Offline-first: route field writes into the queue when shouldQueue() says so.
+    offlineQueue: getOfflineQueue(),
  });
 
  /* ---------------------------------------------------------------- */
@@ -428,6 +631,56 @@ export default function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  const offline = useOfflineQueue();
+ const revalidator = useRevalidator();
+
+ /* ---------------------------------------------------------------- */
+ /* Queued photo previews (Task 4) */
+ /* ---------------------------------------------------------------- */
+
+ // itemId → Array<{ name, objectUrl }> — local blob previews for photos
+ // queued while offline.  Object URLs are created on enqueue and revoked
+ // on unmount or after a successful replay clears the queue.
+ const [queuedPhotoPreviews, setQueuedPhotoPreviews] = useState<QueuedPreviewMap>({});
+ const queuedPhotoPreviewsRef = useRef(queuedPhotoPreviews);
+ queuedPhotoPreviewsRef.current = queuedPhotoPreviews;
+
+ // Revoke all object URLs when the route unmounts.
+ useEffect(() => {
+  return () => {
+   for (const url of collectObjectUrls(queuedPhotoPreviewsRef.current)) {
+    URL.revokeObjectURL(url);
+   }
+  };
+ }, []);
+
+ // When a replay finishes (syncing flips false → true → false) AND pending
+ // count reaches 0, clear the preview map and revalidate loader data so the
+ // confirmed server photos appear in the strip.
+ const prevSyncing = useRef(false);
+ useEffect(() => {
+  const justFinished = prevSyncing.current && !offline.syncing;
+  prevSyncing.current = offline.syncing;
+  if (justFinished && offline.pendingCount === 0) {
+   // Revoke object URLs before clearing so the browser can GC the blobs.
+   for (const url of collectObjectUrls(queuedPhotoPreviewsRef.current)) {
+    URL.revokeObjectURL(url);
+   }
+   setQueuedPhotoPreviews(clearQueuedPreviews());
+   revalidator.revalidate();
+  }
+ }, [offline.syncing, offline.pendingCount, revalidator]);
+
+ /* ---------------------------------------------------------------- */
+ /* Manual sync — fires toasts from the ReplayResult */
+ /* ---------------------------------------------------------------- */
+
+ const handleSyncNow = useCallback(async () => {
+  const result = await offline.replayNow();
+  if (!result) return; // single-flight guard fired — a replay was already running
+  for (const t of formatReplayToasts(result)) {
+   pushToast({ message: t.message, durationMs: t.durationMs });
+  }
+ }, [offline]);
 
  /* ---------------------------------------------------------------- */
  /* Unsaved changes guard */
@@ -604,10 +857,14 @@ export default function InspectionEditPage() {
  useEffect(() => {
  // B-17: "fetcher went idle" is NOT "saved" — check the action's ok flag.
  // A failed write keeps dirty=true so the unsaved-changes blocker still arms.
- const submitting = fetcher.state !== "idle" || notesFetcher.state !== "idle";
+ // FE-2: uploadFetcher participates too — otherwise a photo upload leaves
+ // dirty=true forever and the beforeunload blocker traps the inspector.
+ const submitting =
+ fetcher.state !== "idle" || notesFetcher.state !== "idle" || uploadFetcher.state !== "idle";
  const failed =
  (fetcher.data as { ok?: boolean } | undefined)?.ok === false ||
- (notesFetcher.data as { ok?: boolean } | undefined)?.ok === false;
+ (notesFetcher.data as { ok?: boolean } | undefined)?.ok === false ||
+ (uploadFetcher.data as { ok?: boolean } | undefined)?.ok === false;
  if (submitting) {
  state.setSaveStatus("saving");
  } else if (state.saveStatus === "saving") {
@@ -624,22 +881,38 @@ export default function InspectionEditPage() {
  return () => clearTimeout(timer);
  }
  }
- }, [fetcher.state, notesFetcher.state]);
+ }, [fetcher.state, notesFetcher.state, uploadFetcher.state]);
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */
  /* ---------------------------------------------------------------- */
 
+ /**
+ * B-18 — two root causes lived here:
+ * 1. `find(l => l.id === rating)` missed because the old hardcoded
+ * buttons emitted 'DEF' while levels carry ids like 'Defect', so
+ * `pausesAdvance` (Defect/Monitor stop for notes) never fired.
+ * `findRatingLevel` normalises the lookup.
+ * 2. Advance ran for every input source. Pointer clicks are the
+ * deliberate-editing path (rate → describe → photo); only keyboard
+ * rating speed-scans forward (configurable via prefs.autoAdvance).
+ */
  const handleRating = useCallback(
- (rating: string) => {
+ (rating: string, source: 'pointer' | 'keyboard' = 'pointer') => {
  if (!state.activeItemId || !state.currentSection) return;
  findings.setRating(state.currentSection.id, state.activeItemId, rating);
- const level = state.ratingLevels?.find((l: { id: string; pausesAdvance?: boolean }) => l.id === rating);
- if (level?.pausesAdvance) {
+ const level = findRatingLevel(state.ratingLevels ?? [], rating);
+ const decision = ratingAdvanceDecision({
+ source,
+ level,
+ mode: inspectionPrefs.autoAdvance,
+ });
+ if (decision.focusNotes) {
  const ta = document.getElementById('notes-textarea') as HTMLTextAreaElement | null;
  ta?.focus({ preventScroll: true });
  return;
  }
+ if (!decision.advance) return;
  setTimeout(
  () => state.advanceToNextUnrated((newSectionTitle: string) => {
  pushToast({
@@ -650,7 +923,7 @@ export default function InspectionEditPage() {
  inspectionPrefs.autoAdvanceDelayMs,
  );
  },
- [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, inspectionPrefs.autoAdvanceDelayMs],
+ [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, inspectionPrefs.autoAdvance, inspectionPrefs.autoAdvanceDelayMs],
  );
 
  /* ---------------------------------------------------------------- */
@@ -744,66 +1017,155 @@ export default function InspectionEditPage() {
  /* Photo upload */
  /* ---------------------------------------------------------------- */
 
+ /**
+ * FE-2 — uploads go through the route action ("upload-photo" intent) on a
+ * dedicated fetcher: the old direct fetch('/api/…/upload') bypassed the
+ * BFF token relay (unauthenticated in saas, C-12 class) and swallowed
+ * every failure silently. The effect below attaches returned keys and
+ * surfaces failures as a toast.
+ */
+ // FE-3 — when set, the next picked photo pins to this defect row instead
+ // of the item; armed by ItemEditor's per-defect chip right before the
+ // picker opens, consumed (and cleared) by handlePhotoUpload.
+ const pendingPhotoTargetRef = useRef<{ kind: "canned" | "custom"; id: string } | null>(null);
+
  const handlePhotoUpload = useCallback(
- async (e: React.ChangeEvent<HTMLInputElement>) => {
+ (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  if (!file || !state.activeItemId) return;
+ const itemId = state.activeItemId;
+
+ // Task 4 — when offline, enqueue for later replay and show a local preview.
+ const nav = typeof navigator !== "undefined" ? navigator : undefined;
+ if (shouldQueue(nav)) {
+  const objectUrl = URL.createObjectURL(file);
+  setQueuedPhotoPreviews((prev) =>
+   addQueuedPreview(prev, itemId, { name: file.name, objectUrl }),
+  );
+  void getOfflineQueue().enqueuePhoto({
+   inspectionId: String(state.inspection.id),
+   itemId,
+   name: file.name,
+   blob: file,
+   enqueuedAt: Date.now(),
+  });
+  pushToast({ message: "Photo queued — will upload when back online", durationMs: 3000 });
+  // Reset input so picking the same file twice re-fires onChange
+  if (photoInputRef.current) photoInputRef.current.value = "";
+  return;
+ }
+
  const formData = new FormData();
+ formData.append("intent", "upload-photo");
+ formData.append("itemId", itemId);
  formData.append("file", file);
- formData.append("itemId", state.activeItemId);
- try {
- const res = await fetch(
- `/api/inspections/${state.inspection.id}/upload`,
- {
- method: "POST",
- body: formData,
- credentials: "include",
- },
- );
- if (res.ok) {
- const json = (await res.json()) as {
- data: { key: string };
- };
- findings.addPhotoToItem(state.activeItemId, json.data.key);
+ const target = pendingPhotoTargetRef.current;
+ pendingPhotoTargetRef.current = null;
+ if (target) {
+ formData.append("targetType", "defect");
+ formData.append("customId", target.id);
+ formData.append("defectKind", target.kind);
  }
- } catch {
- /* swallow */
- }
- // Reset input
+ uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+ // Reset input so picking the same file twice re-fires onChange
  if (photoInputRef.current) photoInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, findings],
+ [state.activeItemId, state.inspection.id, uploadFetcher],
  );
 
  const handleBurstCommit = useCallback(
- async (blobs: Blob[]) => {
- if (!state.burstCameraItemId) return;
- for (const blob of blobs) {
+ (blobs: Blob[]) => {
+ if (!state.burstCameraItemId || blobs.length === 0) return;
+ const itemId = state.burstCameraItemId;
+
+ // Task 6 (rider) — same offline branch as handlePhotoUpload: when offline,
+ // enqueue each captured blob and show a local preview instead of uploading.
+ const nav = typeof navigator !== "undefined" ? navigator : undefined;
+ if (shouldQueue(nav)) {
+  blobs.forEach((blob, i) => {
+  const name = `burst-${i + 1}.jpg`;
+  const objectUrl = URL.createObjectURL(blob);
+  setQueuedPhotoPreviews((prev) =>
+   addQueuedPreview(prev, itemId, { name, objectUrl }),
+  );
+  void getOfflineQueue().enqueuePhoto({
+   inspectionId: String(state.inspection.id),
+   itemId,
+   name,
+   blob,
+   enqueuedAt: Date.now(),
+  });
+  });
+  pushToast({
+  message: `${blobs.length} photo${blobs.length === 1 ? "" : "s"} queued — will upload when back online`,
+  durationMs: 3000,
+  });
+  return;
+ }
+
  const formData = new FormData();
- formData.append("file", blob, `burst-${Date.now()}.jpg`);
- formData.append("itemId", state.burstCameraItemId);
- try {
- const res = await fetch(
- `/api/inspections/${state.inspection.id}/upload`,
- {
- method: "POST",
- body: formData,
- credentials: "include",
+ formData.append("intent", "upload-photo");
+ formData.append("itemId", itemId);
+ blobs.forEach((blob, i) => {
+ formData.append("file", new File([blob], `burst-${i + 1}.jpg`, { type: "image/jpeg" }));
+ });
+ uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
  },
+ [state.burstCameraItemId, state.inspection.id, uploadFetcher],
  );
- if (res.ok) {
- const json = (await res.json()) as {
- data: { key: string };
- };
- findings.addPhotoToItem(state.burstCameraItemId!, json.data.key);
+
+ // Attach uploaded photo keys once the action responds — to the item, or
+ // (FE-3) to the specific defect row the action echoes back.
+ const processedUploadData = useRef<unknown>(null);
+ useEffect(() => {
+ const d = uploadFetcher.data as
+ | {
+ ok?: boolean;
+ keys?: string[];
+ itemId?: string;
+ targetType?: "item" | "defect";
+ customId?: string;
+ defectKind?: "canned" | "custom";
  }
- } catch {
- /* swallow */
- }
- }
- },
- [state.burstCameraItemId, state.inspection.id, findings],
+ | undefined;
+ if (uploadFetcher.state !== "idle" || !d || processedUploadData.current === d) return;
+ processedUploadData.current = d;
+ if (d.keys?.length && d.itemId) {
+ for (const k of d.keys) {
+ if (d.targetType === "defect" && d.customId) {
+ findings.addPhotoToDefect(
+ d.itemId,
+ { kind: d.defectKind ?? "canned", id: d.customId },
+ k,
  );
+ } else {
+ findings.addPhotoToItem(d.itemId, k);
+ }
+ }
+ pushToast({
+ message: `${d.keys.length} photo${d.keys.length === 1 ? "" : "s"} added${d.targetType === "defect" ? " to defect" : ""}`,
+ durationMs: 2000,
+ });
+ }
+ if (d.ok === false) {
+ pushToast({
+ message: "Photo upload failed — your photo did NOT reach the server.",
+ durationMs: 8000,
+ });
+ }
+ }, [uploadFetcher.state, uploadFetcher.data, findings]);
+
+ /* ---------------------------------------------------------------- */
+ /* Open-snippets callback (shared by keyboard shortcut + textarea trigger) */
+ /* ---------------------------------------------------------------- */
+
+ const openSnippets = useCallback(() => {
+ if (!state.activeItemId) return;
+ state.setCommentLibraryFilter("my-snippets");
+ state.setCommentLibrarySearch("");
+ state.setCommentLibrarySelectedIdx(0);
+ state.setShowCommentLibrary(true);
+ }, [state]);
 
  /* ---------------------------------------------------------------- */
  /* Keyboard shortcuts */
@@ -813,7 +1175,7 @@ export default function InspectionEditPage() {
  () => ({
  onRate: (level: number) => {
  if (state.activeItemId && state.currentSection && state.ratingLevels[level - 1]) {
- handleRating(state.ratingLevels[level - 1].id);
+ handleRating(state.ratingLevels[level - 1].id, 'keyboard');
  }
  },
  onClearRating: () => {
@@ -829,7 +1191,7 @@ export default function InspectionEditPage() {
  return ab === "NA" || ab === "N/A" || nm.includes("not applicable");
  });
  if (naLevel) {
- handleRating(naLevel.id);
+ handleRating(naLevel.id, 'keyboard');
  }
  },
  onNextItem: () => state.navigateItem(1),
@@ -869,13 +1231,7 @@ export default function InspectionEditPage() {
  state.setCommentLibrarySelectedIdx(0);
  state.setShowCommentLibrary(true);
  },
- onOpenSnippets: () => {
- if (!state.activeItemId) return;
- state.setCommentLibraryFilter("my-snippets");
- state.setCommentLibrarySearch("");
- state.setCommentLibrarySelectedIdx(0);
- state.setShowCommentLibrary(true);
- },
+ onOpenSnippets: openSnippets,
  showCommentLibrary: state.showCommentLibrary,
  onLibraryDown: () => {
  state.setCommentLibrarySelectedIdx(
@@ -946,6 +1302,7 @@ export default function InspectionEditPage() {
  handleRating,
  toggleSpeedMode,
  speedRate,
+ openSnippets,
  comments,
  commentLibraryItems,
  serverComments,
@@ -1016,7 +1373,35 @@ export default function InspectionEditPage() {
  )
  : {}
  }
+ ratingLevels={state.ratingLevels}
  onRating={handleRating}
+ onAddPhoto={() => photoInputRef.current?.click()}
+ onAddDefectPhoto={(target) => {
+ pendingPhotoTargetRef.current = target;
+ photoInputRef.current?.click();
+ }}
+ photoUploading={uploadFetcher.state !== "idle"}
+ onAddCustomDefect={(input) => {
+ if (state.activeItemId && state.currentSection) {
+ const d = makeCustomDefect(input);
+ if (d) {
+ findings.addCustomDefect(state.currentSection.id, state.activeItemId, {
+ ...d,
+ comment: d.comment ?? "",
+ });
+ }
+ }
+ }}
+ onToggleCustomDefect={(customId, included) => {
+ if (state.activeItemId && state.currentSection) {
+ findings.toggleCustomDefect(
+ state.currentSection.id,
+ state.activeItemId,
+ customId,
+ included,
+ );
+ }
+ }}
  onNotes={(notes) => {
  if (state.activeItemId && state.currentSection) {
  findings.setNotes(
@@ -1063,14 +1448,16 @@ export default function InspectionEditPage() {
  onCloneLast={handleCloneLast}
  cloneDefaultScope={inspectionPrefs.cloneDefault}
  tagChipRow={tagChipRow}
+ onOpenSnippets={openSnippets}
+ queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}
  />
  ) : (
- <div className="flex items-center justify-center h-full text-slate-400">
+ <div className="flex items-center justify-center h-full text-ih-fg-4">
  <div className="text-center">
  <p className="text-[13px]">
  Select an item from the list to start editing
  </p>
- <p className="text-[11px] mt-2 text-slate-300">
+ <p className="text-[11px] mt-2 text-ih-fg-4">
  Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> / <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd> to navigate
  </p>
  </div>
@@ -1088,26 +1475,78 @@ export default function InspectionEditPage() {
  />
  );
 
+ /* B-22: empty-template CTA — shown instead of normal editor body when the
+  * inspection has no sections (template not applied yet). Opens the
+  * InspectionSettingsSheet where the user can pick a template. */
+ const emptyTemplateEl = state.sections.length === 0 ? (
+ <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
+  <p className="text-[15px] font-semibold text-ih-fg-1">This inspection has no template content</p>
+  <p className="text-[13px] text-ih-fg-3 max-w-sm">Apply a template to get sections, items and canned comments — or import your Spectora template.</p>
+  <button
+  onClick={() => state.setSettingsOpen(true)}
+  className="px-4 h-10 rounded-lg bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600"
+  >
+  Choose a template
+  </button>
+ </div>
+ ) : null;
+
  /* ---------------------------------------------------------------- */
  /* Render */
  /* ---------------------------------------------------------------- */
+
+ // Offline status surfaces — shared by BOTH layout branches (a phone in the
+ // field is exactly where the offline indicator matters most).
+ const offlineStatusEl = (
+  <>
+   {!offline.online && (
+    <div className="fixed top-14 left-0 right-0 z-40 bg-ih-watch-bg border-b border-ih-watch px-4 py-2 text-center">
+     <span className="text-[12px] font-bold text-ih-watch-fg">
+      Saved on this device — will sync when you&apos;re back online.
+     </span>
+    </div>
+   )}
+   <NetworkPill
+    online={offline.online}
+    pendingCount={offline.pendingCount}
+    failedCount={offline.failedCount}
+    syncing={offline.syncing}
+    onSyncNow={handleSyncNow}
+   />
+  </>
+ );
 
  if (isMobile) {
  return (
  <div className="min-h-screen pb-14">
  <ToastPortal />
+ {/* FE-2: the hidden photo input previously rendered only in the desktop
+ tree — on mobile photoInputRef.current was null and every photo
+ entry point was dead. */}
+ <input
+ ref={photoInputRef}
+ type="file"
+ accept="image/*"
+ capture="environment"
+ className="hidden"
+ onChange={handlePhotoUpload}
+ />
  <MobileAppBar
  sectionTitle={state.currentSection?.title ?? ''}
  itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? 'Select an item'}
- onBack={() => navigate('/dashboard')}
+ onBack={() => {
+  // B-22: back from item editor → item list; back from list → dashboard
+  if (state.activeItemId) { state.setActiveItemId(null); return; }
+  navigate('/dashboard');
+ }}
  onMore={() => { /* future: open more menu */ }}
  />
  <main className="p-4">
- {state.activeItemId ? (
- itemEditorEl
+ {emptyTemplateEl ?? (state.activeItemId ? (
+  itemEditorEl
  ) : (
- <p className="text-center text-ih-fg-3 mt-12">Tap [☰ Sections] below to begin</p>
- )}
+  <p className="text-center text-ih-fg-3 mt-12">Tap [☰ Sections] below to begin</p>
+ ))}
  </main>
  <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} />
  <MobileBottomDrawer
@@ -1131,6 +1570,7 @@ export default function InspectionEditPage() {
  >
  {sideRailEl}
  </MobileBottomDrawer>
+   {offlineStatusEl}
  </div>
  );
  }
@@ -1224,16 +1664,20 @@ export default function InspectionEditPage() {
  open={state.settingsOpen}
  onClose={() => state.setSettingsOpen(false)}
  inspectionId={String(state.inspection.id)}
+ // Template schema drives the whole editor state (frozen at mount in useInspection),
+ // so a template change requires a full route reload — this also fixes the same
+ // staleness for mid-inspection template switches, not just the empty case.
+ onTemplateApplied={() => window.location.reload()}
  />
 
  {/* Unsaved changes blocker dialog */}
  {blocker.state === "blocked" && (
  <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
  <div
- className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+ className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm"
  onClick={cancelLeave}
  />
- <div className="relative bg-ih-bg-card rounded-lg shadow-xl p-6 max-w-sm w-full">
+ <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover p-6 max-w-sm w-full">
  <h3 className="text-[15px] font-bold text-ih-fg-1">
  Unsaved changes
  </h3>
@@ -1243,13 +1687,13 @@ export default function InspectionEditPage() {
  <div className="flex justify-end gap-2 mt-4">
  <button
  onClick={cancelLeave}
- className="px-4 py-2 text-[13px] font-bold text-slate-600 hover:bg-slate-100 rounded-md"
+ className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md"
  >
  Stay
  </button>
  <button
  onClick={confirmLeave}
- className="px-4 py-2 text-[13px] font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-md"
+ className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md"
  >
  Leave
  </button>
@@ -1261,8 +1705,8 @@ export default function InspectionEditPage() {
  {/* Publish confirmation modal */}
  {state.showPublishModal && (
  <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
- <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => state.setShowPublishModal(false)} />
- <div className="relative bg-ih-bg-card rounded-xl shadow-2xl p-6 max-w-md w-full border border-ih-border">
+ <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => state.setShowPublishModal(false)} />
+ <div className="relative bg-ih-bg-card rounded-xl shadow-ih-popover p-6 max-w-md w-full border border-ih-border">
  <h3 className="text-[16px] font-bold text-ih-fg-1">Publish Report</h3>
  <p className="text-[13px] text-ih-fg-3 mt-2">
  Publishing will finalize this inspection and make the report available to clients.
@@ -1278,13 +1722,13 @@ export default function InspectionEditPage() {
  <div className="flex justify-between"><span className="text-ih-fg-3">Status</span><span className="font-bold uppercase">{state.inspection.status as string}</span></div>
  </div>
  <div className="flex justify-end gap-2 mt-5">
- <button onClick={() => state.setShowPublishModal(false)} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md">Cancel</button>
+ <button onClick={() => state.setShowPublishModal(false)} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted rounded-md">Cancel</button>
  <button
  onClick={() => {
  fetcher.submit({ intent: "publish" }, { method: "post" });
  state.setShowPublishModal(false);
  }}
- className="px-4 py-2 text-[13px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md"
+ className="px-4 py-2 text-[13px] font-bold text-white bg-ih-ok hover:bg-ih-ok/85 rounded-md"
  >Publish Now</button>
  </div>
  </div>
@@ -1294,8 +1738,8 @@ export default function InspectionEditPage() {
  {/* Inspector sign modal */}
  {signModalOpen && (
  <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
- <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSignModalOpen(false)} />
- <div className="relative bg-ih-bg-card rounded-xl shadow-2xl p-6 max-w-md w-full border border-ih-border">
+ <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => setSignModalOpen(false)} />
+ <div className="relative bg-ih-bg-card rounded-xl shadow-ih-popover p-6 max-w-md w-full border border-ih-border">
  <h3 className="text-[16px] font-bold text-ih-fg-1">Inspector Signature</h3>
  <p className="text-[13px] text-ih-fg-3 mt-2 mb-4">
  Sign this inspection. The signature will be saved and can be included in the published report.
@@ -1306,7 +1750,7 @@ export default function InspectionEditPage() {
  label="Save signature"
  />
  {signFetcher.data && !(signFetcher.data as { ok: boolean }).ok && (
- <p className="text-sm text-red-600 mt-2">Failed to save signature. Please try again.</p>
+ <p className="text-sm text-ih-bad-fg mt-2">Failed to save signature. Please try again.</p>
  )}
  </div>
  </div>
@@ -1316,15 +1760,15 @@ export default function InspectionEditPage() {
  {state.showCommentLibrary && (
  <div className="fixed inset-0 z-[80] flex">
  <div
- className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+ className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm"
  onClick={() => state.setShowCommentLibrary(false)}
  />
- <div className="relative ml-auto w-full max-w-md bg-ih-bg-card border-l border-ih-border shadow-2xl flex flex-col h-full">
+ <div className="relative ml-auto w-full max-w-md bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col h-full">
  <div className="flex items-center justify-between px-4 py-3 border-b border-ih-border">
  <h3 className="text-[14px] font-bold">Comment Library</h3>
  <button
  onClick={() => state.setShowCommentLibrary(false)}
- className="text-slate-400 hover:text-slate-600 text-lg"
+ className="text-ih-fg-4 hover:text-ih-fg-2 text-lg"
  >
  &#x2715;
  </button>
@@ -1333,7 +1777,7 @@ export default function InspectionEditPage() {
  {/* Sort + Filter mode header */}
  <div className="flex items-center gap-3 px-3 py-2 border-b border-ih-border">
  <div className="flex items-center gap-1.5">
- <span className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Filter</span>
+ <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4">Filter</span>
  <select
  value={comments.filterMode}
  onChange={e => comments.setFilterMode(e.target.value as 'auto' | 'all')}
@@ -1344,7 +1788,7 @@ export default function InspectionEditPage() {
  </select>
  </div>
  <div className="flex items-center gap-1.5 ml-auto">
- <span className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Sort</span>
+ <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4">Sort</span>
  <select
  value={comments.sort}
  onChange={e => comments.setSort(e.target.value)}
@@ -1362,13 +1806,13 @@ export default function InspectionEditPage() {
  {/* Context strip (auto mode + active item) */}
  {comments.filterMode === 'auto' && state.activeItem && (
  <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] bg-ih-bg-muted border-b border-ih-border">
- <span className="text-slate-400">Context:</span>
+ <span className="text-ih-fg-4">Context:</span>
  <span>
  {state.currentSection?.title} › {(state.activeItem.label || state.activeItem.name) as string}
  </span>
  {Boolean(state.activeItemId && state.getResult(state.activeItemId)?.rating) && (
  <>
- <span className="text-slate-400">·</span>
+ <span className="text-ih-fg-4">·</span>
  <span>
  {state.getRatingLabel?.(state.getResult(state.activeItemId as string)?.rating as string) ?? ''}
  </span>
@@ -1376,7 +1820,7 @@ export default function InspectionEditPage() {
  )}
  <button
  onClick={() => comments.setFilterMode('all')}
- className="ml-auto text-slate-400 hover:text-slate-600"
+ className="ml-auto text-ih-fg-4 hover:text-ih-fg-2"
  aria-label="Clear filter"
  >×</button>
  </div>
@@ -1399,8 +1843,8 @@ export default function InspectionEditPage() {
  }}
  className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
  state.commentLibraryFilter === f.id
- ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
- : "text-slate-400 hover:text-slate-600"
+ ? "bg-ih-primary-tint text-ih-primary"
+ : "text-ih-fg-4 hover:text-ih-fg-2"
  }`}
  >
  {f.label}
@@ -1422,7 +1866,7 @@ export default function InspectionEditPage() {
  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
  autoFocus
  />
- <p className="text-[10px] text-slate-400 mt-1">
+ <p className="text-[10px] text-ih-fg-4 mt-1">
  {serverComments.length} comments
  </p>
  </div>
@@ -1445,7 +1889,7 @@ export default function InspectionEditPage() {
  }}
  className={`cursor-pointer ${
  idx === state.commentLibrarySelectedIdx
- ? "bg-ih-primary-tint ring-1 ring-inset ring-indigo-200 dark:ring-indigo-700"
+ ? "bg-ih-primary-tint ring-1 ring-inset ring-ih-primary/30"
  : ""
  }`}
  >
@@ -1453,7 +1897,7 @@ export default function InspectionEditPage() {
  <p className="flex-1 text-[12px] text-ih-fg-2 leading-relaxed">
  {c.text}
  </p>
- <span className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">
+ <span className="text-[10px] text-ih-fg-4 tabular-nums whitespace-nowrap">
  {comments.sort === 'recent'   && c.lastUsedAt ? formatRelativeTime(c.lastUsedAt) : ''}
  {comments.sort === 'frequent' && c.useCount   ? `${c.useCount}×`               : ''}
  </span>
@@ -1474,8 +1918,8 @@ export default function InspectionEditPage() {
  {/* Section picker modal */}
  {state.sectionPickerOpen && (
  <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[20vh]">
- <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => state.closeSectionPicker()} />
- <div className="relative w-full max-w-md bg-ih-bg-card rounded-xl shadow-2xl border border-ih-border overflow-hidden">
+ <div className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => state.closeSectionPicker()} />
+ <div className="relative w-full max-w-md bg-ih-bg-card rounded-xl shadow-ih-popover border border-ih-border overflow-hidden">
  <div className="px-4 py-3 border-b border-ih-border">
  <input
  id="section-picker-input"
@@ -1509,13 +1953,13 @@ export default function InspectionEditPage() {
  {/* Tag picker modal */}
  {tagPickerOpen && state.activeItemId && (
  <div className="fixed inset-0 z-[95] flex items-start justify-center pt-[20vh]">
-  <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setTagPickerOpen(false)} />
-  <div className="relative w-full max-w-sm bg-ih-bg-card rounded-xl shadow-2xl border border-ih-border overflow-hidden">
+  <div className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setTagPickerOpen(false)} />
+  <div className="relative w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover border border-ih-border overflow-hidden">
   <div className="px-4 py-3 border-b border-ih-border flex items-center justify-between">
    <h3 className="text-[14px] font-bold text-ih-fg-1">Tags</h3>
    <button
    onClick={() => setTagPickerOpen(false)}
-   className="text-slate-400 hover:text-slate-600 text-lg"
+   className="text-ih-fg-4 hover:text-ih-fg-2 text-lg"
    >
    &#x2715;
    </button>
@@ -1531,7 +1975,7 @@ export default function InspectionEditPage() {
     className={`w-full text-left px-3 py-2.5 rounded-lg text-[13px] font-medium flex items-center gap-3 transition-colors ${
      isActive
      ? "bg-ih-bg-muted ring-1 ring-inset"
-     : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
+     : "hover:bg-ih-bg-muted"
     }`}
     style={isActive ? { "--tw-ring-color": tag.color } as React.CSSProperties : undefined}
     >
@@ -1592,7 +2036,7 @@ export default function InspectionEditPage() {
  <div className="h-14 bg-ih-bg-card border-b border-ih-border flex items-center px-4 gap-3">
  <a
  href="/dashboard"
- className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+ className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
  >
  <svg
  className="w-4 h-4"
@@ -1632,15 +2076,15 @@ export default function InspectionEditPage() {
  </div>
 
  {/* View mode */}
- <div className="hidden lg:flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
+ <div className="hidden lg:flex items-center gap-0.5 bg-ih-bg-muted rounded-md p-0.5">
  <button
  onClick={() => state.setViewMode("split")}
- className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "split" ? "bg-white dark:bg-slate-700 text-ih-fg-1 shadow-sm" : "text-ih-fg-3"}`}
+ className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "split" ? "bg-ih-bg-card text-ih-fg-1 shadow-ih-card" : "text-ih-fg-3"}`}
  title="Split view (Cmd+1)"
  >Split</button>
  <button
  onClick={() => state.setViewMode("focus")}
- className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "focus" ? "bg-white dark:bg-slate-700 text-ih-fg-1 shadow-sm" : "text-ih-fg-3"}`}
+ className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "focus" ? "bg-ih-bg-card text-ih-fg-1 shadow-ih-card" : "text-ih-fg-3"}`}
  title="Focus view (Cmd+2)"
  >Focus</button>
  </div>
@@ -1657,8 +2101,8 @@ export default function InspectionEditPage() {
  }}
  className={`hidden lg:flex w-9 h-9 rounded-md items-center justify-center ${
   state.batchMode
-  ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
-  : "text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+  ? "bg-ih-primary-tint text-ih-primary"
+  : "text-ih-fg-3 hover:bg-ih-bg-muted"
  }`}
  title={state.batchMode ? "Exit batch mode" : "Batch mode (B)"}
  >
@@ -1694,7 +2138,7 @@ export default function InspectionEditPage() {
  >
  {state.saveStatus === "saving" ? (
  <>
- <span className="w-1.5 h-1.5 rounded-full bg-ih-watch-bg0 animate-pulse" />
+ <span className="w-1.5 h-1.5 rounded-full bg-ih-watch animate-pulse" />
  Saving...
  </>
  ) : state.saveStatus === "saved" ? (
@@ -1716,7 +2160,7 @@ export default function InspectionEditPage() {
  </>
  ) : (
  <>
- <span className="w-1.5 h-1.5 rounded-full bg-ih-bad-bg0" />
+ <span className="w-1.5 h-1.5 rounded-full bg-ih-bad" />
  Error
  </>
  )}
@@ -1724,14 +2168,14 @@ export default function InspectionEditPage() {
  )}
 
  {/* Status badge */}
- <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600 inline-flex items-center">
+ <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border inline-flex items-center">
  {state.inspection.status as string}
  </span>
 
  {/* Dark mode toggle */}
  <button
  onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'auto' : 'light')}
- className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+ className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
  title={`Theme: ${scheme}`}
  >
  {scheme === 'dark' ? (
@@ -1746,7 +2190,7 @@ export default function InspectionEditPage() {
  {/* Settings button */}
  <button
  onClick={() => state.setSettingsOpen(true)}
- className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-slate-100 dark:hover:bg-slate-800"
+ className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
  title="Inspection settings"
  >
  <svg
@@ -1776,7 +2220,7 @@ export default function InspectionEditPage() {
  type="checkbox"
  checked={autoSign}
  onChange={(e) => handleAutoSignToggle(e.target.checked)}
- className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+ className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
  />
  Auto-sign
  </label>
@@ -1784,7 +2228,7 @@ export default function InspectionEditPage() {
  {/* Sign now button */}
  <button
  onClick={() => setSignModalOpen(true)}
- className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-slate-100 dark:hover:bg-slate-800 items-center gap-1.5"
+ className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
  title="Sign this inspection now"
  >
  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1796,7 +2240,7 @@ export default function InspectionEditPage() {
  {/* Publish button */}
  <button
  onClick={handlePublishClick}
- className="h-9 px-4 rounded-md bg-emerald-600 text-white font-bold text-[12px] hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5"
+ className="h-9 px-4 rounded-md bg-ih-ok text-white font-bold text-[12px] hover:bg-ih-ok/85 transition-colors inline-flex items-center gap-1.5"
  >
  <svg
  className="w-3.5 h-3.5"
@@ -1820,6 +2264,13 @@ export default function InspectionEditPage() {
  {/* 4-column layout below header */}
  {/* ------------------------------------------------------------ */}
  <div className="flex flex-1 pt-14 pb-9">
+ {/* B-22: if no sections, show the empty-template CTA spanning the full body */}
+ {emptyTemplateEl ? (
+ <div className="flex-1 flex">
+  {emptyTemplateEl}
+ </div>
+ ) : (
+ <>
  {/* Column 1: Section Rail (200px) */}
  {sectionRailEl}
 
@@ -1875,7 +2326,7 @@ export default function InspectionEditPage() {
  <div className="flex items-center gap-1 px-3 py-1 border-b border-ih-border">
   <button
   onClick={() => state.batchSelectAll()}
-  className="px-2 py-0.5 rounded text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+  className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-primary hover:bg-ih-primary-tint"
   >
   Select All
   </button>
@@ -1916,18 +2367,20 @@ export default function InspectionEditPage() {
  </div>
 
  {/* Column 3: Item Editor (flex-1, focal) */}
- <main className="flex-1 overflow-y-auto border-t-2 border-indigo-600 p-6">
+ <main className="flex-1 overflow-y-auto border-t-2 border-ih-primary p-6">
  {itemEditorEl}
  </main>
 
  {/* Column 4: SideRail */}
  {sideRailEl}
+ </>
+ )}
  </div>
 
  {/* ------------------------------------------------------------ */}
  {/* Footer Bar */}
  {/* ------------------------------------------------------------ */}
- <FooterBar connected={presence.connected} roster={presence.roster} />
+ <FooterBar connected={presence.connected} status={presence.status} roster={presence.roster} />
 
  {/* ------------------------------------------------------------ */}
  {/* Inspector Tools Dock (FAB) */}
@@ -1960,19 +2413,7 @@ export default function InspectionEditPage() {
  hidden={state.speedMode}
  />
 
- {/* Offline reconnect banner */}
- {!offline.online && (
- <div className="fixed top-14 left-0 right-0 z-40 bg-ih-watch-bg border-b border-ih-watch px-4 py-2 text-center">
- <span className="text-[12px] font-bold text-ih-watch-fg">
- You are offline. Changes will sync when you reconnect.
- </span>
- {offline.pendingCount > 0 && (
- <span className="text-[11px] text-ih-watch-fg ml-2">
- ({offline.pendingCount} pending)
- </span>
- )}
- </div>
- )}
+ {offlineStatusEl}
  </div>
  );
 }

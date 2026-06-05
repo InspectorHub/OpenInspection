@@ -272,6 +272,61 @@ const skipSetupRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
+const dismissChecklistRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/checklist/dismiss',
+    operationId: 'dismissOnboardingChecklist',
+    summary: 'Dismiss the onboarding checklist',
+    description: 'Marks the dashboard onboarding checklist as dismissed for the current user. Idempotent — safe to call multiple times.',
+    tags: ['auth'],
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    responses: {
+        200: {
+            content: {
+                'application/json': { schema: SuccessResponseSchema.describe('Checklist dismissed') }
+            },
+            description: 'Checklist marked as dismissed'
+        },
+        401: { description: 'Unauthorized' }
+    }
+}, { scopes: [], tier: 'excluded' }));
+
+// Allowlist of boolean flags that can be set via the generic onboarding-flag endpoint.
+// Adding a new flag here is the only server-side change needed for new one-time UI states.
+const ONBOARDING_FLAG_ALLOWLIST = ['checklistDismissed', 'spectoraMappingSeen'] as const;
+type OnboardingFlag = typeof ONBOARDING_FLAG_ALLOWLIST[number];
+
+const markOnboardingFlagRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/onboarding/flag',
+    operationId: 'markOnboardingFlag',
+    summary: 'Mark a one-time onboarding flag as seen',
+    description: 'Sets a boolean flag in the current user\'s onboardingState. Allowlisted flags only: checklistDismissed, spectoraMappingSeen. Idempotent.',
+    tags: ['auth'],
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        flag: z.enum(ONBOARDING_FLAG_ALLOWLIST).describe('The onboarding flag to mark as true.'),
+                    })
+                }
+            }
+        }
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': { schema: SuccessResponseSchema.describe('Flag marked') }
+            },
+            description: 'Onboarding flag set'
+        },
+        400: { description: 'Unknown flag' },
+        401: { description: 'Unauthorized' }
+    }
+}, { scopes: [], tier: 'excluded' }));
+
 const meRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/me',
@@ -734,6 +789,34 @@ export const coreAuthRoutes = createApiRouter()
         await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
 
         return c.json({ success: true, data: { skipped: true } }, 200);
+    })
+    .openapi(dismissChecklistRoute, async (c) => {
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized('Not signed in');
+
+        const db = drizzle(c.env.DB);
+        const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
+        const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
+        onboardingState.checklistDismissed = true;
+
+        await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
+
+        return c.json({ success: true, data: { checklistDismissed: true } }, 200);
+    })
+    .openapi(markOnboardingFlagRoute, async (c) => {
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized('Not signed in');
+
+        const { flag } = c.req.valid('json') as { flag: OnboardingFlag };
+
+        const db = drizzle(c.env.DB);
+        const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
+        const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
+        onboardingState[flag] = true;
+
+        await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
+
+        return c.json({ success: true, data: { [flag]: true } }, 200);
     })
     .openapi(meRoute, async (c) => {
         const user = c.get('user');

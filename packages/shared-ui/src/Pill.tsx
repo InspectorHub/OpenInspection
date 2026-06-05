@@ -8,7 +8,7 @@ const toneClasses: Record<PillTone, string> = {
   defect: "bg-ih-bad-bg text-ih-bad-fg",
   ni: "bg-ih-bg-muted text-ih-fg-3",
   np: "bg-ih-bg-muted text-ih-fg-4",
-  info: "bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400",
+  info: "bg-ih-info-bg text-ih-info-fg",
   gen: "bg-ih-bg-muted text-ih-fg-3",
   primary: "bg-ih-primary-tint text-ih-primary",
   neutral: "bg-ih-bg-muted text-ih-fg-3",

@@ -8,7 +8,7 @@ export default function NotFoundPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-ih-bg-card">
       <div className="text-center">
-        <h1 className="text-6xl font-bold text-slate-300 dark:text-slate-600">
+        <h1 className="text-6xl font-bold text-ih-fg-4">
           404
         </h1>
         <p className="text-lg font-semibold text-ih-fg-2 mt-4">

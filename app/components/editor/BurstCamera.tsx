@@ -120,11 +120,13 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
   }
 
   return (
+    /* ds-allow: fixed-dark full-screen camera overlay (stays dark in both themes) */
     <div className="fixed inset-0 z-50 bg-black flex flex-col" role="dialog" aria-label="Burst camera" aria-modal="true">
       <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Top chrome */}
+      {/* ds-allow: fixed-dark camera overlay chrome (light-on-dark) */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4">
         <button type="button" onClick={onClose} className="w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60" aria-label="Close camera">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -142,11 +144,12 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
       {/* Thumbnail strip */}
       {captures.length > 0 && (
         <div className="relative z-10 mb-3 px-4">
+          {/* ds-allow: fixed-dark camera overlay thumbnails (light-on-dark border) */}
           <div className="flex gap-2 overflow-x-auto pb-1" data-testid="burst-thumbnails">
             {captures.map((c) => (
               <div key={c.id} className="relative flex-shrink-0">
                 <img src={c.url} className="w-16 h-16 object-cover rounded-md border-2 border-white/30" alt="Captured frame" />
-                <button type="button" onClick={() => discardOne(c.id)} className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-ih-bad-bg0 text-white text-xs font-bold flex items-center justify-center hover:bg-rose-600" aria-label="Discard this frame">x</button>
+                <button type="button" onClick={() => discardOne(c.id)} className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-ih-bad text-white text-xs font-bold flex items-center justify-center hover:bg-ih-bad/85" aria-label="Discard this frame">x</button>
               </div>
             ))}
           </div>
@@ -155,10 +158,12 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
 
       {/* Bottom action row */}
       <div className="relative z-10 pb-8 px-4 flex items-center justify-between gap-4">
+        {/* ds-allow: fixed-dark camera overlay control (light-on-dark) */}
         {captures.length > 0 ? (
           <button type="button" onClick={discardAll} className="text-rose-300 text-xs font-semibold hover:text-rose-200">Discard all</button>
         ) : <div className="w-20" />}
 
+        {/* ds-allow: fixed-dark camera shutter (white button + rose burst ring + dark label, stays fixed in both themes) */}
         <button
           type="button"
           onMouseDown={onShutterDown}
@@ -174,12 +179,13 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
           {burstActive ? (
             <span className="text-ih-bad-fg text-xs font-bold animate-pulse">{burstCount} / 30</span>
           ) : (
+            /* ds-allow: dark label on the white shutter button (fixed-dark camera overlay) */
             <span className="text-slate-700 text-[10px] font-bold tracking-widest uppercase">Shoot</span>
           )}
         </button>
 
         {captures.length > 0 ? (
-          <button type="button" onClick={commit} className="px-5 py-2.5 rounded-full bg-indigo-500 text-white text-sm font-bold shadow-lg hover:bg-ih-primary" data-testid="burst-done">
+          <button type="button" onClick={commit} className="px-5 py-2.5 rounded-full bg-ih-primary text-white text-sm font-bold shadow-ih-popover hover:bg-ih-primary-600" data-testid="burst-done">
             {uploading ? "Uploading..." : "Done"}
           </button>
         ) : <div className="w-20" />}

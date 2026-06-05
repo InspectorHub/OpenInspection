@@ -41,14 +41,14 @@ export function IdentitySwitcher() {
   }
 
   return (
-    <div className="border-t border-slate-100 dark:border-slate-700 pt-2 mt-2">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 px-3">
+    <div className="border-t border-ih-border pt-2 mt-2">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1 px-3">
         Switch identity
       </div>
       {identities.map((id) => (
         <button
           key={id.id}
-          className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+          className="w-full text-left px-3 py-2 hover:bg-ih-bg-muted flex items-center gap-2"
           onClick={() => switchTo(id.linkedUserId)}
           disabled={submitting}
         >

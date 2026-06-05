@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, sql } from 'drizzle-orm';
+import { eq, and, like, sql, isNull } from 'drizzle-orm';
 import { contacts } from '../lib/db/schema/contact';
 import { inspections } from '../lib/db/schema/inspection';
 import { Errors } from '../lib/errors';
@@ -67,5 +67,73 @@ export class ContactService {
         const existing = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Contact not found');
         await db.delete(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+    }
+
+    /**
+     * IA-1 — Idempotent upsert used during inspection creation to capture client
+     * and agent people without double-creating rows.
+     *
+     * Rules:
+     * - Email is normalized to lowercase+trim before any lookup or write.
+     * - Email present: find ACTIVE (archived_at IS NULL) row by (tenantId, normalizedEmail).
+     *   - Found: fill-forward: set name/phone ONLY where existing value is null/empty. Returns {id, created:false}.
+     *   - Not found: INSERT a new row. Returns {id, created:true}.
+     * - Email absent: always INSERT a name-only row. Returns {id, created:true}.
+     * - Archived rows with matching email are NOT matched (the partial unique allows a fresh active row).
+     */
+    async upsertClientContact(
+        tenantId: string,
+        input: { name: string; email?: string; phone?: string; type: 'client' | 'agent' },
+    ): Promise<{ id: string; created: boolean }> {
+        const db = this.getDrizzle();
+        const normalizedEmail = input.email ? input.email.toLowerCase().trim() : undefined;
+
+        if (normalizedEmail) {
+            // Look for an ACTIVE row with this email (archived_at IS NULL).
+            const existing = await db
+                .select()
+                .from(contacts)
+                .where(
+                    and(
+                        eq(contacts.tenantId, tenantId),
+                        eq(contacts.email, normalizedEmail),
+                        isNull(contacts.archivedAt),
+                    ),
+                )
+                .get();
+
+            if (existing) {
+                // Fill-forward: only update name/phone if currently null/empty.
+                const updates: Partial<{ name: string; phone: string }> = {};
+                if ((!existing.name || existing.name.trim() === '') && input.name) {
+                    updates.name = input.name;
+                }
+                if ((!existing.phone || existing.phone.trim() === '') && input.phone) {
+                    updates.phone = input.phone;
+                }
+                if (Object.keys(updates).length > 0) {
+                    await db
+                        .update(contacts)
+                        .set(updates)
+                        .where(eq(contacts.id, existing.id));
+                }
+                return { id: existing.id, created: false };
+            }
+        }
+
+        // INSERT — either no email or no matching active row found.
+        const id = crypto.randomUUID();
+        await db.insert(contacts).values({
+            id,
+            tenantId,
+            type: input.type,
+            name: input.name,
+            email: normalizedEmail ?? null,
+            phone: input.phone ?? null,
+            agency: null,
+            notes: null,
+            createdAt: new Date(),
+        });
+        return { id, created: true };
     }
 }

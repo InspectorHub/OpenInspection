@@ -231,19 +231,19 @@ export default function SettingsIntegrationsQbo() {
           </h3>
           <ul className="text-[13px] text-ih-fg-3 text-left max-w-xs mx-auto mb-6 space-y-2">
             <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">&#x2713;</span> Real-time
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Real-time
               invoice sync
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">&#x2713;</span> Automatic
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Automatic
               payment status updates
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">&#x2713;</span> Duplicate
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Duplicate
               customer detection
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">&#x2713;</span> Invoice
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Invoice
               void and refund sync
             </li>
           </ul>
@@ -280,8 +280,8 @@ export default function SettingsIntegrationsQbo() {
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
  status.syncEnabled
- ? "bg-emerald-500"
- : "bg-slate-400"
+ ? "bg-ih-ok"
+ : "bg-ih-fg-4"
  }`}
                 />
                 {status.syncEnabled ? "Active" : "Paused"}

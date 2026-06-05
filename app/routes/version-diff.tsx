@@ -92,7 +92,7 @@ export default function VersionDiffPage() {
  </div>
  <a
  href={`/inspections/${inspectionId}/edit`}
- className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex items-center"
+ className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors inline-flex items-center"
  >
  Back to Editor
  </a>
@@ -100,12 +100,12 @@ export default function VersionDiffPage() {
 
  {/* Diff table */}
  {diffs.length === 0 ? (
- <div className="p-6 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-slate-400">
+ <div className="p-6 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-ih-fg-4">
  No changes in this version.
  </div>
  ) : (
  <div className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden">
- <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 text-[11px] font-bold uppercase tracking-widest text-slate-400 bg-ih-bg-app/30 border-b border-ih-border">
+ <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 bg-ih-bg-app/30 border-b border-ih-border">
  <div className="px-4 py-3">Field</div>
  <div className="px-4 py-3 border-l border-ih-border">
  Before
@@ -118,24 +118,24 @@ export default function VersionDiffPage() {
  {diffs.map((d, i) => (
  <div
  key={i}
- className="grid grid-cols-[1fr_1fr_1fr] gap-0 border-b last:border-b-0 border-slate-100 dark:border-slate-700"
+ className="grid grid-cols-[1fr_1fr_1fr] gap-0 border-b last:border-b-0 border-ih-border"
  >
  <div className="px-4 py-3">
  <p className="text-[13px] font-semibold text-ih-fg-1">
  {d.item}
  </p>
- <p className="text-[11px] text-slate-400 mt-0.5">
+ <p className="text-[11px] text-ih-fg-4 mt-0.5">
  {d.section} / {d.field}
  </p>
  </div>
  <div className="px-4 py-3 border-l border-ih-border bg-ih-bad-bg/50">
  <span className="text-[13px] text-ih-bad-fg">
- {d.before ?? <span className="italic text-slate-400">empty</span>}
+ {d.before ?? <span className="italic text-ih-fg-4">empty</span>}
  </span>
  </div>
  <div className="px-4 py-3 border-l border-ih-border bg-ih-ok-bg/50">
  <span className="text-[13px] text-ih-ok-fg">
- {d.after ?? <span className="italic text-slate-400">empty</span>}
+ {d.after ?? <span className="italic text-ih-fg-4">empty</span>}
  </span>
  </div>
  </div>

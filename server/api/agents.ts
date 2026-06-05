@@ -8,6 +8,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { signJwt } from '../lib/jwt-keyring';
 import { agentTenantLinks, users } from '../lib/db/schema/tenant';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { getLegalLinks, buildTermsAcceptedBlob } from '../lib/legal-links';
 
 /**
  * Agent Accounts A1 — invite + accept endpoints. The (existing) /api/agent
@@ -63,6 +64,9 @@ const AcceptBodySchema = z
         token: z.string().min(8).describe('TODO describe token field for the OpenInspection MCP integration'),
         password: z.string().min(12).describe('TODO describe password field for the OpenInspection MCP integration'),
         name: z.string().min(2).max(120).describe('TODO describe name field for the OpenInspection MCP integration'),
+        // Legal-links feature — required (true) only when the operator configured
+        // TERMS_URL/PRIVACY_URL; enforced in the handler, optional on the wire.
+        termsAccepted: z.boolean().optional().describe('Acceptance of operator Terms of Service and Privacy Policy; required when the operator has configured TERMS_URL/PRIVACY_URL'),
     })
     .openapi('AgentAcceptBody');
 
@@ -225,9 +229,19 @@ export const agentsRoutes = createApiRouter()
     })
     .openapi(acceptRoute, async (c) => {
         const body = c.req.valid('json');
+
+        const links = getLegalLinks(c.env);
+        if (links && body.termsAccepted !== true) {
+            throw Errors.BadRequest('You must accept the terms to create an account.');
+        }
+
         const result = await c.var.services.agent.acceptInvite(body.token, {
             password: body.password,
             name: body.name,
+            ...(links ? { termsAccepted: buildTermsAcceptedBlob(links, {
+                ip: c.req.header('CF-Connecting-IP'),
+                country: (c.req.raw.cf?.country as string | undefined),
+            }) } : {}),
         });
 
         // Mint the agent JWT — note the deliberate absence of a tenantId claim. Per

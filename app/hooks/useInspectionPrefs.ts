@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { AutoAdvanceMode } from '~/lib/rating-levels';
 
 export interface InspectionPrefs {
     cloneDefault:       'rating' | 'rating_notes' | 'all';
+    /** B-18 — when rating an item advances to the next unrated one.
+     *  'keyboard' (default): only keyboard 1-5 speed-scanning advances;
+     *  pointer clicks stay put for the rate → describe → photo flow. */
+    autoAdvance:        AutoAdvanceMode;
     autoAdvanceDelayMs: number;
     pinnedTagIds:       string[];
 }
 
 const DEFAULTS: InspectionPrefs = {
     cloneDefault:       'rating_notes',
+    autoAdvance:        'keyboard',
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
 };

@@ -174,7 +174,7 @@ export class ConciergeService {
             clientEmail: params.clientEmail,
             clientPhone: params.clientPhone ?? null,
             date: params.date,
-            status: 'pending',
+            status: 'scheduled',
             paymentStatus: 'unpaid',
             paymentRequired: params.paymentRequired,
             agreementRequired: params.agreementRequired,

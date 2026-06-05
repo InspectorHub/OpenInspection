@@ -225,7 +225,7 @@ export default function SettingsAdvancedPage() {
                 placeholder="acct_1AbCdEfGhIjKlMnO"
                 autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
                 aria-invalid={stripeFields.stripeAccountId.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-mono text-[13px] placeholder:text-slate-300 dark:placeholder:text-slate-500 text-ih-fg-1"
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-mono text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1"
               />
               {stripeFields.stripeAccountId.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{stripeFields.stripeAccountId.errors[0]}</p>

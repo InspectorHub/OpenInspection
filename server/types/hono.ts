@@ -58,6 +58,12 @@ export interface AppEnv {
     PRIMARY_COLOR: string;
     APP_BASE_URL?: string;
 
+    // Legal
+    /** Optional: URL of the operator's Terms of Service. When set (with or without PRIVACY_URL), account-creating public forms require an acceptance checkbox. */
+    TERMS_URL?: string;
+    /** Optional: URL of the operator's Privacy Policy. When set, public pages render a privacy-notice footer link. */
+    PRIVACY_URL?: string;
+
     // Optional Configuration
     SINGLE_TENANT_ID?: string;
     BILLING_URL?: string;

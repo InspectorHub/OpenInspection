@@ -50,14 +50,14 @@ export function MintObserverLinkModal({ open, inspectionId, onClose }: MintObser
  if (!open) return null;
 
  return (
- <div className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Share live view">
- <div className="max-w-md w-full p-6 bg-ih-bg-card rounded-xl shadow-2xl">
+ <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Share live view">
+ <div className="max-w-md w-full p-6 bg-ih-bg-card rounded-xl shadow-ih-popover">
  <h2 className="text-xl font-bold mb-2 text-ih-fg-1">Share live view</h2>
  <p className="text-sm text-ih-fg-3 mb-4">
  Generate a one-time read-only link a buyer or agent can use to watch this inspection live. No account needed.
  </p>
  <label className="block mb-4">
- <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Duration</span>
+ <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">Duration</span>
  <select
  className="w-full px-3 py-2 border border-ih-border rounded-md text-sm font-medium bg-ih-bg-card text-ih-fg-1"
  value={durationSeconds}
@@ -73,7 +73,7 @@ export function MintObserverLinkModal({ open, inspectionId, onClose }: MintObser
  <div className="text-[10px] font-bold uppercase tracking-widest text-ih-ok-fg">Live-view link (one-time)</div>
  <input className="w-full px-2 py-1 border border-ih-ok rounded text-xs font-mono bg-ih-bg-card" value={generatedUrl} readOnly onClick={(e) => (e.target as HTMLInputElement).select()} />
  <div className="flex gap-2">
- <button className="px-3 h-7 rounded-md bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700" onClick={copyUrl}>Copy link</button>
+ <button className="px-3 h-7 rounded-md bg-ih-ok text-white text-xs font-bold hover:bg-ih-ok/85" onClick={copyUrl}>Copy link</button>
  {copied && <span className="text-xs text-ih-ok-fg self-center">Copied!</span>}
  </div>
  </div>

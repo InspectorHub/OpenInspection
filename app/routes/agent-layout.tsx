@@ -9,23 +9,23 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 const NAV_ITEMS = [
   { to: "/agent-dashboard", label: "Dashboard" },
-  { to: "/agent-recommendations", label: "Recommendations" },
+  { to: "/agent-recommendations", label: "Repair Items" },
   { to: "/agent-inspectors", label: "Inspectors" },
   { to: "/agent-settings/profile", label: "Settings" },
 ];
 
 export default function AgentLayout() {
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-900">
+    <div className="min-h-screen bg-ih-bg-app">
       {/* Top bar */}
-      <header className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+      <header className="border-b border-ih-border bg-ih-bg-card">
         <div className="max-w-[1080px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo.svg" alt="" className="w-7 h-7 shrink-0" width={28} height={28} />
-            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <span className="text-sm font-bold text-ih-fg-1">
               OpenInspection
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-2 hidden sm:inline">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 ml-2 hidden sm:inline">
               Agent Portal
             </span>
           </div>
@@ -37,8 +37,8 @@ export default function AgentLayout() {
                 className={({ isActive }) =>
                   `px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
                     isActive
-                      ? "bg-indigo-50 text-indigo-600 dark:bg-slate-700 dark:text-white"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                      ? "bg-ih-primary-tint text-ih-primary"
+                      : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-fg-1"
                   }`
                 }
               >
@@ -47,7 +47,7 @@ export default function AgentLayout() {
             ))}
             <a
               href="/logout"
-              className="px-3 py-1.5 rounded-md text-[13px] font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors ml-2"
+              className="px-3 py-1.5 rounded-md text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bad-bg hover:text-ih-bad-fg transition-colors ml-2"
             >
               Log out
             </a>

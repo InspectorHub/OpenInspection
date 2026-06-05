@@ -6,7 +6,7 @@ import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
-import { changePasswordSchema } from "~/lib/forms/settings.schema";
+import { changePasswordSchema, deleteAccountSchema } from "~/lib/forms/settings.schema";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -15,6 +15,9 @@ import { changePasswordSchema } from "~/lib/forms/settings.schema";
 interface AuthMe {
   totpEnabled?: boolean;
   recoveryCodesRemaining?: number | null;
+  email?: string | null;
+  name?: string | null;
+  createdAt?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -26,7 +29,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const api = createApi(context, { token });
 
   const [meRes, secretsRes] = await Promise.all([
-    api.auth.me.$get(),
+    // TODO(C-10 collapse): hono/client collapses api.auth.me.$get to a non-callable
+    // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
+    (api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>)(),
     api.secrets.secrets.$get().catch(() => null),
   ]);
 
@@ -87,6 +92,35 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: true, error: null };
   }
 
+  if (intent === "export-data") {
+    // TODO(C-10 collapse): hono/client collapses api.identity.account path;
+    // localized assertion until the typed-hono spike resolves it. Binding preserved.
+    const identityClient = api.identity as unknown as { account: { export: { $post: (args?: unknown) => Promise<Response> }; delete: { $post: (args: { json: { confirmEmail: string } }) => Promise<Response> } } };
+    const res = await identityClient.account.export.$post();
+    if (!res.ok) {
+      return { success: false, error: "Data export failed. Please try again." };
+    }
+    return { success: true, error: null, message: "Data export complete. Your account data is available below." };
+  }
+
+  if (intent === "delete-account") {
+    const submission = parseWithZod(fd, { schema: deleteAccountSchema });
+    if (submission.status !== "success") {
+      return submission.reply();
+    }
+    const confirmEmail = submission.value.confirmEmail.trim();
+    const identityClient2 = api.identity as unknown as { account: { export: { $post: (args?: unknown) => Promise<Response> }; delete: { $post: (args: { json: { confirmEmail: string } }) => Promise<Response> } } };
+    const res = await identityClient2.account.delete.$post({ json: { confirmEmail } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = (err as { error?: { message?: string } })?.error?.message
+        ?? (err as Record<string, string>)?.message
+        ?? "Account deletion failed.";
+      return submission.reply({ formErrors: [msg] });
+    }
+    return { success: true, error: null, message: "Account deleted." };
+  }
+
   return { success: false, error: "Unknown action" };
 }
 
@@ -98,15 +132,29 @@ export default function SettingsSecurityPage() {
   const { user, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [showPassword, setShowPassword] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Conform owns only the change-password form. The success flash above reads
-  // the `{success}` shape; field/form errors come through `lastResult`. Guard so
-  // a non-Conform actionData (save-turnstile) isn't fed into useForm.
-  const pwResult = actionData && "status" in actionData ? actionData : undefined;
+  // Conform owns the change-password form. Guard so non-Conform actionData
+  // (save-turnstile / export-data) isn't fed into useForm.
+  const pwResult = actionData && "status" in actionData && (actionData as { intent?: string }).intent !== "delete-account" ? actionData : undefined;
   const [pwForm, pwFields] = useForm({
     lastResult: pwResult,
     onValidate({ formData }) {
       return parseWithZod(formData, { schema: changePasswordSchema });
+    },
+    shouldValidate: "onBlur",
+    shouldRevalidate: "onInput",
+  });
+
+  // Conform for the delete-account form.
+  const deleteResult =
+    actionData && "status" in actionData && (actionData as { intent?: string }).intent === "delete-account"
+      ? actionData
+      : undefined;
+  const [deleteForm, deleteFields] = useForm({
+    lastResult: deleteResult,
+    onValidate({ formData }) {
+      return parseWithZod(formData, { schema: deleteAccountSchema });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -118,15 +166,15 @@ export default function SettingsSecurityPage() {
       <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
         <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
         <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Security</span>
+        <span className="text-ih-fg-1">Account & Security</span>
       </div>
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Security</h2>
-      <p className="text-[13px] text-ih-fg-3">Password, two-factor authentication, and active sessions.</p>
+      <h2 className="text-[19px] font-bold text-ih-fg-1">Account & Security</h2>
+      <p className="text-[13px] text-ih-fg-3">Password, two-factor authentication, account data, and security settings.</p>
 
       {/* Flash */}
       {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Password changed successfully.
+          {(actionData as Record<string, unknown>).message as string || "Saved."}
         </div>
       )}
       {actionData && "error" in actionData && typeof actionData.error === "string" && actionData.error ? (
@@ -134,6 +182,21 @@ export default function SettingsSecurityPage() {
           {actionData.error}
         </div>
       ) : null}
+
+      {/* Account info */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Account details</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">Email</p>
+            <p className="text-[13px] text-ih-fg-1 font-medium">{user.email || "Not set"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">Name</p>
+            <p className="text-[13px] text-ih-fg-1 font-medium">{user.name || "Not set"}</p>
+          </div>
+        </div>
+      </section>
 
       {/* Change password */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
@@ -273,6 +336,85 @@ export default function SettingsSecurityPage() {
           </div>
         </div>
         <p className="text-[11px] text-ih-fg-3">Full session management coming soon.</p>
+      </section>
+
+      {/* Data export */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Data export</h3>
+        <p className="text-[13px] text-ih-fg-3">
+          Download a copy of all your data including inspections, reports, templates, and client information.
+        </p>
+        <Form method="post">
+          <input type="hidden" name="intent" value="export-data" />
+          <button type="submit"
+            className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-2 text-[13px] font-semibold hover:bg-ih-bg-muted transition-colors">
+            Download my data
+          </button>
+        </Form>
+      </section>
+
+      {/* Danger zone */}
+      <section className="bg-ih-bg-card rounded-lg border border-ih-bad p-6 space-y-4">
+        <h3 className="text-[11px] font-bold text-ih-bad-fg uppercase tracking-[0.2em]">Danger zone</h3>
+        <div className="p-4 rounded-md bg-ih-bad-bg border border-ih-bad">
+          <p className="text-[13px] font-bold text-ih-bad-fg mb-1">Delete account</p>
+          <p className="text-[12px] text-ih-bad-fg leading-relaxed">
+            Permanently delete your account and all associated data including inspections,
+            reports, templates, and client records. This action cannot be undone.
+          </p>
+        </div>
+
+        {!showDeleteConfirm ? (
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="h-9 px-4 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-colors"
+          >
+            Delete my account
+          </button>
+        ) : (
+          <Form
+            method="post"
+            id={deleteForm.id}
+            onSubmit={deleteForm.onSubmit}
+            noValidate
+            className="space-y-3 max-w-sm"
+          >
+            <input type="hidden" name="intent" value="delete-account" />
+            <div className="space-y-2">
+              <label htmlFor={deleteFields.confirmEmail.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
+                Retype your email to confirm
+              </label>
+              <input
+                type="email"
+                id={deleteFields.confirmEmail.id}
+                name={deleteFields.confirmEmail.name}
+                autoComplete="off"
+                aria-invalid={deleteFields.confirmEmail.errors ? true : undefined}
+                placeholder={user.email ?? "your@email.com"}
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-bad focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1"
+              />
+              {deleteFields.confirmEmail.errors && (
+                <p className="mt-1 text-xs text-ih-bad-fg">{deleteFields.confirmEmail.errors[0]}</p>
+              )}
+            </div>
+            {deleteForm.errors && (
+              <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">
+                {deleteForm.errors[0]}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setShowDeleteConfirm(false)}
+                className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
+                Cancel
+              </button>
+              <button type="submit"
+                className="h-9 px-4 rounded-md bg-ih-bad text-white font-bold text-[13px] hover:bg-ih-bad/85 active:scale-[.98] transition-all">
+                Permanently delete
+              </button>
+            </div>
+          </Form>
+        )}
       </section>
     </div>
   );

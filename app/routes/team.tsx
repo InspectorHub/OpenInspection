@@ -120,7 +120,7 @@ export default function TeamPage() {
                     <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${
                       m.status === "active" ? "text-ih-ok-fg" : "text-ih-watch-fg"
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-emerald-500" : "bg-amber-500"}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-ih-ok" : "bg-ih-watch"}`} />
                       {m.status === "active" ? "Active" : "Pending"}
                     </span>
                   </td>

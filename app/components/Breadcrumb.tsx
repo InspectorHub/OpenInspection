@@ -15,11 +15,11 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
         const isLast = i === items.length - 1;
         return (
           <span key={it.label} className="inline-flex items-center gap-1.5">
-            {i > 0 && <span className="text-slate-300 select-none" aria-hidden="true">&rsaquo;</span>}
+            {i > 0 && <span className="text-ih-fg-4 select-none" aria-hidden="true">&rsaquo;</span>}
             {isLast ? (
               <span className="text-ih-fg-1 font-bold" aria-current="page">{it.label}</span>
             ) : (
-              <a href={it.href ?? "#"} className="text-ih-fg-3 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">{it.label}</a>
+              <a href={it.href ?? "#"} className="text-ih-fg-3 hover:text-ih-fg-1 transition-colors">{it.label}</a>
             )}
           </span>
         );

@@ -33,7 +33,7 @@ export default function SettingsInspectionPage() {
             </div>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-3">Clone last (R key) default</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Clone last (R key) default</h2>
                 {(['rating', 'rating_notes', 'all'] as const).map(scope => (
                     <label key={scope} className="flex items-center gap-2 py-1.5 cursor-pointer">
                         <input
@@ -52,8 +52,24 @@ export default function SettingsInspectionPage() {
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-3">Auto-advance delay</h2>
-                <div className="flex items-center gap-3">
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Auto-advance after rating</h2>
+                {(['keyboard', 'always', 'off'] as const).map(mode => (
+                    <label key={mode} className="flex items-center gap-2 py-1 cursor-pointer">
+                        <input
+                            type="radio"
+                            checked={prefs.autoAdvance === mode}
+                            onChange={() => patch({ autoAdvance: mode })}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-[13px]">{({
+                            keyboard: 'Keyboard rating only (1-5 speed-scans; clicks stay on the item)',
+                            always:   'Always (clicks and keyboard both advance)',
+                            off:      'Never (always stay on the item)',
+                        } as Record<typeof mode, string>)[mode]}</span>
+                    </label>
+                ))}
+                <p className="text-[12px] text-ih-fg-3 mt-1">Defect/Monitor-style ratings always stay put and focus Notes so you can describe the finding.</p>
+                <div className="flex items-center gap-3 mt-3">
                     <input
                         type="range"
                         min={0}
@@ -65,11 +81,11 @@ export default function SettingsInspectionPage() {
                     />
                     <span className="text-[13px] font-mono tabular-nums w-20 text-right">{prefs.autoAdvanceDelayMs} ms</span>
                 </div>
-                <p className="text-[12px] text-ih-fg-3 mt-1">After rating a satisfactory item, the editor advances to the next item after this delay.</p>
+                <p className="text-[12px] text-ih-fg-3 mt-1">Delay before the editor advances to the next item.</p>
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-3">Pinned tags ({prefs.pinnedTagIds.length}/5)</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Pinned tags ({prefs.pinnedTagIds.length}/5)</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-3">Up to 5 tags shown as 1-click chips below the Notes field.</p>
                 <ul className="space-y-1">
                     {tags.map(tag => {

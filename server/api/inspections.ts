@@ -1870,6 +1870,10 @@ export const inspectionsRoutes = createApiRouter()
         const body = c.req.valid('json');
         const service = c.var.services.template;
         const template = await service.createTemplate(c.get('tenantId'), body.name, body.schema);
+        auditFromContext(c, 'template.create', 'template', {
+            entityId: template.id,
+            metadata: { name: template.name },
+        });
         return c.json({ success: true, data: { template } }, 201);
     })
     .openapi(importSpectoraRoute, async (c) => {
@@ -1885,6 +1889,10 @@ export const inspectionsRoutes = createApiRouter()
             body.name,
             schema as unknown as Record<string, unknown>,
         );
+        auditFromContext(c, 'template.create', 'template', {
+            entityId: template.id,
+            metadata: { name: template.name, source: 'spectora-import' },
+        });
         return c.json({ success: true, data: { template, stats } }, 201);
     })
     .openapi(updateTemplateRoute, async (c) => {
@@ -1892,12 +1900,17 @@ export const inspectionsRoutes = createApiRouter()
         const body = c.req.valid('json');
         const service = c.var.services.template;
         const template = await service.updateTemplate(id, c.get('tenantId'), body.name, body.schema);
+        auditFromContext(c, 'template.update', 'template', {
+            entityId: id,
+            metadata: { name: template.name },
+        });
         return c.json({ success: true, data: { template } }, 200);
     })
     .openapi(deleteTemplateRoute, async (c) => {
         const { id } = c.req.valid('param');
         const service = c.var.services.template;
         await service.deleteTemplate(id, c.get('tenantId'));
+        auditFromContext(c, 'template.delete', 'template', { entityId: id });
         return c.json({ success: true }, 200);
     })
     .openapi(listInspectorsRoute, async (c) => {
@@ -1966,7 +1979,17 @@ export const inspectionsRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
-        await db.update(inspectionTable).set(body).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+
+        // Tenant-ownership pre-check above guards access. The validated `body`
+        // can legitimately be empty: the settings sheet forwards its whole form
+        // and the BFF sanitizer drops empty-string "unchanged" fields, so a save
+        // that touched nothing (or only fields outside UpdateInspectionSchema)
+        // arrives as `{}`. drizzle throws "No values to set" on `.set({})`, which
+        // used to surface as a 500 → the sheet's "Error — try again". Treat the
+        // no-op as a successful save instead of writing an empty UPDATE.
+        if (Object.keys(body).length > 0) {
+            await db.update(inspectionTable).set(body).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+        }
 
         if (body.status && body.status !== inspection.status) {
             auditFromContext(c, 'inspection.status_change', 'inspection', {
@@ -2089,23 +2112,66 @@ export const inspectionsRoutes = createApiRouter()
     })
     .openapi(createInspectionRoute, async (c) => {
         const body = c.req.valid('json');
+        const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
-        
+        const contactService = c.var.services.contact;
+
         // Filter undefined values and handle inspectorId logic
         const createData = Object.fromEntries(
             Object.entries(body).filter(([_, v]) => v !== undefined)
         ) as typeof body;
 
-        const inspection = await service.createInspection(c.get('tenantId'), {
+        // IA-1: Resolve client contact before creating the inspection.
+        let clientContactId: string | undefined;
+        if (body.client) {
+            const { id } = await contactService.upsertClientContact(tenantId, {
+                name:  body.client.name,
+                email: body.client.email,
+                phone: body.client.phone,
+                type:  'client',
+            });
+            clientContactId = id;
+            // Double-write denormalized columns so legacy read paths keep working.
+            // Unconditional: the structured client object is the authoritative
+            // source — the flat clientName carries a zod default ('Private
+            // Client') that would otherwise always win and mask the real name.
+            (createData as Record<string, unknown>).clientName = body.client.name;
+            (createData as Record<string, unknown>).clientEmail = body.client.email ?? null;
+            (createData as Record<string, unknown>).clientPhone = body.client.phone ?? null;
+        }
+
+        // IA-1: Resolve agent — newAgent creates/finds a contacts row; agentContactId uses an existing one.
+        let resolvedAgentId: string | undefined = createData.referredByAgentId as string | undefined;
+        if (body.newAgent) {
+            const { id } = await contactService.upsertClientContact(tenantId, {
+                name:  body.newAgent.name,
+                email: body.newAgent.email,
+                type:  'agent',
+            });
+            resolvedAgentId = id;
+        } else if (body.agentContactId) {
+            resolvedAgentId = body.agentContactId;
+        }
+
+        const inspection = await service.createInspection(tenantId, {
             ...createData,
-            inspectorId: body.inspectorId || c.get('user').sub
-        });
+            inspectorId:       body.inspectorId || c.get('user').sub,
+            referredByAgentId: resolvedAgentId ?? null,
+            // IA-1: pass the resolved contact ids through; createInspection stores them.
+            clientContactId,
+        } as Parameters<typeof service.createInspection>[1]);
+
+        // IA-1: Apply serviceSelections price overrides — replace null priceOverride
+        // for any service whose id appears in serviceSelections with a set override.
+        if (body.serviceSelections && body.serviceSelections.length > 0) {
+            await service.applyServicePriceOverrides(inspection.id, tenantId, body.serviceSelections);
+        }
 
         auditFromContext(c, 'inspection.create', 'inspection', {
             entityId: inspection.id,
             metadata: { propertyAddress: inspection.propertyAddress },
         });
-        
+
         return c.json({
             success: true,
             data: { inspection }

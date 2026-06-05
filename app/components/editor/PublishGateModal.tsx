@@ -10,15 +10,15 @@ export interface PublishGateModalProps {
 export function PublishGateModal({ open, readiness, onClose, onJump }: PublishGateModalProps) {
     if (!open || !readiness || readiness.ready) return null;
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
+            <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-2xl max-h-[80vh] flex flex-col">
                 <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
                     <h2 className="text-[14px] font-bold">
                         Cannot publish &mdash; {readiness.blockingDefects.length} defect{readiness.blockingDefects.length === 1 ? '' : 's'} need attention
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-600 w-6 h-6 flex items-center justify-center"
+                        className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
                         aria-label="Close"
                     >
                         &#x2715;
@@ -28,7 +28,7 @@ export function PublishGateModal({ open, readiness, onClose, onJump }: PublishGa
                     {readiness.blockingDefects.map((b, i) => (
                         <li key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-ih-bg-muted">
                             <div className="flex-1 min-w-0">
-                                <div className="text-[11px] uppercase tracking-[0.1em] text-slate-400">
+                                <div className="text-[11px] uppercase tracking-[0.1em] text-ih-fg-4">
                                     {b.sectionTitle} &rsaquo; {b.itemLabel}
                                 </div>
                                 <div className="text-[13px] font-bold">{b.cannedTitle}</div>

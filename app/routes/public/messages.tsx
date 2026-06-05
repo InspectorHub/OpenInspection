@@ -151,7 +151,7 @@ export default function MessagesPublicPage() {
             onChange={(e) => setComposeBody(e.target.value)}
             rows={3}
             placeholder="Type your message..."
-            className="w-full px-3 py-2 rounded-xl border border-ih-border text-sm resize-none bg-ih-bg-card text-ih-fg-1 outline-none focus:border-indigo-500"
+            className="w-full px-3 py-2 rounded-xl border border-ih-border text-sm resize-none bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary"
           />
           <div className="mt-2 flex items-center justify-end">
             <button

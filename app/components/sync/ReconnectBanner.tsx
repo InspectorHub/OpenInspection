@@ -22,7 +22,7 @@ export function ReconnectBanner({ kind, visible, mergedCount = 0, conflictCount 
           </span>
           <span><strong>Reconnected</strong> · {mergedCount} changes auto-merged · You are back in sync.</span>
         </div>
-        <button type="button" onClick={onDismiss} className="text-ih-ok-fg hover:text-emerald-900" aria-label="Dismiss">
+        <button type="button" onClick={onDismiss} className="text-ih-ok-fg hover:text-ih-ok-fg" aria-label="Dismiss">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -44,8 +44,8 @@ export function ReconnectBanner({ kind, visible, mergedCount = 0, conflictCount 
   }
 
   return (
-    <div className="sticky top-0 inset-x-0 z-40 bg-amber-100 border-b border-ih-watch px-4 py-2 text-sm text-amber-900 flex items-center gap-3" role="alert">
-      <span className="w-4 h-4 rounded-full bg-ih-watch-bg0 animate-pulse" />
+    <div className="sticky top-0 inset-x-0 z-40 bg-ih-watch-bg border-b border-ih-watch px-4 py-2 text-sm text-ih-watch-fg flex items-center gap-3" role="alert">
+      <span className="w-4 h-4 rounded-full bg-ih-watch animate-pulse" />
       <span>Reconnecting... {queuedCount} queued changes syncing</span>
     </div>
   );

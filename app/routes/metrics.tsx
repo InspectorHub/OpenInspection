@@ -71,7 +71,7 @@ export default function MetricsPage() {
                 onClick={() => changePeriod(p)}
                 className={`h-6 px-3 rounded text-[12px] font-bold transition-all ${
                   period === p
-                    ? "bg-ih-bg-card shadow-sm text-ih-fg-1"
+                    ? "bg-ih-bg-card shadow-ih-card text-ih-fg-1"
                     : "text-ih-fg-4"
                 }`}
               >
@@ -129,7 +129,7 @@ export default function MetricsPage() {
                 <div key={m.ym + "-rev"} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[10px] font-bold text-ih-fg-3">{fmt(m.revenue)}</span>
                   <div
-                    className="w-full bg-emerald-500 dark:bg-emerald-400 rounded-t"
+                    className="w-full bg-ih-ok rounded-t"
                     style={{ height: `${Math.max(pct, 4)}%` }}
                   />
                   <span className="text-[10px] text-ih-fg-4">{m.ym.slice(5)}</span>

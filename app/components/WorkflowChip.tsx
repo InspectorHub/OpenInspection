@@ -17,7 +17,7 @@ const STATE_LABELS: Record<WorkflowState, string> = {
 
 const STATE_TONES: Record<WorkflowState, { bg: string; text: string }> = {
  agreement: { bg: "bg-ih-watch-bg", text: "text-ih-watch-fg" },
- payment: { bg: "bg-sky-50 dark:bg-sky-900/30", text: "text-sky-700 dark:text-sky-300" },
+ payment: { bg: "bg-ih-info-bg", text: "text-ih-info-fg" },
  "apprentice-review": { bg: "bg-ih-watch-bg", text: "text-ih-watch-fg" },
  published: { bg: "bg-ih-ok-bg", text: "text-ih-ok-fg" },
  cancelled: { bg: "bg-ih-bad-bg", text: "text-ih-bad-fg" },

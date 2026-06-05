@@ -12,7 +12,7 @@ export const InspectionSchema = z.object({
     status: z.enum(['draft', 'completed', 'delivered']).openapi({ example: 'draft' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     date: z.string().openapi({ example: '2024-03-20' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    templateId: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
+    templateId: z.string().min(1).nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
     createdAt: z.string().datetime().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }).openapi('Inspection');
 
@@ -46,7 +46,7 @@ export const CreateInspectionSchema = z.object({
         .transform((v) => (v === '' || v === undefined ? null : v))
         .openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     clientPhone: z.string().max(30).optional().nullable().openapi({ example: '(555) 123-4567' }).describe('TODO describe clientPhone field for the OpenInspection MCP integration'),
-    templateId: z.string().uuid('Invalid template ID').openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
+    templateId: z.string().min(1, 'Template is required').openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     referredByAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }).describe('TODO describe referredByAgentId field for the OpenInspection MCP integration'),
@@ -61,7 +61,28 @@ export const CreateInspectionSchema = z.object({
     addressCounty:  z.string().max(100).optional().nullable().describe('TODO describe addressCounty field for the OpenInspection MCP integration'),
     addressLat:     z.number().min(-90).max(90).optional().nullable().describe('TODO describe addressLat field for the OpenInspection MCP integration'),
     addressLng:     z.number().min(-180).max(180).optional().nullable().describe('TODO describe addressLng field for the OpenInspection MCP integration'),
-    serviceIds:     z.array(z.string()).optional().describe('TODO describe serviceIds field for the OpenInspection MCP integration'),
+    serviceIds:     z.array(z.string()).optional().describe('Legacy flat service-id list. Kept for backward compat. When serviceSelections is also present, serviceSelections takes precedence for per-row price overrides; any serviceId listed here but absent from serviceSelections is linked without a priceOverride.'),
+    // IA-1 People step: richer service selection with optional per-line price overrides.
+    // Relationship to serviceIds: serviceSelections is the superset. Old callers that
+    // only post serviceIds keep working unchanged. New wizard posts serviceSelections
+    // which may carry priceOverrideCents per row. A serviceId present in serviceIds
+    // but absent from serviceSelections is linked with priceOverride=null.
+    serviceSelections: z.array(z.object({
+        serviceId:          z.string().describe('Service catalog id to link to the inspection.'),
+        priceOverrideCents: z.number().int().min(0).optional().describe('Per-line price override in cents. Omit to use the catalog price.'),
+    })).optional().describe('IA-1: Richer service list that carries optional per-row price overrides. Superset of serviceIds.'),
+    // IA-1 People step: client capture.
+    client: z.object({
+        name:  z.string().min(1).describe('Client full name.'),
+        email: z.string().email().optional().describe('Client email — used to deduplicate against the contacts table.'),
+        phone: z.string().optional().describe('Client phone number.'),
+    }).optional().describe('IA-1: When present, upserts a contact row and links it as client_contact_id.'),
+    // IA-1 People step: agent capture — exactly one of agentContactId or newAgent may be set.
+    agentContactId: z.string().optional().describe('IA-1: Existing contacts.id to link as referred_by_agent_id.'),
+    newAgent: z.object({
+        name:  z.string().min(1).describe('Agent full name.'),
+        email: z.string().email().optional().describe('Agent email — used to deduplicate against the contacts table.'),
+    }).optional().describe('IA-1: When present, upserts a contact row of type=agent and links it as referred_by_agent_id.'),
     discountCodeId: z.string().nullable().optional().describe('TODO describe discountCodeId field for the OpenInspection MCP integration'),
     discountAmount: z.number().int().nullable().optional().describe('TODO describe discountAmount field for the OpenInspection MCP integration'),
     price:          z.number().int().min(0).optional().describe('TODO describe price field for the OpenInspection MCP integration'),
@@ -109,6 +130,12 @@ export const UpdateInspectionSchema = z.object({
     // (maps to inspections.auto_sign_on_publish). Toggled from the editor's
     // "toggle-auto-sign" action via PATCH /{id}.
     autoSignOnPublish: z.boolean().optional().openapi({ example: true }).describe('Whether the inspector signature is auto-applied when the report is published.'),
+    // The settings sheet's "Template" selector reassigns the inspection's
+    // template (inspections.template_id). The column is a free-text id
+    // (templates.id is `text`, not a UUID — seed/imported ids like
+    // 'tpl-e2e-trackA' are valid), so this is a plain string, not `.uuid()`.
+    // null detaches the template; omitted leaves it unchanged.
+    templateId: z.string().min(1).nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('Template assigned to this inspection (free-text template id).'),
 }).openapi('UpdateInspection');
 
 /**

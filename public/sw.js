@@ -5,11 +5,10 @@
 //   - HTML navigation: network-first, fall back to cache for offline shell
 //   - /api/* requests: network-only (offline handled by IndexedDB in the app)
 
-const SW_VERSION  = 'v2-b4';
+const SW_VERSION  = 'v3-a2';
 const CACHE_NAME  = `openinspection-${SW_VERSION}`;
 
 const PRECACHE_ASSETS = [
-  '/styles.css',
   '/favicon.svg',
   '/logo.svg',
   '/manifest.json',
@@ -20,7 +19,11 @@ const CDN_HOSTS = [];
 // ���� Install: precache static shell ������������������������������������������������������������������������������������
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS))
+    caches.open(CACHE_NAME).then((cache) =>
+      // Tolerant precache: a single 404 must not brick the whole install
+      // ('/styles.css' did exactly that after the single-worker flatten).
+      Promise.allSettled(PRECACHE_ASSETS.map((a) => cache.add(a)))
+    )
   );
   // Activate immediately ??don't wait for old tabs to close
   self.skipWaiting();

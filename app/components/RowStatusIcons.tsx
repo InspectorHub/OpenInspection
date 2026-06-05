@@ -12,7 +12,7 @@ interface RowStatusIconsProps {
 export function RowStatusIcons({ statusFlags }: RowStatusIconsProps) {
   const f = statusFlags ?? {};
   return (
-    <div className="flex items-center gap-1 text-slate-300" data-testid="row-status-icons">
+    <div className="flex items-center gap-1 text-ih-fg-4" data-testid="row-status-icons">
       {/* Report ready */}
       <span
         className={`w-5 h-5 inline-flex items-center justify-center ${f.reportReady ? "text-ih-ok" : ""}`}
@@ -36,7 +36,7 @@ export function RowStatusIcons({ statusFlags }: RowStatusIconsProps) {
       </span>
       {/* Sent */}
       <span
-        className={`w-5 h-5 inline-flex items-center justify-center ${f.sent ? "text-sky-500" : ""}`}
+        className={`w-5 h-5 inline-flex items-center justify-center ${f.sent ? "text-ih-info" : ""}`}
         title={f.sent ? "Report sent" : "Report not yet sent"}
         aria-label={f.sent ? "Report sent" : "Report not yet sent"}
       >
