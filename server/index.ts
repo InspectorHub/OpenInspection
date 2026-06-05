@@ -733,10 +733,15 @@ export default {
     scheduled: async (event: ScheduledEvent, env: HonoConfig['Bindings'], ctx: ExecutionContext) => {
         await baseScheduled(event, env, ctx);
     },
-    // Queue consumer: this worker consumes ONLY the sync DLQ
-    // (`inspectorhub-sync-dlq-saas`). Each dead message's outbox row is marked
-    // `failed` so the failure is durable + visible in the console. Never throws.
+    // Queue consumers: the cmd queue (`inspectorhub-cmd-saas`, portal→core
+    // commands — A-21) and the sync DLQ (`inspectorhub-sync-dlq-saas`, dead
+    // core→portal envelopes → outbox `failed` writeback). Never throws.
     queue: async (batch: MessageBatch<unknown>, env: HonoConfig['Bindings'], _ctx: ExecutionContext) => {
+        if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {
+            const { handleCmdBatch } = await import('./portal/cmd-consumer');
+            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch);
+            return;
+        }
         await handleSyncDlqBatch(env.DB, batch);
     },
 };

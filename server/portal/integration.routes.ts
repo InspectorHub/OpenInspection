@@ -178,27 +178,11 @@ api.post('/sync-quota', requireServiceBinding, async (c) => {
         return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
     }
     const { tenantId, maxUsers } = parsed.data;
-
-    const { drizzle } = await import('drizzle-orm/d1');
-    const { eq } = await import('drizzle-orm');
-    const { tenants } = await import('../lib/db/schema');
-    const db = drizzle(c.env.DB);
-
-    const result = await db.update(tenants)
-        .set({ maxUsers })
-        .where(eq(tenants.id, tenantId))
-        .returning({ id: tenants.id });
-    if (result.length === 0) {
+    const { applySyncQuota } = await import('./apply-commands');
+    const result = await applySyncQuota(c.env.DB, c.env.TENANT_CACHE, { tenantId, maxUsers });
+    if (result === 'tenant-not-found') {
         return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
     }
-
-    // Invalidate the per-tenant KV cache so the next request reads the
-    // fresh maxUsers value rather than the stale snapshot.
-    try {
-        await c.env.TENANT_CACHE.delete(`tenant:${tenantId}`);
-    } catch { /* cache miss is fine — read-through repopulates */ }
-
-    logger.info('sync-quota applied', { tenantId, maxUsers });
     return c.json({ success: true });
 });
 

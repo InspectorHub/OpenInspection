@@ -13,6 +13,10 @@ export const tenants = sqliteTable('tenants', {
     // Design System 0520 subsystem E P8 — optional InterNACHI inspector
     // certification number, rendered in the TeamCredit report footer.
     nachiNumber: text('nachi_number'),
+    // A-21 — high-water mark of the portal→core command sequence applied to
+    // this tenant (envelope `tenantseq`). The cmd consumer drops any command
+    // with tenantseq <= this value (stale/reordered last-writer-wins guard).
+    appliedCmdSeq: integer('applied_cmd_seq').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
@@ -371,4 +375,26 @@ export const notifications = sqliteTable('notifications', {
 }, (t) => [
     index('idx_notifications_tenant_user_created').on(t.tenantId, t.userId, t.createdAt),
     index('idx_notifications_tenant_user_unread').on(t.tenantId, t.userId, t.readAt),
+]);
+
+/** A-21 — dedup ledger for inbound portal→core commands (mirror of portal's
+ *  processed_sync_events). Insert-first: a PK conflict means already applied. */
+export const processedCmdEvents = sqliteTable('processed_cmd_events', {
+    eventId:     text('event_id').primaryKey(),
+    cmdType:     text('cmd_type').notNull(),
+    // Raw unix SECONDS — same convention as sync_outbox.created_at.
+    processedAt: integer('processed_at').notNull(),
+});
+
+/** A-21 — parking lot for inbound command envelopes this build cannot apply
+ *  (unknown type/dataschema = deploy skew, or parse failure). Park + ack,
+ *  never 400/retry — same tolerant-reader contract as portal's
+ *  parked_sync_events. */
+export const parkedCmdEvents = sqliteTable('parked_cmd_events', {
+    id:         text('id').primaryKey(),
+    envelope:   text('envelope').notNull(),
+    reason:     text('reason').notNull(),
+    receivedAt: integer('received_at').notNull(),
+}, (t) => [
+    index('idx_parked_cmd_events_received_at').on(t.receivedAt),
 ]);
