@@ -2,7 +2,6 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
-import { encryptSecrets, decryptSecrets, maskSecret, isMasked } from '../lib/config-crypto';
 import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 
 export interface IntegrationConfig {
@@ -11,12 +10,10 @@ export interface IntegrationConfig {
     googleClientId?: string;
 }
 
-export interface SecretsConfig {
-    resendApiKey?: string;
-    turnstileSecretKey?: string;
-    geminiApiKey?: string;
-    googleClientSecret?: string;
-}
+// C-15 (2026-06-06): the legacy `SecretsConfig` shape (camelCase keys in the
+// retired `tenant_configs.secrets` column) is GONE. Tenant secrets live solely
+// in `encrypted_secrets` (ENV-name keys; server/api/secrets.ts +
+// lib/secrets-cache.ts + lib/middleware/integration-secrets.ts).
 
 /**
  * Service to handle tenant-specific branding and configuration.
@@ -184,58 +181,8 @@ export class BrandingService {
         await this.updateBranding(tenantId, { integrationConfig: JSON.stringify(cleaned) });
     }
 
-    // ─── Secrets (AES-256-GCM encrypted) ────────────────────────────────────
-
-    /**
-     * Returns decrypted secrets for internal service use.
-     * Never call this in an API response — use getMaskedSecrets instead.
-     */
-    async getDecryptedSecrets(tenantId: string, jwtSecret: string): Promise<SecretsConfig> {
-        const db = this.getDrizzle();
-        const row = await db
-            .select({ secrets: tenantConfigs.secrets })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-
-        if (!row?.secrets) return {};
-        try {
-            return await decryptSecrets(row.secrets, jwtSecret) as SecretsConfig;
-        } catch {
-            return {};
-        }
-    }
-
-    /**
-     * Returns masked secrets safe for API responses.
-     * e.g. { resendApiKey: "re_1••••••••abcd" }
-     */
-    async getMaskedSecrets(tenantId: string, jwtSecret: string): Promise<Record<string, string>> {
-        const secrets = await this.getDecryptedSecrets(tenantId, jwtSecret);
-        return Object.fromEntries(
-            Object.entries(secrets).map(([k, v]) => [k, maskSecret(v)])
-        );
-    }
-
-    /**
-     * Merges and saves secrets (encrypted). Skips fields that contain mask characters
-     * (i.e. the frontend sent back the masked display value — field not changed).
-     */
-    async updateSecrets(tenantId: string, jwtSecret: string, newData: Partial<SecretsConfig>): Promise<void> {
-        const existing = await this.getDecryptedSecrets(tenantId, jwtSecret);
-
-        // Filter out masked/empty values — those mean "no change"
-        const updates = Object.fromEntries(
-            Object.entries(newData).filter(([, v]) => v && !isMasked(v))
-        );
-
-        if (Object.keys(updates).length === 0) return;
-
-        const merged = { ...existing, ...updates };
-        const encrypted = await encryptSecrets(
-            Object.fromEntries(Object.entries(merged).filter(([, v]) => v)) as Record<string, string>,
-            jwtSecret
-        );
-        await this.updateBranding(tenantId, { secrets: encrypted });
-    }
+    // C-15 (2026-06-06): getDecryptedSecrets / getMaskedSecrets / updateSecrets
+    // were RETIRED with the legacy `tenant_configs.secrets` dual store (the
+    // A-16 wrong-store bug came from exactly this duality). Reads + writes go
+    // through the canonical `encrypted_secrets` column only.
 }
