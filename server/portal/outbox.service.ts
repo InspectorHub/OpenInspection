@@ -26,8 +26,14 @@ import type { UserSyncEvent, UserSyncEventType, UserSyncOutbox } from '../lib/in
 
 // Canonical event shapes live in the seam (lib/integration/user-sync) so core
 // services can depend on them without importing this concrete module.
-export type OutboxEventType = UserSyncEventType;
-export type OutboxEvent = UserSyncEvent;
+// A-21 batch 2: the outbox also carries command REPLIES (`reply.tenant.updated`,
+// emitted by the cmd consumer) on the same queue — widened here, NOT in the
+// user-sync seam (replies are not user-lifecycle events).
+export type OutboxEventType = UserSyncEventType | 'reply.tenant.updated';
+export type OutboxEvent = UserSyncEvent | {
+    type: 'reply.tenant.updated';
+    payload: Record<string, unknown>;
+};
 
 export interface OutboxRow {
     id: string;
