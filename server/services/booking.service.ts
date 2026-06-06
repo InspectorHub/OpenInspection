@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, gte, lte, sql } from 'drizzle-orm';
-import { availability, availabilityOverrides, inspections, users } from '../lib/db/schema';
+import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
+import { availability, availabilityOverrides, inspections, inspectionInspectors, serviceInspectors, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
@@ -63,6 +63,10 @@ export class BookingService {
     /**
      * Returns computed time slots for a given inspector/date.
      * Reads recurring availability windows, date overrides, and existing bookings.
+     *
+     * LEGACY (lead-only busy check via inspections.inspectorId): no production caller —
+     * the live booking path uses getTenantSlots, whose link-table busy check also counts
+     * helper assignments. Prefer getTenantSlots for new code.
      */
     async getAvailableSlots(
         tenantId: string,
@@ -113,6 +117,140 @@ export class BookingService {
 
         const busyTimes = new Set(existingInsp.map(i => String(i.date).slice(11, 16)));
         return slots.map(time => ({ time, available: !busyTimes.has(time) }));
+    }
+
+    /**
+     * IA-26 — staff eligible to run the given services. Base set = every
+     * non-deleted tenant user except global agents (availability is the real
+     * bookability signal: office staff who never configure hours simply never
+     * yield slots). service_inspectors rows RESTRICT per service; zero rows
+     * for a service = everyone qualifies. Multi-service bookings intersect.
+     */
+    async getQualifiedInspectorIds(tenantId: string, serviceIds: string[]): Promise<string[]> {
+        const db = this.getDrizzle();
+        const staff = await db.select({ id: users.id }).from(users)
+            .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt), ne(users.role, 'agent')))
+            .all();
+        let ids = staff.map(s => s.id);
+        if (serviceIds.length === 0 || ids.length === 0) return ids;
+        const quals = await db.select().from(serviceInspectors)
+            .where(and(eq(serviceInspectors.tenantId, tenantId), inArray(serviceInspectors.serviceId, serviceIds)))
+            .all();
+        for (const sid of serviceIds) {
+            const allowed = quals.filter(q => q.serviceId === sid).map(q => q.userId);
+            if (allowed.length > 0) ids = ids.filter(id => allowed.includes(id));
+        }
+        return ids;
+    }
+
+    /**
+     * True iff at least one qualified staff member has recurring hours.
+     * @param qualifiedIds Optional precomputed result of getQualifiedInspectorIds to avoid duplicate lookups.
+     */
+    async hasAnyHours(tenantId: string, serviceIds: string[], qualifiedIds?: string[]): Promise<boolean> {
+        const db = this.getDrizzle();
+        const qualified = qualifiedIds ?? await this.getQualifiedInspectorIds(tenantId, serviceIds);
+        if (qualified.length === 0) return false;
+        const row = await db.select({ id: availability.id }).from(availability)
+            .where(and(eq(availability.tenantId, tenantId), inArray(availability.inspectorId, qualified)))
+            .limit(1).get();
+        return !!row;
+    }
+
+    /**
+     * IA-26 aggregation layer — the union of qualified inspectors' bookable
+     * slots for one date. A slot is available iff at least one qualified
+     * inspector (a) has it inside a weekly window, (b) has no blocking
+     * override that date, and (c) has no inspection at that time (via the
+     * inspection_inspectors link table, so helper assignments count as busy
+     * too). Storage stays per-inspector; this only changes the query face.
+     * @param qualifiedIds Optional precomputed result of getQualifiedInspectorIds to avoid duplicate lookups.
+     */
+    async getTenantSlots(
+        tenantId: string,
+        dateStr: string,
+        serviceIds: string[],
+        qualifiedIds?: string[],
+    ): Promise<Array<{ time: string; available: boolean; inspectorIds: string[] }>> {
+        const db = this.getDrizzle();
+        const qualified = qualifiedIds ?? await this.getQualifiedInspectorIds(tenantId, serviceIds);
+        if (qualified.length === 0) return [];
+        const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+
+        const [windows, overrides, busy] = await Promise.all([
+            db.select().from(availability).where(and(
+                eq(availability.tenantId, tenantId),
+                inArray(availability.inspectorId, qualified),
+                eq(availability.dayOfWeek, dayOfWeek),
+            )).all(),
+            db.select().from(availabilityOverrides).where(and(
+                eq(availabilityOverrides.tenantId, tenantId),
+                inArray(availabilityOverrides.inspectorId, qualified),
+                eq(availabilityOverrides.date, dateStr),
+            )).all(),
+            db.select({ userId: inspectionInspectors.userId, date: inspections.date })
+                .from(inspectionInspectors)
+                .innerJoin(inspections, eq(inspections.id, inspectionInspectors.inspectionId))
+                .where(and(
+                    eq(inspectionInspectors.tenantId, tenantId),
+                    inArray(inspectionInspectors.userId, qualified),
+                    sql`date(${inspections.date}) = ${dateStr}`,
+                    sql`${inspections.status} not in ('cancelled')`,
+                )).all(),
+        ]);
+
+        // slotMap: time -> set of free inspector ids (inspectors WITH a window but NOT busy at that time)
+        const slotMap = new Map<string, Set<string>>();
+
+        for (const inspectorId of qualified) {
+            const myWindows = windows.filter(w => w.inspectorId === inspectorId);
+            const myOverrides = overrides.filter(o => o.inspectorId === inspectorId);
+            const blocked = myOverrides.some(o => !o.isAvailable);
+            const effective = blocked ? myOverrides.filter(o => o.isAvailable) : myWindows;
+            if (effective.length === 0) continue;
+
+            const busyTimes = new Set(
+                busy.filter(b => b.userId === inspectorId).map(b => String(b.date).slice(11, 16)),
+            );
+
+            // Collect all time slots from this inspector's effective windows
+            const mySlots: string[] = [];
+            for (const w of effective) {
+                let current = w.startTime ?? '08:00';
+                const end = w.endTime ?? '17:00';
+                while (current < end) {
+                    if (!mySlots.includes(current)) mySlots.push(current);
+                    const [h, m] = current.split(':').map(Number);
+                    const next = new Date(0, 0, 0, h, m + 30);
+                    current = `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`;
+                }
+            }
+
+            for (const time of mySlots) {
+                if (!slotMap.has(time)) slotMap.set(time, new Set());
+                if (!busyTimes.has(time)) {
+                    slotMap.get(time)!.add(inspectorId);
+                }
+            }
+        }
+
+        return [...slotMap.entries()]
+            .sort(([a], [b]) => (a < b ? -1 : 1))
+            .map(([time, ids]) => ({ time, available: ids.size > 0, inspectorIds: [...ids].sort() }));
+    }
+
+    /**
+     * Deterministic auto-assignment — "first available": stable sort by
+     * (name, id) over the free set so repeated submissions pick the same
+     * person (Spectora's seniority-order analogue without a rank field).
+     */
+    async pickInspector(tenantId: string, freeIds: string[]): Promise<string | null> {
+        if (freeIds.length === 0) return null;
+        const db = this.getDrizzle();
+        const rows = await db.select({ id: users.id, name: users.name }).from(users)
+            .where(and(eq(users.tenantId, tenantId), inArray(users.id, freeIds))).all();
+        rows.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '') || a.id.localeCompare(b.id));
+        return rows[0]?.id ?? null;
     }
 
     /**

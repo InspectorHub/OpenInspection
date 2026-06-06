@@ -36,7 +36,7 @@ A complete home inspection software stack: inspector dashboard, public booking w
 - Migrate from Spectora in under 5 minutes via paste-JSON import
 
 ### Customer experience
-- Public booking widget with Turnstile bot protection
+- Company-level public booking widget (`/book/<slug>`) with auto-assignment, optional inspector choice, and Turnstile bot protection
 - E-sign agreements with Ed25519 audit chain — server-rendered signed PDF + Certificate of Completion via Browser Run, evidence-pack zip with email delivery, public verifier URL (`/v/<token>`) with QR code on PDFs + offline self-verify (`/verify`) for court-friendly independence from the server, optional inspector pre-sign
 - Branded report viewer with print-as-PDF
 

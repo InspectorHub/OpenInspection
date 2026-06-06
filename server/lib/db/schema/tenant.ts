@@ -52,9 +52,14 @@ export const users = sqliteTable('users', {
     defaultSignatureBase64: text('default_signature_base64'),
     bio: text('bio'),
     serviceAreas: text('service_areas'),
-    // Booking #7 Sprint A — per-tenant unique inspector slug used for /book/<slug>.
-    // Nullable until the inspector picks one. Per-tenant uniqueness enforced via
-    // partial index `idx_users_slug_per_tenant` (migrations/0052_inspector_slug.sql).
+    // FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector
+    // booking slug is retired — /book/:tenant is the canonical public entry
+    // and no inspector-facing route writes this column anymore. Live READERS
+    // that still resolve inspectors by slug: the ICS calendar feed
+    // (ics.service.ts), audit records (lib/audit.ts), and the legacy
+    // /book/:tenant/:slug profile endpoint behind the deep-link redirect —
+    // check those before any reuse. Global AGENT slugs (tenant_id IS NULL,
+    // role='agent') still use this column actively — do not repurpose.
     slug: text('slug'),
     // DDL default 'admin' is FROZEN (D1 cannot alter column defaults without a
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
@@ -152,6 +157,7 @@ export const syncOutbox = sqliteTable('sync_outbox', {
 // Booking #7 Sprint A — reserved/banned slug list. Seeded via migration 0052
 // with the project's reserved route names (admin, api, book, login, etc.) so
 // customers cannot register slugs that would shadow real URL paths.
+// FROZEN for the inspector namespace (2026-06-06, DB-12); still consulted for agent slugs.
 export const slugReservations = sqliteTable('slug_reservations', {
     slug: text('slug').primaryKey(),
     reason: text('reason').notNull(),
@@ -275,6 +281,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // magic-link goes to client immediately. 1 (true) = Spectora reviewer
     // mode: inspector must approve the draft before the client gets the link.
     conciergeReviewRequired: integer('concierge_review_required', { mode: 'boolean' }).notNull().default(false),
+    // IA-26 — company-level booking page: when true the public /book/:tenant
+    // wizard shows an inspector dropdown ("Allow choice of inspectors",
+    // Spectora-style). Default OFF = pure auto-assign (first available).
+    allowInspectorChoice: integer('allow_inspector_choice', { mode: 'boolean' }).notNull().default(false),
     // Migration 0059 — Workers Paid PDF pipeline opt-in.
     // Default 0 (OFF) — keeps the Free-plan path cost-free (window.print()
     // fallback in the viewer is unaffected). Tenants on Workers Paid flip

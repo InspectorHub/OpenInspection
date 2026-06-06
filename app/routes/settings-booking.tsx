@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLoaderData } from "react-router";
+import { useState, useEffect, useRef } from "react";
+import { Link, useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/settings-booking";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -13,7 +13,7 @@ interface AvailabilitySlot {
 }
 
 interface DateOverride {
-  id: number;
+  id: string;
   date: string;
   isAvailable: boolean;
   startTime: string | null;
@@ -23,6 +23,14 @@ interface DateOverride {
 interface TenantConfig {
   conciergeReviewRequired: boolean;
   blockUnsignedAgreement: boolean;
+  allowInspectorChoice: boolean;
+}
+
+interface Member {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: string;
 }
 
 export function meta() {
@@ -32,11 +40,16 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const [availRes, overridesRes, configRes, originsRes] = await Promise.all([
-    api.availability.index.$get({ query: {} }).catch(() => null),
-    api.availability.overrides.$get({ query: {} }).catch(() => null),
+
+  const url = new URL(request.url);
+  const inspectorId = url.searchParams.get("inspectorId") ?? undefined;
+
+  const [availRes, overridesRes, configRes, originsRes, membersRes] = await Promise.all([
+    api.availability.index.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
+    api.availability.overrides.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.widget.origins.$get().catch(() => null),
+    api.admin.members.$get().catch(() => null),
   ]);
 
   let slots: AvailabilitySlot[] = [];
@@ -51,13 +64,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     overrides = ((body.data ?? []) as DateOverride[]);
   }
 
-  let config: TenantConfig = { conciergeReviewRequired: false, blockUnsignedAgreement: false };
+  let config: TenantConfig = { conciergeReviewRequired: false, blockUnsignedAgreement: false, allowInspectorChoice: false };
   if (configRes?.ok) {
     const body = (await configRes.json()) as Record<string, unknown>;
     const d = (body.data ?? {}) as Record<string, unknown>;
     config = {
       conciergeReviewRequired: Boolean(d.conciergeReviewRequired),
       blockUnsignedAgreement: Boolean(d.blockUnsignedAgreement),
+      allowInspectorChoice: Boolean(d.allowInspectorChoice),
     };
   }
 
@@ -68,7 +82,86 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     origins = (d.origins || []) as string[];
   }
 
-  return { slots, overrides, config, origins };
+  // Non-admins get 403 → null → empty list; no separate role check needed.
+  let members: Member[] = [];
+  if (membersRes?.ok) {
+    const body = (await membersRes.json()) as Record<string, unknown>;
+    members = ((body.data ?? []) as Member[]);
+  }
+
+  return {
+    slots,
+    overrides,
+    config,
+    origins,
+    members,
+    managedInspectorId: inspectorId ?? null,
+  };
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const form = await request.formData();
+  const intent = String(form.get("intent"));
+
+  if (intent === "schedule-save") {
+    // defensive: value is client-built; guard against malformed JSON
+    let slots: { dayOfWeek: number; startTime: string; endTime: string }[];
+    try {
+      slots = JSON.parse(String(form.get("slots") ?? "[]"));
+    } catch {
+      return { ok: false, intent };
+    }
+    const inspectorId = String(form.get("inspectorId") ?? "") || undefined;
+    const res = await api.availability.index.$put({
+      json: { slots, ...(inspectorId ? { inspectorId } : {}) },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as string | undefined;
+      return { ok: false, intent, message };
+    }
+    return { ok: res.ok, intent };
+  }
+
+  if (intent === "override-add") {
+    const inspectorId = String(form.get("inspectorId") ?? "") || undefined;
+    const res = await api.availability.overrides.$post({
+      json: {
+        date: String(form.get("date")),
+        isAvailable: false,
+        ...(inspectorId ? { inspectorId } : {}),
+      },
+    });
+    const body = res.ok ? ((await res.json()) as { data?: { override?: unknown } }) : null;
+    return { ok: res.ok, intent, override: body?.data?.override ?? null };
+  }
+
+  if (intent === "override-remove") {
+    const res = await api.availability.overrides[":id"].$delete({
+      param: { id: String(form.get("id")) },
+    });
+    return { ok: res.ok, intent };
+  }
+
+  if (intent === "policies-save") {
+    const res = await api.admin["tenant-config"].$patch({
+      json: {
+        conciergeReviewRequired: form.get("conciergeReviewRequired") === "true",
+        blockUnsignedAgreement: form.get("blockUnsignedAgreement") === "true",
+        allowInspectorChoice: form.get("allowInspectorChoice") === "true",
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as string | undefined;
+      return { ok: false, intent, message };
+    }
+    return { ok: res.ok, intent };
+  }
+
+  return { ok: false, intent };
 }
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -79,6 +172,16 @@ export default function SettingsBookingPage() {
 
   const tenant = ctx?.branding?.tenantSlug;
   const slug = ctx?.branding?.currentUserSlug;
+  // The current user's id is not in session context — we use role+members for the picker.
+  // Admin/owner role means members loaded successfully (403 gate for non-admins).
+  const isAdmin = ctx?.user?.role === "owner" || ctx?.user?.role === "admin";
+
+  // Show picker only to admins; restrict to the roles that can hold a
+  // schedule ('lead' is the canonical alias of 'inspector' — see rbac.ts
+  // ROLE_ALIASES; the availability API accepts both).
+  const pickerMembers = isAdmin
+    ? data.members.filter((m) => ['owner', 'admin', 'inspector', 'lead'].includes(m.role))
+    : [];
 
   return (
     <div className="space-y-[18px]">
@@ -94,11 +197,58 @@ export default function SettingsBookingPage() {
       </p>
 
       <StatusAndLinks tenant={tenant} slug={slug} />
-      <WeeklySchedule initialSlots={data.slots} />
-      <DateOverrides initialOverrides={data.overrides} />
+
+      {pickerMembers.length > 0 && (
+        <ManageOthersPicker members={pickerMembers} managedInspectorId={data.managedInspectorId} />
+      )}
+
+      <WeeklySchedule
+        key={data.managedInspectorId ?? "self"}
+        initialSlots={data.slots}
+        inspectorId={data.managedInspectorId}
+      />
+      <DateOverrides
+        key={data.managedInspectorId ?? "self"}
+        initialOverrides={data.overrides}
+        inspectorId={data.managedInspectorId}
+      />
       <BookingPolicies initialConfig={data.config} />
-      <EmbedWidget tenant={tenant} slug={slug} />
+      <EmbedWidget tenant={tenant} />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Manage-others picker (admin only)                                  */
+/* ------------------------------------------------------------------ */
+
+function ManageOthersPicker({
+  members,
+  managedInspectorId,
+}: {
+  members: Member[];
+  managedInspectorId: string | null;
+}) {
+  const navigate = useNavigate();
+  return (
+    <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 flex items-center gap-3">
+      <span className="text-[13px] font-bold text-ih-fg-1">Managing schedule for</span>
+      <select
+        value={managedInspectorId ?? ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          navigate(v ? `/settings/booking?inspectorId=${v}` : "/settings/booking");
+        }}
+        className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
+      >
+        <option value="">Myself</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.email}
+          </option>
+        ))}
+      </select>
+    </section>
   );
 }
 
@@ -109,26 +259,16 @@ export default function SettingsBookingPage() {
 function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; slug: string | null | undefined }) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  if (!slug) {
-    return (
-      <section className="bg-ih-bad-bg border border-ih-bad-fg/20 rounded-lg p-5 space-y-2">
-        <h3 className="text-[13px] font-bold text-ih-bad-fg">Booking page not available</h3>
-        <p className="text-[12px] text-ih-fg-2">
-          You need to set a booking slug before your public booking page can go live.
-        </p>
-        <Link
-          to="/settings/profile"
-          className="inline-block text-[12px] text-ih-primary font-bold hover:underline"
-        >
-          Go to Profile settings &rarr;
-        </Link>
-      </section>
-    );
-  }
-
+  // window.location.origin is "" during SSR and real on client.
+  // The existing code used this same pattern — it's a pre-existing SSR/client
+  // mismatch (both sides render a different string). React does NOT suppress
+  // text mismatches, but in practice the hydration warning is benign here
+  // because the iframe src / anchor href update on the first client render.
+  // This matches the pre-Task-10 behavior exactly; we do not introduce a new
+  // mismatch class. A proper fix (useEffect + state) is tracked separately.
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const bookingUrl = `${origin}/book/${tenant}/${slug}`;
-  const profileUrl = `${origin}/inspector/${tenant}/${slug}`;
+  const companyUrl = tenant ? `${origin}/book/${tenant}` : null;
+  const deepLink = tenant && slug ? `${origin}/book/${tenant}/${slug}` : null;
 
   function copy(value: string, field: string) {
     void navigator.clipboard.writeText(value);
@@ -136,11 +276,29 @@ function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; s
     setTimeout(() => setCopiedField(null), 2000);
   }
 
+  if (!companyUrl) return null;
+
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Your links</h3>
-      <UrlRow label="Booking page" url={bookingUrl} copied={copiedField === "booking"} onCopy={() => copy(bookingUrl, "booking")} />
-      <UrlRow label="Inspector profile" url={profileUrl} copied={copiedField === "profile"} onCopy={() => copy(profileUrl, "profile")} />
+      <UrlRow
+        label="Company booking page"
+        url={companyUrl}
+        copied={copiedField === "company"}
+        onCopy={() => copy(companyUrl, "company")}
+      />
+      {deepLink && (
+        <UrlRow
+          label="Your personal deep link"
+          url={deepLink}
+          copied={copiedField === "deep"}
+          onCopy={() => copy(deepLink, "deep")}
+        />
+      )}
+      <p className="text-[12px] text-ih-fg-3">
+        Share the company link — clients are matched with the first available inspector.
+        The personal deep link pre-selects you.
+      </p>
     </section>
   );
 }
@@ -148,7 +306,7 @@ function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; s
 function UrlRow({ label, url, copied, onCopy }: { label: string; url: string; copied: boolean; onCopy: () => void }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[12px] font-bold text-ih-fg-2 w-32 shrink-0">{label}</span>
+      <span className="text-[12px] font-bold text-ih-fg-2 w-36 shrink-0">{label}</span>
       <span className="text-[12px] text-ih-fg-1 truncate flex-1 font-mono bg-ih-bg-muted rounded px-2 py-1.5 border border-ih-border">
         {url}
       </span>
@@ -187,30 +345,51 @@ function buildDayMap(slots: AvailabilitySlot[]): DayState[] {
   return days;
 }
 
-function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) {
+function WeeklySchedule({
+  initialSlots,
+  inspectorId,
+}: {
+  initialSlots: AvailabilitySlot[];
+  inspectorId: string | null | undefined;
+}) {
+  const fetcher = useFetcher<typeof action>();
   const [days, setDays] = useState<DayState[]>(() => buildDayMap(initialSlots));
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // dirty tracks whether local state differs from the last saved state
+  const [dirty, setDirty] = useState(false);
+
+  // Derive saved from fetcher response; reset dirty when the save completes
+  const saved =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "schedule-save" &&
+    fetcher.data.ok === true &&
+    !dirty;
+
+  const failed =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "schedule-save" &&
+    fetcher.data.ok === false &&
+    !dirty;
+
+  const saving = fetcher.state !== "idle";
 
   function updateDay(idx: number, patch: Partial<DayState>) {
     setDays((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
-    setSaved(false);
+    setDirty(true);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
+  function handleSave() {
     const slots = days
       .map((d, i) => (d.enabled ? { dayOfWeek: i, startTime: d.startTime, endTime: d.endTime } : null))
       .filter(Boolean);
-    await fetch("/api/availability", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ slots }),
-    });
-    setSaving(false);
-    setSaved(true);
+    setDirty(false);
+    fetcher.submit(
+      {
+        intent: "schedule-save",
+        slots: JSON.stringify(slots),
+        ...(inspectorId ? { inspectorId } : {}),
+      },
+      { method: "post" },
+    );
   }
 
   const displayOrder = [1, 2, 3, 4, 5, 6, 0];
@@ -261,6 +440,11 @@ function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) 
           {saving ? "Saving..." : "Save schedule"}
         </button>
         {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+        {failed && (
+          <span className="text-[13px] text-ih-bad-fg font-bold">
+            {fetcher.data?.message ?? "Save failed. Please try again."}
+          </span>
+        )}
       </div>
     </section>
   );
@@ -270,38 +454,83 @@ function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) 
 /*  Section 3 — Date Overrides                                         */
 /* ------------------------------------------------------------------ */
 
-function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] }) {
+function DateOverrides({
+  initialOverrides,
+  inspectorId,
+}: {
+  initialOverrides: DateOverride[];
+  inspectorId: string | null | undefined;
+}) {
+  const addFetcher = useFetcher<typeof action>();
+  const removeFetcher = useFetcher<typeof action>();
+
   const [overrides, setOverrides] = useState<DateOverride[]>(initialOverrides);
   const [newDate, setNewDate] = useState("");
-  const [adding, setAdding] = useState(false);
+  // Track the last appended override id to prevent double-append on re-render
+  const lastAppendedId = useRef<string | null>(null);
+  // Keep a ref to the pending-removed override for rollback on failure
+  const pendingRemovedRef = useRef<DateOverride | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
-  async function handleAdd() {
-    if (!newDate) return;
-    setAdding(true);
-    const res = await fetch("/api/availability/overrides", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ date: newDate, isAvailable: false }),
-    });
-    if (res.ok) {
-      const body = (await res.json()) as Record<string, unknown>;
-      const d = (body.data ?? {}) as Record<string, unknown>;
-      const created = d.override as DateOverride;
-      if (created) {
+  const adding = addFetcher.state !== "idle";
+
+  // Append the newly created override to local list when add succeeds
+  useEffect(() => {
+    if (
+      addFetcher.state === "idle" &&
+      addFetcher.data?.intent === "override-add" &&
+      addFetcher.data.ok === true &&
+      addFetcher.data.override
+    ) {
+      const created = addFetcher.data.override as DateOverride;
+      if (created.id && created.id !== lastAppendedId.current) {
+        lastAppendedId.current = created.id;
         setOverrides((prev) => [...prev, created]);
+        setNewDate("");
       }
-      setNewDate("");
     }
-    setAdding(false);
+  }, [addFetcher.state, addFetcher.data]);
+
+  // Restore the row and show error if remove failed
+  useEffect(() => {
+    if (
+      removeFetcher.state === "idle" &&
+      removeFetcher.data?.intent === "override-remove" &&
+      removeFetcher.data.ok === false
+    ) {
+      if (pendingRemovedRef.current) {
+        setOverrides((prev) => [...prev, pendingRemovedRef.current!]);
+        pendingRemovedRef.current = null;
+        setRemoveError("Failed to remove date — please try again.");
+      }
+    } else if (removeFetcher.state === "idle" && removeFetcher.data?.ok === true) {
+      pendingRemovedRef.current = null;
+      setRemoveError(null);
+    }
+  }, [removeFetcher.state, removeFetcher.data]);
+
+  function handleAdd() {
+    if (!newDate) return;
+    addFetcher.submit(
+      {
+        intent: "override-add",
+        date: newDate,
+        ...(inspectorId ? { inspectorId } : {}),
+      },
+      { method: "post" },
+    );
   }
 
-  async function handleRemove(id: number) {
+  function handleRemove(id: string) {
+    const target = overrides.find((o) => o.id === id) ?? null;
+    pendingRemovedRef.current = target;
+    setRemoveError(null);
+    // Optimistic removal
     setOverrides((prev) => prev.filter((o) => o.id !== id));
-    await fetch(`/api/availability/overrides/${id}`, {
-      method: "DELETE",
-      credentials: "same-origin",
-    });
+    removeFetcher.submit(
+      { intent: "override-remove", id },
+      { method: "post" },
+    );
   }
 
   return (
@@ -330,6 +559,10 @@ function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] 
         <p className="text-[12px] text-ih-fg-4 italic">No date overrides set.</p>
       )}
 
+      {removeError && (
+        <p className="text-[12px] text-ih-bad-fg">{removeError}</p>
+      )}
+
       <div className="flex items-center gap-3 pt-1">
         <input
           type="date"
@@ -355,25 +588,36 @@ function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] 
 /* ------------------------------------------------------------------ */
 
 function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
+  const fetcher = useFetcher<typeof action>();
   const [concierge, setConcierge] = useState(initialConfig.conciergeReviewRequired);
   const [blockUnsigned, setBlockUnsigned] = useState(initialConfig.blockUnsignedAgreement);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [allowChoice, setAllowChoice] = useState(initialConfig.allowInspectorChoice);
+  const [dirty, setDirty] = useState(false);
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    await fetch("/api/admin/tenant-config", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({
-        conciergeReviewRequired: concierge,
-        blockUnsignedAgreement: blockUnsigned,
-      }),
-    });
-    setSaving(false);
-    setSaved(true);
+  const saving = fetcher.state !== "idle";
+  const saved =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "policies-save" &&
+    fetcher.data.ok === true &&
+    !dirty;
+
+  const failed =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "policies-save" &&
+    fetcher.data.ok === false &&
+    !dirty;
+
+  function handleSave() {
+    setDirty(false);
+    fetcher.submit(
+      {
+        intent: "policies-save",
+        conciergeReviewRequired: String(concierge),
+        blockUnsignedAgreement: String(blockUnsigned),
+        allowInspectorChoice: String(allowChoice),
+      },
+      { method: "post" },
+    );
   }
 
   return (
@@ -384,7 +628,7 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
         <input
           type="checkbox"
           checked={concierge}
-          onChange={(e) => { setConcierge(e.target.checked); setSaved(false); }}
+          onChange={(e) => { setConcierge(e.target.checked); setDirty(true); }}
           className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
         />
         <span>
@@ -399,13 +643,28 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
         <input
           type="checkbox"
           checked={blockUnsigned}
-          onChange={(e) => { setBlockUnsigned(e.target.checked); setSaved(false); }}
+          onChange={(e) => { setBlockUnsigned(e.target.checked); setDirty(true); }}
           className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
         />
         <span>
           <span className="block text-[13px] font-bold text-ih-fg-1">Require signed agreement</span>
           <span className="block text-[12px] text-ih-fg-3 mt-0.5">
             Clients must sign the inspection agreement before the booking is confirmed.
+          </span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={allowChoice}
+          onChange={(e) => { setAllowChoice(e.target.checked); setDirty(true); }}
+          className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
+        />
+        <span>
+          <span className="block text-[13px] font-bold text-ih-fg-1">Allow clients to choose their inspector</span>
+          <span className="block text-[12px] text-ih-fg-3 mt-0.5">
+            When off, bookings are auto-assigned to the first available inspector.
           </span>
         </span>
       </label>
@@ -419,6 +678,11 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
           {saving ? "Saving..." : "Save policies"}
         </button>
         {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+        {failed && (
+          <span className="text-[13px] text-ih-bad-fg font-bold">
+            {fetcher.data?.message ?? "Save failed. Please try again."}
+          </span>
+        )}
       </div>
     </section>
   );
@@ -434,39 +698,36 @@ const STYLES = [
   { id: "branded", label: "Branded" },
 ] as const;
 
-function EmbedWidget({ tenant, slug }: { tenant: string | null | undefined; slug: string | null | undefined }) {
+function EmbedWidget({ tenant }: { tenant: string | null | undefined }) {
   const [style, setStyle] = useState<"light" | "dark" | "branded">("light");
   const [copied, setCopied] = useState(false);
-  const hasBooking = !!(tenant && slug);
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const embedUrl = hasBooking ? `${origin}/embed/${tenant}/${slug}?style=${style}` : null;
-
-  const snippet = hasBooking
-    ? `<iframe src="${origin}/embed/${tenant}/${slug}?style=${style}" style="width:100%;min-height:700px;border:none;" loading="lazy"></iframe>`
-    : "";
-
-  function copySnippet() {
-    void navigator.clipboard.writeText(snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  if (!hasBooking) {
+  // Company-level embed: only requires tenant (slug not needed).
+  // See Part 4c — we use company-only embed, no per-inspector variant in the snippet.
+  if (!tenant) {
     return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-3">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Embed widget</h3>
         <div className="w-full min-h-[200px] rounded-md border-2 border-dashed border-ih-border flex items-center justify-center">
           <div className="text-center">
             <EmbedIcon />
-            <p className="text-[13px] text-ih-fg-3 mt-2">Set a booking slug in your profile to enable the embed widget.</p>
-            <Link to="/settings/profile" className="text-[13px] text-ih-primary hover:underline mt-1 inline-block">
-              Go to Profile &rarr;
-            </Link>
+            <p className="text-[13px] text-ih-fg-3 mt-2">No company configured — embed widget unavailable.</p>
           </div>
         </div>
       </section>
     );
+  }
+
+  // SSR produces "" for origin; client produces the real origin.
+  // Same pre-existing mismatch class as StatusAndLinks above.
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const embedUrl = `${origin}/embed/${tenant}?style=${style}`;
+  const snippet = `<iframe src="${origin}/embed/${tenant}?style=${style}" style="width:100%;min-height:700px;border:none;" loading="lazy"></iframe>`;
+
+  function copySnippet() {
+    void navigator.clipboard.writeText(snippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -508,7 +769,7 @@ function EmbedWidget({ tenant, slug }: { tenant: string | null | undefined; slug
       <div className="space-y-2">
         <span className="text-[12px] font-bold text-ih-fg-2">Live preview</span>
         <iframe
-          src={embedUrl!}
+          src={embedUrl}
           className="w-full min-h-[700px] rounded-md border border-ih-border"
           loading="lazy"
           title="Widget preview"

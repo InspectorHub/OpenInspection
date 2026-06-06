@@ -102,7 +102,7 @@ Both call Gemini 1.5 Flash. Temperature 0.2.
 
 Inspectors manage weekly schedule + date overrides via `availability` / `availability_overrides` tables.
 
-Public booking: `GET /public/book/:tenant/:slug` returns inspector profile + services. Customer submits via `POST /public/book` with Turnstile bot protection.
+Public booking: `GET /public/book/:tenant` returns the company booking page with all services and available slots; the system auto-assigns the first available qualified inspector. An optional inspector-choice dropdown is shown when the tenant enables "Allow clients to choose their inspector" (Settings → Online Booking → Booking policies). Customer submits via `POST /public/book` with Turnstile bot protection. Legacy per-inspector URLs `GET /public/book/:tenant/:slug` redirect 302 to the company page with that inspector pre-selected.
 
 ## 8. Execution Flow
 

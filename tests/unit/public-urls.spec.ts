@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bookingUrl, inspectorProfileUrl, inspectorCalendarUrl, reportUrl, signUrl, agreementSignUrl, agreementSignPath, embedBookingUrl, m2mAgreementRenderUrl } from '../../server/lib/public-urls';
+import { bookingUrl, inspectorProfileUrl, inspectorCalendarUrl, reportUrl, signUrl, agreementSignUrl, agreementSignPath, embedBookingUrl, embedBookingCompanyUrl, m2mAgreementRenderUrl } from '../../server/lib/public-urls';
 
 describe('public URL builders', () => {
     it('bookingUrl emits /book/<tenant>/<inspector>', () => {
@@ -26,8 +26,11 @@ describe('public URL builders', () => {
     it('inspectorCalendarUrl emits /inspector/<tenant>/<slug>/calendar.ics', () => {
         expect(inspectorCalendarUrl('app.example.com', 'acme', 'jane')).toBe('https://app.example.com/inspector/acme/jane/calendar.ics');
     });
-    it('embedBookingUrl emits /embed/book/<tenant>/<slug>', () => {
-        expect(embedBookingUrl('app.example.com', 'acme', 'jane')).toBe('https://app.example.com/embed/book/acme/jane');
+    it('embedBookingUrl emits /embed/<tenant>/<slug> (real route, not /embed/book/)', () => {
+        expect(embedBookingUrl('app.example.com', 'acme', 'jane')).toBe('https://app.example.com/embed/acme/jane');
+    });
+    it('embedBookingCompanyUrl emits /embed/<tenant> (company-level, IA-26)', () => {
+        expect(embedBookingCompanyUrl('app.example.com', 'acme')).toBe('https://app.example.com/embed/acme');
     });
     it('m2mAgreementRenderUrl emits /m2m/agreement-render/<tenant>/<token>', () => {
         expect(m2mAgreementRenderUrl('app.example.com', 'acme', 'tok-xyz')).toBe('https://app.example.com/m2m/agreement-render/acme/tok-xyz');

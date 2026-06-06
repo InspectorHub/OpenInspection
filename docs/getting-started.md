@@ -21,7 +21,7 @@ After deploying (see [`developers/02_deploy.md`](developers/02_deploy.md)), visi
 
 **3. Publish** — Click Publish to create a versioned report snapshot. Client receives an email with report link (`/report/:id`).
 
-**4. Booking (Optional)** — Enable public booking at Settings → Services + Availability. Share `/book/:tenant/:slug`. Embeddable widget at `/embed/:tenant/:slug`.
+**4. Booking (Optional)** — Enable public booking at Settings → Services + Availability. Share your company booking page `/book/<company-slug>`. Embeddable widget at `/embed/<company-slug>`. Per-inspector deep links (`/book/<company-slug>/<inspector-slug>`) still work and pre-select that inspector.
 
 ### Templates
 
@@ -133,5 +133,5 @@ Browser → single Worker (Hono entry):
 | Contacts | `/contacts` | Client and agent CRM |
 | Calendar | `/calendar` | Schedule view |
 | Settings | `/settings/*` | Workspace config, integrations, billing |
-| Public Booking | `/book/:tenant/:slug` | Client self-scheduling |
+| Public Booking | `/book/:tenant` | Client self-scheduling (company-level; auto-assigns inspector) |
 | Report Viewer | `/report/:id` | Client-facing inspection report |

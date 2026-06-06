@@ -6,6 +6,7 @@ import {
     CreateServiceSchema, UpdateServiceSchema, ServiceResponseSchema,
     ServiceListResponseSchema, CreateDiscountCodeSchema, UpdateDiscountCodeSchema,
     ValidateDiscountSchema, ValidateDiscountResponseSchema,
+    ServiceInspectorListResponseSchema, SetServiceInspectorsSchema, SetServiceInspectorsResponseSchema,
 } from '../lib/validations/service.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -115,6 +116,46 @@ export const servicesRoutes = createApiRouter()
         const data = c.req.valid('json');
         const row = await c.var.services.service.createService(tenantId, data);
         return c.json({ success: true, data: row }, 201);
+    })
+    // GET /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
+    .openapi(createRoute(withMcpMetadata({
+        method: 'get', path: '/{id}/inspectors',
+        tags: ["services"], summary: "Get qualified inspector restriction list for a service",
+        middleware: [requireRole(['owner', 'admin'])] as const,
+        request: {
+            params: z.object({ id: z.string().describe('Service ID') }),
+        },
+        responses: {
+            200: { content: { 'application/json': { schema: ServiceInspectorListResponseSchema } }, description: 'OK — empty userIds means all staff are qualified' },
+        },
+        operationId: "getServiceInspectors",
+        description: "Returns the inspector restriction list for a service. An empty userIds array means all non-agent staff are qualified (no restriction rows). Admin or owner only.",
+    }, { scopes: ['read'], tier: 'extended' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const userIds = await c.var.services.service.getServiceInspectors(tenantId, id);
+        return c.json({ success: true, data: { userIds } });
+    })
+    // PUT /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
+    .openapi(createRoute(withMcpMetadata({
+        method: 'put', path: '/{id}/inspectors',
+        tags: ["services"], summary: "Replace inspector restriction list for a service",
+        middleware: [requireRole(['owner', 'admin'])] as const,
+        request: {
+            params: z.object({ id: z.string().describe('Service ID') }),
+            body: { content: { 'application/json': { schema: SetServiceInspectorsSchema } } },
+        },
+        responses: {
+            200: { content: { 'application/json': { schema: SetServiceInspectorsResponseSchema } }, description: 'OK — count of restriction rows now in effect' },
+        },
+        operationId: "setServiceInspectors",
+        description: "Full-replace the qualified inspector list for a service. An empty userIds array clears all restrictions (back to all-qualified). Every userId must be a non-deleted, non-agent member of the caller's tenant. Admin or owner only.",
+    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const { userIds } = c.req.valid('json');
+        const count = await c.var.services.service.setServiceInspectors(tenantId, id, userIds);
+        return c.json({ success: true, data: { count } });
     })
     // PUT /api/services/:id
     .openapi(createRoute(withMcpMetadata({

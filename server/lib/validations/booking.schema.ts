@@ -21,7 +21,12 @@ export const PublicBookingSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-15' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     timeSlot: z.enum(['morning', 'afternoon', 'all-day', 'custom']).openapi({ example: 'morning' }).describe('TODO describe timeSlot field for the OpenInspection MCP integration'),
     customTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().openapi({ example: '13:30' }).describe('TODO describe customTime field for the OpenInspection MCP integration'),
-    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    // IA-26 — optional. Omit for company-level auto-assign (the server picks the
+    // first available qualified inspector). Supply to target a specific inspector
+    // (per-inspector deep link / allowInspectorChoice dropdown). If supplied and
+    // the inspector is unavailable or belongs to a different tenant the request
+    // is rejected; the server will NOT silently reassign to a free inspector.
+    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Optional inspector id. Omit for company-level auto-assign; supply to target a specific inspector (deep link / inspector-choice flow).'),
     turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }).describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
     // Sprint 2 S2-2 — Multi-inspection per request. Customer can pick multiple
     // services in a single visit. When omitted (legacy single-service flow),
@@ -51,7 +56,7 @@ export const AvailabilitySchema = z.object({
         dayOfWeek: z.number().min(0).max(6).openapi({ example: 1 }).describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
         startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
         endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '17:00' }).describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    })).min(1).openapi({ description: 'List of weekly availability slots' }),
+    })).min(0).openapi({ description: 'List of weekly availability slots (empty array clears all slots)' }),
 }).openapi('Availability');
 
 /**
