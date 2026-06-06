@@ -171,10 +171,12 @@ export function useCannedComments(options: {
       params.set("sort", sort);
       params.set("filterMode", filterMode);
       if (ctx.search) params.set("search", ctx.search);
+      // Track H: rating rides regardless of filter mode (the modal's bucket
+      // chips set it explicitly); section/itemLabel stay auto-only context.
+      if (ctx.ratingBucket) params.set("rating", ctx.ratingBucket);
       if (filterMode === "auto") {
         if (ctx.itemLabel) params.set("itemLabel", ctx.itemLabel);
         if (ctx.section) params.set("section", ctx.section);
-        if (ctx.ratingBucket) params.set("rating", ctx.ratingBucket);
       }
       return loadServerRows(params);
     },

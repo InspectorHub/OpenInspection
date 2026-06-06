@@ -107,4 +107,18 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
         expect(texts).toHaveLength(0);
         expect(total).toBe(0);
     });
+    it('rating filter applies in filterMode=all too (the modal bucket chips)', async () => {
+        await db.insert(schema.comments).values([
+            { id: 'd1', tenantId: TENANT, text: 'Defect one.', ratingBucket: 'defect', section: null, category: null, createdAt: new Date() },
+            { id: 's1', tenantId: TENANT, text: 'Sat one.', ratingBucket: 'satisfactory', section: null, category: null, createdAt: new Date() },
+        ]);
+        const res = await buildApp().request(
+            '/api/admin/comments?filterMode=all&rating=defect',
+            {},
+            { DB: {} },
+        );
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: Array<{ text: string }> };
+        expect(body.data.map(d => d.text)).toEqual(['Defect one.']);
+    });
 });

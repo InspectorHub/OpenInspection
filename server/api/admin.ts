@@ -1629,7 +1629,10 @@ export const adminRoutes = createApiRouter()
         if (triggerCode) {
             conditions.push(eq(comments.triggerCode, triggerCode));
         }
-        if (auto && rating) conditions.push(eq(comments.ratingBucket, rating));
+        // Track H: `rating` applies whenever the caller sends it — the library
+        // modal's bucket chips pass it explicitly in `all` mode too (it used to
+        // be auto-gated like section/itemLabel, which left the chips dead).
+        if (rating) conditions.push(eq(comments.ratingBucket, rating));
         if (auto && section) conditions.push(eq(comments.section, section));
         if (auto && itemLabel) conditions.push(eq(comments.itemLabel, itemLabel));
         // Track H (IA-5): search is pushed down to SQL so pagination + count

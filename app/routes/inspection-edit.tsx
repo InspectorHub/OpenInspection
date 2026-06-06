@@ -601,7 +601,7 @@ export default function InspectionEditPage() {
 
  useEffect(() => {
  if (!state.showCommentLibrary) { setServerComments([]); return; }
- const ctx: { itemLabel?: string; section?: string; ratingBucket?: string } = {};
+ const ctx: { itemLabel?: string; section?: string; ratingBucket?: string; search?: string } = {};
  if (comments.filterMode === 'auto' && state.activeItem) {
  ctx.itemLabel = (state.activeItem.label || state.activeItem.name || '') as string;
  ctx.section   = state.currentSection?.title;
@@ -610,11 +610,26 @@ export default function InspectionEditPage() {
  ctx.ratingBucket = state.bucketForRatingId(r as string);
  }
  }
+ // Track H (IA-5) — the modal's search box queries the SERVER (SQL pushdown
+ // over the whole tenant library incl. imported rows); it used to only reset
+ // the keyboard cursor. Bucket chips override the context-derived rating.
+ const q = state.commentLibrarySearch.trim();
+ if (q.length >= 2) ctx.search = q;
+ if (['satisfactory', 'monitor', 'defect'].includes(state.commentLibraryFilter)) {
+ ctx.ratingBucket = state.commentLibraryFilter;
+ }
+ let cancelled = false;
+ const t = setTimeout(() => {
  comments.fetchFiltered(ctx).then((rows) => {
+ if (cancelled) return;
  setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>);
  });
+ }, q ? 250 : 0);
+ return () => { cancelled = true; clearTimeout(t); };
  }, [
  state.showCommentLibrary,
+ state.commentLibrarySearch,
+ state.commentLibraryFilter,
  comments.sort,
  comments.filterMode,
  state.activeItemId,
