@@ -78,11 +78,22 @@ export async function action({ request, context }: Route.ActionArgs) {
   const intent = String(form.get("intent"));
 
   if (intent === "schedule-save") {
-    const slots = JSON.parse(String(form.get("slots") ?? "[]"));
+    // defensive: value is client-built; guard against malformed JSON
+    let slots: { dayOfWeek: number; startTime: string; endTime: string }[];
+    try {
+      slots = JSON.parse(String(form.get("slots") ?? "[]"));
+    } catch {
+      return { ok: false, intent };
+    }
     const inspectorId = String(form.get("inspectorId") ?? "") || undefined;
     const res = await api.availability.index.$put({
       json: { slots, ...(inspectorId ? { inspectorId } : {}) },
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as string | undefined;
+      return { ok: false, intent, message };
+    }
     return { ok: res.ok, intent };
   }
 
@@ -113,6 +124,11 @@ export async function action({ request, context }: Route.ActionArgs) {
         blockUnsignedAgreement: form.get("blockUnsignedAgreement") === "true",
       },
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as string | undefined;
+      return { ok: false, intent, message };
+    }
     return { ok: res.ok, intent };
   }
 
@@ -248,6 +264,12 @@ function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) 
     fetcher.data.ok === true &&
     !dirty;
 
+  const failed =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "schedule-save" &&
+    fetcher.data.ok === false &&
+    !dirty;
+
   const saving = fetcher.state !== "idle";
 
   function updateDay(idx: number, patch: Partial<DayState>) {
@@ -314,6 +336,11 @@ function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) 
           {saving ? "Saving..." : "Save schedule"}
         </button>
         {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+        {failed && (
+          <span className="text-[13px] text-ih-bad-fg font-bold">
+            {fetcher.data?.message ?? "Save failed. Please try again."}
+          </span>
+        )}
       </div>
     </section>
   );
@@ -459,6 +486,12 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
     fetcher.data.ok === true &&
     !dirty;
 
+  const failed =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "policies-save" &&
+    fetcher.data.ok === false &&
+    !dirty;
+
   function handleSave() {
     setDirty(false);
     fetcher.submit(
@@ -514,6 +547,11 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
           {saving ? "Saving..." : "Save policies"}
         </button>
         {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+        {failed && (
+          <span className="text-[13px] text-ih-bad-fg font-bold">
+            {fetcher.data?.message ?? "Save failed. Please try again."}
+          </span>
+        )}
       </div>
     </section>
   );
