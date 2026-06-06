@@ -114,6 +114,12 @@ export interface AppEnv {
     // never constructed and no rows accumulate.
     SYNC_QUEUE?: Queue<import('../lib/sync-events/envelope').SyncEnvelope>;
 
+    // A-21 batch 3 — shared offboarding exports bucket (SaaS-only; the same
+    // bucket the portal worker binds). The cmd consumer streams the tenant
+    // export ZIP here (`cmd.tenant.data_export`) via multipart upload and the
+    // portal serves the download. Absent in standalone (no portal).
+    EXPORTS_BUCKET?: R2Bucket;
+
     // Spec 5D — Address Autofill. Server-side proxy holds the API key so it
     // never leaks to the client. Optional: when absent, dashboard.tsx falls
     // back to a free-text address input (no autocomplete dropdown).
