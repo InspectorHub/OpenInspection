@@ -176,9 +176,9 @@ export default function SettingsBookingPage() {
   // Admin/owner role means members loaded successfully (403 gate for non-admins).
   const isAdmin = ctx?.user?.role === "owner" || ctx?.user?.role === "admin";
 
-  // Filter out agent role and show picker only to admins with >0 other members
+  // Show picker only to admins; restrict to known scheduling roles.
   const pickerMembers = isAdmin
-    ? data.members.filter((m) => m.role !== "agent")
+    ? data.members.filter((m) => ['owner', 'admin', 'inspector'].includes(m.role))
     : [];
 
   return (
@@ -211,7 +211,7 @@ export default function SettingsBookingPage() {
         inspectorId={data.managedInspectorId}
       />
       <BookingPolicies initialConfig={data.config} />
-      <EmbedWidget tenant={tenant} slug={slug} />
+      <EmbedWidget tenant={tenant} />
     </div>
   );
 }
@@ -696,7 +696,7 @@ const STYLES = [
   { id: "branded", label: "Branded" },
 ] as const;
 
-function EmbedWidget({ tenant }: { tenant: string | null | undefined; slug?: string | null }) {
+function EmbedWidget({ tenant }: { tenant: string | null | undefined }) {
   const [style, setStyle] = useState<"light" | "dark" | "branded">("light");
   const [copied, setCopied] = useState(false);
 
@@ -709,7 +709,7 @@ function EmbedWidget({ tenant }: { tenant: string | null | undefined; slug?: str
         <div className="w-full min-h-[200px] rounded-md border-2 border-dashed border-ih-border flex items-center justify-center">
           <div className="text-center">
             <EmbedIcon />
-            <p className="text-[13px] text-ih-fg-3 mt-2">No tenant slug configured — embed widget unavailable.</p>
+            <p className="text-[13px] text-ih-fg-3 mt-2">No company configured — embed widget unavailable.</p>
           </div>
         </div>
       </section>

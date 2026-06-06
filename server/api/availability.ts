@@ -169,7 +169,13 @@ export const availabilityRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
         const tenantId = c.get('tenantId');
         const user = c.get('user');
+        const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
+
+        if (queryId && queryId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+            throw Errors.Forbidden('Can only view your own availability');
+        }
+
         const inspectorId = queryId || user.sub;
 
         const slots = await db.select()
@@ -206,7 +212,13 @@ export const availabilityRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
         const tenantId = c.get('tenantId');
         const user = c.get('user');
+        const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
+
+        if (queryId && queryId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+            throw Errors.Forbidden('Can only view your own availability');
+        }
+
         const inspectorId = queryId || user.sub;
 
         const overrides = await db.select()
