@@ -63,6 +63,10 @@ export class BookingService {
     /**
      * Returns computed time slots for a given inspector/date.
      * Reads recurring availability windows, date overrides, and existing bookings.
+     *
+     * LEGACY (lead-only busy check via inspections.inspectorId): no production caller —
+     * the live booking path uses getTenantSlots, whose link-table busy check also counts
+     * helper assignments. Prefer getTenantSlots for new code.
      */
     async getAvailableSlots(
         tenantId: string,

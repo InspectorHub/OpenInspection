@@ -983,6 +983,7 @@ export const bookingsRoutes = createApiRouter()
      * and then re-running both calls inside the allowChoice branch.
      */
     .get('/book/:tenant', async (c) => {
+        await checkRateLimit(c, 'availability');
         const { tenant } = c.req.param();
         const db = drizzle(c.env.DB);
 
@@ -1040,6 +1041,7 @@ export const bookingsRoutes = createApiRouter()
      * Returns inspector name, services, and availability for the booking page.
      */
     .get('/book/:tenant/:slug', async (c) => {
+        await checkRateLimit(c, 'availability');
         const { tenant, slug } = c.req.param();
         const db = drizzle(c.env.DB);
 
