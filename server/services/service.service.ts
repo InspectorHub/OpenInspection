@@ -170,15 +170,29 @@ export class ServiceService {
             }
         }
 
-        // Delete all existing rows for this service+tenant, then insert new ones.
-        await db.delete(serviceInspectors)
+        // Full-replace atomically: delete existing rows then insert new ones in one
+        // db.batch() so a failed insert can never leave zero rows (fail-open).
+        // Drivers without batch support (e.g. the better-sqlite3 unit-test mock)
+        // fall back to sequential statements, matching the pattern in
+        // starter-content.service.ts:batchInsert.
+        const deleteStmt = db.delete(serviceInspectors)
             .where(and(eq(serviceInspectors.serviceId, serviceId), eq(serviceInspectors.tenantId, tenantId)));
 
         if (userIds.length > 0) {
             const now = new Date();
-            await db.insert(serviceInspectors).values(
+            const insertStmt = db.insert(serviceInspectors).values(
                 userIds.map(userId => ({ serviceId, userId, tenantId, createdAt: now })),
             );
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (typeof (db as any).batch === 'function') {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (db as any).batch([deleteStmt, insertStmt]);
+            } else {
+                await deleteStmt;
+                await insertStmt;
+            }
+        } else {
+            await deleteStmt;
         }
 
         return userIds.length;

@@ -80,7 +80,9 @@ export const ServiceInspectorListResponseSchema = createApiResponseSchema(z.obje
 }));
 
 export const SetServiceInspectorsSchema = z.object({
-    userIds: z.array(z.string()).describe('Full replacement list of inspector user IDs; empty array clears restriction'),
+    userIds: z.array(z.string())
+        .transform(a => [...new Set(a)])
+        .describe('Full replacement list of inspector user IDs; empty array clears restriction; duplicates are silently deduplicated'),
 }).openapi('SetServiceInspectors');
 
 export const SetServiceInspectorsResponseSchema = createApiResponseSchema(z.object({

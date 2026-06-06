@@ -117,7 +117,7 @@ export const servicesRoutes = createApiRouter()
         const row = await c.var.services.service.createService(tenantId, data);
         return c.json({ success: true, data: row }, 201);
     })
-    // GET /api/services/:id/inspectors — MUST be before /{id} routes
+    // GET /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
     .openapi(createRoute(withMcpMetadata({
         method: 'get', path: '/{id}/inspectors',
         tags: ["services"], summary: "Get qualified inspector restriction list for a service",
@@ -136,7 +136,7 @@ export const servicesRoutes = createApiRouter()
         const userIds = await c.var.services.service.getServiceInspectors(tenantId, id);
         return c.json({ success: true, data: { userIds } });
     })
-    // PUT /api/services/:id/inspectors — MUST be before /{id} routes
+    // PUT /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
     .openapi(createRoute(withMcpMetadata({
         method: 'put', path: '/{id}/inspectors',
         tags: ["services"], summary: "Replace inspector restriction list for a service",

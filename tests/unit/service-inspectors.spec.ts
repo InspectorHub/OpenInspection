@@ -226,6 +226,32 @@ describe('GET / PUT /:id/inspectors (Task 11, Track G)', () => {
     });
 
     // ----------------------------------------------------------------
+    // Dedup: duplicate userIds are silently collapsed
+    // ----------------------------------------------------------------
+
+    it('PUT with duplicate userIds succeeds and GET returns deduplicated set', async () => {
+        const app = buildApp(db);
+
+        // Send U1 twice in the same request.
+        const putRes = await app.request(`/${S1}/inspectors`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userIds: [U1, U1, U2, U1] }),
+        }, FAKE_ENV);
+        expect(putRes.status).toBe(200);
+        const putBody = await putRes.json() as any;
+        expect(putBody.success).toBe(true);
+        // After dedup: [U1, U2] → count = 2, not 4.
+        expect(putBody.data.count).toBe(2);
+
+        const getRes = await app.request(`/${S1}/inspectors`, {}, FAKE_ENV);
+        const getBody = await getRes.json() as any;
+        expect(getBody.data.userIds).toHaveLength(2);
+        expect(getBody.data.userIds).toContain(U1);
+        expect(getBody.data.userIds).toContain(U2);
+    });
+
+    // ----------------------------------------------------------------
     // Integration: write face feeds BookingService read face
     // ----------------------------------------------------------------
 

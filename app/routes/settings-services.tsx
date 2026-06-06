@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLoaderData, Form, useActionData, useFetcher } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -49,7 +49,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const d = (body.data ?? {}) as Record<string, unknown>;
     const rawServices = (Array.isArray(d?.services) ? d.services : []) as Service[];
 
-    // Fetch qualification restrictions for all services in parallel.
+    // Fetch qualification restrictions for all services in parallel (one GET per service).
+    // Acceptable at realistic service counts; add a bulk endpoint if this grows.
     const restrictionResults = await Promise.all(
       rawServices.map(async (svc) => {
         try {
@@ -166,6 +167,13 @@ function QualificationWidget({ service, initialUserIds, members }: Qualification
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set(initialUserIds));
   const [dirty, setDirty] = useState(false);
+
+  // Re-sync local selection when the loader delivers a fresh restrictionMap
+  // (e.g. after a full-page navigation or revalidation).
+  useEffect(() => {
+    setSelected(new Set(initialUserIds));
+    setDirty(false);
+  }, [initialUserIds]);
 
   const saving = fetcher.state !== "idle";
   const lastResult = fetcher.state === "idle" ? fetcher.data : undefined;
