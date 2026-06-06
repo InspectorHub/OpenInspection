@@ -12,7 +12,7 @@ vi.mock('../../server/services/starter-content.service', () => ({
     seedStarterContent: vi.fn(async () => ({
         inspectionTemplatesSeeded: 7,
         agreementTemplatesSeeded: 1,
-        cannedCommentsSeeded: 250,
+        cannedCommentsSeeded: 254,
         eventTypesSeeded: 3,
         tagsSeeded: 4,
         recommendationsSeeded: 80,

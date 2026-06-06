@@ -82,7 +82,7 @@ describe('POST /api/integration/seed-starter-content', () => {
         };
         expect(body.success).toBe(true);
         expect(body.data.inspectionTemplatesSeeded).toBe(7);
-        expect(body.data.cannedCommentsSeeded).toBe(250);
+        expect(body.data.cannedCommentsSeeded).toBe(254);
     });
 
     it('returns 403 when the M2M header is missing', async () => {

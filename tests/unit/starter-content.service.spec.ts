@@ -51,7 +51,7 @@ describe('seedStarterContent', () => {
 
         expect(result.inspectionTemplatesSeeded).toBe(7);
         expect(result.agreementTemplatesSeeded).toBe(1);
-        expect(result.cannedCommentsSeeded).toBe(250);
+        expect(result.cannedCommentsSeeded).toBe(254);
         expect(result.eventTypesSeeded).toBe(3);
         expect(result.tagsSeeded).toBe(4);
         expect(result.recommendationsSeeded).toBeGreaterThan(0);
