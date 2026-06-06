@@ -26,12 +26,14 @@ export async function loader({
     const date = url.searchParams.get("date") ?? "";
     const excludeId = url.searchParams.get("excludeId") ?? undefined;
 
-    if (!inspectorId || !date) return { conflicts: [] };
+    if (!date) return { conflicts: [] };
 
     const res = await api.inspections["schedule-conflicts"]
         .$get({
             query: {
-                inspectorId,
+                // Omitted inspectorId = check the caller (solo wizard flow
+                // assigns the inspection to its creator).
+                ...(inspectorId ? { inspectorId } : {}),
                 date,
                 ...(excludeId ? { excludeId } : {}),
             },

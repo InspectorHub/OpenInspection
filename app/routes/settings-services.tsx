@@ -41,13 +41,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const [svcRes, membersRes] = await Promise.all([
+    const [svcRes, discountRes, membersRes] = await Promise.all([
       api.services.index.$get({}),
+      api.services["discount-codes"].$get().catch(() => null),
       api.admin.members.$get().catch(() => null),
     ]);
+    // GET /api/services returns { success, data: Service[] } — data IS the
+    // array (the pre-C-10 admin endpoint wrapped it in { services, discounts },
+    // which this loader kept parsing; the list rendered empty ever since).
     const body = svcRes.ok ? ((await svcRes.json()) as Record<string, unknown>) : {};
-    const d = (body.data ?? {}) as Record<string, unknown>;
-    const rawServices = (Array.isArray(d?.services) ? d.services : []) as Service[];
+    const rawServices = (Array.isArray(body.data) ? body.data : []) as Service[];
+    const discountBody = discountRes?.ok ? ((await discountRes.json()) as Record<string, unknown>) : {};
+    const rawDiscounts = (Array.isArray(discountBody.data) ? discountBody.data : []) as Discount[];
 
     // Fetch qualification restrictions for all services in parallel (one GET per service).
     // Acceptable at realistic service counts; add a bulk endpoint if this grows.
@@ -76,7 +81,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
     return {
       services: rawServices,
-      discounts: (Array.isArray(d?.discounts) ? d.discounts : []) as Discount[],
+      discounts: rawDiscounts,
       restrictionMap,
       members,
     };
@@ -107,7 +112,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await (api.services.index.$post as unknown as (args: { json: Record<string, unknown> }) => Promise<Response>)({
       json: {
         name,
-        description: description || null,
+        // CreateServiceSchema.description is .optional() — undefined is the
+        // only valid "absent" encoding; sending null fails validation (400).
+        ...(description ? { description } : {}),
         price: Number(price) * 100 || 0,
       },
     });

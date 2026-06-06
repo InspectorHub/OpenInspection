@@ -157,15 +157,16 @@ export function NewInspectionWizard({
   }, [open]);
 
   // IA-6 — debounced schedule conflict check: fires 400 ms after either
-  // inspectorId or date/time changes. Only queries when a real inspector id
-  // is selected (non-empty) and a date is set. Advisory only — never blocks.
+  // inspectorId or date/time changes. With no explicit inspector chosen
+  // (solo flow) the server checks the CALLER — that is who the inspection
+  // will be assigned to. Advisory only — never blocks.
   useEffect(() => {
-    if (!inspectorId || !date) return;
+    if (!date) return;
     const combinedDate = `${date}T${time}:00Z`;
+    const params = new URLSearchParams({ date: combinedDate });
+    if (inspectorId) params.set("inspectorId", inspectorId);
     const t = setTimeout(() => {
-      conflictFetcher.load(
-        `/resources/schedule-conflicts?inspectorId=${encodeURIComponent(inspectorId)}&date=${encodeURIComponent(combinedDate)}`,
-      );
+      conflictFetcher.load(`/resources/schedule-conflicts?${params.toString()}`);
     }, 400);
     return () => clearTimeout(t);
   // conflictFetcher is stable across renders — intentionally omitted per RR convention.
@@ -628,6 +629,20 @@ export function NewInspectionWizard({
                 <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Time</label>
                 <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
               </div>
+              {/* IA-6 — advisory conflict warning; non-blocking. With no team
+                  step (solo tenants) the inspection goes to the creator, and
+                  the conflict check covers them by default. */}
+              {(conflictFetcher.data?.conflicts?.length ?? 0) > 0 && (
+                <div className="rounded-md border border-ih-watch/40 bg-ih-watch-bg px-3 py-2">
+                  <p className="text-[12px] font-bold text-ih-watch-fg">
+                    <strong>Schedule conflict:</strong>{" "}
+                    {conflictFetcher.data!.conflicts.length === 1
+                      ? `this inspector already has an inspection at ${conflictFetcher.data!.conflicts[0].propertyAddress}`
+                      : `this inspector already has ${conflictFetcher.data!.conflicts.length} inspections`}{" "}
+                    in this time slot. You can still schedule it.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

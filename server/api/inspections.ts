@@ -474,7 +474,7 @@ const scheduleConflictsRoute = createRoute(withMcpMetadata({
     middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
     request: {
         query: z.object({
-            inspectorId: z.string().min(1).describe('Inspector user id to check.'),
+            inspectorId: z.string().min(1).optional().describe('Inspector user id to check; defaults to the caller (solo wizard flow assigns the creator).'),
             date: z.string().min(1).describe('Proposed date/time — ISO datetime or YYYY-MM-DD.'),
             excludeId: z.string().optional().describe('Inspection id being rescheduled; excluded from collision results.'),
         }).describe('Conflict query'),
@@ -2017,7 +2017,10 @@ export const inspectionsRoutes = createApiRouter()
         const { inspectorId, date, excludeId } = c.req.valid('query');
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
-        const conflicts = await findScheduleConflicts(db, tenantId, inspectorId, date, excludeId);
+        // Solo wizard flow sends no inspectorId — the inspection will be
+        // assigned to the creator, so that is who we check against.
+        const targetId = inspectorId || c.get('user').sub;
+        const conflicts = await findScheduleConflicts(db, tenantId, targetId, date, excludeId);
         return c.json({ success: true, data: { conflicts } }, 200);
     })
     .openapi(getInspectionRoute, async (c) => {
