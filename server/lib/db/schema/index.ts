@@ -8,6 +8,8 @@ export {
     inspectionAgreements,
     availability,
     availabilityOverrides,
+    inspectionInspectors,
+    serviceInspectors,
     comments,
     agreementRequests,
     services,

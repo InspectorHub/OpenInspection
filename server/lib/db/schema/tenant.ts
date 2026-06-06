@@ -275,6 +275,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // magic-link goes to client immediately. 1 (true) = Spectora reviewer
     // mode: inspector must approve the draft before the client gets the link.
     conciergeReviewRequired: integer('concierge_review_required', { mode: 'boolean' }).notNull().default(false),
+    // IA-26 — company-level booking page: when true the public /book/:tenant
+    // wizard shows an inspector dropdown ("Allow choice of inspectors",
+    // Spectora-style). Default OFF = pure auto-assign (first available).
+    allowInspectorChoice: integer('allow_inspector_choice', { mode: 'boolean' }).notNull().default(false),
     // Migration 0059 — Workers Paid PDF pipeline opt-in.
     // Default 0 (OFF) — keeps the Free-plan path cost-free (window.print()
     // fallback in the viewer is unaffected). Tenants on Workers Paid flip
