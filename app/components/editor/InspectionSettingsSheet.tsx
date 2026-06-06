@@ -90,8 +90,8 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
       const loadedTemplateId = (insp.templateId as string) || "";
       templateIdAtOpen.current = loadedTemplateId;
       setForm({
-        date: (insp.date as string) || "",
-        closingDate: (insp.closingDate as string) || "",
+        date: ((insp.date as string) || "").replace(/T.*/, ''),
+        closingDate: ((insp.closingDate as string) || "").replace(/T.*/, ''),
         inspectorId: (insp.inspectorId as string) || "",
         orderId: (insp.orderId as string) || "",
         referralSource: (insp.referralSource as string) || "",
