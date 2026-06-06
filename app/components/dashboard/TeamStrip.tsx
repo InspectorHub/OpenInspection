@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useFetcher } from "react-router";
 
 interface TeamMember {
   id: string;
@@ -12,29 +13,18 @@ interface TeamStripProps {
   members?: TeamMember[];
 }
 
+interface LoaderData { members: TeamMember[]; pendingInvites: unknown[] }
+
 export function TeamStrip({ members: propMembers }: TeamStripProps) {
-  const [members, setMembers] = useState<TeamMember[]>(propMembers || []);
+  const fetcher = useFetcher<LoaderData>();
 
   useEffect(() => {
-    if (propMembers) {
-      setMembers(propMembers);
-      return;
+    if (!propMembers && fetcher.state === "idle" && !fetcher.data) {
+      fetcher.load("/resources/team-members");
     }
-    // Fetch from API if no prop members provided
-    async function load() {
-      try {
-        const res = await fetch("/api/team/members", { credentials: "include" });
-        if (res.ok) {
-          const { data } = (await res.json()) as { data: TeamMember[] };
-          setMembers(data || []);
-        }
-      } catch {
-        // degrade gracefully — hide the strip
-      }
-    }
-    load();
-  }, [propMembers]);
+  }, [propMembers, fetcher]);
 
+  const members: TeamMember[] = propMembers ?? (fetcher.data?.members as TeamMember[] | undefined) ?? [];
   const onlineCount = members.filter((m) => m.online).length;
 
   if (members.length <= 1) return null;

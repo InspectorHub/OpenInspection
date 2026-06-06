@@ -107,8 +107,8 @@
   --ih-border-strong-color: #cbd5e1;
 }
 
-/* ── Dark mode ── */
-html[data-color-scheme="dark"], .dark {
+/* ── Dark mode (the 'field' scheme is dark-based and inherits these vars) ── */
+html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
   --ih-primary: #818cf8;
   --ih-primary-600: #6366f1;
   --ih-primary-700: #4f46e5;
@@ -138,6 +138,32 @@ html[data-color-scheme="dark"], .dark {
 
   --ih-border-color: #334155;
   --ih-border-strong-color: #475569;
+}
+
+/* ── Field mode (Track H 迁移⑤) ──
+   High-contrast, large-type variant of dark for outdoor/sunlight use:
+   18px base font (rem-based sizes scale up), near-black background,
+   brighter foregrounds and stronger borders. Inherits everything else
+   from the dark block above. */
+html[data-color-scheme="field"] {
+  font-size: 18px;
+
+  --ih-fg-1: #ffffff;
+  --ih-fg-2: #e2e8f0;
+  --ih-fg-3: #cbd5e1;
+  --ih-fg-4: #94a3b8;
+
+  --ih-bg-app: #020617;
+  --ih-bg-card: #0f172a;
+  --ih-bg-muted: #1e293b;
+
+  --ih-status-ok-fg: #6ee7b7;
+  --ih-status-watch-fg: #fcd34d;
+  --ih-status-bad-fg: #fca5a5;
+  --ih-status-info-fg: #7dd3fc;
+
+  --ih-border-color: #475569;
+  --ih-border-strong-color: #64748b;
 }
 
 /* ── Utility classes from Design System §1.6 ── */

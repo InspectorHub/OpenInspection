@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, eq as eqDz, asc as ascDz, desc as descDz, sql as sqlTpl } from 'drizzle-orm';
+import { eq, and, or, like, eq as eqDz, asc as ascDz, desc as descDz, sql as sqlTpl } from 'drizzle-orm';
 import { buildMeta } from '../lib/validations/pagination.schema';
 import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
@@ -1638,9 +1638,21 @@ export const adminRoutes = createApiRouter()
         if (triggerCode) {
             conditions.push(eq(comments.triggerCode, triggerCode));
         }
-        if (auto && rating) conditions.push(eq(comments.ratingBucket, rating));
+        // Track H: `rating` applies whenever the caller sends it — the library
+        // modal's bucket chips pass it explicitly in `all` mode too (it used to
+        // be auto-gated like section/itemLabel, which left the chips dead).
+        if (rating) conditions.push(eq(comments.ratingBucket, rating));
         if (auto && section) conditions.push(eq(comments.section, section));
         if (auto && itemLabel) conditions.push(eq(comments.itemLabel, itemLabel));
+        // Track H (IA-5): search is pushed down to SQL so pagination + count
+        // are correct. (The old behavior filtered in JS AFTER the limit, so a
+        // match beyond the first page silently never surfaced.) Matches text
+        // OR the curated search_keywords column; SQLite LIKE is ASCII
+        // case-insensitive, which is what the library content needs.
+        if (search && search.trim().length >= 2) {
+            const needle = `%${escapeLikePattern(search.trim())}%`;
+            conditions.push(or(like(comments.text, needle), like(comments.searchKeywords, needle))!);
+        }
 
         // ORDER BY by sort. SQLite treats NULL as smaller than any value, so
         // descDz(commentUsage.lastUsedAt) naturally puts user-touched rows first
@@ -1652,7 +1664,7 @@ export const adminRoutes = createApiRouter()
           : sort === 'alpha'    ? [ascDz(comments.text)]
           :                       [ascDz(comments.ratingBucket), descDz(comments.createdAt)];
 
-        let rows = await db.select({
+        const rows = await db.select({
             id:             comments.id,
             tenantId:       comments.tenantId,
             text:           comments.text,
@@ -1682,20 +1694,14 @@ export const adminRoutes = createApiRouter()
             .offset((page - 1) * pageSize)
             .all();
 
-        // Total count for pagination meta. `search` is applied in JS after the
-        // limit query (legacy behavior) so the COUNT is necessarily an upper bound
-        // when search is present — for the no-search case (the common one) it is
-        // exact.
+        // Total count for pagination meta — exact now that search lives in the
+        // WHERE clause (Track H).
         const totalRow = await db
             .select({ c: sqlTpl<number>`count(*)` })
             .from(comments)
             .where(and(...conditions))
             .get();
         const total = totalRow?.c ?? 0;
-        if (search && search.trim()) {
-            const needle = search.trim().toLowerCase();
-            rows = rows.filter(r => r.text.toLowerCase().includes(needle));
-        }
         // `commentRowToResponse` is exported via the local helper above and used
         // by the create / update routes — we extend in-place at the route to
         // avoid touching the create / update signatures.

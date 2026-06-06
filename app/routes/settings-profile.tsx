@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Form, Link, useLoaderData, useActionData, useFetcher } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -63,6 +63,21 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: true, error: null, intent };
   }
 
+  // Profile photo upload
+  if (intent === "photo-upload") {
+    const photo = fd.get("photo");
+    if (!(photo instanceof File) || photo.size === 0) {
+      return { success: false, error: "No valid photo provided", intent };
+    }
+    // hono/client form: keys must match the API schema field names
+    const res = await api.profile.photo.$post({ form: { photo } } as Parameters<typeof api.profile.photo.$post>[0]);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: (err as Record<string, string>)?.message || "Upload failed", intent };
+    }
+    return { success: true, error: null, intent };
+  }
+
   // Default: save profile fields
   const submission = parseWithZod(fd, { schema: profileSchema });
   if (submission.status !== "success") {
@@ -109,6 +124,14 @@ export default function SettingsProfilePage() {
   // Conform narrowing helpers (cat-7): actionData may be SubmissionResult or {success,error,...}
   const flashSuccess = actionData && "success" in actionData && actionData.success;
   const flashError = actionData && "error" in actionData && typeof actionData.error === "string" ? actionData.error : null;
+
+  // Photo upload fetcher — replaces the raw fetch() in the file input onChange
+  const photoFetcher = useFetcher<{ success?: boolean; error?: string; intent?: string }>();
+  useEffect(() => {
+    if (photoFetcher.state === "idle" && photoFetcher.data?.success && photoFetcher.data?.intent === "photo-upload") {
+      window.location.reload();
+    }
+  }, [photoFetcher.state, photoFetcher.data]);
 
   // Signature pad state
   const sigFetcher = useFetcher<typeof action>();
@@ -216,13 +239,13 @@ export default function SettingsProfilePage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   className="block text-[11px] text-ih-fg-3"
-                  onChange={async (e) => {
+                  onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     const fd = new FormData();
+                    fd.append("intent", "photo-upload");
                     fd.append("photo", file);
-                    const res = await fetch("/api/profile/photo", { method: "POST", credentials: "same-origin", body: fd });
-                    if (res.ok) window.location.reload();
+                    photoFetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
                   }}
                 />
                 <p className="text-[11px] text-ih-fg-3">JPG, PNG, or WebP. Max 2 MB. Square crop renders best.</p>

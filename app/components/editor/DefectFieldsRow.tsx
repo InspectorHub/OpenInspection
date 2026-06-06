@@ -46,7 +46,7 @@ export function DefectFieldsRow({
                     value={value.location ?? ''}
                     onChange={e => onChange(cannedId, { location: e.target.value || null })}
                     placeholder="e.g. master bathroom, NE corner of basement"
-                    className={`w-full px-2 py-1 rounded border bg-ih-bg-app text-ih-fg-1 ${
+                    className={`w-full px-2 h-11 rounded border bg-ih-bg-app text-ih-fg-1 ${
                         locationRequired && !value.location ? 'border-ih-bad' : 'border-ih-border'
                     }`}
                 />
@@ -63,7 +63,7 @@ export function DefectFieldsRow({
                 <select
                     value={value.trade ?? ''}
                     onChange={e => onChange(cannedId, { trade: (e.target.value || null) as DefectTrade | null })}
-                    className={`w-full px-2 py-1 rounded border bg-ih-bg-app text-ih-fg-1 ${
+                    className={`w-full px-2 h-11 rounded border bg-ih-bg-app text-ih-fg-1 ${
                         tradeRequired && !value.trade ? 'border-ih-bad' : 'border-ih-border'
                     }`}
                 >
@@ -80,7 +80,7 @@ export function DefectFieldsRow({
                 <select
                     value={value.deadline ?? ''}
                     onChange={e => onChange(cannedId, { deadline: (e.target.value || null) as DefectDeadline | null })}
-                    className="w-full px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
+                    className="w-full px-2 h-11 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
                 >
                     <option value="">—</option>
                     {DEFECT_DEADLINE_OPTIONS.map(o => (
@@ -95,7 +95,7 @@ export function DefectFieldsRow({
                 <select
                     value={value.timeframe ?? ''}
                     onChange={e => onChange(cannedId, { timeframe: (e.target.value || null) as DefectTimeframe | null })}
-                    className="w-full px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
+                    className="w-full px-2 h-11 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
                 >
                     <option value="">—</option>
                     {DEFECT_TIMEFRAME_OPTIONS.map(o => (

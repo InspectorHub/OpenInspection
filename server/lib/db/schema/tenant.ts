@@ -299,6 +299,11 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
     apprenticeReviewRequired: integer('apprentice_review_required', { mode: 'boolean' }).notNull().default(false),
     guestInvitesEnabled:      integer('guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),
+    // Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
+    // Tenant default; per-inspection override on inspections.require_defect_
+    // fields_override (the blockUnpaid → paymentRequired inheritance pattern).
+    // Default LOOSE: missing fields downgrade to yellow warnings, not blocks.
+    requireDefectFields: text('require_defect_fields', { enum: ['none', 'location', 'trade', 'both'] }).notNull().default('none'),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

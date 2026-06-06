@@ -116,6 +116,9 @@ export const inspections = sqliteTable('inspections', {
     templateSnapshot:    text('template_snapshot', { mode: 'json' }),
     templateSnapshotVersion: integer('template_snapshot_version').default(1),
     reportThemeOverride: text('report_theme_override', { enum: ['modern', 'classic', 'minimal'] }),
+    // Track H (IA-7) — per-inspection override of the tenant's
+    // require_defect_fields default; NULL = inherit.
+    requireDefectFieldsOverride: text('require_defect_fields_override', { enum: ['none', 'location', 'trade', 'both'] }),
     // Sprint 2 S2-2 — Multi-inspection per request. NULL on legacy rows pre-backfill;
     // application requires a non-null value on all newly created inspections.
     requestId:           text('request_id').references(() => inspectionRequests.id),

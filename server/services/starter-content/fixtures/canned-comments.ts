@@ -37,6 +37,13 @@ const RAW_COMMENTS: ReadonlyArray<{ category: string; itemLabel: string; severit
   { category: 'Roof', itemLabel: 'Gutters & Downspouts', severity: 'defect', text: 'Significant debris accumulation in gutters causing overflow; recommend cleaning and repair to prevent fascia rot.' },
   { category: 'Roof', itemLabel: 'Gutters & Downspouts', severity: 'defect', text: 'Downspout disconnected or missing — recommend immediate repair to prevent foundation water intrusion.' },
   { category: 'Roof', itemLabel: 'Flashing', severity: 'defect', text: 'Visible daylight at roof-to-wall junction indicates open gap — recommend sealing by licensed roofer.' },
+  // Track H (B-20 seed expansion) — highest-frequency field findings the
+  // 2026-06-04 blind test showed inspectors reach for and miss ("water stain
+  // on roof covering" was the literal escape-to-notes case).
+  { category: 'Roof', itemLabel: 'Roof Covering', severity: 'defect', text: 'Water staining observed on the roof covering and underlying sheathing, indicating current or past moisture intrusion — recommend evaluation and repair by a licensed roofer.' },
+  { category: 'Roof', itemLabel: 'Roof Covering', severity: 'defect', text: 'Exposed or backed-out fasteners observed on the roof covering — entry points for moisture; recommend sealing or replacement by a licensed roofer.' },
+  { category: 'Roof', itemLabel: 'Roof Covering', severity: 'defect', text: 'Heavy moss/biological growth is lifting shingle edges and retaining moisture — recommend treatment and repair of affected shingles by a licensed roofer.' },
+  { category: 'Roof', itemLabel: 'Flashing', severity: 'defect', text: 'Sealant at roof penetrations (vents, pipes, flashing joints) is cracked or failed — recommend resealing by a licensed roofer to prevent water entry.' },
 
   // ELECTRICAL — 18 total (5 sat, 6 mon, 7 def)
   { category: 'Electrical', itemLabel: 'Service Panel', severity: 'satisfactory', text: 'Electrical panel is properly labeled, accessible, and shows no visible signs of overheating or corrosion.' },

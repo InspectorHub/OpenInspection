@@ -148,25 +148,50 @@ export interface PublishBlockingDefect {
     unresolvedTokens: string[];
 }
 
+/** Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
+ *  Resolved as inspection override ?? tenant default ?? 'none' (loose). */
+export type RequireDefectFields = 'none' | 'location' | 'trade' | 'both';
+
+/** Pure resolution of the two-level config — override (NULL = inherit)
+ *  beats the tenant default; both unset → 'none' (loose). */
+export function resolveRequireDefectFields(
+    override: RequireDefectFields | null | undefined,
+    tenantDefault: RequireDefectFields | null | undefined,
+): RequireDefectFields {
+    return override ?? tenantDefault ?? 'none';
+}
+
 export interface PublishReadiness {
     ready: boolean;
     blockingDefects: PublishBlockingDefect[];
+    /** Track H (IA-7) — incomplete-but-not-required defects: surfaced as a
+     *  yellow warning on the publish gate, never a block. */
+    warningDefects: PublishBlockingDefect[];
 }
 
 /**
  * Task 12 — pure function: walks the template schema + inspection results
- * and returns the set of included defects that are missing required fields
- * (location and/or trade). Unresolved Mustache tokens in the rendered comment
- * are also reported.
+ * and returns the set of included defects that are missing fields
+ * (location and/or trade) or have unresolved Mustache tokens.
  *
- * Required: location + trade.
- * Advisory (not blocking): deadline, timeframe.
+ * Track H (IA-7 / P-6②): which missing fields BLOCK is now configurable.
+ *   - A field in `requirement` missing → the defect blocks publish.
+ *   - A field missing but NOT required → the defect lands in warningDefects.
+ *   - Unresolved tokens ALWAYS block: the canned prose references a variable
+ *     ({{location}}, {{brand}}, …) that would render as a literal gap in the
+ *     report — that's broken content, not a policy choice.
+ * The parameter defaults to 'both' (the legacy behavior) so existing pure
+ * callers are unaffected; the SERVICE resolves the tenant/inspection config.
  */
 export function computePublishReadinessFromState(
     schema: TemplateSchemaV2,
     results: Record<string, unknown>,
+    requirement: RequireDefectFields = 'both',
 ): PublishReadiness {
+    const requireLocation = requirement === 'location' || requirement === 'both';
+    const requireTrade = requirement === 'trade' || requirement === 'both';
     const blocking: PublishBlockingDefect[] = [];
+    const warnings: PublishBlockingDefect[] = [];
     for (const section of schema.sections ?? []) {
         for (const item of section.items ?? []) {
             if (item.type !== 'rich') continue;
@@ -198,7 +223,10 @@ export function computePublishReadinessFromState(
                     ...itemAttrVars,
                 });
                 if (missing.length === 0 && unresolved.length === 0) continue;
-                blocking.push({
+                const requiredMissing = missing.filter(f =>
+                    (f === 'location' && requireLocation) || (f === 'trade' && requireTrade));
+                const target = (requiredMissing.length > 0 || unresolved.length > 0) ? blocking : warnings;
+                target.push({
                     sectionId:        section.id,
                     sectionTitle:     section.title,
                     itemId:           item.id,
@@ -211,7 +239,7 @@ export function computePublishReadinessFromState(
             }
         }
     }
-    return { ready: blocking.length === 0, blockingDefects: blocking };
+    return { ready: blocking.length === 0, blockingDefects: blocking, warningDefects: warnings };
 }
 
 type Inspection = z.infer<typeof InspectionSchema>;
@@ -3077,7 +3105,16 @@ export class InspectionService {
             ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, unknown>
             : {};
 
-        return computePublishReadinessFromState(schemaData, resultData);
+        // Track H (IA-7 / P-6②) — effective requirement: per-inspection
+        // override beats the tenant default; both unset → 'none' (loose).
+        const cfgRow = await db.select({ requireDefectFields: tenantConfigs.requireDefectFields })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        const override = (inspection as unknown as { requireDefectFieldsOverride?: RequireDefectFields | null }).requireDefectFieldsOverride;
+        const requirement = resolveRequireDefectFields(override, cfgRow?.requireDefectFields);
+
+        return computePublishReadinessFromState(schemaData, resultData, requirement);
     }
 }
 

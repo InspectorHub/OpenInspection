@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 
 interface SettingsForm {
@@ -11,6 +11,9 @@ interface SettingsForm {
   price: number;
   paymentRequired: boolean;
   agreementRequired: boolean;
+  /** Track H (IA-7) — per-inspection override of the tenant-wide required
+   *  defect fields; '' = inherit (stored as NULL). */
+  requireDefectFieldsOverride: "" | "none" | "location" | "trade" | "both";
 }
 
 interface Inspector {
@@ -50,6 +53,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     price: 0,
     paymentRequired: false,
     agreementRequired: false,
+    requireDefectFieldsOverride: "",
   });
   // Tracks the templateId that was loaded when the sheet opened, so we can
   // detect whether the user changed it before saving.
@@ -63,48 +67,54 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   const saveFetcher = useFetcher<{ ok: boolean; intent?: string }>();
   const templateChangedAtSubmit = useRef(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [inspRes, tplRes, insRes] = await Promise.all([
-        fetch(`/api/inspections/${inspectionId}`, { credentials: "include" }),
-        fetch("/api/inspections/templates", { credentials: "include" }),
-        fetch("/api/team/members", { credentials: "include" }),
-      ]);
-      if (inspRes.ok) {
-        const { data } = (await inspRes.json()) as { data: Record<string, unknown> };
-        const loadedTemplateId = (data.templateId as string) || "";
-        templateIdAtOpen.current = loadedTemplateId;
-        setForm({
-          date: (data.date as string) || "",
-          closingDate: (data.closingDate as string) || "",
-          inspectorId: (data.inspectorId as string) || "",
-          orderId: (data.orderId as string) || "",
-          referralSource: (data.referralSource as string) || "",
-          templateId: loadedTemplateId,
-          price: (data.price as number) || 0,
-          paymentRequired: !!data.paymentRequired,
-          agreementRequired: !!data.agreementRequired,
-        });
-      }
-      if (tplRes.ok) {
-        const { data } = (await tplRes.json()) as { data: Template[] };
-        setTemplates(data || []);
-      }
-      if (insRes.ok) {
-        const { data } = (await insRes.json()) as { data: Inspector[] };
-        setInspectors(data || []);
-      }
-    } catch {
-      // degrade gracefully
-    } finally {
-      setLoading(false);
+  type SheetData = {
+    inspection: Record<string, unknown> | null;
+    templates: Template[];
+    members: Array<{ id: string; email: string }>;
+  };
+  const loadFetcher = useFetcher<SheetData>();
+
+  // Trigger load when the sheet opens or inspectionId changes
+  useEffect(() => {
+    if (open && inspectionId) {
+      loadFetcher.load(`/resources/inspection-settings-sheet?inspectionId=${encodeURIComponent(inspectionId)}`);
     }
-  }, [inspectionId]);
+  }, [open, inspectionId]);
+
+  // Apply fetched data to local state (mirrors old load() behaviour)
+  useEffect(() => {
+    const d = loadFetcher.data;
+    if (!d) return;
+    const insp = d.inspection;
+    if (insp) {
+      const loadedTemplateId = (insp.templateId as string) || "";
+      templateIdAtOpen.current = loadedTemplateId;
+      setForm({
+        date: (insp.date as string) || "",
+        closingDate: (insp.closingDate as string) || "",
+        inspectorId: (insp.inspectorId as string) || "",
+        orderId: (insp.orderId as string) || "",
+        referralSource: (insp.referralSource as string) || "",
+        templateId: loadedTemplateId,
+        price: (insp.price as number) || 0,
+        paymentRequired: !!insp.paymentRequired,
+        agreementRequired: !!insp.agreementRequired,
+        requireDefectFieldsOverride: (insp.requireDefectFieldsOverride as SettingsForm["requireDefectFieldsOverride"]) || "",
+      });
+    }
+    setTemplates(d.templates ?? []);
+    setInspectors((d.members ?? []) as Inspector[]);
+    setLoading(false);
+  }, [loadFetcher.data]);
+
+  // Sync loading state with fetcher
+  useEffect(() => {
+    if (loadFetcher.state !== "idle") setLoading(true);
+  }, [loadFetcher.state]);
 
   useEffect(() => {
-    if (open) load();
-  }, [open, load]);
+    if (open) setLoading(true);
+  }, [open, inspectionId]);
 
   // Drive saveState from the dedicated fetcher's lifecycle. submitting → saving;
   // response ok → saved (+ onTemplateApplied if the template changed); not ok →
@@ -136,8 +146,11 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     e.preventDefault();
     setSaveState("saving");
     templateChangedAtSubmit.current = form.templateId !== templateIdAtOpen.current;
+    // '' means "inherit" and must reach the API as an explicit null (clears the
+    // override column) — the BFF sanitizer drops empty strings entirely.
+    const payload = { ...form, requireDefectFieldsOverride: form.requireDefectFieldsOverride === "" ? null : form.requireDefectFieldsOverride };
     saveFetcher.submit(
-      { intent: "save-settings", payload: JSON.stringify(form) },
+      { intent: "save-settings", payload: JSON.stringify(payload) },
       { method: "post" },
     );
   }
@@ -239,6 +252,22 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                     </label>
                   </div>
                 </div>
+                <label className="block">
+                  <span className={labelClass}>Required defect fields at publish</span>
+                  <select
+                    value={form.requireDefectFieldsOverride}
+                    onChange={(e) => updateForm("requireDefectFieldsOverride", e.target.value as SettingsForm["requireDefectFieldsOverride"])}
+                    className={inputClass}
+                    data-testid="inspection-require-defect-fields"
+                  >
+                    <option value="">Inherit (tenant default)</option>
+                    <option value="none">None — warn only</option>
+                    <option value="location">Location required</option>
+                    <option value="trade">Recommended trade required</option>
+                    <option value="both">Location + trade required</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-ih-fg-4">Overrides the workspace default for this inspection only.</p>
+                </label>
               </fieldset>
 
               <div className="flex items-center justify-end gap-3 border-t border-ih-border pt-4">

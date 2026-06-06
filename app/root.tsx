@@ -54,13 +54,13 @@ if(lc!==null&&getC('oi-sidebar-collapsed')===null){setC('oi-sidebar-collapsed',l
 }catch(e){}
 // resolve the actual paint scheme: explicit cookie wins, else OS preference
 var s=getC('oi-color-scheme');
-var resolved=s==='dark'||s==='light'?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+var resolved=s==='dark'||s==='light'||s==='field'?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
 d.setAttribute('data-color-scheme',resolved);
-if(resolved==='dark')d.classList.add('dark');else d.classList.remove('dark');
+if(resolved==='dark'||resolved==='field')d.classList.add('dark');else d.classList.remove('dark');
 if(getC('oi-sidebar-collapsed')==='1')d.setAttribute('data-sidebar-collapsed','1');
 })();`;
 
-const CRITICAL_CSS = `html{background:#f8fafc;color:#0f172a;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}html[data-color-scheme="dark"]{background:#0f172a;color:#f1f5f9}body{margin:0;min-height:100vh;background:inherit;color:inherit}`;
+const CRITICAL_CSS = `html{background:#f8fafc;color:#0f172a;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}html[data-color-scheme="dark"]{background:#0f172a;color:#f1f5f9}html[data-color-scheme="field"]{background:#020617;color:#ffffff;font-size:18px}body{margin:0;min-height:100vh;background:inherit;color:inherit}`;
 
 export function Layout({ children }: { children: React.ReactNode }) {
   // Root loader data is unavailable while the error boundary renders; fall back
@@ -70,7 +70,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      className={`scroll-smooth${ssrScheme === "dark" ? " dark" : ""}`}
+      className={`scroll-smooth${ssrScheme === "dark" || ssrScheme === "field" ? " dark" : ""}`}
       data-color-scheme={ssrScheme}
       data-sidebar-collapsed={prefs.sidebarCollapsed ? "1" : undefined}
       suppressHydrationWarning

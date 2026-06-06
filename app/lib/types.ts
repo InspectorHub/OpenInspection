@@ -12,6 +12,10 @@ export interface PublishBlockingDefect {
 export interface PublishReadiness {
     ready: boolean;
     blockingDefects: PublishBlockingDefect[];
+    /** Track H (IA-7) — gaps below the tenant's required threshold: shown as
+     *  yellow warnings, never block. Optional so stale server responses
+     *  (pre-split) still type-check. */
+    warningDefects?: PublishBlockingDefect[];
 }
 
 export interface ItemAttribute {

@@ -1235,6 +1235,17 @@ const getReportDataRoute = createRoute(withMcpMetadata({
  * required fields (location + trade). The frontend pre-publish modal
  * consumes this before allowing the inspector to publish the report.
  */
+const PublishDefectEntrySchema = z.object({
+    sectionId:        z.string(),
+    sectionTitle:     z.string(),
+    itemId:           z.string(),
+    itemLabel:        z.string(),
+    cannedId:         z.string(),
+    cannedTitle:      z.string(),
+    missing:          z.array(z.enum(['location', 'trade'])),
+    unresolvedTokens: z.array(z.string()),
+});
+
 const publishReadinessRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/publish-readiness',
@@ -1250,23 +1261,17 @@ const publishReadinessRoute = createRoute(withMcpMetadata({
                 'application/json': {
                     schema: z.object({
                         ready: z.boolean(),
-                        blockingDefects: z.array(z.object({
-                            sectionId:        z.string(),
-                            sectionTitle:     z.string(),
-                            itemId:           z.string(),
-                            itemLabel:        z.string(),
-                            cannedId:         z.string(),
-                            cannedTitle:      z.string(),
-                            missing:          z.array(z.enum(['location', 'trade'])),
-                            unresolvedTokens: z.array(z.string()),
-                        })),
+                        blockingDefects: z.array(PublishDefectEntrySchema),
+                        // Track H (IA-7) — incomplete-but-not-required defects:
+                        // yellow warning on the gate, never a block.
+                        warningDefects: z.array(PublishDefectEntrySchema),
                     }),
                 },
             },
         },
     },
     operationId: 'getInspectionPublishReadiness',
-    description: 'Returns ready=true when every included defect on the inspection has location and trade filled. Blocking defects are listed with the specific missing fields.',
+    description: 'Returns ready=true when every included defect has its REQUIRED fields filled (configurable per tenant/inspection — Track H IA-7); non-required gaps surface as warningDefects.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 

@@ -64,10 +64,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  api.inspections[":id"].results.$get({ param: { id } }),
  api.inspections[":id"]["report-data"].$get({ param: { id } }),
+ // Track H (C-12): tag library moved off the client-side fetch into the loader.
+ api.tags.index.$get().catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -114,7 +116,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // shared helper so persisted ratings survive a reload.
  const results = unwrapResultsResponse(resultsBody) as ResultMap;
 
- return { inspection, schema, results, ratingLevels, token };
+ let tagLibrary: Array<{ id: string; name: string; color: string }> = [];
+ if (tagsRes?.ok) {
+ const tagsBody = await tagsRes.json() as { data?: Array<{ id: string; name: string; color: string }> };
+ tagLibrary = tagsBody.data ?? [];
+ }
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary };
 }
 
 /* ------------------------------------------------------------------ */
@@ -498,18 +506,9 @@ export default function InspectionEditPage() {
  /* Tag library fetch + memos */
  /* ---------------------------------------------------------------- */
 
- const [tagLibrary, setTagLibrary] = useState<TagPin[]>([]);
- useEffect(() => {
- (async () => {
- try {
- const res = await fetch('/api/tags', { credentials: 'include' });
- if (res.ok) {
- const body = await res.json() as { data?: Array<{ id: string; name: string; color: string }> };
- setTagLibrary(body.data ?? []);
- }
- } catch { /* noop */ }
- })();
- }, []);
+ // Track H (C-12): the tag library now arrives via the loader (token-relay)
+ // instead of a raw client fetch against /api/tags.
+ const tagLibrary = (loaderData.tagLibrary ?? []) as TagPin[];
 
  const pinnedTags = useMemo(() => {
  return inspectionPrefs.pinnedTagIds
@@ -583,6 +582,19 @@ export default function InspectionEditPage() {
  return map;
  }, [publishReadiness]);
 
+ // IA-7 — effective required-defect-fields policy: per-inspection override
+ // (NULL = inherit) falls back to the tenant default from inspection prefs.
+ // Drives the proactive red asterisk on every defect row.
+ const requiredDefectFields = useMemo(() => {
+  const override = (loaderData.inspection as Record<string, unknown>).requireDefectFieldsOverride as
+   'none' | 'location' | 'trade' | 'both' | null | undefined;
+  const effective = override ?? inspectionPrefs.requireDefectFields;
+  return {
+   location: effective === 'location' || effective === 'both',
+   trade:    effective === 'trade'    || effective === 'both',
+  };
+ }, [loaderData.inspection, inspectionPrefs.requireDefectFields]);
+
  /* ---------------------------------------------------------------- */
  /* Canned comments library */
  /* ---------------------------------------------------------------- */
@@ -602,7 +614,7 @@ export default function InspectionEditPage() {
 
  useEffect(() => {
  if (!state.showCommentLibrary) { setServerComments([]); return; }
- const ctx: { itemLabel?: string; section?: string; ratingBucket?: string } = {};
+ const ctx: { itemLabel?: string; section?: string; ratingBucket?: string; search?: string } = {};
  if (comments.filterMode === 'auto' && state.activeItem) {
  ctx.itemLabel = (state.activeItem.label || state.activeItem.name || '') as string;
  ctx.section   = state.currentSection?.title;
@@ -611,11 +623,26 @@ export default function InspectionEditPage() {
  ctx.ratingBucket = state.bucketForRatingId(r as string);
  }
  }
+ // Track H (IA-5) — the modal's search box queries the SERVER (SQL pushdown
+ // over the whole tenant library incl. imported rows); it used to only reset
+ // the keyboard cursor. Bucket chips override the context-derived rating.
+ const q = state.commentLibrarySearch.trim();
+ if (q.length >= 2) ctx.search = q;
+ if (['satisfactory', 'monitor', 'defect'].includes(state.commentLibraryFilter)) {
+ ctx.ratingBucket = state.commentLibraryFilter;
+ }
+ let cancelled = false;
+ const t = setTimeout(() => {
  comments.fetchFiltered(ctx).then((rows) => {
+ if (cancelled) return;
  setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>);
  });
+ }, q ? 250 : 0);
+ return () => { cancelled = true; clearTimeout(t); };
  }, [
  state.showCommentLibrary,
+ state.commentLibrarySearch,
+ state.commentLibraryFilter,
  comments.sort,
  comments.filterMode,
  state.activeItemId,
@@ -752,13 +779,17 @@ export default function InspectionEditPage() {
 
  const handlePublishClick = useCallback(async () => {
   try {
-   const res = await fetch(`/api/inspections/${state.inspection.id}/publish-readiness`, {
+   // Track H (C-12): fresh on-demand check via the BFF resource route
+   // (token relay) — never a raw client fetch on /api.
+   const res = await fetch(`/resources/publish-readiness?id=${encodeURIComponent(state.inspection.id)}`, {
     credentials: 'include',
    });
    if (res.ok) {
-    const readiness = await res.json() as PublishReadiness;
-    if (!readiness.ready) {
-     setPublishReadiness(readiness);
+    const body = await res.json() as { readiness: PublishReadiness | null };
+    // IA-7: hard gaps block; soft gaps (below the tenant's required
+    // threshold) surface as a yellow warning pass with "Publish anyway".
+    if (body.readiness && (!body.readiness.ready || (body.readiness.warningDefects?.length ?? 0) > 0)) {
+     setPublishReadiness(body.readiness);
      setShowPublishGate(true);
      return;
     }
@@ -1434,6 +1465,7 @@ export default function InspectionEditPage() {
  defectStates={defectStates}
  locationSuggestions={locationSuggestions}
  missingFields={missingFields}
+ requiredDefectFields={requiredDefectFields}
  onDefectFields={(cannedId, patch) => {
  if (state.activeItemId && state.currentSection) {
  findings.setDefectFields(
@@ -1449,6 +1481,21 @@ export default function InspectionEditPage() {
  cloneDefaultScope={inspectionPrefs.cloneDefault}
  tagChipRow={tagChipRow}
  onOpenSnippets={openSnippets}
+ onSearchLibrary={comments.searchLibrary}
+ onSaveDefectToLibrary={(input) => {
+ // Track H (B-20 回流): best-effort — the defect itself already landed in
+ // result.customComments; a failed library save only costs reuse next time.
+ const text = input.comment ? `${input.title} — ${input.comment}` : input.title;
+ comments.saveSnippet(
+ text,
+ "defect",
+ state.currentSection?.title || "",
+ undefined,
+ (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
+ ).then((ok) => {
+ if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", durationMs: 6000 });
+ });
+ }}
  queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}
  />
  ) : (
@@ -2017,6 +2064,11 @@ export default function InspectionEditPage() {
   open={showPublishGate}
   readiness={publishReadiness}
   onClose={() => setShowPublishGate(false)}
+  onProceed={() => {
+   // IA-7 warning mode — user acknowledged the soft gaps.
+   setShowPublishGate(false);
+   state.setShowPublishModal(true);
+  }}
   onJump={(b: PublishBlockingDefect) => {
    state.selectSectionById(b.sectionId);
    state.setActiveItemId(b.itemId);
@@ -2172,16 +2224,18 @@ export default function InspectionEditPage() {
  {state.inspection.status as string}
  </span>
 
- {/* Dark mode toggle */}
+ {/* Theme cycle: light → dark → field (Track H 迁移⑤) → auto */}
  <button
- onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'auto' : 'light')}
+ onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'field' : scheme === 'field' ? 'auto' : 'light')}
  className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
- title={`Theme: ${scheme}`}
+ title={`Theme: ${scheme}${scheme === 'field' ? ' (high-contrast outdoor)' : ''}`}
  >
  {scheme === 'dark' ? (
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
  ) : scheme === 'light' ? (
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+ ) : scheme === 'field' ? (
+ <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
  ) : (
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
  )}

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePointerGesture } from '../../hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
+import { shouldShowSpeedModeCoach, markSpeedModeCoached } from '../../lib/speedmode-coach';
 
 interface JumpToSection {
   id: string;
@@ -73,6 +74,24 @@ export function SpeedMode({
 }: SpeedModeProps) {
   const [showJumpTo, setShowJumpTo] = useState(false);
   const [pendingUndo, setPendingUndo] = useState<{ message: string; onUndo: () => void } | null>(null);
+
+  // IA-17 — one-time coach mark on first Speed Mode entry (device-level).
+  // Read in an effect (not the initializer) so SSR markup stays stable.
+  const [showCoach, setShowCoach] = useState(false);
+  useEffect(() => {
+    if (shouldShowSpeedModeCoach()) setShowCoach(true);
+  }, []);
+  const dismissCoach = useCallback(() => {
+    setShowCoach(false);
+    markSpeedModeCoached();
+  }, []);
+  // Any keypress while the coach is up dismisses it (the key still does its
+  // normal job — we only listen, never swallow).
+  useEffect(() => {
+    if (!showCoach) return;
+    window.addEventListener('keydown', dismissCoach);
+    return () => window.removeEventListener('keydown', dismissCoach);
+  }, [showCoach, dismissCoach]);
 
   const gesture = usePointerGesture({
     onSwipeLeft:  () => onNextItem?.(),
@@ -161,6 +180,40 @@ export function SpeedMode({
       <div className="h-10 flex items-center justify-center text-[11px] text-ih-fg-3 border-t border-slate-700">
         Press <kbd className="mx-1 px-1.5 py-0.5 bg-slate-800 rounded text-[10px] font-mono border border-slate-700">Z</kbd> or <kbd className="mx-1 px-1.5 py-0.5 bg-slate-800 rounded text-[10px] font-mono border border-slate-700">Esc</kbd> to exit
       </div>
+
+      {/* IA-17 — first-run coach mark: tap anywhere (or press any key) to dismiss */}
+      {showCoach && (
+        // ds-allow: fixed-dark surface
+        <div
+          className="absolute inset-0 z-10 bg-slate-900/80 backdrop-blur-[2px] flex items-center justify-center cursor-pointer"
+          onPointerDown={dismissCoach}
+          data-testid="speedmode-coach"
+          role="dialog"
+          aria-label="Speed Mode tips"
+        >
+          {/* ds-allow: fixed-dark surface */}
+          <div className="mx-6 max-w-sm rounded-xl border border-slate-600 bg-slate-800/95 px-6 py-5 text-slate-200 shadow-2xl">
+            <h3 className="text-[15px] font-bold text-white mb-3">Speed Mode</h3>
+            <ul className="space-y-2 text-[13px]">
+              <li className="flex items-center gap-3">
+                {/* ds-allow: fixed-dark surface */}
+                <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-[11px] font-mono border border-slate-600 shrink-0">1–5</kbd>
+                <span>Rate the current item</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-[16px] shrink-0" aria-hidden="true">⇄</span>
+                <span>Swipe left / right to change item</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-[16px] shrink-0" aria-hidden="true">⊙</span>
+                <span>Long-press to jump to a section</span>
+              </li>
+            </ul>
+            {/* ds-allow: fixed-dark surface */}
+            <p className="mt-4 text-[11px] text-slate-400">Tap anywhere to start</p>
+          </div>
+        </div>
+      )}
 
       {/* Undo toast */}
       <SpeedModeUndoToast

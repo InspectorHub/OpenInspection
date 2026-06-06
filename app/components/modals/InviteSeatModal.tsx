@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useFetcher } from "react-router";
 
 type Mode = "permanent" | "guest";
 type Role = "lead" | "specialist" | "apprentice" | "office";
@@ -32,8 +33,24 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  const [sectionIds, setSectionIds] = useState<string[]>([]);
  const [durationSeconds, setDurationSeconds] = useState(86400);
  const [generatedUrl, setGeneratedUrl] = useState("");
- const [submitting, setSubmitting] = useState(false);
  const [error, setError] = useState("");
+
+ const inviteFetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null; url: string | null }>();
+ const submitting = inviteFetcher.state !== "idle";
+
+ useEffect(() => {
+  const d = inviteFetcher.data;
+  if (!d) return;
+  if (!d.ok) {
+   setError(d.error ?? "Failed");
+   return;
+  }
+  if (d.intent === "invite") {
+   onClose();
+  } else if (d.intent === "guest-invite" && d.url) {
+   setGeneratedUrl(d.url);
+  }
+ }, [inviteFetcher.data, onClose]);
 
  if (!open) return null;
 
@@ -41,48 +58,26 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  setSectionIds((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
  }
 
- async function submitPermanent() {
- if (submitting) return;
- setSubmitting(true);
- setError("");
- try {
- const res = await fetch("/api/team/invite", {
- method: "POST",
- credentials: "include",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ email, role, notify, mentorId: mentorId || undefined, sectionIds }),
- });
- if (!res.ok) {
- const data = await res.json().catch(() => ({}));
- throw new Error((data as { error?: string })?.error || `HTTP ${res.status}`);
- }
- onClose();
- } catch (e) {
- setError(e instanceof Error ? e.message : "Failed");
- } finally {
- setSubmitting(false);
- }
+ function submitPermanent() {
+  if (submitting) return;
+  setError("");
+  const fd = new FormData();
+  fd.append("intent", "invite");
+  fd.append("email", email);
+  fd.append("role", role);
+  if (mentorId) fd.append("mentorId", mentorId);
+  if (sectionIds.length > 0) fd.append("assignedSectionIds", JSON.stringify(sectionIds));
+  inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }
 
- async function submitGuest() {
- if (submitting) return;
- setSubmitting(true);
- setError("");
- try {
- const res = await fetch("/api/team/guest-invite", {
- method: "POST",
- credentials: "include",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ role, durationSeconds, sectionIds }),
- });
- if (!res.ok) throw new Error(`HTTP ${res.status}`);
- const data = (await res.json()) as { url: string };
- setGeneratedUrl(data.url);
- } catch (e) {
- setError(e instanceof Error ? e.message : "Failed");
- } finally {
- setSubmitting(false);
- }
+ function submitGuest() {
+  if (submitting) return;
+  setError("");
+  const fd = new FormData();
+  fd.append("intent", "guest-invite");
+  fd.append("role", role);
+  fd.append("durationSeconds", String(durationSeconds));
+  inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }
 
  return (

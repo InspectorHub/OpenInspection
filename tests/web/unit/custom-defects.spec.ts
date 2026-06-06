@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterCannedEntries, makeCustomDefect, appendCustomDefect } from '~/lib/custom-defects';
+import { filterCannedEntries, makeCustomDefect, deriveDefectTitle, appendCustomDefect } from '~/lib/custom-defects';
 
 /**
  * B-20 — the Defects tab offered only the template's canned list: no search,
@@ -78,5 +78,24 @@ describe('appendCustomDefect', () => {
     const next = appendCustomDefect(result, d);
     const defects = (next.customComments as { defects: Array<{ id: string }> }).defects;
     expect(defects.map((x) => x.id)).toEqual(['cd_0', 'cd_1']);
+  });
+});
+
+// Track H (IA-5) — library-hit → custom-defect title derivation.
+describe('deriveDefectTitle', () => {
+  it('takes the first sentence of a multi-sentence comment', () => {
+    expect(deriveDefectTitle('Water staining observed. Recommend repair by a roofer.'))
+      .toBe('Water staining observed.');
+  });
+
+  it('truncates a long single sentence to ~60 chars with an ellipsis', () => {
+    const long = 'Sealant at roof penetrations is cracked or failed across multiple vents and pipe boots throughout';
+    const out = deriveDefectTitle(long);
+    expect(out.length).toBeLessThanOrEqual(60);
+    expect(out.endsWith('…')).toBe(true);
+  });
+
+  it('passes a short single-sentence text through unchanged', () => {
+    expect(deriveDefectTitle('Exposed fasteners at ridge.')).toBe('Exposed fasteners at ridge.');
   });
 });
