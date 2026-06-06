@@ -158,13 +158,20 @@ export default function BookingPage() {
     step === 2 ? inspectionDate.length > 0 && clientName.length > 0 && clientEmail.length > 0 :
     needsTurnstile ? !!turnstileToken : true;
 
+  const inspectorOptions = useMemo(() => {
+    const base = profile?.allowInspectorChoice && profile.inspectors.length > 0 ? [...profile.inspectors] : [];
+    if (preselected && !base.some((i) => i.id === preselected.id)) {
+      base.push({ id: preselected.id, name: preselected.name, photoUrl: null });
+    }
+    return base;
+  }, [profile, preselected]);
+
   const chosenInspectorName = useMemo(() => {
     if (!chosenInspectorId) return "First available";
-    const found = profile?.inspectors.find((i) => i.id === chosenInspectorId);
+    const found = inspectorOptions.find((i) => i.id === chosenInspectorId);
     if (found) return found.name ?? "Inspector";
-    if (preselected?.id === chosenInspectorId) return preselected.name;
     return "Inspector";
-  }, [chosenInspectorId, profile?.inspectors, preselected]);
+  }, [chosenInspectorId, inspectorOptions]);
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -229,8 +236,7 @@ export default function BookingPage() {
     );
   }
 
-  const showInspectorDropdown =
-    (profile.allowInspectorChoice && profile.inspectors.length > 0) || !!preselected;
+  const showInspectorDropdown = inspectorOptions.length > 0;
 
   return (
     <div className="min-h-screen bg-ih-bg-app py-12 px-4" style={brandTokens(brand.primaryColor)}>
@@ -409,10 +415,7 @@ export default function BookingPage() {
                       className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
                     >
                       <option value="">No preference — first available</option>
-                      {(profile.allowInspectorChoice && profile.inspectors.length > 0
-                        ? profile.inspectors
-                        : preselected ? [{ id: preselected.id, name: preselected.name, photoUrl: null }] : []
-                      ).map((i) => (
+                      {inspectorOptions.map((i) => (
                         <option key={i.id} value={i.id}>{i.name ?? "Inspector"}</option>
                       ))}
                     </select>
