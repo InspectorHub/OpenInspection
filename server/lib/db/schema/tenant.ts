@@ -52,9 +52,12 @@ export const users = sqliteTable('users', {
     defaultSignatureBase64: text('default_signature_base64'),
     bio: text('bio'),
     serviceAreas: text('service_areas'),
-    // Booking #7 Sprint A — per-tenant unique inspector slug used for /book/<slug>.
-    // Nullable until the inspector picks one. Per-tenant uniqueness enforced via
-    // partial index `idx_users_slug_per_tenant` (migrations/0052_inspector_slug.sql).
+    // FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector
+    // booking slug is retired — /book/:tenant is the canonical public entry
+    // and the profile PATCH no longer accepts slug. Existing values remain
+    // readable for the legacy /book/:tenant/:slug deep-link redirect.
+    // Global AGENT slugs (tenant_id IS NULL, role='agent') still use this
+    // column actively — do not repurpose.
     slug: text('slug'),
     // DDL default 'admin' is FROZEN (D1 cannot alter column defaults without a
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
@@ -152,6 +155,7 @@ export const syncOutbox = sqliteTable('sync_outbox', {
 // Booking #7 Sprint A — reserved/banned slug list. Seeded via migration 0052
 // with the project's reserved route names (admin, api, book, login, etc.) so
 // customers cannot register slugs that would shadow real URL paths.
+// FROZEN for the inspector namespace (2026-06-06, DB-12); still consulted for agent slugs.
 export const slugReservations = sqliteTable('slug_reservations', {
     slug: text('slug').primaryKey(),
     reason: text('reason').notNull(),

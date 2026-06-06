@@ -5,7 +5,6 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { useSessionContext } from "~/hooks/useSessionContext";
 import { SignaturePad } from "~/components/SignaturePad";
 import { profileSchema } from "~/lib/forms/settings.schema";
 
@@ -18,7 +17,7 @@ interface Profile {
   email?: string | null;
   phone?: string | null;
   licenseNumber?: string | null;
-  slug?: string | null;
+  // DB-12 / IA-26 — slug omitted; inspector booking slugs are frozen.
   bio?: string | null;
   photoUrl?: string | null;
 }
@@ -71,7 +70,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   const v = submission.value;
   const body: Record<string, unknown> = {};
-  for (const key of ["name", "phone", "licenseNumber", "slug", "bio"] as const) {
+  // DB-12 / IA-26 — "slug" intentionally removed; inspector booking slugs frozen.
+  for (const key of ["name", "phone", "licenseNumber", "bio"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
   const res = await api.profile.index.$patch({ json: body });
@@ -92,8 +92,7 @@ export default function SettingsProfilePage() {
   const { profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [bioLen, setBioLen] = useState((profile.bio ?? "").length);
-  const ctx = useSessionContext();
-  const tenant = ctx?.branding?.tenantSlug;
+  // DB-12 / IA-26 — useSessionContext / tenantSlug removed; slug section gone.
 
   // Conform owns the main profile form (default intent). The save-signature
   // intent is handled by a separate useFetcher below, so guard against feeding
@@ -191,39 +190,8 @@ export default function SettingsProfilePage() {
           </div>
         </section>
 
-        {/* Booking slug */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-          <header className="space-y-1">
-            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Booking link</h3>
-            <p className="text-[12px] text-ih-fg-3">Customers visit this URL to book inspections directly with you.</p>
-          </header>
-          <div className="space-y-2">
-            <label htmlFor={fields.slug.id} className="block text-[13px] font-semibold text-ih-fg-1">Slug</label>
-            <input type="text" id={fields.slug.id} name={fields.slug.name} defaultValue={profile.slug ?? ""}
-              placeholder="your-public-username" autoComplete="off"
-              aria-invalid={fields.slug.errors ? true : undefined}
-              className="block w-full rounded-md border border-ih-border bg-ih-bg-card px-3 py-2 text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-colors text-ih-fg-1" />
-            {fields.slug.errors ? (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.slug.errors[0]}</p>
-            ) : (
-              <p className="text-[11px] text-ih-fg-3">Lowercase letters, numbers, and hyphens (3-32 chars).</p>
-            )}
-          </div>
-          {profile.slug && tenant ? (
-            <div className="flex items-center gap-3 pt-2">
-              <a href={`/inspector/${tenant}/${profile.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-ih-primary font-bold hover:underline">
-                View my public profile &rarr;
-              </a>
-              <a href={`/book/${tenant}/${profile.slug}`} target="_blank" rel="noopener noreferrer" className="text-[12px] text-ih-primary font-bold hover:underline">
-                View my booking page &rarr;
-              </a>
-            </div>
-          ) : (
-            <p className="text-[12px] text-ih-fg-3 italic pt-2">
-              Set a slug above and Save Profile to enable your public profile and booking links.
-            </p>
-          )}
-        </section>
+        {/* DB-12 / IA-26 — Booking slug section removed; the company booking link
+            now lives in Settings → Booking ("Your links"). */}
 
         {/* Photo placeholder */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">

@@ -174,6 +174,11 @@ export class UserService {
      * Persists a slug for `userId` (scoped to `tenantId`). Re-validates
      * availability before writing so a concurrent claim can't race past the
      * UI check.
+     *
+     * FROZEN (DB-12 2026-06-06): inspector slug writes retired; this method is
+     * still called by the dedicated POST /api/profile/slug route (which handles
+     * the one-time initial slug-claim flow) and by agent namespace operations.
+     * The inspector profile PATCH no longer reaches this method.
      */
     async setSlug(userId: string, tenantId: string, slug: string): Promise<void> {
         const check = await this.checkSlug(tenantId, slug, userId);

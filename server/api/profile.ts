@@ -53,11 +53,15 @@ const SlugConflictResponseSchema = z.object({
     }),
 });
 
+// DB-12 / IA-26 (2026-06-06) — slug FROZEN for inspectors. The field is
+// intentionally absent from this schema so Zod strips it from any PATCH body;
+// no 400 is raised (unknown keys are ignored via passthrough behavior). Global
+// AGENT slugs use a completely separate endpoint (POST /api/agent/profile) and
+// are unaffected.
 const PatchProfileSchema = z.object({
     name: z.string().max(100).optional().describe('Display name shown on reports and the booking page'),
     phone: z.string().max(30).optional().describe('Contact phone number for the inspector profile'),
     licenseNumber: z.string().max(50).optional().describe('Professional inspector license or certification number'),
-    slug: z.string().min(3).max(32).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).optional().describe('Public booking-page slug used in /book/<slug> URLs'),
     bio: z.string().max(600).nullable().optional().describe('Short inspector biography shown on the public booking page'),
 });
 
@@ -67,7 +71,7 @@ const patchProfileRoute = createRoute(withMcpMetadata({
     operationId: 'patchMyProfile',
     tags: ['profile'],
     summary: 'Update current user profile',
-    description: 'Partially updates the authenticated user\'s profile. Slug uniqueness is validated; other fields are written directly.',
+    description: 'Partially updates the authenticated user\'s profile (name, phone, licenseNumber, bio). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile.',
     request: {
         body: {
             content: {
@@ -232,33 +236,13 @@ export const profileRoutes = createApiRouter()
         if (body.phone !== undefined) updates.phone = body.phone;
         if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
         if (body.bio !== undefined) updates.bio = body.bio;
-
-        if (body.slug !== undefined) {
-            const userService = c.var.services.user;
-            const check = await userService.checkSlug(tenantId, body.slug, userId);
-            if (!check.available) {
-                return c.json({
-                    success: false as const,
-                    error: {
-                        message: check.reason === 'reserved'
-                            ? 'That slug is reserved. Please choose another.'
-                            : 'That slug is already taken.',
-                        code: ErrorCode.CONFLICT,
-                        details: { suggestions: check.suggestions ?? [] },
-                    },
-                }, 409);
-            }
-            updates.slug = body.slug;
-        }
+        // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
+        // Agent slug writes go through POST /api/agent/profile (separate endpoint).
 
         if (Object.keys(updates).length > 0) {
             await drizzle(c.env.DB as never).update(users)
                 .set(updates)
                 .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-            if (updates.slug !== undefined) {
-                // A-16 — drop the cached palette slug so the new value serves immediately.
-                await c.env.TENANT_CACHE?.delete(userSlugCacheKey(userId)).catch(() => {});
-            }
         }
 
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
