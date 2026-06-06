@@ -131,6 +131,9 @@ export const UpdateInspectionSchema = z.object({
     // clears the cover. The editor UI for picking it lands with Track H —
     // this write path makes preflight's `coverPhotoSet` attainable via API.
     coverPhotoId: z.string().uuid().nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440042' }).describe('Report cover photo — an inspection_media_pool row id owned by this inspection; null clears it.'),
+    // Track H (IA-7) — per-inspection override of the tenant's
+    // require_defect_fields publish-gate policy; null = inherit.
+    requireDefectFieldsOverride: z.enum(['none', 'location', 'trade', 'both']).nullable().optional().describe('Per-inspection override of which defect fields the publish gate requires; null inherits the tenant default.'),
     // Per-inspection override of the tenant's auto-sign-on-publish default
     // (maps to inspections.auto_sign_on_publish). Toggled from the editor's
     // "toggle-auto-sign" action via PATCH /{id}.

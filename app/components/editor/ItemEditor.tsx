@@ -124,6 +124,10 @@ interface ItemEditorProps {
  locationSuggestions?: string[];
  onDefectFields?: (cannedId: string, patch: Partial<DefectFieldsValue>) => void;
  missingFields?: Map<string, { location: boolean; trade: boolean }>;
+ /** Track H (IA-7) — the EFFECTIVE tenant/inspection policy: which defect
+  *  fields are required at publish. Drives the proactive red asterisk on
+  *  every defect row (missingFields still unions in post-gate flags). */
+ requiredDefectFields?: { location: boolean; trade: boolean };
  onItemAttribute?: (itemId: string, attributeId: string, value: string | number | boolean | null) => void;
  onCloneLast?: (scope: 'rating' | 'rating_notes' | 'all') => void;
  cloneDefaultScope?: 'rating' | 'rating_notes' | 'all';
@@ -163,6 +167,7 @@ export function ItemEditor({
  locationSuggestions,
  onDefectFields,
  missingFields,
+ requiredDefectFields,
  onItemAttribute,
  onCloneLast,
  cloneDefaultScope,
@@ -541,8 +546,8 @@ export function ItemEditor({
  value={st!}
  locationSuggestions={locationSuggestions ?? []}
  onChange={onDefectFields ?? (() => {})}
- locationRequired={missingFields?.get(entry.id)?.location}
- tradeRequired={missingFields?.get(entry.id)?.trade}
+ locationRequired={(requiredDefectFields?.location ?? false) || missingFields?.get(entry.id)?.location}
+ tradeRequired={(requiredDefectFields?.trade ?? false) || missingFields?.get(entry.id)?.trade}
  />
  {/* FE-3 — photo pinned to THIS defect, not the item */}
  {defectPhotoChip({ kind: "canned", id: entry.id }, cannedDefectPhotoCount(entry.id))}

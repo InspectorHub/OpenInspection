@@ -582,6 +582,19 @@ export default function InspectionEditPage() {
  return map;
  }, [publishReadiness]);
 
+ // IA-7 — effective required-defect-fields policy: per-inspection override
+ // (NULL = inherit) falls back to the tenant default from inspection prefs.
+ // Drives the proactive red asterisk on every defect row.
+ const requiredDefectFields = useMemo(() => {
+  const override = (loaderData.inspection as Record<string, unknown>).requireDefectFieldsOverride as
+   'none' | 'location' | 'trade' | 'both' | null | undefined;
+  const effective = override ?? inspectionPrefs.requireDefectFields;
+  return {
+   location: effective === 'location' || effective === 'both',
+   trade:    effective === 'trade'    || effective === 'both',
+  };
+ }, [loaderData.inspection, inspectionPrefs.requireDefectFields]);
+
  /* ---------------------------------------------------------------- */
  /* Canned comments library */
  /* ---------------------------------------------------------------- */
@@ -773,7 +786,9 @@ export default function InspectionEditPage() {
    });
    if (res.ok) {
     const body = await res.json() as { readiness: PublishReadiness | null };
-    if (body.readiness && !body.readiness.ready) {
+    // IA-7: hard gaps block; soft gaps (below the tenant's required
+    // threshold) surface as a yellow warning pass with "Publish anyway".
+    if (body.readiness && (!body.readiness.ready || (body.readiness.warningDefects?.length ?? 0) > 0)) {
      setPublishReadiness(body.readiness);
      setShowPublishGate(true);
      return;
@@ -1450,6 +1465,7 @@ export default function InspectionEditPage() {
  defectStates={defectStates}
  locationSuggestions={locationSuggestions}
  missingFields={missingFields}
+ requiredDefectFields={requiredDefectFields}
  onDefectFields={(cannedId, patch) => {
  if (state.activeItemId && state.currentSection) {
  findings.setDefectFields(
@@ -2048,6 +2064,11 @@ export default function InspectionEditPage() {
   open={showPublishGate}
   readiness={publishReadiness}
   onClose={() => setShowPublishGate(false)}
+  onProceed={() => {
+   // IA-7 warning mode — user acknowledged the soft gaps.
+   setShowPublishGate(false);
+   state.setShowPublishModal(true);
+  }}
   onJump={(b: PublishBlockingDefect) => {
    state.selectSectionById(b.sectionId);
    state.setActiveItemId(b.itemId);

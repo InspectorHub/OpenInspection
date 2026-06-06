@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFetcher } from 'react-router';
 import type { AutoAdvanceMode } from '~/lib/rating-levels';
 
+export type RequireDefectFields = 'none' | 'location' | 'trade' | 'both';
+
 export interface InspectionPrefs {
     cloneDefault:       'rating' | 'rating_notes' | 'all';
     /** B-18 — when rating an item advances to the next unrated one.
@@ -10,6 +12,9 @@ export interface InspectionPrefs {
     autoAdvance:        AutoAdvanceMode;
     autoAdvanceDelayMs: number;
     pinnedTagIds:       string[];
+    /** Track H (IA-7) — which defect fields the publish gate REQUIRES
+     *  tenant-wide. 'none' (default) = gaps warn but never block. */
+    requireDefectFields: RequireDefectFields;
 }
 
 const DEFAULTS: InspectionPrefs = {
@@ -17,6 +22,7 @@ const DEFAULTS: InspectionPrefs = {
     autoAdvance:        'keyboard',
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
+    requireDefectFields: 'none',
 };
 
 /**
