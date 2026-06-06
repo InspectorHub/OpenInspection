@@ -106,6 +106,13 @@
       "when": 1780655053415,
       "tag": "0014_brown_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1780701669123,
+      "tag": "0015_amused_rage",
+      "breakpoints": true
     }
   ]
 }

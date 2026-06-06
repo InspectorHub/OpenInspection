@@ -4,7 +4,6 @@
 // (API worker + web worker + Service Binding) topology with one deployable.
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
-import apiHandler, { app as apiApp } from "../server/index";
 
 declare module "react-router" {
   export interface AppLoadContext {
@@ -21,6 +20,18 @@ interface Env {
   SESSION_SECRET?: string;
 }
 
+// The API graph (server/index → every route/service/dep) is imported LAZILY.
+// Evaluating it at module top-level breaks `react-router dev`: the
+// @cloudflare/vite-plugin dev runner evaluates the worker entry under Vite's
+// SSR transform to detect export types, and a transitive CJS dep in the API
+// graph crashes that evaluation (the build + real-workerd path is unaffected).
+// Deferring the import keeps the entry's top-level graph tiny, so dev-mode
+// export-type detection succeeds; the first real request pays a one-time
+// (cached) import. See docs/developers for the dev-mode notes.
+type ApiModule = typeof import("../server/index");
+let apiModule: Promise<ApiModule> | undefined;
+const getApi = () => (apiModule ??= import("../server/index"));
+
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
   import.meta.env.MODE,
@@ -34,7 +45,10 @@ const requestHandler = createRequestHandler(
 const ssr = (c: any) => {
   const env = {
     ...c.env,
-    API_WORKER: { fetch: (req: Request) => apiApp.fetch(req, c.env, c.executionCtx) },
+    API_WORKER: {
+      fetch: async (req: Request) =>
+        (await getApi()).app.fetch(req, c.env, c.executionCtx),
+    },
   };
   return requestHandler(c.req.raw, { cloudflare: { env, ctx: c.executionCtx } });
 };
@@ -45,7 +59,8 @@ const ssr = (c: any) => {
 // what caused the CSRF 403 on the frontend's /login POST when the API was mounted
 // at "/". Mirrors the CF template's "explicit API routes before the catch-all".
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toApi = (c: any) => apiApp.fetch(c.req.raw, c.env, c.executionCtx);
+const toApi = async (c: any) =>
+  (await getApi()).app.fetch(c.req.raw, c.env, c.executionCtx);
 
 const app = new Hono();
 
@@ -80,16 +95,21 @@ app.all("*", ssr);
 // fetch from the merged Hono app; scheduled (cron) + queue (sync DLQ consumer)
 // reused from the API handler. The queue handler is defined in server/index.ts
 // (the allowed portal-import composition point) so this entry never imports
-// server/portal/* directly — it just forwards the runtime invocation.
+// server/portal/* statically — it just forwards the runtime invocation.
 export default {
   fetch: app.fetch,
-  scheduled: apiHandler.scheduled,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  queue: (batch: any, env: any, ctx: any) => apiHandler.queue(batch, env, ctx),
+  scheduled: async (controller: any, env: any, ctx: any) =>
+    (await getApi()).default.scheduled(controller, env, ctx),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  queue: async (batch: any, env: any, ctx: any) =>
+    (await getApi()).default.queue(batch, env, ctx),
 };
 
 // Re-export Durable Objects + Workflow so wrangler can bind them on the single
 // worker (their class names are referenced by the combined wrangler config).
+// These MUST stay static (wrangler binds the classes at module scope); their
+// import graphs must stay light — see the lazy-API note above.
 export { InspectionPresenceDO } from "../server/durable-objects/inspection-presence";
 export { TenantPresenceDO } from "../server/durable-objects/tenant-presence";
 export { SignCompletionWorkflow } from "../server/workflows/sign-completion-workflow";

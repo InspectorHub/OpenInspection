@@ -18,6 +18,17 @@
     "incremental": true,
     "tsBuildInfoFile": "./.tsbuildinfo.app"
   },
-  "include": [".react-router/types/**/*", "app/**/*.ts", "app/**/*.tsx", "workers/**/*.ts", "vite.config.ts"],
+  "include": [
+    ".react-router/types/**/*",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "workers/**/*.ts",
+    "vite.config.ts",
+    // The worker entry's `typeof import("../server/index")` pulls the server
+    // graph into this program too, so server-side ambient declarations the
+    // graph relies on must be visible here (they live under the api config's
+    // server/** include).
+    "server/types/qrcode-internals.d.ts"
+  ],
   "exclude": ["node_modules", "build", "dist"]
 }

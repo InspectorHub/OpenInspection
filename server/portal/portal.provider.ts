@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants, users, tenantConfigs } from '../lib/db/schema';
+import { tenants, tenantConfigs } from '../lib/db/schema';
 import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { logger } from '../lib/logger';
+import { applyAdminCredential } from './admin-credential';
 
 /**
  * Portal implementation of IntegrationProvider.
@@ -93,29 +94,11 @@ export class PortalProvider implements IntegrationProvider {
                 logger.error('Cannot sync admin: No tenant ID resolved');
                 return;
             }
-
-            const existingUser = await db.select()
-                .from(users)
-                .where(eq(users.email, adminEmail))
-                .get();
-
-            if (!existingUser) {
-                await db.insert(users).values({
-                    id: crypto.randomUUID(),
-                    tenantId: finalTenantId,
-                    email: adminEmail,
-                    passwordHash: adminPasswordHash,
-                    role: 'owner',
-                    createdAt: new Date(),
-                });
-            } else {
-                await db.update(users)
-                    .set({
-                        passwordHash: adminPasswordHash,
-                        tenantId: finalTenantId // Ensure it's correctly linked
-                    })
-                    .where(eq(users.id, existingUser.id));
-            }
+            await applyAdminCredential(this.db, {
+                tenantId: finalTenantId,
+                adminEmail,
+                adminPasswordHash,
+            });
         }
 
         // Clear cache if KV exists

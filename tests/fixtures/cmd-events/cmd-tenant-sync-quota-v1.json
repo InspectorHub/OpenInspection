@@ -1,0 +1,13 @@
+{
+  "specversion": "1.0",
+  "id": "22222222-2222-4222-8222-222222222222",
+  "type": "io.inspectorhub.cmd.tenant.sync_quota",
+  "source": "portal",
+  "time": "2026-06-05T00:00:00.000Z",
+  "dataschema": "cmd-tenant-sync-quota/v1",
+  "tenantseq": 2,
+  "data": {
+    "tenantId": "fixture-tenant-1",
+    "maxUsers": 10
+  }
+}

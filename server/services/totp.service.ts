@@ -1,5 +1,5 @@
 import { TOTP, Secret } from 'otpauth';
-import QRCode from 'qrcode';
+import { qrToSvgDataUri } from '../lib/qr';
 
 /**
  * Spec 4A — TOTP 2FA service.
@@ -20,9 +20,9 @@ export class TotpService {
         return totp.toString();
     }
 
-    /** Render the otpauth URL as a data: URI PNG suitable for an <img> src. */
+    /** Render the otpauth URL as a data: URI (SVG) suitable for an <img> src. */
     async qrCodeDataUri(otpAuthUrl: string): Promise<string> {
-        return QRCode.toDataURL(otpAuthUrl, { width: 240, margin: 2 });
+        return qrToSvgDataUri(otpAuthUrl, { width: 240, margin: 2 });
     }
 
     /**

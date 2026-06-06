@@ -9,11 +9,13 @@ NC='\033[0m'
 
 FAILED=0
 
-pass() { echo "  ✓  $1"; }
-fail() { echo "  ✗  $1"; FAILED=1; }
-step() { echo "\n  →  $1"; }
+# printf, not echo: POSIX sh echo does not interpret \n or \033 escapes
+# (they printed literally under Git Bash), and %b expands them portably.
+pass() { printf '  ✓  %b\n' "$1"; }
+fail() { printf '  ✗  %b\n' "$1"; FAILED=1; }
+step() { printf '\n  →  %b\n' "$1"; }
 
-echo "${BOLD}── OpenInspection (Pre-commit Checks) ───────────────────────────${NC}"
+printf '%b\n' "${BOLD}── OpenInspection (Pre-commit Checks) ───────────────────────────${NC}"
 
 # 1. Type check — SCOPED to what the staged changes can actually affect.
 #    CI's required "verify" check is the authoritative full gate; this hook is
@@ -60,9 +62,9 @@ else
 fi
 
 if [ "$FAILED" -eq 1 ]; then
-    echo "\n${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"
+    printf '\n%b\n' "${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"
     exit 1
 fi
 
-echo "\n${GREEN}All pre-commit checks passed.${NC}"
+printf '\n%b\n' "${GREEN}All pre-commit checks passed.${NC}"
 exit 0
