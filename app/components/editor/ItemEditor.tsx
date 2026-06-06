@@ -358,7 +358,9 @@ export function ItemEditor({
  {/* Rating buttons — driven by the rating system's levels (C-14a):
  full words on ≥sm, abbreviation on narrow, always-on semantic colour. */}
  {item.type === "rich" && (
- <div data-shortcut-scope className="flex gap-2">
+ // FE-4 — gap-3 (12px) between rating buttons: adjacent mis-taps were the
+ // top field complaint; buttons themselves are already 52px tall.
+ <div data-shortcut-scope className="flex gap-3">
  {levels.map((r, idx) => {
  const sev = SEVERITY_STYLES[r.severity ?? "minor"] ?? SEVERITY_STYLES.minor;
  const isActive = activeLevel?.id === r.id;
@@ -479,7 +481,7 @@ export function ItemEditor({
  return (
  <label
  key={entry.id}
- className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors ${
+ className={`flex items-start gap-2.5 p-2.5 min-h-11 rounded-lg cursor-pointer transition-colors ${
  isIncluded
  ? "bg-ih-primary-tint ring-1 ring-ih-primary/30"
  : "bg-ih-bg-app/50 hover:bg-ih-bg-muted"
@@ -601,7 +603,7 @@ export function ItemEditor({
  {customDefects.map((cd) => (
  <label
  key={cd.id}
- className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors ${
+ className={`flex items-start gap-2.5 p-2.5 min-h-11 rounded-lg cursor-pointer transition-colors ${
  cd.included !== false
  ? "bg-ih-primary-tint ring-1 ring-ih-primary/30"
  : "bg-ih-bg-app/50 hover:bg-ih-bg-muted"
