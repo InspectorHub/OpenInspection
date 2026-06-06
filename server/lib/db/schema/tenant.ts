@@ -17,6 +17,13 @@ export const tenants = sqliteTable('tenants', {
     // this tenant (envelope `tenantseq`). The cmd consumer drops any command
     // with tenantseq <= this value (stale/reordered last-writer-wins guard).
     appliedCmdSeq: integer('applied_cmd_seq').notNull().default(0),
+    // A-21 batch 2 — high-water mark of the CREDENTIAL stream (envelope
+    // `credseq`). Admin credentials ride `cmd.tenant.update` sparsely, so the
+    // shared tenantseq can't guard them; this independent sequence ensures a
+    // stale credential never overwrites a newer one (closes the batch-1
+    // residual). Commands without credseq (legacy in-flight) apply credentials
+    // unguarded and do NOT advance this.
+    appliedCredSeq: integer('applied_cred_seq').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
