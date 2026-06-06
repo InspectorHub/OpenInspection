@@ -27,6 +27,9 @@ export default defineConfig({
                 compatibilityDate: '2024-11-01',
                 compatibilityFlags: ['nodejs_compat'],
                 d1Databases: { DB: 'test-sync-db' },
+                // A-21 batch 3 — the offboarding commands stream between real
+                // (miniflare-emulated) R2 buckets: PHOTOS in, EXPORTS_BUCKET out.
+                r2Buckets: { PHOTOS: 'test-photos', EXPORTS_BUCKET: 'test-exports' },
                 queueProducers: {
                     SYNC_QUEUE: { queueName: 'inspectorhub-sync-saas' },
                 },

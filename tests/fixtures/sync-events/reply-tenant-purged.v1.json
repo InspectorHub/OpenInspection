@@ -1,0 +1,17 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-0000000rpg01",
+  "type": "io.inspectorhub.reply.tenant.purged",
+  "source": "core",
+  "time": "2026-06-06T01:00:03.000Z",
+  "dataschema": "reply-tenant-purged/v1",
+  "data": {
+    "tenantId": "fixture-tenant-3",
+    "correlationId": "wf:offboarding:offboarding-fixture-tenant-3-1:purge",
+    "replyto": "wf:offboarding:offboarding-fixture-tenant-3-1",
+    "rows": 42,
+    "r2": 3,
+    "r2Bytes": 1048576,
+    "kv": 2
+  }
+}
