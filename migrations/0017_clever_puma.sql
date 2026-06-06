@@ -19,10 +19,12 @@ CREATE TABLE `service_inspectors` (
 --> statement-breakpoint
 CREATE INDEX `idx_service_inspectors_tenant` ON `service_inspectors` (`tenant_id`);--> statement-breakpoint
 ALTER TABLE `tenant_configs` ADD `allow_inspector_choice` integer DEFAULT false NOT NULL;--> statement-breakpoint
+-- MIN(id) on a TEXT primary key is arbitrary-but-deterministic (lexicographic order), not insertion order.
 DELETE FROM `availability` WHERE `id` NOT IN (
   SELECT MIN(`id`) FROM `availability` GROUP BY `inspector_id`, `day_of_week`, `start_time`
 );
 --> statement-breakpoint
+-- MIN(id) on a TEXT primary key is arbitrary-but-deterministic (lexicographic order), not insertion order.
 DELETE FROM `availability_overrides` WHERE `is_available` = 0 AND `id` NOT IN (
   SELECT MIN(`id`) FROM `availability_overrides` WHERE `is_available` = 0 GROUP BY `inspector_id`, `date`
 );
@@ -36,5 +38,6 @@ FROM `inspections` WHERE COALESCE(`lead_inspector_id`, `inspector_id`) IS NOT NU
 --> statement-breakpoint
 INSERT OR IGNORE INTO `inspection_inspectors` (`inspection_id`, `user_id`, `tenant_id`, `role`, `created_at`)
 SELECT i.`id`, je.`value`, i.`tenant_id`, 'helper', strftime('%s','now') * 1000
-FROM `inspections` i, json_each(i.`helper_inspector_ids`) je
-WHERE je.`value` IS NOT NULL AND je.`value` <> COALESCE(i.`lead_inspector_id`, i.`inspector_id`);
+FROM `inspections` i, json_each(CASE WHEN json_valid(i.`helper_inspector_ids`) THEN i.`helper_inspector_ids` ELSE '[]' END) je
+WHERE je.`value` IS NOT NULL
+AND (COALESCE(i.`lead_inspector_id`, i.`inspector_id`) IS NULL OR je.`value` <> COALESCE(i.`lead_inspector_id`, i.`inspector_id`));
