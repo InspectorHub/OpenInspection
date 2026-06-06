@@ -126,9 +126,17 @@ describe('GET /book/:tenant — company booking profile (IA-26)', () => {
             { id: 's2', tenantId: TENANT_ID, name: 'Radon', price: 15000, active: true, templateId: null, createdAt: new Date() },
             { id: 's3', tenantId: TENANT_ID, name: 'Inactive', price: 5000, active: false, templateId: null, createdAt: new Date() },
         ] as any);
+        // Seed inspector + availability so the shared scan produces bookingOpen=true.
+        await db.insert(users).values([
+            { id: 'u-open', tenantId: TENANT_ID, email: 'open@x.com', passwordHash: 'h', role: 'inspector', name: 'Open', createdAt: new Date() },
+        ] as any);
+        await db.insert(availability).values([
+            { id: 'av-open', tenantId: TENANT_ID, inspectorId: 'u-open', dayOfWeek: 1, startTime: '09:00', endTime: '17:00', createdAt: new Date() },
+        ] as any);
 
-        const hasAnyHours = vi.fn().mockResolvedValue(true);
-        const app = buildApp(db, { hasAnyHours });
+        // The restructured handler always calls getQualifiedInspectorIds (not hasAnyHours).
+        const getQualifiedInspectorIds = vi.fn().mockResolvedValue(['u-open']);
+        const app = buildApp(db, { getQualifiedInspectorIds });
 
         const res = await app.request(`/book/${TENANT_SLUG}`, {}, FAKE_ENV);
         expect(res.status).toBe(200);
@@ -142,12 +150,14 @@ describe('GET /book/:tenant — company booking profile (IA-26)', () => {
         expect(body.data.services).toHaveLength(1);
         expect(body.data.services[0].id).toBe('s1');
         expect(body.data.turnstileSiteKey).toBe('test-site-key');
-        expect(hasAnyHours).toHaveBeenCalledWith(TENANT_ID, []);
+        expect(getQualifiedInspectorIds).toHaveBeenCalledWith(TENANT_ID, []);
     });
 
-    it('returns bookingOpen=false when hasAnyHours returns false', async () => {
-        const hasAnyHours = vi.fn().mockResolvedValue(false);
-        const app = buildApp(db, { hasAnyHours });
+    it('returns bookingOpen=false when no qualified inspectors have hours', async () => {
+        // Returning an empty qualified list short-circuits the availability scan
+        // and produces bookingOpen=false without any DB round-trip for availability.
+        const getQualifiedInspectorIds = vi.fn().mockResolvedValue([]);
+        const app = buildApp(db, { getQualifiedInspectorIds });
         const res = await app.request(`/book/${TENANT_SLUG}`, {}, FAKE_ENV);
         expect(res.status).toBe(200);
         const body = await res.json() as any;
@@ -189,6 +199,53 @@ describe('GET /book/:tenant — company booking profile (IA-26)', () => {
         expect(body.data.inspectors[1].name).toBe('Charlie');
         // photoUrl field is present (even if null).
         expect('photoUrl' in body.data.inspectors[0]).toBe(true);
+    });
+});
+
+describe('GET /book/:tenant/:slug — route-order lock (IA-26)', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+    let sqlite: any;
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db as BetterSQLite3Database<typeof schema>;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        (mockDrizzle as any).mockReturnValue(db);
+
+        await db.insert(tenants).values({
+            id: TENANT_ID, name: 'Acme Inspections', slug: TENANT_SLUG,
+            tier: 'free', status: 'active', maxUsers: 5,
+            deploymentMode: 'shared', createdAt: new Date(),
+        } as any);
+    });
+
+    afterEach(() => sqlite.close());
+
+    it('inspector-scoped route returns data.inspectorId and does not shadow the 2-segment route', async () => {
+        // Seed an inspector with a slug so /book/<tenant>/<slug> can resolve.
+        await db.insert(users).values([
+            { id: 'u-slug', tenantId: TENANT_ID, email: 'slug@x.com', passwordHash: 'h', role: 'inspector', name: 'Slug Inspector', slug: 'slug-inspector', createdAt: new Date() },
+        ] as any);
+
+        const app = buildApp(db);
+
+        // 3-segment route: /book/<tenant>/<inspector-slug>
+        const res3 = await app.request(`/book/${TENANT_SLUG}/slug-inspector`, {}, FAKE_ENV);
+        expect(res3.status).toBe(200);
+        const body3 = await res3.json() as any;
+        expect(body3.success).toBe(true);
+        // Inspector-scoped shape must carry inspectorId.
+        expect(body3.data.inspectorId).toBe('u-slug');
+        expect(body3.data.name).toBe('Slug Inspector');
+
+        // 2-segment route still resolves independently (company profile shape has no inspectorId).
+        const res2 = await app.request(`/book/${TENANT_SLUG}`, {}, FAKE_ENV);
+        expect(res2.status).toBe(200);
+        const body2 = await res2.json() as any;
+        expect(body2.success).toBe(true);
+        expect(body2.data).not.toHaveProperty('inspectorId');
+        expect(body2.data.company).toBe('Acme Inspections');
     });
 });
 

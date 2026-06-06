@@ -968,6 +968,13 @@ export const bookingsRoutes = createApiRouter()
      * The canonical public entry. bookingOpen is company-wide: true iff ANY
      * qualified staff member has configured recurring hours. The inspectors
      * list is only exposed when the tenant enabled allowInspectorChoice.
+     *
+     * Round-trip budget: tenant lookup (1) + 3 parallel (services, config,
+     * getQualifiedInspectorIds) + 1 availability scan shared by bookingOpen
+     * and the choice list + 1 conditional inspector fetch = 5 max.
+     * The previous implementation ran up to 6 serial round-trips by calling
+     * hasAnyHours (which itself called getQualifiedInspectorIds + availability)
+     * and then re-running both calls inside the allowChoice branch.
      */
     .get('/book/:tenant', async (c) => {
         const { tenant } = c.req.param();
@@ -977,36 +984,35 @@ export const bookingsRoutes = createApiRouter()
             .from(tenants).where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
 
-        const svcRows = await db.select({
-            id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
-            durationMinutes: servicesTable.durationMinutes, templateId: servicesTable.templateId,
-            active: servicesTable.active,
-        }).from(servicesTable).where(eq(servicesTable.tenantId, tenantRow.id)).all();
+        const booking = c.var.services.booking;
+        const [svcRows, config, qualified] = await Promise.all([
+            db.select({
+                id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
+                durationMinutes: servicesTable.durationMinutes, templateId: servicesTable.templateId,
+                active: servicesTable.active,
+            }).from(servicesTable).where(eq(servicesTable.tenantId, tenantRow.id)).all(),
+            db.select({ allowInspectorChoice: tenantConfigs.allowInspectorChoice })
+                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantRow.id)).get(),
+            booking.getQualifiedInspectorIds(tenantRow.id, []),
+        ]);
         const visible = svcRows.filter(s => s.active && s.templateId);
-
-        const config = await db.select({ allowInspectorChoice: tenantConfigs.allowInspectorChoice })
-            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantRow.id)).get();
         const allowChoice = !!config?.allowInspectorChoice;
 
-        const booking = c.var.services.booking;
-        const bookingOpen = await booking.hasAnyHours(tenantRow.id, []);
+        // One availability scan serves BOTH bookingOpen and the choice list.
+        const withHours = qualified.length > 0
+            ? await db.selectDistinct({ inspectorId: availability.inspectorId })
+                .from(availability)
+                .where(and(eq(availability.tenantId, tenantRow.id), inArray(availability.inspectorId, qualified)))
+                .all()
+            : [];
+        const hourIds = withHours.map(r => r.inspectorId);
+        const bookingOpen = hourIds.length > 0;
 
         let inspectors: Array<{ id: string; name: string | null; photoUrl: string | null }> = [];
-        if (allowChoice) {
-            const qualified = await booking.getQualifiedInspectorIds(tenantRow.id, []);
-            if (qualified.length > 0) {
-                // Only staff with configured hours are offered for choice.
-                const withHours = await db.selectDistinct({ inspectorId: availability.inspectorId })
-                    .from(availability)
-                    .where(and(eq(availability.tenantId, tenantRow.id), inArray(availability.inspectorId, qualified)))
-                    .all();
-                const ids = withHours.map(r => r.inspectorId);
-                if (ids.length > 0) {
-                    inspectors = await db.select({ id: users.id, name: users.name, photoUrl: users.photoUrl })
-                        .from(users).where(and(eq(users.tenantId, tenantRow.id), inArray(users.id, ids))).all();
-                    inspectors.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-                }
-            }
+        if (allowChoice && hourIds.length > 0) {
+            inspectors = await db.select({ id: users.id, name: users.name, photoUrl: users.photoUrl })
+                .from(users).where(and(eq(users.tenantId, tenantRow.id), inArray(users.id, hourIds))).all();
+            inspectors.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
         }
 
         return c.json({
