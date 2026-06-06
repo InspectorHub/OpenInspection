@@ -33,7 +33,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
     const [inspRes, tplRes, membersRes] = await Promise.all([
         api.inspections[":id"].$get({ param: { id: inspectionId } }, hdr).catch(() => null),
-        api.inspections.templates.$get({ query: { page: "1", pageSize: "200" } }, hdr).catch(() => null),
+        api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }, hdr).catch(() => null),
         api.team.members.$get({}, hdr).catch(() => null),
     ]);
 
