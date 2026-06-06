@@ -64,10 +64,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  api.inspections[":id"].results.$get({ param: { id } }),
  api.inspections[":id"]["report-data"].$get({ param: { id } }),
+ // Track H (C-12): tag library moved off the client-side fetch into the loader.
+ api.tags.index.$get().catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -114,7 +116,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // shared helper so persisted ratings survive a reload.
  const results = unwrapResultsResponse(resultsBody) as ResultMap;
 
- return { inspection, schema, results, ratingLevels, token };
+ let tagLibrary: Array<{ id: string; name: string; color: string }> = [];
+ if (tagsRes?.ok) {
+ const tagsBody = await tagsRes.json() as { data?: Array<{ id: string; name: string; color: string }> };
+ tagLibrary = tagsBody.data ?? [];
+ }
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary };
 }
 
 /* ------------------------------------------------------------------ */
@@ -498,18 +506,9 @@ export default function InspectionEditPage() {
  /* Tag library fetch + memos */
  /* ---------------------------------------------------------------- */
 
- const [tagLibrary, setTagLibrary] = useState<TagPin[]>([]);
- useEffect(() => {
- (async () => {
- try {
- const res = await fetch('/api/tags', { credentials: 'include' });
- if (res.ok) {
- const body = await res.json() as { data?: Array<{ id: string; name: string; color: string }> };
- setTagLibrary(body.data ?? []);
- }
- } catch { /* noop */ }
- })();
- }, []);
+ // Track H (C-12): the tag library now arrives via the loader (token-relay)
+ // instead of a raw client fetch against /api/tags.
+ const tagLibrary = (loaderData.tagLibrary ?? []) as TagPin[];
 
  const pinnedTags = useMemo(() => {
  return inspectionPrefs.pinnedTagIds
@@ -752,13 +751,15 @@ export default function InspectionEditPage() {
 
  const handlePublishClick = useCallback(async () => {
   try {
-   const res = await fetch(`/api/inspections/${state.inspection.id}/publish-readiness`, {
+   // Track H (C-12): fresh on-demand check via the BFF resource route
+   // (token relay) — never a raw client fetch on /api.
+   const res = await fetch(`/resources/publish-readiness?id=${encodeURIComponent(state.inspection.id)}`, {
     credentials: 'include',
    });
    if (res.ok) {
-    const readiness = await res.json() as PublishReadiness;
-    if (!readiness.ready) {
-     setPublishReadiness(readiness);
+    const body = await res.json() as { readiness: PublishReadiness | null };
+    if (body.readiness && !body.readiness.ready) {
+     setPublishReadiness(body.readiness);
      setShowPublishGate(true);
      return;
     }

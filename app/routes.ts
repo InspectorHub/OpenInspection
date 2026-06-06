@@ -72,6 +72,11 @@ export default [
   route("feature-disabled", "routes/feature-disabled.tsx"),
   // API docs (Swagger UI) — was hono GET /ui; OpenAPI JSON still served at /doc
   route("ui", "routes/docs.tsx"),
+  // BFF resource routes (no UI) — Token-Relay endpoints for editor hooks
+  // (Track H / C-12: client code never fetches /api directly).
+  route("resources/comments-library", "routes/resources/comments-library.tsx"),
+  route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
+  route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   layout("routes/auth-layout.tsx", [
     route("dashboard", "routes/dashboard.tsx"),
     route("calendar", "routes/calendar.tsx"),
