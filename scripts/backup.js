@@ -12,12 +12,42 @@ const getArg = (key) => {
     return (idx !== -1 && process.argv[idx + 1] && !process.argv[idx + 1].startsWith('--')) ? process.argv[idx + 1] : null;
 };
 
-const TOML_PATH = getArg('--config') || 'wrangler.local.jsonc';
+// C-17: resolve the wrangler config the same way scripts/wrangler.mjs does
+// (--config flag > WRANGLER_CONFIG env > wrangler.local.jsonc > wrangler.jsonc)
+// and derive the DB/bucket names FROM that config — the old hardcoded
+// standalone names made `npm run backup` useless for the SaaS target.
+const TOML_PATH = getArg('--config')
+    || process.env.WRANGLER_CONFIG
+    || (fs.existsSync('wrangler.local.jsonc') ? 'wrangler.local.jsonc' : 'wrangler.jsonc');
 const PROJECT_SLUG = 'openinspection';
 
-// Dynamic Resource Naming
-const DB_NAME = getArg('--db-name') || `${PROJECT_SLUG}-db`;
-const BUCKETS = [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
+function readWranglerConfig(file) {
+    try {
+        let raw = fs.readFileSync(file, 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//g, '')      // block comments
+            .replace(/^\s*\/\/.*$/gm, '');          // whole-line comments
+        try {
+            return JSON.parse(raw);
+        } catch {
+            // Retry with trailing line comments stripped (safe for our configs —
+            // no string values contain `//` outside URLs at line start).
+            raw = raw.replace(/,?\s*\/\/[^"\n]*$/gm, (m) => (m.startsWith(',') ? ',' : ''));
+            return JSON.parse(raw);
+        }
+    } catch (e) {
+        console.warn(`  ⚠ Could not parse ${file} (${e.message}) — falling back to default resource names`);
+        return {};
+    }
+}
+const WRANGLER_CFG = readWranglerConfig(TOML_PATH);
+
+// Dynamic Resource Naming (derived from the resolved config; flags override)
+const DB_NAME = getArg('--db-name')
+    || WRANGLER_CFG.d1_databases?.[0]?.database_name
+    || `${PROJECT_SLUG}-db`;
+const BUCKETS = (getArg('--buckets')?.split(',').filter(Boolean))
+    || (WRANGLER_CFG.r2_buckets?.map((b) => b.bucket_name).filter(Boolean))
+    || [`${PROJECT_SLUG}-photos`, `${PROJECT_SLUG}-photos-preview`];
 const BACKUP_ROOT = 'backups';
 
 const info = (msg) => console.log(`  ✓ ${msg}`);

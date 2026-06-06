@@ -1,0 +1,14 @@
+{
+  "specversion": "1.0",
+  "id": "wf:offboarding:offboarding-fixture-tenant-3-1:export",
+  "type": "io.inspectorhub.cmd.tenant.data_export",
+  "source": "portal",
+  "time": "2026-06-06T01:00:00.000Z",
+  "dataschema": "cmd-tenant-data-export/v1",
+  "tenantseq": 1,
+  "replyto": "wf:offboarding:offboarding-fixture-tenant-3-1",
+  "data": {
+    "tenantId": "fixture-tenant-3",
+    "r2Key": "exports/fixture-tenant-3/1780000000000.zip"
+  }
+}

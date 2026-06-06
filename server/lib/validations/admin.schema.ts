@@ -118,12 +118,8 @@ export const TenantStatusBodySchema = z.object({
     adminPasswordHash: z.string().optional().describe('TODO describe adminPasswordHash field for the OpenInspection MCP integration'),
 });
 
-/**
- * Body schema for POST /api/integration/tenants/:slug/stripe-connect (M2M).
- */
-export const StripeConnectBodySchema = z.object({
-    accountId: z.string().min(1).describe('TODO describe accountId field for the OpenInspection MCP integration'),
-});
+// StripeConnectBodySchema removed with the dead M2M stripe-connect endpoint
+// (A-21 batch 3 adjudication).
 
 /**
  * Body schema for inspector-facing PUT /api/admin/stripe-connect.

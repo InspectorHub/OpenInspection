@@ -1,0 +1,14 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-0000000r2u01",
+  "type": "io.inspectorhub.reply.tenant.updated",
+  "source": "core",
+  "time": "2026-06-06T00:00:02.000Z",
+  "dataschema": "reply-tenant-updated/v1",
+  "data": {
+    "tenantId": "fixture-tenant-2",
+    "correlationId": "wf:onboarding:fixture-tenant-2:sync-to-core",
+    "replyto": "wf:onboarding:fixture-tenant-2",
+    "result": "applied"
+  }
+}

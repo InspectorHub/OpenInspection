@@ -13,6 +13,10 @@ import { z } from 'zod';
 export const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     'io.inspectorhub.cmd.tenant.update': ['cmd-tenant-update/v1'],
     'io.inspectorhub.cmd.tenant.sync_quota': ['cmd-tenant-sync-quota/v1'],
+    'io.inspectorhub.cmd.tenant.seed_starter_content': ['cmd-tenant-seed-starter-content/v1'],
+    // A-21 batch 3 — offboarding data plane.
+    'io.inspectorhub.cmd.tenant.data_export': ['cmd-tenant-data-export/v1'],
+    'io.inspectorhub.cmd.tenant.purge': ['cmd-tenant-purge/v1'],
 };
 
 export const cmdEnvelopeSchema = z.object({
@@ -23,6 +27,13 @@ export const cmdEnvelopeSchema = z.object({
     time: z.string().min(1),
     dataschema: z.string().min(1),
     tenantseq: z.number().int().nonnegative(),
+    // A-21 batch 2 (additive-optional — no dataschema bump):
+    /** Producer wants a `reply.tenant.updated` routed here (`wf:onboarding:<id>`). */
+    replyto: z.string().optional(),
+    /** Credential-stream sequence; present ONLY on credential-bearing commands.
+     *  Guarded by `tenants.applied_cred_seq` (a stale credential never
+     *  overwrites a newer one). Absent = legacy in-flight → apply unguarded. */
+    credseq: z.number().int().positive().optional(),
     data: z.record(z.string(), z.unknown()),
 });
 export type CmdEnvelope = z.infer<typeof cmdEnvelopeSchema>;
@@ -42,6 +53,19 @@ export const cmdTenantUpdateDataSchema = z.object({
 export const cmdSyncQuotaDataSchema = z.object({
     tenantId: z.string(),
     maxUsers: z.number(),
+});
+export const cmdSeedStarterContentDataSchema = z.object({
+    tenantId: z.string(),
+});
+/** A-21 batch 3 — export straight into the shared EXPORTS_BUCKET. The r2Key is
+ *  allocated by the portal workflow (stable across step retries) so a re-sent
+ *  command overwrites the same object — idempotent. */
+export const cmdDataExportDataSchema = z.object({
+    tenantId: z.string(),
+    r2Key: z.string(),
+});
+export const cmdPurgeDataSchema = z.object({
+    tenantId: z.string(),
 });
 
 export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {

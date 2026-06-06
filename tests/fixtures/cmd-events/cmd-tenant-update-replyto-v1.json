@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "wf:onboarding:fixture-tenant-2:sync-to-core",
+  "type": "io.inspectorhub.cmd.tenant.update",
+  "source": "portal",
+  "time": "2026-06-06T00:00:00.000Z",
+  "dataschema": "cmd-tenant-update/v1",
+  "tenantseq": 1,
+  "credseq": 1,
+  "replyto": "wf:onboarding:fixture-tenant-2",
+  "data": {
+    "tenantId": "fixture-tenant-2",
+    "slug": "ws-fix-2",
+    "status": "active",
+    "name": "Fixture Two",
+    "maxUsers": 5,
+    "adminEmail": "fix2@example.com",
+    "adminPasswordHash": "pbkdf2$fixture"
+  }
+}

@@ -23,9 +23,7 @@ export interface IntegrationProvider {
      * In Standalone mode, this updates the local D1 database.
      */
     handleTenantUpdate(params: TenantUpdateParams): Promise<void>;
-
-    /**
-     * Called when a tenant connects their Stripe account.
-     */
-    handleStripeConnect?(slug: string, accountId: string): Promise<void>;
+    // handleStripeConnect was removed with the dead M2M stripe-connect endpoint
+    // (A-21 batch 3 adjudication) — the live write path is the inspector-facing
+    // AdminService.setStripeConnect.
 }

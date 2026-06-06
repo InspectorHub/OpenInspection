@@ -17,6 +17,13 @@ export const tenants = sqliteTable('tenants', {
     // this tenant (envelope `tenantseq`). The cmd consumer drops any command
     // with tenantseq <= this value (stale/reordered last-writer-wins guard).
     appliedCmdSeq: integer('applied_cmd_seq').notNull().default(0),
+    // A-21 batch 2 — high-water mark of the CREDENTIAL stream (envelope
+    // `credseq`). Admin credentials ride `cmd.tenant.update` sparsely, so the
+    // shared tenantseq can't guard them; this independent sequence ensures a
+    // stale credential never overwrites a newer one (closes the batch-1
+    // residual). Commands without credseq (legacy in-flight) apply credentials
+    // unguarded and do NOT advance this.
+    appliedCredSeq: integer('applied_cred_seq').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
@@ -213,7 +220,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     useInspectorFromName: integer('use_inspector_from_name', { mode: 'boolean' }).notNull().default(false),
     billingUrl: text('billing_url'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
-    secrets: text('secrets'),                      // AES-GCM encrypted JSON: {resendApiKey, turnstileSecretKey, geminiApiKey, googleClientSecret}
+    // DEAD (C-15, 2026-06-06): legacy AES-GCM secrets store, soft-retired —
+    // nothing reads or writes it anymore (D1 can't drop columns on FK-referenced
+    // tables, so the column stays as a dead shadow). Canonical store below.
+    secrets: text('secrets'),
     // Secret UI化 (migration 0079) — AES-256-GCM encrypted JSON holding all
     // 14 integration API keys configurable via Settings UI. Supersedes the
     // `secrets` column which held a smaller subset. Worker env vars still

@@ -50,7 +50,7 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool } from '../lib/db/schema';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
 import { eq, inArray, and } from 'drizzle-orm';
@@ -556,6 +556,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        400: { description: 'coverPhotoId does not reference a photo of this inspection (DB-16)' },
     },
     operationId: "patchInspection"
 }, { scopes: ['write'], tier: 'primary' }));
@@ -1979,6 +1980,23 @@ export const inspectionsRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+
+        // DB-16 — coverPhotoId must reference a media-pool row owned by THIS
+        // inspection (null clears the cover). Reject dangling/foreign ids so
+        // the preflight gate + report renderer can always resolve the R2 key.
+        if (typeof body.coverPhotoId === 'string') {
+            const pool = await db.select({ id: inspectionMediaPool.id })
+                .from(inspectionMediaPool)
+                .where(and(
+                    eq(inspectionMediaPool.id, body.coverPhotoId),
+                    eq(inspectionMediaPool.tenantId, tenantId),
+                    eq(inspectionMediaPool.inspectionId, id),
+                ))
+                .get();
+            if (!pool) {
+                return c.json({ success: false as const, error: { code: 'INVALID_COVER_PHOTO', message: 'coverPhotoId does not reference a photo of this inspection' } }, 400);
+            }
+        }
 
         // Tenant-ownership pre-check above guards access. The validated `body`
         // can legitimately be empty: the settings sheet forwards its whole form

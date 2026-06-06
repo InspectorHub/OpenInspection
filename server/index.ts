@@ -739,7 +739,10 @@ export default {
     queue: async (batch: MessageBatch<unknown>, env: HonoConfig['Bindings'], _ctx: ExecutionContext) => {
         if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {
             const { handleCmdBatch } = await import('./portal/cmd-consumer');
-            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch);
+            // SYNC_QUEUE carries command replies back to portal (A-21 batch 2);
+            // PHOTOS/EXPORTS_BUCKET serve the offboarding commands (batch 3).
+            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE,
+                { photos: env.PHOTOS, exports: env.EXPORTS_BUCKET });
             return;
         }
         await handleSyncDlqBatch(env.DB, batch);
