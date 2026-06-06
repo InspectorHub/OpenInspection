@@ -14,7 +14,10 @@ export default [
   route("templates/:id/edit", "routes/template-edit.tsx"),
   // Public pages — no auth, minimal layout, SSR for SEO
   layout("routes/public-layout.tsx", [
-    route("book/:tenant/:slug", "routes/public/booking.tsx"),
+    route("book/:tenant", "routes/public/booking.tsx"),
+    // IA-26 — legacy per-inspector URL kept alive as a deep link: 302 to the
+    // company page with ?inspector=<slug> (preserves ?ref= and other params).
+    route("book/:tenant/:slug", "routes/public/booking-inspector-redirect.tsx"),
     route("report/:tenant/:id", "routes/public/report.tsx"),
     route(
       "agreements/sign/:tenant/:token",
