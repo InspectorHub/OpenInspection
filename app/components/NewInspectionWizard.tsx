@@ -64,6 +64,11 @@ export function NewInspectionWizard({
   // separate fetcher prevents competing mutations from cancelling each other).
   const agentFetcher = useFetcher<{ intent: "search-agents"; agents: AgentResult[] }>();
   const agentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // IA-6 — advisory schedule conflict detection (separate fetcher to avoid
+  // cancelling the submit fetcher; B-17 convention).
+  const conflictFetcher = useFetcher<{
+    conflicts: Array<{ inspectionId: string; propertyAddress: string; date: string }>;
+  }>();
 
   const [stepIdx, setStepIdx] = useState(0);
   const [propertyType, setPropertyType] = useState("single_family");
@@ -150,6 +155,21 @@ export function NewInspectionWizard({
     setNewAgentName("");
     setNewAgentEmail("");
   }, [open]);
+
+  // IA-6 — debounced schedule conflict check: fires 400 ms after either
+  // inspectorId or date/time changes. Only queries when a real inspector id
+  // is selected (non-empty) and a date is set. Advisory only — never blocks.
+  useEffect(() => {
+    if (!inspectorId || !date) return;
+    const combinedDate = `${date}T${time}:00Z`;
+    const t = setTimeout(() => {
+      conflictFetcher.load(
+        `/resources/schedule-conflicts?inspectorId=${encodeURIComponent(inspectorId)}&date=${encodeURIComponent(combinedDate)}`,
+      );
+    }, 400);
+    return () => clearTimeout(t);
+  // conflictFetcher is stable across renders — intentionally omitted per RR convention.
+  }, [inspectorId, date, time]);
 
   // IA-1 — agent typeahead: debounce ~300 ms, then POST search-agents intent
   // via the dedicated agentFetcher (BFF pattern, no direct client fetch).
@@ -636,6 +656,18 @@ export function NewInspectionWizard({
                     </select>
                   ) : (
                     <input value={inspectorId} onChange={(e) => setInspectorId(e.target.value)} placeholder="Inspector ID or name" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
+                  )}
+                  {/* IA-6 — advisory conflict warning; non-blocking */}
+                  {(conflictFetcher.data?.conflicts?.length ?? 0) > 0 && (
+                    <div className="mt-2 rounded-md border border-ih-watch/40 bg-ih-watch-bg px-3 py-2">
+                      <p className="text-[12px] font-bold text-ih-watch-fg">
+                        <strong>Schedule conflict:</strong>{" "}
+                        {conflictFetcher.data!.conflicts.length === 1
+                          ? `this inspector already has an inspection at ${conflictFetcher.data!.conflicts[0].propertyAddress}`
+                          : `this inspector already has ${conflictFetcher.data!.conflicts.length} inspections`}{" "}
+                        in this time slot. You can still schedule it.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

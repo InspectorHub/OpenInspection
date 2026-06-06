@@ -54,6 +54,7 @@ import { inspections as inspectionTable, inspectionResults, agreements, inspecti
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
+import { findScheduleConflicts } from '../lib/schedule-conflicts';
 import { eq, inArray, and } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { SignatureUser } from '../lib/inspector-signature';
@@ -460,6 +461,45 @@ const getCountsRoute = createRoute(withMcpMetadata({
     },
     operationId: "countsInspection",
     description: "Auto-generated placeholder for countsInspection (GET /counts, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['read'], tier: 'extended' }));
+
+
+// IA-6 — GET /api/inspections/schedule-conflicts
+// MUST be registered before /{id} to avoid 'schedule-conflicts' matching as an id param.
+const scheduleConflictsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/schedule-conflicts',
+    tags: ['inspections'],
+    summary: 'Detect same-day-hour assignment conflicts for an inspector',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        query: z.object({
+            inspectorId: z.string().min(1).describe('Inspector user id to check.'),
+            date: z.string().min(1).describe('Proposed date/time — ISO datetime or YYYY-MM-DD.'),
+            excludeId: z.string().optional().describe('Inspection id being rescheduled; excluded from collision results.'),
+        }).describe('Conflict query'),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.boolean().describe('Whether the request succeeded'),
+                        data: z.object({
+                            conflicts: z.array(z.object({
+                                inspectionId: z.string().describe('Colliding inspection id'),
+                                propertyAddress: z.string().describe('Colliding inspection address'),
+                                date: z.string().describe('Colliding inspection date'),
+                            })).describe('Same-day-hour collisions for this inspector'),
+                        }).describe('Conflict payload'),
+                    }).describe('Conflict response'),
+                },
+            },
+            description: 'Success',
+        },
+    },
+    operationId: 'getScheduleConflicts',
+    description: 'IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 
@@ -1970,6 +2010,15 @@ export const inspectionsRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const counts = await c.var.services.inspection.getCounts(tenantId);
         return c.json({ success: true, data: counts });
+    })
+    // IA-6 — advisory schedule conflict check; placed before /{id} to prevent
+    // 'schedule-conflicts' being matched as a param value.
+    .openapi(scheduleConflictsRoute, async (c) => {
+        const { inspectorId, date, excludeId } = c.req.valid('query');
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+        const conflicts = await findScheduleConflicts(db, tenantId, inspectorId, date, excludeId);
+        return c.json({ success: true, data: { conflicts } }, 200);
     })
     .openapi(getInspectionRoute, async (c) => {
         const { id } = c.req.valid('param');

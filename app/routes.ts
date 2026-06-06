@@ -78,6 +78,10 @@ export default [
   // API docs (Swagger UI) — was hono GET /ui; OpenAPI JSON still served at /doc
   route("ui", "routes/docs.tsx"),
   layout("routes/auth-layout.tsx", [
+    // IA-6 — BFF resource route for advisory schedule-conflict detection.
+    // Loaded via useFetcher; no UI rendered; must be inside the auth layout so
+    // requireToken() can redirect to /login when unauthenticated.
+    route("resources/schedule-conflicts", "routes/resources/schedule-conflicts.ts"),
     route("dashboard", "routes/dashboard.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),
