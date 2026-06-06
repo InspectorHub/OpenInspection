@@ -4,7 +4,7 @@ import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
-import { NewInspectionWizard } from "~/components/NewInspectionWizard";
+import { NewInspectionWizard, type WizardTeamMember } from "~/components/NewInspectionWizard";
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
 import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
@@ -201,12 +201,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // The TODO(C-10) cast mirrors settings-account.tsx — hono/client collapses
     // the typed union; assertion is localized here and does not affect safety.
     const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
-    const [dashRes, tagsRes, templatesRes, servicesRes, meRes] = await Promise.all([
+    const [dashRes, tagsRes, templatesRes, servicesRes, meRes, membersRes] = await Promise.all([
       api.inspections.dashboard.$get(),
       api.tags.index.$get().catch(() => null),
       api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
       api.services.index.$get().catch(() => null),
       meGet().catch(() => null),
+      api.admin.members.$get().catch(() => null),
     ]);
     const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
     const d = (json.data ?? {}) as unknown as DashboardData | undefined;
@@ -224,6 +225,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (servicesRes && servicesRes.ok) {
       const sj = (await servicesRes.json()) as { data?: ServiceOption[] };
       svcOptions = (sj.data ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price }));
+    }
+    // B-21 team step — non-admins get 403 → null → []; team step hidden for them.
+    const schedulingRoles = new Set(["owner", "admin", "inspector", "lead"]);
+    let teamMembers: WizardTeamMember[] = [];
+    if (membersRes?.ok) {
+      const mb = (await membersRes.json()) as { data?: Array<{ id: string; email: string; role: string; name?: string | null }> };
+      teamMembers = (mb.data ?? [])
+        .filter((m) => schedulingRoles.has(m.role))
+        .map((m) => ({ id: m.id, name: m.name ?? m.email }));
     }
     // IA-12: read checklistDismissed from onboardingState. Best-effort: if the
     // call fails we show the checklist (safe default — the user can dismiss again).
@@ -248,6 +258,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       tags,
       templates,
       services: svcOptions,
+      teamMembers,
       checklistDismissed,
       // Pass raw template/service counts for the onboarding checklist. The
       // dashboard buckets already have the inspection counts we need.
@@ -269,6 +280,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       tags: [] as Tag[],
       templates: [] as TemplateOption[],
       services: [] as ServiceOption[],
+      teamMembers: [] as WizardTeamMember[],
       checklistDismissed: false,
       templateCount: 0,
       serviceCount: 0,
@@ -377,7 +389,7 @@ const BUCKET_META: Record<string, { label: string; hint: string }> = {
 const PAGE_SIZE = 25;
 
 export default function DashboardPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services, checklistDismissed: loaderDismissed, templateCount, serviceCount } = useLoaderData<typeof loader>();
+  const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services, teamMembers, checklistDismissed: loaderDismissed, templateCount, serviceCount } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
@@ -950,6 +962,7 @@ export default function DashboardPage() {
         onClose={() => setWizardOpen(false)}
         templates={templates}
         services={services}
+        teamMembers={teamMembers}
       />
 
       {/* Command Palette */}

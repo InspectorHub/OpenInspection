@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLoaderData, Form, useActionData } from "react-router";
+import { useState, useEffect } from "react";
+import { Link, useLoaderData, Form, useActionData, useFetcher } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-services";
@@ -27,19 +27,71 @@ interface Discount {
   active: boolean;
 }
 
+interface Member {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
+
+// Scheduling roles that may be restricted per-service.
+const SCHEDULING_ROLES = new Set(["owner", "admin", "inspector", "lead"]);
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    const res = await api.services.index.$get({});
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-    const d = (body.data ?? {}) as Record<string, unknown>;
+    const [svcRes, discountRes, membersRes] = await Promise.all([
+      api.services.index.$get({}),
+      api.services["discount-codes"].$get().catch(() => null),
+      api.admin.members.$get().catch(() => null),
+    ]);
+    // GET /api/services returns { success, data: Service[] } — data IS the
+    // array (the pre-C-10 admin endpoint wrapped it in { services, discounts },
+    // which this loader kept parsing; the list rendered empty ever since).
+    const body = svcRes.ok ? ((await svcRes.json()) as Record<string, unknown>) : {};
+    const rawServices = (Array.isArray(body.data) ? body.data : []) as Service[];
+    const discountBody = discountRes?.ok ? ((await discountRes.json()) as Record<string, unknown>) : {};
+    const rawDiscounts = (Array.isArray(discountBody.data) ? discountBody.data : []) as Discount[];
+
+    // Fetch qualification restrictions for all services in parallel (one GET per service).
+    // Acceptable at realistic service counts; add a bulk endpoint if this grows.
+    const restrictionResults = await Promise.all(
+      rawServices.map(async (svc) => {
+        try {
+          const res = await api.services[":id"].inspectors.$get({ param: { id: svc.id } });
+          if (!res.ok) return { serviceId: svc.id, userIds: [] as string[] };
+          const rb = (await res.json()) as Record<string, unknown>;
+          const rd = (rb.data ?? {}) as Record<string, unknown>;
+          return { serviceId: svc.id, userIds: (Array.isArray(rd.userIds) ? rd.userIds : []) as string[] };
+        } catch {
+          return { serviceId: svc.id, userIds: [] as string[] };
+        }
+      }),
+    );
+    const restrictionMap: Record<string, string[]> = {};
+    for (const r of restrictionResults) restrictionMap[r.serviceId] = r.userIds;
+
+    let members: Member[] = [];
+    if (membersRes?.ok) {
+      const mb = (await membersRes.json()) as Record<string, unknown>;
+      const raw = ((mb.data ?? []) as Member[]);
+      members = raw.filter((m) => SCHEDULING_ROLES.has(m.role));
+    }
+
     return {
-      services: (Array.isArray(d?.services) ? d.services : []) as Service[],
-      discounts: (Array.isArray(d?.discounts) ? d.discounts : []) as Discount[],
+      services: rawServices,
+      discounts: rawDiscounts,
+      restrictionMap,
+      members,
     };
   } catch {
-    return { services: [] as Service[], discounts: [] as Discount[] };
+    return {
+      services: [] as Service[],
+      discounts: [] as Discount[],
+      restrictionMap: {} as Record<string, string[]>,
+      members: [] as Member[],
+    };
   }
 }
 
@@ -60,7 +112,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await (api.services.index.$post as unknown as (args: { json: Record<string, unknown> }) => Promise<Response>)({
       json: {
         name,
-        description: description || null,
+        // CreateServiceSchema.description is .optional() — undefined is the
+        // only valid "absent" encoding; sending null fails validation (400).
+        ...(description ? { description } : {}),
         price: Number(price) * 100 || 0,
       },
     });
@@ -78,13 +132,187 @@ export async function action({ request, context }: Route.ActionArgs) {
       param: { id },
       json: { active: !active },
     });
+  } else if (intent === "qualification-save") {
+    const id = String(form.get("serviceId") ?? "");
+    let userIds: string[];
+    try {
+      userIds = JSON.parse(String(form.get("userIds") ?? "[]"));
+    } catch {
+      return { ok: false, intent: "qualification-save", message: "Invalid user IDs format." };
+    }
+    const res = await api.services[":id"].inspectors.$put({
+      param: { id },
+      json: { userIds },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return {
+        ok: false,
+        intent: "qualification-save",
+        message: (err as Record<string, unknown>)?.message as string | undefined ?? "Failed to save restrictions.",
+        serviceId: id,
+      };
+    }
+    return { ok: true, intent: "qualification-save", serviceId: id };
   }
 
   return { ok: true };
 }
 
+// ----------------------------------------------------------------
+// Qualified Inspectors widget (per-service)
+// ----------------------------------------------------------------
+
+interface QualificationWidgetProps {
+  service: Service;
+  initialUserIds: string[];
+  members: Member[];
+}
+
+function QualificationWidget({ service, initialUserIds, members }: QualificationWidgetProps) {
+  const fetcher = useFetcher<typeof action>({ key: `qual-${service.id}` });
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialUserIds));
+  const [dirty, setDirty] = useState(false);
+
+  // Re-sync local selection when the loader delivers a fresh restrictionMap
+  // (e.g. after a full-page navigation or revalidation).
+  useEffect(() => {
+    setSelected(new Set(initialUserIds));
+    setDirty(false);
+  }, [initialUserIds]);
+
+  const saving = fetcher.state !== "idle";
+  const lastResult = fetcher.state === "idle" ? fetcher.data : undefined;
+  const saved =
+    !dirty &&
+    lastResult !== undefined &&
+    "intent" in lastResult &&
+    lastResult.intent === "qualification-save" &&
+    (lastResult as { ok: boolean }).ok === true &&
+    "serviceId" in lastResult &&
+    (lastResult as { serviceId: string }).serviceId === service.id;
+  const failed =
+    !dirty &&
+    lastResult !== undefined &&
+    "intent" in lastResult &&
+    lastResult.intent === "qualification-save" &&
+    (lastResult as { ok: boolean }).ok === false &&
+    "serviceId" in lastResult &&
+    (lastResult as { serviceId: string }).serviceId === service.id;
+
+  const displayLabel =
+    initialUserIds.length === 0
+      ? "All inspectors"
+      : `${initialUserIds.length} inspector${initialUserIds.length !== 1 ? "s" : ""}`;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setDirty(true);
+  }
+
+  function handleSave() {
+    setDirty(false);
+    fetcher.submit(
+      {
+        intent: "qualification-save",
+        serviceId: service.id,
+        userIds: JSON.stringify(Array.from(selected)),
+      },
+      { method: "post" },
+    );
+  }
+
+  function handleCancel() {
+    setSelected(new Set(initialUserIds));
+    setDirty(false);
+    setOpen(false);
+  }
+
+  // Read-only display when no scheduling members are available (non-admin).
+  if (members.length === 0) {
+    return (
+      <div className="text-[12px] text-ih-fg-3">
+        <span className="font-medium">Qualified:</span> {displayLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      {!open ? (
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-ih-fg-3">
+            <span className="font-medium">Qualified:</span> {displayLabel}
+          </span>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="text-[12px] font-semibold text-ih-primary hover:underline"
+          >
+            Edit
+          </button>
+          {saved && <span className="text-[12px] text-ih-ok-fg font-bold">Saved.</span>}
+        </div>
+      ) : (
+        <div className="border border-ih-border rounded-md p-3 space-y-2 bg-ih-bg-muted">
+          <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">
+            Qualified inspectors
+          </p>
+          <p className="text-[12px] text-ih-fg-3 mb-2">
+            Leave all unchecked to allow all staff.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-40 overflow-y-auto">
+            {members.map((m) => (
+              <label key={m.id} className="flex items-center gap-2 cursor-pointer select-none py-1">
+                <input
+                  type="checkbox"
+                  checked={selected.has(m.id)}
+                  onChange={() => toggle(m.id)}
+                  className="h-4 w-4 rounded border-ih-border text-ih-primary"
+                />
+                <span className="text-[12px] text-ih-fg-1 truncate">
+                  {m.email}
+                  <span className="ml-1 text-ih-fg-3 text-[11px]">({m.role})</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {failed && (
+            <p className="text-[12px] text-ih-bad-fg">
+              {(lastResult as { message?: string }).message ?? "Save failed. Please try again."}
+            </p>
+          )}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="h-7 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsServices() {
-  const { services, discounts } = useLoaderData<typeof loader>();
+  const { services, discounts, restrictionMap, members } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [showForm, setShowForm] = useState(false);
 
@@ -215,6 +443,11 @@ export default function SettingsServices() {
                     {svc.description && (
                       <p className="text-[11px] text-ih-fg-3 mt-0.5 line-clamp-1">{svc.description}</p>
                     )}
+                    <QualificationWidget
+                      service={svc}
+                      initialUserIds={restrictionMap[svc.id] ?? []}
+                      members={members}
+                    />
                   </td>
                   <td className="py-3 px-4 text-[13px] text-ih-fg-3">&mdash;</td>
                   <td className="py-3 px-4 text-[13px] font-bold text-ih-ok-fg">

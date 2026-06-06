@@ -11,7 +11,8 @@ const STUB_INSPECTOR = {
 };
 
 const HOST = 'app.inspectorhub.io';
-const SIGNATURE_LINK = 'https://app.inspectorhub.io/book/acme/mike';
+// DB-12 / IA-26 — company-level URL; per-inspector slug retired.
+const SIGNATURE_LINK = 'https://app.inspectorhub.io/book/acme';
 
 interface SentCall {
     to: string[];
