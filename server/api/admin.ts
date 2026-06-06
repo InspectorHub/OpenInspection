@@ -1466,7 +1466,7 @@ export const adminRoutes = createApiRouter()
         // Sprint B-4a — append the sender (current admin/inspector) signature so
         // the client can rebook with this user via the embedded booking link.
         const senderId = c.get('user')?.sub;
-        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; slug: string | null } | undefined;
+        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
         if (senderId) {
             try {
                 const row = await drizzle(c.env.DB).select({
@@ -1474,7 +1474,6 @@ export const adminRoutes = createApiRouter()
                     email:         schema.users.email,
                     phone:         schema.users.phone,
                     licenseNumber: schema.users.licenseNumber,
-                    slug:          schema.users.slug,
                 }).from(schema.users)
                     .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
                     .get();
