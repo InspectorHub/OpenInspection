@@ -51,26 +51,43 @@ export const inspectionPrefsRoutes = createApiRouter()
     .openapi(getRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const db = drizzle(c.env.DB as never);
-        const row = await db.select({ prefs: tenantConfigs.inspectionPrefs })
+        const row = await db.select({
+            prefs:               tenantConfigs.inspectionPrefs,
+            requireDefectFields: tenantConfigs.requireDefectFields,
+        })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
-        const merged = withDefaults(row?.prefs ?? null);
+        // requireDefectFields rides this endpoint but lives in its own column
+        // (the publish-readiness service reads it without JSON parsing).
+        const merged = {
+            ...withDefaults(row?.prefs ?? null),
+            requireDefectFields: row?.requireDefectFields ?? 'none',
+        };
         return c.json(merged, 200);
     })
     .openapi(patchRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const patch = c.req.valid('json');
         const db = drizzle(c.env.DB as never);
-        const existing = await db.select({ prefs: tenantConfigs.inspectionPrefs })
+        const existing = await db.select({
+            prefs:               tenantConfigs.inspectionPrefs,
+            requireDefectFields: tenantConfigs.requireDefectFields,
+        })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
-        const merged = { ...withDefaults(existing?.prefs ?? null), ...patch };
+        const merged = {
+            ...withDefaults(existing?.prefs ?? null),
+            requireDefectFields: existing?.requireDefectFields ?? 'none',
+            ...patch,
+        };
         // Re-validate merged in case the patch claimed a valid field but the merged result violates max constraints.
         const parsed = InspectionPrefsSchema.parse(merged);
+        // Split storage: requireDefectFields → its own column; everything else → the JSON blob.
+        const { requireDefectFields, ...jsonPrefs } = parsed;
         await db.update(tenantConfigs)
-            .set({ inspectionPrefs: parsed })
+            .set({ inspectionPrefs: jsonPrefs, requireDefectFields })
             .where(eq(tenantConfigs.tenantId, tenantId));
         return c.json(parsed, 200);
     });

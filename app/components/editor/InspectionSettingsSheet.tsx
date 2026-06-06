@@ -11,6 +11,9 @@ interface SettingsForm {
   price: number;
   paymentRequired: boolean;
   agreementRequired: boolean;
+  /** Track H (IA-7) — per-inspection override of the tenant-wide required
+   *  defect fields; '' = inherit (stored as NULL). */
+  requireDefectFieldsOverride: "" | "none" | "location" | "trade" | "both";
 }
 
 interface Inspector {
@@ -50,6 +53,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     price: 0,
     paymentRequired: false,
     agreementRequired: false,
+    requireDefectFieldsOverride: "",
   });
   // Tracks the templateId that was loaded when the sheet opened, so we can
   // detect whether the user changed it before saving.
@@ -73,18 +77,22 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
       ]);
       if (inspRes.ok) {
         const { data } = (await inspRes.json()) as { data: Record<string, unknown> };
-        const loadedTemplateId = (data.templateId as string) || "";
+        // GET /api/inspections/:id wraps the row: data = { inspection, template }.
+        // Unwrap (with a flat fallback) — reading data.templateId directly never matched.
+        const insp = (data.inspection as Record<string, unknown>) ?? data;
+        const loadedTemplateId = (insp.templateId as string) || "";
         templateIdAtOpen.current = loadedTemplateId;
         setForm({
-          date: (data.date as string) || "",
-          closingDate: (data.closingDate as string) || "",
-          inspectorId: (data.inspectorId as string) || "",
-          orderId: (data.orderId as string) || "",
-          referralSource: (data.referralSource as string) || "",
+          date: (insp.date as string) || "",
+          closingDate: (insp.closingDate as string) || "",
+          inspectorId: (insp.inspectorId as string) || "",
+          orderId: (insp.orderId as string) || "",
+          referralSource: (insp.referralSource as string) || "",
           templateId: loadedTemplateId,
-          price: (data.price as number) || 0,
-          paymentRequired: !!data.paymentRequired,
-          agreementRequired: !!data.agreementRequired,
+          price: (insp.price as number) || 0,
+          paymentRequired: !!insp.paymentRequired,
+          agreementRequired: !!insp.agreementRequired,
+          requireDefectFieldsOverride: (insp.requireDefectFieldsOverride as SettingsForm["requireDefectFieldsOverride"]) || "",
         });
       }
       if (tplRes.ok) {
@@ -136,8 +144,11 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     e.preventDefault();
     setSaveState("saving");
     templateChangedAtSubmit.current = form.templateId !== templateIdAtOpen.current;
+    // '' means "inherit" and must reach the API as an explicit null (clears the
+    // override column) — the BFF sanitizer drops empty strings entirely.
+    const payload = { ...form, requireDefectFieldsOverride: form.requireDefectFieldsOverride === "" ? null : form.requireDefectFieldsOverride };
     saveFetcher.submit(
-      { intent: "save-settings", payload: JSON.stringify(form) },
+      { intent: "save-settings", payload: JSON.stringify(payload) },
       { method: "post" },
     );
   }
@@ -239,6 +250,22 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                     </label>
                   </div>
                 </div>
+                <label className="block">
+                  <span className={labelClass}>Required defect fields at publish</span>
+                  <select
+                    value={form.requireDefectFieldsOverride}
+                    onChange={(e) => updateForm("requireDefectFieldsOverride", e.target.value as SettingsForm["requireDefectFieldsOverride"])}
+                    className={inputClass}
+                    data-testid="inspection-require-defect-fields"
+                  >
+                    <option value="">Inherit (tenant default)</option>
+                    <option value="none">None — warn only</option>
+                    <option value="location">Location required</option>
+                    <option value="trade">Recommended trade required</option>
+                    <option value="both">Location + trade required</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-ih-fg-4">Overrides the workspace default for this inspection only.</p>
+                </label>
               </fieldset>
 
               <div className="flex items-center justify-end gap-3 border-t border-ih-border pt-4">

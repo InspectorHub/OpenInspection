@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useLoaderData } from 'react-router';
+import type { Route } from './+types/settings-inspection';
+import { requireToken } from '~/lib/session.server';
+import { createApi } from '~/lib/api-client.server';
 import { useInspectionPrefs } from '~/hooks/useInspectionPrefs';
 
 export function meta() {
@@ -7,21 +10,23 @@ export function meta() {
 
 interface TagRow { id: string; name: string; color: string }
 
+// Track H (C-12): tag list moved off the raw client `fetch('/api/tags')`
+// (unauthenticated — BFF rule) into the loader with Token-Relay.
+export async function loader({ request, context }: Route.LoaderArgs) {
+    const token = await requireToken(context, request);
+    try {
+        const api = createApi(context, { token });
+        const res = await api.tags.index.$get();
+        const body = res.ok ? ((await res.json()) as { data?: TagRow[] }) : { data: [] };
+        return { tags: body.data ?? [] };
+    } catch {
+        return { tags: [] };
+    }
+}
+
 export default function SettingsInspectionPage() {
     const { prefs, loaded, patch } = useInspectionPrefs();
-    const [tags, setTags] = useState<TagRow[]>([]);
-
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch('/api/tags', { credentials: 'include' });
-                if (res.ok) {
-                    const body = await res.json() as { data?: TagRow[] };
-                    setTags(body.data ?? []);
-                }
-            } catch { /* noop */ }
-        })();
-    }, []);
+    const { tags } = useLoaderData<typeof loader>();
 
     if (!loaded) return <div className="p-6 text-[13px] text-ih-fg-3">Loading...</div>;
 
@@ -82,6 +87,27 @@ export default function SettingsInspectionPage() {
                     <span className="text-[13px] font-mono tabular-nums w-20 text-right">{prefs.autoAdvanceDelayMs} ms</span>
                 </div>
                 <p className="text-[12px] text-ih-fg-3 mt-1">Delay before the editor advances to the next item.</p>
+            </section>
+
+            <section>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Required defect fields at publish</h2>
+                <p className="text-[12px] text-ih-fg-3 mb-2">Fields every defect must have before a report can be published. Inspections can override this per-job in inspection settings.</p>
+                {(['none', 'location', 'trade', 'both'] as const).map(req => (
+                    <label key={req} className="flex items-center gap-2 py-1 cursor-pointer">
+                        <input
+                            type="radio"
+                            checked={prefs.requireDefectFields === req}
+                            onChange={() => patch({ requireDefectFields: req })}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-[13px]">{({
+                            none:     'None — missing fields warn, never block',
+                            location: 'Location required',
+                            trade:    'Recommended trade required',
+                            both:     'Location + trade required',
+                        } as Record<typeof req, string>)[req]}</span>
+                    </label>
+                ))}
             </section>
 
             <section>

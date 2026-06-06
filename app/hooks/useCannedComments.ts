@@ -82,6 +82,26 @@ function buildLibrary(): CommentEntry[] {
 }
 
 /* ------------------------------------------------------------------ */
+/*  BFF channel (Track H / C-12)                                       */
+/* ------------------------------------------------------------------ */
+
+// Every server call rides the BFF resource route (RR loader/action does the
+// token relay) — client code never fetches `/api/...` directly. The promise
+// contracts the editor relies on (`fetchFiltered(...).then(...)`) are kept.
+const LIBRARY_ROUTE = "/resources/comments-library";
+
+function mapRow(r: Record<string, unknown>): CommentEntry {
+  return {
+    id: r.id as string,
+    rating: (r.ratingBucket as string) || "all",
+    section: (r.section as string) || null,
+    category: (r.category as string) || null,
+    text: r.text as string,
+    source: "snippet" as const,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Hook                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -128,71 +148,77 @@ export function useCannedComments(options: {
     }
   }, []);
 
+  const loadServerRows = useCallback(async (params?: URLSearchParams): Promise<Array<Record<string, unknown>>> => {
+    try {
+      const qs = params && params.size > 0 ? `?${params}` : "";
+      const res = await fetch(`${LIBRARY_ROUTE}${qs}`, { credentials: "include" });
+      if (!res.ok) return [];
+      const body = (await res.json()) as { comments?: Array<Record<string, unknown>> };
+      return body.comments ?? [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   const fetchFiltered = useCallback(
     async (ctx: {
       itemLabel?: string;
       section?: string;
       ratingBucket?: string;
+      search?: string;
     }) => {
       const params = new URLSearchParams();
       params.set("sort", sort);
       params.set("filterMode", filterMode);
+      if (ctx.search) params.set("search", ctx.search);
+      // Track H: rating rides regardless of filter mode (the modal's bucket
+      // chips set it explicitly); section/itemLabel stay auto-only context.
+      if (ctx.ratingBucket) params.set("rating", ctx.ratingBucket);
       if (filterMode === "auto") {
         if (ctx.itemLabel) params.set("itemLabel", ctx.itemLabel);
         if (ctx.section) params.set("section", ctx.section);
-        if (ctx.ratingBucket) params.set("rating", ctx.ratingBucket);
       }
-      try {
-        const res = await fetch(`/api/admin/comments?${params}`, {
-          credentials: "include",
-        });
-        if (!res.ok) return [];
-        const body = (await res.json()) as { data?: unknown[] };
-        return body.data ?? [];
-      } catch {
-        return [];
-      }
+      return loadServerRows(params);
     },
-    [sort, filterMode],
+    [sort, filterMode, loadServerRows],
+  );
+
+  /** Track H (IA-5) — search the whole tenant library (incl. imported
+   *  libraries) regardless of filter mode; used by the Defects-tab library
+   *  group and the `/` snippet picker. */
+  const searchLibrary = useCallback(
+    async (query: string): Promise<CommentEntry[]> => {
+      const q = query.trim();
+      if (q.length < 2) return [];
+      const params = new URLSearchParams();
+      params.set("search", q);
+      params.set("filterMode", "all");
+      params.set("sort", "relevance");
+      const rows = await loadServerRows(params);
+      return rows.map(mapRow);
+    },
+    [loadServerRows],
   );
 
   const touchSnippet = useCallback((id: string) => {
     // Fire-and-forget; no UI dependency on the response.
     try {
-      fetch(`/api/admin/comments/${id}/touch`, {
-        method: "POST",
-        credentials: "include",
-      });
+      const form = new FormData();
+      form.set("intent", "touch");
+      form.set("id", id);
+      fetch(LIBRARY_ROUTE, { method: "POST", credentials: "include", body: form });
     } catch {
       /* noop */
     }
   }, []);
 
-  // Load user snippets from server
+  // Load user snippets from server. (Pre-Track-H this unwrapped a
+  // `data.comments` shape the API never returned, so server snippets silently
+  // never loaded — fixed by going through the resource route.)
   useEffect(() => {
     (async () => {
-      try {
-        const res = await fetch("/api/admin/comments", {
-          credentials: "include",
-        });
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          data?: { comments?: Array<Record<string, unknown>> };
-        };
-        const rows = json.data?.comments || [];
-        setUserSnippets(
-          rows.map((r) => ({
-            id: r.id as string,
-            rating: (r.ratingBucket as string) || "all",
-            section: (r.section as string) || null,
-            category: (r.category as string) || null,
-            text: r.text as string,
-            source: "snippet" as const,
-          })),
-        );
-      } catch {
-        /* non-fatal */
-      }
+      const rows = await loadServerRows();
+      if (rows.length > 0) setUserSnippets(rows.map(mapRow));
     })();
   }, [inspectionId]);
 
@@ -303,42 +329,27 @@ export function useCannedComments(options: {
       title?: string,
       itemLabel?: string,
     ) => {
-      const body = {
-        text,
-        ratingBucket: bucket === "all" ? null : bucket,
-        section: section || null,
-        category: title || null,
-        itemLabel: itemLabel || null,
-      };
       try {
-        const res = await fetch("/api/admin/comments", {
+        const form = new FormData();
+        form.set("intent", "save");
+        form.set("text", text);
+        form.set("ratingBucket", bucket);
+        form.set("section", section || "");
+        form.set("category", title || "");
+        form.set("itemLabel", itemLabel || "");
+        const res = await fetch(LIBRARY_ROUTE, {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: form,
         });
         if (res.ok) {
-          // Reload user snippets
-          const reloadRes = await fetch("/api/admin/comments", {
-            credentials: "include",
-          });
-          if (reloadRes.ok) {
-            const json = (await reloadRes.json()) as {
-              data?: { comments?: Array<Record<string, unknown>> };
-            };
-            const rows = json.data?.comments || [];
-            setUserSnippets(
-              rows.map((r) => ({
-                id: r.id as string,
-                rating: (r.ratingBucket as string) || "all",
-                section: (r.section as string) || null,
-                category: (r.category as string) || null,
-                text: r.text as string,
-                source: "snippet" as const,
-              })),
-            );
+          const body = (await res.json()) as { ok?: boolean };
+          if (body.ok) {
+            // Reload user snippets through the same channel.
+            const rows = await loadServerRows();
+            setUserSnippets(rows.map(mapRow));
+            return true;
           }
-          return true;
         }
       } catch {
         /* fallback to local */
@@ -362,7 +373,7 @@ export function useCannedComments(options: {
         return false;
       }
     },
-    [],
+    [loadServerRows],
   );
 
   return {
@@ -376,6 +387,7 @@ export function useCannedComments(options: {
     filterMode,
     setFilterMode,
     fetchFiltered,
+    searchLibrary,
     touchSnippet,
   };
 }

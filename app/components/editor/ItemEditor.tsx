@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { TabStrip } from "@core/shared-ui";
 import { CloneLastButton } from "./CloneLastButton";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
@@ -13,7 +13,7 @@ import {
 } from "../../lib/defect-fields";
 import { findRatingLevel, type EditorRatingLevel } from "../../lib/rating-levels";
 import { findRatingContradictions } from "../../lib/contradiction-lint";
-import { filterCannedEntries, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
+import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
 
 /* C-14a — rating buttons render from the inspection's rating-system levels
  * (full words + always-on semantic colour). The hardcoded SAT/MON/DEF row
@@ -79,6 +79,16 @@ interface ItemTabs {
 
 type CannedTabId = "information" | "limitations" | "defects";
 
+/** Track H — a tenant-library search hit (shape mirrors CommentEntry in
+ *  useCannedComments; kept structural so this component stays hook-free). */
+export interface LibraryMatch {
+ id?: string;
+ text: string;
+ rating: string;
+ category?: string | null;
+ section?: string | null;
+}
+
 const CANNED_TABS: Array<{ id: CannedTabId; label: string }> = [
  { id: "information", label: "Information" },
  { id: "limitations", label: "Limitations" },
@@ -104,6 +114,9 @@ interface ItemEditorProps {
  photoUploading?: boolean;
  /** B-20 — add a field-authored defect into result.customComments.defects. */
  onAddCustomDefect?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
+ /** Track H (B-20 回流) — save the custom defect into the tenant library
+  *  (best-effort; failure must not block the defect itself). */
+ onSaveDefectToLibrary?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
  onToggleCustomDefect?: (customId: string, included: boolean) => void;
  /** FE-3 — open the photo picker targeting a specific defect row. */
  onAddDefectPhoto?: (target: { kind: "canned" | "custom"; id: string }) => void;
@@ -111,12 +124,20 @@ interface ItemEditorProps {
  locationSuggestions?: string[];
  onDefectFields?: (cannedId: string, patch: Partial<DefectFieldsValue>) => void;
  missingFields?: Map<string, { location: boolean; trade: boolean }>;
+ /** Track H (IA-7) — the EFFECTIVE tenant/inspection policy: which defect
+  *  fields are required at publish. Drives the proactive red asterisk on
+  *  every defect row (missingFields still unions in post-gate flags). */
+ requiredDefectFields?: { location: boolean; trade: boolean };
  onItemAttribute?: (itemId: string, attributeId: string, value: string | number | boolean | null) => void;
  onCloneLast?: (scope: 'rating' | 'rating_notes' | 'all') => void;
  cloneDefaultScope?: 'rating' | 'rating_notes' | 'all';
  tagChipRow?: React.ReactNode;
  /** B-19b — called when "/" is typed at a line/word start in the notes field. */
  onOpenSnippets?: () => void;
+ /** Track H (IA-5/迁移③) — searches the whole tenant comment library
+  *  (incl. imported libraries); powers the "From your library" group under
+  *  the Defects-tab search. */
+ onSearchLibrary?: (query: string) => Promise<LibraryMatch[]>;
  /**
   * Task 4 — local blob previews for photos queued while offline.
   * Rendered in the photo strip after confirmed server photos.
@@ -146,11 +167,14 @@ export function ItemEditor({
  locationSuggestions,
  onDefectFields,
  missingFields,
+ requiredDefectFields,
  onItemAttribute,
  onCloneLast,
  cloneDefaultScope,
  tagChipRow,
  onOpenSnippets,
+ onSearchLibrary,
+ onSaveDefectToLibrary,
  queuedPreviews,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
@@ -159,6 +183,30 @@ export function ItemEditor({
  const [customTitle, setCustomTitle] = useState("");
  const [customComment, setCustomComment] = useState("");
  const [customCategory, setCustomCategory] = useState<CustomDefectCategory>("recommendation");
+ const [saveToLibrary, setSaveToLibrary] = useState(false);
+
+ // Track H (IA-5/迁移③) — debounced whole-library search behind the Defects
+ // tab search box. Defect-bucket hits sort first; imported-library rows
+ // participate (that's the migration selling point — years of accumulated
+ // language come along).
+ const [libraryMatches, setLibraryMatches] = useState<LibraryMatch[]>([]);
+ useEffect(() => {
+ const q = defectQuery.trim();
+ if (activeTab !== "defects" || q.length < 2 || !onSearchLibrary) {
+ setLibraryMatches([]);
+ return;
+ }
+ let cancelled = false;
+ const t = setTimeout(() => {
+ onSearchLibrary(q).then((rows) => {
+ if (cancelled) return;
+ const ranked = [...rows].sort((a, b) =>
+ (a.rating === "defect" ? 0 : 1) - (b.rating === "defect" ? 0 : 1));
+ setLibraryMatches(ranked.slice(0, 6));
+ }).catch(() => { /* search is best-effort */ });
+ }, 250);
+ return () => { cancelled = true; clearTimeout(t); };
+ }, [defectQuery, activeTab, onSearchLibrary]);
 
  if (!item) return null;
 
@@ -252,9 +300,16 @@ export function ItemEditor({
  const title = customTitle.trim();
  if (!title || !onAddCustomDefect) return;
  onAddCustomDefect({ title, comment: customComment.trim(), category: customCategory });
+ // Track H (B-20 回流) — optionally flow the field-authored defect back into
+ // the tenant library so the next inspection finds it in search. Best-effort:
+ // library save failure must never block the defect itself (parent toasts).
+ if (saveToLibrary && onSaveDefectToLibrary) {
+ onSaveDefectToLibrary({ title, comment: customComment.trim(), category: customCategory });
+ }
  setCustomTitle("");
  setCustomComment("");
  setCustomCategory("recommendation");
+ setSaveToLibrary(false);
  setCustomFormOpen(false);
  };
 
@@ -303,7 +358,9 @@ export function ItemEditor({
  {/* Rating buttons — driven by the rating system's levels (C-14a):
  full words on ≥sm, abbreviation on narrow, always-on semantic colour. */}
  {item.type === "rich" && (
- <div data-shortcut-scope className="flex gap-2">
+ // FE-4 — gap-3 (12px) between rating buttons: adjacent mis-taps were the
+ // top field complaint; buttons themselves are already 52px tall.
+ <div data-shortcut-scope className="flex gap-3">
  {levels.map((r, idx) => {
  const sev = SEVERITY_STYLES[r.severity ?? "minor"] ?? SEVERITY_STYLES.minor;
  const isActive = activeLevel?.id === r.id;
@@ -424,7 +481,7 @@ export function ItemEditor({
  return (
  <label
  key={entry.id}
- className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors ${
+ className={`flex items-start gap-2.5 p-2.5 min-h-11 rounded-lg cursor-pointer transition-colors ${
  isIncluded
  ? "bg-ih-primary-tint ring-1 ring-ih-primary/30"
  : "bg-ih-bg-app/50 hover:bg-ih-bg-muted"
@@ -491,8 +548,8 @@ export function ItemEditor({
  value={st!}
  locationSuggestions={locationSuggestions ?? []}
  onChange={onDefectFields ?? (() => {})}
- locationRequired={missingFields?.get(entry.id)?.location}
- tradeRequired={missingFields?.get(entry.id)?.trade}
+ locationRequired={(requiredDefectFields?.location ?? false) || missingFields?.get(entry.id)?.location}
+ tradeRequired={(requiredDefectFields?.trade ?? false) || missingFields?.get(entry.id)?.trade}
  />
  {/* FE-3 — photo pinned to THIS defect, not the item */}
  {defectPhotoChip({ kind: "canned", id: entry.id }, cannedDefectPhotoCount(entry.id))}
@@ -507,13 +564,46 @@ export function ItemEditor({
  })
  )}
 
+ {/* Track H (IA-5/迁移③) — whole-library hits under the same search box.
+     Tapping one SEEDS the custom-defect form (title from the first
+     sentence, narrative = full text) so the inspector can edit before
+     committing — a library comment is language, not a finished defect. */}
+ {activeTab === "defects" && libraryMatches.length > 0 && (
+ <div className="pt-1">
+ <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-ih-fg-4 px-1 pb-1">
+ From your library
+ </div>
+ <div className="space-y-1.5">
+ {libraryMatches.map((m, i) => (
+ <button
+ key={m.id ?? `lib-${i}`}
+ type="button"
+ onClick={() => {
+ setCustomTitle(deriveDefectTitle(m.text));
+ setCustomComment(m.text);
+ setCustomCategory("recommendation");
+ setCustomFormOpen(true);
+ }}
+ className="w-full text-left p-2.5 rounded-lg bg-ih-bg-app/50 hover:bg-ih-bg-muted border border-dashed border-ih-border transition-colors"
+ >
+ <p className="text-[12px] leading-relaxed text-ih-fg-2 line-clamp-2">{m.text}</p>
+ <span className="text-[10px] text-ih-fg-4">
+ {m.rating !== "all" ? m.rating : "any rating"}
+ {m.section ? ` · ${m.section}` : ""} · tap to use as custom defect
+ </span>
+ </button>
+ ))}
+ </div>
+ </div>
+ )}
+
  {/* B-20 — field-authored custom defects + inline add form */}
  {activeTab === "defects" && (
  <>
  {customDefects.map((cd) => (
  <label
  key={cd.id}
- className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-colors ${
+ className={`flex items-start gap-2.5 p-2.5 min-h-11 rounded-lg cursor-pointer transition-colors ${
  cd.included !== false
  ? "bg-ih-primary-tint ring-1 ring-ih-primary/30"
  : "bg-ih-bg-app/50 hover:bg-ih-bg-muted"
@@ -580,6 +670,18 @@ export function ItemEditor({
  <option value="recommendation">Recommendation</option>
  <option value="maintenance">Maintenance</option>
  </select>
+ {/* Track H (B-20 回流) — default OFF so one-off findings don't pollute the library */}
+ {onSaveDefectToLibrary && (
+ <label className="flex items-center gap-1.5 text-[11px] text-ih-fg-3 cursor-pointer select-none">
+ <input
+ type="checkbox"
+ checked={saveToLibrary}
+ onChange={(e) => setSaveToLibrary(e.target.checked)}
+ className="w-3.5 h-3.5 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
+ />
+ Save to my library
+ </label>
+ )}
  <span className="flex-1" />
  <button
  type="button"

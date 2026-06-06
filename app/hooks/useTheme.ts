@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouteLoaderData } from "react-router";
-import { writeColorSchemeCookie, type UiPrefs } from "~/lib/ui-prefs";
+import { writeColorSchemeCookie, type ColorScheme, type UiPrefs } from "~/lib/ui-prefs";
 
-type ColorScheme = "light" | "dark" | "auto";
-
-function resolveScheme(scheme: ColorScheme): "light" | "dark" {
+function resolveScheme(scheme: ColorScheme): "light" | "dark" | "field" {
   if (scheme !== "auto") return scheme;
   if (typeof window === "undefined") return "light";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -14,7 +12,8 @@ function applyScheme(scheme: ColorScheme) {
   const resolved = resolveScheme(scheme);
   const root = document.documentElement;
   root.setAttribute("data-color-scheme", resolved);
-  if (resolved === "dark") {
+  // 'field' is dark-based — keep the .dark class so Tailwind dark: variants apply.
+  if (resolved === "dark" || resolved === "field") {
     root.classList.add("dark");
   } else {
     root.classList.remove("dark");

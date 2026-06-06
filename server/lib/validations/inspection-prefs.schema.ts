@@ -15,6 +15,11 @@ export const InspectionPrefsSchema = z.object({
     autoAdvance:        z.enum(['always', 'keyboard', 'off']).default('keyboard'),
     autoAdvanceDelayMs: z.number().int().min(0).max(2000),
     pinnedTagIds:       z.array(z.string().min(1)).max(5),
+    /** Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
+     *  Rides this prefs endpoint but is STORED in its own
+     *  `tenant_configs.require_defect_fields` column (the readiness service
+     *  reads it directly). Default LOOSE — gaps warn, not block. */
+    requireDefectFields: z.enum(['none', 'location', 'trade', 'both']).default('none'),
 }).openapi('InspectionPrefs');
 
 export type InspectionPrefs = z.infer<typeof InspectionPrefsSchema>;
@@ -28,6 +33,7 @@ export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     autoAdvance:        'keyboard',
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
+    requireDefectFields: 'none',
 };
 
 /** Merge a possibly-partial DB row with the defaults. */

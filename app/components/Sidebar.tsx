@@ -72,7 +72,7 @@ function ThemeSegmentControl() {
   const { scheme, setColorScheme } = useTheme();
   return (
     <div className="flex gap-1 p-1 bg-ih-bg-muted rounded-[6px]">
-      {(["auto", "light", "dark"] as const).map((mode) => (
+      {(["auto", "light", "dark", "field"] as const).map((mode) => (
         <button
           key={mode}
           type="button"
@@ -83,8 +83,9 @@ function ThemeSegmentControl() {
               : "text-ih-fg-3 hover:text-ih-fg-1"
           }`}
           aria-pressed={scheme === mode}
+          title={mode === "field" ? "High-contrast large type for outdoor use" : undefined}
         >
-          {mode === "auto" ? "Auto" : mode === "light" ? "Light" : "Dark"}
+          {mode === "auto" ? "Auto" : mode === "light" ? "Light" : mode === "dark" ? "Dark" : "Field"}
         </button>
       ))}
     </div>
@@ -306,9 +307,9 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
           <div className="px-1 py-0.5">
             <div className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-wide mb-1.5 px-1">Theme</div>
             <div className="flex gap-1">
-              {(["auto", "light", "dark"] as const).map((mode) => (
+              {(["auto", "light", "dark", "field"] as const).map((mode) => (
                 <button key={mode} onClick={() => setColorScheme(mode)} className={`flex-1 py-1.5 rounded-[6px] text-[11px] font-bold transition-colors ${scheme === mode ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3 hover:bg-ih-bg-muted"}`}>
-                  {mode === "auto" ? "Auto" : mode === "dark" ? "Dark" : "Light"}
+                  {mode === "auto" ? "Auto" : mode === "dark" ? "Dark" : mode === "field" ? "Field" : "Light"}
                 </button>
               ))}
             </div>
