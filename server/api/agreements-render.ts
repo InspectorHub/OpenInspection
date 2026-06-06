@@ -3,7 +3,7 @@ import { HonoConfig } from '../types/hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
-import QRCode from 'qrcode';
+import { qrToSvg } from '../lib/qr';
 
 const HTML_HEAD = `<!doctype html><html><head><meta charset="utf-8">
 <style>
@@ -77,7 +77,7 @@ export async function agreementRenderHandler(
   if (reqRow.verificationToken && baseUrl) {
       const verifyUrl = `${baseUrl}/v/${reqRow.verificationToken}`;
       try {
-          const qrSvg = await QRCode.toString(verifyUrl, { type: 'svg', margin: 1, width: 120 });
+          const qrSvg = qrToSvg(verifyUrl, { margin: 1, width: 120 });
           qrHtml = `<div style="margin-top:32px;display:flex;align-items:center;gap:16px">` +
               qrSvg +
               `<div style="font-size:11px;color:#475569">Verify this document at<br><code>${escapeHtml(verifyUrl)}</code></div>` +
@@ -142,7 +142,7 @@ export async function certRenderHandler(
   if (reqRow.verificationToken && baseUrl) {
       const verifyUrl = `${baseUrl}/v/${reqRow.verificationToken}`;
       try {
-          const qrSvg = await QRCode.toString(verifyUrl, { type: 'svg', margin: 1, width: 120 });
+          const qrSvg = qrToSvg(verifyUrl, { margin: 1, width: 120 });
           qrHtml = `<div style="margin-top:32px;display:flex;align-items:center;gap:16px">` +
               qrSvg +
               `<div style="font-size:11px;color:#475569">Verify this document at<br><code>${escapeHtml(verifyUrl)}</code></div>` +
