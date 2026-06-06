@@ -32,10 +32,17 @@ async function seedSchema(): Promise<void> {
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);',
     );
+    // PortalProvider.handleTenantUpdate reads/initializes tenant_configs when a
+    // command carries `name` (IA-27 siteName init). Test DDL keeps every column
+    // SELECTed by drizzle present but unconstrained — the apply path only ever
+    // writes (tenant_id, site_name, updated_at) here.
+    await b.DB.exec(
+        'CREATE TABLE IF NOT EXISTS tenant_configs (tenant_id TEXT PRIMARY KEY, site_name TEXT, primary_color TEXT, logo_url TEXT, support_email TEXT, sender_email TEXT, reply_to TEXT, email_mode TEXT, sender_display_name TEXT, use_inspector_from_name INTEGER, billing_url TEXT, integration_config TEXT, secrets TEXT, encrypted_secrets TEXT, ics_token TEXT, widget_allowed_origins TEXT, report_theme TEXT, attention_thresholds TEXT, inspection_prefs TEXT, show_estimates INTEGER, enable_repair_list INTEGER, enable_customer_repair_export INTEGER, block_unpaid INTEGER, block_unsigned_agreement INTEGER, custom_referral_sources TEXT, dashboard_column_prefs TEXT, concierge_review_required INTEGER, enable_pdf_pipeline INTEGER, auto_sign_on_publish_default INTEGER, team_mode_default TEXT, apprentice_review_required INTEGER, guest_invites_enabled INTEGER, updated_at INTEGER);',
+    );
 }
 
 async function clearTables(): Promise<void> {
-    for (const t of ['processed_cmd_events', 'parked_cmd_events', 'users', 'tenants']) {
+    for (const t of ['processed_cmd_events', 'parked_cmd_events', 'users', 'tenant_configs', 'tenants']) {
         await b.DB.exec(`DELETE FROM ${t};`);
     }
 }
