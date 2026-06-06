@@ -114,6 +114,9 @@ interface ItemEditorProps {
  photoUploading?: boolean;
  /** B-20 — add a field-authored defect into result.customComments.defects. */
  onAddCustomDefect?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
+ /** Track H (B-20 回流) — save the custom defect into the tenant library
+  *  (best-effort; failure must not block the defect itself). */
+ onSaveDefectToLibrary?: (input: { title: string; comment: string; category: CustomDefectCategory }) => void;
  onToggleCustomDefect?: (customId: string, included: boolean) => void;
  /** FE-3 — open the photo picker targeting a specific defect row. */
  onAddDefectPhoto?: (target: { kind: "canned" | "custom"; id: string }) => void;
@@ -166,6 +169,7 @@ export function ItemEditor({
  tagChipRow,
  onOpenSnippets,
  onSearchLibrary,
+ onSaveDefectToLibrary,
  queuedPreviews,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
@@ -174,6 +178,7 @@ export function ItemEditor({
  const [customTitle, setCustomTitle] = useState("");
  const [customComment, setCustomComment] = useState("");
  const [customCategory, setCustomCategory] = useState<CustomDefectCategory>("recommendation");
+ const [saveToLibrary, setSaveToLibrary] = useState(false);
 
  // Track H (IA-5/迁移③) — debounced whole-library search behind the Defects
  // tab search box. Defect-bucket hits sort first; imported-library rows
@@ -290,9 +295,16 @@ export function ItemEditor({
  const title = customTitle.trim();
  if (!title || !onAddCustomDefect) return;
  onAddCustomDefect({ title, comment: customComment.trim(), category: customCategory });
+ // Track H (B-20 回流) — optionally flow the field-authored defect back into
+ // the tenant library so the next inspection finds it in search. Best-effort:
+ // library save failure must never block the defect itself (parent toasts).
+ if (saveToLibrary && onSaveDefectToLibrary) {
+ onSaveDefectToLibrary({ title, comment: customComment.trim(), category: customCategory });
+ }
  setCustomTitle("");
  setCustomComment("");
  setCustomCategory("recommendation");
+ setSaveToLibrary(false);
  setCustomFormOpen(false);
  };
 
@@ -651,6 +663,18 @@ export function ItemEditor({
  <option value="recommendation">Recommendation</option>
  <option value="maintenance">Maintenance</option>
  </select>
+ {/* Track H (B-20 回流) — default OFF so one-off findings don't pollute the library */}
+ {onSaveDefectToLibrary && (
+ <label className="flex items-center gap-1.5 text-[11px] text-ih-fg-3 cursor-pointer select-none">
+ <input
+ type="checkbox"
+ checked={saveToLibrary}
+ onChange={(e) => setSaveToLibrary(e.target.checked)}
+ className="w-3.5 h-3.5 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
+ />
+ Save to my library
+ </label>
+ )}
  <span className="flex-1" />
  <button
  type="button"

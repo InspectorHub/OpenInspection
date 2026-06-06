@@ -1466,6 +1466,20 @@ export default function InspectionEditPage() {
  tagChipRow={tagChipRow}
  onOpenSnippets={openSnippets}
  onSearchLibrary={comments.searchLibrary}
+ onSaveDefectToLibrary={(input) => {
+ // Track H (B-20 回流): best-effort — the defect itself already landed in
+ // result.customComments; a failed library save only costs reuse next time.
+ const text = input.comment ? `${input.title} — ${input.comment}` : input.title;
+ comments.saveSnippet(
+ text,
+ "defect",
+ state.currentSection?.title || "",
+ undefined,
+ (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
+ ).then((ok) => {
+ if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", durationMs: 6000 });
+ });
+ }}
  queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}
  />
  ) : (
