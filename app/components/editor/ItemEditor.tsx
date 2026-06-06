@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { TabStrip } from "@core/shared-ui";
 import { CloneLastButton } from "./CloneLastButton";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
@@ -13,7 +13,7 @@ import {
 } from "../../lib/defect-fields";
 import { findRatingLevel, type EditorRatingLevel } from "../../lib/rating-levels";
 import { findRatingContradictions } from "../../lib/contradiction-lint";
-import { filterCannedEntries, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
+import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
 
 /* C-14a — rating buttons render from the inspection's rating-system levels
  * (full words + always-on semantic colour). The hardcoded SAT/MON/DEF row
@@ -79,6 +79,16 @@ interface ItemTabs {
 
 type CannedTabId = "information" | "limitations" | "defects";
 
+/** Track H — a tenant-library search hit (shape mirrors CommentEntry in
+ *  useCannedComments; kept structural so this component stays hook-free). */
+export interface LibraryMatch {
+ id?: string;
+ text: string;
+ rating: string;
+ category?: string | null;
+ section?: string | null;
+}
+
 const CANNED_TABS: Array<{ id: CannedTabId; label: string }> = [
  { id: "information", label: "Information" },
  { id: "limitations", label: "Limitations" },
@@ -117,6 +127,10 @@ interface ItemEditorProps {
  tagChipRow?: React.ReactNode;
  /** B-19b — called when "/" is typed at a line/word start in the notes field. */
  onOpenSnippets?: () => void;
+ /** Track H (IA-5/迁移③) — searches the whole tenant comment library
+  *  (incl. imported libraries); powers the "From your library" group under
+  *  the Defects-tab search. */
+ onSearchLibrary?: (query: string) => Promise<LibraryMatch[]>;
  /**
   * Task 4 — local blob previews for photos queued while offline.
   * Rendered in the photo strip after confirmed server photos.
@@ -151,6 +165,7 @@ export function ItemEditor({
  cloneDefaultScope,
  tagChipRow,
  onOpenSnippets,
+ onSearchLibrary,
  queuedPreviews,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
@@ -159,6 +174,29 @@ export function ItemEditor({
  const [customTitle, setCustomTitle] = useState("");
  const [customComment, setCustomComment] = useState("");
  const [customCategory, setCustomCategory] = useState<CustomDefectCategory>("recommendation");
+
+ // Track H (IA-5/迁移③) — debounced whole-library search behind the Defects
+ // tab search box. Defect-bucket hits sort first; imported-library rows
+ // participate (that's the migration selling point — years of accumulated
+ // language come along).
+ const [libraryMatches, setLibraryMatches] = useState<LibraryMatch[]>([]);
+ useEffect(() => {
+ const q = defectQuery.trim();
+ if (activeTab !== "defects" || q.length < 2 || !onSearchLibrary) {
+ setLibraryMatches([]);
+ return;
+ }
+ let cancelled = false;
+ const t = setTimeout(() => {
+ onSearchLibrary(q).then((rows) => {
+ if (cancelled) return;
+ const ranked = [...rows].sort((a, b) =>
+ (a.rating === "defect" ? 0 : 1) - (b.rating === "defect" ? 0 : 1));
+ setLibraryMatches(ranked.slice(0, 6));
+ }).catch(() => { /* search is best-effort */ });
+ }, 250);
+ return () => { cancelled = true; clearTimeout(t); };
+ }, [defectQuery, activeTab, onSearchLibrary]);
 
  if (!item) return null;
 
@@ -505,6 +543,39 @@ export function ItemEditor({
  </label>
  );
  })
+ )}
+
+ {/* Track H (IA-5/迁移③) — whole-library hits under the same search box.
+     Tapping one SEEDS the custom-defect form (title from the first
+     sentence, narrative = full text) so the inspector can edit before
+     committing — a library comment is language, not a finished defect. */}
+ {activeTab === "defects" && libraryMatches.length > 0 && (
+ <div className="pt-1">
+ <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-ih-fg-4 px-1 pb-1">
+ From your library
+ </div>
+ <div className="space-y-1.5">
+ {libraryMatches.map((m, i) => (
+ <button
+ key={m.id ?? `lib-${i}`}
+ type="button"
+ onClick={() => {
+ setCustomTitle(deriveDefectTitle(m.text));
+ setCustomComment(m.text);
+ setCustomCategory("recommendation");
+ setCustomFormOpen(true);
+ }}
+ className="w-full text-left p-2.5 rounded-lg bg-ih-bg-app/50 hover:bg-ih-bg-muted border border-dashed border-ih-border transition-colors"
+ >
+ <p className="text-[12px] leading-relaxed text-ih-fg-2 line-clamp-2">{m.text}</p>
+ <span className="text-[10px] text-ih-fg-4">
+ {m.rating !== "all" ? m.rating : "any rating"}
+ {m.section ? ` · ${m.section}` : ""} · tap to use as custom defect
+ </span>
+ </button>
+ ))}
+ </div>
+ </div>
  )}
 
  {/* B-20 — field-authored custom defects + inline add form */}

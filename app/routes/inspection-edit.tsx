@@ -1450,6 +1450,7 @@ export default function InspectionEditPage() {
  cloneDefaultScope={inspectionPrefs.cloneDefault}
  tagChipRow={tagChipRow}
  onOpenSnippets={openSnippets}
+ onSearchLibrary={comments.searchLibrary}
  queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}
  />
  ) : (

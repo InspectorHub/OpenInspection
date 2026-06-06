@@ -36,6 +36,15 @@ export function filterCannedEntries<T extends CannedEntryLike>(
   );
 }
 
+/** Track H (IA-5) — first sentence (or first ~60 chars) of a library comment;
+ *  used as the custom-defect title when a library search hit seeds the form. */
+export function deriveDefectTitle(text: string): string {
+  const firstSentence = text.split(/(?<=[.!?])\s/)[0] ?? text;
+  return firstSentence.length > 60
+    ? `${firstSentence.slice(0, 57).trimEnd()}…`
+    : firstSentence;
+}
+
 export function makeCustomDefect(
   input: {
     title: string;
