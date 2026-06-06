@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useFetcher } from "react-router";
 
 interface Identity {
   id: string;
@@ -7,38 +8,38 @@ interface Identity {
   linkedRole: string;
 }
 
+interface LoaderData { identities: Identity[] }
+interface ActionData { ok: boolean; redirectUrl: string | null }
+
 export function IdentitySwitcher() {
-  const [identities, setIdentities] = useState<Identity[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const loader = useFetcher<LoaderData>();
+  const switcher = useFetcher<ActionData>();
 
   useEffect(() => {
-    fetch("/api/identities", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setIdentities((d as { data?: Identity[] }).data ?? []))
-      .catch(() => {});
-  }, []);
+    if (loader.state === "idle" && !loader.data) {
+      loader.load("/resources/identities");
+    }
+  }, [loader]);
 
+  useEffect(() => {
+    if (switcher.state === "idle" && switcher.data?.ok && switcher.data.redirectUrl) {
+      window.location.href = switcher.data.redirectUrl;
+    }
+  }, [switcher.state, switcher.data]);
+
+  const identities = loader.data?.identities ?? [];
   if (!identities.length) return null;
 
-  async function switchTo(linkedUserId: string) {
-    setSubmitting(true);
-    setError("");
-    try {
-      const res = await fetch("/api/identities/switch", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linkedUserId }),
-      });
-      if (!res.ok) throw new Error("Switch failed");
-      const data = (await res.json()) as { redirect?: string };
-      window.location.href = data.redirect ?? "/dashboard";
-    } catch {
-      setError("Could not switch identity");
-      setSubmitting(false);
-    }
+  function switchTo(linkedUserId: string) {
+    const form = new FormData();
+    form.append("linkedUserId", linkedUserId);
+    switcher.submit(form, { method: "POST", action: "/resources/identities" });
   }
+
+  const submitting = switcher.state !== "idle";
+  const error = switcher.state === "idle" && switcher.data && !switcher.data.ok
+    ? "Could not switch identity"
+    : "";
 
   return (
     <div className="border-t border-ih-border pt-2 mt-2">

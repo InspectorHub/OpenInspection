@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useFetcher } from "react-router";
 import { useSessionContext } from "~/hooks/useSessionContext";
 
 /* ------------------------------------------------------------------ */
@@ -130,10 +130,9 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
-  const [recentInspections, setRecentInspections] = useState<PaletteItem[]>([]);
-  const [loadedRecents, setLoadedRecents] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const recentsFetcher = useFetcher<{ inspections: Array<Record<string, unknown>> }>();
   const sessionCtx = useSessionContext();
 
   // F6 — Build booking link action dynamically from session context
@@ -173,36 +172,15 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Focus input when opened
+  // Focus input when opened; lazy-load recent inspections via BFF resource route
   useEffect(() => {
     if (open) {
       inputRef.current?.focus();
-      // Lazy load recent inspections
-      if (!loadedRecents) {
-        fetch("/api/inspections?pageSize=10", { credentials: "include" })
-          .then((r) => r.ok ? r.json() : null)
-          .then((j) => {
-            if (!j) return;
-            const list = ((j as Record<string, unknown>)?.data as Array<Record<string, unknown>>) || [];
-            setRecentInspections(
-              list.slice(0, 10).map((insp, i) => {
-                const addr = [insp.address1, insp.city, insp.state].filter(Boolean).join(", ") || `Inspection #${String(insp.id || "").slice(0, 6)}`;
-                return {
-                  id: `ri-${i}`,
-                  label: addr as string,
-                  group: "Recent Inspections",
-                  icon: "clip",
-                  hint: (insp.status as string) || "",
-                  to: `/inspections/${insp.id}/edit`,
-                };
-              }),
-            );
-            setLoadedRecents(true);
-          })
-          .catch(() => { /* silent */ });
+      if (recentsFetcher.state === "idle" && !recentsFetcher.data) {
+        recentsFetcher.load("/resources/recent-inspections");
       }
     }
-  }, [open, loadedRecents]);
+  }, [open, recentsFetcher]);
 
   // Build all actions
   const allItems = useMemo(() => {
@@ -218,7 +196,18 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     } else if (isPeople) {
       sources = []; // contacts would need a search endpoint
     } else {
-      sources = [...PAGES, ...recentInspections, ...SETTINGS, ...dynamicQuickActions];
+      const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).map((insp, i) => {
+        const addr = [insp.address1, insp.city, insp.state].filter(Boolean).join(", ") || `Inspection #${String(insp.id || "").slice(0, 6)}`;
+        return {
+          id: `ri-${i}`,
+          label: addr as string,
+          group: "Recent Inspections",
+          icon: "clip",
+          hint: (insp.status as string) || "",
+          to: `/inspections/${insp.id}/edit`,
+        };
+      });
+      sources = [...PAGES, ...recents, ...SETTINGS, ...dynamicQuickActions];
     }
 
     if (!q) return sources;
@@ -227,7 +216,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.item);
-  }, [query, recentInspections]);
+  }, [query, recentsFetcher.data]);
 
   // Group the filtered results
   const groups = useMemo(() => {
