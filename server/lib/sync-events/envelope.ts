@@ -18,13 +18,17 @@
 
 import { z } from 'zod';
 
-/** The three user-lifecycle event types the seam carries. Mirrors
+/** The event types the seam carries. The three user-lifecycle events mirror
  *  `UserSyncEventType` in lib/integration/user-sync (kept independent so this
- *  contract module has no dependency on the outbox service surface). */
+ *  contract module has no dependency on the outbox service surface).
+ *  `reply.tenant.updated` (A-21 batch 2) is the command-reply channel: core's
+ *  answer to a portal->core `cmd.tenant.update` that asked for a reply — it
+ *  rides this same sync queue (no new queue; one consumer per queue). */
 export type SyncEventType =
     | 'user.invited'
     | 'user.password_changed'
-    | 'user.deleted';
+    | 'user.deleted'
+    | 'reply.tenant.updated';
 
 /** CloudEvents 1.0 envelope (subset profile used by this seam). */
 export interface SyncEnvelope {
@@ -65,9 +69,22 @@ export const userDeletedDataSchema = z.object({
     email: z.string(),
 });
 
+/** A-21 batch 2 — reply to a portal->core command. `correlationId` is the cmd
+ *  envelope id; `replyto` is the producer's routing key
+ *  (`wf:onboarding:<instanceId>`) the portal consumer uses to wake the
+ *  waiting Workflow instance. `result` is the consumer's terminal verdict —
+ *  duplicates re-emit a reply so a lost reply self-heals on command retry. */
+export const replyTenantUpdatedDataSchema = z.object({
+    tenantId: z.string(),
+    correlationId: z.string(),
+    replyto: z.string(),
+    result: z.enum(['applied', 'duplicate', 'stale', 'stale-credential-applied']),
+});
+
 export type UserInvitedData = z.infer<typeof userInvitedDataSchema>;
 export type UserPasswordChangedData = z.infer<typeof userPasswordChangedDataSchema>;
 export type UserDeletedData = z.infer<typeof userDeletedDataSchema>;
+export type ReplyTenantUpdatedData = z.infer<typeof replyTenantUpdatedDataSchema>;
 
 /** Registry mapping each event type to its supported dataschema versions.
  *  Portal's `isKnown(type, dataschema)` consults the equivalent registry; a
@@ -76,6 +93,7 @@ export const SCHEMAS: Record<SyncEventType, readonly string[]> = {
     'user.invited': ['v1'],
     'user.password_changed': ['v1'],
     'user.deleted': ['v1'],
+    'reply.tenant.updated': ['v1'],
 };
 
 /** Zod validator per event type, for tests and producer-side assertions. */
@@ -83,6 +101,7 @@ export const DATA_SCHEMAS: Record<SyncEventType, z.ZodTypeAny> = {
     'user.invited': userInvitedDataSchema,
     'user.password_changed': userPasswordChangedDataSchema,
     'user.deleted': userDeletedDataSchema,
+    'reply.tenant.updated': replyTenantUpdatedDataSchema,
 };
 
 /** `user.invited` -> `user-invited`, `user.password_changed` ->
