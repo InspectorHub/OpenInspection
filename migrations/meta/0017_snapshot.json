@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4a5f9cef-d693-4db6-af89-db9908231e8d",
-  "prevId": "26cb83e5-c6c3-46a0-a249-012891dca0c8",
+  "id": "709d8410-0e7c-47c5-910a-6fe656b465e9",
+  "prevId": "ba914a5e-3304-4984-9199-e8e15b319389",
   "tables": {
     "agreement_requests": {
       "name": "agreement_requests",
@@ -7084,6 +7084,14 @@
         },
         "applied_cmd_seq": {
           "name": "applied_cmd_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "applied_cred_seq": {
+          "name": "applied_cred_seq",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
