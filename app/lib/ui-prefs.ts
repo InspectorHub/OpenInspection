@@ -9,7 +9,10 @@
  * with every request, so server and client agree on the first render.
  */
 
-export type ColorScheme = "light" | "dark" | "auto";
+/** Track H (迁移⑤) — 'field' is a high-contrast, large-type variant of dark
+ *  for outdoor/sunlight use (18px base font + stronger contrast). A first-class
+ *  scheme the user picks explicitly: "auto" never resolves to it. */
+export type ColorScheme = "light" | "dark" | "auto" | "field";
 
 export interface UiPrefs {
   colorScheme: ColorScheme;
@@ -36,7 +39,9 @@ export function parseUiPrefs(cookieHeader: string | null): UiPrefs {
   const header = cookieHeader ?? "";
   const rawScheme = readCookie(header, COLOR_SCHEME_COOKIE);
   const colorScheme: ColorScheme =
-    rawScheme === "light" || rawScheme === "dark" || rawScheme === "auto" ? rawScheme : "auto";
+    rawScheme === "light" || rawScheme === "dark" || rawScheme === "auto" || rawScheme === "field"
+      ? rawScheme
+      : "auto";
   return {
     colorScheme,
     sidebarCollapsed: readCookie(header, SIDEBAR_COOKIE) === "1",
@@ -49,8 +54,8 @@ export function parseUiPrefs(cookieHeader: string | null): UiPrefs {
  * "light"; the inline boot script corrects it before first paint (the attribute
  * change is covered by `suppressHydrationWarning` on <html>).
  */
-export function resolveSchemeForSSR(scheme: ColorScheme): "light" | "dark" {
-  return scheme === "dark" ? "dark" : "light";
+export function resolveSchemeForSSR(scheme: ColorScheme): "light" | "dark" | "field" {
+  return scheme === "dark" || scheme === "field" ? scheme : "light";
 }
 
 /** Persist the color scheme client-side so the next SSR render is correct. */
