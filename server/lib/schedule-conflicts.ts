@@ -9,6 +9,9 @@ import { sameDayHour } from './calendar-conflict';
  * Counts both lead and helper assignments via the inspection_inspectors
  * link table. Callers render a warning; scheduling is never blocked.
  *
+ * Collision model: same UTC hour BUCKET (per sameDayHour, S3-9), not a
+ * duration overlap: 09:01↔09:59 collide; 09:59↔10:01 do not.
+ *
  * @param db         Drizzle D1 database instance (or compatible).
  * @param tenantId   Tenant scope for the query.
  * @param inspectorId  The user id to check for conflicts.
@@ -35,6 +38,9 @@ export async function findScheduleConflicts(
             eq(inspectionInspectors.tenantId, tenantId),
             eq(inspectionInspectors.userId, inspectorId),
             sql`date(${inspections.date}) = ${dayPart}`,
+            // Deliberate: only 'cancelled' is excluded. Terminal statuses such as
+            // 'completed' still surface — an advisory warning for a completed same-slot
+            // inspection is acceptable; better to over-warn than silently miss it.
             sql`${inspections.status} not in ('cancelled')`,
         ))
         .all();

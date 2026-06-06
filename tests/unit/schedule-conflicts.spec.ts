@@ -14,8 +14,6 @@ import * as schema from '../../server/lib/db/schema';
 // but the extracted findScheduleConflicts takes a drizzle instance directly — no mock needed.
 import { findScheduleConflicts } from '../../server/lib/schedule-conflicts';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-
 const TENANT_ID = 't1';
 const U2 = 'u2';
 const U3 = 'u3';
@@ -98,6 +96,15 @@ describe('findScheduleConflicts', () => {
 
         const result = await findScheduleConflicts(db as any, TENANT_ID, U2, '2026-06-08T09:30:00Z');
         // Only i1 should appear; i2 is cancelled and must be excluded
+        expect(result).toHaveLength(1);
+        expect(result[0].inspectionId).toBe(I1);
+    });
+
+    it('6. plain YYYY-MM-DD proposed date (all-day semantics) → hits i1', async () => {
+        // A bare date string (no time component) is treated as an all-day occupant
+        // by sameDayHour: any existing inspection on that calendar day is a conflict,
+        // regardless of hour. i1 is on 2026-06-08 so it must be returned.
+        const result = await findScheduleConflicts(db as any, TENANT_ID, U2, '2026-06-08');
         expect(result).toHaveLength(1);
         expect(result[0].inspectionId).toBe(I1);
     });

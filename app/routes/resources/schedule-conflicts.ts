@@ -38,6 +38,8 @@ export async function loader({
         })
         .catch(() => null);
 
+    // Advisory feature: API failures intentionally yield an empty result so the
+    // wizard stays unblocked. Check API logs server-side for details on failures.
     if (!res?.ok) return { conflicts: [] };
 
     const body = (await res.json()) as {
