@@ -41,3 +41,21 @@ export async function applyTenantUpdate(
 ): Promise<void> {
     await new PortalProvider(dbBinding, kv).handleTenantUpdate(params);
 }
+
+/** Starter-content seed apply (A-21 batch 2) — same single-implementation rule:
+ *  both the POST /seed-starter-content endpoint and the cmd consumer call this.
+ *  Idempotent per table (name/slug/text-keyed skips). Dynamic import keeps the
+ *  bundled seed JSON out of this module's static graph. */
+export async function applySeedStarterContent(
+    dbBinding: D1Database,
+    p: { tenantId: string },
+): Promise<{ seeded: import('../services/starter-content.service').StarterContentResult } | 'tenant-not-found'> {
+    const db = drizzle(dbBinding);
+    const existing = await db.select({ id: tenants.id })
+        .from(tenants).where(eq(tenants.id, p.tenantId)).get();
+    if (!existing) return 'tenant-not-found';
+    const { seedStarterContent } = await import('../services/starter-content.service');
+    const result = await seedStarterContent(dbBinding, p.tenantId);
+    logger.info('seed-starter-content applied', { tenantId: p.tenantId, ...result });
+    return { seeded: result };
+}

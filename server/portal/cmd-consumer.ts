@@ -4,10 +4,13 @@ import { tenants, processedCmdEvents, parkedCmdEvents } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import {
     parseCmdEnvelope, isKnownCmd, cmdTenantUpdateDataSchema, cmdSyncQuotaDataSchema,
+    cmdSeedStarterContentDataSchema,
     type CmdEnvelope,
 } from '../lib/sync-events/cmd-envelope';
-import { applySyncQuota, applyTenantUpdate } from './apply-commands';
-import { applyAdminCredential } from './admin-credential';
+import type { SyncEnvelope } from '../lib/sync-events/envelope';
+import { applySyncQuota, applyTenantUpdate, applySeedStarterContent } from './apply-commands';
+import { applyCredentialIfFresh } from './admin-credential';
+import { OutboxService, type OutboxRow } from './outbox.service';
 
 /**
  * A-21 — consumer for `inspectorhub-cmd-saas` (portal→core commands).
@@ -37,6 +40,7 @@ export async function applyCmdEnvelope(
     dbBinding: D1Database,
     kv: KVNamespace | undefined,
     raw: unknown,
+    syncQueue?: Queue<SyncEnvelope>,
 ): Promise<CmdApplyResult> {
     const db = drizzle(dbBinding);
     const env = parseCmdEnvelope(raw);
@@ -61,6 +65,10 @@ export async function applyCmdEnvelope(
             processedAt: Math.floor(Date.now() / 1000),
         });
     } catch {
+        // A-21 batch 2: a duplicate still re-emits the reply. The producer's
+        // retry loop re-sends the SAME envelope id when the original reply was
+        // lost — without this, a lost reply could never recover.
+        await emitReply(dbBinding, syncQueue, env, 'duplicate');
         return 'duplicate';
     }
 
@@ -82,19 +90,27 @@ export async function applyCmdEnvelope(
             // still salvage the credential or core never receives the new hash
             // (the newer, higher-seq command didn't carry one). Email-keyed
             // idempotent upsert; tenant fields stay dropped; seq not advanced.
+            // Batch 2: the salvage itself is guarded by the CREDENTIAL stream
+            // (`credseq` vs applied_cred_seq) so a stale credential can no
+            // longer overwrite a newer one.
             if (env.type === 'io.inspectorhub.cmd.tenant.update') {
                 const cred = cmdTenantUpdateDataSchema.safeParse(env.data);
                 if (cred.success && cred.data.adminEmail && cred.data.adminPasswordHash) {
-                    await applyAdminCredential(dbBinding, {
+                    const credResult = await applyCredentialIfFresh(dbBinding, {
                         tenantId: cred.data.tenantId,
                         adminEmail: cred.data.adminEmail,
                         adminPasswordHash: cred.data.adminPasswordHash,
+                        ...(env.credseq !== undefined && { credseq: env.credseq }),
                     });
-                    logger.info('[cmd] stale command — credential salvaged', { id: env.id, tenantseq: env.tenantseq, applied: row.applied });
-                    return 'stale-credential-applied';
+                    if (credResult === 'credential-applied') {
+                        logger.info('[cmd] stale command — credential salvaged', { id: env.id, tenantseq: env.tenantseq, applied: row.applied });
+                        await emitReply(dbBinding, syncQueue, env, 'stale-credential-applied');
+                        return 'stale-credential-applied';
+                    }
                 }
             }
             logger.info('[cmd] stale command dropped', { id: env.id, tenantseq: env.tenantseq, applied: row.applied });
+            await emitReply(dbBinding, syncQueue, env, 'stale');
             return 'stale'; // dedup marker stays — a redelivery is equally stale
         }
     }
@@ -107,6 +123,7 @@ export async function applyCmdEnvelope(
                 .set({ appliedCmdSeq: env.tenantseq })
                 .where(and(eq(tenants.id, tenantId), lt(tenants.appliedCmdSeq, env.tenantseq)));
         }
+        await emitReply(dbBinding, syncQueue, env, 'applied');
         return 'applied';
     } catch (err) {
         await db.delete(processedCmdEvents).where(eq(processedCmdEvents.eventId, env.id)).catch(() => {});
@@ -123,6 +140,10 @@ async function applyKnownCmd(dbBinding: D1Database, kv: KVNamespace | undefined,
             // exactOptionalPropertyTypes: true — only spread optional fields when
             // present; passing explicit `undefined` for an optional narrow type
             // is a type error.
+            //
+            // Batch 2: credentials are STRIPPED from the provider call and applied
+            // separately under the credential-stream guard. (The PATCH RPC endpoint
+            // keeps the provider's inline credential path — no credseq there.)
             await applyTenantUpdate(dbBinding, kv, {
                 id: data.tenantId,
                 slug: data.slug,
@@ -130,9 +151,25 @@ async function applyKnownCmd(dbBinding: D1Database, kv: KVNamespace | undefined,
                 ...(data.tier !== undefined && { tier: data.tier as 'free' | 'pro' | 'enterprise' }),
                 ...(data.name !== undefined && { name: data.name }),
                 ...(data.maxUsers !== undefined && { maxUsers: data.maxUsers }),
-                ...(data.adminEmail !== undefined && { adminEmail: data.adminEmail }),
-                ...(data.adminPasswordHash !== undefined && { adminPasswordHash: data.adminPasswordHash }),
             });
+            if (data.adminEmail && data.adminPasswordHash) {
+                await applyCredentialIfFresh(dbBinding, {
+                    tenantId: data.tenantId,
+                    adminEmail: data.adminEmail,
+                    adminPasswordHash: data.adminPasswordHash,
+                    ...(env.credseq !== undefined && { credseq: env.credseq }),
+                });
+            }
+            return;
+        }
+        case 'io.inspectorhub.cmd.tenant.seed_starter_content': {
+            const data = cmdSeedStarterContentDataSchema.parse(env.data);
+            const result = await applySeedStarterContent(dbBinding, data);
+            if (result === 'tenant-not-found') {
+                // Seed raced ahead of the tenant upsert — throw so the queue
+                // retry gives the upsert time to land (mirrors sync_quota).
+                throw new Error(`seed_starter_content: tenant not found ${data.tenantId}`);
+            }
             return;
         }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
@@ -151,6 +188,45 @@ async function applyKnownCmd(dbBinding: D1Database, kv: KVNamespace | undefined,
     }
 }
 
+/**
+ * A-21 batch 2 — emit a `reply.tenant.updated` for a command that asked for
+ * one (`replyto` present). The reply rides the EXISTING core→portal sync queue
+ * via the sync outbox (durable: append first, inline publish best-effort, the
+ * cron sweeper republishes stragglers). Emission failure must NEVER fail the
+ * command — the command already applied; a missing reply self-heals via the
+ * producer's timeout → command retry → 'duplicate' → re-emit.
+ */
+async function emitReply(
+    dbBinding: D1Database,
+    syncQueue: Queue<SyncEnvelope> | undefined,
+    env: CmdEnvelope,
+    result: 'applied' | 'duplicate' | 'stale' | 'stale-credential-applied',
+): Promise<void> {
+    if (!env.replyto) return;
+    try {
+        let insertedRow: OutboxRow | undefined;
+        const outbox = new OutboxService(dbBinding, (row) => { insertedRow = row; });
+        await outbox.append({
+            type: 'reply.tenant.updated',
+            payload: {
+                tenantId: (env.data['tenantId'] as string | undefined) ?? '',
+                correlationId: env.id,
+                replyto: env.replyto,
+                result,
+            },
+        });
+        if (syncQueue && insertedRow) {
+            // Inline publish; a throw is caught below and the row stays
+            // `pending` for the sweeper.
+            await outbox.publishRow(syncQueue, insertedRow);
+        }
+        logger.info('[cmd] reply emitted', { correlationId: env.id, result, published: !!(syncQueue && insertedRow) });
+    } catch (err) {
+        logger.error('[cmd] reply emission failed — outbox sweeper will retry if appended',
+            { id: env.id, result }, err instanceof Error ? err : undefined);
+    }
+}
+
 function safeStringify(value: unknown): string {
     try { return JSON.stringify(value) ?? String(value); } catch { return String(value); }
 }
@@ -160,15 +236,18 @@ function backoffSeconds(attempts: number): number {
     return Math.min(30 * 2 ** attempts, 3600);
 }
 
-/** Batch handler for the cmd queue. STRICTLY per-message ack/retry. */
+/** Batch handler for the cmd queue. STRICTLY per-message ack/retry.
+ *  `syncQueue` (A-21 batch 2) carries replies back to portal — optional so
+ *  the standalone build (no queues at all) type-checks unchanged. */
 export async function handleCmdBatch(
     dbBinding: D1Database,
     kv: KVNamespace | undefined,
     batch: MessageBatch<unknown>,
+    syncQueue?: Queue<SyncEnvelope>,
 ): Promise<void> {
     for (const msg of batch.messages) {
         try {
-            const result = await applyCmdEnvelope(dbBinding, kv, msg.body);
+            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue);
             logger.info('[cmd] queue message handled', { id: msg.id, attempts: msg.attempts, result });
             msg.ack();
         } catch (err) {

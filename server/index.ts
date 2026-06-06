@@ -739,7 +739,8 @@ export default {
     queue: async (batch: MessageBatch<unknown>, env: HonoConfig['Bindings'], _ctx: ExecutionContext) => {
         if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {
             const { handleCmdBatch } = await import('./portal/cmd-consumer');
-            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch);
+            // SYNC_QUEUE carries command replies back to portal (A-21 batch 2).
+            await handleCmdBatch(env.DB, env.TENANT_CACHE, batch, env.SYNC_QUEUE);
             return;
         }
         await handleSyncDlqBatch(env.DB, batch);

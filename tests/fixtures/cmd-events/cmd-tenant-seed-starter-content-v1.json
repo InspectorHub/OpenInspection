@@ -1,0 +1,12 @@
+{
+  "specversion": "1.0",
+  "id": "wf:onboarding:fixture-tenant-2:seed",
+  "type": "io.inspectorhub.cmd.tenant.seed_starter_content",
+  "source": "portal",
+  "time": "2026-06-06T00:00:01.000Z",
+  "dataschema": "cmd-tenant-seed-starter-content/v1",
+  "tenantseq": 2,
+  "data": {
+    "tenantId": "fixture-tenant-2"
+  }
+}

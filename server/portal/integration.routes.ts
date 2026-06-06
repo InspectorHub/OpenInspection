@@ -18,6 +18,12 @@ const SyncRedriveSchema = z.object({
 /**
  * PATCH /api/integration/tenants/:slug
  * Triggered by Portal when tenant information changes.
+ *
+ * A-21 batch 2 adjudication: this endpoint is KEPT as permanent RPC — it is
+ * the target of (a) the sysadmin console force-sync rescue lever (a rescue
+ * channel must not depend on the queue it rescues) and (b) the dispatch
+ * fallback when CMD_QUEUE is unbound. The cmd-queue consumer shares the same
+ * implementation (apply-commands.ts), so behavior cannot diverge.
  */
 api.patch('/tenants/:slug', requireServiceBinding, async (c) => {
     const slug = c.req.param('slug');
@@ -191,6 +197,10 @@ api.post('/sync-quota', requireServiceBinding, async (c) => {
  * Invoked by the portal's OnboardingWorkflow once a tenant is provisioned.
  * Seeds initial templates, agreements, rating-systems, and marketplace
  * defaults. Idempotent — safe to retry.
+ *
+ * A-21 batch 2 adjudication: KEPT as the CMD_QUEUE-unbound fallback target
+ * (the workflow publishes `cmd.tenant.seed_starter_content` when the queue is
+ * bound). Same implementation as the cmd consumer (apply-commands.ts).
  */
 api.post('/seed-starter-content', requireServiceBinding, async (c) => {
     const parsed = SeedStarterContentBodySchema.safeParse(await c.req.json());
@@ -199,19 +209,12 @@ api.post('/seed-starter-content', requireServiceBinding, async (c) => {
     }
     const { tenantId } = parsed.data;
 
-    const { drizzle } = await import('drizzle-orm/d1');
-    const { eq } = await import('drizzle-orm');
-    const { tenants } = await import('../lib/db/schema');
-    const db = drizzle(c.env.DB);
-    const existing = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, tenantId)).get();
-    if (!existing) {
+    const { applySeedStarterContent } = await import('./apply-commands');
+    const result = await applySeedStarterContent(c.env.DB, { tenantId });
+    if (result === 'tenant-not-found') {
         return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
     }
-
-    const { seedStarterContent } = await import('../services/starter-content.service');
-    const result = await seedStarterContent(c.env.DB, tenantId);
-
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: result.seeded });
 });
 
 /**

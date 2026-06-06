@@ -20,6 +20,8 @@ const CASES: { file: string; eventType: SyncEventType }[] = [
     { file: 'user-invited.v1.json', eventType: 'user.invited' },
     { file: 'user-password-changed.v1.json', eventType: 'user.password_changed' },
     { file: 'user-deleted.v1.json', eventType: 'user.deleted' },
+    // A-21 batch 2 — command reply riding the sync queue.
+    { file: 'reply-tenant-updated.v1.json', eventType: 'reply.tenant.updated' },
 ];
 
 describe('sync envelope contract (golden fixtures)', () => {

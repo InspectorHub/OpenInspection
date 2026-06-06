@@ -13,6 +13,7 @@ import { z } from 'zod';
 export const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     'io.inspectorhub.cmd.tenant.update': ['cmd-tenant-update/v1'],
     'io.inspectorhub.cmd.tenant.sync_quota': ['cmd-tenant-sync-quota/v1'],
+    'io.inspectorhub.cmd.tenant.seed_starter_content': ['cmd-tenant-seed-starter-content/v1'],
 };
 
 export const cmdEnvelopeSchema = z.object({
@@ -23,6 +24,13 @@ export const cmdEnvelopeSchema = z.object({
     time: z.string().min(1),
     dataschema: z.string().min(1),
     tenantseq: z.number().int().nonnegative(),
+    // A-21 batch 2 (additive-optional — no dataschema bump):
+    /** Producer wants a `reply.tenant.updated` routed here (`wf:onboarding:<id>`). */
+    replyto: z.string().optional(),
+    /** Credential-stream sequence; present ONLY on credential-bearing commands.
+     *  Guarded by `tenants.applied_cred_seq` (a stale credential never
+     *  overwrites a newer one). Absent = legacy in-flight → apply unguarded. */
+    credseq: z.number().int().positive().optional(),
     data: z.record(z.string(), z.unknown()),
 });
 export type CmdEnvelope = z.infer<typeof cmdEnvelopeSchema>;
@@ -42,6 +50,9 @@ export const cmdTenantUpdateDataSchema = z.object({
 export const cmdSyncQuotaDataSchema = z.object({
     tenantId: z.string(),
     maxUsers: z.number(),
+});
+export const cmdSeedStarterContentDataSchema = z.object({
+    tenantId: z.string(),
 });
 
 export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {
