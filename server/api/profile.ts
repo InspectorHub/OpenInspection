@@ -2,11 +2,9 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
-import { ErrorCode, Errors } from '../lib/errors';
-import { SetSlugRequestSchema } from '../lib/validations/profile.schema';
+import { Errors } from '../lib/errors';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { users } from '../lib/db/schema/tenant';
-import { userSlugCacheKey } from '../lib/middleware/inspector-palette';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 
@@ -44,15 +42,6 @@ const getProfileRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['read'], tier: 'primary' }));
 
-const SlugConflictResponseSchema = z.object({
-    success: z.literal(false).describe('TODO describe success field for the OpenInspection MCP integration'),
-    error: z.object({
-        message: z.string().describe('TODO describe message field for the OpenInspection MCP integration'),
-        code: z.string().describe('TODO describe code field for the OpenInspection MCP integration'),
-        details: z.object({ suggestions: z.array(z.string()).optional().describe('TODO describe suggestions field for the OpenInspection MCP integration') }).optional().describe('TODO describe details field for the OpenInspection MCP integration'),
-    }),
-});
-
 // DB-12 / IA-26 (2026-06-06) — slug FROZEN for inspectors. The field is
 // intentionally absent from this schema so Zod strips it from any PATCH body;
 // no 400 is raised (unknown keys are ignored via passthrough behavior). Global
@@ -88,46 +77,8 @@ const patchProfileRoute = createRoute(withMcpMetadata({
             },
             description: 'Saved',
         },
-        409: {
-            content: {
-                'application/json': { schema: SlugConflictResponseSchema },
-            },
-            description: 'Slug conflict',
-        },
     },
 }, { scopes: ['write'], tier: 'primary' }));
-
-const setSlugRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/slug',
-    operationId: 'setMyBookingSlug',
-    tags: ['profile'],
-    summary: 'Set the current user booking slug',
-    description: 'Saves the caller\'s public booking-page slug used in /book/<slug> URLs. Validates availability and returns 409 with suggestions when the slug is taken or reserved.',
-    request: {
-        body: {
-            content: {
-                'application/json': { schema: SetSlugRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') },
-            },
-        },
-    },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: createApiResponseSchema(z.object({ slug: z.string().describe('TODO describe slug field for the OpenInspection MCP integration') })),
-                },
-            },
-            description: 'Slug saved',
-        },
-        409: {
-            content: {
-                'application/json': { schema: SlugConflictResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') },
-            },
-            description: 'Slug conflict',
-        },
-    },
-}, { scopes: ['write'], tier: 'extended' }));
 
 // ── Sprint C-1 — profile photo upload + bio/service-areas details ──────────────
 
@@ -246,35 +197,6 @@ export const profileRoutes = createApiRouter()
         }
 
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(setSlugRoute, async (c) => {
-        const userId = c.get('user')?.sub;
-        const tenantId = c.get('tenantId');
-        if (!userId || !tenantId) throw Errors.Unauthorized();
-
-        const { slug } = c.req.valid('json');
-        const userService = c.var.services.user;
-        const check = await userService.checkSlug(tenantId, slug, userId);
-        if (!check.available) {
-            const message = check.reason === 'reserved'
-                ? 'That slug is reserved. Please choose another.'
-                : 'That slug is already taken.';
-            return c.json(
-                {
-                    success: false as const,
-                    error: {
-                        message,
-                        code: ErrorCode.CONFLICT,
-                        details: { suggestions: check.suggestions ?? [] },
-                    },
-                },
-                409,
-            );
-        }
-        await userService.setSlug(userId, tenantId, slug);
-        // A-16 — drop the cached palette slug so the new value serves immediately.
-        await c.env.TENANT_CACHE?.delete(userSlugCacheKey(userId)).catch(() => {});
-        return c.json({ success: true as const, data: { slug } }, 200);
     })
     .openapi(photoUploadRoute, async (c) => {
         const userId = c.get('user')?.sub;

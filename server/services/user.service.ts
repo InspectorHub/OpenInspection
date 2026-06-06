@@ -175,10 +175,10 @@ export class UserService {
      * availability before writing so a concurrent claim can't race past the
      * UI check.
      *
-     * FROZEN (DB-12 2026-06-06): inspector slug writes retired; this method is
-     * still called by the dedicated POST /api/profile/slug route (which handles
-     * the one-time initial slug-claim flow) and by agent namespace operations.
-     * The inspector profile PATCH no longer reaches this method.
+     * FROZEN for inspectors (DB-12 2026-06-06): no inspector-facing route calls
+     * this anymore — the POST /api/profile/slug claim route was removed with the
+     * freeze. Retained for potential agent reuse; no live callers (unit tests
+     * exercise the method directly to keep the logic verified).
      */
     async setSlug(userId: string, tenantId: string, slug: string): Promise<void> {
         const check = await this.checkSlug(tenantId, slug, userId);
