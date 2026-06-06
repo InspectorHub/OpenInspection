@@ -126,6 +126,11 @@ export const UpdateInspectionSchema = z.object({
     // round-trip without a separate enum.
     referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('TODO describe referralSource field for the OpenInspection MCP integration'),
     reportThemeOverride: z.enum(['modern', 'classic', 'minimal']).nullable().optional().openapi({ example: 'classic' }).describe('TODO describe reportThemeOverride field for the OpenInspection MCP integration'),
+    // DB-16 — report cover photo. References an inspection_media_pool row id
+    // belonging to THIS inspection (validated in the PATCH handler); null
+    // clears the cover. The editor UI for picking it lands with Track H —
+    // this write path makes preflight's `coverPhotoSet` attainable via API.
+    coverPhotoId: z.string().uuid().nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440042' }).describe('Report cover photo — an inspection_media_pool row id owned by this inspection; null clears it.'),
     // Per-inspection override of the tenant's auto-sign-on-publish default
     // (maps to inspections.auto_sign_on_publish). Toggled from the editor's
     // "toggle-auto-sign" action via PATCH /{id}.

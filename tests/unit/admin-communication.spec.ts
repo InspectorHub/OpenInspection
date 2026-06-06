@@ -1,7 +1,21 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import adminRoutes from '../../server/api/admin';
 import type { HonoConfig } from '../../server/types/hono';
+
+// C-15: resendConfigured now reads the CANONICAL encrypted_secrets store via
+// lib/secrets-cache + config-crypto (the legacy branding.getDecryptedSecrets
+// is gone). Stub the loaders; per-test overrides below.
+vi.mock('../../server/lib/secrets-cache', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    loadEncryptedSecretsBlob: vi.fn(async () => null),
+}));
+vi.mock('../../server/lib/config-crypto', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    decryptSecrets: vi.fn(async () => ({})),
+}));
+import { loadEncryptedSecretsBlob } from '../../server/lib/secrets-cache';
+import { decryptSecrets } from '../../server/lib/config-crypto';
 
 /**
  * C-10 ③-D (B-4 / A-7) — GET+PATCH /api/admin/communication.
@@ -21,13 +35,20 @@ describe('admin communication config — ③-D (B-4)', () => {
         return { app, env };
     }
 
-    it('GET returns senderEmail/replyTo + flags from branding config', async () => {
+    beforeEach(() => {
+        vi.mocked(loadEncryptedSecretsBlob).mockReset().mockResolvedValue(null);
+        vi.mocked(decryptSecrets).mockReset().mockResolvedValue({});
+    });
+
+    it('GET returns senderEmail/replyTo + flags from branding config (tenant Resend key in the canonical store)', async () => {
         const getBranding = vi.fn().mockResolvedValue({
             senderEmail: 'noreply@acme.com', replyTo: 'office@acme.com', icsToken: 'icstok', googleRefreshToken: 'g',
             emailMode: 'own', senderDisplayName: 'Acme Inspections', useInspectorFromName: true,
         });
-        const getDecryptedSecrets = vi.fn().mockResolvedValue({ resendApiKey: 're_123' });
-        const { app, env } = buildApp({ getBranding, getDecryptedSecrets });
+        // C-15: configured via the canonical encrypted_secrets store.
+        vi.mocked(loadEncryptedSecretsBlob).mockResolvedValue('enc-blob');
+        vi.mocked(decryptSecrets).mockResolvedValue({ RESEND_API_KEY: 're_123' });
+        const { app, env } = buildApp({ getBranding });
         const res = await app.request('/api/admin/communication', {}, env);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { senderEmail: string; replyTo: string; resendConfigured: boolean; googleCalendarConnected: boolean; icsUrl: string | null; templates: unknown[]; emailMode: string; senderDisplayName: string; useInspectorFromName: boolean } };
@@ -45,8 +66,7 @@ describe('admin communication config — ③-D (B-4)', () => {
 
     it('GET reports resendConfigured=false when neither env nor tenant secret has a Resend key', async () => {
         const getBranding = vi.fn().mockResolvedValue({ senderEmail: null, replyTo: null });
-        const getDecryptedSecrets = vi.fn().mockResolvedValue({});
-        const { app, env } = buildApp({ getBranding, getDecryptedSecrets });
+        const { app, env } = buildApp({ getBranding });
         const res = await app.request('/api/admin/communication', {}, env);
         const body = await res.json() as { data: { resendConfigured: boolean; senderEmail: string | null; googleCalendarConnected: boolean } };
         expect(body.data.resendConfigured).toBe(false);

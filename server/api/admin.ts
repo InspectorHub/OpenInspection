@@ -388,13 +388,9 @@ const IntegrationConfigSchema = z.object({
     googleClientId: z.string().optional().describe('TODO describe googleClientId field for the OpenInspection MCP integration'),
 }).openapi('IntegrationConfig');
 
-const SecretsInputSchema = z.object({
-    resendApiKey: z.string().optional().describe('TODO describe resendApiKey field for the OpenInspection MCP integration'),
-    senderEmail: z.string().optional().describe('TODO describe senderEmail field for the OpenInspection MCP integration'),
-    turnstileSecretKey: z.string().optional().describe('TODO describe turnstileSecretKey field for the OpenInspection MCP integration'),
-    geminiApiKey: z.string().optional().describe('TODO describe geminiApiKey field for the OpenInspection MCP integration'),
-    googleClientSecret: z.string().optional().describe('TODO describe googleClientSecret field for the OpenInspection MCP integration'),
-}).openapi('SecretsInput');
+// C-15 (2026-06-06): SecretsInputSchema + the POST /config/secrets route were
+// RETIRED with the legacy `tenant_configs.secrets` store. Tenant secrets are
+// written exclusively via PUT /api/secrets (canonical `encrypted_secrets`).
 
 const getConfigRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -425,21 +421,6 @@ const updateIntegrationConfigRoute = createRoute(withMcpMetadata({
     },
     operationId: "createTenantConfig",
     description: "Auto-generated placeholder for createTenantConfig (POST /config, admin domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['admin'], tier: 'extended' }));
-
-
-const updateSecretsRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/config/secrets',
-    tags: ["admin"],
-    summary: "Create tenant config secrets",
-    middleware: [requireRole(['owner'])],
-    request: { body: { content: { 'application/json': { schema: SecretsInputSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-    responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Saved' },
-    },
-    operationId: "createTenantConfigSecrets",
-    description: "Auto-generated placeholder for createTenantConfigSecrets (POST /config/secrets, admin domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -1406,22 +1387,16 @@ export const adminRoutes = createApiRouter()
     .openapi(getConfigRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const svc = c.var.services.branding;
-        const [integrationConfig, secrets] = await Promise.all([
-            svc.getIntegrationConfig(tenantId),
-            svc.getMaskedSecrets(tenantId, c.env.JWT_SECRET),
-        ]);
-        return c.json({ success: true, data: { integrationConfig, secrets } }, 200);
+        const integrationConfig = await svc.getIntegrationConfig(tenantId);
+        // C-15: the legacy `tenant_configs.secrets` store is retired. Masked
+        // secrets are served by GET /api/secrets (canonical `encrypted_secrets`);
+        // the field is kept (empty) for response-shape compatibility.
+        return c.json({ success: true, data: { integrationConfig, secrets: {} } }, 200);
     })
     .openapi(updateIntegrationConfigRoute, async (c) => {
         const body = c.req.valid('json');
         await c.var.services.branding.updateIntegrationConfig(c.get('tenantId'), body as unknown as import('../services/branding.service').IntegrationConfig);
         auditFromContext(c, 'config.integration.update', 'tenant_config');
-        return c.json({ success: true }, 200);
-    })
-    .openapi(updateSecretsRoute, async (c) => {
-        const body = c.req.valid('json');
-        await c.var.services.branding.updateSecrets(c.get('tenantId'), c.env.JWT_SECRET, body as unknown as import('../services/branding.service').SecretsConfig);
-        auditFromContext(c, 'config.secrets.update', 'tenant_config');
         return c.json({ success: true }, 200);
     })
     .openapi(sendAgreementRoute, async (c) => {
@@ -2214,11 +2189,17 @@ export const adminRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const cfg = await c.var.services.branding.getBranding(tenantId, { siteName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
         // Resend is "configured" if a key is in env OR stored in tenant secrets.
+        // C-15: reads the CANONICAL `encrypted_secrets` store (ENV-name keys).
         let resendConfigured = !!c.env.RESEND_API_KEY;
         if (!resendConfigured) {
             try {
-                const secrets = await c.var.services.branding.getDecryptedSecrets(tenantId, c.env.JWT_SECRET);
-                resendConfigured = !!secrets.resendApiKey;
+                const { loadEncryptedSecretsBlob } = await import('../lib/secrets-cache');
+                const { decryptSecrets } = await import('../lib/config-crypto');
+                const blob = await loadEncryptedSecretsBlob(c.env.DB, c.env.TENANT_CACHE, tenantId);
+                if (blob) {
+                    const dec = await decryptSecrets(blob, c.env.JWT_SECRET) as Record<string, string | undefined>;
+                    resendConfigured = !!dec.RESEND_API_KEY;
+                }
             } catch { /* no decryptable secrets — leave false */ }
         }
         const icsToken = cfg.icsToken as string | null | undefined;

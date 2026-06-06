@@ -11,6 +11,16 @@ export function meta() {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
+  // B-26 — SaaS deploys have no local login: identities live on the portal
+  // (POST /api/auth/login already answers 410 LOGIN_MOVED_TO_PORTAL there).
+  // Bounce the PAGE too, so app.<domain>/login never renders a dead form.
+  // Mirrors getDeploymentProfile(): saas mode + PORTAL_API_URL as the base.
+  const env = (context as { cloudflare?: { env?: { APP_MODE?: string; PORTAL_API_URL?: string } } })
+    ?.cloudflare?.env;
+  if (env?.APP_MODE === "saas" && env.PORTAL_API_URL) {
+    return redirect(`${env.PORTAL_API_URL.replace(/\/$/, "")}/login`);
+  }
+
   const token = await getToken(context, request);
   if (token) return redirect("/dashboard");
   return null;

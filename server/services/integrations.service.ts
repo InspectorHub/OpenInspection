@@ -15,7 +15,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, qboConnections } from '../lib/db/schema';
 import type { AppEnv } from '../types/hono';
-import { BrandingService } from './branding.service';
+import { loadEncryptedSecretsBlob } from '../lib/secrets-cache';
+import { decryptSecrets } from '../lib/config-crypto';
 
 export interface IntegrationRow {
     id:        string;
@@ -43,9 +44,13 @@ export class IntegrationsService {
         );
         // Gemini is bring-your-own-key (per-tenant). "Connected" reflects the
         // tenant's own bound key in encrypted secrets, never a platform env key.
-        const dbSecrets = await this._safeGet(() =>
-            new BrandingService(this.db, this.env.TENANT_CACHE).getDecryptedSecrets(tenantId, this.env.JWT_SECRET),
-        );
+        // C-15: reads the CANONICAL `encrypted_secrets` store (ENV-name keys) —
+        // the legacy `tenant_configs.secrets` column is retired.
+        const dbSecrets = await this._safeGet(async () => {
+            const blob = await loadEncryptedSecretsBlob(this.db, this.env.TENANT_CACHE, tenantId);
+            if (!blob) return null;
+            return await decryptSecrets(blob, this.env.JWT_SECRET) as Record<string, string | undefined>;
+        });
 
         const integrations: IntegrationRow[] = [
             {
@@ -86,7 +91,7 @@ export class IntegrationsService {
             {
                 id:        'gemini',
                 name:      'Gemini AI',
-                connected: !!dbSecrets?.geminiApiKey,
+                connected: !!dbSecrets?.GEMINI_API_KEY,
                 lastSync:  null,
                 action:    null,
             },

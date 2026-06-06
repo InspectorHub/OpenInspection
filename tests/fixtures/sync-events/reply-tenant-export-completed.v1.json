@@ -1,0 +1,15 @@
+{
+  "specversion": "1.0",
+  "id": "00000000-0000-4000-8000-0000000rec01",
+  "type": "io.inspectorhub.reply.tenant.export_completed",
+  "source": "core",
+  "time": "2026-06-06T01:00:02.000Z",
+  "dataschema": "reply-tenant-export-completed/v1",
+  "data": {
+    "tenantId": "fixture-tenant-3",
+    "correlationId": "wf:offboarding:offboarding-fixture-tenant-3-1:export",
+    "replyto": "wf:offboarding:offboarding-fixture-tenant-3-1",
+    "r2Key": "exports/fixture-tenant-3/1780000000000.zip",
+    "manifest": { "rows": 2, "photos": 3, "photosEmbedded": 3 }
+  }
+}

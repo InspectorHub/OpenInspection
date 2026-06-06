@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { HonoConfig } from '../types/hono';
 import { TenantUpdateParams } from '../lib/integration';
-import { TenantStatusBodySchema, StripeConnectBodySchema, SeedStarterContentBodySchema } from '../lib/validations/admin.schema';
+import { TenantStatusBodySchema, SeedStarterContentBodySchema } from '../lib/validations/admin.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { logger } from '../lib/logger';
 import { OutboxService } from './outbox.service';
@@ -47,27 +47,12 @@ api.patch('/tenants/:slug', requireServiceBinding, async (c) => {
     }
 });
 
-/**
- * POST /api/integration/tenants/:slug/stripe-connect
- * Triggered by Portal when Stripe Connect is completed.
- */
-api.post('/tenants/:slug/stripe-connect', requireServiceBinding, async (c) => {
-    const slug = c.req.param('slug');
-    const parsed = StripeConnectBodySchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
-    }
-
-    const adminService = c.var.services.admin;
-
-    try {
-        await adminService.updateStripeConnect(slug as string, parsed.data.accountId);
-        return c.json({ success: true });
-    } catch (error: unknown) {
-        logger.error('Failed to handle stripe connect', {}, error instanceof Error ? error : undefined);
-        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
-    }
-});
+// A-21 batch 3 adjudication (2026-06-06): POST /tenants/:slug/stripe-connect was
+// REMOVED — portal never calls it (Stripe Connect is configured tenant-side via
+// the inspector-facing GET/PUT/DELETE /api/admin/stripe-connect; checkout is
+// disabled on the portal). The dead M2M write path was the only consumer of
+// AdminService.updateStripeConnect / IntegrationProvider.handleStripeConnect,
+// which were removed with it.
 
 /**
  * POST /api/integration/tenants/:slug/data-export
