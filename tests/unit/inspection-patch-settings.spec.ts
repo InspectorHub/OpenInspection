@@ -103,4 +103,39 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
         expect(await patch('inspector', { clientName: 'A' })).toBe(200);
         expect(await patch('owner', { clientName: 'B' })).toBe(200);
     });
+
+    // ── DB-16: coverPhotoId write path ──────────────────────────────────────
+    const POOL_ID = '550e8400-e29b-41d4-a716-446655440042';
+
+    async function seedPoolRow(over: Partial<{ id: string; inspectionId: string; tenantId: string }> = {}) {
+        await db.insert(schema.inspectionMediaPool).values({
+            id: over.id ?? POOL_ID,
+            inspectionId: over.inspectionId ?? INSP_ID,
+            tenantId: over.tenantId ?? TENANT,
+            r2Key: 'tenants/t/p.jpg', url: '/p.jpg', uploadedAt: 1,
+        } as never);
+    }
+
+    it('DB-16: sets coverPhotoId when it references a pool row of this inspection', async () => {
+        await seedPoolRow();
+        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(200);
+        const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
+        expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBe(POOL_ID);
+    });
+
+    it('DB-16: rejects a coverPhotoId belonging to a DIFFERENT inspection (400)', async () => {
+        await seedPoolRow({ inspectionId: '550e8400-e29b-41d4-a716-446655449999' });
+        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(400);
+        const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
+        expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBeNull();
+    });
+
+    it('DB-16: rejects a dangling coverPhotoId (400) and accepts null to clear', async () => {
+        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(400); // no pool row at all
+        await seedPoolRow();
+        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(200);
+        expect(await patch('admin', { coverPhotoId: null })).toBe(200);
+        const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
+        expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBeNull();
+    });
 });
