@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from './db';
 import { BookingService } from '../../server/services/booking.service';
-import { tenants, users, services, availability, inspections, inspectionInspectors, serviceInspectors } from '../../server/lib/db/schema';
+import { tenants, users, services, availability, availabilityOverrides, inspections, inspectionInspectors, serviceInspectors } from '../../server/lib/db/schema';
 import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -83,5 +83,60 @@ describe('BookingService tenant aggregation (IA-26)', () => {
     it('pickInspector is deterministic by (name, id)', async () => {
         expect(await svc.pickInspector('t1', ['u3', 'u1', 'u2'])).toBe('u1');
         expect(await svc.pickInspector('t1', [])).toBeNull();
+    });
+
+    it('hasAnyHours negative: qualified inspector with no availability rows returns false', async () => {
+        // s3 is restricted to u3 who has NO availability rows
+        await db.insert(services).values({ id: 's3', tenantId: 't1', name: 'Mold', price: 20000, createdAt: new Date() });
+        await db.insert(serviceInspectors).values({ serviceId: 's3', userId: 'u3', tenantId: 't1', createdAt: new Date() });
+
+        expect(await svc.hasAnyHours('t1', ['s3'])).toBe(false);
+    });
+
+    it('blocking override: u2 blocked on MONDAY removes all s2 slots; u1 still serves all-staff', async () => {
+        // Block u2 entirely on MONDAY
+        await db.insert(availabilityOverrides).values({
+            id: 'ov1', tenantId: 't1', inspectorId: 'u2', date: MONDAY,
+            isAvailable: false, startTime: null, endTime: null, createdAt: new Date(),
+        });
+
+        // s2 is sole-qualified to u2 — with blocking override u2 yields no effective windows
+        const s2Slots = await svc.getTenantSlots('t1', MONDAY, ['s2']);
+        expect(s2Slots).toEqual([]);
+
+        // All-staff: u1 still has 08:00-10:00 windows; 08:00 must be available via u1
+        const allSlots = await svc.getTenantSlots('t1', MONDAY, []);
+        const slot0800 = allSlots.find(s => s.time === '08:00')!;
+        expect(slot0800.available).toBe(true);
+        expect(slot0800.inspectorIds).toEqual(['u1']);
+    });
+
+    it('additive override: blocking + additive row gives u2 only the 12:00-13:00 window', async () => {
+        // Insert blocking row (replaces recurring) AND additive row (adds 12:00-13:00)
+        await db.insert(availabilityOverrides).values([
+            {
+                id: 'ov-block', tenantId: 't1', inspectorId: 'u2', date: MONDAY,
+                isAvailable: false, startTime: null, endTime: null, createdAt: new Date(),
+            },
+            {
+                id: 'ov-add', tenantId: 't1', inspectorId: 'u2', date: MONDAY,
+                isAvailable: true, startTime: '12:00', endTime: '13:00', createdAt: new Date(),
+            },
+        ]);
+
+        // s2 sole-qualified to u2: effective windows = just 12:00-13:00 (two 30-min slots)
+        const slots = await svc.getTenantSlots('t1', MONDAY, ['s2']);
+        const times = slots.map(s => s.time);
+
+        // Must have 12:00 and 12:30
+        expect(times).toContain('12:00');
+        expect(times).toContain('12:30');
+
+        // Must NOT have any 08:xx or 09:xx slots (recurring window is replaced)
+        expect(times.some(t => t.startsWith('08:') || t.startsWith('09:'))).toBe(false);
+
+        // Both slots should be available (u2 has no inspection at 12:00 or 12:30)
+        expect(slots.find(s => s.time === '12:00')!.available).toBe(true);
+        expect(slots.find(s => s.time === '12:30')!.available).toBe(true);
     });
 });
