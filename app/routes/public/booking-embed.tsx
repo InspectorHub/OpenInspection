@@ -14,9 +14,12 @@ export function meta() {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-interface EmbedData {
+export interface EmbedData {
+  /** Inspector slug, or "" for company-level auto-assign (IA-26). */
   slug: string;
+  /** Inspector UUID, or "" for company-level auto-assign (IA-26). */
   inspectorId: string;
+  /** Inspector name for per-inspector variant; company name for company variant. */
   inspectorName: string;
   tenantSlug: string;
   siteKey: string;
@@ -82,15 +85,23 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Page (no layout -- standalone iframe)                              */
+/*  Shared embed widget — consumed by both route variants              */
 /* ------------------------------------------------------------------ */
 
-export default function BookingEmbedPage() {
-  const { data, error } = useLoaderData<typeof loader>();
-
+/**
+ * IA-26 — exported so the company-level route (booking-embed-company.tsx)
+ * can render the same widget with different EmbedData values.
+ */
+export function EmbedWizard({
+  data,
+  error,
+}: {
+  data: EmbedData | null;
+  error: string | null;
+}) {
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const isDark = data && (data as EmbedData).theme === "dark";
+    const isDark = data && data.theme === "dark";
     document.documentElement.setAttribute("data-color-scheme", isDark ? "dark" : "light");
     if (isDark) {
       document.documentElement.classList.add("dark");
@@ -126,7 +137,7 @@ export default function BookingEmbedPage() {
         {data.bookingOpen ? (
           <>
             <p className="text-[13px] text-ih-fg-3 mb-4">
-              Pick a date and we'll confirm by email.
+              Pick a date and we&rsquo;ll confirm by email.
             </p>
             <BookingForm data={data} privacyUrl={data.privacyUrl} />
           </>
@@ -139,6 +150,15 @@ export default function BookingEmbedPage() {
       </div>
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page (no layout -- standalone iframe)                              */
+/* ------------------------------------------------------------------ */
+
+export default function BookingEmbedPage() {
+  const { data, error } = useLoaderData<typeof loader>();
+  return <EmbedWizard data={data} error={error} />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -156,13 +176,15 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
 
     const fd = new FormData(e.currentTarget);
     try {
+      // IA-26 — omit inspectorId when empty so the server auto-assigns.
+      const inspectorId = fd.get("inspectorId") || "";
       const res = await fetch("/api/public/book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenant: data.tenantSlug,
-          slug: fd.get("slug"),
-          inspectorId: fd.get("inspectorId"),
+          slug: fd.get("slug") || undefined,
+          ...(inspectorId ? { inspectorId } : {}),
           address: fd.get("address"),
           clientName: fd.get("clientName"),
           clientEmail: fd.get("clientEmail"),

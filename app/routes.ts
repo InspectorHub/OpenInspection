@@ -62,6 +62,8 @@ export default [
   route("conflict-resolver/:id", "routes/conflict-resolver.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
   // Standalone public — no layout (iframe-friendly)
+  // IA-26 — company-level embed (no inspector slug); legacy per-inspector kept alive.
+  route("embed/:tenant", "routes/public/booking-embed-company.tsx"),
   route(
     "embed/:tenant/:slug",
     "routes/public/booking-embed.tsx",
