@@ -1266,9 +1266,11 @@ export const adminRoutes = createApiRouter()
                 paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
                 createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
             }).onConflictDoNothing().run();
-            // DB-8: mirror assignment into inspection_inspectors (full-replace is safe on
-            // conflict — onConflictDoNothing leaves canonical columns unchanged so sync
-            // re-aligns the link table to whatever inspectorId the import row carries).
+            // DB-8: mirror the import row's assignment into the link table. NOTE: on
+            // onConflictDoNothing conflicts the canonical inspection row is unchanged,
+            // so this intentionally re-asserts the link rows from the IMPORT payload —
+            // acceptable for the one-shot import tool, where re-importing the same file
+            // is the only conflict source and payloads are identical.
             await syncInspectionAssignments(db, tenantId, ins.id, { inspectorId: ins.inspectorId || null });
             counts.inspections++;
         }

@@ -672,12 +672,17 @@ export class InspectionService {
                     .where(and(eq(inspections.id, created.id), eq(inspections.tenantId, tenantId)));
             }
             // DB-8: re-sync with effective post-patch assignment values when team
-            // fields were written (the initial createInspection call already synced
-            // inspectorId=creatorUserId; this overwrites that with the resolved lead).
+            // fields were written. Always pass creatorUserId as the inspectorId
+            // fallback so that when teamMode=false but a stale leadInspectorId was
+            // present in the request (effectiveLead=null, effectiveHelpers=[]),
+            // syncInspectionAssignments still writes a lead row for the creator
+            // rather than clearing all link rows while inspections.inspectorId
+            // still holds creatorUserId (which would diverge the two sources of truth).
             if (teamFieldsPatched) {
                 await syncInspectionAssignments(db, tenantId, created.id, {
-                    leadInspectorId:     effectiveLead,
-                    helperInspectorIds:  effectiveHelpers,
+                    inspectorId:        creatorUserId,
+                    leadInspectorId:    effectiveLead,
+                    helperInspectorIds: effectiveHelpers,
                 });
             }
         }
