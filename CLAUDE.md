@@ -12,8 +12,10 @@ API in-process and delegates page routes to React Router v7 SSR.
 # Single package.json at the root.
 npm install
 npm run dev          # Build + run the worker locally (react-router build + wrangler dev).
-                     # No HMR. `npm run dev:hmr` (react-router dev) is currently broken by
-                     # the in-process API module graph — see docs/developers.
+                     # Production-shape (real workerd, no HMR) — use to verify built behavior.
+npm run dev:hmr      # Vite dev server with HMR (react-router dev). The fast iteration loop.
+                     # Works since the lazy-API entry refactor (workers/app.ts) — the entry
+                     # must keep its top-level import graph tiny; see the comment there.
 npm run build        # react-router build — bundles server/ (API) + app/ (RR SSR) into one worker
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
