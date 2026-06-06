@@ -10,6 +10,10 @@
  *
  * Keep `public/js/settings-profile-signature.js` in sync — it mirrors this
  * helper client-side for the live preview card.
+ *
+ * DB-12 / IA-26 — "Book again" links now point to the company-level booking
+ * page (`/book/<tenantSlug>`). The per-inspector URL (`/book/<t>/<slug>`) is
+ * retired. SignatureUser.slug is still accepted but is no longer read.
  */
 
 export interface SignatureUser {
@@ -17,8 +21,14 @@ export interface SignatureUser {
     email?: string | null;
     phone?: string | null;
     licenseNumber?: string | null;
+    /**
+     * DB-12 / IA-26 — inspector booking slugs are retired. This field is
+     * retained so existing callers do not need to change their call sites, but
+     * the signature helper no longer uses it for the booking URL.
+     * @deprecated Kept for API stability; ignored when building the booking link.
+     */
     slug?: string | null;
-    /** Tenant slug — required for path-tenant booking URLs (`/book/<tenant>/<slug>`). */
+    /** Tenant slug — builds the company-level booking URL (`/book/<tenant>`). */
     tenantSlug?: string | null;
 }
 
@@ -52,8 +62,10 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
     const email     = user.email         ? escapeHtml(user.email)         : null;
     const phoneRaw  = user.phone         ? escapeHtml(user.phone)         : null;
     const phoneE164 = phoneTel(user.phone ?? null);
-    const link      = (user.slug && user.tenantSlug)
-        ? `https://${host}/book/${escapeHtml(user.tenantSlug)}/${escapeHtml(user.slug)}`
+    // DB-12 / IA-26 — the per-inspector URL is retired; link to the company
+    // booking page instead. tenantSlug alone is sufficient now.
+    const link      = user.tenantSlug
+        ? `https://${host}/book/${escapeHtml(user.tenantSlug)}`
         : null;
 
     const htmlLines: string[] = [];
@@ -75,8 +87,9 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
         if (user.email) cb.push(user.email);
         textLines.push(cb.join(' · '));
     }
-    if (user.slug && user.tenantSlug) {
-        textLines.push(`Book again: https://${host}/book/${user.tenantSlug}/${user.slug}`);
+    // DB-12 / IA-26 — company-level URL only; per-inspector slug retired.
+    if (user.tenantSlug) {
+        textLines.push(`Book again: https://${host}/book/${user.tenantSlug}`);
     }
     const text = textLines.join('\n');
 

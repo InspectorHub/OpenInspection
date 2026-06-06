@@ -73,3 +73,18 @@ export const ValidateDiscountResponseSchema = z.object({
 
 export const ServiceListResponseSchema = createApiResponseSchema(z.array(ServiceSchema));
 export const ServiceResponseSchema     = createApiResponseSchema(ServiceSchema);
+
+// IA-26 — per-service inspector qualification
+export const ServiceInspectorListResponseSchema = createApiResponseSchema(z.object({
+    userIds: z.array(z.string()).describe('Restricted inspector user IDs; empty = all staff qualified'),
+}));
+
+export const SetServiceInspectorsSchema = z.object({
+    userIds: z.array(z.string())
+        .transform(a => [...new Set(a)])
+        .describe('Full replacement list of inspector user IDs; empty array clears restriction; duplicates are silently deduplicated'),
+}).openapi('SetServiceInspectors');
+
+export const SetServiceInspectorsResponseSchema = createApiResponseSchema(z.object({
+    count: z.number().int().describe('Number of restriction rows now in effect'),
+}));

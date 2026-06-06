@@ -22,9 +22,14 @@ export const SlugSchema = z
     )
     .openapi({ example: 'john-smith' });
 
+/**
+ * @deprecated for inspectors (DB-12 2026-06-06): the slug-claim route was
+ * removed with the inspector-slug freeze. Retained because the slug FORMAT
+ * rules still guard the agent namespace and stay under direct test coverage.
+ */
 export const SetSlugRequestSchema = z
     .object({
-        slug: SlugSchema.describe('TODO describe slug field for the OpenInspection MCP integration'),
+        slug: SlugSchema.describe('Public slug to claim (agent namespace; inspector slug writes are frozen).'),
     })
     .openapi('SetSlugRequest');
 

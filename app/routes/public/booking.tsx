@@ -22,13 +22,12 @@ export function meta() {
   return [{ title: "Book an Inspection - OpenInspection" }];
 }
 
-interface InspectorProfile {
-  inspectorId: string;
-  name: string;
-  company?: string;
-  avatar?: string;
+interface CompanyProfile {
+  company: string;
   turnstileSiteKey?: string | null;
   bookingOpen?: boolean;
+  allowInspectorChoice?: boolean;
+  inspectors: { id: string; name: string | null; photoUrl: string | null }[];
   services: { id: string; name: string; price: number; duration: number }[];
 }
 
@@ -40,29 +39,42 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     refRaw && /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(refRaw)
       ? refRaw
       : null;
+  const inspectorSlug = url.searchParams.get("inspector");
 
   try {
     const api = createApi(context);
     const [res, brand] = await Promise.all([
-      api.bookings.book[":tenant"][":slug"].$get({
-        param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
-      }),
+      api.bookings.book[":tenant"].$get({ param: { tenant: params.tenant ?? "" } }),
       resolveTenantBrand(context, params.tenant),
     ]);
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+
+    // Deep link: resolve ?inspector=<slug> through the legacy profile
+    // endpoint so the wizard can pin that inspector.
+    let preselected: { id: string; name: string } | null = null;
+    if (inspectorSlug) {
+      const legacy = await api.bookings.book[":tenant"][":slug"].$get({
+        param: { tenant: params.tenant ?? "", slug: inspectorSlug },
+      }).catch(() => null);
+      if (legacy?.ok) {
+        const lb = (await legacy.json()) as { data?: { inspectorId?: string; name?: string } };
+        if (lb.data?.inspectorId) preselected = { id: lb.data.inspectorId, name: lb.data.name ?? "Inspector" };
+      }
+    }
+
     const legal = readLegalLinks(context);
     return {
-      profile: (Object.keys(d).length > 0 ? d : null) as InspectorProfile | null,
-      error: res.ok ? null : "Inspector not found",
+      profile: (Object.keys(d).length > 0 ? d : null) as CompanyProfile | null,
+      preselected,
+      error: res.ok ? null : "Company not found",
       tenant: params.tenant,
-      slug: params.slug,
       agentRefSlug,
       brand,
       privacyUrl: legal?.privacyUrl ?? null,
     };
   } catch {
-    return { profile: null, error: "Service unavailable", tenant: "", slug: "", agentRefSlug: null, brand: EMPTY_BRAND as TenantBrand, privacyUrl: null };
+    return { profile: null, preselected: null, error: "Service unavailable", tenant: "", agentRefSlug: null, brand: EMPTY_BRAND as TenantBrand, privacyUrl: null };
   }
 }
 
@@ -81,7 +93,7 @@ const TIME_WINDOWS = [
 ] as const;
 
 export default function BookingPage() {
-  const { profile, error, agentRefSlug, brand, tenant, privacyUrl } = useLoaderData<typeof loader>();
+  const { profile, preselected, error, agentRefSlug, brand, tenant, privacyUrl } = useLoaderData<typeof loader>();
   const [step, setStep] = useState(0);
 
   // Form state
@@ -92,6 +104,7 @@ export default function BookingPage() {
   const [customTime, setCustomTime] = useState("09:00");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [chosenInspectorId, setChosenInspectorId] = useState<string | null>(preselected?.id ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -145,6 +158,21 @@ export default function BookingPage() {
     step === 2 ? inspectionDate.length > 0 && clientName.length > 0 && clientEmail.length > 0 :
     needsTurnstile ? !!turnstileToken : true;
 
+  const inspectorOptions = useMemo(() => {
+    const base = profile?.allowInspectorChoice && profile.inspectors.length > 0 ? [...profile.inspectors] : [];
+    if (preselected && !base.some((i) => i.id === preselected.id)) {
+      base.push({ id: preselected.id, name: preselected.name, photoUrl: null });
+    }
+    return base;
+  }, [profile, preselected]);
+
+  const chosenInspectorName = useMemo(() => {
+    if (!chosenInspectorId) return "First available";
+    const found = inspectorOptions.find((i) => i.id === chosenInspectorId);
+    if (found) return found.name ?? "Inspector";
+    return "Inspector";
+  }, [chosenInspectorId, inspectorOptions]);
+
   async function handleSubmit() {
     setSubmitting(true);
     setMessage(null);
@@ -158,7 +186,7 @@ export default function BookingPage() {
           date: inspectionDate,
           timeSlot: timeWindow === "custom" ? "custom" : timeWindow,
           ...(timeWindow === "custom" ? { customTime } : {}),
-          inspectorId: profile?.inspectorId,
+          ...(chosenInspectorId ? { inspectorId: chosenInspectorId } : {}),
           services: [...selectedServices].map(id => ({ serviceId: id })),
           clientName,
           clientEmail,
@@ -193,7 +221,7 @@ export default function BookingPage() {
     );
   }
 
-  // B-16 — the inspector hasn't configured working hours yet: show an honest
+  // B-16 — the company hasn't configured working hours yet: show an honest
   // not-open state instead of a wizard whose submit can only fail.
   if (profile.bookingOpen === false) {
     return (
@@ -201,31 +229,29 @@ export default function BookingPage() {
         <div className="max-w-md text-center p-8 bg-ih-bg-card border border-ih-border rounded-xl">
           <h1 className="text-xl font-bold text-ih-fg-1">Online booking isn&rsquo;t open yet</h1>
           <p className="text-[14px] text-ih-fg-3 mt-3 leading-relaxed">
-            {profile.name} hasn&rsquo;t opened online scheduling. Please contact{" "}
-            {profile.company ? `${profile.company}` : "them"} directly to book your inspection.
+            {profile.company} hasn&rsquo;t opened online scheduling yet. Please contact them directly to book your inspection.
           </p>
         </div>
       </div>
     );
   }
 
+  const showInspectorDropdown = inspectorOptions.length > 0;
+
   return (
     <div className="min-h-screen bg-ih-bg-app py-12 px-4" style={brandTokens(brand.primaryColor)}>
       <div className="max-w-2xl mx-auto">
-        {/* Inspector header */}
+        {/* Company header */}
         <nav className="mb-8 flex items-center gap-3">
           {brand.logoUrl ? (
             <img src={brand.logoUrl} alt={brand.siteName ?? profile.company ?? "Logo"} className="h-10 w-auto" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-ih-primary-tint flex items-center justify-center text-ih-primary text-lg font-bold">
-              {profile.name.charAt(0)}
+              {profile.company.charAt(0)}
             </div>
           )}
           <div>
-            <p className="text-[15px] font-semibold text-ih-fg-1">{profile.name}</p>
-            {profile.company && (
-              <p className="text-[12px] text-ih-fg-3">{profile.company}</p>
-            )}
+            <p className="text-[15px] font-semibold text-ih-fg-1">{profile.company}</p>
           </div>
         </nav>
 
@@ -380,6 +406,21 @@ export default function BookingPage() {
                     </div>
                   )}
                 </div>
+                {showInspectorDropdown && (
+                  <label className="block">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Inspector</span>
+                    <select
+                      value={chosenInspectorId ?? ""}
+                      onChange={(e) => setChosenInspectorId(e.target.value || null)}
+                      className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
+                    >
+                      <option value="">No preference — first available</option>
+                      {inspectorOptions.map((i) => (
+                        <option key={i.id} value={i.id}>{i.name ?? "Inspector"}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
 
               <div className="space-y-5">
@@ -451,6 +492,12 @@ export default function BookingPage() {
                       <span className="text-ih-fg-3">Services</span>
                       <span className="font-medium text-ih-fg-1">{selectedServices.size} selected</span>
                     </div>
+                    {showInspectorDropdown && (
+                      <div className="flex justify-between">
+                        <span className="text-ih-fg-3">Inspector</span>
+                        <span className="font-medium text-ih-fg-1">{chosenInspectorName}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between border-t border-ih-border pt-3">
                       <span className="font-bold text-ih-fg-2">Total</span>
                       <span className="font-bold text-ih-fg-1">${totalPrice.toFixed(2)}</span>
@@ -504,7 +551,7 @@ export default function BookingPage() {
               ) : (
                 <div className="text-right">
                   <p className="mb-2 text-xs text-ih-fg-3">
-                    Your information is shared with {profile.company ?? profile.name} to schedule your inspection.
+                    Your information is shared with {profile.company} to schedule your inspection.
                     {privacyUrl && <> See our <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>.</>}
                   </p>
                   <button

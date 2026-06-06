@@ -45,6 +45,7 @@ import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validatio
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
 import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 
 /**
  * GET /api/admin/export
@@ -848,6 +849,7 @@ const TenantConfigGetResponseSchema = z.object({
     data: z.object({
         conciergeReviewRequired: z.boolean().describe('Whether bookings require concierge review before confirmation'),
         blockUnsignedAgreement: z.boolean().describe('Whether unsigned agreements block inspection start'),
+        allowInspectorChoice: z.boolean().describe('Whether the public booking page offers an inspector dropdown'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -875,7 +877,9 @@ const tenantConfigGetRoute = createRoute(withMcpMetadata({
 // the settings UI surfaces directly. Currently only `conciergeReviewRequired`.
 // Adding more keys here in the future stays a one-line allowlist change.
 const TenantConfigPatchSchema = z.object({
-    conciergeReviewRequired: z.boolean().optional().describe('TODO describe conciergeReviewRequired field for the OpenInspection MCP integration'),
+    conciergeReviewRequired: z.boolean().optional().describe('Whether agent-submitted bookings require owner/admin approval before the client receives a confirmation link.'),
+    blockUnsignedAgreement: z.boolean().optional().describe('Whether clients must sign the inspection agreement before a booking is confirmed.'),
+    allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -1265,6 +1269,12 @@ export const adminRoutes = createApiRouter()
                 paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
                 createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
             }).onConflictDoNothing().run();
+            // DB-8: mirror the import row's assignment into the link table. NOTE: on
+            // onConflictDoNothing conflicts the canonical inspection row is unchanged,
+            // so this intentionally re-asserts the link rows from the IMPORT payload —
+            // acceptable for the one-shot import tool, where re-importing the same file
+            // is the only conflict source and payloads are identical.
+            await syncInspectionAssignments(db, tenantId, ins.id, { inspectorId: ins.inspectorId || null });
             counts.inspections++;
         }
 
@@ -1456,7 +1466,7 @@ export const adminRoutes = createApiRouter()
         // Sprint B-4a — append the sender (current admin/inspector) signature so
         // the client can rebook with this user via the embedded booking link.
         const senderId = c.get('user')?.sub;
-        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; slug: string | null } | undefined;
+        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
         if (senderId) {
             try {
                 const row = await drizzle(c.env.DB).select({
@@ -1464,7 +1474,6 @@ export const adminRoutes = createApiRouter()
                     email:         schema.users.email,
                     phone:         schema.users.phone,
                     licenseNumber: schema.users.licenseNumber,
-                    slug:          schema.users.slug,
                 }).from(schema.users)
                     .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
                     .get();
@@ -1928,6 +1937,7 @@ export const adminRoutes = createApiRouter()
             data: {
                 conciergeReviewRequired: config?.conciergeReviewRequired ?? false,
                 blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
+                allowInspectorChoice: config?.allowInspectorChoice ?? false,
             },
         }, 200);
     })
@@ -1938,6 +1948,12 @@ export const adminRoutes = createApiRouter()
         const update: Partial<typeof tenantConfigs.$inferInsert> = {};
         if (body.conciergeReviewRequired !== undefined) {
             update.conciergeReviewRequired = body.conciergeReviewRequired;
+        }
+        if (body.blockUnsignedAgreement !== undefined) {
+            update.blockUnsignedAgreement = body.blockUnsignedAgreement;
+        }
+        if (body.allowInspectorChoice !== undefined) {
+            update.allowInspectorChoice = body.allowInspectorChoice;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

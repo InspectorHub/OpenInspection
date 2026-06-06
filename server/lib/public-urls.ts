@@ -19,8 +19,19 @@ export function bookingUrl(host: string, tenantSlug: string, inspectorSlug: stri
     return joinUrl(host, `/book/${tenantSlug}/${inspectorSlug}`);
 }
 
+/** Company-level embed — no inspector slug required (Task 10 / IA-26). */
+export function embedBookingCompanyUrl(host: string, tenantSlug: string): string {
+    return joinUrl(host, `/embed/${tenantSlug}`);
+}
+
+/**
+ * Per-inspector embed deep link.
+ * @deprecated the old path `/embed/book/<tenant>/<slug>` never existed.
+ * The real route is `/embed/:tenant/:slug`. Kept for referential use;
+ * prefer embedBookingCompanyUrl for new surfaces.
+ */
 export function embedBookingUrl(host: string, tenantSlug: string, inspectorSlug: string): string {
-    return joinUrl(host, `/embed/book/${tenantSlug}/${inspectorSlug}`);
+    return joinUrl(host, `/embed/${tenantSlug}/${inspectorSlug}`);
 }
 
 export function inspectorProfileUrl(host: string, tenantSlug: string, inspectorSlug: string): string {

@@ -50,9 +50,11 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors } from '../lib/db/schema';
 import { applyResultsBatch } from '../services/inspection-results.service';
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
+import { findScheduleConflicts } from '../lib/schedule-conflicts';
 import { eq, inArray, and } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { SignatureUser } from '../lib/inspector-signature';
@@ -459,6 +461,45 @@ const getCountsRoute = createRoute(withMcpMetadata({
     },
     operationId: "countsInspection",
     description: "Auto-generated placeholder for countsInspection (GET /counts, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['read'], tier: 'extended' }));
+
+
+// IA-6 — GET /api/inspections/schedule-conflicts
+// MUST be registered before /{id} to avoid 'schedule-conflicts' matching as an id param.
+const scheduleConflictsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/schedule-conflicts',
+    tags: ['inspections'],
+    summary: 'Detect same-day-hour assignment conflicts for an inspector',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        query: z.object({
+            inspectorId: z.string().min(1).optional().describe('Inspector user id to check; defaults to the caller (solo wizard flow assigns the creator).'),
+            date: z.string().min(1).describe('Proposed date/time — ISO datetime or YYYY-MM-DD.'),
+            excludeId: z.string().optional().describe('Inspection id being rescheduled; excluded from collision results.'),
+        }).describe('Conflict query'),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.boolean().describe('Whether the request succeeded'),
+                        data: z.object({
+                            conflicts: z.array(z.object({
+                                inspectionId: z.string().describe('Colliding inspection id'),
+                                propertyAddress: z.string().describe('Colliding inspection address'),
+                                date: z.string().describe('Colliding inspection date'),
+                            })).describe('Same-day-hour collisions for this inspector'),
+                        }).describe('Conflict payload'),
+                    }).describe('Conflict response'),
+                },
+            },
+            description: 'Success',
+        },
+    },
+    operationId: 'getScheduleConflicts',
+    description: 'IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 
@@ -1926,8 +1967,29 @@ export const inspectionsRoutes = createApiRouter()
 
         if (body.action === 'assignInspector') {
             if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
+            // DB-8: fetch team fields BEFORE the update so the link-table mirror
+            // carries ALL canonical assignment columns (preserves team-mode lead/
+            // helpers that bulk-assign cannot change).
+            const affected = await db.select({
+                id:                 inspectionTable.id,
+                leadInspectorId:    inspectionTable.leadInspectorId,
+                helperInspectorIds: inspectionTable.helperInspectorIds,
+            }).from(inspectionTable)
+                .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)))
+                .all();
             await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
+            // DB-8: re-sync the link table for each reassigned inspection, preserving
+            // team-mode rows that this bulk operation cannot change.
+            for (const row of affected) {
+                let helpers: string[] = [];
+                try { helpers = JSON.parse(row.helperInspectorIds ?? '[]'); } catch { /* malformed legacy JSON */ }
+                await syncInspectionAssignments(db, tenantId, row.id, {
+                    inspectorId:        body.inspectorId,
+                    leadInspectorId:    row.leadInspectorId,
+                    helperInspectorIds: helpers,
+                });
+            }
 
             auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
                 metadata: { ids: body.ids, inspectorId: body.inspectorId },
@@ -1949,6 +2011,18 @@ export const inspectionsRoutes = createApiRouter()
         const counts = await c.var.services.inspection.getCounts(tenantId);
         return c.json({ success: true, data: counts });
     })
+    // IA-6 — advisory schedule conflict check; placed before /{id} to prevent
+    // 'schedule-conflicts' being matched as a param value.
+    .openapi(scheduleConflictsRoute, async (c) => {
+        const { inspectorId, date, excludeId } = c.req.valid('query');
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+        // Solo wizard flow sends no inspectorId — the inspection will be
+        // assigned to the creator, so that is who we check against.
+        const targetId = inspectorId || c.get('user').sub;
+        const conflicts = await findScheduleConflicts(db, tenantId, targetId, date, excludeId);
+        return c.json({ success: true, data: { conflicts } }, 200);
+    })
     .openapi(getInspectionRoute, async (c) => {
         const { id } = c.req.valid('param');
         const service = c.var.services.inspection;
@@ -1965,6 +2039,8 @@ export const inspectionsRoutes = createApiRouter()
         const { inspection } = await service.getInspection(id, tenantId);
 
         const db = drizzle(c.env.DB);
+        // DB-8: delete link rows before (or together with) the inspection row.
+        await db.delete(inspectionInspectors).where(and(eq(inspectionInspectors.inspectionId, id), eq(inspectionInspectors.tenantId, tenantId)));
         await db.delete(inspectionTable).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
@@ -2007,6 +2083,21 @@ export const inspectionsRoutes = createApiRouter()
         // no-op as a successful save instead of writing an empty UPDATE.
         if (Object.keys(body).length > 0) {
             await db.update(inspectionTable).set(body).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+        }
+
+        // DB-8: re-sync link table when inspectorId is explicitly updated.
+        // DB-8: mirror ALL canonical assignment columns — PATCH can only change
+        // inspectorId, so preserve the pre-patch team-mode fields (leadInspectorId,
+        // helperInspectorIds) from the fetched row so the link table stays a faithful
+        // mirror of post-patch canonical state and team-mode rows are not wiped.
+        if ('inspectorId' in body) {
+            let helpers: string[] = [];
+            try { helpers = JSON.parse(inspection.helperInspectorIds ?? '[]'); } catch { /* malformed legacy JSON -> no helpers */ }
+            await syncInspectionAssignments(db, tenantId, id, {
+                inspectorId:        body.inspectorId ?? null,
+                leadInspectorId:    inspection.leadInspectorId,
+                helperInspectorIds: helpers,
+            });
         }
 
         if (body.status && body.status !== inspection.status) {

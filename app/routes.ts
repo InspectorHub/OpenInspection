@@ -14,7 +14,10 @@ export default [
   route("templates/:id/edit", "routes/template-edit.tsx"),
   // Public pages — no auth, minimal layout, SSR for SEO
   layout("routes/public-layout.tsx", [
-    route("book/:tenant/:slug", "routes/public/booking.tsx"),
+    route("book/:tenant", "routes/public/booking.tsx"),
+    // IA-26 — legacy per-inspector URL kept alive as a deep link: 302 to the
+    // company page with ?inspector=<slug> (preserves ?ref= and other params).
+    route("book/:tenant/:slug", "routes/public/booking-inspector-redirect.tsx"),
     route("report/:tenant/:id", "routes/public/report.tsx"),
     route(
       "agreements/sign/:tenant/:token",
@@ -59,6 +62,8 @@ export default [
   route("conflict-resolver/:id", "routes/conflict-resolver.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
   // Standalone public — no layout (iframe-friendly)
+  // IA-26 — company-level embed (no inspector slug); legacy per-inspector kept alive.
+  route("embed/:tenant", "routes/public/booking-embed-company.tsx"),
   route(
     "embed/:tenant/:slug",
     "routes/public/booking-embed.tsx",
@@ -73,6 +78,10 @@ export default [
   // API docs (Swagger UI) — was hono GET /ui; OpenAPI JSON still served at /doc
   route("ui", "routes/docs.tsx"),
   layout("routes/auth-layout.tsx", [
+    // IA-6 — BFF resource route for advisory schedule-conflict detection.
+    // Loaded via useFetcher; no UI rendered; must be inside the auth layout so
+    // requireToken() can redirect to /login when unauthenticated.
+    route("resources/schedule-conflicts", "routes/resources/schedule-conflicts.ts"),
     route("dashboard", "routes/dashboard.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),

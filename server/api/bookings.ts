@@ -2,7 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, inArray } from 'drizzle-orm';
-import { users, inspections, services as servicesTable, agentTenantLinks, tenants, availability } from '../lib/db/schema';
+import { users, inspections, services as servicesTable, agentTenantLinks, tenants, availability, tenantConfigs } from '../lib/db/schema';
 import { isNull } from 'drizzle-orm';
 import { createCalendarEvent } from './calendar';
 import { Errors } from '../lib/errors';
@@ -16,6 +16,7 @@ import {
     BookingResponseSchema
 } from '../lib/validations/booking.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 
 /**
  * GET /api/public/inspectors
@@ -278,6 +279,44 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
+/**
+ * GET /api/public/slots — company-level aggregated bookable time slots (IA-26).
+ */
+const getTenantSlotsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/slots',
+    tags: ['bookings', 'public'],
+    summary: 'Company-level bookable time slots for a date',
+    description: 'Returns the union of qualified inspectors\' bookable 30-minute slots for the given date (IA-26 aggregation). When inspectorId is supplied the result is restricted to that inspector (deep-link / client-choice flow). Free-inspector identities are never exposed on this public surface.',
+    request: {
+        query: z.object({
+            tenant: z.string().min(1).openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
+            date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).openapi({ example: '2026-07-01' }).describe('Date to query, YYYY-MM-DD.'),
+            serviceIds: z.string().optional().openapi({ example: 'svc-1,svc-2' }).describe('Comma-separated service ids; restricts the qualified-inspector set.'),
+            inspectorId: z.string().uuid().optional().describe('Restrict slots to a single inspector (client choice / deep link).'),
+        }).describe('Tenant slot query parameters'),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.boolean().describe('Whether the request succeeded'),
+                        data: z.object({
+                            slots: z.array(z.object({
+                                time: z.string().describe('Slot start time, HH:MM (24h)'),
+                                available: z.boolean().describe('Whether at least one qualified inspector is free at this time'),
+                            })).describe('Bookable 30-minute slot grid for the requested date'),
+                        }).describe('Aggregated slot data'),
+                    }).describe('Tenant slots response'),
+                },
+            },
+            description: 'Success',
+        },
+    },
+    operationId: 'getTenantBookingSlots',
+}, { scopes: ['read'], tier: 'extended' }));
+
 export const bookingsRoutes = createApiRouter()
     .openapi(listInspectorsRoute, async (c) => {
         const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
@@ -419,41 +458,35 @@ export const bookingsRoutes = createApiRouter()
             }
         }
 
-        // Booking #7 Sprint A — inspectorId is now required. The legacy
-        // "first-inspector-wins" fallback was removed because the customer-facing
-        // booking page now resolves an inspector via /book/<slug>, and the form
-        // submits the resolved id as a hidden field. Submissions without it are a
-        // bug or a tampered payload, not a routine fallback case.
-        const inspectorId = body.inspectorId;
-        if (!inspectorId) {
-            throw Errors.BadRequest('Booking link missing inspector context. Please use the link your inspector provided.');
+        // IA-26 — inspectorId is now OPTIONAL. The company-level booking page
+        // submits without one (pure auto-assign); the legacy per-inspector
+        // deep link and the allowInspectorChoice dropdown still send it.
+        const serviceIdsForQual = (body.services ?? []).map(s => s.serviceId);
+        let inspectorId = body.inspectorId ?? null;
+
+        if (inspectorId) {
+            // B-16 — a supplied inspector must belong to the resolved tenant;
+            // a mismatched id (tampered payload or stale form) must not reach
+            // into another tenant's availability/inspection space.
+            const inspectorRow = await db.select({ id: users.id }).from(users)
+                .where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId)))
+                .get();
+            if (!inspectorRow) throw Errors.NotFound('Inspector not found.');
         }
 
-        // B-16 — the inspector must belong to the resolved tenant; a mismatched
-        // id (tampered payload or stale form) must not reach into another
-        // tenant's availability/inspection space.
-        const inspectorRow = await db.select({ id: users.id }).from(users)
-            .where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId)))
-            .get();
-        if (!inspectorRow) throw Errors.NotFound('Inspector not found.');
-
-        // B-16 — distinguish "never configured working hours" from a genuinely
-        // taken slot. With zero availability rows every submit would otherwise
-        // 409 with a misleading "slot no longer available".
-        const hasHours = await db.select({ id: availability.id }).from(availability)
-            .where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId)))
-            .limit(1)
-            .get();
-        if (!hasHours) {
-            throw Errors.Conflict('Online booking is not open for this inspector yet. Please contact them directly to schedule.');
+        // B-16 (company-wide) — distinguish "nobody configured working hours"
+        // from a genuinely taken slot, with the honest not-open copy.
+        // qualifiedIds is computed once here and threaded through to avoid
+        // duplicate getQualifiedInspectorIds lookups in hasAnyHours / getTenantSlots.
+        const qualifiedIds = await service.getQualifiedInspectorIds(tenantId, serviceIdsForQual);
+        const bookingOpen = await service.hasAnyHours(tenantId, serviceIdsForQual, qualifiedIds);
+        if (!bookingOpen) {
+            throw Errors.Conflict('Online booking is not open yet. Please contact the company directly to schedule.');
         }
 
-        // Spec 3C — enforce inspector availability + availability_overrides + existing-bookings collision check.
-        // Reuses BookingService.getAvailableSlots (returns [{time:'HH:MM', available:bool}, ...]).
-        //
-        // Sprint 1 C-6 — translate the 4 customer-facing window options into the
-        // existing internal time-slot model. all-day reuses the morning slot
-        // (08:00); custom maps to the user-provided customTime (HH:mm).
+        // Spec 3C / IA-26 — availability enforcement now runs on the tenant
+        // aggregation: a slot is bookable iff at least one QUALIFIED inspector
+        // is free (or the requested one, when the client chose).
         let requestedTime: string;
         switch (body.timeSlot) {
             case 'morning':   requestedTime = '08:00'; break;
@@ -461,10 +494,22 @@ export const bookingsRoutes = createApiRouter()
             case 'all-day':   requestedTime = '08:00'; break;
             case 'custom':    requestedTime = body.customTime ?? '08:00'; break;
         }
-        const slots = await service.getAvailableSlots(tenantId, inspectorId, body.date);
-        const targetSlot = slots.find(s => s.time === requestedTime);
-        if (!targetSlot || !targetSlot.available) {
+        // KNOWN RACE (advisory check): the slot read and the inspection insert
+        // below are not atomic and D1 offers no row locks, so two concurrent
+        // submits for the last slot can both pass and double-book the same
+        // inspector (deterministic pickInspector converges on one person).
+        // Accepted for launch traffic; a post-insert recheck/compensation is
+        // tracked in the backlog. Do NOT "fix" by randomizing the pick — the
+        // determinism is intentional (idempotent re-submits).
+        const slots = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual, qualifiedIds);
+        const target = slots.find(s => s.time === requestedTime);
+        const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
+        if (freeIds.length === 0) {
             throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
+        }
+        if (!inspectorId) {
+            inspectorId = await service.pickInspector(tenantId, freeIds);
+            if (!inspectorId) throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
         }
 
         // Sprint 2 S2-2 — When the customer selects multiple services, we route
@@ -538,6 +583,14 @@ export const bookingsRoutes = createApiRouter()
                 referredByAgentId: resolvedAgentContactId,
                 createdAt: now
             });
+            // DB-8: mirror assignment into inspection_inspectors link table.
+            // Non-fatal — the link table is a denormalized mirror; a sync failure
+            // must never 500 an anonymous booker whose inspection row already committed.
+            try {
+                await syncInspectionAssignments(db, tenantId, primaryInspectionId, { inspectorId });
+            } catch (e) {
+                logger.error('booking.assignment-sync.failed', { inspectionId: primaryInspectionId }, e instanceof Error ? e : undefined);
+            }
             allInspectionIds = [primaryInspectionId];
         }
         const inspectionId = primaryInspectionId;
@@ -902,11 +955,93 @@ export const bookingsRoutes = createApiRouter()
             return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
         }
     })
+    .openapi(getTenantSlotsRoute, async (c) => {
+        await checkRateLimit(c, 'availability');
+        const { tenant, date, serviceIds, inspectorId } = c.req.valid('query');
+        const tenantRow = await drizzle(c.env.DB).select({ id: tenants.id })
+            .from(tenants).where(eq(tenants.slug, tenant)).get();
+        if (!tenantRow) throw Errors.NotFound('Tenant not found.');
+        const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
+        const all = await c.var.services.booking.getTenantSlots(tenantRow.id, date, ids);
+        const slots = all.map(s => ({
+            time: s.time,
+            available: inspectorId ? s.inspectorIds.includes(inspectorId) : s.available,
+        }));
+        return c.json({ success: true, data: { slots } }, 200);
+    })
+    /**
+     * GET /api/public/book/:tenant — company-level booking profile (IA-26).
+     * The canonical public entry. bookingOpen is company-wide: true iff ANY
+     * qualified staff member has configured recurring hours. The inspectors
+     * list is only exposed when the tenant enabled allowInspectorChoice.
+     *
+     * Round-trip budget: tenant lookup (1) + 3 parallel (services, config,
+     * getQualifiedInspectorIds) + 1 availability scan shared by bookingOpen
+     * and the choice list + 1 conditional inspector fetch = 5 max.
+     * The previous implementation ran up to 6 serial round-trips by calling
+     * hasAnyHours (which itself called getQualifiedInspectorIds + availability)
+     * and then re-running both calls inside the allowChoice branch.
+     */
+    .get('/book/:tenant', async (c) => {
+        await checkRateLimit(c, 'availability');
+        const { tenant } = c.req.param();
+        const db = drizzle(c.env.DB);
+
+        const tenantRow = await db.select({ id: tenants.id, name: tenants.name })
+            .from(tenants).where(eq(tenants.slug, tenant)).get();
+        if (!tenantRow) return c.json({ success: false, error: { code: 'not_found', message: 'Tenant not found' } }, 404);
+
+        const booking = c.var.services.booking;
+        const [svcRows, config, qualified] = await Promise.all([
+            db.select({
+                id: servicesTable.id, name: servicesTable.name, price: servicesTable.price,
+                durationMinutes: servicesTable.durationMinutes, templateId: servicesTable.templateId,
+                active: servicesTable.active,
+            }).from(servicesTable).where(eq(servicesTable.tenantId, tenantRow.id)).all(),
+            db.select({ allowInspectorChoice: tenantConfigs.allowInspectorChoice })
+                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantRow.id)).get(),
+            booking.getQualifiedInspectorIds(tenantRow.id, []),
+        ]);
+        const visible = svcRows.filter(s => s.active && s.templateId);
+        const allowChoice = !!config?.allowInspectorChoice;
+
+        // One availability scan serves BOTH bookingOpen and the choice list.
+        const withHours = qualified.length > 0
+            ? await db.selectDistinct({ inspectorId: availability.inspectorId })
+                .from(availability)
+                .where(and(eq(availability.tenantId, tenantRow.id), inArray(availability.inspectorId, qualified)))
+                .all()
+            : [];
+        const hourIds = withHours.map(r => r.inspectorId);
+        const bookingOpen = hourIds.length > 0;
+
+        let inspectors: Array<{ id: string; name: string | null; photoUrl: string | null }> = [];
+        if (allowChoice && hourIds.length > 0) {
+            inspectors = await db.select({ id: users.id, name: users.name, photoUrl: users.photoUrl })
+                .from(users).where(and(eq(users.tenantId, tenantRow.id), inArray(users.id, hourIds))).all();
+            inspectors.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+        }
+
+        return c.json({
+            success: true,
+            data: {
+                company: tenantRow.name,
+                turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
+                bookingOpen,
+                allowInspectorChoice: allowChoice,
+                inspectors,
+                services: visible.map(s => ({
+                    id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
+                })),
+            },
+        });
+    })
     /**
      * GET /api/public/book/:tenant/:slug — public booking profile
      * Returns inspector name, services, and availability for the booking page.
      */
     .get('/book/:tenant/:slug', async (c) => {
+        await checkRateLimit(c, 'availability');
         const { tenant, slug } = c.req.param();
         const db = drizzle(c.env.DB);
 

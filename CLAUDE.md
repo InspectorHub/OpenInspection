@@ -103,7 +103,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - 9 item types: `rich` (rating + 3 canned-comment tabs) plus `boolean / text / textarea / number / select / multi_select / date / photo_only` for non-rated data points. Inspection side stores rating on `result.rating` and non-rich values on `result.value`.
 - Spectora import path: `POST /api/inspections/templates/import-spectora` accepts a raw Spectora export + a name, runs `lib/spectora-import.ts` (4-bucket → 3-tab mapping, identifier preservation via `source`), creates a template in one shot. UI entry point: "Import Spectora" button on `/templates`.
 - Support for field results, e-signatures, and report generation.
-- Integrated public booking system with Turnstile bot protection.
+- Integrated public booking system with Turnstile bot protection. Entry point is company-level (`/book/:tenant`); bookings auto-assign the first available qualified inspector. Admins can optionally enable an inspector-choice dropdown (Settings → Online Booking → Booking policies). Legacy per-inspector deep links (`/book/:tenant/:slug`) redirect 302 to the company page with that inspector pre-selected.
 
 ## Frontend Architecture
 

@@ -16,6 +16,7 @@ import {
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 
 export interface CreateRequestInput {
     clientName:      string;
@@ -246,6 +247,10 @@ export class InspectionRequestService {
         });
 
         await db.insert(inspections).values(subRows);
+        // DB-8: mirror assignments into inspection_inspectors for each sub-inspection.
+        for (const row of subRows) {
+            await syncInspectionAssignments(db, tenantId, row.id, { inspectorId: row.inspectorId });
+        }
         logger.info('inspection-request.created', { requestId, tenantId, subCount: subs.length });
 
         const detail = await this.get(tenantId, requestId);

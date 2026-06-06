@@ -7,9 +7,12 @@ import {
     recommendations, comments, contacts, users, tenantConfigs, tenants,
     availability, availabilityOverrides, inspectionAgreements,
     eventTypes, inspectionEvents, tenantDestructionRecords,
+    inspectionInspectors, serviceInspectors,
 } from '../lib/db/schema';
 
 const TENANT_TABLES = [
+    // DB-8: link tables must be deleted before their parent rows.
+    inspectionInspectors, serviceInspectors,
     inspectionAgreements, agreementRequests, agreements, automationLogs,
     inspectionEvents, eventTypes, automations,
     inspectionServices, services, discountCodes, recommendations, comments, contacts,
