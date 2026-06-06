@@ -139,10 +139,13 @@ export class BookingService {
         return ids;
     }
 
-    /** True iff at least one qualified staff member has recurring hours. */
-    async hasAnyHours(tenantId: string, serviceIds: string[]): Promise<boolean> {
+    /**
+     * True iff at least one qualified staff member has recurring hours.
+     * @param qualifiedIds Optional precomputed result of getQualifiedInspectorIds to avoid duplicate lookups.
+     */
+    async hasAnyHours(tenantId: string, serviceIds: string[], qualifiedIds?: string[]): Promise<boolean> {
         const db = this.getDrizzle();
-        const qualified = await this.getQualifiedInspectorIds(tenantId, serviceIds);
+        const qualified = qualifiedIds ?? await this.getQualifiedInspectorIds(tenantId, serviceIds);
         if (qualified.length === 0) return false;
         const row = await db.select({ id: availability.id }).from(availability)
             .where(and(eq(availability.tenantId, tenantId), inArray(availability.inspectorId, qualified)))
@@ -157,14 +160,16 @@ export class BookingService {
      * override that date, and (c) has no inspection at that time (via the
      * inspection_inspectors link table, so helper assignments count as busy
      * too). Storage stays per-inspector; this only changes the query face.
+     * @param qualifiedIds Optional precomputed result of getQualifiedInspectorIds to avoid duplicate lookups.
      */
     async getTenantSlots(
         tenantId: string,
         dateStr: string,
         serviceIds: string[],
+        qualifiedIds?: string[],
     ): Promise<Array<{ time: string; available: boolean; inspectorIds: string[] }>> {
         const db = this.getDrizzle();
-        const qualified = await this.getQualifiedInspectorIds(tenantId, serviceIds);
+        const qualified = qualifiedIds ?? await this.getQualifiedInspectorIds(tenantId, serviceIds);
         if (qualified.length === 0) return [];
         const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
 

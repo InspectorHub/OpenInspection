@@ -476,7 +476,10 @@ export const bookingsRoutes = createApiRouter()
 
         // B-16 (company-wide) — distinguish "nobody configured working hours"
         // from a genuinely taken slot, with the honest not-open copy.
-        const bookingOpen = await service.hasAnyHours(tenantId, serviceIdsForQual);
+        // qualifiedIds is computed once here and threaded through to avoid
+        // duplicate getQualifiedInspectorIds lookups in hasAnyHours / getTenantSlots.
+        const qualifiedIds = await service.getQualifiedInspectorIds(tenantId, serviceIdsForQual);
+        const bookingOpen = await service.hasAnyHours(tenantId, serviceIdsForQual, qualifiedIds);
         if (!bookingOpen) {
             throw Errors.Conflict('Online booking is not open yet. Please contact the company directly to schedule.');
         }
@@ -491,7 +494,14 @@ export const bookingsRoutes = createApiRouter()
             case 'all-day':   requestedTime = '08:00'; break;
             case 'custom':    requestedTime = body.customTime ?? '08:00'; break;
         }
-        const slots = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual);
+        // KNOWN RACE (advisory check): the slot read and the inspection insert
+        // below are not atomic and D1 offers no row locks, so two concurrent
+        // submits for the last slot can both pass and double-book the same
+        // inspector (deterministic pickInspector converges on one person).
+        // Accepted for launch traffic; a post-insert recheck/compensation is
+        // tracked in the backlog. Do NOT "fix" by randomizing the pick — the
+        // determinism is intentional (idempotent re-submits).
+        const slots = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual, qualifiedIds);
         const target = slots.find(s => s.time === requestedTime);
         const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
         if (freeIds.length === 0) {

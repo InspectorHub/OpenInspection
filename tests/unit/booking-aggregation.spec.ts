@@ -8,7 +8,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
-// 2026-06-08 is a Monday.
+// 2026-06-08 is a Monday (dayOfWeek = 1).
+// Must stay future-dated if a past-date guard ever lands in the booking handler.
 const MONDAY = '2026-06-08';
 
 describe('BookingService tenant aggregation (IA-26)', () => {

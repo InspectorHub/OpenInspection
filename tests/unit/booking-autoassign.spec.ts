@@ -37,6 +37,7 @@ vi.mock('../../server/lib/rate-limit', () => ({
 import { bookingsRoutes } from '../../server/api/bookings';
 
 // 2026-06-08 is a Monday (dayOfWeek = 1) — mirrors booking-aggregation.spec.ts.
+// Must stay future-dated if a past-date guard ever lands in the booking handler.
 const MONDAY = '2026-06-08';
 
 // Stable UUIDs so test assertions are readable.
