@@ -86,6 +86,8 @@ export default [
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
+  route("resources/template-search", "routes/resources/template-search.tsx"),
+  route("resources/inspection-search", "routes/resources/inspection-search.tsx"),
   layout("routes/auth-layout.tsx", [
     // IA-6 — BFF resource route for advisory schedule-conflict detection.
     // Loaded via useFetcher; no UI rendered; must be inside the auth layout so

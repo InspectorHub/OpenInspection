@@ -145,7 +145,7 @@ const listTemplatesRoute = createRoute(withMcpMetadata({
     tags: ["inspections", "templates"],
     summary: "List inspection templates (paginated)",
     description: "Paginated list of inspection templates for the tenant.",
-    request: { query: paginationQuerySchema },
+    request: { query: paginationQuerySchema.extend({ q: z.string().optional().describe('Filter templates by name (case-insensitive substring match)') }) },
     responses: {
         200: {
             content: {
@@ -1893,13 +1893,18 @@ export const inspectionsRoutes = createApiRouter()
         }, 200);
     })
     .openapi(listTemplatesRoute, async (c) => {
-        const q = c.req.valid('query');
+        const queryParams = c.req.valid('query');
         const service = c.var.services.template;
-        const { rows, total } = await service.listTemplates(c.get('tenantId'), q);
+        const { page, pageSize, q } = queryParams;
+        const { rows, total } = await service.listTemplates(c.get('tenantId'), {
+            ...(page !== undefined ? { page } : {}),
+            ...(pageSize !== undefined ? { pageSize } : {}),
+            ...(q !== undefined ? { q } : {}),
+        });
         return c.json({
             success: true,
             data: rows,
-            meta: buildMeta({ total, page: q.page, pageSize: q.pageSize }),
+            meta: buildMeta({ total, page: queryParams.page, pageSize: queryParams.pageSize }),
         }, 200);
     })
     .openapi(listTemplateDuplicatesRoute, async (c) => {

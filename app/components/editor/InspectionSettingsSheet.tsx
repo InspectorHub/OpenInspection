@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { TemplateCombobox } from "~/components/TemplateCombobox";
 
 interface SettingsForm {
   date: string;
@@ -225,13 +226,14 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
 
               <fieldset className="space-y-4">
                 <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Template</legend>
-                <label className="block">
+                <div className="block">
                   <span className={labelClass}>Inspection template</span>
-                  <select value={form.templateId} onChange={(e) => updateForm("templateId", e.target.value)} className={inputClass}>
-                    <option value="">--- Select template ---</option>
-                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </label>
+                  <TemplateCombobox
+                    value={form.templateId}
+                    onChange={(id) => updateForm("templateId", id)}
+                    initialTemplates={templates}
+                  />
+                </div>
               </fieldset>
 
               <fieldset className="space-y-4">
