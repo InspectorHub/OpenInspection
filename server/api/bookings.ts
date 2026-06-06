@@ -540,7 +540,13 @@ export const bookingsRoutes = createApiRouter()
                 createdAt: now
             });
             // DB-8: mirror assignment into inspection_inspectors link table.
-            await syncInspectionAssignments(db, tenantId, primaryInspectionId, { inspectorId });
+            // Non-fatal — the link table is a denormalized mirror; a sync failure
+            // must never 500 an anonymous booker whose inspection row already committed.
+            try {
+                await syncInspectionAssignments(db, tenantId, primaryInspectionId, { inspectorId });
+            } catch (e) {
+                logger.error('booking.assignment-sync.failed', { inspectionId: primaryInspectionId }, e instanceof Error ? e : undefined);
+            }
             allInspectionIds = [primaryInspectionId];
         }
         const inspectionId = primaryInspectionId;

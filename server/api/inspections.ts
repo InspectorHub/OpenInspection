@@ -50,10 +50,9 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors } from '../lib/db/schema';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
-import { inspectionInspectors } from '../lib/db/schema';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
 import { eq, inArray, and } from 'drizzle-orm';
 import type { Context } from 'hono';
@@ -1928,11 +1927,28 @@ export const inspectionsRoutes = createApiRouter()
 
         if (body.action === 'assignInspector') {
             if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
+            // DB-8: fetch team fields BEFORE the update so the link-table mirror
+            // carries ALL canonical assignment columns (preserves team-mode lead/
+            // helpers that bulk-assign cannot change).
+            const affected = await db.select({
+                id:                 inspectionTable.id,
+                leadInspectorId:    inspectionTable.leadInspectorId,
+                helperInspectorIds: inspectionTable.helperInspectorIds,
+            }).from(inspectionTable)
+                .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)))
+                .all();
             await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
-            // DB-8: re-sync the link table for each reassigned inspection.
-            for (const iid of body.ids) {
-                await syncInspectionAssignments(db, tenantId, iid, { inspectorId: body.inspectorId });
+            // DB-8: re-sync the link table for each reassigned inspection, preserving
+            // team-mode rows that this bulk operation cannot change.
+            for (const row of affected) {
+                let helpers: string[] = [];
+                try { helpers = JSON.parse(row.helperInspectorIds ?? '[]'); } catch { /* malformed legacy JSON */ }
+                await syncInspectionAssignments(db, tenantId, row.id, {
+                    inspectorId:        body.inspectorId,
+                    leadInspectorId:    row.leadInspectorId,
+                    helperInspectorIds: helpers,
+                });
             }
 
             auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
@@ -2018,8 +2034,18 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         // DB-8: re-sync link table when inspectorId is explicitly updated.
+        // DB-8: mirror ALL canonical assignment columns — PATCH can only change
+        // inspectorId, so preserve the pre-patch team-mode fields (leadInspectorId,
+        // helperInspectorIds) from the fetched row so the link table stays a faithful
+        // mirror of post-patch canonical state and team-mode rows are not wiped.
         if ('inspectorId' in body) {
-            await syncInspectionAssignments(db, tenantId, id, { inspectorId: body.inspectorId ?? null });
+            let helpers: string[] = [];
+            try { helpers = JSON.parse(inspection.helperInspectorIds ?? '[]'); } catch { /* malformed legacy JSON -> no helpers */ }
+            await syncInspectionAssignments(db, tenantId, id, {
+                inspectorId:        body.inspectorId ?? null,
+                leadInspectorId:    inspection.leadInspectorId,
+                helperInspectorIds: helpers,
+            });
         }
 
         if (body.status && body.status !== inspection.status) {

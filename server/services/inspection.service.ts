@@ -511,7 +511,12 @@ export class InspectionService {
 
         await this.sdb.insert(inspections, newInspection);
         // DB-8: mirror assignment into inspection_inspectors link table.
-        await syncInspectionAssignments(this.getDrizzle(), tenantId, id, { inspectorId: newInspection.inspectorId });
+        // Non-fatal — a sync failure must not roll back a committed inspection row.
+        try {
+            await syncInspectionAssignments(this.getDrizzle(), tenantId, id, { inspectorId: newInspection.inspectorId });
+        } catch (e) {
+            logger.error('inspection.assignment-sync.failed', { inspectionId: id }, e instanceof Error ? e : undefined);
+        }
         await fireAutomation(this.db, tenantId, id, 'inspection.created');
 
         // Soft-upsert the client into Contacts so it shows up in the Contacts list
@@ -679,11 +684,18 @@ export class InspectionService {
             // rather than clearing all link rows while inspections.inspectorId
             // still holds creatorUserId (which would diverge the two sources of truth).
             if (teamFieldsPatched) {
-                await syncInspectionAssignments(db, tenantId, created.id, {
-                    inspectorId:        creatorUserId,
-                    leadInspectorId:    effectiveLead,
-                    helperInspectorIds: effectiveHelpers,
-                });
+                // Non-fatal — the link table is a denormalized mirror; a sync
+                // failure must not surface to the caller after the canonical row
+                // has already been written.
+                try {
+                    await syncInspectionAssignments(db, tenantId, created.id, {
+                        inspectorId:        creatorUserId,
+                        leadInspectorId:    effectiveLead,
+                        helperInspectorIds: effectiveHelpers,
+                    });
+                } catch (e) {
+                    logger.error('inspection.wizard-team-sync.failed', { inspectionId: created.id }, e instanceof Error ? e : undefined);
+                }
             }
         }
 
@@ -710,11 +722,17 @@ export class InspectionService {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.getDrizzle().insert(inspections).values(clone as any);
         // DB-8: mirror the cloned inspection's assignment into inspection_inspectors.
-        await syncInspectionAssignments(this.getDrizzle(), tenantId, clone.id, {
-            inspectorId:        (clone as { inspectorId?: string | null }).inspectorId ?? null,
-            leadInspectorId:    (clone as { leadInspectorId?: string | null }).leadInspectorId ?? null,
-            helperInspectorIds: JSON.parse((clone as { helperInspectorIds?: string }).helperInspectorIds ?? '[]') as string[],
-        });
+        // Non-fatal — the link table is a denormalized mirror; a sync failure must
+        // not abort a clone whose canonical inspection row already committed.
+        try {
+            await syncInspectionAssignments(this.getDrizzle(), tenantId, clone.id, {
+                inspectorId:        (clone as { inspectorId?: string | null }).inspectorId ?? null,
+                leadInspectorId:    (clone as { leadInspectorId?: string | null }).leadInspectorId ?? null,
+                helperInspectorIds: JSON.parse((clone as { helperInspectorIds?: string }).helperInspectorIds ?? '[]') as string[],
+            });
+        } catch (e) {
+            logger.error('inspection.clone-sync.failed', { inspectionId: clone.id }, e instanceof Error ? e : undefined);
+        }
 
         return {
             ...clone,

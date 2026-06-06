@@ -43,4 +43,13 @@ describe('syncInspectionAssignments', () => {
         await syncInspectionAssignments(db as any, 't1', 'i1', {});
         expect(await db.select().from(inspectionInspectors).all()).toHaveLength(0);
     });
+
+    it('tenant scoping — syncing tenant A does not touch tenant B rows for the same inspectionId', async () => {
+        await syncInspectionAssignments(db as any, 'tA', 'i1', { inspectorId: 'u1' });
+        await syncInspectionAssignments(db as any, 'tB', 'i1', { inspectorId: 'u9' });
+        // re-sync tenant A — tenant B's row must survive
+        await syncInspectionAssignments(db as any, 'tA', 'i1', { inspectorId: 'u2' });
+        const rows = await db.select().from(inspectionInspectors).all();
+        expect(rows.map(r => `${r.tenantId}:${r.userId}`).sort()).toEqual(['tA:u2', 'tB:u9']);
+    });
 });
