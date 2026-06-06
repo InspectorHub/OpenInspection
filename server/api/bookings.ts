@@ -16,6 +16,7 @@ import {
     BookingResponseSchema
 } from '../lib/validations/booking.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 
 /**
  * GET /api/public/inspectors
@@ -538,6 +539,8 @@ export const bookingsRoutes = createApiRouter()
                 referredByAgentId: resolvedAgentContactId,
                 createdAt: now
             });
+            // DB-8: mirror assignment into inspection_inspectors link table.
+            await syncInspectionAssignments(db, tenantId, primaryInspectionId, { inspectorId });
             allInspectionIds = [primaryInspectionId];
         }
         const inspectionId = primaryInspectionId;

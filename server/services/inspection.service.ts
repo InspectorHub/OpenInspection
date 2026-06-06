@@ -17,6 +17,7 @@ import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../lib/r
 import { computePreflightFromData } from '../lib/preflight';
 import { decideFieldWrite, applyFieldWrite } from '../lib/field-version';
 import { ApprenticeService } from './apprentice.service';
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
@@ -509,6 +510,8 @@ export class InspectionService {
         };
 
         await this.sdb.insert(inspections, newInspection);
+        // DB-8: mirror assignment into inspection_inspectors link table.
+        await syncInspectionAssignments(this.getDrizzle(), tenantId, id, { inspectorId: newInspection.inspectorId });
         await fireAutomation(this.db, tenantId, id, 'inspection.created');
 
         // Soft-upsert the client into Contacts so it shows up in the Contacts list
@@ -652,15 +655,30 @@ export class InspectionService {
             if (input.property.propertyType === 'commercial' && input.property.commercialSubtype) {
                 patch.commercialSubtype = input.property.commercialSubtype;
             }
+            let teamFieldsPatched = false;
+            let effectiveLead: string | null = null;
+            let effectiveHelpers: string[] = [];
             if (input.teamMode || input.leadInspectorId || (input.helperInspectorIds?.length ?? 0) > 0) {
                 patch.teamMode           = input.teamMode;
                 patch.leadInspectorId    = input.teamMode ? (input.leadInspectorId ?? creatorUserId) : null;
                 patch.helperInspectorIds = JSON.stringify(input.teamMode ? (input.helperInspectorIds ?? []) : []);
+                teamFieldsPatched = true;
+                effectiveLead    = patch.leadInspectorId as string | null;
+                effectiveHelpers = input.teamMode ? (input.helperInspectorIds ?? []) : [];
             }
             if (Object.keys(patch).length > 0) {
                 await db.update(inspections)
                     .set(patch)
                     .where(and(eq(inspections.id, created.id), eq(inspections.tenantId, tenantId)));
+            }
+            // DB-8: re-sync with effective post-patch assignment values when team
+            // fields were written (the initial createInspection call already synced
+            // inspectorId=creatorUserId; this overwrites that with the resolved lead).
+            if (teamFieldsPatched) {
+                await syncInspectionAssignments(db, tenantId, created.id, {
+                    leadInspectorId:     effectiveLead,
+                    helperInspectorIds:  effectiveHelpers,
+                });
             }
         }
 
@@ -686,6 +704,12 @@ export class InspectionService {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.getDrizzle().insert(inspections).values(clone as any);
+        // DB-8: mirror the cloned inspection's assignment into inspection_inspectors.
+        await syncInspectionAssignments(this.getDrizzle(), tenantId, clone.id, {
+            inspectorId:        (clone as { inspectorId?: string | null }).inspectorId ?? null,
+            leadInspectorId:    (clone as { leadInspectorId?: string | null }).leadInspectorId ?? null,
+            helperInspectorIds: JSON.parse((clone as { helperInspectorIds?: string }).helperInspectorIds ?? '[]') as string[],
+        });
 
         return {
             ...clone,

@@ -11,6 +11,7 @@ import {
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import type { EmailService } from './email.service';
 
 /**
@@ -182,6 +183,8 @@ export class ConciergeService {
             conciergeStatus,
             createdAt: new Date(),
         });
+        // DB-8: mirror assignment into inspection_inspectors link table.
+        await syncInspectionAssignments(db, params.tenantId, inspectionId, { inspectorId: inspector.id });
         logger.info('concierge.createBooking', {
             tenantId: params.tenantId,
             inspectionId,

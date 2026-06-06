@@ -45,6 +45,7 @@ import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validatio
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
 import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
 
 /**
  * GET /api/admin/export
@@ -1265,6 +1266,10 @@ export const adminRoutes = createApiRouter()
                 paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
                 createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
             }).onConflictDoNothing().run();
+            // DB-8: mirror assignment into inspection_inspectors (full-replace is safe on
+            // conflict — onConflictDoNothing leaves canonical columns unchanged so sync
+            // re-aligns the link table to whatever inspectorId the import row carries).
+            await syncInspectionAssignments(db, tenantId, ins.id, { inspectorId: ins.inspectorId || null });
             counts.inspections++;
         }
 

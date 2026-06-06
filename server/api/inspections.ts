@@ -52,6 +52,8 @@ import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/valid
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool } from '../lib/db/schema';
 import { applyResultsBatch } from '../services/inspection-results.service';
+import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import { inspectionInspectors } from '../lib/db/schema';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
 import { eq, inArray, and } from 'drizzle-orm';
 import type { Context } from 'hono';
@@ -1928,6 +1930,10 @@ export const inspectionsRoutes = createApiRouter()
             if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
             await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
+            // DB-8: re-sync the link table for each reassigned inspection.
+            for (const iid of body.ids) {
+                await syncInspectionAssignments(db, tenantId, iid, { inspectorId: body.inspectorId });
+            }
 
             auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
                 metadata: { ids: body.ids, inspectorId: body.inspectorId },
@@ -1965,6 +1971,8 @@ export const inspectionsRoutes = createApiRouter()
         const { inspection } = await service.getInspection(id, tenantId);
 
         const db = drizzle(c.env.DB);
+        // DB-8: delete link rows before (or together with) the inspection row.
+        await db.delete(inspectionInspectors).where(and(eq(inspectionInspectors.inspectionId, id), eq(inspectionInspectors.tenantId, tenantId)));
         await db.delete(inspectionTable).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
@@ -2007,6 +2015,11 @@ export const inspectionsRoutes = createApiRouter()
         // no-op as a successful save instead of writing an empty UPDATE.
         if (Object.keys(body).length > 0) {
             await db.update(inspectionTable).set(body).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+        }
+
+        // DB-8: re-sync link table when inspectorId is explicitly updated.
+        if ('inspectorId' in body) {
+            await syncInspectionAssignments(db, tenantId, id, { inspectorId: body.inspectorId ?? null });
         }
 
         if (body.status && body.status !== inspection.status) {
