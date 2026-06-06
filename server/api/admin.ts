@@ -876,7 +876,8 @@ const tenantConfigGetRoute = createRoute(withMcpMetadata({
 // the settings UI surfaces directly. Currently only `conciergeReviewRequired`.
 // Adding more keys here in the future stays a one-line allowlist change.
 const TenantConfigPatchSchema = z.object({
-    conciergeReviewRequired: z.boolean().optional().describe('TODO describe conciergeReviewRequired field for the OpenInspection MCP integration'),
+    conciergeReviewRequired: z.boolean().optional().describe('Whether agent-submitted bookings require owner/admin approval before the client receives a confirmation link.'),
+    blockUnsignedAgreement: z.boolean().optional().describe('Whether clients must sign the inspection agreement before a booking is confirmed.'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -1945,6 +1946,9 @@ export const adminRoutes = createApiRouter()
         const update: Partial<typeof tenantConfigs.$inferInsert> = {};
         if (body.conciergeReviewRequired !== undefined) {
             update.conciergeReviewRequired = body.conciergeReviewRequired;
+        }
+        if (body.blockUnsignedAgreement !== undefined) {
+            update.blockUnsignedAgreement = body.blockUnsignedAgreement;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

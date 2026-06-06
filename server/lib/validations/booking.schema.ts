@@ -56,7 +56,7 @@ export const AvailabilitySchema = z.object({
         dayOfWeek: z.number().min(0).max(6).openapi({ example: 1 }).describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
         startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
         endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '17:00' }).describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    })).min(1).openapi({ description: 'List of weekly availability slots' }),
+    })).min(0).openapi({ description: 'List of weekly availability slots (empty array clears all slots)' }),
 }).openapi('Availability');
 
 /**

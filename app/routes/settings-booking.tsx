@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLoaderData } from "react-router";
+import { useState, useEffect, useRef } from "react";
+import { Link, useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/settings-booking";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -13,7 +13,7 @@ interface AvailabilitySlot {
 }
 
 interface DateOverride {
-  id: number;
+  id: string;
   date: string;
   isAvailable: boolean;
   startTime: string | null;
@@ -69,6 +69,54 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   return { slots, overrides, config, origins };
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const form = await request.formData();
+  const intent = String(form.get("intent"));
+
+  if (intent === "schedule-save") {
+    const slots = JSON.parse(String(form.get("slots") ?? "[]"));
+    const inspectorId = String(form.get("inspectorId") ?? "") || undefined;
+    const res = await api.availability.index.$put({
+      json: { slots, ...(inspectorId ? { inspectorId } : {}) },
+    });
+    return { ok: res.ok, intent };
+  }
+
+  if (intent === "override-add") {
+    const inspectorId = String(form.get("inspectorId") ?? "") || undefined;
+    const res = await api.availability.overrides.$post({
+      json: {
+        date: String(form.get("date")),
+        isAvailable: false,
+        ...(inspectorId ? { inspectorId } : {}),
+      },
+    });
+    const body = res.ok ? ((await res.json()) as { data?: { override?: unknown } }) : null;
+    return { ok: res.ok, intent, override: body?.data?.override ?? null };
+  }
+
+  if (intent === "override-remove") {
+    const res = await api.availability.overrides[":id"].$delete({
+      param: { id: String(form.get("id")) },
+    });
+    return { ok: res.ok, intent };
+  }
+
+  if (intent === "policies-save") {
+    const res = await api.admin["tenant-config"].$patch({
+      json: {
+        conciergeReviewRequired: form.get("conciergeReviewRequired") === "true",
+        blockUnsignedAgreement: form.get("blockUnsignedAgreement") === "true",
+      },
+    });
+    return { ok: res.ok, intent };
+  }
+
+  return { ok: false, intent };
 }
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -188,29 +236,34 @@ function buildDayMap(slots: AvailabilitySlot[]): DayState[] {
 }
 
 function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) {
+  const fetcher = useFetcher<typeof action>();
   const [days, setDays] = useState<DayState[]>(() => buildDayMap(initialSlots));
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // dirty tracks whether local state differs from the last saved state
+  const [dirty, setDirty] = useState(false);
+
+  // Derive saved from fetcher response; reset dirty when the save completes
+  const saved =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "schedule-save" &&
+    fetcher.data.ok === true &&
+    !dirty;
+
+  const saving = fetcher.state !== "idle";
 
   function updateDay(idx: number, patch: Partial<DayState>) {
     setDays((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
-    setSaved(false);
+    setDirty(true);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
+  function handleSave() {
     const slots = days
       .map((d, i) => (d.enabled ? { dayOfWeek: i, startTime: d.startTime, endTime: d.endTime } : null))
       .filter(Boolean);
-    await fetch("/api/availability", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ slots }),
-    });
-    setSaving(false);
-    setSaved(true);
+    setDirty(false);
+    fetcher.submit(
+      { intent: "schedule-save", slots: JSON.stringify(slots) },
+      { method: "post" },
+    );
   }
 
   const displayOrder = [1, 2, 3, 4, 5, 6, 0];
@@ -271,37 +324,72 @@ function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) 
 /* ------------------------------------------------------------------ */
 
 function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] }) {
+  const addFetcher = useFetcher<typeof action>();
+  const removeFetcher = useFetcher<typeof action>();
+
   const [overrides, setOverrides] = useState<DateOverride[]>(initialOverrides);
   const [newDate, setNewDate] = useState("");
-  const [adding, setAdding] = useState(false);
+  // Track the last appended override id to prevent double-append on re-render
+  const lastAppendedId = useRef<string | null>(null);
+  // Keep a ref to the pending-removed override for rollback on failure
+  const pendingRemovedRef = useRef<DateOverride | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
-  async function handleAdd() {
-    if (!newDate) return;
-    setAdding(true);
-    const res = await fetch("/api/availability/overrides", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ date: newDate, isAvailable: false }),
-    });
-    if (res.ok) {
-      const body = (await res.json()) as Record<string, unknown>;
-      const d = (body.data ?? {}) as Record<string, unknown>;
-      const created = d.override as DateOverride;
-      if (created) {
+  const adding = addFetcher.state !== "idle";
+
+  // Append the newly created override to local list when add succeeds
+  useEffect(() => {
+    if (
+      addFetcher.state === "idle" &&
+      addFetcher.data?.intent === "override-add" &&
+      addFetcher.data.ok === true &&
+      addFetcher.data.override
+    ) {
+      const created = addFetcher.data.override as DateOverride;
+      if (created.id && created.id !== lastAppendedId.current) {
+        lastAppendedId.current = created.id;
         setOverrides((prev) => [...prev, created]);
+        setNewDate("");
       }
-      setNewDate("");
     }
-    setAdding(false);
+  }, [addFetcher.state, addFetcher.data]);
+
+  // Restore the row and show error if remove failed
+  useEffect(() => {
+    if (
+      removeFetcher.state === "idle" &&
+      removeFetcher.data?.intent === "override-remove" &&
+      removeFetcher.data.ok === false
+    ) {
+      if (pendingRemovedRef.current) {
+        setOverrides((prev) => [...prev, pendingRemovedRef.current!]);
+        pendingRemovedRef.current = null;
+        setRemoveError("Failed to remove date — please try again.");
+      }
+    } else if (removeFetcher.state === "idle" && removeFetcher.data?.ok === true) {
+      pendingRemovedRef.current = null;
+      setRemoveError(null);
+    }
+  }, [removeFetcher.state, removeFetcher.data]);
+
+  function handleAdd() {
+    if (!newDate) return;
+    addFetcher.submit(
+      { intent: "override-add", date: newDate },
+      { method: "post" },
+    );
   }
 
-  async function handleRemove(id: number) {
+  function handleRemove(id: string) {
+    const target = overrides.find((o) => o.id === id) ?? null;
+    pendingRemovedRef.current = target;
+    setRemoveError(null);
+    // Optimistic removal
     setOverrides((prev) => prev.filter((o) => o.id !== id));
-    await fetch(`/api/availability/overrides/${id}`, {
-      method: "DELETE",
-      credentials: "same-origin",
-    });
+    removeFetcher.submit(
+      { intent: "override-remove", id },
+      { method: "post" },
+    );
   }
 
   return (
@@ -330,6 +418,10 @@ function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] 
         <p className="text-[12px] text-ih-fg-4 italic">No date overrides set.</p>
       )}
 
+      {removeError && (
+        <p className="text-[12px] text-ih-bad-fg">{removeError}</p>
+      )}
+
       <div className="flex items-center gap-3 pt-1">
         <input
           type="date"
@@ -355,25 +447,28 @@ function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] 
 /* ------------------------------------------------------------------ */
 
 function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
+  const fetcher = useFetcher<typeof action>();
   const [concierge, setConcierge] = useState(initialConfig.conciergeReviewRequired);
   const [blockUnsigned, setBlockUnsigned] = useState(initialConfig.blockUnsignedAgreement);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    await fetch("/api/admin/tenant-config", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({
-        conciergeReviewRequired: concierge,
-        blockUnsignedAgreement: blockUnsigned,
-      }),
-    });
-    setSaving(false);
-    setSaved(true);
+  const saving = fetcher.state !== "idle";
+  const saved =
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === "policies-save" &&
+    fetcher.data.ok === true &&
+    !dirty;
+
+  function handleSave() {
+    setDirty(false);
+    fetcher.submit(
+      {
+        intent: "policies-save",
+        conciergeReviewRequired: String(concierge),
+        blockUnsignedAgreement: String(blockUnsigned),
+      },
+      { method: "post" },
+    );
   }
 
   return (
@@ -384,7 +479,7 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
         <input
           type="checkbox"
           checked={concierge}
-          onChange={(e) => { setConcierge(e.target.checked); setSaved(false); }}
+          onChange={(e) => { setConcierge(e.target.checked); setDirty(true); }}
           className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
         />
         <span>
@@ -399,7 +494,7 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
         <input
           type="checkbox"
           checked={blockUnsigned}
-          onChange={(e) => { setBlockUnsigned(e.target.checked); setSaved(false); }}
+          onChange={(e) => { setBlockUnsigned(e.target.checked); setDirty(true); }}
           className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
         />
         <span>
