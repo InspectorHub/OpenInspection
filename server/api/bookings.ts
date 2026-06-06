@@ -458,41 +458,32 @@ export const bookingsRoutes = createApiRouter()
             }
         }
 
-        // Booking #7 Sprint A — inspectorId is now required. The legacy
-        // "first-inspector-wins" fallback was removed because the customer-facing
-        // booking page now resolves an inspector via /book/<slug>, and the form
-        // submits the resolved id as a hidden field. Submissions without it are a
-        // bug or a tampered payload, not a routine fallback case.
-        const inspectorId = body.inspectorId;
-        if (!inspectorId) {
-            throw Errors.BadRequest('Booking link missing inspector context. Please use the link your inspector provided.');
+        // IA-26 — inspectorId is now OPTIONAL. The company-level booking page
+        // submits without one (pure auto-assign); the legacy per-inspector
+        // deep link and the allowInspectorChoice dropdown still send it.
+        const serviceIdsForQual = (body.services ?? []).map(s => s.serviceId);
+        let inspectorId = body.inspectorId ?? null;
+
+        if (inspectorId) {
+            // B-16 — a supplied inspector must belong to the resolved tenant;
+            // a mismatched id (tampered payload or stale form) must not reach
+            // into another tenant's availability/inspection space.
+            const inspectorRow = await db.select({ id: users.id }).from(users)
+                .where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId)))
+                .get();
+            if (!inspectorRow) throw Errors.NotFound('Inspector not found.');
         }
 
-        // B-16 — the inspector must belong to the resolved tenant; a mismatched
-        // id (tampered payload or stale form) must not reach into another
-        // tenant's availability/inspection space.
-        const inspectorRow = await db.select({ id: users.id }).from(users)
-            .where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId)))
-            .get();
-        if (!inspectorRow) throw Errors.NotFound('Inspector not found.');
-
-        // B-16 — distinguish "never configured working hours" from a genuinely
-        // taken slot. With zero availability rows every submit would otherwise
-        // 409 with a misleading "slot no longer available".
-        const hasHours = await db.select({ id: availability.id }).from(availability)
-            .where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId)))
-            .limit(1)
-            .get();
-        if (!hasHours) {
-            throw Errors.Conflict('Online booking is not open for this inspector yet. Please contact them directly to schedule.');
+        // B-16 (company-wide) — distinguish "nobody configured working hours"
+        // from a genuinely taken slot, with the honest not-open copy.
+        const bookingOpen = await service.hasAnyHours(tenantId, serviceIdsForQual);
+        if (!bookingOpen) {
+            throw Errors.Conflict('Online booking is not open yet. Please contact the company directly to schedule.');
         }
 
-        // Spec 3C — enforce inspector availability + availability_overrides + existing-bookings collision check.
-        // Reuses BookingService.getAvailableSlots (returns [{time:'HH:MM', available:bool}, ...]).
-        //
-        // Sprint 1 C-6 — translate the 4 customer-facing window options into the
-        // existing internal time-slot model. all-day reuses the morning slot
-        // (08:00); custom maps to the user-provided customTime (HH:mm).
+        // Spec 3C / IA-26 — availability enforcement now runs on the tenant
+        // aggregation: a slot is bookable iff at least one QUALIFIED inspector
+        // is free (or the requested one, when the client chose).
         let requestedTime: string;
         switch (body.timeSlot) {
             case 'morning':   requestedTime = '08:00'; break;
@@ -500,10 +491,15 @@ export const bookingsRoutes = createApiRouter()
             case 'all-day':   requestedTime = '08:00'; break;
             case 'custom':    requestedTime = body.customTime ?? '08:00'; break;
         }
-        const slots = await service.getAvailableSlots(tenantId, inspectorId, body.date);
-        const targetSlot = slots.find(s => s.time === requestedTime);
-        if (!targetSlot || !targetSlot.available) {
+        const slots = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual);
+        const target = slots.find(s => s.time === requestedTime);
+        const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
+        if (freeIds.length === 0) {
             throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
+        }
+        if (!inspectorId) {
+            inspectorId = await service.pickInspector(tenantId, freeIds);
+            if (!inspectorId) throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
         }
 
         // Sprint 2 S2-2 — When the customer selects multiple services, we route
