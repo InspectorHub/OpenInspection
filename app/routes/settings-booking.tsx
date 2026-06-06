@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLoaderData, useFetcher } from "react-router";
+import { Link, useLoaderData, useFetcher, useNavigate } from "react-router";
 import type { Route } from "./+types/settings-booking";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -23,6 +23,14 @@ interface DateOverride {
 interface TenantConfig {
   conciergeReviewRequired: boolean;
   blockUnsignedAgreement: boolean;
+  allowInspectorChoice: boolean;
+}
+
+interface Member {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: string;
 }
 
 export function meta() {
@@ -32,11 +40,16 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const [availRes, overridesRes, configRes, originsRes] = await Promise.all([
-    api.availability.index.$get({ query: {} }).catch(() => null),
-    api.availability.overrides.$get({ query: {} }).catch(() => null),
+
+  const url = new URL(request.url);
+  const inspectorId = url.searchParams.get("inspectorId") ?? undefined;
+
+  const [availRes, overridesRes, configRes, originsRes, membersRes] = await Promise.all([
+    api.availability.index.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
+    api.availability.overrides.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.widget.origins.$get().catch(() => null),
+    api.admin.members.$get().catch(() => null),
   ]);
 
   let slots: AvailabilitySlot[] = [];
@@ -51,13 +64,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     overrides = ((body.data ?? []) as DateOverride[]);
   }
 
-  let config: TenantConfig = { conciergeReviewRequired: false, blockUnsignedAgreement: false };
+  let config: TenantConfig = { conciergeReviewRequired: false, blockUnsignedAgreement: false, allowInspectorChoice: false };
   if (configRes?.ok) {
     const body = (await configRes.json()) as Record<string, unknown>;
     const d = (body.data ?? {}) as Record<string, unknown>;
     config = {
       conciergeReviewRequired: Boolean(d.conciergeReviewRequired),
       blockUnsignedAgreement: Boolean(d.blockUnsignedAgreement),
+      allowInspectorChoice: Boolean(d.allowInspectorChoice),
     };
   }
 
@@ -68,7 +82,21 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     origins = (d.origins || []) as string[];
   }
 
-  return { slots, overrides, config, origins };
+  // Non-admins get 403 → null → empty list; no separate role check needed.
+  let members: Member[] = [];
+  if (membersRes?.ok) {
+    const body = (await membersRes.json()) as Record<string, unknown>;
+    members = ((body.data ?? []) as Member[]);
+  }
+
+  return {
+    slots,
+    overrides,
+    config,
+    origins,
+    members,
+    managedInspectorId: inspectorId ?? null,
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -122,6 +150,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       json: {
         conciergeReviewRequired: form.get("conciergeReviewRequired") === "true",
         blockUnsignedAgreement: form.get("blockUnsignedAgreement") === "true",
+        allowInspectorChoice: form.get("allowInspectorChoice") === "true",
       },
     });
     if (!res.ok) {
@@ -143,6 +172,14 @@ export default function SettingsBookingPage() {
 
   const tenant = ctx?.branding?.tenantSlug;
   const slug = ctx?.branding?.currentUserSlug;
+  // The current user's id is not in session context — we use role+members for the picker.
+  // Admin/owner role means members loaded successfully (403 gate for non-admins).
+  const isAdmin = ctx?.user?.role === "owner" || ctx?.user?.role === "admin";
+
+  // Filter out agent role and show picker only to admins with >0 other members
+  const pickerMembers = isAdmin
+    ? data.members.filter((m) => m.role !== "agent")
+    : [];
 
   return (
     <div className="space-y-[18px]">
@@ -158,11 +195,58 @@ export default function SettingsBookingPage() {
       </p>
 
       <StatusAndLinks tenant={tenant} slug={slug} />
-      <WeeklySchedule initialSlots={data.slots} />
-      <DateOverrides initialOverrides={data.overrides} />
+
+      {pickerMembers.length > 0 && (
+        <ManageOthersPicker members={pickerMembers} managedInspectorId={data.managedInspectorId} />
+      )}
+
+      <WeeklySchedule
+        key={data.managedInspectorId ?? "self"}
+        initialSlots={data.slots}
+        inspectorId={data.managedInspectorId}
+      />
+      <DateOverrides
+        key={data.managedInspectorId ?? "self"}
+        initialOverrides={data.overrides}
+        inspectorId={data.managedInspectorId}
+      />
       <BookingPolicies initialConfig={data.config} />
       <EmbedWidget tenant={tenant} slug={slug} />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Manage-others picker (admin only)                                  */
+/* ------------------------------------------------------------------ */
+
+function ManageOthersPicker({
+  members,
+  managedInspectorId,
+}: {
+  members: Member[];
+  managedInspectorId: string | null;
+}) {
+  const navigate = useNavigate();
+  return (
+    <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 flex items-center gap-3">
+      <span className="text-[13px] font-bold text-ih-fg-1">Managing schedule for</span>
+      <select
+        value={managedInspectorId ?? ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          navigate(v ? `/settings/booking?inspectorId=${v}` : "/settings/booking");
+        }}
+        className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
+      >
+        <option value="">Myself</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.email}
+          </option>
+        ))}
+      </select>
+    </section>
   );
 }
 
@@ -173,26 +257,16 @@ export default function SettingsBookingPage() {
 function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; slug: string | null | undefined }) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  if (!slug) {
-    return (
-      <section className="bg-ih-bad-bg border border-ih-bad-fg/20 rounded-lg p-5 space-y-2">
-        <h3 className="text-[13px] font-bold text-ih-bad-fg">Booking page not available</h3>
-        <p className="text-[12px] text-ih-fg-2">
-          You need to set a booking slug before your public booking page can go live.
-        </p>
-        <Link
-          to="/settings/profile"
-          className="inline-block text-[12px] text-ih-primary font-bold hover:underline"
-        >
-          Go to Profile settings &rarr;
-        </Link>
-      </section>
-    );
-  }
-
+  // window.location.origin is "" during SSR and real on client.
+  // The existing code used this same pattern — it's a pre-existing SSR/client
+  // mismatch (both sides render a different string). React does NOT suppress
+  // text mismatches, but in practice the hydration warning is benign here
+  // because the iframe src / anchor href update on the first client render.
+  // This matches the pre-Task-10 behavior exactly; we do not introduce a new
+  // mismatch class. A proper fix (useEffect + state) is tracked separately.
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const bookingUrl = `${origin}/book/${tenant}/${slug}`;
-  const profileUrl = `${origin}/inspector/${tenant}/${slug}`;
+  const companyUrl = tenant ? `${origin}/book/${tenant}` : null;
+  const deepLink = tenant && slug ? `${origin}/book/${tenant}/${slug}` : null;
 
   function copy(value: string, field: string) {
     void navigator.clipboard.writeText(value);
@@ -200,11 +274,29 @@ function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; s
     setTimeout(() => setCopiedField(null), 2000);
   }
 
+  if (!companyUrl) return null;
+
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Your links</h3>
-      <UrlRow label="Booking page" url={bookingUrl} copied={copiedField === "booking"} onCopy={() => copy(bookingUrl, "booking")} />
-      <UrlRow label="Inspector profile" url={profileUrl} copied={copiedField === "profile"} onCopy={() => copy(profileUrl, "profile")} />
+      <UrlRow
+        label="Company booking page"
+        url={companyUrl}
+        copied={copiedField === "company"}
+        onCopy={() => copy(companyUrl, "company")}
+      />
+      {deepLink && (
+        <UrlRow
+          label="Your personal deep link"
+          url={deepLink}
+          copied={copiedField === "deep"}
+          onCopy={() => copy(deepLink, "deep")}
+        />
+      )}
+      <p className="text-[12px] text-ih-fg-3">
+        Share the company link — clients are matched with the first available inspector.
+        The personal deep link pre-selects you.
+      </p>
     </section>
   );
 }
@@ -212,7 +304,7 @@ function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; s
 function UrlRow({ label, url, copied, onCopy }: { label: string; url: string; copied: boolean; onCopy: () => void }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[12px] font-bold text-ih-fg-2 w-32 shrink-0">{label}</span>
+      <span className="text-[12px] font-bold text-ih-fg-2 w-36 shrink-0">{label}</span>
       <span className="text-[12px] text-ih-fg-1 truncate flex-1 font-mono bg-ih-bg-muted rounded px-2 py-1.5 border border-ih-border">
         {url}
       </span>
@@ -251,7 +343,13 @@ function buildDayMap(slots: AvailabilitySlot[]): DayState[] {
   return days;
 }
 
-function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) {
+function WeeklySchedule({
+  initialSlots,
+  inspectorId,
+}: {
+  initialSlots: AvailabilitySlot[];
+  inspectorId: string | null | undefined;
+}) {
   const fetcher = useFetcher<typeof action>();
   const [days, setDays] = useState<DayState[]>(() => buildDayMap(initialSlots));
   // dirty tracks whether local state differs from the last saved state
@@ -283,7 +381,11 @@ function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) 
       .filter(Boolean);
     setDirty(false);
     fetcher.submit(
-      { intent: "schedule-save", slots: JSON.stringify(slots) },
+      {
+        intent: "schedule-save",
+        slots: JSON.stringify(slots),
+        ...(inspectorId ? { inspectorId } : {}),
+      },
       { method: "post" },
     );
   }
@@ -350,7 +452,13 @@ function WeeklySchedule({ initialSlots }: { initialSlots: AvailabilitySlot[] }) 
 /*  Section 3 — Date Overrides                                         */
 /* ------------------------------------------------------------------ */
 
-function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] }) {
+function DateOverrides({
+  initialOverrides,
+  inspectorId,
+}: {
+  initialOverrides: DateOverride[];
+  inspectorId: string | null | undefined;
+}) {
   const addFetcher = useFetcher<typeof action>();
   const removeFetcher = useFetcher<typeof action>();
 
@@ -402,7 +510,11 @@ function DateOverrides({ initialOverrides }: { initialOverrides: DateOverride[] 
   function handleAdd() {
     if (!newDate) return;
     addFetcher.submit(
-      { intent: "override-add", date: newDate },
+      {
+        intent: "override-add",
+        date: newDate,
+        ...(inspectorId ? { inspectorId } : {}),
+      },
       { method: "post" },
     );
   }
@@ -477,6 +589,7 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
   const fetcher = useFetcher<typeof action>();
   const [concierge, setConcierge] = useState(initialConfig.conciergeReviewRequired);
   const [blockUnsigned, setBlockUnsigned] = useState(initialConfig.blockUnsignedAgreement);
+  const [allowChoice, setAllowChoice] = useState(initialConfig.allowInspectorChoice);
   const [dirty, setDirty] = useState(false);
 
   const saving = fetcher.state !== "idle";
@@ -499,6 +612,7 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
         intent: "policies-save",
         conciergeReviewRequired: String(concierge),
         blockUnsignedAgreement: String(blockUnsigned),
+        allowInspectorChoice: String(allowChoice),
       },
       { method: "post" },
     );
@@ -538,6 +652,21 @@ function BookingPolicies({ initialConfig }: { initialConfig: TenantConfig }) {
         </span>
       </label>
 
+      <label className="flex items-start gap-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={allowChoice}
+          onChange={(e) => { setAllowChoice(e.target.checked); setDirty(true); }}
+          className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
+        />
+        <span>
+          <span className="block text-[13px] font-bold text-ih-fg-1">Allow clients to choose their inspector</span>
+          <span className="block text-[12px] text-ih-fg-3 mt-0.5">
+            When off, bookings are auto-assigned to the first available inspector.
+          </span>
+        </span>
+      </label>
+
       <div className="flex items-center gap-3 pt-2">
         <button
           onClick={handleSave}
@@ -567,39 +696,36 @@ const STYLES = [
   { id: "branded", label: "Branded" },
 ] as const;
 
-function EmbedWidget({ tenant, slug }: { tenant: string | null | undefined; slug: string | null | undefined }) {
+function EmbedWidget({ tenant }: { tenant: string | null | undefined; slug?: string | null }) {
   const [style, setStyle] = useState<"light" | "dark" | "branded">("light");
   const [copied, setCopied] = useState(false);
-  const hasBooking = !!(tenant && slug);
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const embedUrl = hasBooking ? `${origin}/embed/${tenant}/${slug}?style=${style}` : null;
-
-  const snippet = hasBooking
-    ? `<iframe src="${origin}/embed/${tenant}/${slug}?style=${style}" style="width:100%;min-height:700px;border:none;" loading="lazy"></iframe>`
-    : "";
-
-  function copySnippet() {
-    void navigator.clipboard.writeText(snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  if (!hasBooking) {
+  // Company-level embed: only requires tenant (slug not needed).
+  // See Part 4c — we use company-only embed, no per-inspector variant in the snippet.
+  if (!tenant) {
     return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-3">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Embed widget</h3>
         <div className="w-full min-h-[200px] rounded-md border-2 border-dashed border-ih-border flex items-center justify-center">
           <div className="text-center">
             <EmbedIcon />
-            <p className="text-[13px] text-ih-fg-3 mt-2">Set a booking slug in your profile to enable the embed widget.</p>
-            <Link to="/settings/profile" className="text-[13px] text-ih-primary hover:underline mt-1 inline-block">
-              Go to Profile &rarr;
-            </Link>
+            <p className="text-[13px] text-ih-fg-3 mt-2">No tenant slug configured — embed widget unavailable.</p>
           </div>
         </div>
       </section>
     );
+  }
+
+  // SSR produces "" for origin; client produces the real origin.
+  // Same pre-existing mismatch class as StatusAndLinks above.
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const embedUrl = `${origin}/embed/${tenant}?style=${style}`;
+  const snippet = `<iframe src="${origin}/embed/${tenant}?style=${style}" style="width:100%;min-height:700px;border:none;" loading="lazy"></iframe>`;
+
+  function copySnippet() {
+    void navigator.clipboard.writeText(snippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -641,7 +767,7 @@ function EmbedWidget({ tenant, slug }: { tenant: string | null | undefined; slug
       <div className="space-y-2">
         <span className="text-[12px] font-bold text-ih-fg-2">Live preview</span>
         <iframe
-          src={embedUrl!}
+          src={embedUrl}
           className="w-full min-h-[700px] rounded-md border border-ih-border"
           loading="lazy"
           title="Widget preview"
