@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { useLoaderData, useActionData, Link, Form } from "react-router";
+import { useState, useEffect } from "react";
+import { useLoaderData, useActionData, useFetcher, Link, Form } from "react-router";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { getApiUrl } from "~/lib/api.server";
 import { SecretField } from "~/components/SecretField";
 
 interface QboStatus {
@@ -18,12 +19,34 @@ export function meta() {
   return [{ title: "QuickBooks Integration - OpenInspection" }];
 }
 
+type BffEnv = { API_WORKER?: { fetch: typeof fetch } };
+
+async function qboApiFetch(
+  context: Route.LoaderArgs["context"],
+  cookie: string,
+  path: string,
+  method = "GET",
+): Promise<Response | null> {
+  try {
+    const env = (context.cloudflare?.env ?? {}) as BffEnv;
+    const apiBase = getApiUrl(context);
+    const req = new Request(`${apiBase}/settings/integrations/qbo${path}`, {
+      method,
+      headers: { Cookie: cookie },
+    });
+    return env.API_WORKER ? env.API_WORKER.fetch(req) : fetch(req);
+  } catch {
+    return null;
+  }
+}
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
+  const cookie = request.headers.get("Cookie") ?? "";
 
   const [qboRes, secretsRes] = await Promise.all([
-    fetch("/settings/integrations/qbo/status", { credentials: "include" }).catch(() => null),
+    qboApiFetch(context, cookie, "/status"),
     api.secrets.secrets.$get().catch(() => null),
   ]);
 
@@ -50,7 +73,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const fd = await request.formData();
-  const intent = fd.get("intent");
+  const intent = fd.get("intent") as string | null;
+  const cookie = request.headers.get("Cookie") ?? "";
 
   if (intent === "save-qbo-secrets") {
     const body: Record<string, string> = {};
@@ -62,13 +86,25 @@ export async function action({ request, context }: Route.ActionArgs) {
       const api = createApi(context, { token });
       const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
-        return { success: false, error: "Failed to save QBO keys." };
+        return { success: false, intent, error: "Failed to save QBO keys.", syncEnabled: undefined };
       }
     }
-    return { success: true, error: null };
+    return { success: true, intent, error: null, syncEnabled: undefined };
   }
 
-  return { success: false, error: "Unknown action" };
+  if (intent === "qbo-sync" || intent === "qbo-pause" || intent === "qbo-disconnect") {
+    const path = intent === "qbo-sync" ? "/sync" : intent === "qbo-pause" ? "/pause" : "/disconnect";
+    const res = await qboApiFetch(context, cookie, path, "POST");
+    if (!res?.ok) return { success: false, intent, error: `${intent} failed`, syncEnabled: undefined };
+
+    if (intent === "qbo-pause") {
+      const body = await res.json() as { data?: { syncEnabled?: boolean } };
+      return { success: true, intent, error: null, syncEnabled: body?.data?.syncEnabled };
+    }
+    return { success: true, intent, error: null, syncEnabled: undefined };
+  }
+
+  return { success: false, intent, error: "Unknown action", syncEnabled: undefined };
 }
 
 function timeSince(ts: number | null | undefined): string {
@@ -83,38 +119,35 @@ export default function SettingsIntegrationsQbo() {
   const { status: initial, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [status, setStatus] = useState<QboStatus | null>(initial);
-  const [syncing, setSyncing] = useState(false);
+  const qboFetcher = useFetcher<{ success: boolean; intent?: string | null; error: string | null; syncEnabled?: boolean }>();
 
   const connected = status?.connected;
+  const syncing = qboFetcher.state !== "idle" && qboFetcher.formData?.get("intent") === "qbo-sync";
   const expiryWarning =
     status?.refreshTokenExpiresAt &&
     status.refreshTokenExpiresAt <
       Math.floor(Date.now() / 1000) + 30 * 24 * 3600;
 
-  async function triggerSync() {
-    setSyncing(true);
-    await fetch("/api/qbo/sync", { method: "POST", credentials: "same-origin" });
-    setSyncing(false);
-  }
-
-  async function togglePause() {
-    const res = await fetch("/api/qbo/pause", {
-      method: "POST",
-      credentials: "same-origin",
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { syncEnabled?: boolean };
-      setStatus((s) => (s ? { ...s, syncEnabled: json.syncEnabled } : s));
+  useEffect(() => {
+    const d = qboFetcher.data;
+    if (!d?.success) return;
+    if (d.intent === "qbo-pause") {
+      setStatus((s) => (s ? { ...s, syncEnabled: d.syncEnabled } : s));
+    } else if (d.intent === "qbo-disconnect") {
+      setStatus(null);
     }
+  }, [qboFetcher.data]);
+
+  function triggerSync() {
+    qboFetcher.submit({ intent: "qbo-sync" }, { method: "POST" });
   }
 
-  async function disconnect() {
-    // Uses a simple confirm for now; will be replaced with a custom modal
-    await fetch("/api/qbo/disconnect", {
-      method: "POST",
-      credentials: "same-origin",
-    });
-    setStatus(null);
+  function togglePause() {
+    qboFetcher.submit({ intent: "qbo-pause" }, { method: "POST" });
+  }
+
+  function disconnect() {
+    qboFetcher.submit({ intent: "qbo-disconnect" }, { method: "POST" });
   }
 
   return (
@@ -213,7 +246,7 @@ export default function SettingsIntegrationsQbo() {
           </svg>
           <span>
             Your QuickBooks connection expires soon.{" "}
-            <a href="/api/qbo/connect" className="underline font-semibold">
+            <a href="/settings/integrations/qbo/connect" className="underline font-semibold">
               Reconnect to avoid interruption.
             </a>
           </span>
@@ -248,7 +281,7 @@ export default function SettingsIntegrationsQbo() {
             </li>
           </ul>
           <a
-            href="/api/qbo/connect"
+            href="/settings/integrations/qbo/connect"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#2CA01C] text-white rounded-lg font-bold text-[13px] hover:bg-[#237a16] transition-colors"
           >
             Connect QuickBooks

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 
 interface SettingsForm {
@@ -67,52 +67,54 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   const saveFetcher = useFetcher<{ ok: boolean; intent?: string }>();
   const templateChangedAtSubmit = useRef(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [inspRes, tplRes, insRes] = await Promise.all([
-        fetch(`/api/inspections/${inspectionId}`, { credentials: "include" }),
-        fetch("/api/inspections/templates", { credentials: "include" }),
-        fetch("/api/team/members", { credentials: "include" }),
-      ]);
-      if (inspRes.ok) {
-        const { data } = (await inspRes.json()) as { data: Record<string, unknown> };
-        // GET /api/inspections/:id wraps the row: data = { inspection, template }.
-        // Unwrap (with a flat fallback) — reading data.templateId directly never matched.
-        const insp = (data.inspection as Record<string, unknown>) ?? data;
-        const loadedTemplateId = (insp.templateId as string) || "";
-        templateIdAtOpen.current = loadedTemplateId;
-        setForm({
-          date: (insp.date as string) || "",
-          closingDate: (insp.closingDate as string) || "",
-          inspectorId: (insp.inspectorId as string) || "",
-          orderId: (insp.orderId as string) || "",
-          referralSource: (insp.referralSource as string) || "",
-          templateId: loadedTemplateId,
-          price: (insp.price as number) || 0,
-          paymentRequired: !!insp.paymentRequired,
-          agreementRequired: !!insp.agreementRequired,
-          requireDefectFieldsOverride: (insp.requireDefectFieldsOverride as SettingsForm["requireDefectFieldsOverride"]) || "",
-        });
-      }
-      if (tplRes.ok) {
-        const { data } = (await tplRes.json()) as { data: Template[] };
-        setTemplates(data || []);
-      }
-      if (insRes.ok) {
-        const { data } = (await insRes.json()) as { data: Inspector[] };
-        setInspectors(data || []);
-      }
-    } catch {
-      // degrade gracefully
-    } finally {
-      setLoading(false);
+  type SheetData = {
+    inspection: Record<string, unknown> | null;
+    templates: Template[];
+    members: Array<{ id: string; email: string }>;
+  };
+  const loadFetcher = useFetcher<SheetData>();
+
+  // Trigger load when the sheet opens or inspectionId changes
+  useEffect(() => {
+    if (open && inspectionId) {
+      loadFetcher.load(`/resources/inspection-settings-sheet?inspectionId=${encodeURIComponent(inspectionId)}`);
     }
-  }, [inspectionId]);
+  }, [open, inspectionId]);
+
+  // Apply fetched data to local state (mirrors old load() behaviour)
+  useEffect(() => {
+    const d = loadFetcher.data;
+    if (!d) return;
+    const insp = d.inspection;
+    if (insp) {
+      const loadedTemplateId = (insp.templateId as string) || "";
+      templateIdAtOpen.current = loadedTemplateId;
+      setForm({
+        date: (insp.date as string) || "",
+        closingDate: (insp.closingDate as string) || "",
+        inspectorId: (insp.inspectorId as string) || "",
+        orderId: (insp.orderId as string) || "",
+        referralSource: (insp.referralSource as string) || "",
+        templateId: loadedTemplateId,
+        price: (insp.price as number) || 0,
+        paymentRequired: !!insp.paymentRequired,
+        agreementRequired: !!insp.agreementRequired,
+        requireDefectFieldsOverride: (insp.requireDefectFieldsOverride as SettingsForm["requireDefectFieldsOverride"]) || "",
+      });
+    }
+    setTemplates(d.templates ?? []);
+    setInspectors((d.members ?? []) as Inspector[]);
+    setLoading(false);
+  }, [loadFetcher.data]);
+
+  // Sync loading state with fetcher
+  useEffect(() => {
+    if (loadFetcher.state !== "idle") setLoading(true);
+  }, [loadFetcher.state]);
 
   useEffect(() => {
-    if (open) load();
-  }, [open, load]);
+    if (open) setLoading(true);
+  }, [open, inspectionId]);
 
   // Drive saveState from the dedicated fetcher's lifecycle. submitting → saving;
   // response ok → saved (+ onTemplateApplied if the template changed); not ok →
