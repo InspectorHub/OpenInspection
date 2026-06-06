@@ -25,9 +25,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context, { token });
     const res = await api.team.members.$get();
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    const body = res.ok ? ((await res.json()) as unknown as { data?: { members?: Member[] } }) : { data: { members: [] as Member[] } };
     return {
-      members: (body.data ?? []) as Member[],
+      members: (body.data?.members ?? []) as Member[],
       settings: {} as Record<string, unknown>,
     };
   } catch {
