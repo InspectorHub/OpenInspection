@@ -165,15 +165,10 @@ export class AdminService {
         return this.updateTenantStatus(params);
     }
 
-    /**
-     * Connects a Stripe account for the tenant.
-     */
-    async updateStripeConnect(slug: string, accountId: string) {
-        if (!this.integration?.handleStripeConnect) {
-            throw new Error('IntegrationProvider not configured or does not support Stripe Connect');
-        }
-        await this.integration.handleStripeConnect(slug, accountId);
-    }
+    // updateStripeConnect (slug-keyed M2M write) was removed with its only
+    // caller, the dead POST /api/integration/tenants/:slug/stripe-connect
+    // endpoint (A-21 batch 3 adjudication). Inspector-facing setStripeConnect
+    // below is the live write path.
 
     /**
      * Reads the tenant's Stripe Connect account ID (inspector-facing, JWT-scoped).

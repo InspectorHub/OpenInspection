@@ -108,15 +108,4 @@ export class PortalProvider implements IntegrationProvider {
         }
     }
 
-    async handleStripeConnect(slug: string, accountId: string): Promise<void> {
-        const db = this.getDrizzle();
-        await db.update(tenants)
-            .set({ stripeConnectAccountId: accountId })
-            .where(eq(tenants.slug, slug));
-
-        if (this.kv) {
-            await this.kv.delete(`tenant:${slug}`);
-        }
-    }
-
 }

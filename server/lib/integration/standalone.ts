@@ -294,8 +294,4 @@ export class StandaloneProvider implements IntegrationProvider {
         if (this.kv) await this.kv.delete(`tenant:${slug}`);
     }
 
-    async handleStripeConnect(slug: string, accountId: string): Promise<void> {
-        const db = this.getDrizzle();
-        await db.update(tenants).set({ stripeConnectAccountId: accountId }).where(eq(tenants.slug, slug));
-    }
 }
