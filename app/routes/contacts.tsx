@@ -289,12 +289,13 @@ function CsvImportModal({ open, onClose }: { open: boolean; onClose: () => void 
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
   const [csvText, setCsvText] = useState("");
   const [fileName, setFileName] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // `!open` renders null but the component stays MOUNTED, so without this
   // reset a reopened modal resumes on the previous run's result step.
   useEffect(() => {
-    if (open) { setStep("upload"); setCsvText(""); setFileName(""); }
+    if (open) { setStep("upload"); setCsvText(""); setFileName(""); setFileError(null); }
   }, [open]);
 
   const preview = (fetcher.data as Record<string, unknown>)?.preview as Record<string, unknown> | undefined;
@@ -304,6 +305,27 @@ function CsvImportModal({ open, onClose }: { open: boolean; onClose: () => void 
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
+    setFileError(null);
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith(".xlsx")) {
+      // Client-side parse (vendored ExcelJS, loaded on demand) → CSV text →
+      // the same validate/import pipeline as a pasted CSV.
+      import("~/lib/xlsx-import")
+        .then((m) => m.parseXlsxFile(file))
+        .then(setCsvText)
+        .catch((err: unknown) => {
+          setCsvText("");
+          setFileError(err instanceof Error ? err.message : "Could not read the .xlsx file.");
+        });
+      return;
+    }
+    if (lower.endsWith(".xls")) {
+      // The 2003 binary format — ExcelJS doesn't read it; modern Excel/WPS/
+      // Numbers all save as .xlsx in one step.
+      setCsvText("");
+      setFileError("Legacy .xls files aren't supported — save the file as .xlsx or CSV and retry.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => setCsvText(ev.target?.result as string);
     reader.readAsText(file);
@@ -321,9 +343,16 @@ function CsvImportModal({ open, onClose }: { open: boolean; onClose: () => void 
 
         {step === "upload" && (
           <div className="p-6 space-y-4">
-            <p className="text-sm text-ih-fg-3">Upload a CSV with your contacts. Spectora and ITB exports work out of the box.</p>
-            <input type="file" ref={fileRef} accept=".csv,text/csv" onChange={onFileChange} className="text-sm" />
-            {fileName && <p className="text-xs text-ih-fg-3">Selected: {fileName}</p>}
+            <p className="text-sm text-ih-fg-3">Upload a CSV or Excel (.xlsx) file with your contacts. Spectora and ITB exports work out of the box.</p>
+            <input
+              type="file"
+              ref={fileRef}
+              accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={onFileChange}
+              className="text-sm"
+            />
+            {fileName && !fileError && <p className="text-xs text-ih-fg-3">Selected: {fileName}</p>}
+            {fileError && <p className="text-xs text-ih-bad-fg" role="alert">{fileError}</p>}
             <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} rows={6} placeholder="...or paste CSV content here" className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-xs font-mono" />
             <Button
               variant="primary"

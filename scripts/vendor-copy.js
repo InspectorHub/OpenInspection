@@ -21,6 +21,10 @@ const jsFiles = [
   // Alpine, flatpickr, chart, sortable removed — old Hono SSR templates deleted.
   ['swagger-ui-dist/swagger-ui-bundle.js', 'swagger-ui-bundle.js'],
   ['swagger-ui-dist/swagger-ui.css', 'swagger-ui.css'],
+  // ExcelJS browser build — loaded on demand by the contacts .xlsx import
+  // (script injection, NEVER bundled: ~940KB must stay out of both the worker
+  // bundle and the initial client chunk).
+  ['exceljs/dist/exceljs.min.js', 'exceljs.min.js'],
 ];
 
 for (const [src, dest] of jsFiles) {
