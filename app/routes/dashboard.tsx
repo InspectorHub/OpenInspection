@@ -394,7 +394,7 @@ export default function DashboardPage() {
   const sessionCtx = useSessionContext();
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fetcher = useFetcher();
 
   /* ---- IA-12 Onboarding checklist ---- */
@@ -404,9 +404,13 @@ export default function DashboardPage() {
   const checklistDismissed = loaderDismissed || checklistDismissedOptimistic;
 
   /* ---- State ---- */
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    (searchParams.get("workflow") as TabKey) || "all",
-  );
+  // Workflow tab is derived from the URL (two-way sync — mirrors usePagination).
+  // Unknown/absent ?workflow values fall back to "all" rather than crashing, so
+  // the sidebar can deep-link a tab (#111) and refresh/back preserve it.
+  const rawWorkflow = searchParams.get("workflow");
+  const activeTab: TabKey = TABS.some((t) => t.key === rawWorkflow)
+    ? (rawWorkflow as TabKey)
+    : "all";
   const [activeFilter, setActiveFilter] = useState<FilterId>("all");
   const [activeTagFilter, setActiveTagFilter] = useState("");
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
@@ -901,7 +905,19 @@ export default function DashboardPage() {
       <TabStrip
         tabs={TABS.map((t) => ({ id: t.key, label: t.label, count: t.key === "all" ? undefined : (tabCounts[t.key] ?? 0) }))}
         activeId={activeTab}
-        onChange={(id) => setActiveTab(id as TabKey)}
+        onChange={(id) =>
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              if (id === "all") next.delete("workflow");
+              else next.set("workflow", id);
+              return next;
+            },
+            // replace:true so tab flips don't pollute browser history;
+            // preventScrollReset keeps the list scroll position on switch.
+            { replace: true, preventScrollReset: true },
+          )
+        }
       />
 
       {/* Time filter strip — underline style */}
