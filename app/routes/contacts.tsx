@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -291,6 +291,12 @@ function CsvImportModal({ open, onClose }: { open: boolean; onClose: () => void 
   const [fileName, setFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // `!open` renders null but the component stays MOUNTED, so without this
+  // reset a reopened modal resumes on the previous run's result step.
+  useEffect(() => {
+    if (open) { setStep("upload"); setCsvText(""); setFileName(""); }
+  }, [open]);
+
   const preview = (fetcher.data as Record<string, unknown>)?.preview as Record<string, unknown> | undefined;
   const importResult = (fetcher.data as Record<string, unknown>)?.result as Record<string, unknown> | undefined;
 
@@ -371,6 +377,19 @@ function CsvImportModal({ open, onClose }: { open: boolean; onClose: () => void 
         {step === "done" && (() => {
           const r = importResult as { inserted?: number; skipped?: number; errors?: { row: number; message: string }[] } | undefined;
           const errs = r?.errors ?? [];
+          // Transport/server failure (non-2xx) — never paint it as success.
+          if (fetcher.data && (fetcher.data as { ok?: boolean }).ok === false) {
+            return (
+              <div className="p-6 text-center space-y-3">
+                <p className="text-lg font-bold text-ih-bad-fg">Import failed</p>
+                <p className="text-sm text-ih-fg-3">The server rejected the import. Nothing was written — try again, and contact support if it persists.</p>
+                <div className="flex gap-3 justify-center">
+                  <Button variant="secondary" onClick={() => setStep("upload")}>Back to file</Button>
+                  <button onClick={onClose} className="px-5 py-2 rounded-lg bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest">Close</button>
+                </div>
+              </div>
+            );
+          }
           // B-29+ two-phase import: ANY row error means NOTHING was written —
           // the full error list comes back so the user fixes the file in one
           // pass and retries against an unchanged contact list.
