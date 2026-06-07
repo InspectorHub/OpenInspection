@@ -1,23 +1,75 @@
 /**
- * Design System 0520 subsystem E phase 6 — IntegrationsService route.
+ * Design System 0520 subsystem E phase 6 — IntegrationsService routes.
  *
  * `GET /api/integrations/status` returns the six-row snapshot the
  * grid page renders. JWT-guarded; tenant scope from the JWT claim.
+ *
+ * `POST /api/integrations/stripe/test` — on-demand "Test connection" diagnostic.
+ * `GET  /api/integrations/stripe/webhook-log` — recent delivery log (diagnostics).
  */
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
-import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { requireRole } from '../lib/middleware/rbac';
 
 const statusRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/status',
-    tags: ["integrations"],
+    tags: ['integrations'],
     summary: 'Snapshot of every integration for the active tenant',
     responses: { 200: { description: 'ok' } },
-    operationId: "listIntegrationStatus",
-    description: "Auto-generated placeholder for listIntegrationStatus (GET /status, integrations domain). TODO: replace with a real description sourced from the handler."
+    operationId: 'listIntegrationStatus',
+    description: 'Returns a per-integration enabled/configured status row for the active tenant. Drives the integrations overview grid on the settings page.',
 }, { scopes: ['read'], tier: 'extended' }));
+
+// ─── POST /stripe/test ────────────────────────────────────────────────────────
+
+const StripeTestResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        accountName: z.string().describe('Display name (or email/id fallback) of the connected Stripe account.'),
+        livemode: z.boolean().describe('True when the stored key is a live-mode key (sk_live_/rk_live_ prefix).'),
+    }),
+}).openapi('StripeTestResponse');
+
+const stripeTestRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/stripe/test',
+    tags: ['integrations'],
+    summary: 'Verify the stored Stripe secret key against the live API',
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: { content: { 'application/json': { schema: StripeTestResponseSchema } }, description: 'Key is valid; returns account name and mode' },
+        502: { description: 'Stripe rejected the stored key' },
+        503: { description: 'No Stripe secret key configured' },
+    },
+    operationId: 'testStripeConnection',
+    description: "Calls Stripe GET /v1/account with the tenant's STORED secret key (merged into env by the integration-secrets middleware) — the on-demand diagnostic behind the settings-page Test connection button. Mode (test/live) is inferred from the key prefix.",
+}, { scopes: ['admin'], tier: 'extended' }));
+
+// ─── GET /stripe/webhook-log ──────────────────────────────────────────────────
+
+const WebhookLogEntrySchema = z.object({
+    ts: z.string().describe('ISO 8601 delivery timestamp.'),
+    eventType: z.string().describe('Stripe event type, or "unknown" for unverifiable payloads.'),
+    result: z.enum(['processed', 'received', 'signature_failed', 'tenant_mismatch']).describe('Delivery outcome.'),
+});
+
+const stripeWebhookLogRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/stripe/webhook-log',
+    tags: ['integrations'],
+    summary: 'Recent Stripe webhook deliveries (diagnostics)',
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(WebhookLogEntrySchema) }).openapi('StripeWebhookLogResponse') } }, description: 'Up to 20 recent deliveries, newest first' },
+    },
+    operationId: 'getStripeWebhookLog',
+    description: 'Reads the per-tenant KV rolling log written by the Stripe webhook handler. Metadata only (timestamp, event type, result) — payloads are never stored. Backs the settings-page Recent Deliveries panel.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+// ─── Router ───────────────────────────────────────────────────────────────────
 
 export const integrationsRoutes = createApiRouter()
     .openapi(statusRoute, async (c) => {
@@ -25,6 +77,28 @@ export const integrationsRoutes = createApiRouter()
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
         const out = await c.var.services.integrations.status(tenantId);
         return c.json({ success: true as const, data: out }, 200);
+    })
+    .openapi(stripeTestRoute, async (c) => {
+        const env = c.env as unknown as Record<string, string | undefined>;
+        const secretKey = env.STRIPE_SECRET_KEY;
+        if (!secretKey) {
+            return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'No Stripe secret key is configured.' } }, 503);
+        }
+        try {
+            const { StripeService } = await import('../services/stripe.service');
+            const { accountName } = await new StripeService(secretKey).getAccount();
+            const livemode = secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_');
+            return c.json({ success: true as const, data: { accountName, livemode } }, 200);
+        } catch {
+            return c.json({ success: false as const, error: { code: 'STRIPE_KEY_INVALID', message: 'Stripe rejected the stored secret key.' } }, 502);
+        }
+    })
+    .openapi(stripeWebhookLogRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+        const { readWebhookLog } = await import('../lib/stripe-webhook-log');
+        const entries = await readWebhookLog(c.env.TENANT_CACHE, tenantId);
+        return c.json({ success: true as const, data: entries }, 200);
     });
 
 export type IntegrationsApi = typeof integrationsRoutes;
