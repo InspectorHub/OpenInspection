@@ -126,6 +126,38 @@ describe('POST /api/admin/agreements/send — multi-signer', () => {
         expect(new Set(urls).size).toBe(2);
     });
 
+    it('signers-only send WITHOUT clientEmail succeeds (multi-signer path ignores clientEmail)', async () => {
+        const res = await buildApp().request('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agreementId: AGR_ID,
+                inspectionId: INSP_ID,
+                completionPolicy: 'all',
+                signers: [
+                    { name: 'Jane', email: 'jane@test.com', role: 'client' },
+                    { name: 'John', email: 'john@test.com', role: 'co_client' },
+                ],
+            }),
+        }, ENV, EXEC);
+        expect(res.status).toBe(200);
+        const body = await res.json() as { success: boolean; data: { requestId: string; signers: unknown[] } };
+        expect(body.success).toBe(true);
+        expect(body.data.requestId).toBeTruthy();
+        expect(body.data.signers).toHaveLength(2);
+        expect(emailSend).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects a request with neither clientEmail nor signers', async () => {
+        const res = await buildApp().request('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agreementId: AGR_ID, inspectionId: INSP_ID }),
+        }, ENV, EXEC);
+        // zod refine rejects before the handler runs.
+        expect(res.status).toBe(400);
+    });
+
     it('legacy send (no signers) still succeeds', async () => {
         const res = await buildApp().request('/api/admin/agreements/send', {
             method: 'POST',

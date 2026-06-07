@@ -53,6 +53,22 @@ export function validateSigners(signers: SignerDraft[]): string | null {
     return null;
 }
 
+/**
+ * Pure submit-payload builder: trims each signer's name/email (preserving role)
+ * and pairs them with the completion policy. The parent serializes this into
+ * the route's `send` intent. Kept pure so the wiring can be unit-tested without
+ * a render harness (happy-dom has none in this repo).
+ */
+export function buildSendPayload(
+    signers: SignerDraft[],
+    completionPolicy: "all" | "one",
+): SendAgreementPayload {
+    return {
+        signers: signers.map((s) => ({ name: s.name.trim(), email: s.email.trim(), role: s.role })),
+        completionPolicy,
+    };
+}
+
 export function SendAgreementModal({
     onSend,
     onClose,
@@ -79,10 +95,7 @@ export function SendAgreementModal({
         const problem = validateSigners(signers);
         if (problem) { setError(problem); return; }
         setError(null);
-        onSend({
-            signers: signers.map((s) => ({ name: s.name.trim(), email: s.email.trim(), role: s.role })),
-            completionPolicy,
-        });
+        onSend(buildSendPayload(signers, completionPolicy));
     };
 
     return (

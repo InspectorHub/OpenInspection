@@ -206,7 +206,11 @@ export const SignerInputSchema = z.object({
 
 export const SendAgreementSchema = z.object({
     agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
-    clientEmail: z.string().email().openapi({ example: 'client@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
+    // Track I-a Task 9 — `clientEmail` is only consumed on the legacy
+    // single-recipient path; the multi-signer path keys recipients off the
+    // `signers` array. Optional here, gated by the refine below so exactly one
+    // of the two paths is always satisfiable.
+    clientEmail: z.string().email().optional().openapi({ example: 'client@example.com' }).describe('Recipient email for the legacy single-signer send; omit when `signers` is provided'),
     clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     inspectionId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
     // Track I-a Task 9 — multi-signer envelope. When `signers` is provided the
@@ -214,7 +218,12 @@ export const SendAgreementSchema = z.object({
     // pinning + per-signer links). Omitted → legacy single-recipient behavior.
     signers: z.array(SignerInputSchema).min(1).max(10).optional().describe('Optional multi-signer recipient list; when present routes through the envelope model'),
     completionPolicy: z.enum(['all', 'one']).optional().openapi({ example: 'all' }).describe('Whether all signers must sign or any one signature completes the envelope'),
-}).openapi('SendAgreement');
+}).refine(
+    // Valid request = legacy path (clientEmail present) OR multi-signer path
+    // (signers non-empty). The handler routes on these same two conditions.
+    (v) => Boolean(v.clientEmail) || (Array.isArray(v.signers) && v.signers.length > 0),
+    { message: 'Provide clientEmail (single-signer) or a non-empty signers list (multi-signer).', path: ['clientEmail'] },
+).openapi('SendAgreement');
 
 export const AgreementResponseSchema = createApiResponseSchema(z.object({
     agreement: z.object({

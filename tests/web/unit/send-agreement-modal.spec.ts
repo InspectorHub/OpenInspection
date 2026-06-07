@@ -3,7 +3,7 @@
  * add-remove / radios are Chrome-verified; happy-dom has no render harness.)
  */
 import { describe, it, expect } from "vitest";
-import { validateSigners, emptySigner } from "~/components/agreements/SendAgreementModal";
+import { validateSigners, emptySigner, buildSendPayload } from "~/components/agreements/SendAgreementModal";
 
 describe("validateSigners", () => {
     it("rejects an empty signer set", () => {
@@ -33,5 +33,38 @@ describe("validateSigners", () => {
 describe("emptySigner", () => {
     it("defaults to an empty client row", () => {
         expect(emptySigner()).toEqual({ name: "", email: "", role: "client" });
+    });
+});
+
+// The Signing-tab wiring submits `buildSendPayload(...)` under intent 'send'.
+// happy-dom has no render harness (see signer-list.spec header), so the
+// submit-payload builder is unit-tested directly; the modal open / select
+// gating is Chrome-verified.
+describe("buildSendPayload — Signing tab 'send' intent body", () => {
+    it("trims name/email, preserves role, and carries the completion policy", () => {
+        const payload = buildSendPayload(
+            [
+                { name: "  Jane  ", email: " jane@test.com ", role: "client" },
+                { name: "John", email: "john@test.com", role: "co_client" },
+            ],
+            "one",
+        );
+        expect(payload).toEqual({
+            completionPolicy: "one",
+            signers: [
+                { name: "Jane", email: "jane@test.com", role: "client" },
+                { name: "John", email: "john@test.com", role: "co_client" },
+            ],
+        });
+    });
+
+    it("round-trips through JSON.stringify as the route serializes it", () => {
+        const payload = buildSendPayload([{ name: "Jane", email: "jane@test.com", role: "agent" }], "all");
+        // The route posts `signers: JSON.stringify(payload.signers)`; assert the
+        // server receives exactly the trimmed signer objects with role intact.
+        expect(JSON.parse(JSON.stringify(payload.signers))).toEqual([
+            { name: "Jane", email: "jane@test.com", role: "agent" },
+        ]);
+        expect(payload.completionPolicy).toBe("all");
     });
 });

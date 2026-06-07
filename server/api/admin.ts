@@ -1610,9 +1610,17 @@ export const adminRoutes = createApiRouter()
             }, 200);
         }
 
+        // Legacy single-recipient path. `clientEmail` is schema-optional now
+        // (the multi-signer path keys off `signers`), so guard it here: this
+        // branch is only reached when no `signers`+`inspectionId` envelope was
+        // built, in which case clientEmail is required to address the email.
+        if (!body.clientEmail) {
+            throw Errors.BadRequest('clientEmail is required for a single-signer send.');
+        }
+        const clientEmail = body.clientEmail;
         const request = await svc.createSigningRequest(tenantId, {
             agreementId: body.agreementId,
-            clientEmail: body.clientEmail,
+            clientEmail,
             ...(body.clientName !== undefined ? { clientName: body.clientName } : {}),
             ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
         });
@@ -1652,7 +1660,7 @@ export const adminRoutes = createApiRouter()
                 agreementContentHash,
                 agreementId: body.agreementId,
                 agreementName,
-                clientEmail: body.clientEmail,
+                clientEmail,
                 clientName: body.clientName ?? null,
                 envelopeId: request.id,
                 inspectionId: body.inspectionId ?? null,
@@ -1683,14 +1691,14 @@ export const adminRoutes = createApiRouter()
             }
         }
 
-        await c.var.services.email.sendAgreementRequest(body.clientEmail, body.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c))
+        await c.var.services.email.sendAgreementRequest(clientEmail, body.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c))
             .catch((e: unknown) => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
 
         // Append request.sent only after email is dispatched (or attempted)
         try {
             await c.var.services.auditLog.append(tenantId, request.id, 'request.sent', {
                 envelopeId: request.id,
-                recipientEmail: body.clientEmail,
+                recipientEmail: clientEmail,
                 signUrl,
                 tsMs: Date.now(),
             });
@@ -1698,7 +1706,7 @@ export const adminRoutes = createApiRouter()
             logger.warn('audit.append.sent.failed', { requestId: request.id, error: (e as Error).message });
         }
 
-        auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, clientEmail: body.clientEmail } });
+        auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, clientEmail } });
         return c.json({ success: true as const, data: { token: request.token, signUrl } }, 200);
     })
     .openapi(listSigningRequestsRoute, async (c) => {
