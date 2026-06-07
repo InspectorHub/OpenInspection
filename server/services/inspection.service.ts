@@ -2141,21 +2141,27 @@ export class InspectionService {
             amountCents = invoice?.amountCents ?? null;
         }
 
-        // Combined checkout link: reconstruct the first outstanding signer's
-        // tier-2 token server-side. If the helper is unavailable or yields no
-        // outstanding signer, fall back to the single-gate agreement URL.
-        let combinedToken: string | null = null;
-        if (bothOutstanding && agreementService) {
-            combinedToken = await agreementService.getFirstOutstandingSignerLink(tenantId, inspectionId);
+        // Reconstruct the first outstanding signer's tier-2 link token
+        // server-side. Used by BOTH the combined "Sign & pay" checkout URL and
+        // the agreement-only sign URL — `agreementRequests.token` is an
+        // UNDISTRIBUTED placeholder for envelope-v2 (real tokens live per-signer),
+        // so routing the customer to it would 404. When the helper is unavailable
+        // or yields no outstanding signer, fall back to the legacy envelope token
+        // (still resolves for legacy `createSigningRequest` envelopes whose
+        // plaintext token IS distributed) — last resort, never break those.
+        let signerLink: string | null = null;
+        if ((bothOutstanding || reason === 'agreement') && agreementService) {
+            signerLink = await agreementService.getFirstOutstandingSignerLink(tenantId, inspectionId);
         }
+        const agreementLinkToken = signerLink ?? agreementToken;
 
-        const actionUrl = bothOutstanding && combinedToken
-            ? `/checkout/${tenantSlug}/${combinedToken}`
+        const actionUrl = bothOutstanding && signerLink
+            ? `/checkout/${tenantSlug}/${signerLink}`
             : reason === 'payment'
                 ? `/r/${inspectionId}/invoice`
-                : (agreementToken ? `/agreements/sign/${tenantSlug}/${agreementToken}` : `/report-gate/${tenantSlug}/${inspectionId}`);
+                : (agreementLinkToken ? `/agreements/sign/${tenantSlug}/${agreementLinkToken}` : `/report-gate/${tenantSlug}/${inspectionId}`);
 
-        const actionLabel = bothOutstanding && combinedToken
+        const actionLabel = bothOutstanding && signerLink
             ? 'Sign & pay'
             : reason === 'payment' ? 'Pay invoice' : 'Sign agreement';
 

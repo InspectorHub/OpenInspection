@@ -1943,7 +1943,7 @@ export const adminRoutes = createApiRouter()
             .where(eqDz(schema.agreementSigners.id, signerId));
 
         try {
-            await c.var.services.auditLog.append(tenantId, requestId, 'request.reminded', {
+            await c.var.services.auditLog.append(tenantId, requestId, 'signer.reminded', {
                 envelopeId: requestId,
                 signerId,
                 recipientEmail: row.email,

@@ -99,6 +99,32 @@ describe('TenantPurgeService.purge', () => {
         expect(rec.destroyedAt).toBeInstanceOf(Date);
     });
 
+    it('cascades agreement_signers (PII) so no orphaned signer rows survive', async () => {
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        // Seed an agreement template + envelope + signer (PII) under the tenant.
+        await testDb.insert(schema.agreements).values({
+            id: 'agr-1', tenantId: TENANT, name: 'Std', content: 'text', version: 1, createdAt: new Date(),
+        } as never);
+        await testDb.insert(schema.agreementRequests).values({
+            id: 'req-1', tenantId: TENANT, inspectionId: 'i-1', agreementId: 'agr-1',
+            clientEmail: 'jane@test.com', clientName: 'Jane', token: crypto.randomUUID(),
+            status: 'sent', completionPolicy: 'all', createdAt: new Date(),
+        } as never);
+        await testDb.insert(schema.agreementSigners).values({
+            id: 'sig-1', tenantId: TENANT, requestId: 'req-1', name: 'Jane', email: 'jane@test.com',
+            role: 'client', tokenHash: null, tokenEnc: null, status: 'sent', createdAt: new Date(),
+        } as never);
+
+        const r2 = makeR2([]);
+        const kv = makeKv();
+        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        await svc.purge(TENANT);
+
+        const signers = await testDb.select().from(schema.agreementSigners).all();
+        expect(signers).toHaveLength(0);
+    });
+
     it('destruction record is non-personal (no email/name/address columns)', async () => {
         const { drizzle } = await import('drizzle-orm/d1');
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);

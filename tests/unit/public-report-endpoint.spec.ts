@@ -250,16 +250,47 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         expect(resolved?.signer.id).toBe(signers[0].id);
     });
 
-    it('ONLY agreement outstanding -> legacy /agreements/sign URL unchanged', async () => {
+    it('ONLY agreement outstanding -> /agreements/sign URL carries the REAL signer token', async () => {
         await seed({ agreementRequired: true, paymentRequired: false, paymentStatus: 'unpaid' });
-        await createEnvelope();
+        const { token, signers } = await createEnvelope();
         const { inspection, agreement } = makeService();
 
         const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
         expect(gate!.reason).toBe('agreement');
         expect(gate!.actionLabel).toBe('Sign agreement');
-        expect(gate!.actionUrl).toMatch(new RegExp(`^/agreements/sign/${SLUG}/`));
+        // The agreement-only sign URL must route through the first outstanding
+        // signer's real tier-2 token — NOT the undistributed envelope placeholder.
+        expect(gate!.actionUrl).toBe(`/agreements/sign/${SLUG}/${token}`);
         expect(gate!.actionUrl).not.toContain('/checkout/');
+        // The token round-trips back to signer 1 (proves it is the signer link,
+        // not the placeholder envelope token) and never carries a sentinel.
+        expect(gate!.actionUrl).not.toContain('x:');
+        const resolved = await agreement.getSignerByPresentedToken(token);
+        expect(resolved?.signer.id).toBe(signers[0].id);
+    });
+
+    it('multi-signer agreement-only gate URL resolves to signer 1, never a sentinel', async () => {
+        await seed({ agreementRequired: true, paymentRequired: false, paymentStatus: 'unpaid' });
+        // Two-signer envelope: the gate must route to signer 1's real token.
+        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
+            signers: [
+                { name: 'Jane', email: 'jane@test.com', role: 'client' },
+                { name: 'John', email: 'john@test.com', role: 'co_client' },
+            ],
+            completionPolicy: 'all',
+        });
+        const signers = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId))
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+        const { inspection, agreement } = makeService();
+
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        expect(gate!.reason).toBe('agreement');
+        const urlToken = gate!.actionUrl.split('/').pop()!;
+        expect(urlToken).not.toContain('x:');
+        const resolved = await agreement.getSignerByPresentedToken(urlToken);
+        expect(resolved?.signer.id).toBe(signers[0].id);
     });
 
     it('ONLY payment outstanding -> legacy /r/:id/invoice URL unchanged', async () => {

@@ -27,7 +27,7 @@ export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     id:             text('id').primaryKey(),
     tenantId:       text('tenant_id').notNull(),
     requestId:      text('request_id').notNull(),
-    event:          text('event', { enum: ['request.created', 'request.sent', 'request.viewed', 'agreement.signed', 'agreement.inspector_signed', 'signer.signed', 'signer.declined', 'workflow.complete'] }).notNull(),
+    event:          text('event', { enum: ['request.created', 'request.sent', 'request.viewed', 'agreement.signed', 'agreement.inspector_signed', 'signer.signed', 'signer.declined', 'signer.reminded', 'workflow.complete'] }).notNull(),
     payloadJson:    text('payload_json').notNull(),
     prevHash:       text('prev_hash'),
     hash:           text('hash').notNull(),

@@ -275,6 +275,47 @@ describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
         expect(notificationCreate).toHaveBeenCalledTimes(1); // not 2
     });
 
+    // 6b — legacy envelope (createSigningRequest, no signer rows) → findOrCreate
+    // synthesizes a default signer on reuse so on-site signing succeeds (no 409).
+    it('POST /:id/sign on a legacy signer-less envelope synthesizes a signer and signs', async () => {
+        await seedBase(db);
+        // Create a legacy envelope via createSigningRequest — it has a distributed
+        // plaintext token but NO agreement_signers rows.
+        const legacySvc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const legacy = await legacySvc.createSigningRequest(TENANT_ID, {
+            agreementId: AGR_ID, clientEmail: 'jane@test.com', clientName: 'Jane', inspectionId: INSP_ID,
+        });
+        const before = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, legacy.id)).all();
+        expect(before.length).toBe(0);
+
+        // findOrCreate reuse should synthesize exactly one signer.
+        const reuseSvc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const reuse = await reuseSvc.findOrCreate(TENANT_ID, INSP_ID);
+        expect(reuse.alreadyExists).toBe(true);
+        expect(reuse.requestId).toBe(legacy.id);
+        const after = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, legacy.id)).all();
+        expect(after.length).toBe(1);
+
+        // The on-site sign flow now succeeds (no spurious Conflict).
+        const { app } = buildApp(db);
+        const { ctx, settle } = makeExecCtx();
+        const res = await app.request(`/${INSP_ID}/sign`, postSign({ signatureBase64: SIG }), FAKE_ENV, ctx);
+        expect(res.status).toBe(200);
+        const body = await res.json() as any;
+        expect(body.data.signed).toBe(true);
+        expect(body.data.signerId).toBeTruthy();
+        await settle();
+
+        // Still only one signer row, now signed in_person.
+        const signed = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, legacy.id)).all();
+        expect(signed.length).toBe(1);
+        expect(signed[0].status).toBe('signed');
+        expect(signed[0].channel).toBe('in_person');
+    });
+
     // 6
     it('POST /:id/sign with NO template → 409 no_agreement_template', async () => {
         await seedBase(db, { withTemplate: false });

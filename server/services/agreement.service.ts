@@ -327,15 +327,21 @@ export class AgreementService {
             // legacy envelope token (still satisfies the public lookup path).
             const env = existing[0];
             let token = env.token;
-            const firstSigner = await db.select().from(agreementSigners)
+            let firstSigner = (await db.select().from(agreementSigners)
                 .where(eq(agreementSigners.requestId, env.id))
-                .orderBy(asc(agreementSigners.createdAt)).limit(1);
-            if (firstSigner.length > 0) {
-                try {
-                    token = await this.getSignerLink(env.id, firstSigner[0].id);
-                } catch (e) {
-                    logger.warn('AgreementService.findOrCreate reuse-link failed', { requestId: env.id, error: e instanceof Error ? e.message : String(e) });
-                }
+                .orderBy(asc(agreementSigners.createdAt)).limit(1))[0];
+            // Legacy reuse path: an envelope created via `createSigningRequest`
+            // has NO signer rows. Synthesize a default client signer (identical
+            // shape to the public resolution path) so the on-site sign flow,
+            // which enumerates signers, finds one to target instead of 409ing
+            // on an empty signer set.
+            if (!firstSigner) {
+                firstSigner = await this.synthesizeDefaultSigner(env);
+            }
+            try {
+                token = await this.getSignerLink(env.id, firstSigner.id);
+            } catch (e) {
+                logger.warn('AgreementService.findOrCreate reuse-link failed', { requestId: env.id, error: e instanceof Error ? e.message : String(e) });
             }
             return { token, status: env.status, alreadyExists: true, requestId: env.id };
         }
@@ -575,6 +581,22 @@ export class AgreementService {
         if (signers.length > 0) {
             return { signer: signers[0], envelope };
         }
+        const created = await this.synthesizeDefaultSigner(envelope);
+        return { signer: created, envelope };
+    }
+
+    /**
+     * Synthesize a single default client signer for a legacy envelope that has
+     * none (created via the pre-envelope-v2 `createSigningRequest` path). The
+     * signer mirrors the envelope's client + status and carries no link token
+     * (tokenHash/tokenEnc NULL) — the legacy plaintext envelope token remains
+     * the distributed link. Shared by `getSignerByPresentedToken` (public
+     * resolution) and `findOrCreate` (in-app reuse) so the two stay identical.
+     */
+    private async synthesizeDefaultSigner(
+        envelope: typeof agreementRequests.$inferSelect,
+    ): Promise<typeof agreementSigners.$inferSelect> {
+        const db = this.getDrizzle();
         const synthId = crypto.randomUUID();
         const now = new Date();
         await db.insert(agreementSigners).values({
@@ -589,8 +611,7 @@ export class AgreementService {
             status: envelope.status,
             createdAt: now,
         });
-        const created = (await db.select().from(agreementSigners).where(eq(agreementSigners.id, synthId)).limit(1))[0];
-        return { signer: created, envelope };
+        return (await db.select().from(agreementSigners).where(eq(agreementSigners.id, synthId)).limit(1))[0];
     }
 
     /** List all signers of an envelope (tenant-scoped), ordered by creation. */
