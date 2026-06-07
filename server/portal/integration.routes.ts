@@ -280,6 +280,7 @@ api.post('/sync-redrive', requireServiceBinding, async (c) => {
  * Idempotent; SOP: docs/saas-ops/jwt-secret-rotation-sop.md.
  */
 api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
+    try {
     const db = drizzle(c.env.DB);
     const report = await reencryptAllTenantSecrets({
         listRows: async () => {
@@ -308,6 +309,10 @@ api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
         alreadyCurrent: report.alreadyCurrent, failed: report.failed.length,
     });
     return c.json({ success: true, data: report });
+    } catch (error: unknown) {
+        logger.error('secrets reencrypt failed', {}, error instanceof Error ? error : undefined);
+        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
+    }
 });
 
 export default api;
