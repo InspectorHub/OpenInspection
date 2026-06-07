@@ -436,7 +436,7 @@ export const agreementRequests = sqliteTable('agreement_requests', {
 // server-side link reconstruction (gate CTA / reminders / Copy link).
 export const agreementSigners = sqliteTable('agreement_signers', {
     id:                 text('id').primaryKey(),
-    tenantId:           text('tenant_id').notNull(),
+    tenantId:           text('tenant_id').notNull(),     // → tenants.id (app-layer; FK intentionally omitted per Schema Rules)
     requestId:          text('request_id').notNull(),     // → agreement_requests.id (app-layer)
     name:               text('name').notNull(),
     email:              text('email').notNull(),

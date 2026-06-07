@@ -50,6 +50,9 @@ SELECT lower(hex(randomblob(16))), tenant_id, id,
        CAST(strftime('%s','now') AS INTEGER) * 1000
 FROM agreement_requests;
 --> statement-breakpoint
+-- signed/declined/expired rows intentionally keep content_snapshot NULL: back-dating
+-- the CURRENT template text as "what was signed" would be fabrication. The verifier
+-- renders a "snapshot predates this feature" notice for them instead.
 UPDATE agreement_requests
 SET content_snapshot = (SELECT a.content FROM agreements a WHERE a.id = agreement_requests.agreement_id)
 WHERE status IN ('pending','sent','viewed') AND content_snapshot IS NULL;
