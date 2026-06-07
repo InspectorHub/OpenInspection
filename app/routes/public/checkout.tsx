@@ -170,6 +170,7 @@ export default function CheckoutPage() {
             <PayCard
                 state={state.pay}
                 invoice={checkout.invoice}
+                inspectionId={checkout.inspection.id}
                 brandColor={checkout.branding.primaryColor}
                 justPaid={justPaid}
                 companyName={checkout.branding.companyName}
@@ -443,12 +444,14 @@ function SignCard({
 function PayCard({
     state,
     invoice,
+    inspectionId,
     brandColor,
     justPaid,
     companyName,
 }: {
     state: StepState;
     invoice: { id: string; amountCents: number; status: "paid" | "partial" | "unpaid" } | null;
+    inspectionId: string;
     brandColor: string | null;
     justPaid: boolean;
     companyName: string;
@@ -478,7 +481,7 @@ function PayCard({
 
             {state === "todo" && invoice && !justPaid && (
                 <PayPanel
-                    invoiceId={invoice.id}
+                    inspectionId={inspectionId}
                     amountCents={invoice.amountCents}
                     brandColor={brandColor}
                     companyName={companyName}
@@ -491,12 +494,13 @@ function PayCard({
 type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 
 function PayPanel({
-    invoiceId,
+    inspectionId,
     amountCents,
     brandColor,
     companyName,
 }: {
-    invoiceId: string;
+    /** Inspection id — the pay-intent endpoint is inspection-keyed (/r/:id/pay-intent), NOT invoice-keyed. */
+    inspectionId: string;
     amountCents: number;
     brandColor: string | null;
     companyName: string;
@@ -508,7 +512,7 @@ function PayPanel({
     async function startPayment() {
         setPhase("loading");
         try {
-            const res = await fetch(`/api/public/r/${invoiceId}/pay-intent`, {
+            const res = await fetch(`/api/public/r/${inspectionId}/pay-intent`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: "{}",

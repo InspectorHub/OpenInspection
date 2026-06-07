@@ -81,6 +81,12 @@ describe('shouldUseCheckoutLink (Track I-a Task 8)', () => {
         expect(await shouldUseCheckoutLink(FAKE_DB, TENANT_ID, INSP_ID)).toBe(false);
     });
 
+    it('true when the invoice is only partially paid (balance remains)', async () => {
+        await seedInspection({ paymentRequired: true });
+        await seedInvoice({ paidAt: null, partialPaidAt: new Date() });
+        expect(await shouldUseCheckoutLink(FAKE_DB, TENANT_ID, INSP_ID)).toBe(true);
+    });
+
     it('true when payment required AND an unpaid invoice exists', async () => {
         await seedInspection({ paymentRequired: true });
         await seedInvoice({ paidAt: null });
