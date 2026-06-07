@@ -24,6 +24,7 @@ export default function globalSetup() {
     // Use --command per table because wrangler --file doesn't persist PRAGMA across statements
     const tables = [
         'audit_logs',
+        'erasure_log',
         'agreement_signers',
         'inspection_agreements',
         'inspection_results',
