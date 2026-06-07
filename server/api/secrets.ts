@@ -215,7 +215,10 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
         if (value.trim() === '') {
             delete existing[key];
         } else {
-            existing[key] = value;
+            // Store TRIMMED — the live-verify below tests the trimmed value, and
+            // consumers read the stored value raw; a pasted trailing newline must
+            // not diverge the two (verified-ok but broken at payment time).
+            existing[key] = value.trim();
         }
     }
 
