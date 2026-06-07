@@ -7,12 +7,14 @@ import type { HonoConfig } from '../../types/hono';
 /**
  * Tenant resolution for the public client chain keyed by inspection id:
  * `/r/:id/...` (invoice page, repair-request) and `/api/public/r/:id/...`
- * (invoice data, pay-intent). The unguessable inspection UUID is already the
- * capability these endpoints trust; resolving tenancy from it is equivalent
- * to the portal-token → tenantId pattern. Unknown id → leave context unset →
- * endpoints 404 exactly as before.
+ * (invoice data, pay-intent), plus the repair-request data GET
+ * `/api/public/repair-request/:id`. The unguessable inspection UUID is
+ * already the capability these endpoints trust; resolving tenancy from it is
+ * equivalent to the portal-token → tenantId pattern. Unknown id (including
+ * the `/email` POST sibling, whose first segment is not an id) → leave
+ * context unset → endpoints 404/self-resolve exactly as before.
  */
-const R_PREFIXES = ['/r/', '/api/public/r/'];
+const R_PREFIXES = ['/r/', '/api/public/r/', '/api/public/repair-request/'];
 
 export function extractInspectionIdFromPath(path: string): string | null {
     for (const prefix of R_PREFIXES) {
