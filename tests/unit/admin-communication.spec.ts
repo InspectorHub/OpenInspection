@@ -4,18 +4,13 @@ import adminRoutes from '../../server/api/admin';
 import type { HonoConfig } from '../../server/types/hono';
 
 // C-15: resendConfigured now reads the CANONICAL encrypted_secrets store via
-// lib/secrets-cache + config-crypto (the legacy branding.getDecryptedSecrets
-// is gone). Stub the loaders; per-test overrides below.
+// the single envelope-aware entry point lib/secrets-cache#loadTenantSecrets
+// (returns DECRYPTED records). Stub it; per-test overrides below.
 vi.mock('../../server/lib/secrets-cache', async (importOriginal) => ({
     ...(await importOriginal<object>()),
-    loadEncryptedSecretsBlob: vi.fn(async () => null),
+    loadTenantSecrets: vi.fn(async () => null),
 }));
-vi.mock('../../server/lib/config-crypto', async (importOriginal) => ({
-    ...(await importOriginal<object>()),
-    decryptSecrets: vi.fn(async () => ({})),
-}));
-import { loadEncryptedSecretsBlob } from '../../server/lib/secrets-cache';
-import { decryptSecrets } from '../../server/lib/config-crypto';
+import { loadTenantSecrets } from '../../server/lib/secrets-cache';
 
 /**
  * C-10 ③-D (B-4 / A-7) — GET+PATCH /api/admin/communication.
@@ -36,8 +31,7 @@ describe('admin communication config — ③-D (B-4)', () => {
     }
 
     beforeEach(() => {
-        vi.mocked(loadEncryptedSecretsBlob).mockReset().mockResolvedValue(null);
-        vi.mocked(decryptSecrets).mockReset().mockResolvedValue({});
+        vi.mocked(loadTenantSecrets).mockReset().mockResolvedValue(null);
     });
 
     it('GET returns senderEmail/replyTo + flags from branding config (tenant Resend key in the canonical store)', async () => {
@@ -46,8 +40,7 @@ describe('admin communication config — ③-D (B-4)', () => {
             emailMode: 'own', senderDisplayName: 'Acme Inspections', useInspectorFromName: true,
         });
         // C-15: configured via the canonical encrypted_secrets store.
-        vi.mocked(loadEncryptedSecretsBlob).mockResolvedValue('enc-blob');
-        vi.mocked(decryptSecrets).mockResolvedValue({ RESEND_API_KEY: 're_123' });
+        vi.mocked(loadTenantSecrets).mockResolvedValue({ RESEND_API_KEY: 're_123' });
         const { app, env } = buildApp({ getBranding });
         const res = await app.request('/api/admin/communication', {}, env);
         expect(res.status).toBe(200);

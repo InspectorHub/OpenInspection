@@ -2,8 +2,7 @@ import { EmailService } from '../../services/email.service';
 import { BrandingService } from '../../services/branding.service';
 import { EmailTemplateService } from '../../services/email-template.service';
 import { EmailTemplateRenderer } from '../email-templates/renderer';
-import { decryptSecrets } from '../config-crypto';
-import { loadEncryptedSecretsBlob } from '../secrets-cache';
+import { loadTenantSecrets } from '../secrets-cache';
 import type { EmailIdentityConfig } from './sender-identity';
 import type { TemplateOverride } from '../email-templates/types';
 
@@ -15,6 +14,7 @@ export interface EmailServiceEnv {
     DB: D1Database;
     TENANT_CACHE: KVNamespace;
     JWT_SECRET: string;
+    JWT_SECRET_PREVIOUS?: string;
     RESEND_API_KEY?: string;
     SENDER_EMAIL?: string;
     APP_NAME?: string;
@@ -88,9 +88,9 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
  * ciphertext (see lib/secrets-cache.ts).
  */
 async function loadEmailSecrets(env: EmailServiceEnv, tenantId: string): Promise<LoadedEmailConfig['dbSecrets']> {
-    const blob = await loadEncryptedSecretsBlob(env.DB, env.TENANT_CACHE, tenantId);
-    if (!blob) return {};
-    const dec = await decryptSecrets(blob, env.JWT_SECRET) as Record<string, string | undefined>;
+    const dec = (await loadTenantSecrets(
+        env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
+    ).catch(() => null)) ?? {};
     return {
         ...(dec.RESEND_API_KEY ? { resendApiKey: dec.RESEND_API_KEY } : {}),
         ...(dec.GEMINI_API_KEY ? { geminiApiKey: dec.GEMINI_API_KEY } : {}),

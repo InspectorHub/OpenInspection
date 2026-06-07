@@ -2219,13 +2219,12 @@ export const adminRoutes = createApiRouter()
         let resendConfigured = !!c.env.RESEND_API_KEY;
         if (!resendConfigured) {
             try {
-                const { loadEncryptedSecretsBlob } = await import('../lib/secrets-cache');
-                const { decryptSecrets } = await import('../lib/config-crypto');
-                const blob = await loadEncryptedSecretsBlob(c.env.DB, c.env.TENANT_CACHE, tenantId);
-                if (blob) {
-                    const dec = await decryptSecrets(blob, c.env.JWT_SECRET) as Record<string, string | undefined>;
-                    resendConfigured = !!dec.RESEND_API_KEY;
-                }
+                const { loadTenantSecrets } = await import('../lib/secrets-cache');
+                const dec = (await loadTenantSecrets(
+                    c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET,
+                    c.env.JWT_SECRET_PREVIOUS,
+                ).catch(() => null)) ?? ({} as Record<string, string | undefined>);
+                resendConfigured = !!dec.RESEND_API_KEY;
             } catch { /* no decryptable secrets — leave false */ }
         }
         const icsToken = cfg.icsToken as string | null | undefined;

@@ -63,4 +63,19 @@ export class StripeService {
             Stripe.createSubtleCryptoProvider(),
         );
     }
+
+    /**
+     * Verifies the secret key is alive by fetching its own account.
+     * Used by save-time validation and the settings "Test connection" button.
+     * Mode (test/live) is inferred from the key prefix by callers — the
+     * Account API does not reliably expose livemode.
+     */
+    async getAccount(): Promise<{ accountName: string }> {
+        // Pass `null` to retrieve the account that owns the API key in use
+        // (this SDK version requires the id argument; null = own account).
+        const acct = await this.stripe.accounts.retrieve(null);
+        return {
+            accountName: acct.settings?.dashboard?.display_name || acct.email || acct.id,
+        };
+    }
 }

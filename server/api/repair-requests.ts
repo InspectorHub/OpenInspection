@@ -112,10 +112,20 @@ export const repairRequestRoutes = createApiRouter()
     await checkRateLimit(c, 'book');
 
     const body = c.req.valid('json');
-    const tenantId = c.get('tenantId') || c.get('resolvedTenantId');
-    if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
-
     const db = drizzle(c.env.DB);
+
+    let tenantId = c.get('tenantId') || c.get('resolvedTenantId');
+    if (!tenantId) {
+        // SaaS: this POST carries the unguessable inspection id in the BODY,
+        // so path-based resolution can't see it. Derive tenancy from the id —
+        // the same capability model as the /r/ inspection-id resolver.
+        const owner = await db.select({ tenantId: inspections.tenantId })
+            .from(inspections)
+            .where(eq(inspections.id, body.inspectionId))
+            .get();
+        tenantId = owner?.tenantId;
+    }
+    if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
 
     // Tenant opt-in check.
     const cfg = await db.select({

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useActionData, useFetcher, Link, Form } from "react-router";
+import { useLoaderData, useActionData, useNavigation, useFetcher, Link, Form } from "react-router";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -86,7 +86,15 @@ export async function action({ request, context }: Route.ActionArgs) {
       const api = createApi(context, { token });
       const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
-        return { success: false, intent, error: "Failed to save QBO keys.", syncEnabled: undefined };
+        const errBody = (await res.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null;
+        return {
+          success: false,
+          intent,
+          error: errBody?.error?.message ?? "Failed to save QBO keys.",
+          syncEnabled: undefined,
+        };
       }
     }
     return { success: true, intent, error: null, syncEnabled: undefined };
@@ -118,7 +126,21 @@ function timeSince(ts: number | null | undefined): string {
 export default function SettingsIntegrationsQbo() {
   const { status: initial, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const nav = useNavigation();
   const [status, setStatus] = useState<QboStatus | null>(initial);
+
+  const savingSecrets =
+    nav.state !== "idle" && nav.formData?.get("intent") === "save-qbo-secrets";
+
+  // Transient success flash — visible for 4s after a save round-trip.
+  const [flashVisible, setFlashVisible] = useState(false);
+  useEffect(() => {
+    if (actionData?.success && actionData.intent === "save-qbo-secrets") {
+      setFlashVisible(true);
+      const t = setTimeout(() => setFlashVisible(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [actionData]);
   const qboFetcher = useFetcher<{ success: boolean; intent?: string | null; error: string | null; syncEnabled?: boolean }>();
 
   const connected = status?.connected;
@@ -177,7 +199,7 @@ export default function SettingsIntegrationsQbo() {
       </h2>
 
       {/* Flash */}
-      {actionData?.success && (
+      {flashVisible && actionData?.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           QBO credentials saved.
         </div>
@@ -220,9 +242,9 @@ export default function SettingsIntegrationsQbo() {
             hint="Verifies QuickBooks data change notifications. Found at developer.intuit.com → Webhooks"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit"
-              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-              Save credentials
+            <button type="submit" disabled={savingSecrets}
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+              {savingSecrets ? "Saving…" : "Save credentials"}
             </button>
           </div>
         </Form>

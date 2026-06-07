@@ -1,10 +1,15 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq, isNotNull } from 'drizzle-orm';
 import { HonoConfig } from '../types/hono';
 import { TenantUpdateParams } from '../lib/integration';
 import { TenantStatusBodySchema, SeedStarterContentBodySchema } from '../lib/validations/admin.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { logger } from '../lib/logger';
+import { tenantConfigs } from '../lib/db/schema';
+import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
+import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
 import { requireServiceBinding } from './service-binding-guard';
 
@@ -264,6 +269,48 @@ api.post('/sync-redrive', requireServiceBinding, async (c) => {
         return c.json({ success: true, data: { redriven } });
     } catch (error: unknown) {
         logger.error('sync-redrive failed', {}, error instanceof Error ? error : undefined);
+        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
+    }
+});
+
+/**
+ * POST /api/integration/secrets/reencrypt — JWT_SECRET rotation tool.
+ * SaaS-only by construction (this seam is unmounted in standalone); a
+ * standalone tenant converges lazily on its next secrets write instead.
+ * Idempotent; SOP: docs/saas-ops/jwt-secret-rotation-sop.md.
+ */
+api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
+    try {
+    const db = drizzle(c.env.DB);
+    const report = await reencryptAllTenantSecrets({
+        listRows: async () => {
+            const rows = await db
+                .select({ tenantId: tenantConfigs.tenantId, blob: tenantConfigs.encryptedSecrets, dekEnc: tenantConfigs.dekEnc })
+                .from(tenantConfigs)
+                .where(isNotNull(tenantConfigs.encryptedSecrets))
+                .all();
+            return rows.map(r => ({ tenantId: r.tenantId, blob: r.blob as string, dekEnc: r.dekEnc ?? null }));
+        },
+        updateRow: async (tenantId, patch) => {
+            await db.update(tenantConfigs)
+                .set({
+                    ...(patch.blob !== undefined ? { encryptedSecrets: patch.blob } : {}),
+                    ...(patch.dekEnc !== undefined ? { dekEnc: patch.dekEnc } : {}),
+                    updatedAt: new Date(),
+                })
+                .where(eq(tenantConfigs.tenantId, tenantId));
+        },
+        bustCache: async (tenantId) => {
+            await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
+        },
+    }, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS);
+    logger.info('secrets reencrypt completed', {
+        migrated: report.migrated, rewrapped: report.rewrapped,
+        alreadyCurrent: report.alreadyCurrent, failed: report.failed.length,
+    });
+    return c.json({ success: true, data: report });
+    } catch (error: unknown) {
+        logger.error('secrets reencrypt failed', {}, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
     }
 });

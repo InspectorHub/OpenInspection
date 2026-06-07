@@ -235,6 +235,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // `secrets` column which held a smaller subset. Worker env vars still
     // take precedence (backwards compat); DB secrets are the fallback.
     encryptedSecrets: text('encrypted_secrets'),
+    // Envelope encryption (2026-06-07) — the tenant's wrapped DEK
+    // (`k1:iv:wrapped`, AES-GCM under the HKDF KEK from JWT_SECRET, AAD=tenantId).
+    // NULL while the tenant still has a legacy un-prefixed blob (or no secrets).
+    dekEnc: text('dek_enc'),
     icsToken: text('ics_token'),
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
     reportTheme: text('report_theme', { enum: ['modern', 'classic', 'minimal'] }).notNull().default('modern'),

@@ -1,22 +1,40 @@
-import { Link, useLoaderData, useActionData, Form } from "react-router";
+import { useEffect, useState } from "react";
+import {
+  Link,
+  useLoaderData,
+  useActionData,
+  useNavigation,
+  useRevalidator,
+  useFetcher,
+  Form,
+} from "react-router";
 import type { Route } from "./+types/settings-integrations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
+import { useSessionContext } from "~/hooks/useSessionContext";
 
 export function meta() {
   return [{ title: "Integrations - Settings - OpenInspection" }];
 }
 
+type WebhookLogEntry = { ts: string; eventType: string; result: string };
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const secretsRes = await api.secrets.secrets.$get().catch(() => null);
+  const [secretsRes, logRes] = await Promise.all([
+    api.secrets.secrets.$get().catch(() => null),
+    api.integrations.stripe["webhook-log"].$get().catch(() => null),
+  ]);
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
-  const webhookUrl = `${new URL(request.url).origin}/api/integrations/stripe/webhook`;
+  const logBody = logRes?.ok ? ((await logRes.json()) as Record<string, unknown>) : {};
+  const webhookLog = (logBody.data ?? []) as WebhookLogEntry[];
+  const webhookBase = `${new URL(request.url).origin}/api/integrations/stripe/webhook`;
   return {
-    webhookUrl,
+    webhookBase,
+    webhookLog,
     secrets: {
       STRIPE_PUBLISHABLE_KEY: secrets.STRIPE_PUBLISHABLE_KEY || "",
       STRIPE_SECRET_KEY: secrets.STRIPE_SECRET_KEY || "",
@@ -40,13 +58,40 @@ export async function action({ request, context }: Route.ActionArgs) {
       const api = createApi(context, { token });
       const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
-        return { success: false, error: "Failed to save Stripe keys." };
+        const errBody = (await res.json().catch(() => null)) as
+          | { error?: { message?: string; field?: string } }
+          | null;
+        return {
+          intent,
+          success: false,
+          error: errBody?.error?.message ?? "Failed to save Stripe keys.",
+          field: errBody?.error?.field ?? null,
+          test: null,
+        };
       }
     }
-    return { success: true, error: null };
+    return { intent, success: true, error: null, field: null, test: null };
   }
 
-  return { success: false, error: "Unknown action" };
+  if (intent === "test-stripe") {
+    const api = createApi(context, { token });
+    const res = await api.integrations.stripe.test.$post();
+    const body = (await res.json().catch(() => null)) as
+      | { data?: { accountName: string; livemode: boolean }; error?: { message?: string } }
+      | null;
+    if (!res.ok || !body?.data) {
+      return {
+        intent,
+        success: false,
+        error: body?.error?.message ?? "Connection test failed.",
+        field: null,
+        test: null,
+      };
+    }
+    return { intent, success: true, error: null, field: null, test: body.data };
+  }
+
+  return { intent: null, success: false, error: "Unknown action", field: null, test: null };
 }
 
 type Integration = {
@@ -111,9 +156,72 @@ const STATUS_STYLES = {
     "bg-ih-bg-muted text-ih-fg-3",
 };
 
+/**
+ * Eager-after-error prefix rules for the Stripe trio. Masked (unchanged,
+ * contains •) and empty values are skipped — they mean "no change".
+ */
+const STRIPE_FIELD_RULES: Array<[string, RegExp, string]> = [
+  ["STRIPE_PUBLISHABLE_KEY", /^pk_(test|live)_/, "Must start with pk_test_ or pk_live_."],
+  ["STRIPE_SECRET_KEY", /^(sk|rk)_(test|live)_/, "Must start with sk_test_ or sk_live_."],
+  ["STRIPE_WEBHOOK_SECRET", /^whsec_/, "Must start with whsec_."],
+];
+
+function validateStripeForm(fd: FormData): Record<string, string> {
+  const errs: Record<string, string> = {};
+  for (const [name, re, msg] of STRIPE_FIELD_RULES) {
+    const v = fd.get(name);
+    if (typeof v === "string" && v.trim() && !v.includes("•") && !re.test(v.trim())) {
+      errs[name] = msg;
+    }
+  }
+  return errs;
+}
+
+function WebhookResultBadge({ result }: { result: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    processed: { label: "✓ Processed", cls: "bg-ih-ok-bg text-ih-ok-fg" },
+    received: { label: "✓ Received (no action)", cls: "bg-ih-bg-muted text-ih-fg-3" },
+    signature_failed: { label: "✗ Signature failed — check your signing secret", cls: "bg-ih-bad-bg text-ih-bad-fg" },
+    tenant_mismatch: { label: "✗ Tenant mismatch", cls: "bg-ih-bad-bg text-ih-bad-fg" },
+  };
+  const m = map[result] ?? { label: result, cls: "bg-ih-bg-muted text-ih-fg-3" };
+  return <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${m.cls}`}>{m.label}</span>;
+}
+
 export default function SettingsIntegrations() {
-  const { secrets, webhookUrl } = useLoaderData<typeof loader>();
+  const { secrets, webhookBase, webhookLog } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const nav = useNavigation();
+  const revalidator = useRevalidator();
+  const testFetcher = useFetcher<typeof action>();
+  const ctx = useSessionContext();
+
+  const tenantSlug = ctx?.branding?.tenantSlug ?? null;
+  const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
+
+  const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
+
+  // Transient success flash — visible for 4s after a save round-trip.
+  // Errors persist until the next attempt (no auto-dismiss).
+  const [flashVisible, setFlashVisible] = useState(false);
+  useEffect(() => {
+    if (actionData?.intent === "save-stripe-secrets" && actionData.success) {
+      setFlashVisible(true);
+      const t = setTimeout(() => setFlashVisible(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [actionData]);
+
+  // Eager-after-error client validation: validate on submit; after the first
+  // failed submit, re-validate on every change inside the form.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submittedOnce, setSubmittedOnce] = useState(false);
+
+  const serverField = actionData?.intent === "save-stripe-secrets" && !actionData.success
+    ? actionData.field
+    : null;
+  const fieldError = (name: string): string | undefined =>
+    fieldErrors[name] ?? (serverField === name ? actionData?.error ?? undefined : undefined);
 
   return (
     <div className="space-y-[18px]">
@@ -138,12 +246,12 @@ export default function SettingsIntegrations() {
       </div>
 
       {/* Flash */}
-      {actionData?.success && (
+      {flashVisible && actionData?.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Settings saved.
         </div>
       )}
-      {actionData?.error && (
+      {actionData?.intent === "save-stripe-secrets" && actionData.error && (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
@@ -174,44 +282,114 @@ export default function SettingsIntegrations() {
           and pay with card <span className="font-mono">4242&nbsp;4242&nbsp;4242&nbsp;4242</span> (any future date / CVC) to verify the flow before going live.
         </div>
 
-        <Form method="post" className="space-y-4 max-w-xl">
+        <Form
+          method="post"
+          className="space-y-4 max-w-xl"
+          onSubmit={(e) => {
+            const errs = validateStripeForm(new FormData(e.currentTarget));
+            setSubmittedOnce(true);
+            setFieldErrors(errs);
+            if (Object.keys(errs).length > 0) e.preventDefault();
+          }}
+          onChange={(e) => {
+            if (submittedOnce) {
+              setFieldErrors(validateStripeForm(new FormData(e.currentTarget)));
+            }
+          }}
+        >
           <input type="hidden" name="intent" value="save-stripe-secrets" />
           <SecretField
             name="STRIPE_PUBLISHABLE_KEY"
             label="Publishable Key"
             value={secrets.STRIPE_PUBLISHABLE_KEY}
+            error={fieldError("STRIPE_PUBLISHABLE_KEY")}
             hint="Sent to the browser to render the card field. Starts with pk_test_ (test) or pk_live_ (live)."
           />
           <SecretField
             name="STRIPE_SECRET_KEY"
             label="Secret Key"
             value={secrets.STRIPE_SECRET_KEY}
+            error={fieldError("STRIPE_SECRET_KEY")}
             hint="Server-side key that creates the charge. Starts with sk_test_ or sk_live_. Never shared with the browser."
           />
           <SecretField
             name="STRIPE_WEBHOOK_SECRET"
             label="Webhook Signing Secret"
             value={secrets.STRIPE_WEBHOOK_SECRET}
+            error={fieldError("STRIPE_WEBHOOK_SECRET")}
             hint="Verifies payment notifications. Found after you add the webhook endpoint below (starts with whsec_)."
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit"
-              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-              Save Stripe keys
+            <button type="submit" disabled={saving}
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+              {saving ? "Saving…" : "Save Stripe keys"}
             </button>
           </div>
         </Form>
+
+        {/* Test connection — probes the STORED secret key, no re-entry needed */}
+        <testFetcher.Form method="post" className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="intent" value="test-stripe" />
+          <button type="submit" disabled={testFetcher.state !== "idle"}
+            className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+            {testFetcher.state !== "idle" ? "Testing…" : "Test connection"}
+          </button>
+          {testFetcher.data?.intent === "test-stripe" && testFetcher.data.test && (
+            <span className="text-[12px] text-ih-fg-2">
+              Connected: <span className="font-semibold">{testFetcher.data.test.accountName}</span>
+              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
+                testFetcher.data.test.livemode
+                  ? "bg-ih-bad-bg text-ih-bad-fg"
+                  : "bg-ih-ok-bg text-ih-ok-fg"
+              }`}>
+                {testFetcher.data.test.livemode ? "Live" : "Test"}
+              </span>
+            </span>
+          )}
+          {testFetcher.data?.intent === "test-stripe" && !testFetcher.data.success && (
+            <span className="text-[12px] text-ih-bad-fg">{testFetcher.data.error}</span>
+          )}
+        </testFetcher.Form>
 
         {/* Webhook endpoint to register in the Stripe dashboard */}
         <div className="pt-1 space-y-1.5">
           <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">Webhook endpoint</p>
           <p className="text-[12px] text-ih-fg-3 leading-relaxed">
             In Stripe → Developers → Webhooks, add an endpoint for the{" "}
-            <span className="font-semibold text-ih-fg-2">payment_intent.succeeded</span> event pointing at this URL, then paste its signing secret above:
+            <span className="font-semibold text-ih-fg-2">payment_intent.succeeded</span> event pointing at this URL, then paste its signing secret above.
+            If you registered an endpoint before, re-point it to this URL — the signing secret stays the same.
           </p>
           <code className="block w-full px-3 py-2 rounded-md bg-ih-bg-muted border border-ih-border text-[12px] font-mono text-ih-fg-1 break-all select-all">
             {webhookUrl}
           </code>
+        </div>
+
+        {/* Recent webhook deliveries — diagnostics log */}
+        <div className="pt-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">Recent webhook deliveries</p>
+            <button type="button" onClick={() => revalidator.revalidate()}
+              disabled={revalidator.state !== "idle"}
+              className="h-7 px-2.5 rounded-md border border-ih-border bg-ih-bg-card text-[11px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+              {revalidator.state !== "idle" ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+          {webhookLog.length === 0 ? (
+            <p className="text-[12px] text-ih-fg-3 leading-relaxed">
+              No deliveries yet. In Stripe → Developers → Webhooks → your endpoint, click{" "}
+              <span className="font-semibold text-ih-fg-2">Send test event</span>, then hit Refresh.
+            </p>
+          ) : (
+            <ul className="divide-y divide-ih-border rounded-md border border-ih-border bg-ih-bg-card">
+              {webhookLog.map((e, i) => (
+                <li key={`${e.ts}-${i}`} className="flex items-center justify-between px-3 py-2 text-[12px]">
+                  <span className="text-ih-fg-3 tabular-nums flex-shrink-0">{new Date(e.ts).toLocaleString()}</span>
+                  <span className="font-mono text-ih-fg-2 truncate mx-3 flex-1">{e.eventType}</span>
+                  <WebhookResultBadge result={e.result} />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 
