@@ -4,6 +4,7 @@ import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
+import { InviteSeatModal } from "~/components/modals/InviteSeatModal";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
@@ -25,9 +26,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   try {
     const api = createApi(context, { token });
     const res = await api.team.members.$get();
-    const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
+    const body = res.ok ? ((await res.json()) as unknown as { data?: { members?: Member[] } }) : { data: { members: [] as Member[] } };
     return {
-      members: (body.data ?? []) as Member[],
+      members: (body.data?.members ?? []) as Member[],
       settings: {} as Record<string, unknown>,
     };
   } catch {
@@ -57,6 +58,9 @@ export default function TeamPage() {
   const { members } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const [activeTab, setActiveTab] = useState("active");
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  const leads = members.filter((m) => m.role === "lead").map((m) => ({ id: m.id, email: m.email }));
 
   const filtered = members.filter((m) => {
     if (activeTab === "active") return m.status !== "pending" && m.role !== "apprentice";
@@ -79,11 +83,13 @@ export default function TeamPage() {
         title="Workspace Team"
         meta={`${members.length} ${members.length === 1 ? "member" : "members"}`}
         actions={
-          <Button variant="primary" icon={<PlusIcon />}>
+          <Button variant="primary" icon={<PlusIcon />} onClick={() => setInviteOpen(true)}>
             Invite Member
           </Button>
         }
       />
+
+      <InviteSeatModal open={inviteOpen} onClose={() => setInviteOpen(false)} leads={leads} />
 
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
 

@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, like } from 'drizzle-orm';
 import { templates, inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
@@ -58,20 +58,23 @@ export class TemplateService {
     /**
      * Lists all templates for a tenant.
      */
-    async listTemplates(tenantId: string, opts: { page?: number; pageSize?: number } = {}) {
-        const { page = 1, pageSize = 50 } = opts;
+    async listTemplates(tenantId: string, opts: { page?: number; pageSize?: number; q?: string } = {}) {
+        const { page = 1, pageSize = 50, q } = opts;
         const db = this.getDrizzle();
+
+        const baseWhere = eq(templates.tenantId, tenantId);
+        const where = q?.trim() ? and(baseWhere, like(templates.name, `%${q.trim()}%`)) : baseWhere;
 
         const totalRow = await db
             .select({ c: sql<number>`count(*)` })
             .from(templates)
-            .where(eq(templates.tenantId, tenantId))
+            .where(where)
             .get();
         const total = totalRow?.c ?? 0;
 
         const rows = await db.select({ id: templates.id, name: templates.name, version: templates.version, schema: templates.schema })
             .from(templates)
-            .where(eq(templates.tenantId, tenantId))
+            .where(where)
             .orderBy(desc(templates.createdAt))
             .limit(pageSize)
             .offset((page - 1) * pageSize)

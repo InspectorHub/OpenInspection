@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useLoaderData, Link, useFetcher, useSearchParams, redirect } from "react-router";
+import type { InspectionSearchItem } from "~/routes/resources/inspection-search";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -417,6 +418,14 @@ export default function DashboardPage() {
   const [visiblePage, setVisiblePage] = useState(1);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  /* ---- Server-side search (fetcher + state) ---- */
+  const searchFetcher = useFetcher<{ inspections: InspectionSearchItem[]; hasMore: boolean; nextCursor: string | null }>();
+  const [serverResults, setServerResults] = useState<InspectionSearchItem[]>([]);
+  const [serverCursor, setServerCursor] = useState<string | null>(null);
+  const [serverHasMore, setServerHasMore] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLoadMoreRef = useRef(false);
+
   /* ---- Columns (persisted in localStorage) ---- */
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     if (typeof window === "undefined") return DEFAULT_COLUMNS;
@@ -533,6 +542,38 @@ export default function DashboardPage() {
   // Reset page when filters change
   useEffect(() => { setVisiblePage(1); }, [activeTab, activeFilter, activeTagFilter, searchQuery, filterDateFrom, filterDateTo, filterAgentId]);
 
+  // Debounce searchQuery → server-side search via BFF
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!searchQuery.trim()) {
+      setServerResults([]);
+      setServerCursor(null);
+      setServerHasMore(false);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      isLoadMoreRef.current = false;
+      setServerResults([]);
+      setServerCursor(null);
+      searchFetcher.load(`/resources/inspection-search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }, 300);
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [searchQuery]); // searchFetcher.load is stable; omitting it avoids infinite loop
+
+  // Apply searchFetcher results (fresh search or load-more append)
+  useEffect(() => {
+    if (searchFetcher.state !== "idle" || !searchFetcher.data) return;
+    const d = searchFetcher.data;
+    if (isLoadMoreRef.current) {
+      setServerResults(prev => [...prev, ...d.inspections]);
+      isLoadMoreRef.current = false;
+    } else {
+      setServerResults(d.inspections);
+    }
+    setServerHasMore(d.hasMore ?? false);
+    setServerCursor(d.nextCursor ?? null);
+  }, [searchFetcher.state, searchFetcher.data]);
+
   /* ---- IA-12: Onboarding steps ---- */
   // siteNameSet: the session context always returns a non-null siteName
   // (falling back to 'OpenInspection' when not configured). If the value
@@ -639,6 +680,13 @@ export default function DashboardPage() {
     a.click();
     URL.revokeObjectURL(url);
   }, [filteredInspections]);
+
+  /* ---- Server search load-more ---- */
+  const handleSearchLoadMore = () => {
+    if (!serverHasMore || !serverCursor || !searchQuery.trim()) return;
+    isLoadMoreRef.current = true;
+    searchFetcher.load(`/resources/inspection-search?q=${encodeURIComponent(searchQuery.trim())}&cursor=${encodeURIComponent(serverCursor)}`);
+  };
 
   /* ---- Status transition ---- */
   const transitionStatus = (id: string, status: string) => {
@@ -939,21 +987,43 @@ export default function DashboardPage() {
           })}
         </div>
       ) : (
-        /* Flat filtered view */
-        <Card className="overflow-hidden">
-          <div className="px-4 py-2 border-b border-ih-border">
-            <span className="text-[11px] font-bold text-ih-fg-4">
-              {filteredInspections.length} result{filteredInspections.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <div className="divide-y divide-ih-border">
-            {paginatedList.map((insp) => (
-              <InspectionRow key={insp.id} insp={insp} />
-            ))}
-          </div>
-          {/* Infinite scroll sentinel */}
-          {hasMore && <div ref={sentinelRef} className="h-8" />}
-        </Card>
+        /* Flat filtered view — server search when query active, client-side otherwise */
+        (() => {
+          const isServerSearch = searchQuery.trim().length > 0;
+          const isSearching = isServerSearch && searchFetcher.state !== "idle";
+          const displayList = isServerSearch ? (serverResults as unknown as Inspection[]) : paginatedList;
+          const displayCount = isServerSearch ? serverResults.length : filteredInspections.length;
+          return (
+            <Card className="overflow-hidden">
+              <div className="px-4 py-2 border-b border-ih-border">
+                <span className="text-[11px] font-bold text-ih-fg-4">
+                  {isSearching ? "Searching…" : `${displayCount} result${displayCount !== 1 ? "s" : ""}`}
+                </span>
+              </div>
+              <div className="divide-y divide-ih-border">
+                {!isSearching && displayList.map((insp) => (
+                  <InspectionRow key={insp.id} insp={insp} />
+                ))}
+              </div>
+              {isSearching && (
+                <div className="py-8 text-center text-[12px] text-ih-fg-4">Searching…</div>
+              )}
+              {/* Server search load-more */}
+              {isServerSearch && serverHasMore && !isSearching && (
+                <div className="p-3 border-t border-ih-border text-center">
+                  <button
+                    onClick={handleSearchLoadMore}
+                    className="h-8 px-4 rounded-md text-[12px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
+                  >
+                    Load more
+                  </button>
+                </div>
+              )}
+              {/* Infinite scroll for non-search flat mode */}
+              {!isServerSearch && hasMore && <div ref={sentinelRef} className="h-8" />}
+            </Card>
+          );
+        })()
       )}
 
       {/* Wizard modal */}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useLoaderData, useFetcher, useNavigate, Link } from "react-router";
+import { useLoaderData, useFetcher, useNavigate, useSearchParams, Link } from "react-router";
 import type { Route } from "./+types/templates";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -42,12 +42,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const url = new URL(request.url);
     const page     = url.searchParams.get("page")     ?? "1";
     const pageSize = url.searchParams.get("pageSize") ?? "50";
+    const q        = url.searchParams.get("q")        ?? "";
     const api = createApi(context, { token });
     // Best-effort /api/auth/me to read spectoraMappingSeen (same pattern as dashboard IA-12).
     // TODO(C-10): same hono/client collapse as auth.me — localized cast.
     const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
     const [res, meRes] = await Promise.all([
-      api.inspections.templates.$get({ query: { page, pageSize } }),
+      api.inspections.templates.$get({ query: { page, pageSize, ...(q ? { q } : {}) } }),
       meGet().catch(() => null),
     ]);
     const body = res.ok
@@ -62,11 +63,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       };
       spectoraMappingSeen = meBody.data?.user?.onboardingState?.spectoraMappingSeen === true;
     }
-    return { templates, meta, token, spectoraMappingSeen };
+    return { templates, meta, q, token, spectoraMappingSeen };
   } catch {
     return {
       templates: [] as Template[],
       meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+      q: "",
       token: "",
       spectoraMappingSeen: false,
     };
@@ -179,14 +181,16 @@ function countItems(t: Template): number {
 /* ------------------------------------------------------------------ */
 
 export default function TemplatesPage() {
-  const { templates, meta, spectoraMappingSeen: loaderMappingSeen } = useLoaderData<typeof loader>();
+  const { templates, meta, q: loaderQ, spectoraMappingSeen: loaderMappingSeen } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
   const mappingFetcher = useFetcher();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { setPage, setPageSize } = usePagination();
 
   const [view, setView] = useState<"list" | "card">("list");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(loaderQ);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -199,6 +203,22 @@ export default function TemplatesPage() {
   // Optimistic seen state — hide immediately once the user clicks "Got it".
   const [mappingSeenOptimistic, setMappingSeenOptimistic] = useState(false);
   const spectoraMappingSeen = loaderMappingSeen || mappingSeenOptimistic;
+
+  // Debounced URL-based search: triggers loader re-run for server-side filtering
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams);
+      if (searchQuery) {
+        params.set("q", searchQuery);
+      } else {
+        params.delete("q");
+      }
+      params.delete("page"); // reset to page 1 on new search
+      navigate(`?${params}`, { replace: true });
+    }, 350);
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [searchQuery]); // navigate/searchParams are stable refs; omitting avoids re-trigger loop
 
   // Navigate to newly created/duplicated template.
   const fetcherData = fetcher.data as Record<string, unknown> | undefined;
@@ -223,20 +243,9 @@ export default function TemplatesPage() {
     }
   }, [fetcherData, spectoraMappingSeen]);
 
-  /* ---- Filter + Sort ---- */
+  /* ---- Sort (search filtering is now server-side via URL ?q=) ---- */
   const filtered = useMemo(() => {
-    let list = [...templates];
-
-    // Search
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter((t) =>
-        t.name.toLowerCase().includes(q) ||
-        (t.description || "").toLowerCase().includes(q),
-      );
-    }
-
-    // Sort
+    const list = [...templates];
     list.sort((a, b) => {
       switch (sortBy) {
         case "name": return a.name.localeCompare(b.name);
@@ -245,9 +254,8 @@ export default function TemplatesPage() {
         default: return 0;
       }
     });
-
     return list;
-  }, [templates, searchQuery, sortBy]);
+  }, [templates, sortBy]);
 
   const imported = templates.filter((t) => t.marketplaceTemplateId).length;
   const withUpdates = templates.filter((t) => t.upstreamUpdateAvailable).length;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { TemplateCombobox } from "~/components/TemplateCombobox";
 
 interface SettingsForm {
   date: string;
@@ -90,8 +91,8 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
       const loadedTemplateId = (insp.templateId as string) || "";
       templateIdAtOpen.current = loadedTemplateId;
       setForm({
-        date: (insp.date as string) || "",
-        closingDate: (insp.closingDate as string) || "",
+        date: ((insp.date as string) || "").replace(/T.*/, ''),
+        closingDate: ((insp.closingDate as string) || "").replace(/T.*/, ''),
         inspectorId: (insp.inspectorId as string) || "",
         orderId: (insp.orderId as string) || "",
         referralSource: (insp.referralSource as string) || "",
@@ -225,13 +226,14 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
 
               <fieldset className="space-y-4">
                 <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Template</legend>
-                <label className="block">
+                <div className="block">
                   <span className={labelClass}>Inspection template</span>
-                  <select value={form.templateId} onChange={(e) => updateForm("templateId", e.target.value)} className={inputClass}>
-                    <option value="">--- Select template ---</option>
-                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </label>
+                  <TemplateCombobox
+                    value={form.templateId}
+                    onChange={(id) => updateForm("templateId", id)}
+                    initialTemplates={templates}
+                  />
+                </div>
               </fieldset>
 
               <fieldset className="space-y-4">
