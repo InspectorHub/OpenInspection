@@ -52,7 +52,7 @@ import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/valid
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors } from '../lib/db/schema';
 import { applyResultsBatch } from '../services/inspection-results.service';
-import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
 import { findScheduleConflicts } from '../lib/schedule-conflicts';
 import { eq, inArray, and } from 'drizzle-orm';
@@ -1990,16 +1990,19 @@ export const inspectionsRoutes = createApiRouter()
             await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
                 .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
             // DB-8: re-sync the link table for each reassigned inspection, preserving
-            // team-mode rows that this bulk operation cannot change.
-            for (const row of affected) {
+            // team-mode rows that this bulk operation cannot change. B-29: one
+            // db.batch round trip for all N resyncs (was a 2N-statement loop).
+            const inspectorId = body.inspectorId;
+            await syncInspectionAssignmentsBatch(db, tenantId, affected.map(row => {
                 let helpers: string[] = [];
                 try { helpers = JSON.parse(row.helperInspectorIds ?? '[]'); } catch { /* malformed legacy JSON */ }
-                await syncInspectionAssignments(db, tenantId, row.id, {
-                    inspectorId:        body.inspectorId,
+                return {
+                    inspectionId:       row.id,
+                    inspectorId,
                     leadInspectorId:    row.leadInspectorId,
                     helperInspectorIds: helpers,
-                });
-            }
+                };
+            }));
 
             auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
                 metadata: { ids: body.ids, inspectorId: body.inspectorId },
