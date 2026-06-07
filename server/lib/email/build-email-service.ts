@@ -14,6 +14,7 @@ export interface EmailServiceEnv {
     DB: D1Database;
     TENANT_CACHE: KVNamespace;
     JWT_SECRET: string;
+    JWT_SECRET_PREVIOUS?: string;
     RESEND_API_KEY?: string;
     SENDER_EMAIL?: string;
     APP_NAME?: string;
@@ -88,8 +89,7 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
  */
 async function loadEmailSecrets(env: EmailServiceEnv, tenantId: string): Promise<LoadedEmailConfig['dbSecrets']> {
     const dec = (await loadTenantSecrets(
-        env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET,
-        (env as unknown as Record<string, string | undefined>).JWT_SECRET_PREVIOUS,
+        env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     ).catch(() => null)) ?? {};
     return {
         ...(dec.RESEND_API_KEY ? { resendApiKey: dec.RESEND_API_KEY } : {}),

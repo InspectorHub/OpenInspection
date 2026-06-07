@@ -71,9 +71,8 @@ export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async
     try {
         // A-16 — ciphertext is KV-cached; loadTenantSecrets is the single
         // envelope-aware decrypt entry point (see lib/secrets-cache.ts).
-        const env = c.env as unknown as Record<string, string | undefined>;
         const decrypted = await loadTenantSecrets(
-            c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
+            c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
         );
         if (decrypted) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

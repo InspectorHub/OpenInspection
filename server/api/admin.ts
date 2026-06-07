@@ -2218,7 +2218,7 @@ export const adminRoutes = createApiRouter()
                 const { loadTenantSecrets } = await import('../lib/secrets-cache');
                 const dec = (await loadTenantSecrets(
                     c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET,
-                    (c.env as unknown as Record<string, string | undefined>).JWT_SECRET_PREVIOUS,
+                    c.env.JWT_SECRET_PREVIOUS,
                 ).catch(() => null)) ?? ({} as Record<string, string | undefined>);
                 resendConfigured = !!dec.RESEND_API_KEY;
             } catch { /* no decryptable secrets — leave false */ }

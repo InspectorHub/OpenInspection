@@ -48,7 +48,7 @@ export class IntegrationsService {
         const dbSecrets = await this._safeGet(() =>
             loadTenantSecrets(
                 this.db, this.env.TENANT_CACHE, tenantId, this.env.JWT_SECRET,
-                (this.env as unknown as Record<string, string | undefined>).JWT_SECRET_PREVIOUS,
+                this.env.JWT_SECRET_PREVIOUS,
             ),
         );
 
