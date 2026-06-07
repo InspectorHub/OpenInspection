@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Form, Link, useLoaderData, useActionData } from "react-router";
+import { useState, useEffect } from "react";
+import { Form, Link, useLoaderData, useActionData, useNavigation } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-security";
@@ -86,10 +86,18 @@ export async function action({ request, context }: Route.ActionArgs) {
         json: { TURNSTILE_SECRET_KEY: val },
       });
       if (!res.ok) {
-        return { success: false, error: "Failed to save Turnstile key." };
+        const errBody = (await res.json().catch(() => null)) as
+          | { error?: { message?: string; field?: string } }
+          | null;
+        return {
+          intent,
+          success: false,
+          error: errBody?.error?.message ?? "Failed to save Turnstile key.",
+          field: errBody?.error?.field ?? null,
+        };
       }
     }
-    return { success: true, error: null };
+    return { intent, success: true, error: null, field: null };
   }
 
   if (intent === "export-data") {
@@ -131,8 +139,36 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SettingsSecurityPage() {
   const { user, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const nav = useNavigation();
   const [showPassword, setShowPassword] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const savingTurnstile =
+    nav.state !== "idle" && nav.formData?.get("intent") === "save-turnstile";
+
+  // Transient success flash — visible for 4s after a save round-trip.
+  const [flashVisible, setFlashVisible] = useState(false);
+  useEffect(() => {
+    if (actionData && "success" in actionData && actionData.success) {
+      setFlashVisible(true);
+      const t = setTimeout(() => setFlashVisible(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [actionData]);
+
+  // Map the server `field` error onto the matching SecretField (Turnstile).
+  const turnstileFieldError = (name: string): string | undefined => {
+    if (
+      actionData &&
+      "field" in actionData &&
+      actionData.field === name &&
+      "success" in actionData &&
+      !actionData.success
+    ) {
+      return (actionData as { error?: string | null }).error ?? undefined;
+    }
+    return undefined;
+  };
 
   // Conform owns the change-password form. Guard so non-Conform actionData
   // (save-turnstile / export-data) isn't fed into useForm.
@@ -172,12 +208,16 @@ export default function SettingsSecurityPage() {
       <p className="text-[13px] text-ih-fg-3">Password, two-factor authentication, account data, and security settings.</p>
 
       {/* Flash */}
-      {actionData && "success" in actionData && actionData.success && (
+      {flashVisible && actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           {(actionData as Record<string, unknown>).message as string || "Saved."}
         </div>
       )}
-      {actionData && "error" in actionData && typeof actionData.error === "string" && actionData.error ? (
+      {actionData &&
+      "error" in actionData &&
+      typeof actionData.error === "string" &&
+      actionData.error &&
+      !("field" in actionData && actionData.field) ? (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
@@ -310,12 +350,13 @@ export default function SettingsSecurityPage() {
             name="TURNSTILE_SECRET_KEY"
             label="Turnstile Secret Key"
             value={secrets.TURNSTILE_SECRET_KEY}
+            error={turnstileFieldError("TURNSTILE_SECRET_KEY")}
             hint="Bot protection on booking and signup forms. Create at dash.cloudflare.com → Turnstile. Use test key 1x0000000000000000000000000000000AA for development"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit"
-              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-              Save
+            <button type="submit" disabled={savingTurnstile}
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+              {savingTurnstile ? "Saving…" : "Save"}
             </button>
           </div>
         </Form>
