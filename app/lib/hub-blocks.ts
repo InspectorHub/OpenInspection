@@ -172,17 +172,29 @@ export function deriveBlockStates(hub: HubPayload): BlockStates {
 /*  Publish affordance                                                 */
 /* ------------------------------------------------------------------ */
 
-/** Statuses where the report is already shipped to the client — no publish CTA. */
+/**
+ * Statuses where the report is already shipped to the client — no publish CTA.
+ * `delivered` is the only LIVE inspection status here (the lifecycle enum is
+ * `draft | completed | delivered`; publishInspection transitions to
+ * `delivered`). `published` / `signed` are retained DEFENSIVELY, mirroring the
+ * dashboard's `matchesWorkflow` published-tab matching — they are not produced
+ * as inspection.status today but cost nothing to tolerate if that changes.
+ */
 const PUBLISHED_STATUSES = new Set(['delivered', 'published', 'signed']);
 
 /**
  * Task 9 (Issue #111) — whether the hub Report card should offer an ACTIVE
- * "Publish report" button. True only when the report is publish-ready AND not
- * already shipped. A non-ready report shows the disabled button + a blockers
- * hint; an already-shipped report shows read-only state + the header View link.
+ * "Publish report" button. True only when the inspection is `completed` (the
+ * only status from which publishing is legitimate) AND publish-ready AND not
+ * already shipped. The `completed` gate excludes cancelled / draft / in_progress
+ * regardless of readiness, so a stale `ready` flag can never offer a Publish CTA
+ * for a cancelled inspection. A non-ready completed report shows the disabled
+ * button + a blockers hint; an already-shipped report shows read-only state +
+ * the header View link.
  */
 export function canPublish(hub: HubPayload): boolean {
     if (PUBLISHED_STATUSES.has(hub.inspection.status)) return false;
+    if (hub.inspection.status !== 'completed') return false;
     return hub.publishReadiness.ready;
 }
 

@@ -183,10 +183,19 @@ describe('canPublish — report publish affordance (Task 9)', () => {
         }))).toBe(false);
     });
 
-    it('in-progress → false even with no blockers (nothing to publish yet)', () => {
+    it('in_progress & ready → false (status gate: nothing to publish yet)', () => {
+        // Even with a ready readiness flag, only `completed` may publish.
         expect(canPublish(hub({
             inspection: { status: 'in_progress' },
-            publishReadiness: { ready: false, blockingCount: 0 },
+            publishReadiness: { ready: true, blockingCount: 0 },
+        }))).toBe(false);
+    });
+
+    it('cancelled & ready → false (status gate excludes cancelled)', () => {
+        // A stale ready flag on a cancelled inspection must NOT offer a CTA.
+        expect(canPublish(hub({
+            inspection: { status: 'cancelled' },
+            publishReadiness: { ready: true, blockingCount: 0 },
         }))).toBe(false);
     });
 
