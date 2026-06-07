@@ -175,16 +175,38 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-function matchesWorkflow(i: Inspection, tab: TabKey): boolean {
+export function matchesWorkflow(i: Inspection, tab: TabKey): boolean {
   if (tab === "all") return true;
   switch (tab) {
-    case "active": return i.status === "scheduled" || i.status === "in_progress" || i.status === "draft" || i.status === "confirmed";
+    case "active": return ["scheduled", "in_progress", "draft", "confirmed"].includes(i.status);
     case "drafts": return i.status === "draft";
     case "awaiting_payment": return (i.status === "delivered" || i.status === "published") && i.paymentStatus !== "paid";
-    case "published": return i.status === "delivered" || i.status === "published";
+    // #111: Published absorbs the retired /reports list — all report-ready statuses.
+    case "published": return ["completed", "delivered", "published", "signed"].includes(i.status);
     case "cancelled": return i.status === "cancelled";
     default: return true;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Report-state badge (Published tab)                                 */
+/* ------------------------------------------------------------------ */
+
+// #111: the Published tab shows a report-state Pill. Mapping copied verbatim
+// from the now-retired reports.tsx (STATUS_TONE + statusLabel) so the
+// report-oriented list keeps its semantics after the page is deleted.
+const REPORT_STATE_TONE: Record<string, "monitor" | "sat" | "info"> = {
+  completed: "monitor",
+  delivered: "sat",
+  published: "sat",
+  signed: "info",
+};
+
+function reportStateLabel(s: string): string {
+  if (s === "completed") return "Ready";
+  if (s === "delivered" || s === "published") return "Delivered";
+  if (s === "signed") return "Signed";
+  return s;
 }
 
 /* ------------------------------------------------------------------ */
@@ -712,9 +734,17 @@ export default function DashboardPage() {
     cancelled: "gen",
   };
 
+  // #111: tenant slug for the public report deep-link (Published tab). Available
+  // from the auth-layout session context the dashboard already consumes.
+  const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
+
   /* ---- Render inspection row ---- */
-  function InspectionRow({ insp }: { insp: Inspection }) {
+  // reportView=true on the Published tab: render a report-state badge and, for
+  // delivered/published rows, a "View report" deep-link into the public report.
+  function InspectionRow({ insp, reportView = false }: { insp: Inspection; reportView?: boolean }) {
     const isSelected = selectedIds.has(insp.id);
+    const showReportLink =
+      reportView && tenantSlug && (insp.status === "delivered" || insp.status === "published");
     return (
       <div className="flex items-center gap-2 px-4 py-3 hover:bg-ih-bg-muted transition-colors group">
         <input
@@ -757,6 +787,12 @@ export default function DashboardPage() {
                 {insp.status.replace(/_/g, " ")}
               </Pill>
             )}
+            {/* #111: report-state badge (Published tab only) */}
+            {reportView && REPORT_STATE_TONE[insp.status] && (
+              <Pill tone={REPORT_STATE_TONE[insp.status]}>
+                {reportStateLabel(insp.status)}
+              </Pill>
+            )}
             {isColumnVisible("defectChips") && insp.defectStats && (
               <div className="flex gap-1">
                 {insp.defectStats.safety > 0 && (
@@ -791,6 +827,18 @@ export default function DashboardPage() {
           >
             <Icon name="edit" size={14} />
           </Link>
+          {/* #111: deep-link into the public report (Published tab, delivered/published only) */}
+          {showReportLink && (
+            <Link
+              to={`/report/${tenantSlug}/${insp.id}`}
+              aria-label="View report"
+              title="View report"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+            >
+              <Icon name="share" size={14} />
+            </Link>
+          )}
           <select
             value={insp.status}
             onChange={(e) => transitionStatus(insp.id, e.target.value)}
@@ -1003,7 +1051,7 @@ export default function DashboardPage() {
                 {!collapsed && (
                   <div className="divide-y divide-ih-border">
                     {items.map((insp) => (
-                      <InspectionRow key={insp.id} insp={insp} />
+                      <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published"} />
                     ))}
                   </div>
                 )}
@@ -1027,7 +1075,7 @@ export default function DashboardPage() {
               </div>
               <div className="divide-y divide-ih-border">
                 {!isSearching && displayList.map((insp) => (
-                  <InspectionRow key={insp.id} insp={insp} />
+                  <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published"} />
                 ))}
               </div>
               {isSearching && (
