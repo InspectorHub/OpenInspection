@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { ObserverLinkService } from '../../server/services/observer-link.service';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
+import { hashToken, deadTokenSentinel } from '../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+
+const JWT = 'unit-test-jwt-secret';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -34,7 +38,7 @@ describe('ObserverLinkService (subsystem D P4 T4.3)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         await seed(testDb);
-        svc = new ObserverLinkService({} as D1Database);
+        svc = new ObserverLinkService({} as D1Database, { jwtSecret: JWT });
     });
 
     it('mint returns token + expiresAt in the future', async () => {
@@ -84,5 +88,57 @@ describe('ObserverLinkService (subsystem D P4 T4.3)', () => {
         await svc.revoke('other-tenant', minted.id);
         const stillOk = await svc.claim(minted.token);
         expect(stillOk.kind).toBe('ok');
+    });
+
+    // ─── Track I-a — hash-at-rest (tier-2) ───────────────────────────────────
+    it('(a) mint stores hash + enc, NOT plaintext (legacy column is a sentinel)', async () => {
+        const minted = await svc.mint(TENANT, { inspectionId: INSPECTION, createdBy: 'user-a' });
+        const row = await testDb.select().from(schema.observerLinks)
+            .where(eq(schema.observerLinks.id, minted.id)).get();
+        expect(row?.token).toBe(deadTokenSentinel(minted.id));
+        expect(row?.token).not.toBe(minted.token);
+        expect(row?.tokenHash).toBe(await hashToken(minted.token));
+        expect(row?.tokenEnc).toMatch(/^t1:/);
+    });
+
+    it('(b) presenting the plaintext resolves via the hash path', async () => {
+        const minted = await svc.mint(TENANT, { inspectionId: INSPECTION, createdBy: 'user-a' });
+        const out = await svc.claim(minted.token);
+        expect(out.kind).toBe('ok');
+    });
+
+    it('(d) getToken reconstructs the SAME plaintext for a hashed row', async () => {
+        const minted = await svc.mint(TENANT, { inspectionId: INSPECTION, createdBy: 'user-a' });
+        const reconstructed = await svc.getToken(TENANT, minted.id);
+        expect(reconstructed).toBe(minted.token);
+    });
+
+    it('(c) legacy plaintext row claims AND is upgraded in place (+ enc seeded)', async () => {
+        const legacyToken = 'legacy-observer-plaintext-token-123456';
+        const id = crypto.randomUUID();
+        await testDb.insert(schema.observerLinks).values({
+            id, tenantId: TENANT, inspectionId: INSPECTION, token: legacyToken,
+            createdBy: 'user-a', createdAt: new Date().toISOString(),
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        });
+        const out = await svc.claim(legacyToken);
+        expect(out.kind).toBe('ok');
+        const row = await testDb.select().from(schema.observerLinks)
+            .where(eq(schema.observerLinks.id, id)).get();
+        expect(row?.tokenHash).toBe(await hashToken(legacyToken));
+        expect(row?.token).toBe(deadTokenSentinel(id));
+        expect(row?.tokenEnc).toMatch(/^t1:/);
+    });
+
+    it('(d) getToken returns the original plaintext for an upgraded legacy row', async () => {
+        const legacyToken = 'legacy-observer-plaintext-token-abcdef';
+        const id = crypto.randomUUID();
+        await testDb.insert(schema.observerLinks).values({
+            id, tenantId: TENANT, inspectionId: INSPECTION, token: legacyToken,
+            createdBy: 'user-a', createdAt: new Date().toISOString(),
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        });
+        await svc.claim(legacyToken); // upgrades + seals enc
+        expect(await svc.getToken(TENANT, id)).toBe(legacyToken);
     });
 });
