@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
@@ -439,8 +439,14 @@ export class InspectionService {
         const template = result.templateId
             ? await this.sdb.getById(templates, result.templateId as string)
             : null;
-        const signed = await this.sdb.raw.select().from(inspectionAgreements)
-            .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId)))
+        // Track I-a — signed truth rides the envelope: a signed agreement_requests
+        // row (any channel — emailed OR on-site) sets signedByClient.
+        const signed = await this.sdb.raw.select({ id: agreementRequests.id }).from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.inspectionId, id),
+                eq(agreementRequests.tenantId, tenantId),
+                eq(agreementRequests.status, 'signed'),
+            ))
             .get();
 
         return {
@@ -2816,9 +2822,11 @@ export class InspectionService {
 
         // handoff §1 — extra signals for needsAttention bucket.
         // 1) Inspections with NO signed agreement record older than threshold.
-        const signedRows = await db.select({ inspectionId: inspectionAgreements.inspectionId })
-            .from(inspectionAgreements)
-            .where(eq(inspectionAgreements.tenantId, tenantId));
+        // Track I-a — agreement-signed truth rides the envelope: a signed
+        // agreement_requests row (any channel) lights the dashboard 📋 icon.
+        const signedRows = await db.select({ inspectionId: agreementRequests.inspectionId })
+            .from(agreementRequests)
+            .where(and(eq(agreementRequests.tenantId, tenantId), eq(agreementRequests.status, 'signed')));
         const signedSet = new Set(signedRows.map(r => r.inspectionId as string));
         // 2) Unpaid invoices with dueDate past invoice-overdue threshold.
         const overdueInvoices = await db.select({ inspectionId: invoices.inspectionId, dueDate: invoices.dueDate })

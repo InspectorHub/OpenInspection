@@ -140,48 +140,17 @@ export async function runEnvelopeCompletionPipeline(
     if (clientEmail) {
         c.executionCtx.waitUntil((async () => {
             try {
-                const baseUrl = (c.env.APP_BASE_URL || '').replace(/\/$/, '') || (() => {
-                    const host = c.req.header('host');
-                    return host ? `https://${host}` : '';
-                })();
-                const verifyUrl = baseUrl ? `${baseUrl}/verify/${requestId}` : `/verify/${requestId}`;
-                const confirmationId = requestId.replace(/-/g, '').slice(0, 8).toUpperCase();
-
-                // Look up inspector to CC them + append the Sprint B-4c signature footer.
-                let inspectorEmail: string | null = null;
-                let inspectorRow: typeof users.$inferSelect | null = null;
-                let propertyAddress = 'your inspection';
-                if (inspectionId) {
-                    const db = drizzle(c.env.DB);
-                    const insp = await db.select().from(inspections)
-                        .where(eq(inspections.id, inspectionId)).get();
-                    if (insp?.propertyAddress) propertyAddress = insp.propertyAddress;
-                    if (insp?.inspectorId) {
-                        const insRow = await db.select().from(users)
-                            .where(eq(users.id, insp.inspectorId)).get();
-                        inspectorEmail = insRow?.email ?? null;
-                        inspectorRow = insRow ?? null;
-                    }
-                }
-
-                const sigInspector = inspectorRow ? {
-                    name: inspectorRow.name ?? null,
-                    email: inspectorRow.email ?? null,
-                    phone: inspectorRow.phone ?? null,
-                    licenseNumber: inspectorRow.licenseNumber ?? null,
-                    slug: inspectorRow.slug ?? null,
-                } : undefined;
-
+                const built = await buildSignedConfirmation(c, requestId, inspectionId);
                 await c.var.services.email.sendAgreementSignedConfirmation(
                     clientEmail,
-                    inspectorEmail ? [inspectorEmail] : [],
+                    built.inspectorEmail ? [built.inspectorEmail] : [],
                     clientName || 'Client',
-                    propertyAddress,
-                    verifyUrl,
-                    confirmationId,
+                    built.propertyAddress,
+                    built.verifyUrl,
+                    built.confirmationId,
                     new Date().toUTCString(),
                     ip,
-                    sigInspector,
+                    built.sigInspector,
                     getBookingHost(c),
                 );
             } catch (e) {
@@ -189,4 +158,99 @@ export async function runEnvelopeCompletionPipeline(
             }
         })());
     }
+}
+
+/**
+ * Resolves the shared bits of an agreement-signed confirmation email: the
+ * tamper-evident verify URL (always the ENVELOPE verifier), a short
+ * confirmation id, the property address, and the inspector to CC + sign the
+ * footer with. Reused by both the envelope-completion email and the per-signer
+ * in-person receipt so the two never drift.
+ */
+async function buildSignedConfirmation(
+    c: Context<HonoConfig>,
+    requestId: string,
+    inspectionId: string | null,
+): Promise<{
+    verifyUrl: string;
+    confirmationId: string;
+    propertyAddress: string;
+    inspectorEmail: string | null;
+    sigInspector: {
+        name: string | null; email: string | null; phone: string | null;
+        licenseNumber: string | null; slug: string | null;
+    } | undefined;
+}> {
+    const baseUrl = (c.env.APP_BASE_URL || '').replace(/\/$/, '') || (() => {
+        const host = c.req.header('host');
+        return host ? `https://${host}` : '';
+    })();
+    const verifyUrl = baseUrl ? `${baseUrl}/verify/${requestId}` : `/verify/${requestId}`;
+    const confirmationId = requestId.replace(/-/g, '').slice(0, 8).toUpperCase();
+
+    let inspectorEmail: string | null = null;
+    let inspectorRow: typeof users.$inferSelect | null = null;
+    let propertyAddress = 'your inspection';
+    if (inspectionId) {
+        const db = drizzle(c.env.DB);
+        const insp = await db.select().from(inspections)
+            .where(eq(inspections.id, inspectionId)).get();
+        if (insp?.propertyAddress) propertyAddress = insp.propertyAddress;
+        if (insp?.inspectorId) {
+            const insRow = await db.select().from(users)
+                .where(eq(users.id, insp.inspectorId)).get();
+            inspectorEmail = insRow?.email ?? null;
+            inspectorRow = insRow ?? null;
+        }
+    }
+
+    const sigInspector = inspectorRow ? {
+        name: inspectorRow.name ?? null,
+        email: inspectorRow.email ?? null,
+        phone: inspectorRow.phone ?? null,
+        licenseNumber: inspectorRow.licenseNumber ?? null,
+        slug: inspectorRow.slug ?? null,
+    } : undefined;
+
+    return { verifyUrl, confirmationId, propertyAddress, inspectorEmail, sigInspector };
+}
+
+/**
+ * Track I-a Task 5 — per-signer receipt email for in-person (on-site) signing.
+ *
+ * Fires after EVERY successful in-person signature (not only on envelope
+ * completion) so each signer who signs on the inspector's device walks away
+ * with a tamper-evident receipt at THEIR OWN email. Fire-and-forget; the
+ * verify URL is the same envelope verifier as the completion email.
+ *
+ * Callers MUST skip this when the envelope just completed AND the signer's
+ * email equals the envelope clientEmail — the completion pipeline already
+ * emailed that address, and a double email would result.
+ */
+export async function runSignerReceiptEffects(
+    c: Context<HonoConfig>,
+    args: { signerEmail: string; signerName: string; inspectionId: string | null; requestId: string },
+): Promise<void> {
+    const { signerEmail, signerName, inspectionId, requestId } = args;
+    if (!signerEmail) return;
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
+    c.executionCtx.waitUntil((async () => {
+        try {
+            const built = await buildSignedConfirmation(c, requestId, inspectionId);
+            await c.var.services.email.sendAgreementSignedConfirmation(
+                signerEmail,
+                built.inspectorEmail ? [built.inspectorEmail] : [],
+                signerName || 'Signer',
+                built.propertyAddress,
+                built.verifyUrl,
+                built.confirmationId,
+                new Date().toUTCString(),
+                ip,
+                built.sigInspector,
+                getBookingHost(c),
+            );
+        } catch (e) {
+            logger.error('agreement.signer receipt email failed', {}, e instanceof Error ? e : undefined);
+        }
+    })());
 }
