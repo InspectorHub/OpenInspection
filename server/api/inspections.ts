@@ -3189,6 +3189,11 @@ export const inspectionsRoutes = createApiRouter()
             return c.json({ success: true, data: { signed: true, alreadySigned: true, signerId: signer.id, envelopeStatus: envelope.status } }, 200);
         }
 
+        // Terminal-state guard: declined / expired signers must never reach the audit append.
+        if (signer.status === 'declined' || signer.status === 'expired') {
+            throw Errors.Conflict('Agreement is no longer signable');
+        }
+
         const plaintext = await svc.getSignerLink(env.requestId, signer.id);
 
         const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;

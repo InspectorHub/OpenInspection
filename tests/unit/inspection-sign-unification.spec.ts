@@ -313,6 +313,58 @@ describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
         expect(emailConfirm).toHaveBeenCalledTimes(1);
         expect(emailConfirm.mock.calls[0][0]).toBe('jane@test.com');
     });
+
+    // 9 — terminal-state guard: declined signer → 409, no phantom audit event
+    it('POST /:id/sign with signerId of a declined signer → 409, auditAppend NOT called, status stays declined', async () => {
+        await seedBase(db);
+        const { signers } = await createTwoSignerEnvelope(db, 'all');
+        const signerA = signers[0];
+
+        // Force signer A to declined state directly in DB.
+        await db.update(schema.agreementSigners)
+            .set({ status: 'declined' })
+            .where(eq(schema.agreementSigners.id, signerA.id));
+
+        const auditAppend = vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
+        const { app } = buildApp(db, { auditAppend });
+        const { ctx } = makeExecCtx();
+
+        const res = await app.request(
+            `/${INSP_ID}/sign`,
+            postSign({ signatureBase64: SIG, signerId: signerA.id }),
+            FAKE_ENV,
+            ctx,
+        );
+        expect(res.status).toBe(409);
+
+        // No phantom audit event must have been written.
+        expect(auditAppend).not.toHaveBeenCalled();
+
+        // DB row stays declined.
+        const fresh = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.id, signerA.id)).get();
+        expect(fresh?.status).toBe('declined');
+    });
+
+    // 10 — happy-path audit: auditAppend called with signer.signed + channel in_person
+    it('POST /:id/sign (happy path) calls auditAppend with event signer.signed and channel in_person', async () => {
+        await seedBase(db);
+        const auditAppend = vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
+        const { app } = buildApp(db, { auditAppend });
+        const { ctx, settle } = makeExecCtx();
+
+        const res = await app.request(`/${INSP_ID}/sign`, postSign({ signatureBase64: SIG }), FAKE_ENV, ctx);
+        expect(res.status).toBe(200);
+        await settle();
+
+        // At least one audit call must be signer.signed with channel in_person.
+        // (Single-signer envelope also fires agreement.signed on completion — that's fine.)
+        expect(auditAppend).toHaveBeenCalled();
+        const signerSignedCall = auditAppend.mock.calls.find((call) => call[2] === 'signer.signed');
+        expect(signerSignedCall).toBeTruthy();
+        // Fourth argument is the payload object.
+        expect(signerSignedCall![3]).toMatchObject({ channel: 'in_person' });
+    });
 });
 
 describe('signedByClient + dashboard truth read from the envelope (Track I-a Task 5)', () => {
