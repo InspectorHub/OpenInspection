@@ -575,7 +575,12 @@ export const bookingsRoutes = createApiRouter()
                 propertyAddress: body.address,
                 clientName: body.clientName,
                 clientEmail: body.clientEmail,
-                date: body.date,
+                // B-28 adjacent fix — store the full start ISO like the
+                // multi-service path (inspection-request.service create) does.
+                // Busy checks read HH:MM at slice(11,16) of this value; the old
+                // bare `body.date` never marked the slot busy, so even
+                // sequential double-booking succeeded.
+                date: startIso,
                 status: 'draft',
                 paymentStatus: 'unpaid',
                 price: 0,
@@ -594,6 +599,20 @@ export const bookingsRoutes = createApiRouter()
             allInspectionIds = [primaryInspectionId];
         }
         const inspectionId = primaryInspectionId;
+
+        // B-28 — post-insert TOCTOU recheck. Runs after our insert and BEFORE
+        // any side effect (confirmation email, calendar event, notifications)
+        // so a losing booker only ever sees the 409, never a confirmation for
+        // a booking that then vanishes. The arbitration is deterministic
+        // (earliest (createdAt, id) wins), so of two racers exactly one
+        // self-compensates here while the other proceeds untouched.
+        const verdict = await service.arbitrateSlotRace(
+            tenantId, inspectorId!, body.date, requestedTime, createdRequestId,
+        );
+        if (verdict === 'lose') {
+            await service.revokeBooking(tenantId, createdRequestId);
+            throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
+        }
 
         // Sprint 1 C-6 — map window option to a human-readable label for the
         // calendar event + confirmation email.
