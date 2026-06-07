@@ -26,8 +26,7 @@ export class PortalAccessService {
         private secrets?: { jwtSecret: string; jwtSecretPrevious?: string },
     ) {}
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private getDrizzle() { return drizzle(this.db as any); }
+    private getDrizzle() { return drizzle(this.db); }
 
     private newToken(): string {
         return mintToken();

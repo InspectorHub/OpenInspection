@@ -203,6 +203,19 @@ export class GuestInviteService {
 
     async list(tenantId: string) {
         const db = this.getDrizzle();
-        return await db.select().from(guestInvites).where(eq(guestInvites.tenantId, tenantId)).all();
+        // Token material is projected OUT (post hash-at-rest sweep the
+        // plaintext column holds a dead sentinel and tokenHash must never
+        // reach a caller that might route it to a client).
+        return await db.select({
+            id:              guestInvites.id,
+            tenantId:        guestInvites.tenantId,
+            role:            guestInvites.role,
+            durationSeconds: guestInvites.durationSeconds,
+            expiresAt:       guestInvites.expiresAt,
+            claimedByUserId: guestInvites.claimedByUserId,
+            claimedAt:       guestInvites.claimedAt,
+            createdBy:       guestInvites.createdBy,
+            createdAt:       guestInvites.createdAt,
+        }).from(guestInvites).where(eq(guestInvites.tenantId, tenantId)).all();
     }
 }
