@@ -61,6 +61,27 @@ else
     fail "DS token check failed  →  npm run lint:ds"
 fi
 
+# 4. Worker bundle size (C-13b) — Workers FREE caps the script at 3 MiB
+#    gzipped, and OpenInspection promises one-click Free-plan deploys, so an
+#    oversized bundle breaks every self-hoster. Runs the REAL build pipeline
+#    (the old check died on virtual:react-router/server-build outside it and
+#    trained everyone to --no-verify), so it costs ~1-2 min — gated to commits
+#    that can actually change the bundle; docs/tests-only commits skip it.
+BUNDLE_STAGED=$(echo "$STAGED" | grep -E '^(app/|server/|workers/|packages/|public/vendor|package\.json|package-lock\.json|vite\.config|react-router\.config|wrangler.*\.jsonc?)' || true)
+step "Worker bundle size"
+if [ -z "$BUNDLE_STAGED" ]; then
+    pass "Skipped — no staged bundle-affecting changes (CI verify remains the full gate)"
+else
+    BUNDLE_OUT=$(node scripts/check-bundle-size.mjs 2>&1)
+    BUNDLE_RC=$?
+    BUNDLE_LINE=$(echo "$BUNDLE_OUT" | grep -E '^\[bundle-size\] (worker upload|FAIL|WARNING)' | tail -2 | tr '\n' ' ')
+    if [ "$BUNDLE_RC" -eq 0 ]; then
+        pass "Bundle size OK — ${BUNDLE_LINE:-see node scripts/check-bundle-size.mjs}"
+    else
+        fail "Bundle size gate failed — ${BUNDLE_LINE:-run node scripts/check-bundle-size.mjs}"
+    fi
+fi
+
 if [ "$FAILED" -eq 1 ]; then
     printf '\n%b\n' "${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"
     exit 1
