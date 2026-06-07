@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 import { tenants } from './tenant';
 
 /**
@@ -35,7 +36,16 @@ export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     createdAt:      integer('created_at').notNull(),
 }, (t) => ({
     idxRequest:    index('idx_esign_audit_logs_request').on(t.tenantId, t.requestId, t.createdAt),
-    uqEventDedup:  uniqueIndex('idx_esign_audit_logs_event_dedup').on(t.tenantId, t.requestId, t.event),
+    // Track I-a — PARTIAL dedup index. Envelope-level events (request.created,
+    // agreement.signed, workflow.complete, …) fire at most once per envelope, so
+    // the unique constraint keeps their anti-double-fire / idempotency guarantee.
+    // Per-signer events (signer.signed, signer.declined) fire ONCE PER SIGNER and
+    // a multi-signer envelope legitimately appends the same event type N times —
+    // the `event NOT LIKE 'signer.%'` predicate excludes them so each signer's
+    // evidence row is preserved (the chain links them by prev_hash regardless).
+    uqEventDedup:  uniqueIndex('idx_esign_audit_logs_event_dedup')
+        .on(t.tenantId, t.requestId, t.event)
+        .where(sql`event NOT LIKE 'signer.%'`),
 }));
 
 export type SigningKey = typeof signingKeys.$inferSelect;

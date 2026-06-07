@@ -215,6 +215,32 @@ describe('agreement-render handler', () => {
     expect(body).toContain('Signed by Agent Smith on behalf of Jane Doe');
   });
 
+  // Track I-a — signatureBase64 is interpolated into <img src="...">; a payload
+  // that breaks out of the attribute (`" onerror=...`) must be escaped, not live.
+  it('escapes a signature data URL that tries to break out of the img src attribute', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane Doe',
+      token: TOKEN_A, status: 'signed',
+      signatureBase64: 'data:image/png;base64,envelopesig',
+      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+      createdAt: new Date(),
+    });
+    await db.insert(schema.agreementSigners).values({
+      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
+      name: 'Jane Doe', email: 'jane@x', role: 'client',
+      status: 'signed',
+      signatureBase64: 'data:image/png;base64,abc" onerror="x',
+      channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+    });
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const body = await res.text();
+    // The quote is escaped...
+    expect(body).toContain('&quot; onerror=&quot;x');
+    // ...and the raw attribute-injection sequence is NOT present as live markup.
+    expect(body).not.toContain('" onerror=');
+  });
+
   // Track I-a — zero-signer legacy envelope with an envelope-level signature
   // still renders a single Client block (backward compat).
   it('falls back to a single client block for a zero-signer legacy envelope', async () => {

@@ -1,0 +1,2 @@
+DROP INDEX `idx_esign_audit_logs_event_dedup`;--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_esign_audit_logs_event_dedup` ON `esign_audit_logs` (`tenant_id`,`request_id`,`event`) WHERE event NOT LIKE 'signer.%';
