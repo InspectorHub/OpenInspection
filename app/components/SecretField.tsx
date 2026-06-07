@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 /**
  * Secret UI化 — reusable input field for integration API keys.
@@ -7,6 +7,8 @@ import { useState, useRef, useCallback } from "react";
  * - Shows "Not configured" placeholder when empty
  * - On focus, clears the mask so the user can type a new value
  * - On blur without changes, restores the original mask
+ * - After a successful save, the loader revalidates with a fresh masked value
+ *   and the field re-masks itself (typed plaintext never outlives the submit)
  * - The hidden input holds the actual value to submit; the visible input
  *   is just for display/editing
  */
@@ -15,6 +17,7 @@ export function SecretField({
   label,
   value,
   hint,
+  error,
   type = "password",
 }: {
   name: string;
@@ -22,13 +25,28 @@ export function SecretField({
   /** Masked value from the API (e.g. "re_1••••••••xyz") or "" if not set */
   value: string;
   hint?: string;
-  /** "password" for secrets, "text" for non-sensitive values like APP_BASE_URL */
+  /** Validation error to render under the field (conditional only). */
+  error?: string;
+  /**
+   * Kept for API stability. Masking comes from the server-side masked VALUE,
+   * not the input type — plaintext-while-typing is intentional (keys are
+   * pasted and need visual confirmation).
+   */
   type?: "password" | "text";
 }) {
+  void type;
   const isSet = value.length > 0;
   const [editing, setEditing] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Re-mask after save: when the loader revalidates and delivers a fresh
+  // masked value, drop the local editing state so the typed plaintext never
+  // outlives the submit (it used to stay visible until a full reload).
+  useEffect(() => {
+    setEditing(false);
+    setInputValue("");
+  }, [value]);
 
   const handleFocus = useCallback(() => {
     if (!editing) {
@@ -64,7 +82,7 @@ export function SecretField({
         <input
           ref={inputRef}
           id={`secret-${name}`}
-          type={editing ? (type === "password" ? "text" : "text") : "text"}
+          type="text"
           value={editing ? inputValue : (isSet ? value : "")}
           placeholder={isSet ? "" : "Not configured"}
           onFocus={handleFocus}
@@ -74,7 +92,9 @@ export function SecretField({
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
-          className={`w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all ${
+          className={`w-full h-9 px-3 rounded-md border ${
+            error ? "border-ih-bad" : "border-ih-border"
+          } bg-ih-bg-card text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all ${
             isSet && !editing
               ? "font-mono text-ih-fg-3"
               : "text-ih-fg-1"
@@ -94,6 +114,7 @@ export function SecretField({
       {hint && (
         <p className="text-[11px] text-ih-fg-4">{hint}</p>
       )}
+      {error && <p className="text-[11px] text-ih-bad-fg">{error}</p>}
     </div>
   );
 }

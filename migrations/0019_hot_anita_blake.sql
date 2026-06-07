@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_configs` ADD `dek_enc` text;

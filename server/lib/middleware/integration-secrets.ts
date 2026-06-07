@@ -18,8 +18,7 @@
  * don't re-decrypt.
  */
 import { MiddlewareHandler } from 'hono';
-import { decryptSecrets } from '../config-crypto';
-import { loadEncryptedSecretsBlob } from '../secrets-cache';
+import { loadTenantSecrets } from '../secrets-cache';
 import { HonoConfig } from '../../types/hono';
 import { logger } from '../logger';
 import { INTEGRATION_SECRET_KEYS } from '../../api/secrets';
@@ -70,10 +69,12 @@ export const integrationSecretsMiddleware: MiddlewareHandler<HonoConfig> = async
     if (!path.startsWith('/api/')) return next();
 
     try {
-        // A-16 — blob is KV-cached (ciphertext only); see lib/secrets-cache.ts.
-        const blob = await loadEncryptedSecretsBlob(c.env.DB, c.env.TENANT_CACHE, tenantId);
-        if (blob) {
-            const decrypted = await decryptSecrets(blob, c.env.JWT_SECRET);
+        // A-16 — ciphertext is KV-cached; loadTenantSecrets is the single
+        // envelope-aware decrypt entry point (see lib/secrets-cache.ts).
+        const decrypted = await loadTenantSecrets(
+            c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+        );
+        if (decrypted) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             applyIntegrationSecrets(c.env as any, decrypted as Record<string, string | undefined>);
         }

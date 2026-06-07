@@ -1,4 +1,5 @@
-import { Form, Link, useLoaderData, useActionData } from "react-router";
+import { useState, useEffect } from "react";
+import { Form, Link, useLoaderData, useActionData, useNavigation, useFetcher } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-advanced";
@@ -88,22 +89,47 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "disconnect-stripe") {
     const res = await api.admin["stripe-connect"].$delete();
     if (!res.ok) {
-      return { success: false, error: "Failed to disconnect Stripe account." };
+      return { intent, success: false, error: "Failed to disconnect Stripe account.", field: null, test: null };
     }
-    return { success: true, error: null };
+    return { intent, success: true, error: null, field: null, test: null };
   }
 
   if (intent === "save-ai") {
     const geminiApiKey = fd.get("GEMINI_API_KEY");
     if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
-      return { success: false, error: "API key is required." };
+      return { intent, success: false, error: "API key is required.", field: "GEMINI_API_KEY", test: null };
     }
     const res = await api.secrets.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey } });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: (err as Record<string, string>)?.message || "Failed to save AI configuration." };
+      const errBody = (await res.json().catch(() => null)) as
+        | { error?: { message?: string; field?: string } }
+        | null;
+      return {
+        intent,
+        success: false,
+        error: errBody?.error?.message ?? "Failed to save AI configuration.",
+        field: errBody?.error?.field ?? null,
+        test: null,
+      };
     }
-    return { success: true, error: null };
+    return { intent, success: true, error: null, field: null, test: null };
+  }
+
+  if (intent === "test-gemini") {
+    const res = await api.integrations.gemini.test.$post();
+    const body = (await res.json().catch(() => null)) as
+      | { data?: { ok: true }; error?: { message?: string } }
+      | null;
+    if (!res.ok || !body?.data) {
+      return {
+        intent,
+        success: false,
+        error: body?.error?.message ?? "Connection test failed.",
+        field: null,
+        test: null,
+      };
+    }
+    return { intent, success: true, error: null, field: null, test: body.data };
   }
 
   if (intent === "save-advanced-secrets") {
@@ -115,13 +141,22 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (Object.keys(body).length > 0) {
       const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
-        return { success: false, error: "Failed to save integration keys." };
+        const errBody = (await res.json().catch(() => null)) as
+          | { error?: { message?: string; field?: string } }
+          | null;
+        return {
+          intent,
+          success: false,
+          error: errBody?.error?.message ?? "Failed to save integration keys.",
+          field: errBody?.error?.field ?? null,
+          test: null,
+        };
       }
     }
-    return { success: true, error: null };
+    return { intent, success: true, error: null, field: null, test: null };
   }
 
-  return { success: false, error: "Unknown action" };
+  return { intent: null, success: false, error: "Unknown action", field: null, test: null };
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,6 +166,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SettingsAdvancedPage() {
   const { config, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const nav = useNavigation();
+  const geminiTestFetcher = useFetcher<typeof action>();
 
   // Only the `connect-stripe` intent returns a Conform SubmissionResult; the
   // other intents return a `{ success, error }` flash shape. Feed Conform its
@@ -146,6 +183,37 @@ export default function SettingsAdvancedPage() {
     shouldRevalidate: "onInput",
   });
 
+  // Pending save state, per secret intent.
+  const savingAi = nav.state !== "idle" && nav.formData?.get("intent") === "save-ai";
+  const savingAdvanced =
+    nav.state !== "idle" && nav.formData?.get("intent") === "save-advanced-secrets";
+
+  // Transient success flash — visible for 4s after a save round-trip.
+  const [flashVisible, setFlashVisible] = useState(false);
+  useEffect(() => {
+    if (actionData && "success" in actionData && actionData.success) {
+      setFlashVisible(true);
+      const t = setTimeout(() => setFlashVisible(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [actionData]);
+
+  // Map a server `field` error back onto the matching SecretField.
+  const secretFieldError = (name: string): string | undefined => {
+    if (
+      actionData &&
+      "field" in actionData &&
+      actionData.field === name &&
+      "success" in actionData &&
+      !actionData.success
+    ) {
+      return actionData.error ?? undefined;
+    }
+    return undefined;
+  };
+
+  const geminiTest = geminiTestFetcher.data;
+
   return (
     <div className="space-y-[18px] max-w-3xl">
       {/* Breadcrumb */}
@@ -158,12 +226,16 @@ export default function SettingsAdvancedPage() {
       <p className="text-[13px] text-ih-fg-3">Stripe payments, AI features, and integrations.</p>
 
       {/* Flash */}
-      {actionData && "success" in actionData && actionData.success && (
+      {flashVisible && actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Settings saved.
         </div>
       )}
-      {actionData && "error" in actionData && typeof actionData.error === "string" && actionData.error ? (
+      {actionData &&
+      "error" in actionData &&
+      typeof actionData.error === "string" &&
+      actionData.error &&
+      !("field" in actionData && actionData.field) ? (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
         </div>
@@ -269,15 +341,31 @@ export default function SettingsAdvancedPage() {
             name="GEMINI_API_KEY"
             label="Gemini API Key"
             value={secrets.GEMINI_API_KEY}
+            error={secretFieldError("GEMINI_API_KEY")}
             hint="Powers AI comment suggestions and smart field completion. Get at aistudio.google.com/apikey"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit"
-              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-              Save
+            <button type="submit" disabled={savingAi}
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+              {savingAi ? "Saving…" : "Save"}
             </button>
           </div>
         </Form>
+
+        {/* Test connection — probes the STORED Gemini key, no re-entry needed */}
+        <geminiTestFetcher.Form method="post" className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="intent" value="test-gemini" />
+          <button type="submit" disabled={geminiTestFetcher.state !== "idle"}
+            className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+            {geminiTestFetcher.state !== "idle" ? "Testing…" : "Test connection"}
+          </button>
+          {geminiTest && "intent" in geminiTest && geminiTest.intent === "test-gemini" && geminiTest.test && (
+            <span className="text-[12px] text-ih-fg-2">Connected — key is valid</span>
+          )}
+          {geminiTest && "intent" in geminiTest && geminiTest.intent === "test-gemini" && "success" in geminiTest && !geminiTest.success && (
+            <span className="text-[12px] text-ih-bad-fg">{geminiTest.error}</span>
+          )}
+        </geminiTestFetcher.Form>
       </section>
 
       {/* Integration API keys */}
@@ -292,12 +380,14 @@ export default function SettingsAdvancedPage() {
             name="GOOGLE_PLACES_API_KEY"
             label="Google Places API key"
             value={secrets.GOOGLE_PLACES_API_KEY}
+            error={secretFieldError("GOOGLE_PLACES_API_KEY")}
             hint="Address autocomplete on booking and new inspection forms. Create at console.cloud.google.com → Places API"
           />
           <SecretField
             name="ESTATED_API_KEY"
             label="Estated API key"
             value={secrets.ESTATED_API_KEY}
+            error={secretFieldError("ESTATED_API_KEY")}
             hint="Auto-fills Property Facts (year built, sqft, bedrooms). Get at estated.com → API"
           />
           <SecretField
@@ -305,12 +395,13 @@ export default function SettingsAdvancedPage() {
             label="Application base URL"
             value={secrets.APP_BASE_URL}
             type="text"
+            error={secretFieldError("APP_BASE_URL")}
             hint="Public URL of your deployment (e.g. https://app.yourdomain.com). Used in email links"
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit"
-              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-              Save
+            <button type="submit" disabled={savingAdvanced}
+              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+              {savingAdvanced ? "Saving…" : "Save"}
             </button>
           </div>
         </Form>

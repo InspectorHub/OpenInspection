@@ -3,6 +3,7 @@ import type { HonoConfig } from '../../types/hono';
 import { logger } from '../../lib/logger';
 import { resolveByFixedTenant } from './resolve-by-fixed-tenant';
 import { resolveByPathParam } from './resolve-by-path-param';
+import { resolveByInspectionId } from './resolve-by-inspection-id';
 
 /**
  * Tenant resolution middleware.
@@ -37,6 +38,13 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
     // modes.
     const pathParamResolved = await resolveByPathParam(c, path);
     if (pathParamResolved) return next();
+
+    // Inspection-id capability paths (/r/:id, /api/public/r/:id). Skip in
+    // standalone — the fixed tenant below resolves without a query.
+    if (!c.var.profile.fixedTenantId) {
+        const inspectionResolved = await resolveByInspectionId(c, path);
+        if (inspectionResolved) return next();
+    }
 
     const profile = c.var.profile;
 

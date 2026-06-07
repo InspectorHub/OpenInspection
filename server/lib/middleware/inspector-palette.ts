@@ -1,7 +1,7 @@
 import { MiddlewareHandler } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { users } from '../db/schema';
+import { users, tenants } from '../db/schema';
 import { HonoConfig } from '../../types/hono';
 import { getBookingHost } from '../url';
 import { logger } from '../logger';
@@ -26,6 +26,11 @@ export function userSlugCacheKey(userId: string): string {
     return `uslug:${userId}`;
 }
 
+/** Cache key for a tenant's slug (saas JWT-path fallback lookup). */
+export function tenantSlugCacheKey(tenantId: string): string {
+    return `tslug:${tenantId}`;
+}
+
 export const inspectorPaletteMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const branding = c.get('branding');
     const user = c.get('user');
@@ -46,11 +51,31 @@ export const inspectorPaletteMiddleware: MiddlewareHandler<HonoConfig> = async (
             slug = row?.slug ?? '';
             await c.env.TENANT_CACHE?.put(cacheKey, slug, { expirationTtl: SLUG_CACHE_TTL_S });
         }
+        // Tenant slug: public/standalone paths set `requestedTenantSlug` via
+        // tenant routing; saas AUTHENTICATED requests resolve the tenant from
+        // the JWT and never set it — fall back to a cached tenants.slug lookup
+        // (settings pages render slug-qualified URLs: /book/:tenant, the
+        // Stripe webhook endpoint, etc.).
+        let tenantSlug = c.get('requestedTenantSlug') ?? null;
+        if (!tenantSlug) {
+            const tKey = tenantSlugCacheKey(tenantId);
+            let cached = await c.env.TENANT_CACHE?.get(tKey);
+            if (cached === null || cached === undefined) {
+                const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+                    .from(tenants)
+                    .where(eq(tenants.id, tenantId))
+                    .get();
+                cached = row?.slug ?? '';
+                await c.env.TENANT_CACHE?.put(tKey, cached, { expirationTtl: SLUG_CACHE_TTL_S });
+            }
+            tenantSlug = cached || null;
+        }
+
         const enriched = {
             ...branding,
             currentUserSlug: slug || null,
             bookingHost:     getBookingHost(c),
-            tenantSlug: c.get('requestedTenantSlug') ?? null,
+            tenantSlug,
         };
         c.set('branding', enriched);
     } catch (e) {

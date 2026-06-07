@@ -30,6 +30,10 @@ export interface AppEnv {
      *  it from sign()/verify() paths; rotation scripts will retire those
      *  remaining usages. */
     JWT_SECRET: string;
+    /** Optional rotation-window fallback for JWT_SECRET (envelope secrets KEK
+     *  unwrap + legacy blob decrypt). Set during a JWT_SECRET rotation, run the
+     *  reencrypt endpoint, then delete. Never used for new writes. */
+    JWT_SECRET_PREVIOUS?: string;
     /** Spec 5H — AES-GCM key for encrypting tenant Ed25519 private keys. Falls back to JWT_SECRET. */
     KEY_ENCRYPTION_SECRET: string;
     /** Multi-version ES256 keyring (see server/lib/jwt-keyring.ts). Every JWT

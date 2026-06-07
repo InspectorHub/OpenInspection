@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLoaderData, useActionData, Form } from "react-router";
+import { useState, useEffect } from "react";
+import { Link, useLoaderData, useActionData, useNavigation, useFetcher, Form } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-communication";
@@ -97,10 +97,36 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (Object.keys(body).length > 0) {
       const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
-        return { ok: false, error: "Failed to save email secrets." };
+        const errBody = (await res.json().catch(() => null)) as
+          | { error?: { message?: string; field?: string } }
+          | null;
+        return {
+          intent,
+          ok: false,
+          error: errBody?.error?.message ?? "Failed to save email secrets.",
+          field: errBody?.error?.field ?? null,
+          test: null,
+        };
       }
     }
-    return { ok: true };
+    return { intent, ok: true, error: null, field: null, test: null };
+  }
+
+  if (intent === "test-resend") {
+    const res = await api.integrations.resend.test.$post();
+    const body = (await res.json().catch(() => null)) as
+      | { data?: { domains: number }; error?: { message?: string } }
+      | null;
+    if (!res.ok || !body?.data) {
+      return {
+        intent,
+        ok: false,
+        error: body?.error?.message ?? "Connection test failed.",
+        field: null,
+        test: null,
+      };
+    }
+    return { intent, ok: true, error: null, field: null, test: body.data };
   }
 
   if (intent === "save-calendar-secrets") {
@@ -113,10 +139,19 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (Object.keys(body).length > 0) {
       const res = await api.secrets.secrets.$put({ json: body });
       if (!res.ok) {
-        return { ok: false, error: "Failed to save calendar secrets." };
+        const errBody = (await res.json().catch(() => null)) as
+          | { error?: { message?: string; field?: string } }
+          | null;
+        return {
+          intent,
+          ok: false,
+          error: errBody?.error?.message ?? "Failed to save calendar secrets.",
+          field: errBody?.error?.field ?? null,
+          test: null,
+        };
       }
     }
-    return { ok: true };
+    return { intent, ok: true, error: null, field: null, test: null };
   }
 
   if (intent === "toggle-template") {
@@ -136,6 +171,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SettingsCommunication() {
   const { config, emailTemplates, icsUrl, googleCalendarConnected, secrets } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const nav = useNavigation();
+  const resendTestFetcher = useFetcher<typeof action>();
 
   // Only the `save-email` intent returns a Conform SubmissionResult; the
   // secret-paste intents return `{ ok }`. Feed Conform its own result only.
@@ -152,6 +189,59 @@ export default function SettingsCommunication() {
 
   const [mode, setMode] = useState<"platform" | "own">(config.emailMode);
 
+  // Pending save state, per secret intent.
+  const savingEmailSecrets =
+    nav.state !== "idle" && nav.formData?.get("intent") === "save-email-secrets";
+  const savingCalendarSecrets =
+    nav.state !== "idle" && nav.formData?.get("intent") === "save-calendar-secrets";
+
+  // Transient success flash — visible for 4s after a secret save round-trip.
+  // Errors persist until the next attempt (no auto-dismiss).
+  const [flashVisible, setFlashVisible] = useState(false);
+  useEffect(() => {
+    const i = actionData && "intent" in actionData ? actionData.intent : null;
+    if (
+      (i === "save-email-secrets" || i === "save-calendar-secrets") &&
+      actionData &&
+      "ok" in actionData &&
+      actionData.ok
+    ) {
+      setFlashVisible(true);
+      const t = setTimeout(() => setFlashVisible(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [actionData]);
+
+  // Map a server `field` error back onto the matching SecretField.
+  const secretFieldError = (name: string): string | undefined => {
+    if (
+      actionData &&
+      "field" in actionData &&
+      actionData.field === name &&
+      "ok" in actionData &&
+      !actionData.ok
+    ) {
+      return actionData.error ?? undefined;
+    }
+    return undefined;
+  };
+
+  // Form-level error for a given secret intent (no field, or generic message).
+  const secretFormError = (intent: string): string | null => {
+    if (
+      actionData &&
+      "intent" in actionData &&
+      actionData.intent === intent &&
+      "ok" in actionData &&
+      !actionData.ok
+    ) {
+      return actionData.error ?? null;
+    }
+    return null;
+  };
+
+  const resendTest = resendTestFetcher.data;
+
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}
@@ -166,10 +256,10 @@ export default function SettingsCommunication() {
         Configure email delivery, templates, and calendar sync.
       </p>
 
-      {/* Flash */}
-      {actionData && "ok" in actionData && !actionData.ok && actionData.error && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-          {actionData.error}
+      {/* Flash — transient success for secret saves */}
+      {flashVisible && (
+        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
+          Settings saved.
         </div>
       )}
 
@@ -287,15 +377,37 @@ export default function SettingsCommunication() {
               name="RESEND_API_KEY"
               label="Resend API key"
               value={secrets.RESEND_API_KEY}
+              error={secretFieldError("RESEND_API_KEY")}
               hint="Email delivery for reports, confirmations, and password resets. Get your key at resend.com → API Keys"
             />
           </div>
+          {secretFormError("save-email-secrets") && !secretFieldError("RESEND_API_KEY") && (
+            <p className="text-[12px] text-ih-bad-fg">{secretFormError("save-email-secrets")}</p>
+          )}
           <div className="flex justify-end pt-3 border-t border-ih-border">
-            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
-              Save API keys
+            <button type="submit" disabled={savingEmailSecrets}
+              className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              {savingEmailSecrets ? "Saving…" : "Save API keys"}
             </button>
           </div>
         </Form>
+
+        {/* Test connection — probes the STORED Resend key, no re-entry needed */}
+        <resendTestFetcher.Form method="post" className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="intent" value="test-resend" />
+          <button type="submit" disabled={resendTestFetcher.state !== "idle"}
+            className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
+            {resendTestFetcher.state !== "idle" ? "Testing…" : "Test connection"}
+          </button>
+          {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && resendTest.test && (
+            <span className="text-[12px] text-ih-fg-2">
+              Connected — {resendTest.test.domains} verified domain(s)
+            </span>
+          )}
+          {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && "ok" in resendTest && !resendTest.ok && (
+            <span className="text-[12px] text-ih-bad-fg">{resendTest.error}</span>
+          )}
+        </resendTestFetcher.Form>
       </section>
 
       {/* Email templates */}
@@ -325,18 +437,26 @@ export default function SettingsCommunication() {
               name="GOOGLE_CLIENT_ID"
               label="Google Client ID"
               value={secrets.GOOGLE_CLIENT_ID}
+              error={secretFieldError("GOOGLE_CLIENT_ID")}
               hint="Enables Google Calendar sync. Create at console.cloud.google.com → APIs → OAuth 2.0"
             />
             <SecretField
               name="GOOGLE_CLIENT_SECRET"
               label="Google Client Secret"
               value={secrets.GOOGLE_CLIENT_SECRET}
+              error={secretFieldError("GOOGLE_CLIENT_SECRET")}
               hint="Paired with Client ID above. Found in the same OAuth 2.0 credentials page"
             />
           </div>
+          {secretFormError("save-calendar-secrets") &&
+            !secretFieldError("GOOGLE_CLIENT_ID") &&
+            !secretFieldError("GOOGLE_CLIENT_SECRET") && (
+              <p className="text-[12px] text-ih-bad-fg">{secretFormError("save-calendar-secrets")}</p>
+            )}
           <div className="flex justify-end pt-3 border-t border-ih-border">
-            <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
-              Save credentials
+            <button type="submit" disabled={savingCalendarSecrets}
+              className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              {savingCalendarSecrets ? "Saving…" : "Save credentials"}
             </button>
           </div>
         </Form>

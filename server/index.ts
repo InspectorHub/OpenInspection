@@ -249,7 +249,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         path === '/api/concierge/book-info' ||
         path === '/api/concierge/book' ||
         path === '/api/concierge/confirm-info';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook';
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/');
 
     // Design System 0520 subsystem D P5 — observer surfaces are gated by
     // the dedicated observer-cookie middleware, not JWT.
@@ -511,6 +511,11 @@ const routes = app
   .route('/api/notifications', notificationsRoutes)
   .route('/settings/integrations/qbo', qboRoutes)
   .route('/api/integrations/qbo/webhook', qboWebhookRoutes)
+  // Stripe webhook, tenant-scoped (SaaS): /api/integrations/stripe/webhook/:tenant
+  // resolves the tenant via PUBLIC_PREFIXES path-param resolution so
+  // integration-secrets loads THAT tenant's whsec. The bare path below stays
+  // for standalone (fixed tenant) and as a saas no-op.
+  .route('/api/integrations/stripe/webhook/:tenant', stripeWebhookRoutes)
   // Stripe webhook (bring-your-own-keys) — public, verified via the tenant's
   // own stripe-signature secret. Added to isPublic allowlist below.
   .route('/api/integrations/stripe/webhook', stripeWebhookRoutes)

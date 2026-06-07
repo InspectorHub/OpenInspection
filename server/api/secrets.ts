@@ -7,15 +7,17 @@
  * tenants who configure keys via the Settings UI.
  */
 import { createRoute, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
-import { encryptSecrets, decryptSecrets, maskSecret, isMasked } from '../lib/config-crypto';
+import { sealSecrets, openSecrets, maskSecret, isMasked } from '../lib/config-crypto';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import type { HonoConfig } from '../types/hono';
 
 /**
  * Canonical list of all integration secrets configurable via UI.
@@ -43,6 +45,37 @@ export const INTEGRATION_SECRET_KEYS = [
 ] as const;
 
 export type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
+
+/**
+ * Key format rules — the slot a value lands in is inferred from its prefix so
+ * a paste into the wrong field is rejected before we attempt a live call.
+ * Only keys with a recognizable, STABLE vendor prefix are validated; OAuth
+ * client ids/secrets (QBO, Google) and vendor keys without a format guarantee
+ * (Places, Estated) are not.
+ */
+const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }> = [
+    { key: 'STRIPE_PUBLISHABLE_KEY', re: /^pk_(test|live)_/, hint: 'must start with pk_test_ or pk_live_' },
+    { key: 'STRIPE_SECRET_KEY', re: /^(sk|rk)_(test|live)_/, hint: 'must start with sk_test_ / sk_live_ (or a restricted rk_ key)' },
+    { key: 'STRIPE_WEBHOOK_SECRET', re: /^whsec_/, hint: 'must start with whsec_' },
+    { key: 'RESEND_API_KEY', re: /^re_/, hint: 'must start with re_' },
+    { key: 'GEMINI_API_KEY', re: /^AIza/, hint: 'must start with AIza (a Google API key)' },
+    // Cloudflare Turnstile secrets: 0x = real, 1x/2x/3x = documented test secrets.
+    { key: 'TURNSTILE_SECRET_KEY', re: /^[0-3]x/, hint: 'must start with 0x (or a 1x/2x/3x test secret)' },
+    { key: 'APP_BASE_URL', re: /^https?:\/\//, hint: 'must be an http(s):// URL' },
+];
+
+/** Returns the first format violation among NEW (non-masked) values, or null. */
+export function validateStripeKeyFormats(
+    incoming: Record<string, string | undefined>,
+): { field: string; message: string } | null {
+    for (const { key, re, hint } of KEY_FORMATS) {
+        const v = incoming[key];
+        if (v && !isMasked(v) && v.trim() !== '' && !re.test(v.trim())) {
+            return { field: key, message: `${key} ${hint}.` };
+        }
+    }
+    return null;
+}
 
 const SecretsResponseSchema = z.object({
     success: z.literal(true),
@@ -84,6 +117,7 @@ const putSecretsRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } },
             description: 'Secrets saved',
         },
+        422: { description: 'Key format invalid or Stripe rejected the secret key' },
     },
     operationId: 'putIntegrationSecrets',
     description: 'Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields.',
@@ -104,10 +138,194 @@ const postSecretsRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } },
             description: 'Secrets saved',
         },
+        422: { description: 'Key format invalid or Stripe rejected the secret key' },
     },
     operationId: 'postIntegrationSecrets',
     description: 'POST alias for PUT /secrets. Accepts the same body.',
 }, { scopes: ['admin'], tier: 'extended' }));
+
+/**
+ * camelCase aliases the legacy settings-advanced page sends. Normalized to the
+ * canonical ENV-name keys before validation / merge so the POST alias and PUT
+ * share one code path.
+ */
+const CAMEL_TO_ENV: Record<string, IntegrationSecretKey> = {
+    resendApiKey: 'RESEND_API_KEY',
+    geminiApiKey: 'GEMINI_API_KEY',
+    turnstileSecretKey: 'TURNSTILE_SECRET_KEY',
+    googleClientId: 'GOOGLE_CLIENT_ID',
+    googleClientSecret: 'GOOGLE_CLIENT_SECRET',
+    googlePlacesApiKey: 'GOOGLE_PLACES_API_KEY',
+    estatedApiKey: 'ESTATED_API_KEY',
+    qboClientId: 'QBO_CLIENT_ID',
+    qboClientSecret: 'QBO_CLIENT_SECRET',
+    qboWebhookSecret: 'QBO_WEBHOOK_SECRET',
+    stripeSecretKey: 'STRIPE_SECRET_KEY',
+    stripePublishableKey: 'STRIPE_PUBLISHABLE_KEY',
+    stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',
+    appBaseUrl: 'APP_BASE_URL',
+};
+
+/**
+ * Shared save implementation behind both PUT and POST. Normalizes camelCase
+ * aliases, format-gates + live-verifies Stripe keys (fail-closed 422), then
+ * seals the merged set under the tenant's envelope DEK and persists.
+ */
+async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, string | undefined>) {
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB);
+    const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
+
+    // Normalize incoming body to canonical ENV-name keys (drop unknowns).
+    const body: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(rawBody)) {
+        const envKey = CAMEL_TO_ENV[key] ?? key;
+        if (!allowedKeys.has(envKey)) continue;
+        body[envKey] = value;
+    }
+
+    // 0. Format gate — reject wrong-slot pastes before any network call.
+    const formatErr = validateStripeKeyFormats(body);
+    if (formatErr) {
+        return c.json({
+            success: false as const,
+            error: { code: 'INVALID_KEY_FORMAT', message: formatErr.message, field: formatErr.field },
+        }, 422);
+    }
+
+    // 1. Load + decrypt existing secrets (envelope-aware). Failure → start fresh
+    //    (corrupt / key-rotated; admin is re-entering).
+    const row = await db
+        .select({ encryptedSecrets: tenantConfigs.encryptedSecrets, dekEnc: tenantConfigs.dekEnc })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
+
+    let existing: Record<string, string> = {};
+    if (row?.encryptedSecrets) {
+        try {
+            existing = await openSecrets(
+                row.encryptedSecrets, row.dekEnc ?? null, tenantId,
+                c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+            );
+        } catch {
+            // Corrupt or key-rotated — start fresh, let admin re-enter
+        }
+    }
+
+    // 2. Merge: skip masked values and empty strings (no change); empty string
+    //    after trim clears the key; only known keys accepted.
+    for (const [key, value] of Object.entries(body)) {
+        if (!allowedKeys.has(key)) continue;
+        if (!value || isMasked(value)) continue;
+        if (value.trim() === '') {
+            delete existing[key];
+        } else {
+            // Store TRIMMED — the live-verify below tests the trimmed value, and
+            // consumers read the stored value raw; a pasted trailing newline must
+            // not diverge the two (verified-ok but broken at payment time).
+            existing[key] = value.trim();
+        }
+    }
+
+    // 3. Live-verify NEW vendor keys BEFORE persisting (fail-closed). Each
+    //    probe is a cheap read-only call against the vendor's API; a key that
+    //    fails its probe never enters the store.
+    const newSk = body.STRIPE_SECRET_KEY;
+    if (newSk && !isMasked(newSk) && newSk.trim() !== '') {
+        try {
+            const { StripeService } = await import('../services/stripe.service');
+            await new StripeService(newSk.trim()).getAccount();
+        } catch {
+            return c.json({
+                success: false as const,
+                error: {
+                    code: 'STRIPE_KEY_INVALID',
+                    message: 'Stripe rejected this secret key. Check you copied the full sk_… value from the right mode (test vs live).',
+                    field: 'STRIPE_SECRET_KEY',
+                },
+            }, 422);
+        }
+    }
+
+    const newResend = body.RESEND_API_KEY;
+    if (newResend && !isMasked(newResend) && newResend.trim() !== '') {
+        // Auth-only probe: an EMPTY send — bad key → 401/403, valid key
+        // (incl. sending-only restricted keys) → 422. No email is sent.
+        const probe = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${newResend.trim()}`, 'Content-Type': 'application/json' },
+            body: '{}',
+        }).catch(() => null);
+        // 401/403 = bad key. Other failures (network, 5xx) are NOT the key's
+        // fault — let the save proceed rather than blocking on Resend uptime.
+        if (probe && (probe.status === 401 || probe.status === 403)) {
+            return c.json({
+                success: false as const,
+                error: {
+                    code: 'RESEND_KEY_INVALID',
+                    message: 'Resend rejected this API key. Check you copied the full re_… value.',
+                    field: 'RESEND_API_KEY',
+                },
+            }, 422);
+        }
+    }
+
+    const newGemini = body.GEMINI_API_KEY;
+    if (newGemini && !isMasked(newGemini) && newGemini.trim() !== '') {
+        const probe = await fetch(
+            `https://generativelanguage.googleapis.com/v1/models?pageSize=1&key=${encodeURIComponent(newGemini.trim())}`,
+        ).catch(() => null);
+        if (probe && (probe.status === 400 || probe.status === 401 || probe.status === 403)) {
+            return c.json({
+                success: false as const,
+                error: {
+                    code: 'GEMINI_KEY_INVALID',
+                    message: 'Google rejected this Gemini API key. Check you copied the full AIza… value.',
+                    field: 'GEMINI_API_KEY',
+                },
+            }, 422);
+        }
+    }
+
+    // 4. Seal & store. Reuse the existing DEK (rotation converges on write);
+    //    no secrets left → clear both columns.
+    const cleaned = Object.fromEntries(
+        Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
+    );
+
+    let encrypted: string | null = null;
+    let dekEnc: string | null = null;
+    if (Object.keys(cleaned).length > 0) {
+        const sealed = await sealSecrets(
+            cleaned, tenantId, c.env.JWT_SECRET, row?.dekEnc, c.env.JWT_SECRET_PREVIOUS,
+        );
+        encrypted = sealed.blob;
+        dekEnc = sealed.dekEnc;
+    }
+
+    if (row) {
+        await db.update(tenantConfigs)
+            .set({ encryptedSecrets: encrypted, dekEnc, updatedAt: new Date() })
+            .where(eq(tenantConfigs.tenantId, tenantId));
+    } else {
+        await db.insert(tenantConfigs).values({
+            tenantId,
+            encryptedSecrets: encrypted,
+            dekEnc,
+            updatedAt: new Date(),
+        });
+    }
+
+    // A-16 — drop the cached encrypted blob so the next request re-reads D1.
+    await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
+
+    auditFromContext(c, 'config.secrets.update', 'tenant_config', {
+        metadata: { keysUpdated: Object.keys(body).filter(k => body[k] && !isMasked(body[k])) },
+    });
+
+    return c.json({ success: true as const }, 200);
+}
 
 export const secretsRoutes = createApiRouter()
     .openapi(getSecretsRoute, async (c) => {
@@ -115,7 +333,7 @@ export const secretsRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
 
         const row = await db
-            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
+            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets, dekEnc: tenantConfigs.dekEnc })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
@@ -123,7 +341,10 @@ export const secretsRoutes = createApiRouter()
         let stored: Record<string, string> = {};
         if (row?.encryptedSecrets) {
             try {
-                stored = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
+                stored = await openSecrets(
+                    row.encryptedSecrets, row.dekEnc ?? null, tenantId,
+                    c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+                );
             } catch {
                 // Corrupt or key-rotated — return empty, let admin re-enter
             }
@@ -137,144 +358,8 @@ export const secretsRoutes = createApiRouter()
 
         return c.json({ success: true as const, data: masked }, 200);
     })
-    .openapi(putSecretsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const db = drizzle(c.env.DB);
-
-        // 1. Load existing secrets
-        const row = await db
-            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-
-        let existing: Record<string, string> = {};
-        if (row?.encryptedSecrets) {
-            try {
-                existing = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
-            } catch {
-                // Corrupt data — start fresh
-            }
-        }
-
-        // 2. Merge: skip masked values and empty strings (no change); only accept known keys
-        const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
-        for (const [key, value] of Object.entries(body)) {
-            if (!allowedKeys.has(key)) continue;
-            if (!value || isMasked(value)) continue;
-            // Empty string means "clear this secret"
-            if (value.trim() === '') {
-                delete existing[key];
-            } else {
-                existing[key] = value;
-            }
-        }
-
-        // 3. Encrypt and store
-        const cleaned = Object.fromEntries(
-            Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
-        );
-
-        const encrypted = Object.keys(cleaned).length > 0
-            ? await encryptSecrets(cleaned, c.env.JWT_SECRET)
-            : null;
-
-        if (row) {
-            await db.update(tenantConfigs)
-                .set({ encryptedSecrets: encrypted, updatedAt: new Date() })
-                .where(eq(tenantConfigs.tenantId, tenantId));
-        } else {
-            await db.insert(tenantConfigs).values({
-                tenantId,
-                encryptedSecrets: encrypted,
-                updatedAt: new Date(),
-            });
-        }
-
-        // A-16 — drop the cached encrypted blob so the next request re-reads D1.
-        await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
-
-        auditFromContext(c, 'config.secrets.update', 'tenant_config', {
-            metadata: { keysUpdated: Object.keys(body).filter(k => allowedKeys.has(k) && body[k] && !isMasked(body[k])) },
-        });
-
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(postSecretsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const db = drizzle(c.env.DB);
-
-        let existing: Record<string, string> = {};
-        const row = await db
-            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-
-        if (row?.encryptedSecrets) {
-            try {
-                existing = await decryptSecrets(row.encryptedSecrets, c.env.JWT_SECRET);
-            } catch { /* start fresh */ }
-        }
-
-        const allowedKeys = new Set<string>(INTEGRATION_SECRET_KEYS);
-        // Also accept camelCase variants that the existing settings-advanced page sends
-        const camelToEnv: Record<string, string> = {
-            resendApiKey: 'RESEND_API_KEY',
-            geminiApiKey: 'GEMINI_API_KEY',
-            turnstileSecretKey: 'TURNSTILE_SECRET_KEY',
-            googleClientId: 'GOOGLE_CLIENT_ID',
-            googleClientSecret: 'GOOGLE_CLIENT_SECRET',
-            googlePlacesApiKey: 'GOOGLE_PLACES_API_KEY',
-            estatedApiKey: 'ESTATED_API_KEY',
-            qboClientId: 'QBO_CLIENT_ID',
-            qboClientSecret: 'QBO_CLIENT_SECRET',
-            qboWebhookSecret: 'QBO_WEBHOOK_SECRET',
-            stripeSecretKey: 'STRIPE_SECRET_KEY',
-            stripePublishableKey: 'STRIPE_PUBLISHABLE_KEY',
-            stripeWebhookSecret: 'STRIPE_WEBHOOK_SECRET',
-            appBaseUrl: 'APP_BASE_URL',
-        };
-
-        for (const [key, value] of Object.entries(body)) {
-            const envKey = camelToEnv[key] ?? key;
-            if (!allowedKeys.has(envKey)) continue;
-            if (!value || isMasked(value)) continue;
-            if (value.trim() === '') {
-                delete existing[envKey];
-            } else {
-                existing[envKey] = value;
-            }
-        }
-
-        const cleaned = Object.fromEntries(
-            Object.entries(existing).filter(([, v]) => v && v.trim() !== '')
-        );
-
-        const encrypted = Object.keys(cleaned).length > 0
-            ? await encryptSecrets(cleaned, c.env.JWT_SECRET)
-            : null;
-
-        if (row) {
-            await db.update(tenantConfigs)
-                .set({ encryptedSecrets: encrypted, updatedAt: new Date() })
-                .where(eq(tenantConfigs.tenantId, tenantId));
-        } else {
-            await db.insert(tenantConfigs).values({
-                tenantId,
-                encryptedSecrets: encrypted,
-                updatedAt: new Date(),
-            });
-        }
-
-        // A-16 — drop the cached encrypted blob so the next request re-reads D1.
-        await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
-
-        auditFromContext(c, 'config.secrets.update', 'tenant_config');
-        return c.json({ success: true as const }, 200);
-    });
+    .openapi(putSecretsRoute, (c) => saveSecretsImpl(c, c.req.valid('json')))
+    .openapi(postSecretsRoute, (c) => saveSecretsImpl(c, c.req.valid('json')));
 
 export type SecretsApi = typeof secretsRoutes;
 
