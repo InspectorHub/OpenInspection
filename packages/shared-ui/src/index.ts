@@ -11,3 +11,5 @@ export { Card } from "./Card";
 export { Modal } from "./Modal";
 export { Pagination } from "./Pagination";
 export type { PaginationProps } from "./Pagination";
+export { FileDropzone, firstFileFromDrop, formatFileSize, truncateMiddle } from "./FileDropzone";
+export type { FileDropzoneProps } from "./FileDropzone";
