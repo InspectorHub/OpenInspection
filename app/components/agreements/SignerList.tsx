@@ -78,7 +78,15 @@ export function remindState(
 
 export interface SignerListProps {
     signers: SignerRow[];
-    /** Re-send to one signer. May reject (e.g. 429) — surface inline, no alert. */
+    /**
+     * Re-send a reminder to one signer.
+     *
+     * Contract: if the callback returns a rejected Promise, `SignerList` catches
+     * it and surfaces the error as a per-row inline message (no native alert).
+     * Void-returning (fire-and-forget) callbacks — e.g. a fetcher submit that
+     * never rejects — MUST surface errors themselves; the agreements route uses
+     * its own banner for that wiring.
+     */
     onRemind?: (signerId: string) => Promise<void> | void;
     /** Resolve a signer's persistent public link for clipboard copy. */
     onCopyLink?: (signerId: string) => Promise<string>;

@@ -1546,6 +1546,10 @@ export const adminRoutes = createApiRouter()
         // each signer their OWN persistent link. The legacy single-recipient
         // path (no `signers`, or no inspection to key the envelope on) stays
         // untouched below.
+        if (body.signers && body.signers.length > 0 && !body.inspectionId) {
+            throw Errors.BadRequest('inspectionId is required when sending to multiple signers.');
+        }
+
         if (body.signers && body.signers.length > 0 && body.inspectionId) {
             const env = await svc.findOrCreate(tenantId, body.inspectionId, {
                 signers: body.signers.map((s) => ({

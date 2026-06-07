@@ -158,6 +158,23 @@ describe('POST /api/admin/agreements/send — multi-signer', () => {
         expect(res.status).toBe(400);
     });
 
+    it('signers provided WITHOUT inspectionId -> 400 with clear message', async () => {
+        const res = await buildApp().request('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agreementId: AGR_ID,
+                clientEmail: 'jane@test.com',
+                // no inspectionId
+                signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
+            }),
+        }, ENV, EXEC);
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error?: { message?: string }; message?: string };
+        const message = body.error?.message ?? body.message ?? '';
+        expect(message).toMatch(/inspectionId is required when sending to multiple signers/i);
+    });
+
     it('legacy send (no signers) still succeeds', async () => {
         const res = await buildApp().request('/api/admin/agreements/send', {
             method: 'POST',

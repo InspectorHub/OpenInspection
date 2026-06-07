@@ -184,14 +184,20 @@ function RequestDetail({ requestId }: { requestId: string }) {
 
   useEffect(() => {
     loadFetcher.submit({ intent: "load-signers", requestId }, { method: "post" });
-  }, [requestId, loadFetcher]);
+    // Intentional: loadFetcher is omitted from deps — its identity is unstable
+    // (a new ref every render from useFetcher); submit is keyed on requestId only.
+    // react-hooks/exhaustive-deps is not wired in this project's ESLint config.
+  }, [requestId]);
 
   // Reload signers after a successful reminder (lastRemindedAt changed).
   useEffect(() => {
     if (remindFetcher.data?.ok && remindFetcher.data.intent === "remind") {
       loadFetcher.submit({ intent: "load-signers", requestId }, { method: "post" });
     }
-  }, [remindFetcher.data, requestId, loadFetcher]);
+    // Intentional: loadFetcher is omitted from deps — its identity is unstable
+    // (a new ref every render); re-fetch is keyed on remindFetcher.data + requestId.
+    // react-hooks/exhaustive-deps is not wired in this project's ESLint config.
+  }, [remindFetcher.data, requestId]);
 
   const signers = (loadFetcher.data?.ok && loadFetcher.data.intent === "load-signers"
     ? loadFetcher.data.signers

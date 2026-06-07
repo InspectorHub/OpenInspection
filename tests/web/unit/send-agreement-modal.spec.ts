@@ -31,8 +31,20 @@ describe("validateSigners", () => {
 });
 
 describe("emptySigner", () => {
-    it("defaults to an empty client row", () => {
-        expect(emptySigner()).toEqual({ name: "", email: "", role: "client" });
+    it("defaults to an empty client row with a stable UUID key", () => {
+        const s = emptySigner();
+        expect(s.name).toBe("");
+        expect(s.email).toBe("");
+        expect(s.role).toBe("client");
+        // key is a stable UUID — present but not empty.
+        expect(typeof s.key).toBe("string");
+        expect(s.key.length).toBeGreaterThan(0);
+    });
+
+    it("each call returns a distinct key (stable within a row, unique across rows)", () => {
+        const a = emptySigner();
+        const b = emptySigner();
+        expect(a.key).not.toBe(b.key);
     });
 });
 
@@ -66,5 +78,14 @@ describe("buildSendPayload — Signing tab 'send' intent body", () => {
             { name: "Jane", email: "jane@test.com", role: "agent" },
         ]);
         expect(payload.completionPolicy).toBe("all");
+    });
+
+    it("strips the stable `key` field from SignerDraftRow inputs — key must not reach the server", () => {
+        const row = emptySigner();
+        row.name = "Jane";
+        row.email = "jane@test.com";
+        const payload = buildSendPayload([row], "all");
+        expect(payload.signers[0]).toEqual({ name: "Jane", email: "jane@test.com", role: "client" });
+        expect("key" in payload.signers[0]).toBe(false);
     });
 });

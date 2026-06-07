@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@core/shared-ui";
 
 /**
@@ -29,8 +29,14 @@ const ROLE_OPTIONS: Array<{ value: SignerRole; label: string }> = [
     { value: "other", label: "Other" },
 ];
 
-export function emptySigner(): SignerDraft {
-    return { name: "", email: "", role: "client" };
+/** Internal row state: extends SignerDraft with a stable UUID key for React reconciliation. */
+export interface SignerDraftRow extends SignerDraft {
+    key: string;
+}
+
+/** Factory for a new, empty signer row. The `key` is stable across re-renders. */
+export function emptySigner(): SignerDraftRow {
+    return { name: "", email: "", role: "client", key: crypto.randomUUID() };
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,16 +61,18 @@ export function validateSigners(signers: SignerDraft[]): string | null {
 
 /**
  * Pure submit-payload builder: trims each signer's name/email (preserving role)
- * and pairs them with the completion policy. The parent serializes this into
- * the route's `send` intent. Kept pure so the wiring can be unit-tested without
- * a render harness (happy-dom has none in this repo).
+ * and pairs them with the completion policy. The `key` field (stable row identity
+ * used by React reconciliation) is stripped — it must not reach the server.
+ * The parent serializes this into the route's `send` intent. Kept pure so the
+ * wiring can be unit-tested without a render harness (happy-dom has none in this repo).
  */
 export function buildSendPayload(
-    signers: SignerDraft[],
+    signers: SignerDraft[] | SignerDraftRow[],
     completionPolicy: "all" | "one",
 ): SendAgreementPayload {
     return {
-        signers: signers.map((s) => ({ name: s.name.trim(), email: s.email.trim(), role: s.role })),
+        // Destructure to drop any `key` field that may be present on SignerDraftRow.
+        signers: signers.map(({ name, email, role }) => ({ name: name.trim(), email: email.trim(), role })),
         completionPolicy,
     };
 }
@@ -80,9 +88,13 @@ export function SendAgreementModal({
     busy?: boolean;
     initialSigners?: SignerDraft[];
 }) {
-    const [signers, setSigners] = useState<SignerDraft[]>(
-        initialSigners && initialSigners.length > 0 ? initialSigners : [emptySigner()],
-    );
+    const [signers, setSigners] = useState<SignerDraftRow[]>(() => {
+        if (initialSigners && initialSigners.length > 0) {
+            // Attach stable keys to any externally-supplied initial rows.
+            return initialSigners.map((s) => ({ ...s, key: crypto.randomUUID() }));
+        }
+        return [emptySigner()];
+    });
     const [completionPolicy, setCompletionPolicy] = useState<"all" | "one">("all");
     const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +110,13 @@ export function SendAgreementModal({
         onSend(buildSendPayload(signers, completionPolicy));
     };
 
+    // Escape to close — repo idiom: document listener, clean up on unmount.
+    useEffect(() => {
+        const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', fn);
+        return () => document.removeEventListener('keydown', fn);
+    }, [onClose]);
+
     return (
         <div className="fixed inset-0 bg-[rgba(15,23,42,0.4)] flex items-center justify-center z-50 p-4">
             <div className="bg-ih-bg-card rounded-lg p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto">
@@ -108,12 +127,13 @@ export function SendAgreementModal({
 
                 <div className="space-y-3">
                     {signers.map((s, i) => (
-                        <div key={i} className="flex items-start gap-2">
+                        <div key={s.key} className="flex items-start gap-2">
                             <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <input
                                     type="text"
                                     value={s.name}
                                     placeholder="Full name"
+                                    aria-label="Signer name"
                                     disabled={busy}
                                     onChange={(e) => update(i, { name: e.target.value })}
                                     className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
@@ -122,6 +142,7 @@ export function SendAgreementModal({
                                     type="email"
                                     value={s.email}
                                     placeholder="email@example.com"
+                                    aria-label="Signer email"
                                     disabled={busy}
                                     onChange={(e) => update(i, { email: e.target.value })}
                                     className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
