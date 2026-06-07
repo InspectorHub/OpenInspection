@@ -69,6 +69,38 @@ const stripeWebhookLogRoute = createRoute(withMcpMetadata({
     description: 'Reads the per-tenant KV rolling log written by the Stripe webhook handler. Metadata only (timestamp, event type, result) — payloads are never stored. Backs the settings-page Recent Deliveries panel.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
+// ─── POST /resend/test + /gemini/test ─────────────────────────────────────────
+
+const resendTestRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/resend/test',
+    tags: ['integrations'],
+    summary: 'Verify the stored Resend API key against the live API',
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ domains: z.number().describe('Verified sending domains on the account.') }) }).openapi('ResendTestResponse') } }, description: 'Key is valid' },
+        502: { description: 'Resend rejected the stored key' },
+        503: { description: 'No Resend API key configured' },
+    },
+    operationId: 'testResendConnection',
+    description: "Calls Resend GET /domains with the tenant's STORED API key (merged into env by the integration-secrets middleware) — the on-demand diagnostic behind the Communication settings Test connection button.",
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const geminiTestRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/gemini/test',
+    tags: ['integrations'],
+    summary: 'Verify the stored Gemini API key against the live API',
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ ok: z.literal(true) }) }).openapi('GeminiTestResponse') } }, description: 'Key is valid' },
+        502: { description: 'Google rejected the stored key' },
+        503: { description: 'No Gemini API key configured' },
+    },
+    operationId: 'testGeminiConnection',
+    description: "Calls the Gemini models list with the tenant's STORED bring-your-own key — the on-demand diagnostic behind the Advanced settings Test connection button.",
+}, { scopes: ['admin'], tier: 'extended' }));
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const integrationsRoutes = createApiRouter()
@@ -99,6 +131,35 @@ export const integrationsRoutes = createApiRouter()
         const { readWebhookLog } = await import('../lib/stripe-webhook-log');
         const entries = await readWebhookLog(c.env.TENANT_CACHE, tenantId);
         return c.json({ success: true as const, data: entries }, 200);
+    })
+    .openapi(resendTestRoute, async (c) => {
+        const env = c.env as unknown as Record<string, string | undefined>;
+        const key = env.RESEND_API_KEY;
+        if (!key) {
+            return c.json({ success: false as const, error: { code: 'RESEND_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
+        }
+        const probe = await fetch('https://api.resend.com/domains', {
+            headers: { Authorization: `Bearer ${key}` },
+        }).catch(() => null);
+        if (!probe || !probe.ok) {
+            return c.json({ success: false as const, error: { code: 'RESEND_KEY_INVALID', message: 'Resend rejected the stored API key.' } }, 502);
+        }
+        const body = (await probe.json().catch(() => null)) as { data?: unknown[] } | null;
+        return c.json({ success: true as const, data: { domains: Array.isArray(body?.data) ? body.data.length : 0 } }, 200);
+    })
+    .openapi(geminiTestRoute, async (c) => {
+        const env = c.env as unknown as Record<string, string | undefined>;
+        const key = env.GEMINI_API_KEY;
+        if (!key) {
+            return c.json({ success: false as const, error: { code: 'GEMINI_NOT_CONFIGURED', message: 'No Gemini API key is configured.' } }, 503);
+        }
+        const probe = await fetch(
+            `https://generativelanguage.googleapis.com/v1/models?pageSize=1&key=${encodeURIComponent(key)}`,
+        ).catch(() => null);
+        if (!probe || !probe.ok) {
+            return c.json({ success: false as const, error: { code: 'GEMINI_KEY_INVALID', message: 'Google rejected the stored Gemini API key.' } }, 502);
+        }
+        return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 
 export type IntegrationsApi = typeof integrationsRoutes;

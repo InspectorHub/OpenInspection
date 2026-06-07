@@ -47,22 +47,28 @@ export const INTEGRATION_SECRET_KEYS = [
 export type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
 
 /**
- * Stripe key format rules — the slot a value lands in is inferred from its
- * prefix so a paste into the wrong field is rejected before we attempt a live
- * call. Only Stripe keys carry a recognizable, stable prefix; the other 11
- * integrations have no portable format guarantee, so they are not validated.
+ * Key format rules — the slot a value lands in is inferred from its prefix so
+ * a paste into the wrong field is rejected before we attempt a live call.
+ * Only keys with a recognizable, STABLE vendor prefix are validated; OAuth
+ * client ids/secrets (QBO, Google) and vendor keys without a format guarantee
+ * (Places, Estated) are not.
  */
-const STRIPE_KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }> = [
+const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }> = [
     { key: 'STRIPE_PUBLISHABLE_KEY', re: /^pk_(test|live)_/, hint: 'must start with pk_test_ or pk_live_' },
     { key: 'STRIPE_SECRET_KEY', re: /^(sk|rk)_(test|live)_/, hint: 'must start with sk_test_ / sk_live_ (or a restricted rk_ key)' },
     { key: 'STRIPE_WEBHOOK_SECRET', re: /^whsec_/, hint: 'must start with whsec_' },
+    { key: 'RESEND_API_KEY', re: /^re_/, hint: 'must start with re_' },
+    { key: 'GEMINI_API_KEY', re: /^AIza/, hint: 'must start with AIza (a Google API key)' },
+    // Cloudflare Turnstile secrets: 0x = real, 1x/2x/3x = documented test secrets.
+    { key: 'TURNSTILE_SECRET_KEY', re: /^[0-3]x/, hint: 'must start with 0x (or a 1x/2x/3x test secret)' },
+    { key: 'APP_BASE_URL', re: /^https?:\/\//, hint: 'must be an http(s):// URL' },
 ];
 
-/** Returns the first format violation among NEW (non-masked) Stripe values, or null. */
+/** Returns the first format violation among NEW (non-masked) values, or null. */
 export function validateStripeKeyFormats(
     incoming: Record<string, string | undefined>,
 ): { field: string; message: string } | null {
-    for (const { key, re, hint } of STRIPE_KEY_FORMATS) {
+    for (const { key, re, hint } of KEY_FORMATS) {
         const v = incoming[key];
         if (v && !isMasked(v) && v.trim() !== '' && !re.test(v.trim())) {
             return { field: key, message: `${key} ${hint}.` };
@@ -222,7 +228,9 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
         }
     }
 
-    // 3. Live-verify a NEW Stripe secret key BEFORE persisting (fail-closed).
+    // 3. Live-verify NEW vendor keys BEFORE persisting (fail-closed). Each
+    //    probe is a cheap read-only call against the vendor's API; a key that
+    //    fails its probe never enters the store.
     const newSk = body.STRIPE_SECRET_KEY;
     if (newSk && !isMasked(newSk) && newSk.trim() !== '') {
         try {
@@ -235,6 +243,42 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
                     code: 'STRIPE_KEY_INVALID',
                     message: 'Stripe rejected this secret key. Check you copied the full sk_… value from the right mode (test vs live).',
                     field: 'STRIPE_SECRET_KEY',
+                },
+            }, 422);
+        }
+    }
+
+    const newResend = body.RESEND_API_KEY;
+    if (newResend && !isMasked(newResend) && newResend.trim() !== '') {
+        const probe = await fetch('https://api.resend.com/domains', {
+            headers: { Authorization: `Bearer ${newResend.trim()}` },
+        }).catch(() => null);
+        // 401/403 = bad key. Other failures (network, 5xx) are NOT the key's
+        // fault — let the save proceed rather than blocking on Resend uptime.
+        if (probe && (probe.status === 401 || probe.status === 403)) {
+            return c.json({
+                success: false as const,
+                error: {
+                    code: 'RESEND_KEY_INVALID',
+                    message: 'Resend rejected this API key. Check you copied the full re_… value.',
+                    field: 'RESEND_API_KEY',
+                },
+            }, 422);
+        }
+    }
+
+    const newGemini = body.GEMINI_API_KEY;
+    if (newGemini && !isMasked(newGemini) && newGemini.trim() !== '') {
+        const probe = await fetch(
+            `https://generativelanguage.googleapis.com/v1/models?pageSize=1&key=${encodeURIComponent(newGemini.trim())}`,
+        ).catch(() => null);
+        if (probe && (probe.status === 400 || probe.status === 401 || probe.status === 403)) {
+            return c.json({
+                success: false as const,
+                error: {
+                    code: 'GEMINI_KEY_INVALID',
+                    message: 'Google rejected this Gemini API key. Check you copied the full AIza… value.',
+                    field: 'GEMINI_API_KEY',
                 },
             }, 422);
         }
