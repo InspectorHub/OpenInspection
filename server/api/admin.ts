@@ -45,7 +45,7 @@ import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validatio
 import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
 import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import { syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
 
 /**
  * GET /api/admin/export
@@ -1259,6 +1259,7 @@ export const adminRoutes = createApiRouter()
             counts.agreements++;
         }
 
+        const importAssignments: Array<{ inspectionId: string; inspectorId: string | null }> = [];
         for (const ins of importedInspections as unknown as InspectionImport[]) {
             if (!ins.id || !ins.propertyAddress) continue;
             await db.insert(inspections).values({
@@ -1274,9 +1275,12 @@ export const adminRoutes = createApiRouter()
             // so this intentionally re-asserts the link rows from the IMPORT payload —
             // acceptable for the one-shot import tool, where re-importing the same file
             // is the only conflict source and payloads are identical.
-            await syncInspectionAssignments(db, tenantId, ins.id, { inspectorId: ins.inspectorId || null });
+            importAssignments.push({ inspectionId: ins.id, inspectorId: ins.inspectorId || null });
             counts.inspections++;
         }
+        // B-29: all link-table resyncs in one db.batch round trip (was 2N
+        // statements inside the loop).
+        await syncInspectionAssignmentsBatch(db, tenantId, importAssignments);
 
         for (const r of importedResults as unknown as ResultImport[]) {
             if (!r.id || !r.inspectionId) continue;
