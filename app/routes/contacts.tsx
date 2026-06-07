@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher, Link } from "react-router";
 import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/contacts";
@@ -553,7 +553,11 @@ export default function ContactsPage() {
               ) : (
                 filtered.map((c) => (
                   <tr key={c.id} className="border-b border-ih-border hover:bg-ih-bg-muted/50">
-                    <td className="py-3 px-4 text-[13px] font-medium text-ih-fg-1">{c.name}</td>
+                    <td className="py-3 px-4 text-[13px] font-medium">
+                      <Link to={`/contacts/${c.id}`} className="text-ih-fg-1 hover:text-ih-primary hover:underline">
+                        {c.name}
+                      </Link>
+                    </td>
                     <td className="py-3 px-4 text-[13px]">
                       <Pill tone={c.type === "agent" ? "info" : "info"}>{c.type}</Pill>
                     </td>

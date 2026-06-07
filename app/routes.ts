@@ -98,6 +98,8 @@ export default [
     route("dashboard", "routes/dashboard.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),
+    // IA-18 (#111) — contact detail (record + inspection history + stats).
+    route("contacts/:id", "routes/contact-detail.tsx"),
     route("invoices", "routes/invoices.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("templates", "routes/templates.tsx"),

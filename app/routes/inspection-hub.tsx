@@ -316,7 +316,21 @@ export default function InspectionHubPage() {
               </p>
               {people.client ? (
                 <div className="text-[13px] text-ih-fg-1">
-                  <p className="font-medium">{people.client.name}</p>
+                  <p className="font-medium">
+                    {/* Link to the contact record only when the inspection
+                        carries a clientContactId — the inline client name
+                        (denormalized columns) has no contact row to open. */}
+                    {inspection.clientContactId ? (
+                      <Link
+                        to={`/contacts/${inspection.clientContactId}`}
+                        className="hover:text-ih-primary hover:underline"
+                      >
+                        {people.client.name}
+                      </Link>
+                    ) : (
+                      people.client.name
+                    )}
+                  </p>
                   {people.client.email && (
                     <a href={`mailto:${people.client.email}`} className="text-ih-primary hover:underline block">
                       {people.client.email}
@@ -346,7 +360,15 @@ export default function InspectionHubPage() {
                   {allAgents.map((agent) => (
                     <div key={agent.id} className="text-[13px] text-ih-fg-1">
                       <p className="font-medium">
-                        {agent.name}
+                        {/* agent.id is the contacts row id (getPeopleCard reads
+                            referredByAgentId/sellingAgentId from contacts), so the
+                            name always links to the contact detail page. */}
+                        <Link
+                          to={`/contacts/${agent.id}`}
+                          className="hover:text-ih-primary hover:underline"
+                        >
+                          {agent.name}
+                        </Link>
                         {agent.agency && (
                           <span className="text-ih-fg-3 font-normal"> &middot; {agent.agency}</span>
                         )}
