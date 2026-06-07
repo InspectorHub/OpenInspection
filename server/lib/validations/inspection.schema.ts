@@ -371,6 +371,25 @@ export const InspectionHubSchema = z.object({
 
 export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHubSchema).openapi('InspectionHubResponse');
 
+/**
+ * Task 7 (Issue #111) — body for POST /api/inspections/:id/agreement-requests.
+ * Both fields optional: agreementId defaults to the tenant's first agreement
+ * template, email defaults to the inspection's clientEmail.
+ */
+export const SendAgreementRequestSchema = z.object({
+  agreementId: z.string().uuid().optional().describe('Agreement template id; defaults to the tenant first agreement'),
+  email: z.string().email().optional().describe('Recipient email; defaults to inspection.clientEmail'),
+}).openapi('SendAgreementRequest');
+
+export const AgreementRequestCreatedSchema = createApiResponseSchema(
+  z.object({
+    id:          z.string().describe('agreement_requests row id'),
+    status:      z.string().describe('Request status (sent)'),
+    clientEmail: z.string().describe('Recipient email'),
+    createdAt:   z.string().nullable().describe('ISO creation timestamp'),
+  }),
+).openapi('AgreementRequestCreatedResponse');
+
 export const ReportItemSchema = z.object({
   id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
   label: z.string().describe('TODO describe label field for the OpenInspection MCP integration'),

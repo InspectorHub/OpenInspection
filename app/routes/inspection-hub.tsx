@@ -1,4 +1,5 @@
-import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "react-router";
+import { useState, useEffect } from "react";
+import { useLoaderData, Link, isRouteErrorResponse, useRouteError, useFetcher } from "react-router";
 import type { Route } from "./+types/inspection-hub";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -82,6 +83,44 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Action — intent dispatch (mirrors dashboard.tsx)                   */
+/* ------------------------------------------------------------------ */
+
+export async function action({ request, params, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const id = params.id;
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+  const api = createApi(context, { token });
+
+  if (intent === "send-agreement") {
+    // Empty strings → omit, so the endpoint falls back to its defaults
+    // (tenant's first agreement template / inspection clientEmail).
+    const agreementId = String(formData.get("agreementId") || "").trim();
+    const email = String(formData.get("email") || "").trim();
+    const res = await api.inspections[":id"]["agreement-requests"].$post({
+      param: { id },
+      json: {
+        ...(agreementId ? { agreementId } : {}),
+        ...(email ? { email } : {}),
+      },
+    });
+    if (!res.ok) {
+      // Surface the API rejection (B-4: never unconditional ok:true).
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return {
+        ok: false,
+        intent: "send-agreement" as const,
+        error: err?.error?.message ?? "Could not send the agreement. Please try again.",
+      };
+    }
+    return { ok: true, intent: "send-agreement" as const, error: undefined };
+  }
+
+  return { ok: false, intent: undefined, error: "Unknown action." };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Status humanization                                               */
 /* ------------------------------------------------------------------ */
 
@@ -103,6 +142,27 @@ export default function InspectionHubPage() {
   const { hub } = useLoaderData<typeof loader>();
   const { inspection, people, services, tenantSlug } = hub;
   const blocks = deriveBlockStates(hub);
+
+  // Send-agreement modal — its own dedicated fetcher (B-17: never share
+  // fetchers between mutations). Close on success; the loader revalidation
+  // refreshes agreementRequests automatically.
+  const [agreementModalOpen, setAgreementModalOpen] = useState(false);
+  const sendAgreement = useFetcher<typeof action>();
+  const sendingAgreement = sendAgreement.state !== "idle";
+  const agreementError =
+    sendAgreement.data?.intent === "send-agreement" && !sendAgreement.data.ok
+      ? sendAgreement.data.error
+      : undefined;
+  useEffect(() => {
+    if (
+      agreementModalOpen &&
+      sendAgreement.state === "idle" &&
+      sendAgreement.data?.intent === "send-agreement" &&
+      sendAgreement.data.ok
+    ) {
+      setAgreementModalOpen(false);
+    }
+  }, [agreementModalOpen, sendAgreement.state, sendAgreement.data]);
 
   // "View report" only makes sense once the report is shipped to the client.
   const reportShipped =
@@ -267,7 +327,7 @@ export default function InspectionHubPage() {
                 <div key={req.id} className="flex items-center justify-between py-2 text-[12px]">
                   <span className="text-ih-fg-2 truncate mr-2">{req.clientEmail}</span>
                   <span className="text-ih-fg-4 shrink-0">
-                    {req.status}
+                    {humanizeStatus(req.status)}
                     {(req.signedAt || req.createdAt) && (
                       <> &middot; {formatInspectionDateTime(req.signedAt || req.createdAt)}</>
                     )}
@@ -278,7 +338,11 @@ export default function InspectionHubPage() {
           ) : (
             <p className="text-[12px] text-ih-fg-3 mb-3">No agreement requests yet.</p>
           )}
-          <Button variant="secondary" size="sm" disabled title={DISABLED_TITLE}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setAgreementModalOpen(true)}
+          >
             Send agreement
           </Button>
         </Card>
@@ -315,6 +379,120 @@ export default function InspectionHubPage() {
             Publish report
           </Button>
         </Card>
+      </div>
+
+      {/* Send-agreement modal — custom (no window.confirm) */}
+      {agreementModalOpen && (
+        <SendAgreementModal
+          agreements={hub.agreements}
+          defaultEmail={inspection.clientEmail ?? ""}
+          fetcher={sendAgreement}
+          submitting={sendingAgreement}
+          error={agreementError}
+          onClose={() => setAgreementModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Send-agreement modal                                              */
+/* ------------------------------------------------------------------ */
+
+function SendAgreementModal({
+  agreements,
+  defaultEmail,
+  fetcher,
+  submitting,
+  error,
+  onClose,
+}: {
+  agreements: Array<{ id: string; name: string }>;
+  defaultEmail: string;
+  fetcher: ReturnType<typeof useFetcher<typeof action>>;
+  submitting: boolean;
+  error: string | undefined;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
+      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col">
+        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
+          <h2 className="text-[14px] font-bold">Send agreement</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
+            aria-label="Close"
+          >
+            &#x2715;
+          </button>
+        </div>
+
+        <fetcher.Form method="post" className="flex flex-col">
+          <input type="hidden" name="intent" value="send-agreement" />
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <label htmlFor="agreement-email" className="block text-[12px] font-bold text-ih-fg-2 mb-1">
+                Client email
+              </label>
+              <input
+                id="agreement-email"
+                name="email"
+                type="email"
+                required
+                defaultValue={defaultEmail}
+                placeholder="client@example.com"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:outline-none focus:ring-2 focus:ring-ih-primary"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="agreement-template" className="block text-[12px] font-bold text-ih-fg-2 mb-1">
+                Agreement
+              </label>
+              <select
+                id="agreement-template"
+                name="agreementId"
+                defaultValue={agreements[0]?.id ?? ""}
+                disabled={agreements.length === 0}
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:outline-none focus:ring-2 focus:ring-ih-primary disabled:opacity-60"
+              >
+                {agreements.length === 0 ? (
+                  <option value="">No agreement template available</option>
+                ) : (
+                  agreements.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {error && (
+              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
+            )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || agreements.length === 0}
+              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+            >
+              {submitting ? "Sending…" : "Send agreement"}
+            </button>
+          </div>
+        </fetcher.Form>
       </div>
     </div>
   );
