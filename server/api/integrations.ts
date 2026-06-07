@@ -138,14 +138,27 @@ export const integrationsRoutes = createApiRouter()
         if (!key) {
             return c.json({ success: false as const, error: { code: 'RESEND_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
         }
-        const probe = await fetch('https://api.resend.com/domains', {
-            headers: { Authorization: `Bearer ${key}` },
+        // Auth-only probe: an EMPTY send. A bad key → 401/403; a valid key
+        // (including sending-only restricted keys, which 401 on GET /domains)
+        // → 422 validation error. No email is ever sent.
+        const probe = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: '{}',
         }).catch(() => null);
-        if (!probe || !probe.ok) {
+        if (!probe || probe.status === 401 || probe.status === 403) {
             return c.json({ success: false as const, error: { code: 'RESEND_KEY_INVALID', message: 'Resend rejected the stored API key.' } }, 502);
         }
-        const body = (await probe.json().catch(() => null)) as { data?: unknown[] } | null;
-        return c.json({ success: true as const, data: { domains: Array.isArray(body?.data) ? body.data.length : 0 } }, 200);
+        // Bonus signal when the key has full access: count verified domains.
+        let domains = 0;
+        const domRes = await fetch('https://api.resend.com/domains', {
+            headers: { Authorization: `Bearer ${key}` },
+        }).catch(() => null);
+        if (domRes?.ok) {
+            const body = (await domRes.json().catch(() => null)) as { data?: unknown[] } | null;
+            domains = Array.isArray(body?.data) ? body.data.length : 0;
+        }
+        return c.json({ success: true as const, data: { domains } }, 200);
     })
     .openapi(geminiTestRoute, async (c) => {
         const env = c.env as unknown as Record<string, string | undefined>;

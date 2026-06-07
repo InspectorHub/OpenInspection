@@ -250,8 +250,12 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
 
     const newResend = body.RESEND_API_KEY;
     if (newResend && !isMasked(newResend) && newResend.trim() !== '') {
-        const probe = await fetch('https://api.resend.com/domains', {
-            headers: { Authorization: `Bearer ${newResend.trim()}` },
+        // Auth-only probe: an EMPTY send — bad key → 401/403, valid key
+        // (incl. sending-only restricted keys) → 422. No email is sent.
+        const probe = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${newResend.trim()}`, 'Content-Type': 'application/json' },
+            body: '{}',
         }).catch(() => null);
         // 401/403 = bad key. Other failures (network, 5xx) are NOT the key's
         // fault — let the save proceed rather than blocking on Resend uptime.
