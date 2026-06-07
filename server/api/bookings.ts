@@ -2,7 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, inArray } from 'drizzle-orm';
-import { users, inspections, services as servicesTable, agentTenantLinks, tenants, availability, tenantConfigs } from '../lib/db/schema';
+import { users, inspections, services as servicesTable, agentTenantLinks, tenants, availability, tenantConfigs, agreements } from '../lib/db/schema';
 import { isNull } from 'drizzle-orm';
 import { createCalendarEvent } from './calendar';
 import { Errors } from '../lib/errors';
@@ -17,6 +17,7 @@ import {
 } from '../lib/validations/booking.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import { runEnvelopeCompletionPipeline } from '../lib/sign-effects';
 
 /**
  * GET /api/public/inspectors
@@ -155,10 +156,21 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
                     schema: z.object({
                         success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
                         data: z.object({
-                            status: z.enum(['pending', 'viewed', 'signed']).describe('TODO describe status field for the OpenInspection MCP integration'),
+                            status: z.enum(['pending', 'sent', 'viewed', 'signed', 'declined', 'expired']).describe('Envelope aggregate status'),
                             clientName: z.string().nullable().describe('TODO describe clientName field for the OpenInspection MCP integration'),
                             agreementName: z.string().describe('TODO describe agreementName field for the OpenInspection MCP integration'),
-                            agreementContent: z.string().describe('TODO describe agreementContent field for the OpenInspection MCP integration'),
+                            agreementContent: z.string().describe('Pinned content snapshot served to the signer (never the live template)'),
+                            // Track I-a — per-signer context for the public sign page.
+                            signer: z.object({
+                                name: z.string(),
+                                role: z.enum(['client', 'co_client', 'agent', 'other']),
+                                status: z.enum(['pending', 'sent', 'viewed', 'signed', 'declined', 'expired']),
+                            }).describe('The signer resolved from the presented token'),
+                            progress: z.object({
+                                signed: z.number().int(),
+                                total: z.number().int(),
+                            }).describe('Signature progress across the envelope'),
+                            completionPolicy: z.enum(['all', 'one']).describe('Envelope completion policy'),
                         }).describe('TODO describe data field for the OpenInspection MCP integration'),
                     }),
                 },
@@ -183,7 +195,11 @@ const signAgreementRoute = createRoute(withMcpMetadata({
         body: {
             content: {
                 'application/json': {
-                    schema: z.object({ signatureBase64: z.string().min(1).describe('TODO describe signatureBase64 field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration'),
+                    schema: z.object({
+                        signatureBase64: z.string().min(1).describe('TODO describe signatureBase64 field for the OpenInspection MCP integration'),
+                        onBehalfOf: z.string().max(200).optional().describe('Client name an authorized agent is signing on behalf of'),
+                        onBehalfDisclaimer: z.string().max(2000).optional().describe('Authorized-agent disclaimer text shown at sign time'),
+                    }).describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
             },
         },
@@ -717,183 +733,130 @@ export const bookingsRoutes = createApiRouter()
     .openapi(getAgreementByTokenRoute, async (c) => {
         const { token } = c.req.valid('param');
         const svc = c.var.services.agreement;
-        const { request, agreement } = await svc.getAgreementByToken(token);
-        await svc.markViewed(token);
+
+        // Track I-a — resolve the presented token to a SIGNER (signer token first,
+        // legacy envelope-token fallback w/ lazy upgrade). 404 on miss.
+        const resolved = await svc.getSignerByPresentedToken(token);
+        if (!resolved) throw Errors.NotFound('Signing request not found');
+        const { signer, envelope } = resolved;
+
+        // Mark this signer viewed (idempotent; rolls the envelope aggregate forward).
+        await svc.markViewedBySigner(token);
+
+        // Serve the pinned content SNAPSHOT — never the live template.
+        const snapshot = await svc.getSnapshotForRequest(envelope);
+
+        // Agreement name comes from the template row (display only, not content).
+        const agreementRow = await drizzle(c.env.DB).select({ name: agreements.name })
+            .from(agreements).where(eq(agreements.id, envelope.agreementId)).get();
+
+        // Signature progress across the whole envelope.
+        const signers = await svc.listSigners(envelope.tenantId, envelope.id);
+        const signedCount = signers.filter((s) => s.status === 'signed').length;
+
         return c.json({
             success: true as const,
             data: {
-                status: request.status as 'pending' | 'viewed' | 'signed',
-                clientName: request.clientName ?? null,
-                agreementName: agreement.name,
-                agreementContent: agreement.content,
+                status: envelope.status as 'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                clientName: envelope.clientName ?? null,
+                agreementName: agreementRow?.name ?? 'Agreement',
+                agreementContent: snapshot.content,
+                signer: {
+                    name: signer.name,
+                    role: signer.role as 'client' | 'co_client' | 'agent' | 'other',
+                    // Re-read this signer's status post-view (markViewedBySigner may
+                    // have flipped it from sent → viewed).
+                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as
+                        'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                },
+                progress: { signed: signedCount, total: signers.length },
+                completionPolicy: envelope.completionPolicy as 'all' | 'one',
             },
         }, 200);
     })
     .openapi(signAgreementRoute, async (c) => {
         const { token } = c.req.valid('param');
-        const { signatureBase64 } = c.req.valid('json');
+        const { signatureBase64, onBehalfOf, onBehalfDisclaimer } = c.req.valid('json');
         const svc = c.var.services.agreement;
 
-        // Spec 5H P0 — append audit BEFORE flipping DB status so chain integrity
-        // survives a partial failure (audit-before-mutation per spec §2.4).
-        // Look up the request to get tenantId + requestId for the chain.
-        const request = await svc.getRequestByToken(token);
-        if (request) {
+        // Track I-a — resolve the presented token to a SIGNER. 404 on miss.
+        const resolved = await svc.getSignerByPresentedToken(token);
+        if (!resolved) throw Errors.NotFound('Agreement request not found');
+        const { signer, envelope } = resolved;
+
+        const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
+        const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
+        const country = c.req.header('cf-ipcountry') || null;
+        const tsMs = Date.now();
+
+        // Spec 5H P0 — append the per-signer audit BEFORE flipping DB status so
+        // chain integrity survives a partial failure (audit-before-mutation).
+        // Hash the signature image for cert reference (full image stored in DB).
+        const sigBytes = (() => {
             try {
-                const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
-                const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
-                const country = c.req.header('cf-ipcountry') || null;
-                // Hash the signature image for cert reference (full image stored in DB)
-                const sigBytes = (() => {
-                    try {
-                        const b64 = signatureBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-                        const bin = atob(b64);
-                        const out = new Uint8Array(bin.length);
-                        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-                        return out;
-                    } catch { return new Uint8Array(); }
-                })();
-                const sigHash = sigBytes.length > 0
-                    ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', sigBytes)))
-                        .map((b) => b.toString(16).padStart(2, '0')).join('')
-                    : null;
-                await c.var.services.auditLog.append(request.tenantId, request.id, 'agreement.signed', {
-                    country,
-                    envelopeId: request.id,
-                    ip,
-                    signatureImageHash: sigHash ? `sha256:${sigHash}` : null,
-                    tsMs: Date.now(),
-                    ua,
-                });
-            } catch (e) {
-                logger.warn('audit.append.signed.failed', { token: token.slice(0, 8), error: (e as Error).message });
-            }
+                const b64 = signatureBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+                const bin = atob(b64);
+                const out = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+                return out;
+            } catch { return new Uint8Array(); }
+        })();
+        const sigHash = sigBytes.length > 0
+            ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', sigBytes)))
+                .map((b) => b.toString(16).padStart(2, '0')).join('')
+            : null;
+        try {
+            await c.var.services.auditLog.append(envelope.tenantId, envelope.id, 'signer.signed', {
+                envelopeId: envelope.id,
+                signerId: signer.id,
+                signerEmail: signer.email,
+                signerRole: signer.role,
+                channel: 'remote',
+                contentHash: envelope.contentHash ?? null,
+                onBehalfOf: onBehalfOf ?? null,
+                country,
+                ip,
+                signatureImageHash: sigHash ? `sha256:${sigHash}` : null,
+                tsMs,
+                ua,
+            });
+        } catch (e) {
+            logger.warn('audit.append.signer-signed.failed', { requestId: envelope.id, signerId: signer.id, error: (e as Error).message });
         }
 
-        // Spec 5H P2 — opaque verifier token (independent from the write-permission token).
-        const verificationToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-            .map((b) => b.toString(16).padStart(2, '0'))
-            .join('');
-        const signed = await svc.signRequest(token, signatureBase64, verificationToken);
-
-        // Spec 5H P1 — trigger async sign-completion workflow (renders signed.pdf
-        // + Certificate of Completion + appends 'workflow.complete' to audit chain).
-        // Fire-and-forget: client doesn't wait. Workflow has its own retry policy.
-        if (request && c.env.SIGN_COMPLETION_WORKFLOW) {
-            const tenantSlug = c.get('requestedTenantSlug') ?? '';
-            c.executionCtx.waitUntil((async () => {
-                try {
-                    await c.env.SIGN_COMPLETION_WORKFLOW!.create({
-                        id: request.id, // workflow id = requestId for idempotency / re-run
-                        params: { requestId: request.id, tenantId: request.tenantId, tenantSlug, token },
-                    });
-                } catch (e) {
-                    logger.warn('sign-workflow.create.failed', { requestId: request.id, error: (e as Error).message });
-                }
-            })());
-        }
-
-        // Round 14 free-tier structured log — kept alongside the persisted audit
-        // for redundancy in case D1 write fails after Workers commit.
-        logger.info('agreement.signed.audit', {
-            event: 'agreement.signed.audit',
-            token: token.slice(0, 8) + '…',
-            tenantId: signed.tenantId,
-            clientName: signed.clientName ?? null,
-            signedAt: new Date().toISOString(),
-            signerIp: c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null,
-            signerUserAgent: (c.req.header('user-agent') || '').slice(0, 200) || null,
-            signerCountry: c.req.header('cf-ipcountry') || null,
+        const result = await svc.markSignedBySigner(token, signatureBase64, {
+            signedAtMs: tsMs,
+            channel: 'remote',
+            ipAddress: ip,
+            userAgent: ua,
+            onBehalfOf: onBehalfOf ?? null,
+            onBehalfDisclaimer: onBehalfDisclaimer ?? null,
         });
 
-        // B3: in-app notification — fetch agreement name for richer title
-        c.executionCtx.waitUntil((async () => {
-            try {
-                const agreement = await svc.getAgreementByToken(token);
-                await c.var.services.notification.createForAllAdmins(signed.tenantId, {
-                    type: 'agreement.signed',
-                    title: `Agreement signed — ${agreement.agreement.name}`,
-                    body: signed.clientName ? `By ${signed.clientName}` : null,
-                    entityType: 'agreement',
-                    entityId: signed.id,
-                    metadata: {
-                        agreementId: signed.agreementId,
-                        inspectionId: signed.inspectionId ?? null,
-                        clientEmail: signed.clientEmail,
-                    },
-                });
-            } catch (e) {
-                logger.error('agreement.signed notification failed', {}, e instanceof Error ? e : undefined);
-            }
-        })());
-
-        // Spec 2A — also fire automation event so per-tenant rules can react
-        if (signed.inspectionId) {
+        // Spec 2A — per-signer automation event so per-tenant rules can react to
+        // each individual signature (fires on EVERY sign, not just completion).
+        if (result.inspectionId) {
             c.var.services.automation.trigger({
-                tenantId: signed.tenantId,
-                inspectionId: signed.inspectionId,
-                triggerEvent: 'agreement.signed',
+                tenantId: result.tenantId,
+                inspectionId: result.inspectionId,
+                triggerEvent: 'agreement.signer_signed',
                 companyName: c.env.APP_NAME || 'OpenInspection',
                 reportBaseUrl: c.env.APP_BASE_URL || '',
             }).catch(() => {});
         }
 
-        // Sprint 1 C-8 — confirmation email to the signer (and CC the inspector
-        // so both parties have a record). Spec 5H envelope verifier URL is the
-        // tamper-evident receipt; we pass it as the email CTA.
-        if (request && signed.clientEmail) {
-            c.executionCtx.waitUntil((async () => {
-                try {
-                    const baseUrl = (c.env.APP_BASE_URL || '').replace(/\/$/, '') || (() => {
-                        const host = c.req.header('host');
-                        return host ? `https://${host}` : '';
-                    })();
-                    const verifyUrl = baseUrl ? `${baseUrl}/verify/${signed.id}` : `/verify/${signed.id}`;
-                    const confirmationId = signed.id.replace(/-/g, '').slice(0, 8).toUpperCase();
-                    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
-
-                    // Look up inspector record so we can CC them and append the
-                    // Sprint B-4c signature footer.
-                    let inspectorEmail: string | null = null;
-                    let inspectorRow: typeof users.$inferSelect | null = null;
-                    let propertyAddress = 'your inspection';
-                    if (signed.inspectionId) {
-                        const db = drizzle(c.env.DB);
-                        const insp = await db.select().from(inspections)
-                            .where(eq(inspections.id, signed.inspectionId)).get();
-                        if (insp?.propertyAddress) propertyAddress = insp.propertyAddress;
-                        if (insp?.inspectorId) {
-                            const insRow = await db.select().from(users)
-                                .where(eq(users.id, insp.inspectorId)).get();
-                            inspectorEmail = insRow?.email ?? null;
-                            inspectorRow   = insRow ?? null;
-                        }
-                    }
-
-                    const sigInspector = inspectorRow ? {
-                        name:          inspectorRow.name ?? null,
-                        email:         inspectorRow.email ?? null,
-                        phone:         inspectorRow.phone ?? null,
-                        licenseNumber: inspectorRow.licenseNumber ?? null,
-                        slug:          inspectorRow.slug ?? null,
-                    } : undefined;
-
-                    await c.var.services.email.sendAgreementSignedConfirmation(
-                        signed.clientEmail,
-                        inspectorEmail ? [inspectorEmail] : [],
-                        signed.clientName || 'Client',
-                        propertyAddress,
-                        verifyUrl,
-                        confirmationId,
-                        new Date().toUTCString(),
-                        ip,
-                        sigInspector,
-                        getBookingHost(c),
-                    );
-                } catch (e) {
-                    logger.error('agreement.signed confirmation email failed', {}, e instanceof Error ? e : undefined);
-                }
-            })());
+        // Envelope completion side-effects fire EXACTLY ONCE — gated on the
+        // atomic single-fire flag from the service.
+        if (result.envelopeCompletedNow) {
+            await runEnvelopeCompletionPipeline(c, {
+                requestId: result.requestId,
+                tenantId: result.tenantId,
+                inspectionId: result.inspectionId,
+                clientEmail: envelope.clientEmail ?? null,
+                clientName: envelope.clientName ?? null,
+                agreementId: envelope.agreementId,
+                presentedToken: token,
+            });
         }
 
         return c.json({ success: true as const }, 200);
@@ -902,10 +865,36 @@ export const bookingsRoutes = createApiRouter()
         const { token } = c.req.valid('param');
         const { reason } = c.req.valid('json');
         const svc = c.var.services.agreement;
-        const r = await svc.markDeclined(token, reason);
 
-        // Fire automation event so per-tenant rules can notify the inspector
-        if (r.inspectionId) {
+        // Track I-a — resolve the presented token to a SIGNER. 404 on miss.
+        const resolved = await svc.getSignerByPresentedToken(token);
+        if (!resolved) throw Errors.NotFound('Agreement request not found');
+        const { signer, envelope } = resolved;
+
+        const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
+        const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
+        const country = c.req.header('cf-ipcountry') || null;
+
+        // Per-signer audit append (audit-before-mutation, try/catch).
+        try {
+            await c.var.services.auditLog.append(envelope.tenantId, envelope.id, 'signer.declined', {
+                envelopeId: envelope.id,
+                signerId: signer.id,
+                signerEmail: signer.email,
+                reason: reason ?? null,
+                country,
+                ip,
+                tsMs: Date.now(),
+                ua,
+            });
+        } catch (e) {
+            logger.warn('audit.append.signer-declined.failed', { requestId: envelope.id, signerId: signer.id, error: (e as Error).message });
+        }
+
+        const r = await svc.markDeclinedBySigner(token, reason);
+
+        // Envelope-level automation fires ONLY when the WHOLE envelope declined.
+        if (r.inspectionId && r.envelopeStatus === 'declined') {
             c.var.services.automation.trigger({
                 tenantId: r.tenantId,
                 inspectionId: r.inspectionId,

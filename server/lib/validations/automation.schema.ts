@@ -4,6 +4,7 @@ import { createApiResponseSchema } from './shared.schema';
 const AUTOMATION_TRIGGERS = [
     'inspection.created', 'inspection.confirmed', 'inspection.cancelled',
     'report.published', 'invoice.created', 'payment.received', 'agreement.signed',
+    'agreement.signer_signed',
     'agreement.viewed', 'agreement.declined', 'agreement.expired',
     'event.created', 'event.completed',
 ] as const;

@@ -10,6 +10,8 @@ export type AuditEvent =
     | 'request.viewed'
     | 'agreement.signed'
     | 'agreement.inspector_signed'
+    | 'signer.signed'
+    | 'signer.declined'
     | 'workflow.complete';
 
 /**
