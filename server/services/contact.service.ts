@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, sql, isNull } from 'drizzle-orm';
+import { eq, and, like, sql, isNull, or, inArray, isNotNull } from 'drizzle-orm';
 import { contacts } from '../lib/db/schema/contact';
 import { inspections } from '../lib/db/schema/inspection';
+import { invoices } from '../lib/db/schema/invoice';
 import { Errors } from '../lib/errors';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
@@ -35,6 +36,112 @@ export class ContactService {
         }));
 
         return withCounts.map(c => ({ ...c, createdAt: safeISODate(c.createdAt) }));
+    }
+
+    /**
+     * IA-18 (#111) — contact detail page payload: the contact, its inspection
+     * history (date desc), and aggregate stats.
+     *
+     * History linkage:
+     *  - agent  → inspections where referredByAgentId = id OR sellingAgentId = id
+     *             (legacy FK), deduped by inspection id.
+     *  - client → inspections where clientContactId = id OR (the contact has an
+     *             email AND clientEmail = that email) — the DUAL PATH that
+     *             recovers legacy rows created before IA-1 stamped
+     *             clientContactId. Deduped by inspection id.
+     *
+     * Archived contacts STILL return detail (the history stays useful after a
+     * soft-delete). Cross-tenant / unknown ids return null.
+     *
+     * Revenue authority chain (DB-5): revenue = Σ amountCents of PAID invoices
+     * (paidAt IS NOT NULL) joined on those inspection ids — money actually
+     * received. Inspections without a paid invoice contribute zero revenue but
+     * still count toward inspectionCount.
+     */
+    async getContactDetail(id: string, tenantId: string) {
+        const db = this.getDrizzle();
+
+        const contact = await db.select().from(contacts)
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+        if (!contact) return null;
+
+        // Build the tenant-scoped linkage predicate per contact type.
+        let linkage;
+        if (contact.type === 'agent') {
+            linkage = or(
+                eq(inspections.referredByAgentId, id),
+                eq(inspections.sellingAgentId, id),
+            );
+        } else {
+            const clientPaths = [eq(inspections.clientContactId, id)];
+            if (contact.email) {
+                clientPaths.push(eq(inspections.clientEmail, contact.email));
+            }
+            linkage = clientPaths.length > 1 ? or(...clientPaths) : clientPaths[0];
+        }
+
+        const rows = await db.select({
+            id:            inspections.id,
+            propertyAddress: inspections.propertyAddress,
+            date:          inspections.date,
+            status:        inspections.status,
+            price:         inspections.price,
+            paymentStatus: inspections.paymentStatus,
+        }).from(inspections)
+            .where(and(eq(inspections.tenantId, tenantId), linkage))
+            .all();
+
+        // Dedup by inspection id (a row matched by both linkage paths appears
+        // once) and order date desc, newest first.
+        const seen = new Set<string>();
+        const inspectionRows = rows
+            .filter(r => (seen.has(r.id) ? false : (seen.add(r.id), true)))
+            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
+        const inspectionIds = inspectionRows.map(r => r.id);
+
+        // Revenue = Σ amountCents of PAID invoices on those inspections.
+        // Chunk the inArray to stay under D1's 100-bind-param ceiling.
+        let totalRevenueCents = 0;
+        const CHUNK = 90;
+        for (let i = 0; i < inspectionIds.length; i += CHUNK) {
+            const chunk = inspectionIds.slice(i, i + CHUNK);
+            const res = await db.select({ total: sql<number>`coalesce(sum(${invoices.amountCents}), 0)` })
+                .from(invoices)
+                .where(and(
+                    eq(invoices.tenantId, tenantId),
+                    inArray(invoices.inspectionId, chunk),
+                    isNotNull(invoices.paidAt),
+                ))
+                .get();
+            totalRevenueCents += res?.total ?? 0;
+        }
+
+        return {
+            contact: {
+                id:         contact.id,
+                type:       contact.type,
+                name:       contact.name,
+                email:      contact.email,
+                phone:      contact.phone,
+                agency:     contact.agency,
+                notes:      contact.notes,
+                createdAt:  safeISODate(contact.createdAt),
+                archivedAt: contact.archivedAt ? safeISODate(contact.archivedAt) : null,
+            },
+            inspections: inspectionRows.map(r => ({
+                id:              r.id,
+                propertyAddress: r.propertyAddress,
+                date:            r.date,
+                status:          r.status,
+                price:           r.price,
+                paymentStatus:   r.paymentStatus,
+            })),
+            stats: {
+                inspectionCount:   inspectionRows.length,
+                totalRevenueCents,
+            },
+        };
     }
 
     async createContact(tenantId: string, data: { type: 'agent' | 'client'; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; createdByUserId?: string | null | undefined }) {
