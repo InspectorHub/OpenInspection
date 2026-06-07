@@ -1,8 +1,8 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, inArray } from 'drizzle-orm';
-import { users, inspections, services as servicesTable, agentTenantLinks, tenants, availability, tenantConfigs, agreements } from '../lib/db/schema';
+import { eq, and, inArray, desc } from 'drizzle-orm';
+import { users, inspections, services as servicesTable, agentTenantLinks, tenants, availability, tenantConfigs, agreements, invoices } from '../lib/db/schema';
 import { isNull } from 'drizzle-orm';
 import { createCalendarEvent } from './calendar';
 import { Errors } from '../lib/errors';
@@ -180,6 +180,73 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
     },
     operationId: "listBookingAgreements",
     description: "Auto-generated placeholder for listBookingAgreements (GET /agreements/:token, bookings domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['read'], tier: 'extended' }));
+
+/**
+ * GET /api/public/checkout/:token — combined "Sign & pay" page data (Track I-a
+ * Task 7). Resolves a SIGNER token (same tier-2 token the public sign page
+ * uses) to the snapshot + envelope progress + the inspection's outstanding
+ * invoice / payment state + tenant branding, so the page renders in one round
+ * trip. No-auth surface: tokens are NEVER echoed back; only the minimum signer
+ * context the signer themselves needs is exposed.
+ */
+const getCheckoutByTokenRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/checkout/:token',
+    tags: ["bookings", "public"],
+    summary: 'Get combined sign & pay checkout context (public, token-gated)',
+    request: { params: z.object({ token: z.string().min(1).describe('Signer public token from the checkout link') }).describe('Checkout token param') },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(true).describe('Whether the request succeeded'),
+                        data: z.object({
+                            signer: z.object({
+                                name: z.string(),
+                                role: z.enum(['client', 'co_client', 'agent', 'other']),
+                                status: z.enum(['pending', 'sent', 'viewed', 'signed', 'declined', 'expired']),
+                            }).describe('The signer resolved from the presented token'),
+                            agreement: z.object({
+                                name: z.string().describe('Agreement display name'),
+                                content: z.string().describe('Pinned content snapshot served to the signer'),
+                                contentHash: z.string().nullable().describe('SHA-256 hex of the snapshot'),
+                            }).describe('Pinned agreement snapshot'),
+                            envelope: z.object({
+                                status: z.enum(['pending', 'sent', 'viewed', 'signed', 'declined', 'expired']).describe('Envelope aggregate status'),
+                                completionPolicy: z.enum(['all', 'one']).describe('Envelope completion policy'),
+                                progress: z.object({
+                                    signed: z.number().int(),
+                                    total: z.number().int(),
+                                }).describe('Signature progress across the envelope'),
+                            }).describe('Envelope status + progress'),
+                            invoice: z.object({
+                                id: z.string(),
+                                amountCents: z.number().int(),
+                                status: z.string(),
+                            }).nullable().describe('Latest invoice for the inspection, or null'),
+                            payment: z.object({
+                                required: z.boolean(),
+                                paid: z.boolean(),
+                            }).describe('Inspection payment gate state'),
+                            inspection: z.object({
+                                id: z.string(),
+                                propertyAddress: z.string().nullable(),
+                            }).describe('Minimal inspection context'),
+                            branding: z.object({
+                                companyName: z.string(),
+                                primaryColor: z.string().nullable(),
+                            }).describe('Tenant branding for the page chrome'),
+                        }).describe('Combined checkout context'),
+                    }),
+                },
+            },
+            description: 'Combined checkout context',
+        },
+    },
+    operationId: "getBookingCheckout",
+    description: "Combined sign & pay context for the public checkout page (GET /checkout/:token, bookings domain). Resolves a signer token to the agreement snapshot, envelope progress, outstanding invoice/payment state, and tenant branding."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -771,6 +838,103 @@ export const bookingsRoutes = createApiRouter()
                 },
                 progress: { signed: signedCount, total: signers.length },
                 completionPolicy: envelope.completionPolicy as 'all' | 'one',
+            },
+        }, 200);
+    })
+    .openapi(getCheckoutByTokenRoute, async (c) => {
+        const { token } = c.req.valid('param');
+        const svc = c.var.services.agreement;
+
+        // Track I-a Task 7 — resolve the presented SIGNER token to its envelope.
+        // 404 on miss (same posture as the agreement public routes).
+        const resolved = await svc.getSignerByPresentedToken(token);
+        if (!resolved) throw Errors.NotFound('Checkout not found');
+        const { signer, envelope } = resolved;
+
+        const db = drizzle(c.env.DB);
+
+        // Pinned snapshot — never the live template.
+        const snapshot = await svc.getSnapshotForRequest(envelope);
+
+        // Agreement display name (display only, not content).
+        const agreementRow = await db.select({ name: agreements.name })
+            .from(agreements).where(eq(agreements.id, envelope.agreementId)).get();
+
+        // Envelope progress across all signers.
+        const signers = await svc.listSigners(envelope.tenantId, envelope.id);
+        const signedCount = signers.filter((s) => s.status === 'signed').length;
+
+        // Inspection + latest invoice + branding — mirrors getReportGate's
+        // tenant-scoped access pattern. All reads scope on the envelope tenant.
+        const tenantId = envelope.tenantId;
+        const inspectionId = envelope.inspectionId;
+
+        let inspectionRow:
+            | { id: string; propertyAddress: string | null; paymentRequired: boolean | null; paymentStatus: string | null }
+            | undefined;
+        let invoiceRow: { id: string; amountCents: number; paidAt: Date | null; partialPaidAt: Date | null } | undefined;
+        if (inspectionId) {
+            inspectionRow = await db.select({
+                id: inspections.id,
+                propertyAddress: inspections.propertyAddress,
+                paymentRequired: inspections.paymentRequired,
+                paymentStatus: inspections.paymentStatus,
+            }).from(inspections)
+                .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+                .get();
+            invoiceRow = await db.select({
+                id: invoices.id,
+                amountCents: invoices.amountCents,
+                paidAt: invoices.paidAt,
+                partialPaidAt: invoices.partialPaidAt,
+            }).from(invoices)
+                .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
+                .orderBy(desc(invoices.createdAt))
+                .limit(1)
+                .get();
+        }
+
+        const branding = await db.select({ siteName: tenantConfigs.siteName, primaryColor: tenantConfigs.primaryColor })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+
+        const invoiceStatus = invoiceRow
+            ? (invoiceRow.paidAt ? 'paid' : invoiceRow.partialPaidAt ? 'partial' : 'unpaid')
+            : null;
+
+        return c.json({
+            success: true as const,
+            data: {
+                signer: {
+                    name: signer.name,
+                    role: signer.role as 'client' | 'co_client' | 'agent' | 'other',
+                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as
+                        'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                },
+                agreement: {
+                    name: agreementRow?.name ?? 'Agreement',
+                    content: snapshot.content,
+                    contentHash: snapshot.hash,
+                },
+                envelope: {
+                    status: envelope.status as 'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                    completionPolicy: envelope.completionPolicy as 'all' | 'one',
+                    progress: { signed: signedCount, total: signers.length },
+                },
+                invoice: invoiceRow
+                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, status: invoiceStatus as string }
+                    : null,
+                payment: {
+                    required: inspectionRow?.paymentRequired === true,
+                    paid: inspectionRow?.paymentStatus === 'paid',
+                },
+                inspection: {
+                    id: inspectionRow?.id ?? (inspectionId ?? ''),
+                    propertyAddress: inspectionRow?.propertyAddress ?? null,
+                },
+                branding: {
+                    companyName: branding?.siteName ?? 'OpenInspection',
+                    primaryColor: branding?.primaryColor ?? null,
+                },
             },
         }, 200);
     })

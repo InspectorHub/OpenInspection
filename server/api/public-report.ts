@@ -486,7 +486,7 @@ export const publicReportRoutes = createApiRouter()
         const { tenant, id } = c.req.valid('param');
         const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
-        const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant);
+        const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant, c.var.services.agreement);
         return c.json({ success: true as const, data: gate }, 200);
     });
 

@@ -284,6 +284,41 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(row!.tokenEnc).toBeTruthy();
     });
 
+    it('getFirstOutstandingSignerLink: returns first non-terminal signer link; null when none outstanding', async () => {
+        const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [
+                { name: 'Jane', email: 'jane@test.com', role: 'client' },
+                { name: 'John', email: 'john@test.com', role: 'co_client' },
+            ],
+            completionPolicy: 'all',
+        });
+        const signers = await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId))
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+
+        // First outstanding link resolves to signer 1.
+        const link = await svc.getFirstOutstandingSignerLink(TENANT_A, INSP_ID);
+        expect(link).toBeTruthy();
+        expect((await svc.getSignerByPresentedToken(link!))!.signer.id).toBe(signers[0].id);
+
+        // Sign signer 1 -> first outstanding is now signer 2.
+        await testDb.update(schema.agreementSigners)
+            .set({ status: 'signed' }).where(eq(schema.agreementSigners.id, signers[0].id));
+        const link2 = await svc.getFirstOutstandingSignerLink(TENANT_A, INSP_ID);
+        expect((await svc.getSignerByPresentedToken(link2!))!.signer.id).toBe(signers[1].id);
+
+        // No outstanding signers -> null.
+        await testDb.update(schema.agreementSigners)
+            .set({ status: 'signed' }).where(eq(schema.agreementSigners.requestId, r.requestId));
+        await testDb.update(schema.agreementRequests)
+            .set({ status: 'signed' }).where(eq(schema.agreementRequests.id, r.requestId));
+        expect(await svc.getFirstOutstandingSignerLink(TENANT_A, INSP_ID)).toBeNull();
+
+        // No envelope at all -> null.
+        const otherInsp = '00000000-0000-0000-0000-0000000000ff';
+        expect(await svc.getFirstOutstandingSignerLink(TENANT_A, otherInsp)).toBeNull();
+    });
+
     it('getSnapshotForRequest: snapshot set -> returned; NULL + non-terminal -> live template fallback AND persists', async () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, { signers: [{ name: 'Jane', email: 'jane@test.com' }] });
         const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();

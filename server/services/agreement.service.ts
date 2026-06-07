@@ -626,6 +626,48 @@ export class AgreementService {
     }
 
     /**
+     * Track I-a Task 7 — server-side reconstruction of the combined-checkout
+     * link for an inspection. Finds the latest non-terminal envelope for the
+     * inspection, then its first non-terminal signer (pending / sent / viewed,
+     * ordered by creation), and returns that signer's plaintext public token.
+     * Returns null when there is no outstanding signer to route to (no envelope,
+     * or every signer is already signed / declined / expired). The plaintext is
+     * NEVER persisted — only the caller (a server-side link builder) sees it.
+     */
+    async getFirstOutstandingSignerLink(tenantId: string, inspectionId: string): Promise<string | null> {
+        const db = this.getDrizzle();
+        const envelope = await db.select().from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.tenantId, tenantId),
+                eq(agreementRequests.inspectionId, inspectionId),
+                inArray(agreementRequests.status, ['pending', 'sent', 'viewed']),
+            ))
+            .orderBy(desc(agreementRequests.createdAt))
+            .limit(1)
+            .get();
+        if (!envelope) return null;
+
+        const outstanding = await db.select().from(agreementSigners)
+            .where(and(
+                eq(agreementSigners.requestId, envelope.id),
+                inArray(agreementSigners.status, ['pending', 'sent', 'viewed']),
+            ))
+            .orderBy(asc(agreementSigners.createdAt))
+            .limit(1)
+            .get();
+        if (!outstanding) return null;
+
+        try {
+            return await this.getSignerLink(envelope.id, outstanding.id);
+        } catch (e) {
+            logger.warn('AgreementService.getFirstOutstandingSignerLink failed', {
+                tenantId, inspectionId, requestId: envelope.id, error: e instanceof Error ? e.message : String(e),
+            });
+            return null;
+        }
+    }
+
+    /**
      * Marks a signer (resolved by presented token) as viewed and recomputes the
      * envelope aggregate (never downgrades). Null on miss / expired signer.
      * Idempotent.

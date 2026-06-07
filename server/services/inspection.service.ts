@@ -18,6 +18,7 @@ import { computePreflightFromData } from '../lib/preflight';
 import { decideFieldWrite, applyFieldWrite } from '../lib/field-version';
 import { ApprenticeService } from './apprentice.service';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import type { AgreementService } from './agreement.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
@@ -2040,8 +2041,16 @@ export class InspectionService {
      * first gate), then invoice-paid. Returns null when the inspection does not
      * exist OR is not actually gated (nothing to show). The `tenantSlug` is only
      * used to build the agreement-sign URL — authority is always `tenantId`.
+     *
+     * Track I-a Task 7 — when BOTH the agreement and the payment gates are
+     * outstanding, the CTA routes to the combined `/checkout/{slug}/{signerToken}`
+     * page ('Sign & pay') instead of the agreement-only sign page. `reason` stays
+     * 'agreement' (the first-reported gate) for consumer compatibility. The signer
+     * token is reconstructed server-side via the optional `agreementService`
+     * (tier-2 link); when it is absent or yields no outstanding signer the gate
+     * falls back to the legacy single-gate agreement URL.
      */
-    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string): Promise<{
+    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
         primaryColor: string | null;
@@ -2096,10 +2105,16 @@ export class InspectionService {
                 agreementToken = pending?.token ?? null;
             }
         }
-        if (!reason && insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
+        // Payment-outstanding is computed independently of `reason` so the
+        // dual-gate (agreement AND payment) case can route to combined checkout.
+        const paymentOutstanding = insp.paymentRequired === true && insp.paymentStatus !== 'paid';
+        if (!reason && paymentOutstanding) {
             reason = 'payment';
         }
         if (!reason) return null;   // not gated — nothing to surface
+
+        // Track I-a Task 7 — both gates outstanding → combined "Sign & pay".
+        const bothOutstanding = reason === 'agreement' && paymentOutstanding;
 
         const branding = await db.select({ siteName: tenantConfigs.siteName, primaryColor: tenantConfigs.primaryColor })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
@@ -2113,8 +2128,10 @@ export class InspectionService {
                 .get();
         }
 
+        // Surface the invoice amount whenever payment is part of the gate (the
+        // payment-only page AND the combined Sign & pay page both show it).
         let amountCents: number | null = null;
-        if (reason === 'payment') {
+        if (paymentOutstanding) {
             const invoice = await db.select({ amountCents: invoices.amountCents })
                 .from(invoices)
                 .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
@@ -2124,9 +2141,23 @@ export class InspectionService {
             amountCents = invoice?.amountCents ?? null;
         }
 
-        const actionUrl = reason === 'payment'
-            ? `/r/${inspectionId}/invoice`
-            : (agreementToken ? `/agreements/sign/${tenantSlug}/${agreementToken}` : `/report-gate/${tenantSlug}/${inspectionId}`);
+        // Combined checkout link: reconstruct the first outstanding signer's
+        // tier-2 token server-side. If the helper is unavailable or yields no
+        // outstanding signer, fall back to the single-gate agreement URL.
+        let combinedToken: string | null = null;
+        if (bothOutstanding && agreementService) {
+            combinedToken = await agreementService.getFirstOutstandingSignerLink(tenantId, inspectionId);
+        }
+
+        const actionUrl = bothOutstanding && combinedToken
+            ? `/checkout/${tenantSlug}/${combinedToken}`
+            : reason === 'payment'
+                ? `/r/${inspectionId}/invoice`
+                : (agreementToken ? `/agreements/sign/${tenantSlug}/${agreementToken}` : `/report-gate/${tenantSlug}/${inspectionId}`);
+
+        const actionLabel = bothOutstanding && combinedToken
+            ? 'Sign & pay'
+            : reason === 'payment' ? 'Pay invoice' : 'Sign agreement';
 
         return {
             reason,
@@ -2135,7 +2166,7 @@ export class InspectionService {
             // keeps the platform design tokens (no per-surface fallback hex).
             primaryColor: branding?.primaryColor ?? null,
             actionUrl,
-            actionLabel: reason === 'payment' ? 'Pay invoice' : 'Sign agreement',
+            actionLabel,
             propertyAddress: insp.propertyAddress ?? null,
             inspectorName: inspector?.name ?? null,
             inspectorEmail: inspector?.email ?? null,
