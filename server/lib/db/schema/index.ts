@@ -12,6 +12,7 @@ export {
     serviceInspectors,
     comments,
     agreementRequests,
+    agreementSigners,
     services,
     inspectionServices,
     discountCodes,

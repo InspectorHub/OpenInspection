@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 /**
@@ -22,7 +22,10 @@ export const conciergeInvites = sqliteTable('concierge_invites', {
     inspectorId: text('inspector_id'),
     expiresAt: text('expires_at').notNull(),
     createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-});
+    tokenHash: text('token_hash'),
+}, (t) => [
+    uniqueIndex('idx_concierge_invites_token_hash').on(t.tokenHash),
+]);
 
 export const conciergeBookings = sqliteTable('concierge_bookings', {
     id: text('id').primaryKey(),

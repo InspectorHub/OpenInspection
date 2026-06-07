@@ -141,6 +141,13 @@
       "when": 1780796334074,
       "tag": "0019_hot_anita_blake",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1780825048850,
+      "tag": "0020_awesome_typhoid_mary",
+      "breakpoints": true
     }
   ]
 }
