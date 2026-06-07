@@ -347,4 +347,88 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(row!.onBehalfDisclaimer).toBe('authorized agent');
         expect(row!.signatureBase64).toBe('sig');
     });
+
+    it('single-fire: sign A (1/2) then sign B TWICE -> exactly one envelopeCompletedNow=true', async () => {
+        const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [
+                { name: 'Jane', email: 'jane@test.com' },
+                { name: 'John', email: 'john@test.com' },
+            ],
+            completionPolicy: 'all',
+        });
+        const signers = await testDb.select().from(schema.agreementSigners)
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+        const linkA = await svc.getSignerLink(r.requestId, signers[0].id);
+        const linkB = await svc.getSignerLink(r.requestId, signers[1].id);
+
+        // A signs first: envelope 1/2, not complete.
+        const a = await svc.markSignedBySigner(linkA, 'sig-jane', { signedAtMs: 1000, channel: 'remote' });
+        expect(a.envelopeCompletedNow).toBe(false);
+
+        // B signs (2/2) — this completes the envelope. Second call is the
+        // idempotent re-sign of an already-signed signer.
+        const b1 = await svc.markSignedBySigner(linkB, 'sig-john', { signedAtMs: 2000, channel: 'remote' });
+        const b2 = await svc.markSignedBySigner(linkB, 'sig-john-again', { signedAtMs: 3000, channel: 'remote' });
+
+        const fires = [a, b1, b2].filter((x) => x.envelopeCompletedNow).length;
+        expect(fires).toBe(1);
+        expect(b1.envelopeCompletedNow).toBe(true);
+        expect(b2.envelopeCompletedNow).toBe(false);
+
+        const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
+        expect(env!.status).toBe('signed');
+        // Envelope signature is the WINNING write's signature, not the loser's.
+        expect(env!.signatureBase64).toBe('sig-john');
+    });
+
+    it('concurrent: Promise.all two markSignedBySigner for the same last signer -> at most one envelopeCompletedNow=true', async () => {
+        const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [{ name: 'Jane', email: 'jane@test.com' }],
+            completionPolicy: 'one',
+        });
+        const s = await testDb.select().from(schema.agreementSigners).all();
+        const link = await svc.getSignerLink(r.requestId, s[0].id);
+
+        // better-sqlite3 is synchronous under the hood so this resolves
+        // deterministically, but the service awaits between read + write, so the
+        // atomic claim (conditional UPDATE row-count) is what guarantees single-fire.
+        const [c1, c2] = await Promise.all([
+            svc.markSignedBySigner(link, 'sig-1', { signedAtMs: 1000, channel: 'remote' }),
+            svc.markSignedBySigner(link, 'sig-2', { signedAtMs: 1000, channel: 'remote' }),
+        ]);
+        const fires = [c1, c2].filter((x) => x.envelopeCompletedNow).length;
+        expect(fires).toBeLessThanOrEqual(1);
+        expect(fires).toBe(1);
+
+        const env = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, r.requestId)).get();
+        expect(env!.status).toBe('signed');
+    });
+
+    it('no-secrets degraded path: findOrCreate works (tokenEnc NULL), getSignerLink rejects with Internal', async () => {
+        const noSecretSvc = new AgreementService({} as D1Database); // no secrets
+        const r = await noSecretSvc.findOrCreate(TENANT_A, INSP_ID, {
+            signers: [
+                { name: 'Jane', email: 'jane@test.com' },
+                { name: 'John', email: 'john@test.com' },
+            ],
+        });
+        expect(r.alreadyExists).toBe(false);
+        expect(r.requestId).toBeTruthy();
+        // No secrets -> the returned token is the freshly-minted first-signer
+        // plaintext (findOrCreate returns it directly, never via getSignerLink).
+        expect(r.token).toBeTruthy();
+
+        const signers = await testDb.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId))
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+        expect(signers.length).toBe(2);
+        for (const s of signers) {
+            expect(s.tokenHash).toBeTruthy(); // hash is still persisted
+            expect(s.tokenEnc).toBeNull();     // sealing skipped without a key
+        }
+
+        // getSignerLink cannot reconstruct the link without a sealing key.
+        await expect(noSecretSvc.getSignerLink(r.requestId, signers[0].id))
+            .rejects.toThrow(/Token sealing key unavailable/);
+    });
 });

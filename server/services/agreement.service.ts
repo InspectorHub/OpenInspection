@@ -686,16 +686,44 @@ export class AgreementService {
         const previousStatus = envelope.status;
         const signers = await this.loadSigners(envelope.id);
         const aggregate = computeEnvelopeStatus(envelope.completionPolicy, signers);
-        const envelopeCompletedNow = previousStatus !== 'signed' && aggregate === 'signed';
 
-        // Envelope is immutable once terminal (signed/declined/expired).
-        if (!['signed', 'declined', 'expired'].includes(previousStatus) && aggregate !== previousStatus) {
-            const patch: Partial<typeof agreementRequests.$inferInsert> = { status: aggregate };
-            if (aggregate === 'signed') {
-                patch.signedAt = new Date(opts.signedAtMs);
-                patch.signatureBase64 = signatureBase64; // legacy reader compat
-            }
-            await db.update(agreementRequests).set(patch).where(eq(agreementRequests.id, envelope.id));
+        // Claim envelope completion ATOMICALLY. The in-memory `envelope.status`
+        // snapshot is stale under concurrency (two sign calls — same signer
+        // twice, or the last two signers of an 'all' envelope landing together —
+        // can both compute aggregate==='signed' from the same snapshot). Deriving
+        // `envelopeCompletedNow` from that snapshot lets BOTH writers report
+        // completion → duplicate downstream notifications/emails (the workflow is
+        // id-idempotent, but the other effects are not). Instead, gate completion
+        // on the row count of a single conditional UPDATE that only one writer can
+        // win: `WHERE status NOT IN (terminal)`.
+        let envelopeCompletedNow = false;
+        if (aggregate === 'signed') {
+            const res: unknown = await db.update(agreementRequests)
+                .set({
+                    status: 'signed',
+                    signedAt: new Date(opts.signedAtMs),
+                    signatureBase64, // legacy reader compat
+                })
+                .where(and(
+                    eq(agreementRequests.id, envelope.id),
+                    sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
+                ));
+            // Driver-tolerant row-count extraction: drizzle/d1 returns
+            // `{ meta: { changes } }`; drizzle/better-sqlite3 (unit tests) returns
+            // a top-level `{ changes }`. Empirically verified both shapes carry the count.
+            const changes = (res as { meta?: { changes?: number } })?.meta?.changes
+                ?? (res as { changes?: number })?.changes
+                ?? 0;
+            envelopeCompletedNow = changes > 0;
+        } else if (!['signed', 'declined', 'expired'].includes(previousStatus) && aggregate !== previousStatus) {
+            // Non-'signed' aggregate transitions (viewed). Also gated on a
+            // conditional WHERE so a late writer can't clobber a terminal envelope.
+            await db.update(agreementRequests)
+                .set({ status: aggregate })
+                .where(and(
+                    eq(agreementRequests.id, envelope.id),
+                    sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
+                ));
         }
 
         return {
@@ -730,10 +758,16 @@ export class AgreementService {
         const previousStatus = envelope.status;
         const signers = await this.loadSigners(envelope.id);
         const aggregate = computeEnvelopeStatus(envelope.completionPolicy, signers);
+        // Conditional WHERE (not just the in-memory `previousStatus` guard) so a
+        // late decliner can't clobber an envelope another writer already drove
+        // terminal under concurrency.
         if (!['signed', 'declined', 'expired'].includes(previousStatus) && aggregate !== previousStatus) {
             const patch: Partial<typeof agreementRequests.$inferInsert> = { status: aggregate };
             if (aggregate === 'declined' && reason) patch.lastError = reason.slice(0, 500);
-            await db.update(agreementRequests).set(patch).where(eq(agreementRequests.id, envelope.id));
+            await db.update(agreementRequests).set(patch).where(and(
+                eq(agreementRequests.id, envelope.id),
+                sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
+            ));
         }
 
         return { tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id, signerId: signer.id, envelopeStatus: aggregate };
@@ -746,7 +780,13 @@ export class AgreementService {
         const signers = await this.loadSigners(envelope.id);
         const aggregate = computeEnvelopeStatus(envelope.completionPolicy, signers);
         if (aggregate !== envelope.status) {
-            await db.update(agreementRequests).set({ status: aggregate }).where(eq(agreementRequests.id, envelope.id));
+            // Conditional WHERE so a late viewer can't downgrade an envelope that
+            // another concurrent writer already drove terminal (the in-memory
+            // `envelope.status` snapshot is not authoritative under concurrency).
+            await db.update(agreementRequests).set({ status: aggregate }).where(and(
+                eq(agreementRequests.id, envelope.id),
+                sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
+            ));
         }
         return aggregate;
     }
