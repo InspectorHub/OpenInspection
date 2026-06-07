@@ -234,3 +234,14 @@ html[data-color-scheme="field"] {
 html[data-sidebar-collapsed="1"] .ih-sidebar { width: var(--width-sidebar-collapsed); }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ── FileDropzone (shared-ui) ──
+   Marching-ants dashes on drag-over (one dash period = 8+6 = 14 units) and
+   the ok-flash when a file lands. Registered as @theme animations so
+   `animate-ih-dash-march` / `animate-ih-ok-flash` utilities exist. */
+@keyframes ih-dash-march { to { stroke-dashoffset: -14; } }
+@keyframes ih-ok-flash { from { background-color: var(--color-ih-ok-bg); } to { background-color: transparent; } }
+@theme {
+  --animate-ih-dash-march: ih-dash-march 0.6s linear infinite;
+  --animate-ih-ok-flash: ih-ok-flash 1s ease-out;
+}
