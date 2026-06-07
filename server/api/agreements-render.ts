@@ -36,12 +36,16 @@ const escapeHtml = (s: string): string =>
 export async function agreementRenderHandler(
   d1: D1Database,
   tenantSlug: string,
-  token: string,
+  requestId: string,
   baseUrl: string = '',  // pass from route wrapper; tests pass '' which omits QR
 ): Promise<Response> {
+  // Track I-a — resolved by the stable envelope requestId (NOT the legacy
+  // plaintext `token` column, which is now a never-distributed UUID
+  // placeholder). The unguessable requestId is the URL secret, same posture
+  // as /verify/:requestId and the R2 object keys.
   const db = drizzle(d1, { schema });
   const reqRow = await db.select().from(schema.agreementRequests)
-    .where(eq(schema.agreementRequests.token, token)).get();
+    .where(eq(schema.agreementRequests.id, requestId)).get();
   if (!reqRow || reqRow.status !== 'signed' || !reqRow.signatureBase64) {
     return new Response('Not Found', { status: 404 });
   }
@@ -112,12 +116,14 @@ export async function agreementRenderHandler(
 
 export async function certRenderHandler(
   d1: D1Database,
-  token: string,
+  requestId: string,
   baseUrl: string = '',  // pass from route wrapper; tests pass '' which omits QR
 ): Promise<Response> {
+  // Track I-a — resolved by the stable envelope requestId (see
+  // agreementRenderHandler note on the dead `token` column).
   const db = drizzle(d1, { schema });
   const reqRow = await db.select().from(schema.agreementRequests)
-    .where(eq(schema.agreementRequests.token, token)).get();
+    .where(eq(schema.agreementRequests.id, requestId)).get();
   if (!reqRow || reqRow.status !== 'signed') {
     return new Response('Not Found', { status: 404 });
   }
@@ -178,12 +184,15 @@ export async function certRenderHandler(
 }
 
 const agreementsRenderRoutes = new Hono<HonoConfig>();
-agreementsRenderRoutes.get('/agreement-render/:tenant/:token', async (c) => {
+// :id is the stable envelope requestId (Track I-a; the legacy plaintext token
+// column is no longer distributed). The path segment is named :id; the
+// historical `:token` shape is retired.
+agreementsRenderRoutes.get('/agreement-render/:tenant/:id', async (c) => {
   const tenant = c.req.param('tenant');
-  const token = c.req.param('token');
-  return agreementRenderHandler(c.env.DB, tenant, token, c.env.APP_BASE_URL || '');
+  const id = c.req.param('id');
+  return agreementRenderHandler(c.env.DB, tenant, id, c.env.APP_BASE_URL || '');
 });
-agreementsRenderRoutes.get('/cert-render/:token', async (c) =>
-  certRenderHandler(c.env.DB, c.req.param('token'), c.env.APP_BASE_URL || ''));
+agreementsRenderRoutes.get('/cert-render/:id', async (c) =>
+  certRenderHandler(c.env.DB, c.req.param('id'), c.env.APP_BASE_URL || ''));
 
 export default agreementsRenderRoutes;

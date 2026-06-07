@@ -30,8 +30,8 @@ describe('agreement-render handler', () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
   });
 
-  it('returns 404 when token is unknown', async () => {
-    const res = await agreementRenderHandler({} as D1Database, 'acme', 'bogus-token');
+  it('returns 404 when requestId is unknown', async () => {
+    const res = await agreementRenderHandler({} as D1Database, 'acme', '00000000-0000-0000-0000-0000000000ff');
     expect(res.status).toBe(404);
   });
 
@@ -42,7 +42,7 @@ describe('agreement-render handler', () => {
       token: TOKEN_A, status: 'sent', signatureBase64: null,
       createdAt: new Date(),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', TOKEN_A);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
     expect(res.status).toBe(404);
   });
 
@@ -55,7 +55,7 @@ describe('agreement-render handler', () => {
       signedAt: new Date(),
       createdAt: new Date(),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', TOKEN_A);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     const body = await res.text();
@@ -71,7 +71,7 @@ describe('agreement-render handler', () => {
       token: TOKEN_A, status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
       signedAt: new Date(), createdAt: new Date(),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'wrongslug', TOKEN_A);
+    const res = await agreementRenderHandler({} as D1Database, 'wrongslug', REQ_ID);
     expect(res.status).toBe(404);
   });
 
@@ -86,7 +86,7 @@ describe('agreement-render handler', () => {
       inspectorSignedAt: new Date(),
       createdAt: new Date(),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', TOKEN_A);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('clientsig');
@@ -103,7 +103,7 @@ describe('agreement-render handler', () => {
       signedAt: new Date(),
       createdAt: new Date(),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', TOKEN_A);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('clientsig');
@@ -129,8 +129,8 @@ describe('cert-render handler', () => {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
   });
 
-  it('returns 404 when token is unknown', async () => {
-    const res = await certRenderHandler({} as D1Database, 'bogus');
+  it('returns 404 when requestId is unknown', async () => {
+    const res = await certRenderHandler({} as D1Database, '00000000-0000-0000-0000-0000000000ff');
     expect(res.status).toBe(404);
   });
 
@@ -141,7 +141,7 @@ describe('cert-render handler', () => {
       token: TOKEN_A, status: 'sent', signatureBase64: null,
       createdAt: new Date(),
     });
-    const res = await certRenderHandler({} as D1Database, TOKEN_A);
+    const res = await certRenderHandler({} as D1Database, REQ_ID);
     expect(res.status).toBe(404);
   });
 
@@ -169,7 +169,7 @@ describe('cert-render handler', () => {
         createdAt: new Date(Date.UTC(2026, 4, 28, 10, 0, i)).getTime(),
       });
     }
-    const res = await certRenderHandler({} as D1Database, TOKEN_A);
+    const res = await certRenderHandler({} as D1Database, REQ_ID);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     const body = await res.text();

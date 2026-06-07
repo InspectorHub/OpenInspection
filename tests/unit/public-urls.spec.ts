@@ -32,7 +32,7 @@ describe('public URL builders', () => {
     it('embedBookingCompanyUrl emits /embed/<tenant> (company-level, IA-26)', () => {
         expect(embedBookingCompanyUrl('app.example.com', 'acme')).toBe('https://app.example.com/embed/acme');
     });
-    it('m2mAgreementRenderUrl emits /m2m/agreement-render/<tenant>/<token>', () => {
-        expect(m2mAgreementRenderUrl('app.example.com', 'acme', 'tok-xyz')).toBe('https://app.example.com/m2m/agreement-render/acme/tok-xyz');
+    it('m2mAgreementRenderUrl emits /m2m/agreement-render/<tenant>/<requestId>', () => {
+        expect(m2mAgreementRenderUrl('app.example.com', 'acme', 'req-xyz')).toBe('https://app.example.com/m2m/agreement-render/acme/req-xyz');
     });
 });

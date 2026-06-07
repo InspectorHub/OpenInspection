@@ -12,8 +12,11 @@ import * as schema from '../lib/db/schema';
 export interface SignCompletionParams {
     requestId: string;
     tenantId: string;
-    tenantSlug: string;       // tenant slug, required for /m2m/agreement-render/<tenant>/<token>
-    token: string;            // public agreement-request token (used for /m2m/* render routes)
+    tenantSlug: string;       // tenant slug, required for /m2m/agreement-render/<tenant>/<requestId>
+    // Track I-a — the /m2m/* render routes are keyed by the stable envelope
+    // requestId (above), NOT a token. Signer tokens are per-signer and never
+    // match the legacy plaintext `agreement_requests.token` column (now an
+    // undistributed UUID placeholder), so no token is threaded through here.
 }
 
 /**
@@ -37,7 +40,7 @@ export interface SignCompletionParams {
  */
 export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompletionParams> {
     async run(event: WorkflowEvent<SignCompletionParams>, step: WorkflowStep) {
-        const { requestId, tenantId, tenantSlug, token } = event.payload;
+        const { requestId, tenantId, tenantSlug } = event.payload;
         const env = this.env;
 
         // Step 1 — render canonical signed PDF (best-effort; if BR is not
@@ -48,7 +51,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         }, async () => {
             try {
                 return await renderPdfToR2(env, {
-                    renderUrl: m2mAgreementRenderUrl(baseHost(env), tenantSlug, token),
+                    renderUrl: m2mAgreementRenderUrl(baseHost(env), tenantSlug, requestId),
                     r2Key: `tenants/${tenantId}/agreements/${requestId}/signed.pdf`,
                 });
             } catch (e) {
@@ -64,7 +67,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         }, async () => {
             try {
                 return await renderPdfToR2(env, {
-                    renderUrl: `${baseUrl(env)}/m2m/cert-render/${token}`,
+                    renderUrl: `${baseUrl(env)}/m2m/cert-render/${requestId}`,
                     r2Key: `tenants/${tenantId}/agreements/${requestId}/certificate.pdf`,
                 });
             } catch (e) {

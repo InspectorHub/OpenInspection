@@ -58,6 +58,10 @@ export function agreementSignPath(tenantSlug: string, token: string): string {
     return `/agreements/sign/${tenantSlug}/${token}`;
 }
 
-export function m2mAgreementRenderUrl(host: string, tenantSlug: string, token: string): string {
-    return joinUrl(host, `/m2m/agreement-render/${tenantSlug}/${token}`);
+/**
+ * Track I-a — keyed by the stable envelope requestId (the legacy plaintext
+ * `token` column is no longer distributed; signer tokens live per-signer).
+ */
+export function m2mAgreementRenderUrl(host: string, tenantSlug: string, requestId: string): string {
+    return joinUrl(host, `/m2m/agreement-render/${tenantSlug}/${requestId}`);
 }

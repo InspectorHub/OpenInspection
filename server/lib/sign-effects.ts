@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { users, inspections, agreementRequests } from './db/schema';
+import { users, inspections, agreementRequests, agreements } from './db/schema';
 import { logger } from './logger';
 import { getBookingHost } from './url';
 import type { HonoConfig } from '../types/hono';
@@ -31,18 +31,18 @@ export async function runEnvelopeCompletionPipeline(
         clientEmail: string | null;
         clientName: string | null;
         agreementId: string;
-        presentedToken: string;
     },
 ): Promise<void> {
-    const { requestId, tenantId, inspectionId, clientEmail, clientName, agreementId, presentedToken } = args;
-    const svc = c.var.services.agreement;
+    const { requestId, tenantId, inspectionId, clientEmail, clientName, agreementId } = args;
+
+    // Read request-derived metadata ONCE; reuse across every step below.
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
+    const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
+    const country = c.req.header('cf-ipcountry') || null;
 
     // (1) Spec 5H P0 — envelope-level audit append. Wrapped in try/catch so a
     // chain write failure never blocks the signed response.
     try {
-        const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
-        const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
-        const country = c.req.header('cf-ipcountry') || null;
         await c.var.services.auditLog.append(tenantId, requestId, 'agreement.signed', {
             country,
             envelopeId: requestId,
@@ -77,7 +77,7 @@ export async function runEnvelopeCompletionPipeline(
             try {
                 await c.env.SIGN_COMPLETION_WORKFLOW!.create({
                     id: requestId,
-                    params: { requestId, tenantId, tenantSlug, token: presentedToken },
+                    params: { requestId, tenantId, tenantSlug },
                 });
             } catch (e) {
                 logger.warn('sign-workflow.create.failed', { requestId, error: (e as Error).message });
@@ -93,19 +93,23 @@ export async function runEnvelopeCompletionPipeline(
         tenantId,
         clientName: clientName ?? null,
         signedAt: new Date().toISOString(),
-        signerIp: c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null,
-        signerUserAgent: (c.req.header('user-agent') || '').slice(0, 200) || null,
-        signerCountry: c.req.header('cf-ipcountry') || null,
+        signerIp: ip,
+        signerUserAgent: ua,
+        signerCountry: country,
     });
 
     // (5) B3 — in-app notification for all admins (fetch agreement name for a
     // richer title).
     c.executionCtx.waitUntil((async () => {
         try {
-            const agreement = await svc.getAgreementByToken(presentedToken);
+            // Fetch the display name directly by agreement id. (Previously this
+            // resolved by the presented signer token, which never matches the
+            // envelope-plaintext lookup → NotFound → notification silently lost.)
+            const agreement = await drizzle(c.env.DB).select({ name: agreements.name })
+                .from(agreements).where(eq(agreements.id, agreementId)).get();
             await c.var.services.notification.createForAllAdmins(tenantId, {
                 type: 'agreement.signed',
-                title: `Agreement signed — ${agreement.agreement.name}`,
+                title: `Agreement signed — ${agreement?.name ?? 'Agreement'}`,
                 body: clientName ? `By ${clientName}` : null,
                 entityType: 'agreement',
                 entityId: requestId,
@@ -142,7 +146,6 @@ export async function runEnvelopeCompletionPipeline(
                 })();
                 const verifyUrl = baseUrl ? `${baseUrl}/verify/${requestId}` : `/verify/${requestId}`;
                 const confirmationId = requestId.replace(/-/g, '').slice(0, 8).toUpperCase();
-                const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
 
                 // Look up inspector to CC them + append the Sprint B-4c signature footer.
                 let inspectorEmail: string | null = null;

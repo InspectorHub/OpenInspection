@@ -855,7 +855,6 @@ export const bookingsRoutes = createApiRouter()
                 clientEmail: envelope.clientEmail ?? null,
                 clientName: envelope.clientName ?? null,
                 agreementId: envelope.agreementId,
-                presentedToken: token,
             });
         }
 

@@ -6,7 +6,7 @@ import * as schema from '../../server/lib/db/schema';
 import type { HonoConfig } from '../../server/types/hono';
 import { AppError } from '../../server/lib/errors';
 import { AgreementService } from '../../server/services/agreement.service';
-import { hashToken, deadTokenSentinel } from '../../server/lib/token-hash';
+import { hashToken } from '../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 /**
@@ -204,9 +204,9 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(body.data.progress.total).toBe(1);
     });
 
-    it('POST sign signer 1 of 2 (all): envelope NOT signed, workflow NOT created; signer 2 completes -> envelope signed, workflow once, verificationToken set', async () => {
+    it('POST sign signer 1 of 2 (all): envelope NOT signed, workflow NOT created; signer 2 completes -> envelope signed, workflow once, verificationToken set, notification + email fire', async () => {
         const { token1, token2, requestId } = await createTwoSignerEnvelope(db, 'all');
-        const { app, workflowCreate } = buildApp(db);
+        const { app, workflowCreate, notificationCreate, emailConfirm } = buildApp(db);
 
         const ec1 = makeExecCtx();
         const r1 = await app.request(`/agreements/${token1}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec1.ctx);
@@ -217,6 +217,9 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
             .where(eq(schema.agreementRequests.id, requestId)).get();
         expect(env!.status).not.toBe('signed');
         expect(workflowCreate).not.toHaveBeenCalled();
+        // No completion side-effects until the envelope completes.
+        expect(notificationCreate).not.toHaveBeenCalled();
+        expect(emailConfirm).not.toHaveBeenCalled();
 
         const ec2 = makeExecCtx();
         const r2 = await app.request(`/agreements/${token2}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
@@ -229,6 +232,45 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         expect(env!.verificationToken).toMatch(/^[0-9a-f]{64}$/);
         expect(workflowCreate).toHaveBeenCalledTimes(1);
         expect(workflowCreate).toHaveBeenCalledWith(expect.objectContaining({ id: requestId }));
+
+        // Completion notification carries the agreement DISPLAY NAME (regression
+        // guard: previously resolved via the signer token → NotFound → dropped).
+        expect(notificationCreate).toHaveBeenCalledTimes(1);
+        expect(notificationCreate).toHaveBeenCalledWith(
+            TENANT_ID,
+            expect.objectContaining({
+                type: 'agreement.signed',
+                title: 'Agreement signed — Standard Agreement',
+            }),
+        );
+        // Confirmation email goes to the envelope's client email (first arg).
+        expect(emailConfirm).toHaveBeenCalledTimes(1);
+        expect(emailConfirm.mock.calls[0][0]).toBe('jane@test.com');
+    });
+
+    it('idempotent re-sign: POST same signer token twice -> 200 both times, workflow created EXACTLY once, no second notification', async () => {
+        // Single-signer 'one' envelope so the FIRST sign already completes it.
+        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
+            signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
+            completionPolicy: 'one',
+        });
+        const { app, workflowCreate, notificationCreate } = buildApp(db);
+
+        const ec1 = makeExecCtx();
+        const first = await app.request(`/agreements/${r.token}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec1.ctx);
+        await ec1.settle();
+        expect(first.status).toBe(200);
+        expect(workflowCreate).toHaveBeenCalledTimes(1);
+        expect(notificationCreate).toHaveBeenCalledTimes(1);
+
+        const ec2 = makeExecCtx();
+        const second = await app.request(`/agreements/${r.token}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
+        await ec2.settle();
+        expect(second.status).toBe(200);
+        // The single-fire completion gate must NOT re-trigger on a repeat sign.
+        expect(workflowCreate).toHaveBeenCalledTimes(1);
+        expect(notificationCreate).toHaveBeenCalledTimes(1);
     });
 
     it('POST sign persists onBehalfOf / onBehalfDisclaimer on the signer row', async () => {
@@ -335,7 +377,4 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
         const p = await app.request('/agreements/nope-unknown-token/sign', signReq({ signatureBase64: SIG }), FAKE_ENV, ec.ctx);
         expect(p.status).toBe(404);
     });
-
-    // suppress unused import lint in case helpers are trimmed
-    void deadTokenSentinel;
 });
