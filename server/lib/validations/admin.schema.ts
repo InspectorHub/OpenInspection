@@ -196,11 +196,24 @@ export const AgreementListResponseSchema = createApiResponseSchema(z.array(z.obj
     createdAt: z.date().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }))).openapi('AgreementListResponse');
 
+/** Track I-a Task 9 — one recipient row in a multi-signer envelope. */
+export const SignerInputSchema = z.object({
+    name: z.string().min(1).max(120).openapi({ example: 'John Smith' }).describe('Full name of this signer as it appears on the agreement'),
+    email: z.string().email().openapi({ example: 'client@example.com' }).describe('Email address the per-signer signing link is sent to'),
+    role: z.enum(['client', 'co_client', 'agent', 'other']).optional().openapi({ example: 'client' }).describe('Relationship of this signer to the inspection (client, co_client, agent, other)'),
+    contactId: z.string().uuid().nullable().optional().describe('Optional contacts.id this signer was picked from, when available'),
+}).openapi('AgreementSignerInput');
+
 export const SendAgreementSchema = z.object({
     agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
     clientEmail: z.string().email().openapi({ example: 'client@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     inspectionId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    // Track I-a Task 9 — multi-signer envelope. When `signers` is provided the
+    // send routes through AgreementService.findOrCreate (signer rows + snapshot
+    // pinning + per-signer links). Omitted → legacy single-recipient behavior.
+    signers: z.array(SignerInputSchema).min(1).max(10).optional().describe('Optional multi-signer recipient list; when present routes through the envelope model'),
+    completionPolicy: z.enum(['all', 'one']).optional().openapi({ example: 'all' }).describe('Whether all signers must sign or any one signature completes the envelope'),
 }).openapi('SendAgreement');
 
 export const AgreementResponseSchema = createApiResponseSchema(z.object({

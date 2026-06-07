@@ -47,6 +47,8 @@ import { templates, agreements as agreementTable, agreements as agreementsTable,
 import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
+import type { Context } from 'hono';
+import type { HonoConfig } from '../types/hono';
 
 /**
  * GET /api/admin/export
@@ -437,7 +439,19 @@ const sendAgreementRoute = createRoute(withMcpMetadata({
     request: { body: { content: { 'application/json': { schema: SendAgreementSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ token: z.string().describe('TODO describe token field for the OpenInspection MCP integration'), signUrl: z.string().describe('TODO describe signUrl field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
+            // Track I-a Task 9 — two shapes: legacy single-recipient
+            // ({ token, signUrl }) and the multi-signer envelope
+            // ({ requestId, signers }). The latter carries NO token material.
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(true),
+                data: z.union([
+                    z.object({ token: z.string(), signUrl: z.string() }),
+                    z.object({
+                        requestId: z.string(),
+                        signers: z.array(z.object({ id: z.string(), name: z.string(), email: z.string(), role: z.string(), status: z.string() })),
+                    }),
+                ]),
+            }) } },
             description: 'Signing request created and email sent',
         },
     },
@@ -488,6 +502,71 @@ const downloadAuditTrailRoute = createRoute(withMcpMetadata({
     },
     operationId: "listTenantAgreementsRequestsAuditTrail",
     description: "Auto-generated placeholder for listTenantAgreementsRequestsAuditTrail (GET /agreements/requests/{id}/audit-trail, admin domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['admin'], tier: 'extended' }));
+
+// --- Track I-a Task 9 — per-signer admin views (multi-signer envelope) ---
+
+// A signer row as surfaced to the admin UI. NO token material (tokenHash /
+// tokenEnc / token) is ever included — the only endpoint that returns a
+// token-bearing string is the explicit copy-link route below.
+const SignerRowSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    role: z.string(),
+    status: z.string(),
+    channel: z.string().nullable(),
+    signedAt: z.number().nullable(),
+    viewedAt: z.number().nullable(),
+    onBehalfOf: z.string().nullable(),
+    lastRemindedAt: z.number().nullable(),
+}).openapi('AgreementSignerRow');
+
+const listSignersRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/agreements/requests/{requestId}/signers',
+    tags: ["admin", "agreements"],
+    summary: 'List signers of an agreement envelope (no token material)',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { params: z.object({ requestId: z.string().describe('The agreement envelope (agreement_requests) id whose signers to list') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(SignerRowSchema) }) } }, description: 'OK' },
+        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.unknown() }) } }, description: 'Not found' },
+    },
+    operationId: "listTenantAgreementsRequestSigners",
+    description: "List the signers of an agreement envelope with status/role/lastRemindedAt. Token material is never returned."
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const remindSignerRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/agreements/requests/{requestId}/signers/{signerId}/remind',
+    tags: ["admin", "agreements"],
+    summary: 'Re-send the agreement request to a single signer',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { params: z.object({ requestId: z.string().describe('The agreement envelope id that owns the signer being reminded'), signerId: z.string().describe('The agreement_signers id to re-send the request to') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ remindedAt: z.number() }) }) } }, description: 'Reminder sent' },
+        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.unknown() }) } }, description: 'Not found' },
+        409: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.unknown() }) } }, description: 'Signer is in a terminal state' },
+        429: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.unknown() }) } }, description: 'Reminded too recently' },
+    },
+    operationId: "remindTenantAgreementsRequestSigner",
+    description: "Re-send the agreement-request email to a single signer using their persistent link. Rate-limited to once per hour; terminal signers reject with 409."
+}, { scopes: ['admin'], tier: 'extended' }));
+
+const getSignerLinkRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/agreements/requests/{requestId}/signers/{signerId}/link',
+    tags: ["admin", "agreements"],
+    summary: 'Get a single signer\'s persistent public link (copy-link)',
+    middleware: [requireRole(['owner', 'admin'])],
+    request: { params: z.object({ requestId: z.string().describe('The agreement envelope id that owns the signer whose link is requested'), signerId: z.string().describe('The agreement_signers id whose persistent public link to return') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ url: z.string() }) }) } }, description: 'OK' },
+        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.unknown() }) } }, description: 'Not found' },
+    },
+    operationId: "getTenantAgreementsRequestSignerLink",
+    description: "Return the persistent (non-rotated) public link for a single signer. Authed + tenant-scoped; the only admin endpoint that returns a token-bearing URL."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 // --- Comments Library ---
@@ -1189,6 +1268,47 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
     description: 'Persists the tenant From: (senderEmail) and Reply-To: (replyTo) addresses — fixes the B-4/A-7 "Reply-To unsaveable" bug. Either value may be null to clear it.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
+// --- Track I-a Task 9 — agreement send helpers (module scope) -------------
+
+type SenderSignature = { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null };
+
+/**
+ * Look up the current admin/inspector's signature block so the recipient can
+ * rebook with them via the embedded booking link (Sprint B-4a). Tolerant —
+ * any failure yields `undefined` (no signature appended).
+ */
+async function lookupSenderSignature(c: Context<HonoConfig>, tenantId: string): Promise<SenderSignature | undefined> {
+    const senderId = c.get('user')?.sub;
+    if (!senderId) return undefined;
+    try {
+        const row = await drizzle(c.env.DB).select({
+            name:          schema.users.name,
+            email:         schema.users.email,
+            phone:         schema.users.phone,
+            licenseNumber: schema.users.licenseNumber,
+        }).from(schema.users)
+            .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
+            .get();
+        return row ?? undefined;
+    } catch (err) {
+        logger.warn('agreement.signature.lookup.failed', { senderId, error: (err as Error).message });
+        return undefined;
+    }
+}
+
+/**
+ * Per-recipient link rule (shared by send + remind + copy-link): combined
+ * Sign & pay checkout when the inspection requires payment AND has an
+ * outstanding invoice, otherwise the standalone sign page. `token` is the
+ * recipient's persistent public token (per-signer in the envelope model).
+ */
+async function buildSignUrl(c: Context<HonoConfig>, tenantId: string, inspectionId: string | null | undefined, tenantSlug: string, token: string): Promise<string> {
+    const host = getBookingHost(c);
+    return (await shouldUseCheckoutLink(c.env.DB, tenantId, inspectionId))
+        ? checkoutUrl(host, tenantSlug, token)
+        : agreementSignUrl(host, tenantSlug, token);
+}
+
 export const adminRoutes = createApiRouter()
     .openapi(exportDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -1418,6 +1538,77 @@ export const adminRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
         const svc = c.var.services.agreement;
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+
+        // Track I-a Task 9 — multi-signer envelope path. When `signers` is
+        // provided AND the request is bound to an inspection, route through
+        // findOrCreate so signer rows + content snapshot are pinned, then email
+        // each signer their OWN persistent link. The legacy single-recipient
+        // path (no `signers`, or no inspection to key the envelope on) stays
+        // untouched below.
+        if (body.signers && body.signers.length > 0 && body.inspectionId) {
+            const env = await svc.findOrCreate(tenantId, body.inspectionId, {
+                signers: body.signers.map((s) => ({
+                    name: s.name,
+                    email: s.email,
+                    ...(s.role ? { role: s.role } : {}),
+                    ...(s.contactId !== undefined ? { contactId: s.contactId } : {}),
+                })),
+                ...(body.completionPolicy ? { completionPolicy: body.completionPolicy } : {}),
+            });
+
+            const sigInspector = await lookupSenderSignature(c, tenantId);
+            const signers = await svc.listSigners(tenantId, env.requestId);
+
+            // Audit: envelope created (best-effort).
+            try {
+                await c.var.services.auditLog.append(tenantId, env.requestId, 'request.created', {
+                    actorId: c.get('user')?.sub ?? null,
+                    agreementId: body.agreementId,
+                    envelopeId: env.requestId,
+                    inspectionId: body.inspectionId,
+                    signerCount: signers.length,
+                    tenantId,
+                    tsMs: Date.now(),
+                });
+            } catch (e) {
+                logger.warn('audit.append.created.failed', { requestId: env.requestId, error: (e as Error).message });
+            }
+
+            // Email each signer their own link (per-signer token → per-signer URL).
+            for (const s of signers) {
+                let signUrl: string;
+                try {
+                    const token = await svc.getSignerLink(env.requestId, s.id);
+                    signUrl = await buildSignUrl(c, tenantId, body.inspectionId, tenantSlug, token);
+                } catch (e) {
+                    logger.warn('agreement.signer.link.failed', { signerId: s.id, error: (e as Error).message });
+                    continue;
+                }
+                await c.var.services.email.sendAgreementRequest(s.email, s.name, 'Agreement', signUrl, sigInspector, getBookingHost(c))
+                    .catch((e: unknown) => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
+            }
+
+            try {
+                await c.var.services.auditLog.append(tenantId, env.requestId, 'request.sent', {
+                    envelopeId: env.requestId,
+                    recipientCount: signers.length,
+                    tsMs: Date.now(),
+                });
+            } catch (e) {
+                logger.warn('audit.append.sent.failed', { requestId: env.requestId, error: (e as Error).message });
+            }
+
+            auditFromContext(c, 'agreement.send', 'agreement_request', { metadata: { agreementId: body.agreementId, inspectionId: body.inspectionId, signers: signers.length } });
+            return c.json({
+                success: true as const,
+                data: {
+                    requestId: env.requestId,
+                    // Signer statuses only — NO token material in the response.
+                    signers: signers.map((s: typeof schema.agreementSigners.$inferSelect) => ({ id: s.id, name: s.name, email: s.email, role: s.role, status: s.status })),
+                },
+            }, 200);
+        }
 
         const request = await svc.createSigningRequest(tenantId, {
             agreementId: body.agreementId,
@@ -1425,7 +1616,6 @@ export const adminRoutes = createApiRouter()
             ...(body.clientName !== undefined ? { clientName: body.clientName } : {}),
             ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
         });
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
         // Track I-a Task 8 — when the inspection requires payment AND has an
         // outstanding (unpaid) invoice, point the recipient at the combined
         // Sign & pay page; otherwise the standalone sign page.
@@ -1533,7 +1723,28 @@ export const adminRoutes = createApiRouter()
             .where(eqDz(agreementRequestsTable.tenantId, tenantId))
             .orderBy(descDz(agreementRequestsTable.createdAt))
             .limit(200);
-        return c.json({ success: true as const, data: rows }, 200);
+
+        // Track I-a Task 9 — per-envelope signer progress in ONE grouped query
+        // (GROUP BY request_id), no N+1 per row. Merge into the list by id.
+        const counts = await db
+            .select({
+                requestId: schema.agreementSigners.requestId,
+                total: sqlTpl<number>`count(*)`,
+                signed: sqlTpl<number>`sum(case when ${schema.agreementSigners.status} = 'signed' then 1 else 0 end)`,
+            })
+            .from(schema.agreementSigners)
+            .where(eqDz(schema.agreementSigners.tenantId, tenantId))
+            .groupBy(schema.agreementSigners.requestId);
+        const byReq = new Map(counts.map((r) => [r.requestId, r]));
+        const data = rows.map((r) => {
+            const c2 = byReq.get(r.id);
+            return {
+                ...r,
+                signersTotal: Number(c2?.total ?? 0),
+                signersSigned: Number(c2?.signed ?? 0),
+            };
+        });
+        return c.json({ success: true as const, data }, 200);
     })
     .openapi(getSigningRequestDetailRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -1627,6 +1838,111 @@ export const adminRoutes = createApiRouter()
             },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any;
+    })
+    // --- Track I-a Task 9 — per-signer admin endpoints --------------------
+    .openapi(listSignersRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { requestId } = c.req.valid('param');
+        const svc = c.var.services.agreement;
+        // Tenant scope: confirm the envelope belongs to this tenant (404 otherwise).
+        const env = await drizzle(c.env.DB, { schema }).select({ id: schema.agreementRequests.id })
+            .from(schema.agreementRequests)
+            .where(and(eqDz(schema.agreementRequests.id, requestId), eqDz(schema.agreementRequests.tenantId, tenantId)))
+            .get();
+        if (!env) throw Errors.NotFound('Signing request not found');
+        const signers = await svc.listSigners(tenantId, requestId);
+        // Map to the safe row shape — NEVER include tokenHash / tokenEnc.
+        const data = signers.map((s: typeof schema.agreementSigners.$inferSelect) => ({
+            id: s.id,
+            name: s.name,
+            email: s.email,
+            role: s.role,
+            status: s.status,
+            channel: s.channel ?? null,
+            signedAt: s.signedAt ? s.signedAt.getTime() : null,
+            viewedAt: s.viewedAt ? s.viewedAt.getTime() : null,
+            onBehalfOf: s.onBehalfOf ?? null,
+            lastRemindedAt: s.lastRemindedAt ? s.lastRemindedAt.getTime() : null,
+        }));
+        return c.json({ success: true as const, data }, 200);
+    })
+    .openapi(getSignerLinkRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { requestId, signerId } = c.req.valid('param');
+        const svc = c.var.services.agreement;
+        const db = drizzle(c.env.DB, { schema });
+        // Tenant scope on the signer row (tenantId + requestId both pinned).
+        const signer = await db.select({ id: schema.agreementSigners.id, requestId: schema.agreementSigners.requestId, inspectionId: schema.agreementRequests.inspectionId })
+            .from(schema.agreementSigners)
+            .innerJoin(schema.agreementRequests, eqDz(schema.agreementSigners.requestId, schema.agreementRequests.id))
+            .where(and(
+                eqDz(schema.agreementSigners.id, signerId),
+                eqDz(schema.agreementSigners.requestId, requestId),
+                eqDz(schema.agreementSigners.tenantId, tenantId),
+            ))
+            .get();
+        if (!signer) throw Errors.NotFound('Signer not found');
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const token = await svc.getSignerLink(requestId, signerId);
+        const url = await buildSignUrl(c, tenantId, signer.inspectionId, tenantSlug, token);
+        return c.json({ success: true as const, data: { url } }, 200);
+    })
+    .openapi(remindSignerRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { requestId, signerId } = c.req.valid('param');
+        const svc = c.var.services.agreement;
+        const db = drizzle(c.env.DB, { schema });
+        // Tenant scope + load the signer row (need status + lastRemindedAt + inspectionId).
+        const row = await db.select({
+            id: schema.agreementSigners.id,
+            name: schema.agreementSigners.name,
+            email: schema.agreementSigners.email,
+            status: schema.agreementSigners.status,
+            lastRemindedAt: schema.agreementSigners.lastRemindedAt,
+            inspectionId: schema.agreementRequests.inspectionId,
+        })
+            .from(schema.agreementSigners)
+            .innerJoin(schema.agreementRequests, eqDz(schema.agreementSigners.requestId, schema.agreementRequests.id))
+            .where(and(
+                eqDz(schema.agreementSigners.id, signerId),
+                eqDz(schema.agreementSigners.requestId, requestId),
+                eqDz(schema.agreementSigners.tenantId, tenantId),
+            ))
+            .get();
+        if (!row) throw Errors.NotFound('Signer not found');
+        // Terminal signers can't be reminded.
+        if (['signed', 'declined', 'expired'].includes(row.status)) {
+            throw Errors.Conflict('Signer is no longer awaiting signature');
+        }
+        // Rate limit: at most once per hour, measured against lastRemindedAt.
+        const now = Date.now();
+        if (row.lastRemindedAt && now - row.lastRemindedAt.getTime() < 3600_000) {
+            throw Errors.RateLimited('This signer was reminded within the last hour.');
+        }
+
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const token = await svc.getSignerLink(requestId, signerId);
+        const signUrl = await buildSignUrl(c, tenantId, row.inspectionId, tenantSlug, token);
+        const sigInspector = await lookupSenderSignature(c, tenantId);
+        await c.var.services.email.sendAgreementRequest(row.email, row.name, 'Agreement', signUrl, sigInspector, getBookingHost(c))
+            .catch((e: unknown) => logger.error('Failed to send agreement reminder', {}, e instanceof Error ? e : undefined));
+
+        await db.update(schema.agreementSigners).set({ lastRemindedAt: new Date(now) })
+            .where(eqDz(schema.agreementSigners.id, signerId));
+
+        try {
+            await c.var.services.auditLog.append(tenantId, requestId, 'request.reminded', {
+                envelopeId: requestId,
+                signerId,
+                recipientEmail: row.email,
+                tsMs: now,
+            });
+        } catch (e) {
+            logger.warn('audit.append.reminded.failed', { requestId, error: (e as Error).message });
+        }
+
+        auditFromContext(c, 'agreement.remind', 'agreement_request', { metadata: { requestId, signerId } });
+        return c.json({ success: true as const, data: { remindedAt: now } }, 200);
     })
     .openapi(listCommentsRoute, async (c) => {
         const tenantId = c.get('tenantId');

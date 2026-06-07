@@ -38,6 +38,7 @@ export type AuditAction =
     | 'agreement.update'
     | 'agreement.delete'
     | 'agreement.send'
+    | 'agreement.remind'
     | 'agreement.sent'
     | 'agreement.viewed'
     | 'agreement.declined'
