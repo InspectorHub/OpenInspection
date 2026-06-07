@@ -467,17 +467,9 @@ export default function CalendarPage() {
               <button onClick={() => setEventModalOpen(false)} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3">
                 Close
               </button>
-              {selectedEvent.url && (
+              {selectedEvent.id && (
                 <button
-                  onClick={() => { navigate(selectedEvent.url || `/inspections/${selectedEvent.id}/edit`); setEventModalOpen(false); }}
-                  className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
-                >
-                  Open Inspection
-                </button>
-              )}
-              {!selectedEvent.url && (
-                <button
-                  onClick={() => { navigate(`/inspections/${selectedEvent.id}/edit`); setEventModalOpen(false); }}
+                  onClick={() => { navigate(`/inspections/${selectedEvent.id}`); setEventModalOpen(false); }}
                   className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
                 >
                   Open Inspection

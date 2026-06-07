@@ -46,6 +46,15 @@ export function reportUrl(host: string, tenantSlug: string, inspectionId: string
     return joinUrl(host, `/report/${tenantSlug}/${inspectionId}`);
 }
 
+/**
+ * Public invoice payment page (Task 8 / #111). Unlike report/sign links this
+ * route is keyed only by inspection id (`/r/:id/invoice`) — the public payment
+ * page resolves the tenant itself — so no slug segment is required.
+ */
+export function paymentUrl(host: string, inspectionId: string): string {
+    return joinUrl(host, `/r/${inspectionId}/invoice`);
+}
+
 export function signUrl(host: string, tenantSlug: string, inspectionId: string): string {
     return joinUrl(host, `/sign/${tenantSlug}/${inspectionId}`);
 }

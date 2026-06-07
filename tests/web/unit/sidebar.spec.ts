@@ -8,13 +8,16 @@ describe('Sidebar', () => {
     expect(mod.MobileHeader).toBeDefined();
   });
 
-  it('WORKSPACE_ITEMS includes Reports and Team, not Marketplace', async () => {
+  it('WORKSPACE_ITEMS includes Team, not Reports or Marketplace', async () => {
     // Import the raw module source to verify the nav arrays.
     // We inspect the module text so we don't have to render the component.
     const src = await import('~/components/Sidebar?raw');
     const text = (src as unknown as { default: string }).default;
-    expect(text).toContain('"/reports"');
-    expect(text).toContain('"Reports"');
+    // #111: the standalone Reports page is retired — its nav item is removed and
+    // /reports now 301-redirects to the dashboard Published tab. The sidebar must
+    // no longer surface a Reports entry.
+    expect(text).not.toContain('"/reports"');
+    expect(text).not.toContain('"Reports"');
     expect(text).toContain('"/team"');
     expect(text).toContain('"Team"');
     // Marketplace must not appear in LIBRARY_ITEMS (defensive de-listing).

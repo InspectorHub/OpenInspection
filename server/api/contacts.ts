@@ -4,6 +4,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import {
     CreateContactSchema, UpdateContactSchema,
     ContactResponseSchema, ContactListQuerySchema,
+    ContactDetailResponseSchema,
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
@@ -21,6 +22,23 @@ const listContactsRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: "listContacts",
     description: "Auto-generated placeholder for listContacts (GET /, contacts domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['read'], tier: 'primary' }));
+
+const getContactDetailRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/{id}',
+    tags: ["contacts"], summary: "Contact detail: record + inspection history + stats",
+    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    request: { params: z.object({ id: z.string().min(1).describe('Contact identifier') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: ContactDetailResponseSchema } },
+            description: 'Contact detail payload',
+        },
+        404: { description: 'Contact not found in this tenant' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "getContactDetail",
+    description: "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
 }, { scopes: ['read'], tier: 'primary' }));
 
 const createContactRoute = createRoute(withMcpMetadata({
@@ -83,6 +101,13 @@ export const contactRoutes = createApiRouter()
         if (q.search) opts.search = q.search;
         const rows = await c.var.services.contact.listContacts(tenantId, opts);
         return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
+    })
+    .openapi(getContactDetailRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const detail = await c.var.services.contact.getContactDetail(id, tenantId);
+        if (!detail) return c.json({ success: false, error: { message: 'Contact not found', code: 'NOT_FOUND' } }, 404);
+        return c.json({ success: true as const, data: detail }, 200);
     })
     .openapi(createContactRoute, async (c) => {
         const tenantId = c.get('tenantId');

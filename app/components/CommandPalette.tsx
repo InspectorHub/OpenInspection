@@ -22,7 +22,7 @@ interface PaletteItem {
 
 const PAGES: PaletteItem[] = [
   { id: "p-dashboard", label: "Dashboard", group: "Pages", icon: "page", to: "/dashboard", hint: "G then I" },
-  { id: "p-reports", label: "Reports", group: "Pages", icon: "page", to: "/reports", hint: "G then R" },
+  { id: "p-reports", label: "Reports", group: "Pages", icon: "page", to: "/dashboard?workflow=published", hint: "G then R" },
   { id: "p-templates", label: "Templates", group: "Pages", icon: "page", to: "/templates", hint: "G then T" },
   { id: "p-marketplace", label: "Marketplace", group: "Pages", icon: "page", to: "/marketplace" },
   { id: "p-agreements", label: "Agreements", group: "Pages", icon: "page", to: "/agreements" },
@@ -204,7 +204,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
           group: "Recent Inspections",
           icon: "clip",
           hint: (insp.status as string) || "",
-          to: `/inspections/${insp.id}/edit`,
+          to: `/inspections/${insp.id}`,
         };
       });
       sources = [...PAGES, ...recents, ...SETTINGS, ...dynamicQuickActions];
