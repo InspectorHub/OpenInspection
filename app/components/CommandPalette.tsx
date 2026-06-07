@@ -204,7 +204,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
           group: "Recent Inspections",
           icon: "clip",
           hint: (insp.status as string) || "",
-          to: `/inspections/${insp.id}/edit`,
+          to: `/inspections/${insp.id}`,
         };
       });
       sources = [...PAGES, ...recents, ...SETTINGS, ...dynamicQuickActions];

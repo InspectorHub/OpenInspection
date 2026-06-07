@@ -720,7 +720,7 @@ export default function DashboardPage() {
           className="accent-ih-primary shrink-0"
         />
         <Link
-          to={`/inspections/${insp.id}/edit`}
+          to={`/inspections/${insp.id}`}
           className="flex items-center justify-between flex-1 min-w-0"
         >
           <div className="min-w-0">
@@ -776,8 +776,17 @@ export default function DashboardPage() {
             )}
           </div>
         </Link>
-        {/* Status transition dropdown (visible on hover) */}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {/* Hover actions: open editor + status transition (visible on hover) */}
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 flex items-center gap-1.5">
+          <Link
+            to={`/inspections/${insp.id}/edit`}
+            aria-label="Open editor"
+            title="Open editor"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+          >
+            <Icon name="edit" size={14} />
+          </Link>
           <select
             value={insp.status}
             onChange={(e) => transitionStatus(insp.id, e.target.value)}
