@@ -24,6 +24,7 @@ const PUBLIC_PREFIXES = [
     '/sign/',
     '/agreements/sign/',
     '/m2m/agreement-render/',
+    '/api/integrations/stripe/webhook/',
 ];
 
 export async function resolveByPathParam(c: Context<HonoConfig>, path: string): Promise<boolean> {
