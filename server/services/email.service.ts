@@ -327,6 +327,42 @@ export class EmailService {
     }
 
     /**
+     * Task 8 (Issue #111) — emails the client a request to pay their invoice,
+     * linking the public `/r/:id/invoice` payment page. Mirrors
+     * sendAgreementRequest: registry-driven render with a branded fallback and
+     * the inspector's rebooking signature (B-4) when host + inspector are given.
+     */
+    async sendInvoiceRequest(to: string, clientName: string | null, amountLabel: string, payUrl: string, inspector?: SignatureUser, host?: string) {
+        const name = escapeHtml(clientName || 'Client');
+        const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #4f46e5;">Payment Request</h2>
+                <p>Hi ${name},</p>
+                <p>Your invoice is ready. The amount due is:</p>
+                <p style="font-weight: bold; font-size: 20px; color: #1e293b;">${escapeHtml(amountLabel)}</p>
+                <div style="margin: 32px 0;">
+                    <a href="${payUrl}" style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">View &amp; Pay Invoice</a>
+                </div>
+                <p style="font-size: 14px; color: #64748b;">If the button doesn't work, copy and paste this link: ${payUrl}</p>
+                <p style="color: #64748b; font-size: 14px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                    Thank you,<br>${this.appName} Team
+                </p>
+            </div>`;
+        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const rendered = this.renderOr('payment-request', { clientName: clientName ?? 'Client', amount: amountLabel, payUrl }, {
+            subject: `Payment request: ${amountLabel}`,
+            html: appendSignature(fallbackBody, inspector, host),
+        }, signatureHtml ? { signatureHtml } : undefined);
+        if (!rendered.enabled) return;
+        await this.sendEmail(
+            [to],
+            rendered.subject,
+            rendered.html,
+            undefined,
+            { inspector },
+        );
+    }
+
+    /**
      * Phase T (T22): Send a notification email to the other party when a new message arrives.
      * Throttled per inspection per direction via TENANT_CACHE KV (5 min window).
      * recipient: 'client' = email client; 'inspector' = email inspector

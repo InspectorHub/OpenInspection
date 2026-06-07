@@ -117,6 +117,21 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return { ok: true, intent: "send-agreement" as const, error: undefined };
   }
 
+  if (intent === "request-payment") {
+    const res = await api.invoices["request-payment"].$post({
+      json: { inspectionId: id },
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return {
+        ok: false,
+        intent: "request-payment" as const,
+        error: err?.error?.message ?? "Could not request payment. Please try again.",
+      };
+    }
+    return { ok: true, intent: "request-payment" as const, error: undefined };
+  }
+
   return { ok: false, intent: undefined, error: "Unknown action." };
 }
 
@@ -164,12 +179,44 @@ export default function InspectionHubPage() {
     }
   }, [agreementModalOpen, sendAgreement.state, sendAgreement.data]);
 
+  // Request-payment modal — its own dedicated fetcher (B-17). Close on success;
+  // the loader revalidation refreshes the invoice block automatically.
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const requestPayment = useFetcher<typeof action>();
+  const requestingPayment = requestPayment.state !== "idle";
+  const paymentError =
+    requestPayment.data?.intent === "request-payment" && !requestPayment.data.ok
+      ? requestPayment.data.error
+      : undefined;
+  useEffect(() => {
+    if (
+      paymentModalOpen &&
+      requestPayment.state === "idle" &&
+      requestPayment.data?.intent === "request-payment" &&
+      requestPayment.data.ok
+    ) {
+      setPaymentModalOpen(false);
+    }
+  }, [paymentModalOpen, requestPayment.state, requestPayment.data]);
+
   // "View report" only makes sense once the report is shipped to the client.
   const reportShipped =
     inspection.status === "delivered" || inspection.status === "published";
 
   const servicesTotalCents = services.reduce((sum, s) => sum + s.priceCents, 0);
   const allAgents = [...people.buyerAgents, ...people.listingAgents];
+
+  // Invoice amount the SERVER will request — same money authority chain as the
+  // endpoint (invoice > Σ services > inspections.price). Drives the modal amount
+  // and the card's headline figure.
+  const invoiceAmountCents = getEffectivePriceCents({
+    invoiceAmountCents: hub.invoice?.amountCents ?? null,
+    serviceLines: services.map((s) => ({ priceSnapshot: s.priceCents })),
+    inspectionPriceCents: inspection.price,
+  });
+  const invoicePaid = hub.invoice?.status === "paid";
+  // "sent" and "partial" both mean the request has gone out — show resend + link.
+  const invoiceSent = hub.invoice?.status === "sent" || hub.invoice?.status === "partial";
 
   return (
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
@@ -351,18 +398,31 @@ export default function InspectionHubPage() {
         <Card className="p-5">
           <BlockHeading title="Invoice" pill={blocks.invoice} />
           <p className="text-[15px] font-medium text-ih-fg-1 mb-3">
-            {hub.invoice
-              ? formatCents(hub.invoice.amountCents)
-              : formatCents(
-                  getEffectivePriceCents({
-                    serviceLines: services.map((s) => ({ priceSnapshot: s.priceCents })),
-                    inspectionPriceCents: inspection.price,
-                  }),
-                )}
+            {formatCents(invoiceAmountCents)}
           </p>
-          <Button variant="secondary" size="sm" disabled title={DISABLED_TITLE}>
-            Request payment
-          </Button>
+          {invoicePaid ? (
+            // Paid is terminal — read-only (the pill already shows "Paid").
+            <p className="text-[12px] text-ih-fg-3">Payment received.</p>
+          ) : invoiceSent ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPaymentModalOpen(true)}
+              >
+                Resend request
+              </Button>
+              <CopyLinkButton url={`/r/${inspection.id}/invoice`} />
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPaymentModalOpen(true)}
+            >
+              Request payment
+            </Button>
+          )}
         </Card>
 
         {/* 6. Report ------------------------------------------------ */}
@@ -390,6 +450,19 @@ export default function InspectionHubPage() {
           submitting={sendingAgreement}
           error={agreementError}
           onClose={() => setAgreementModalOpen(false)}
+        />
+      )}
+
+      {/* Request-payment modal — custom (no window.confirm) */}
+      {paymentModalOpen && (
+        <RequestPaymentModal
+          recipientEmail={inspection.clientEmail ?? ""}
+          amountLabel={formatCents(invoiceAmountCents)}
+          resend={invoiceSent}
+          fetcher={requestPayment}
+          submitting={requestingPayment}
+          error={paymentError}
+          onClose={() => setPaymentModalOpen(false)}
         />
       )}
     </div>
@@ -495,6 +568,110 @@ function SendAgreementModal({
         </fetcher.Form>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Request-payment modal                                             */
+/* ------------------------------------------------------------------ */
+
+function RequestPaymentModal({
+  recipientEmail,
+  amountLabel,
+  resend,
+  fetcher,
+  submitting,
+  error,
+  onClose,
+}: {
+  recipientEmail: string;
+  amountLabel: string;
+  resend: boolean;
+  fetcher: ReturnType<typeof useFetcher<typeof action>>;
+  submitting: boolean;
+  error: string | undefined;
+  onClose: () => void;
+}) {
+  const title = resend ? "Resend payment request" : "Request payment";
+  const submitLabel = resend ? "Resend request" : "Send request";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
+      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col">
+        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
+          <h2 className="text-[14px] font-bold">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
+            aria-label="Close"
+          >
+            &#x2715;
+          </button>
+        </div>
+
+        <fetcher.Form method="post" className="flex flex-col">
+          <input type="hidden" name="intent" value="request-payment" />
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <p className="text-[12px] font-bold text-ih-fg-2 mb-1">Recipient</p>
+              <p className="text-[13px] text-ih-fg-1">
+                {recipientEmail || (
+                  <span className="text-ih-fg-4">No client email on this inspection</span>
+                )}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[12px] font-bold text-ih-fg-2 mb-1">Amount</p>
+              <p className="text-[18px] font-bold text-ih-fg-1 tabular-nums">{amountLabel}</p>
+            </div>
+
+            {error && (
+              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
+            )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !recipientEmail}
+              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+            >
+              {submitting ? "Sending…" : submitLabel}
+            </button>
+          </div>
+        </fetcher.Form>
+      </div>
+    </div>
+  );
+}
+
+/** Copies a public link to the clipboard with a transient "Copied" state. */
+function CopyLinkButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = () => {
+    const absolute =
+      typeof window !== "undefined" ? `${window.location.origin}${url}` : url;
+    void navigator.clipboard?.writeText(absolute).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted"
+    >
+      {copied ? "Copied!" : "Copy link"}
+    </button>
   );
 }
 

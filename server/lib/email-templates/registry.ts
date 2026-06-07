@@ -147,6 +147,27 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
   },
 
   {
+    trigger: 'payment-request',
+    name: 'Payment request',
+    category: 'client',
+    editable: true,
+    required: false,
+    brand: 'tenant',
+    defaultSubject: 'Payment request: {{amount}}',
+    blocks: [
+      { key: 'heading',  label: 'Heading', default: 'Payment Request',                                                                                multiline: false },
+      { key: 'body',     label: 'Body',    default: 'Hi {{clientName}}, your invoice is ready. The amount due is {{amount}}.',                          multiline: true  },
+      { key: 'ctaLabel', label: 'Button',  default: 'View & Pay Invoice',                                                                              multiline: false },
+    ],
+    variables: [
+      { name: 'clientName', desc: 'Client name' },
+      { name: 'amount',     desc: 'Amount due (formatted, e.g. $500.00)' },
+      { name: 'payUrl',     desc: 'Link to the public invoice payment page' },
+    ],
+    cta: { labelBlockKey: 'ctaLabel', urlVar: 'payUrl' },
+  },
+
+  {
     trigger: 'message-notification',
     name: 'New message',
     category: 'client',
