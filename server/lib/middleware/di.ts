@@ -175,7 +175,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.template = new TemplateService(c.env.DB);
                     break;
                 case 'agreement':
-                    target.agreement = new AgreementService(c.env.DB);
+                    target.agreement = new AgreementService(c.env.DB, {
+                        jwtSecret: c.env.JWT_SECRET,
+                        ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
+                    });
                     break;
                 case 'signingKey':
                     target.signingKey = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);

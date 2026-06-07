@@ -34,7 +34,7 @@ describe('AgreementService', () => {
         await setupSchema(fixture.sqlite);
         await seedBase(testDb);
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new AgreementService({} as D1Database);
+        svc = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
     });
 
     it('findOrCreate inserts a new pending agreement_request with token + sent_at', async () => {
@@ -56,42 +56,63 @@ describe('AgreementService', () => {
         expect(rows.length).toBe(1);
     });
 
-    it('markViewed transitions sent → viewed; idempotent on viewed', async () => {
+    // Track I-a: findOrCreate now returns a SIGNER token; the signer-level
+    // state machine drives the envelope aggregate. The legacy envelope-token
+    // markViewed/markSigned/markDeclined remain public (covered separately
+    // below via a direct envelope token).
+    it('markViewedBySigner transitions sent → viewed; idempotent on viewed', async () => {
         const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
-        const r1 = await svc.markViewed(token);
+        const r1 = await svc.markViewedBySigner(token);
         expect(r1?.inspectionId).toBe(INSP_ID);
         const after = await testDb.select().from(schema.agreementRequests).all();
         expect(after[0].status).toBe('viewed');
-        expect(after[0].viewedAt).toBeDefined();
         // Idempotent
-        const r2 = await svc.markViewed(token);
+        const r2 = await svc.markViewedBySigner(token);
         expect(r2?.inspectionId).toBe(INSP_ID);
     });
 
-    it('markSigned transitions viewed → signed', async () => {
+    it('markSignedBySigner transitions viewed → signed', async () => {
         const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
-        await svc.markViewed(token);
-        await svc.markSigned(token, 'data:image/png;base64,XXXX', Date.now());
+        await svc.markViewedBySigner(token);
+        const res = await svc.markSignedBySigner(token, 'data:image/png;base64,XXXX', { signedAtMs: Date.now(), channel: 'remote' });
+        expect(res.envelopeStatus).toBe('signed');
         const after = await testDb.select().from(schema.agreementRequests).all();
         expect(after[0].status).toBe('signed');
         expect(after[0].signatureBase64).toBe('data:image/png;base64,XXXX');
         expect(after[0].signedAt).toBeDefined();
     });
 
-    it('markDeclined transitions viewed → declined with reason', async () => {
+    it('markDeclinedBySigner transitions viewed → declined with reason', async () => {
         const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
-        await svc.markViewed(token);
-        await svc.markDeclined(token, 'Price too high');
+        await svc.markViewedBySigner(token);
+        await svc.markDeclinedBySigner(token, 'Price too high');
         const after = await testDb.select().from(schema.agreementRequests).all();
         expect(after[0].status).toBe('declined');
         // Reason is stored in last_error column (re-purposed for decline reason)
         expect(after[0].lastError).toBe('Price too high');
     });
 
-    it('markSigned on a declined token throws Conflict', async () => {
+    it('markSignedBySigner on a declined signer throws Conflict', async () => {
         const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
-        await svc.markDeclined(token);
-        await expect(svc.markSigned(token, 'sig', Date.now())).rejects.toThrow();
+        await svc.markDeclinedBySigner(token);
+        await expect(svc.markSignedBySigner(token, 'sig', { signedAtMs: Date.now(), channel: 'remote' })).rejects.toThrow();
+    });
+
+    it('legacy envelope-token markViewed/markSigned/markDeclined still work', async () => {
+        // Build a legacy single-signer envelope directly (plaintext envelope token).
+        const reqId = crypto.randomUUID();
+        const envToken = 'legacy-env-token-xyz';
+        await testDb.insert(schema.agreementRequests).values({
+            id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+            clientEmail: 'jane@test.com', clientName: 'Jane', token: envToken,
+            status: 'sent', completionPolicy: 'all', createdAt: new Date(),
+        });
+        const v = await svc.markViewed(envToken);
+        expect(v?.inspectionId).toBe(INSP_ID);
+        await svc.markSigned(envToken, 'siglegacy', Date.now());
+        const row = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, reqId)).get();
+        expect(row!.status).toBe('signed');
+        expect(row!.signatureBase64).toBe('siglegacy');
     });
 
     it('expireOlderThan marks pending/sent/viewed rows older than N days as expired', async () => {

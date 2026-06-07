@@ -16,6 +16,7 @@ export interface ScheduledEnv {
     APP_NAME?: string;
     APP_BASE_URL?: string;
     JWT_SECRET?: string;
+    JWT_SECRET_PREVIOUS?: string;
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
     QBO_WEBHOOK_SECRET?: string;
@@ -91,7 +92,10 @@ export async function scheduled(
 
     // 1. Agreement expiry (Spec 2A — was daily 02:00 UTC)
     try {
-        const agreementService = new AgreementService(env.DB);
+        const agreementService = new AgreementService(
+            env.DB,
+            env.JWT_SECRET ? { jwtSecret: env.JWT_SECRET, ...(env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: env.JWT_SECRET_PREVIOUS } : {}) } : undefined,
+        );
         const count = await agreementService.expireOlderThan(14);
         if (count > 0) logger.info('[cron] expired agreements', { count });
     } catch (e) {
