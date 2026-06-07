@@ -377,7 +377,10 @@ export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHub
  * template, email defaults to the inspection's clientEmail.
  */
 export const SendAgreementRequestSchema = z.object({
-  agreementId: z.string().uuid().optional().describe('Agreement template id; defaults to the tenant first agreement'),
+  // Plain non-empty string, NOT .uuid(): agreements.id is TEXT and the handler
+  // already 422s when the id doesn't resolve inside the tenant — a format gate
+  // would only reject legitimate non-UUID rows (e.g. imported/seeded data).
+  agreementId: z.string().min(1).optional().describe('Agreement template id; defaults to the tenant first agreement'),
   email: z.string().email().optional().describe('Recipient email; defaults to inspection.clientEmail'),
 }).openapi('SendAgreementRequest');
 
