@@ -9,7 +9,8 @@ import { auditFromContext } from '../lib/audit';
 import { safeISODate } from '../lib/date';
 import { getBaseUrl, getBookingHost } from '../lib/url';
 import { escapeLikePattern } from '../lib/db/like-escape';
-import { agreementSignUrl } from '../lib/public-urls';
+import { agreementSignUrl, checkoutUrl } from '../lib/public-urls';
+import { shouldUseCheckoutLink } from '../lib/agreement-link';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import {
@@ -1425,7 +1426,12 @@ export const adminRoutes = createApiRouter()
             ...(body.inspectionId !== undefined ? { inspectionId: body.inspectionId } : {}),
         });
         const tenantSlug = c.get('requestedTenantSlug') ?? '';
-        const signUrl = agreementSignUrl(getBookingHost(c), tenantSlug, request.token);
+        // Track I-a Task 8 — when the inspection requires payment AND has an
+        // outstanding (unpaid) invoice, point the recipient at the combined
+        // Sign & pay page; otherwise the standalone sign page.
+        const signUrl = (await shouldUseCheckoutLink(c.env.DB, tenantId, body.inspectionId))
+            ? checkoutUrl(getBookingHost(c), tenantSlug, request.token)
+            : agreementSignUrl(getBookingHost(c), tenantSlug, request.token);
 
         // Spec 5H D-patch — fetch the agreement HTML at send-time to compute its
         // content hash. This is the "what was the client agreed to" anchor for

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bookingUrl, inspectorProfileUrl, inspectorCalendarUrl, reportUrl, signUrl, agreementSignUrl, agreementSignPath, embedBookingUrl, embedBookingCompanyUrl, m2mAgreementRenderUrl } from '../../server/lib/public-urls';
+import { bookingUrl, inspectorProfileUrl, inspectorCalendarUrl, reportUrl, signUrl, agreementSignUrl, agreementSignPath, checkoutUrl, embedBookingUrl, embedBookingCompanyUrl, m2mAgreementRenderUrl } from '../../server/lib/public-urls';
 
 describe('public URL builders', () => {
     it('bookingUrl emits /book/<tenant>/<inspector>', () => {
@@ -19,6 +19,9 @@ describe('public URL builders', () => {
     });
     it('agreementSignPath emits relative path', () => {
         expect(agreementSignPath('acme', 'tok-xyz')).toBe('/agreements/sign/acme/tok-xyz');
+    });
+    it('checkoutUrl emits /checkout/<tenant>/<token>', () => {
+        expect(checkoutUrl('app.example.com', 'acme', 'tok-xyz')).toBe('https://app.example.com/checkout/acme/tok-xyz');
     });
     it('inspectorProfileUrl emits /inspector/<tenant>/<slug>', () => {
         expect(inspectorProfileUrl('app.example.com', 'acme', 'jane')).toBe('https://app.example.com/inspector/acme/jane');

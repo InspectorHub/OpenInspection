@@ -23,6 +23,7 @@ export default [
       "agreements/sign/:tenant/:token",
       "routes/public/agreement-sign.tsx",
     ),
+    route("checkout/:tenant/:token", "routes/public/checkout.tsx"),
     route("r/:id/invoice", "routes/public/invoice.tsx"),
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("verify", "routes/public/verify-offline.tsx"),

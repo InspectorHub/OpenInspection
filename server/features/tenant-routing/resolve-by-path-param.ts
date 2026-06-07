@@ -11,7 +11,7 @@ import type { HonoConfig } from '../../types/hono';
  *
  * Pattern: /<prefix>/<tenant>/...
  *   prefix ∈ {book, embed/book, inspector, report, sign,
- *             agreements/sign, m2m/agreement-render}
+ *             agreements/sign, checkout, m2m/agreement-render}
  *
  * Returns true if a tenant was extracted + resolved; false otherwise
  * (caller should then try slug → fixed → leave-unset).
@@ -23,6 +23,7 @@ const PUBLIC_PREFIXES = [
     '/report/',
     '/sign/',
     '/agreements/sign/',
+    '/checkout/',
     '/m2m/agreement-render/',
     '/api/integrations/stripe/webhook/',
 ];
