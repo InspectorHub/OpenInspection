@@ -4,6 +4,46 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { qrToSvg } from '../lib/qr';
+import { AgreementService } from '../services/agreement.service';
+
+/** Human-readable label for a signer role. */
+const roleLabel = (role: string | null | undefined): string => {
+  switch (role) {
+    case 'co_client': return 'Co-Client';
+    case 'agent': return 'Agent';
+    case 'other': return 'Signer';
+    case 'client':
+    default: return 'Client';
+  }
+};
+
+/**
+ * Renders a single signature cell for a signed signer (Track I-a). Includes the
+ * role label, signature image, signer name + timestamp, an in-person badge when
+ * the signature was captured in person, and an "on behalf of" line for an
+ * authorized agent.
+ */
+function signerCellHtml(
+  signer: typeof schema.agreementSigners.$inferSelect,
+  escapeHtml: (s: string) => string,
+): string {
+  const sig = signer.signatureBase64 ?? '';
+  const sigData = sig.startsWith('data:') ? sig : `data:image/png;base64,${sig}`;
+  const at = signer.signedAt ? escapeHtml(new Date(signer.signedAt).toUTCString()) : '';
+  const name = escapeHtml(signer.name || signer.email || 'Signer');
+  const inPerson = signer.channel === 'in_person'
+    ? `<span class="badge">Signed in person</span>`
+    : '';
+  const onBehalf = signer.onBehalfOf
+    ? `<div class="meta">Signed by ${name} on behalf of ${escapeHtml(signer.onBehalfOf)}</div>`
+    : '';
+  return `<div class="sig-cell">` +
+      `<div class="label">${escapeHtml(roleLabel(signer.role))}${inPerson}</div>` +
+      `<img src="${sigData}" alt="${name} signature">` +
+      `<div class="meta">${name} · ${at}</div>` +
+      onBehalf +
+  `</div>`;
+}
 
 const HTML_HEAD = `<!doctype html><html><head><meta charset="utf-8">
 <style>
@@ -16,6 +56,7 @@ const HTML_HEAD = `<!doctype html><html><head><meta charset="utf-8">
   .sig-cell img { max-width: 200px; max-height: 80px; background: #fafafa; padding: 4px; border: 1px solid #cbd5e1; }
   .sig-cell .meta { margin-top: 4px; font-size: 12px; color: #475569; }
   .sig-cell .label { font-weight: 600; margin-bottom: 8px; }
+  .sig-cell .badge { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #1e40af; background: #dbeafe; border-radius: 9999px; padding: 1px 8px; vertical-align: middle; }
   @media print { body { margin: 0; padding: 0; } }
 </style></head><body>`;
 const HTML_FOOT = `</body></html>`;
@@ -58,11 +99,38 @@ export async function agreementRenderHandler(
     .where(eq(schema.agreements.id, reqRow.agreementId)).get();
   if (!agreement) return new Response('Not Found', { status: 404 });
 
-  const clientName = reqRow.clientName ? escapeHtml(reqRow.clientName) : escapeHtml(reqRow.clientEmail);
-  const signedAt = reqRow.signedAt ? new Date(reqRow.signedAt).toUTCString() : '';
-  const sigData = reqRow.signatureBase64.startsWith('data:')
-    ? reqRow.signatureBase64
-    : `data:image/png;base64,${reqRow.signatureBase64}`;
+  // Track I-a — "what was signed" comes from the pinned content snapshot, never
+  // the live template. The service handles snapshot ?? live-template fallback
+  // (with self-heal) so the render path never drifts from the rest of the app.
+  const svc = new AgreementService(d1);
+  const { content: snapshotContent } = await svc.getSnapshotForRequest(reqRow);
+
+  // Track I-a — one signature block PER SIGNED SIGNER (name, role, timestamp,
+  // in-person badge, on-behalf-of line). Backward-compat: an envelope with zero
+  // signer rows but a legacy envelope-level signature falls back to a single
+  // Client block built from the envelope columns.
+  const signers = await db.select().from(schema.agreementSigners)
+    .where(eq(schema.agreementSigners.requestId, reqRow.id))
+    .orderBy(asc(schema.agreementSigners.createdAt))
+    .all();
+  const signedSigners = signers.filter((s) => s.status === 'signed' && s.signatureBase64);
+
+  let signerCellsHtml: string;
+  if (signedSigners.length > 0) {
+    signerCellsHtml = signedSigners.map((s) => signerCellHtml(s, escapeHtml)).join('');
+  } else {
+    // Legacy single-block fallback (pre-backfill envelopes with no signer rows).
+    const clientName = reqRow.clientName ? escapeHtml(reqRow.clientName) : escapeHtml(reqRow.clientEmail);
+    const signedAt = reqRow.signedAt ? new Date(reqRow.signedAt).toUTCString() : '';
+    const sigData = reqRow.signatureBase64.startsWith('data:')
+      ? reqRow.signatureBase64
+      : `data:image/png;base64,${reqRow.signatureBase64}`;
+    signerCellsHtml = `<div class="sig-cell">` +
+        `<div class="label">Client</div>` +
+        `<img src="${sigData}" alt="Client signature">` +
+        `<div class="meta">${clientName} · ${escapeHtml(signedAt)}</div>` +
+    `</div>`;
+  }
 
   const inspectorBlock = reqRow.inspectorSignatureBase64 ? (() => {
       const sig = reqRow.inspectorSignatureBase64!;
@@ -94,14 +162,10 @@ export async function agreementRenderHandler(
 
   const html = HTML_HEAD +
     `<h1>${escapeHtml(agreement.name)}</h1>` +
-    `<div class="body">${escapeHtml(agreement.content)}</div>` +
+    `<div class="body">${escapeHtml(snapshotContent)}</div>` +
     `<div class="sig-block">` +
       `<div class="sig-row">` +
-        `<div class="sig-cell">` +
-          `<div class="label">Client</div>` +
-          `<img src="${sigData}" alt="Client signature">` +
-          `<div class="meta">${clientName} · ${escapeHtml(signedAt)}</div>` +
-        `</div>` +
+        signerCellsHtml +
         inspectorBlock +
       `</div>` +
     `</div>` +
@@ -137,6 +201,24 @@ export async function certRenderHandler(
   const keyFingerprint = auditRows[0]?.keyFingerprint ?? 'unknown';
   const clientLabel = reqRow.clientName ?? reqRow.clientEmail;
 
+  // Track I-a — per-signer roster: who signed, in what role/channel, when, and
+  // on whose behalf. Falls back to the envelope-level client when no signer rows
+  // exist (legacy pre-backfill envelope).
+  const signers = await db.select().from(schema.agreementSigners)
+    .where(eq(schema.agreementSigners.requestId, reqRow.id))
+    .orderBy(asc(schema.agreementSigners.createdAt))
+    .all();
+  const signedSigners = signers.filter((s) => s.status === 'signed');
+  const signersHtml = signedSigners.length > 0
+    ? signedSigners.map((s) => {
+        const at = s.signedAt ? escapeHtml(new Date(s.signedAt).toUTCString()) : '';
+        const name = escapeHtml(s.name || s.email || 'Signer');
+        const inPerson = s.channel === 'in_person' ? ' · Signed in person' : '';
+        const onBehalf = s.onBehalfOf ? ` · on behalf of ${escapeHtml(s.onBehalfOf)}` : '';
+        return `<li>${escapeHtml(roleLabel(s.role))}: ${name}${inPerson}${onBehalf} · ${at}</li>`;
+      }).join('')
+    : `<li>Client: ${escapeHtml(clientLabel)}${reqRow.signedAt ? ` · ${escapeHtml(new Date(reqRow.signedAt).toUTCString())}` : ''}</li>`;
+
   const rowsHtml = auditRows.map((r) => `
     <tr>
       <td style="padding:4px 8px">${escapeHtml(new Date(r.createdAt).toUTCString())}</td>
@@ -163,7 +245,9 @@ export async function certRenderHandler(
     `<h1>Certificate of Completion</h1>` +
     `<p><strong>Document:</strong> Signed agreement for ${escapeHtml(clientLabel)}</p>` +
     `<p><strong>Envelope ID:</strong> <code>${escapeHtml(reqRow.id)}</code></p>` +
-    `<p><strong>Audit chain:</strong> ${auditRows.length} events · key <code>${escapeHtml(keyFingerprint)}</code></p>` +
+    `<p><strong>Signed by:</strong></p>` +
+    `<ul style="margin:4px 0 0 0;padding-left:20px">${signersHtml}</ul>` +
+    `<p style="margin-top:16px"><strong>Audit chain:</strong> ${auditRows.length} events · key <code>${escapeHtml(keyFingerprint)}</code></p>` +
     `<table style="width:100%;border-collapse:collapse;margin-top:16px;font-size:12px">` +
     `<thead><tr style="border-bottom:1px solid #cbd5e1;text-align:left">` +
       `<th style="padding:4px 8px">Time (UTC)</th>` +

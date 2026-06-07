@@ -270,6 +270,14 @@ const reportGateRoute = createRoute(withMcpMetadata({
 
 // Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
 // loadVerifyData; this is the base JSON route the verify page consumes.
+const VerifySignerSchema = z.object({
+    name: z.string(),
+    role: z.string(),
+    status: z.string(),
+    signedAt: z.string().nullable(),
+    channel: z.string().nullable(),
+});
+
 const VerifyResponseSchema = z.object({
     envelopeId: z.string(),
     documentTitle: z.string().nullable(),
@@ -280,6 +288,12 @@ const VerifyResponseSchema = z.object({
     keyFingerprint: z.string().nullable(),
     keyAlgorithm: z.string(),
     eventCount: z.number(),
+    // Track I-a — the pinned content snapshot ("what was signed") + its hash, and
+    // the per-signer roster (no emails — privacy). Snapshot is null on
+    // pre-feature envelopes signed before snapshots were introduced.
+    contentSnapshot: z.string().nullable(),
+    contentHash: z.string().nullable(),
+    signers: z.array(VerifySignerSchema),
 });
 
 const verifyRoute = createRoute(withMcpMetadata({
@@ -313,6 +327,15 @@ export const publicReportRoutes = createApiRouter()
                 keyFingerprint: data.pubKey?.fingerprint ?? null,
                 keyAlgorithm: 'Ed25519',
                 eventCount: data.auditRows.length,
+                contentSnapshot: data.reqRow.contentSnapshot ?? null,
+                contentHash: data.reqRow.contentHash ?? null,
+                signers: data.signers.map((s) => ({
+                    name: s.name,
+                    role: s.role,
+                    status: s.status,
+                    signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
+                    channel: s.channel ?? null,
+                })),
             },
         }, 200);
     })
