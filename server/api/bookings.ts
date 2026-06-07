@@ -224,7 +224,7 @@ const getCheckoutByTokenRoute = createRoute(withMcpMetadata({
                             invoice: z.object({
                                 id: z.string(),
                                 amountCents: z.number().int(),
-                                status: z.string(),
+                                status: z.enum(['paid', 'partial', 'unpaid']),
                             }).nullable().describe('Latest invoice for the inspection, or null'),
                             payment: z.object({
                                 required: z.boolean(),
@@ -851,6 +851,15 @@ export const bookingsRoutes = createApiRouter()
         if (!resolved) throw Errors.NotFound('Checkout not found');
         const { signer, envelope } = resolved;
 
+        // Checkout is always inspection-bound (sign + pay); an envelope without
+        // an inspection has no payment context to combine, so treat as not found.
+        if (!envelope.inspectionId) throw Errors.NotFound('Checkout not found');
+
+        // Mark this signer viewed (idempotent; rolls the envelope aggregate
+        // forward) — same as the standalone sign page, since opening checkout
+        // IS viewing the agreement.
+        await svc.markViewedBySigner(token);
+
         const db = drizzle(c.env.DB);
 
         // Pinned snapshot — never the live template.
@@ -869,30 +878,27 @@ export const bookingsRoutes = createApiRouter()
         const tenantId = envelope.tenantId;
         const inspectionId = envelope.inspectionId;
 
-        let inspectionRow:
-            | { id: string; propertyAddress: string | null; paymentRequired: boolean | null; paymentStatus: string | null }
-            | undefined;
-        let invoiceRow: { id: string; amountCents: number; paidAt: Date | null; partialPaidAt: Date | null } | undefined;
-        if (inspectionId) {
-            inspectionRow = await db.select({
-                id: inspections.id,
-                propertyAddress: inspections.propertyAddress,
-                paymentRequired: inspections.paymentRequired,
-                paymentStatus: inspections.paymentStatus,
-            }).from(inspections)
-                .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-                .get();
-            invoiceRow = await db.select({
-                id: invoices.id,
-                amountCents: invoices.amountCents,
-                paidAt: invoices.paidAt,
-                partialPaidAt: invoices.partialPaidAt,
-            }).from(invoices)
-                .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
-                .orderBy(desc(invoices.createdAt))
-                .limit(1)
-                .get();
-        }
+        const inspectionRow = await db.select({
+            id: inspections.id,
+            propertyAddress: inspections.propertyAddress,
+            paymentRequired: inspections.paymentRequired,
+            paymentStatus: inspections.paymentStatus,
+        }).from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        // Tenant-scoped read came back empty (deleted or cross-tenant) → not found.
+        if (!inspectionRow) throw Errors.NotFound('Checkout not found');
+
+        const invoiceRow = await db.select({
+            id: invoices.id,
+            amountCents: invoices.amountCents,
+            paidAt: invoices.paidAt,
+            partialPaidAt: invoices.partialPaidAt,
+        }).from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
+            .orderBy(desc(invoices.createdAt))
+            .limit(1)
+            .get();
 
         const branding = await db.select({ siteName: tenantConfigs.siteName, primaryColor: tenantConfigs.primaryColor })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
@@ -920,16 +926,16 @@ export const bookingsRoutes = createApiRouter()
                     completionPolicy: envelope.completionPolicy as 'all' | 'one',
                     progress: { signed: signedCount, total: signers.length },
                 },
-                invoice: invoiceRow
-                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, status: invoiceStatus as string }
+                invoice: invoiceRow && invoiceStatus
+                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, status: invoiceStatus }
                     : null,
                 payment: {
-                    required: inspectionRow?.paymentRequired === true,
-                    paid: inspectionRow?.paymentStatus === 'paid',
+                    required: inspectionRow.paymentRequired === true,
+                    paid: inspectionRow.paymentStatus === 'paid',
                 },
                 inspection: {
-                    id: inspectionRow?.id ?? (inspectionId ?? ''),
-                    propertyAddress: inspectionRow?.propertyAddress ?? null,
+                    id: inspectionRow.id,
+                    propertyAddress: inspectionRow.propertyAddress ?? null,
                 },
                 branding: {
                     companyName: branding?.siteName ?? 'OpenInspection',

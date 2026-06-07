@@ -191,4 +191,35 @@ describe('GET /api/public/checkout/:token (Track I-a Task 7)', () => {
         const res = await app.request('/checkout/nope-unknown-token', {}, FAKE_ENV, ctx);
         expect(res.status).toBe(404);
     });
+
+    it('marks the signer viewed (same as the standalone sign page)', async () => {
+        await seedBase(db);
+        const { token, signers } = await createEnvelope(db);
+        expect(signers[0].status).toBe('sent');
+
+        const { app } = buildApp(db);
+        const { ctx } = makeExecCtx();
+        const res = await app.request(`/checkout/${token}`, {}, FAKE_ENV, ctx);
+        expect(res.status).toBe(200);
+        const d = (await res.json() as any).data;
+        // The response itself reflects the post-view state…
+        expect(d.signer.status).toBe('viewed');
+        // …and it is persisted.
+        const after = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.id, signers[0].id)).get();
+        expect(after?.status).toBe('viewed');
+    });
+
+    it('envelope without an inspection -> 404 (checkout is always inspection-bound)', async () => {
+        await seedBase(db);
+        const { token, requestId } = await createEnvelope(db);
+        await db.update(schema.agreementRequests)
+            .set({ inspectionId: null })
+            .where(eq(schema.agreementRequests.id, requestId));
+
+        const { app } = buildApp(db);
+        const { ctx } = makeExecCtx();
+        const res = await app.request(`/checkout/${token}`, {}, FAKE_ENV, ctx);
+        expect(res.status).toBe(404);
+    });
 });
