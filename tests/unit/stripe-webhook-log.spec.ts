@@ -39,3 +39,23 @@ describe('stripe webhook rolling log', () => {
         expect((await readWebhookLog(kv, 't1'))).toHaveLength(1);
     });
 });
+
+describe('signature_failed eviction defense', () => {
+    it('sub-caps unverified failures so verified rows always survive', async () => {
+        const kv = makeKv();
+        // 10 genuine verified entries…
+        for (let i = 0; i < 10; i++) {
+            await appendWebhookLogEntry(kv, 't1', { eventType: `ok${i}`, result: 'processed' });
+        }
+        // …then an attacker spams 30 garbage POSTs (pre-verification failures).
+        for (let i = 0; i < 30; i++) {
+            await appendWebhookLogEntry(kv, 't1', { eventType: 'unknown', result: 'signature_failed' });
+        }
+        const log = await readWebhookLog(kv, 't1');
+        const failed = log.filter((e) => e.result === 'signature_failed');
+        const processed = log.filter((e) => e.result === 'processed');
+        expect(failed.length).toBeLessThanOrEqual(5);
+        expect(processed).toHaveLength(10); // none evicted
+        expect(log[0].result).toBe('signature_failed'); // newest still first
+    });
+});
