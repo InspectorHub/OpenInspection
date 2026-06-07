@@ -9,6 +9,8 @@ export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
+  // Issue #111 — read-only inspection hub ("where does this job stand?").
+  route("inspections/:id", "routes/inspection-hub.tsx"),
   // Full-screen editor (own chrome, no sidebar)
   route("inspections/:id/edit", "routes/inspection-edit.tsx"),
   route("templates/:id/edit", "routes/template-edit.tsx"),
