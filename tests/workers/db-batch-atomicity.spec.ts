@@ -10,6 +10,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/d1';
 import { syncInspectionAssignmentsBatch } from '../../server/lib/db/assignment-links';
 import { BookingService } from '../../server/services/booking.service';
+import { importContacts } from '../../server/services/contacts-import.service';
 
 interface TestBindings { DB: D1Database }
 const b = env as unknown as TestBindings;
@@ -82,6 +83,35 @@ describe('B-29 syncInspectionAssignmentsBatch — real D1 batch', () => {
         expect((await linkRows()).map(r => `${r.inspection_id}:${r.user_id}`)).toEqual([
             'i1:old-1', 'i2:old-2',
         ]);
+    });
+});
+
+describe('B-29+ importContacts phase 2 — real D1 bind limit', () => {
+    beforeAll(async () => {
+        // Full column list per schema/contact.ts — drizzle's multi-row insert
+        // binds every schema column, so the DDL must carry them all. The DB-9
+        // partial unique index is included for fidelity.
+        await b.DB.exec(
+            'CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, type TEXT NOT NULL DEFAULT \'client\', name TEXT NOT NULL, email TEXT, phone TEXT, agency TEXT, notes TEXT, created_by_user_id TEXT, created_at INTEGER NOT NULL, archived_at INTEGER);',
+        );
+        await b.DB.exec(
+            'CREATE UNIQUE INDEX IF NOT EXISTS uq_contacts_tenant_email ON contacts (tenant_id, email) WHERE email IS NOT NULL AND archived_at IS NULL;',
+        );
+    });
+    beforeEach(async () => {
+        await b.DB.exec('DELETE FROM contacts;');
+    });
+
+    it('imports 200 rows on real D1 — an unchunked VALUES list would blow the 100-bind cap', async () => {
+        const lines = Array.from({ length: 200 }, (_, i) => `Person ${i},p${i}@example.com`);
+        const csv = ['n,e', ...lines].join('\n');
+
+        const result = await importContacts(drizzle(b.DB), TENANT, csv, { name: 'n', email: 'e' });
+
+        expect(result.errors).toEqual([]);
+        expect(result.inserted).toBe(200);
+        const count = await b.DB.prepare('SELECT COUNT(*) AS n FROM contacts').first<{ n: number }>();
+        expect(count?.n).toBe(200);
     });
 });
 
