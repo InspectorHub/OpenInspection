@@ -169,6 +169,29 @@ export function deriveBlockStates(hub: HubPayload): BlockStates {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Publish affordance                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Statuses where the report is already shipped to the client — no publish CTA. */
+const PUBLISHED_STATUSES = new Set(['delivered', 'published', 'signed']);
+
+/**
+ * Task 9 (Issue #111) — whether the hub Report card should offer an ACTIVE
+ * "Publish report" button. True only when the report is publish-ready AND not
+ * already shipped. A non-ready report shows the disabled button + a blockers
+ * hint; an already-shipped report shows read-only state + the header View link.
+ */
+export function canPublish(hub: HubPayload): boolean {
+    if (PUBLISHED_STATUSES.has(hub.inspection.status)) return false;
+    return hub.publishReadiness.ready;
+}
+
+/** Whether the report has already been shipped to the client (read-only state). */
+export function isReportShipped(hub: HubPayload): boolean {
+    return PUBLISHED_STATUSES.has(hub.inspection.status);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Money formatting                                                   */
 /* ------------------------------------------------------------------ */
 

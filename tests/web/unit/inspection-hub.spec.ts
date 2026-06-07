@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveBlockStates, formatCents, type HubPayload } from '~/lib/hub-blocks';
+import { deriveBlockStates, formatCents, canPublish, isReportShipped, type HubPayload } from '~/lib/hub-blocks';
 
 /**
  * Issue #111 — pure block-state derivation for the `/inspections/:id` hub page.
@@ -165,6 +165,49 @@ describe('deriveBlockStates — report block', () => {
     it('cancelled status → defect / Cancelled', () => {
         const s = deriveBlockStates(hub({ inspection: { status: 'cancelled' } }));
         expect(s.report).toEqual({ tone: 'defect', label: 'Cancelled' });
+    });
+});
+
+describe('canPublish — report publish affordance (Task 9)', () => {
+    it('completed & ready → true (active publish CTA)', () => {
+        expect(canPublish(hub({
+            inspection: { status: 'completed' },
+            publishReadiness: { ready: true, blockingCount: 0 },
+        }))).toBe(true);
+    });
+
+    it('completed & NOT ready → false (disabled, blockers shown)', () => {
+        expect(canPublish(hub({
+            inspection: { status: 'completed' },
+            publishReadiness: { ready: false, blockingCount: 3 },
+        }))).toBe(false);
+    });
+
+    it('in-progress → false even with no blockers (nothing to publish yet)', () => {
+        expect(canPublish(hub({
+            inspection: { status: 'in_progress' },
+            publishReadiness: { ready: false, blockingCount: 0 },
+        }))).toBe(false);
+    });
+
+    it.each(['delivered', 'published', 'signed'])(
+        'already-shipped status %s → false (read-only, no CTA) even if ready',
+        (status) => {
+            expect(canPublish(hub({
+                inspection: { status },
+                publishReadiness: { ready: true, blockingCount: 0 },
+            }))).toBe(false);
+        },
+    );
+});
+
+describe('isReportShipped', () => {
+    it.each(['delivered', 'published', 'signed'])('%s → true', (status) => {
+        expect(isReportShipped(hub({ inspection: { status } }))).toBe(true);
+    });
+
+    it.each(['draft', 'in_progress', 'completed', 'cancelled'])('%s → false', (status) => {
+        expect(isReportShipped(hub({ inspection: { status } }))).toBe(false);
     });
 });
 

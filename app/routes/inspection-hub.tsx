@@ -4,7 +4,7 @@ import type { Route } from "./+types/inspection-hub";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { deriveBlockStates, formatCents, type HubPayload } from "~/lib/hub-blocks";
+import { deriveBlockStates, formatCents, canPublish, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
@@ -132,6 +132,32 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return { ok: true, intent: "request-payment" as const, error: undefined };
   }
 
+  if (intent === "publish") {
+    // theme: the editor's PublishModal posts no `theme`, so it rides the
+    // schema default ('modern'). We send the same value explicitly here —
+    // the hub deliberately renders NO theme picker (YAGNI), matching the
+    // editor's effective tenant default.
+    const res = await api.inspections[":id"].publish.$post({
+      param: { id },
+      json: {
+        theme: "modern",
+        notifyClient: formData.get("notifyClient") === "on",
+        notifyAgent: formData.get("notifyAgent") === "on",
+        requireSignature: formData.get("requireSignature") === "on",
+        requirePayment: formData.get("requirePayment") === "on",
+      },
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return {
+        ok: false,
+        intent: "publish" as const,
+        error: err?.error?.message ?? "Could not publish the report. Please try again.",
+      };
+    }
+    return { ok: true, intent: "publish" as const, error: undefined };
+  }
+
   return { ok: false, intent: undefined, error: "Unknown action." };
 }
 
@@ -146,8 +172,6 @@ function humanizeStatus(status: string): string {
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
     .join(" ");
 }
-
-const DISABLED_TITLE = "Coming soon in this release";
 
 /* ------------------------------------------------------------------ */
 /*  Page component                                                     */
@@ -199,9 +223,35 @@ export default function InspectionHubPage() {
     }
   }, [paymentModalOpen, requestPayment.state, requestPayment.data]);
 
+  // Publish modal — its own dedicated fetcher (B-17). Close on success; the
+  // loader revalidation flips the Report card to Published + reveals the
+  // header View report link automatically.
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const publish = useFetcher<typeof action>();
+  const publishing = publish.state !== "idle";
+  const publishError =
+    publish.data?.intent === "publish" && !publish.data.ok
+      ? publish.data.error
+      : undefined;
+  useEffect(() => {
+    if (
+      publishModalOpen &&
+      publish.state === "idle" &&
+      publish.data?.intent === "publish" &&
+      publish.data.ok
+    ) {
+      setPublishModalOpen(false);
+    }
+  }, [publishModalOpen, publish.state, publish.data]);
+
   // "View report" only makes sense once the report is shipped to the client.
   const reportShipped =
     inspection.status === "delivered" || inspection.status === "published";
+
+  // Report card affordance (Task 9): active publish CTA vs disabled-with-blockers
+  // vs read-only-shipped.
+  const reportPublished = isReportShipped(hub);
+  const publishReady = canPublish(hub);
 
   const servicesTotalCents = services.reduce((sum, s) => sum + s.priceCents, 0);
   const allAgents = [...people.buyerAgents, ...people.listingAgents];
@@ -428,16 +478,51 @@ export default function InspectionHubPage() {
         {/* 6. Report ------------------------------------------------ */}
         <Card className="p-5">
           <BlockHeading title="Report" pill={blocks.report} />
-          <p className="text-[12px] text-ih-fg-3 mb-3">
-            {inspection.status === "completed" && !hub.publishReadiness.ready
-              ? `${hub.publishReadiness.blockingCount} field(s) must be filled before publishing.`
-              : hub.publishReadiness.ready
-                ? "All required fields are complete."
-                : "Report is still in progress."}
-          </p>
-          <Button variant="secondary" size="sm" disabled title={DISABLED_TITLE}>
-            Publish report
-          </Button>
+          {reportPublished ? (
+            // Already shipped — read-only. The header "View report" link covers
+            // viewing; no publish button here.
+            <p className="text-[12px] text-ih-fg-3">
+              Report delivered to the client.
+            </p>
+          ) : publishReady ? (
+            <>
+              <p className="text-[12px] text-ih-fg-3 mb-3">
+                All required fields are complete.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPublishModalOpen(true)}
+              >
+                Publish report
+              </Button>
+            </>
+          ) : !hub.publishReadiness.ready ? (
+            <>
+              <p className="text-[12px] text-ih-fg-3 mb-3">
+                {hub.publishReadiness.blockingCount} blocker(s) to resolve before publishing
+              </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled
+                  title="Resolve blockers first"
+                >
+                  Publish report
+                </Button>
+                <Link
+                  to={`/inspections/${inspection.id}/edit`}
+                  className="text-[12px] font-bold text-ih-primary hover:underline"
+                >
+                  Resolve in editor
+                </Link>
+              </div>
+            </>
+          ) : (
+            // Pre-completion (in progress) — nothing to publish yet.
+            <p className="text-[12px] text-ih-fg-3">Report is still in progress.</p>
+          )}
         </Card>
       </div>
 
@@ -463,6 +548,18 @@ export default function InspectionHubPage() {
           submitting={requestingPayment}
           error={paymentError}
           onClose={() => setPaymentModalOpen(false)}
+        />
+      )}
+
+      {/* Publish modal — custom (no window.confirm) */}
+      {publishModalOpen && (
+        <PublishReportModal
+          agreementRequired={inspection.agreementRequired}
+          paymentRequired={inspection.paymentRequired}
+          fetcher={publish}
+          submitting={publishing}
+          error={publishError}
+          onClose={() => setPublishModalOpen(false)}
         />
       )}
     </div>
@@ -650,6 +747,112 @@ function RequestPaymentModal({
         </fetcher.Form>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Publish-report modal                                              */
+/* ------------------------------------------------------------------ */
+
+function PublishReportModal({
+  agreementRequired,
+  paymentRequired,
+  fetcher,
+  submitting,
+  error,
+  onClose,
+}: {
+  agreementRequired: boolean;
+  paymentRequired: boolean;
+  fetcher: ReturnType<typeof useFetcher<typeof action>>;
+  submitting: boolean;
+  error: string | undefined;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
+      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col">
+        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
+          <h2 className="text-[14px] font-bold">Publish report</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
+            aria-label="Close"
+          >
+            &#x2715;
+          </button>
+        </div>
+
+        <fetcher.Form method="post" className="flex flex-col">
+          <input type="hidden" name="intent" value="publish" />
+          {/* No theme picker — rides the editor's effective default (server
+              'modern'); the action sends theme:"modern" explicitly. */}
+          <div className="px-5 py-4 space-y-3">
+            <ToggleRow
+              name="notifyClient"
+              label="Notify client by email"
+              defaultChecked
+            />
+            <ToggleRow name="notifyAgent" label="Notify agent" defaultChecked={false} />
+            <ToggleRow
+              name="requireSignature"
+              label="Require signature before viewing"
+              defaultChecked={agreementRequired}
+            />
+            <ToggleRow
+              name="requirePayment"
+              label="Require payment before viewing"
+              defaultChecked={paymentRequired}
+            />
+
+            {error && (
+              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
+            )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+            >
+              {submitting ? "Publishing…" : "Publish report"}
+            </button>
+          </div>
+        </fetcher.Form>
+      </div>
+    </div>
+  );
+}
+
+/** A labeled checkbox row for the publish modal toggles (DS tokens). */
+function ToggleRow({
+  name,
+  label,
+  defaultChecked,
+}: {
+  name: string;
+  label: string;
+  defaultChecked: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-2.5 text-[13px] text-ih-fg-1 cursor-pointer">
+      <input
+        type="checkbox"
+        name={name}
+        defaultChecked={defaultChecked}
+        className="rounded border-ih-border text-ih-primary focus:ring-ih-primary"
+      />
+      <span>{label}</span>
+    </label>
   );
 }
 
