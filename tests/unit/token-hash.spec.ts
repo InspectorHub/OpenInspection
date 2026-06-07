@@ -47,6 +47,19 @@ describe('token-hash', () => {
         expect(upgradeArgs![1]).toBe(await hashToken('tok'));
     });
 
+    it('resolveTokenRow: byHash returning undefined falls through to byPlaintext', async () => {
+        const row = { id: 'r1' };
+        let upgraded = false;
+        const out = await resolveTokenRow({
+            presented: 'tok',
+            byHash: async () => undefined,
+            byPlaintext: async () => row,
+            upgrade: async () => { upgraded = true; },
+        });
+        expect(out).toBe(row);
+        expect(upgraded).toBe(true);
+    });
+
     it('resolveTokenRow: miss everywhere returns null; upgrade errors are swallowed', async () => {
         expect(await resolveTokenRow({
             presented: 'tok', byHash: async () => null, byPlaintext: async () => null, upgrade: async () => {},

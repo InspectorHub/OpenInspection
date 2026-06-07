@@ -18,4 +18,8 @@ describe('config-crypto sealToken/openToken', () => {
         expect(await openToken(enc, 'tenant-1', 'new-secret', 'old-secret')).toBe('my-token');
         await expect(openToken(enc, 'tenant-1', 'new-secret')).rejects.toThrow();
     });
+
+    it('rejects malformed base64 in the ciphertext segment', async () => {
+        await expect(openToken('t1:!!!:abc', 'tenant-1', 'secret')).rejects.toThrow();
+    });
 });

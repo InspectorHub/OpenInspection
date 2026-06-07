@@ -9,12 +9,15 @@
  * secrets read path in config-crypto).
  */
 import { logger } from './logger';
+import { generateRandomToken } from './random-token';
 
+/**
+ * Mint a new opaque capability token. Delegates to the canonical
+ * `generateRandomToken` generator (32 bytes of crypto-random entropy →
+ * base64url, ~43 chars, no padding).
+ */
 export function mintToken(): string {
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
-    let bin = '';
-    for (const b of bytes) bin += String.fromCharCode(b);
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return generateRandomToken();
 }
 
 export async function hashToken(token: string): Promise<string> {
@@ -27,22 +30,29 @@ export function deadTokenSentinel(rowId: string): string {
     return `x:${rowId}`;
 }
 
-export async function resolveTokenRow<T>(opts: {
+export async function resolveTokenRow<T extends object>(opts: {
     presented: string;
     byHash: (hash: string) => Promise<T | null | undefined>;
     byPlaintext: (token: string) => Promise<T | null | undefined>;
-    /** Persist token_hash (+ token_enc for tier 2) and clear the plaintext. Failures are logged, never thrown. */
+    /**
+     * Persist token_hash (+ token_enc for tier 2) and clear the plaintext.
+     * Failures are logged, never thrown.
+     *
+     * For tier-2 families the caller closes over the presented plaintext to
+     * also seal token_enc:
+     *   upgrade: (row, hash) => db.update(...).set({ tokenHash: hash, tokenEnc: await sealToken(presented, ...) })
+     */
     upgrade: (row: T, hash: string) => Promise<void>;
 }): Promise<T | null> {
     const hash = await hashToken(opts.presented);
     const byHash = await opts.byHash(hash);
-    if (byHash) return byHash;
+    if (byHash != null) return byHash;
     const legacy = await opts.byPlaintext(opts.presented);
-    if (!legacy) return null;
+    if (legacy == null) return null;
     try {
         await opts.upgrade(legacy, hash);
     } catch (e) {
-        logger.warn('token-hash.lazy-upgrade.failed', { error: (e as Error).message });
+        logger.warn('token-hash.lazy-upgrade.failed', { error: e instanceof Error ? e.message : String(e) });
     }
     return legacy;
 }
