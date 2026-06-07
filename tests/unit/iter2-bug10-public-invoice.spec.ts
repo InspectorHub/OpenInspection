@@ -127,3 +127,51 @@ describe('iter-2 #10 — InvoiceService.findByInspectionId', () => {
         expect(result).toBeNull();
     });
 });
+
+describe('markPaid idempotency', () => {
+    let svc: InvoiceService;
+    let testDb: BetterSQLite3Database<typeof schema>;
+    let sqlite: { close: () => void };
+
+    const INV_ID = '00000000-0000-0000-0000-000000000300';
+    const INSP_C = '00000000-0000-0000-0000-000000000020';
+
+    beforeEach(async () => {
+        const fixture = createTestDb();
+        testDb = fixture.db;
+        sqlite = fixture.sqlite;
+        await setupSchema(fixture.sqlite);
+        // Seed tenant + inspection + invoice
+        await testDb.insert(schema.tenants).values({
+            id: TENANT_A, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspections).values({
+            id: INSP_C, tenantId: TENANT_A, propertyAddress: '3 Test St', clientName: 'Eve', clientEmail: 'eve@test.com',
+            date: '2026-06-07', status: 'draft', paymentStatus: 'unpaid', price: 10000,
+            agreementRequired: false, paymentRequired: true, createdAt: new Date(),
+        });
+        await testDb.insert(schema.invoices).values({
+            id: INV_ID, tenantId: TENANT_A, inspectionId: INSP_C,
+            clientName: 'Eve', clientEmail: 'eve@test.com', amountCents: 10000,
+            lineItems: [], createdAt: new Date(),
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mockDrizzle as any).mockReturnValue(testDb);
+        svc = new InvoiceService({} as D1Database);
+    });
+
+    afterEach(() => {
+        sqlite.close();
+        vi.clearAllMocks();
+    });
+
+    it('re-marking an already-paid invoice is a no-op (paidAt unchanged)', async () => {
+        await svc.markPaid(INV_ID, TENANT_A, 'oi', 'card');
+        const first = await svc.findByInspectionId(TENANT_A, INSP_C);
+        // timestamp mode is second-granularity — wait >1s so a second new Date() would differ
+        await new Promise(r => setTimeout(r, 1100));
+        await svc.markPaid(INV_ID, TENANT_A, 'oi', 'card');
+        const second = await svc.findByInspectionId(TENANT_A, INSP_C);
+        expect(second!.paidAt).toEqual(first!.paidAt);
+    });
+});
