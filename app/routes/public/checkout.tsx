@@ -106,7 +106,12 @@ export default function CheckoutPage() {
     const [signedNow, setSignedNow] = useState(false);
 
     const effectiveSignerStatus: SignerStatus = signedNow ? "signed" : checkout.signer.status;
-    const effectiveProgress = signedNow && checkout.envelope.progress.signed < checkout.envelope.progress.total
+    // Only bump progress while the server hasn't reflected our sign yet —
+    // after revalidation signer.status is 'signed' and the server count is
+    // authoritative (bumping again would double-count in multi-signer envelopes).
+    const effectiveProgress = signedNow
+        && checkout.signer.status !== "signed"
+        && checkout.envelope.progress.signed < checkout.envelope.progress.total
         ? { ...checkout.envelope.progress, signed: checkout.envelope.progress.signed + 1 }
         : checkout.envelope.progress;
 
@@ -392,6 +397,8 @@ function SignCard({
                     >
                         <canvas
                             ref={canvasRef}
+                            role="img"
+                            aria-label="Signature pad — draw your signature here"
                             width={580}
                             height={180}
                             className="w-full cursor-crosshair block"

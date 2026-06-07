@@ -306,6 +306,8 @@ export default function AgreementSignPage() {
                             <div className="border-2 border-ih-border rounded-2xl overflow-hidden bg-ih-bg-app mb-2" style={{ touchAction: "none" }}>
                                 <canvas
                                     ref={canvasRef}
+                                    role="img"
+                                    aria-label="Signature pad — draw your signature here"
                                     width={580}
                                     height={180}
                                     className="w-full cursor-crosshair block"
