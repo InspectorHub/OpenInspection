@@ -282,7 +282,6 @@ const VerifyResponseSchema = z.object({
     envelopeId: z.string(),
     documentTitle: z.string().nullable(),
     clientName: z.string().nullable(),
-    clientEmail: z.string().nullable(),
     chainValid: z.boolean(),
     chainReason: z.string().nullable(),
     keyFingerprint: z.string().nullable(),
@@ -321,7 +320,8 @@ export const publicReportRoutes = createApiRouter()
                 envelopeId,
                 documentTitle: data.agreement?.name ?? null,
                 clientName: data.reqRow.clientName,
-                clientEmail: data.reqRow.clientEmail,
+                // clientEmail deliberately NOT exposed — this is a public, no-auth
+                // endpoint; the signer roster below is email-free for the same reason.
                 chainValid: data.verify.valid,
                 chainReason: data.verify.valid ? null : (data.verify.reason as string),
                 keyFingerprint: data.pubKey?.fingerprint ?? null,
