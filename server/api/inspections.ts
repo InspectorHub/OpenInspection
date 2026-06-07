@@ -25,6 +25,7 @@ import {
     PublishInspectionSchema,
     InspectionRecipientsResponseSchema,
     InspectionPeopleResponseSchema,
+    InspectionHubResponseSchema,
     ReportDataResponseSchema,
     CancelInspectionSchema,
     DashboardResponseSchema,
@@ -50,7 +51,7 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors, tenants } from '../lib/db/schema';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
@@ -1393,6 +1394,33 @@ const peopleRoute = createRoute(withMcpMetadata({
 
 
 /**
+ * GET /api/inspections/:id/hub
+ *
+ * Issue #111 — single aggregate payload powering the `/inspections/:id` hub
+ * page. One round trip drives all six blocks (People / Schedule / Services /
+ * Agreement / Invoice / Report status). 404 when the inspection does not exist
+ * or belongs to another tenant.
+ */
+const hubRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/{id}/hub',
+    tags: ['inspections'],
+    summary: 'Aggregate hub payload (people, schedule, services, agreement, invoice, report status)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string().min(1).describe('Inspection identifier') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: InspectionHubResponseSchema } },
+            description: 'Inspection hub payload',
+        },
+        404: { description: 'Inspection not found in this tenant' },
+    },
+    operationId: 'getInspectionHub',
+    description: 'Returns one aggregate payload for the inspection hub page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection\'s agreement requests, the most recent invoice, and the publish-readiness summary.',
+}, { scopes: ['read'], tier: 'extended' }));
+
+
+/**
  * POST /api/inspections/:id/publish
  */
 const publishRoute = createRoute(withMcpMetadata({
@@ -2567,6 +2595,27 @@ export const inspectionsRoutes = createApiRouter()
         const { id }   = c.req.valid('param');
         const card     = await c.var.services.inspection.getPeopleCard(id, tenantId);
         return c.json({ success: true, data: card }, 200);
+    })
+    .openapi(hubRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id }   = c.req.valid('param');
+
+        // Tenant slug for building /report/:tenantSlug/:id links. Public/standalone
+        // paths set requestedTenantSlug via tenant routing; saas AUTHENTICATED
+        // requests resolve the tenant from the JWT and never set it — fall back
+        // to a tenants.slug lookup by the verified tenantId.
+        let tenantSlug = c.get('requestedTenantSlug') ?? '';
+        if (!tenantSlug) {
+            const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+                .from(tenants)
+                .where(eq(tenants.id, tenantId))
+                .get();
+            tenantSlug = row?.slug ?? '';
+        }
+
+        const data = await c.var.services.inspection.getInspectionHub(id, tenantId, tenantSlug);
+        if (!data) return c.json({ success: false, error: 'Inspection not found' }, 404);
+        return c.json({ success: true, data }, 200);
     })
     .openapi(publishRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;

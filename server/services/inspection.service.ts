@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, inspectionAgreements, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests, agreements } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
@@ -21,6 +21,7 @@ import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
+import { InvoiceService } from './invoice.service';
 import type { DefectCommentState } from '../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 
@@ -2138,6 +2139,165 @@ export class InspectionService {
             scheduledDate: insp.date ?? null,
             amountCents,
             currency: amountCents != null ? 'USD' : null,
+        };
+    }
+
+    /**
+     * Issue #111 — single aggregate payload for the `/inspections/:id` hub page.
+     * The page loader makes ONE round trip and renders six blocks (People,
+     * Schedule, Services, Agreement, Invoice, Report status) from this result.
+     *
+     * Composition only — every block reuses an existing, already-tenant-scoped
+     * primitive so the hub never re-derives logic that lives elsewhere:
+     *   - `people`            → getPeopleCard (inspector/client/agents)
+     *   - `publishReadiness`  → computePublishReadiness (report-status gate)
+     *   - `invoice`           → InvoiceService.findByInspectionId (+ its getStatus)
+     *
+     * Returns `null` when the inspection does not exist OR belongs to another
+     * tenant; the route turns that into a 404. Every direct query filters by
+     * tenantId. `tenantSlug` is passed through verbatim for building
+     * `/report/:tenantSlug/:id` style links on the page.
+     */
+    async getInspectionHub(inspectionId: string, tenantId: string, tenantSlug: string): Promise<{
+        inspection: {
+            id: string;
+            propertyAddress: string;
+            clientName: string | null;
+            clientEmail: string | null;
+            clientPhone: string | null;
+            clientContactId: string | null;
+            status: string;
+            date: string | null;
+            inspectorId: string | null;
+            templateId: string | null;
+            price: number;
+            paymentStatus: string;
+            paymentRequired: boolean;
+            agreementRequired: boolean;
+            coverPhoto: string | null;
+            referredByAgentId: string | null;
+            sellingAgentId: string | null;
+            createdAt: string | null;
+        };
+        tenantSlug: string;
+        people: Awaited<ReturnType<InspectionService['getPeopleCard']>>;
+        services: Array<{ id: string; name: string; priceCents: number }>;
+        agreements: Array<{ id: string; name: string }>;
+        agreementRequests: Array<{
+            id: string;
+            status: string;
+            clientEmail: string;
+            signedAt: string | null;
+            createdAt: string | null;
+        }>;
+        invoice: { id: string; status: string; amountCents: number; sentAt: string | null; paidAt: string | null } | null;
+        publishReadiness: { ready: boolean; blockingCount: number };
+    } | null> {
+        const db = this.getDrizzle();
+
+        // Authority row — gate on existence + tenant ownership first.
+        const insp = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!insp) return null;
+
+        // Service lines — effective price = priceOverride ?? priceSnapshot
+        // (P-4 authority chain, tier 2). Tenant-scoped on both columns.
+        const serviceRows = await db.select({
+            id:            inspectionServices.id,
+            nameSnapshot:  inspectionServices.nameSnapshot,
+            priceSnapshot: inspectionServices.priceSnapshot,
+            priceOverride: inspectionServices.priceOverride,
+        }).from(inspectionServices)
+            .where(and(
+                eq(inspectionServices.tenantId, tenantId),
+                eq(inspectionServices.inspectionId, inspectionId),
+            ))
+            .all();
+
+        // Tenant's agreement templates — drives a "send agreement" dropdown later.
+        const agreementRows = await db.select({ id: agreements.id, name: agreements.name })
+            .from(agreements)
+            .where(eq(agreements.tenantId, tenantId))
+            .orderBy(desc(agreements.createdAt))
+            .all();
+
+        // Agreement requests for this inspection, newest first.
+        const requestRows = await db.select({
+            id:          agreementRequests.id,
+            status:      agreementRequests.status,
+            clientEmail: agreementRequests.clientEmail,
+            signedAt:    agreementRequests.signedAt,
+            createdAt:   agreementRequests.createdAt,
+        }).from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.tenantId, tenantId),
+                eq(agreementRequests.inspectionId, inspectionId),
+            ))
+            .orderBy(desc(agreementRequests.createdAt))
+            .all();
+
+        // Reused primitives. getPeopleCard/computePublishReadiness throw NotFound
+        // when the row is absent — but we already confirmed it exists above, so
+        // they resolve. InvoiceService is constructed inline (it takes only a
+        // D1Database, same handle this service holds) per the DI guidance: no
+        // constructor-chain redesign, just compose the read.
+        const invoiceSvc = new InvoiceService(this.db);
+        const [people, readiness, invoice] = await Promise.all([
+            this.getPeopleCard(inspectionId, tenantId),
+            this.computePublishReadiness(inspectionId, tenantId),
+            invoiceSvc.findByInspectionId(tenantId, inspectionId),
+        ]);
+
+        return {
+            inspection: {
+                id:                insp.id,
+                propertyAddress:   insp.propertyAddress,
+                clientName:        insp.clientName ?? null,
+                clientEmail:       insp.clientEmail ?? null,
+                clientPhone:       insp.clientPhone ?? null,
+                clientContactId:   insp.clientContactId ?? null,
+                status:            insp.status,
+                date:              insp.date ?? null,
+                inspectorId:       insp.inspectorId ?? null,
+                templateId:        insp.templateId ?? null,
+                price:             insp.price,
+                paymentStatus:     insp.paymentStatus,
+                paymentRequired:   insp.paymentRequired === true,
+                agreementRequired: insp.agreementRequired === true,
+                coverPhoto:        insp.coverPhotoId ?? null,
+                referredByAgentId: insp.referredByAgentId ?? null,
+                sellingAgentId:    insp.sellingAgentId ?? null,
+                createdAt:         safeISODate(insp.createdAt),
+            },
+            tenantSlug,
+            people,
+            services: serviceRows.map(s => ({
+                id:        s.id,
+                name:      s.nameSnapshot,
+                priceCents: s.priceOverride ?? s.priceSnapshot,
+            })),
+            agreements: agreementRows.map(a => ({ id: a.id, name: a.name })),
+            agreementRequests: requestRows.map(r => ({
+                id:          r.id,
+                status:      r.status,
+                clientEmail: r.clientEmail,
+                signedAt:    r.signedAt ? safeISODate(r.signedAt) : null,
+                createdAt:   safeISODate(r.createdAt),
+            })),
+            invoice: invoice
+                ? {
+                    id:         invoice.id,
+                    status:     invoice.status,
+                    amountCents: invoice.amountCents,
+                    sentAt:     invoice.sentAt,
+                    paidAt:     invoice.paidAt,
+                }
+                : null,
+            publishReadiness: {
+                ready:         readiness.ready,
+                blockingCount: readiness.blockingDefects.length,
+            },
         };
     }
 
