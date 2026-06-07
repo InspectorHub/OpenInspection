@@ -83,14 +83,14 @@ async function deriveKek(jwtSecret: string): Promise<CryptoKey> {
     );
 }
 
-function aad(tenantId: string): Uint8Array {
+function aad(tenantId: string): Uint8Array<ArrayBuffer> {
     const bytes = new TextEncoder().encode(tenantId);
     const buf = new ArrayBuffer(bytes.length);
     new Uint8Array(buf).set(bytes);
     return new Uint8Array(buf);
 }
 
-function randomBytes(n: number): Uint8Array {
+function randomBytes(n: number): Uint8Array<ArrayBuffer> {
     const arr = new Uint8Array(new ArrayBuffer(n));
     crypto.getRandomValues(arr);
     return arr;
@@ -100,8 +100,12 @@ function randomBytes(n: number): Uint8Array {
 export async function wrapDek(dek: Uint8Array, tenantId: string, jwtSecret: string): Promise<string> {
     const kek = await deriveKek(jwtSecret);
     const iv = randomBytes(12);
+    // Copy onto an explicit ArrayBuffer — SubtleCrypto's BufferSource typing
+    // rejects ArrayBufferLike-backed views under the app tsconfig.
+    const dekBuf = new ArrayBuffer(dek.length);
+    new Uint8Array(dekBuf).set(dek);
     const wrapped = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv, additionalData: aad(tenantId) }, kek, dek,
+        { name: 'AES-GCM', iv, additionalData: aad(tenantId) }, kek, dekBuf,
     );
     return `k1:${toB64(iv)}:${toB64(wrapped)}`;
 }
