@@ -1,5 +1,5 @@
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import {
     inspections,
     tenantConfigs,
@@ -292,12 +292,21 @@ export class ConciergeService {
                     eq(inspections.tenantId, row.tenantId),
                 ),
             );
-        // Mark token used — key on the row's stored PK (post-upgrade it is the
-        // sentinel, never the presented plaintext).
+        // Mark token used. resolveConfirmToken returns the PRE-upgrade snapshot,
+        // so row.token may be the original plaintext while the DB column was just
+        // rewritten to a sentinel by the lazy upgrade. Key on the hash (set by
+        // both hash-native creation and the upgrade) OR the snapshot token
+        // (covers a legacy row whose upgrade write failed) — exactly one row
+        // can match either.
         await db
             .update(conciergeConfirmTokens)
             .set({ confirmedAt: new Date() })
-            .where(eq(conciergeConfirmTokens.token, row.token));
+            .where(
+                or(
+                    eq(conciergeConfirmTokens.tokenHash, await hashToken(token)),
+                    eq(conciergeConfirmTokens.token, row.token),
+                ),
+            );
 
         // Notify the originating agent. The referredByAgentId on the
         // inspection points at the agent's contact row in this tenant; the

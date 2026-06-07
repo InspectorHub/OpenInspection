@@ -151,7 +151,19 @@ export class ObserverLinkService {
 
     async list(tenantId: string, inspectionId: string) {
         const db = this.getDrizzle();
-        return await db.select().from(observerLinks)
+        // Token material is projected OUT: post hash-at-rest sweep the
+        // plaintext column holds a dead sentinel, and tokenHash/tokenEnc must
+        // never reach a client. Callers needing a shareable URL use getToken().
+        return await db.select({
+            id:           observerLinks.id,
+            tenantId:     observerLinks.tenantId,
+            inspectionId: observerLinks.inspectionId,
+            createdBy:    observerLinks.createdBy,
+            createdAt:    observerLinks.createdAt,
+            expiresAt:    observerLinks.expiresAt,
+            revokedAt:    observerLinks.revokedAt,
+            lastViewedAt: observerLinks.lastViewedAt,
+        }).from(observerLinks)
             .where(and(
                 eq(observerLinks.tenantId, tenantId),
                 eq(observerLinks.inspectionId, inspectionId),

@@ -322,5 +322,28 @@ describe('ConciergeService — A3', () => {
             expect(upgraded?.token).toMatch(/^x:/);     // PK rewritten to sentinel
             expect(upgraded?.clientEmail).toBe('legacy@x.com');
         });
+
+        it('(c2) legacy plaintext confirm is single-use (mark-used survives the lazy upgrade)', async () => {
+            await seedFixture(testDb, { reviewRequired: false });
+            const created = await svc.createBooking(baseParams());
+            const legacyToken = 'legacy-concierge-confirm-token-replay-99';
+            await testDb.insert(schema.conciergeConfirmTokens).values({
+                token: legacyToken,
+                inspectionId: created.inspectionId,
+                tenantId: T1,
+                clientEmail: 'legacy@x.com',
+                expiresAt: new Date(Date.now() + 86_400_000),
+                confirmedAt: null,
+                createdAt: new Date(),
+            });
+            // First confirm succeeds; the lazy upgrade rewrites the PK to a
+            // sentinel mid-flight — confirmedAt must land on the row anyway.
+            await svc.confirmByClient(legacyToken);
+            const upgraded = await testDb.select().from(schema.conciergeConfirmTokens)
+                .where(eq(schema.conciergeConfirmTokens.tokenHash, await hashToken(legacyToken))).get();
+            expect(upgraded?.confirmedAt).toBeTruthy();
+            // Replay must be rejected.
+            await expect(svc.confirmByClient(legacyToken)).rejects.toThrow(/already/i);
+        });
     });
 });
