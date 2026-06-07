@@ -4,6 +4,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { deriveBlockStates, formatCents, type HubPayload } from "~/lib/hub-blocks";
+import { getEffectivePriceCents } from "~/lib/effective-price";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -288,7 +289,12 @@ export default function InspectionHubPage() {
           <p className="text-[15px] font-medium text-ih-fg-1 mb-3">
             {hub.invoice
               ? formatCents(hub.invoice.amountCents)
-              : formatCents(inspection.price)}
+              : formatCents(
+                  getEffectivePriceCents({
+                    serviceLines: services.map((s) => ({ priceSnapshot: s.priceCents })),
+                    inspectionPriceCents: inspection.price,
+                  }),
+                )}
           </p>
           <Button variant="secondary" size="sm" disabled title={DISABLED_TITLE}>
             Request payment
