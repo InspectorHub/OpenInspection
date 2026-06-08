@@ -13,6 +13,10 @@
   "assets": { "directory": "./build/client", "binding": "ASSETS" },
   "observability": { "enabled": true },
   "upload_source_maps": true,
+  // Drives the scheduled() handler: automation flush + inspection.reminder
+  // enqueue (Track J) + agreement expiry + GDPR retention sweep. SaaS uses its
+  // own wrangler.saas.jsonc schedule; this is the standalone/OSS default.
+  "triggers": { "crons": ["*/5 * * * *"] },
   "vars": {
     "ENVIRONMENT": "production",
     "APP_MODE": "standalone",
