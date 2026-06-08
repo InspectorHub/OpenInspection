@@ -38,8 +38,46 @@ export interface ErasureRule {
 }
 
 /**
- * The erasure manifest. Empty in G1; G2 populates the erasure-relevant tables
- * (agreement_requests, agreement_signers, inspections client-PII columns,
- * contacts, + whatever eraseClientData already touches).
+ * The erasure manifest — one entry per PII COLUMN on an erasure-relevant table.
+ *
+ * Row-deletion convention (read before editing): the manifest describes
+ * COLUMN-LEVEL actions only. When a draft/unsigned envelope must be removed as a
+ * ROW, that is expressed by `action: 'delete'` + `condition: 'draft_only'` on a
+ * sentinel rule (one per envelope table). The orchestrator treats any
+ * `draft_only` delete rule on a table as "delete the matching ROWS" rather than
+ * clearing the named column — the `column` on those rules names the locator
+ * column (the email we matched on) for documentation, not a column to null.
+ * Column-level `anonymize`/`null` rules act in-place on the named column.
+ *
+ * Signed-agreement PII columns -> `anonymize` + `legalBasis: 'art_17_3_e'`
+ * (establishment/exercise/defence of legal claims) + `condition: 'signed_only'`,
+ * keeping signature_base64 / signed_at / the audit chain (spec §3 D5).
  */
-export const ERASURE_MANIFEST: ErasureRule[] = [];
+export const ERASURE_MANIFEST: ErasureRule[] = [
+    // ── agreement_signers (signed evidence: anonymize the satellite PII) ──────
+    { table: 'agreement_signers', column: 'name',                 category: 'user.name',                   action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'email',                category: 'user.contact.email',          action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'ip_address',           category: 'user.device.ip_address',      action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'user_agent',           category: 'user.device.user_agent',      action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'on_behalf_of',         category: 'user.name',                   action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_signers', column: 'on_behalf_disclaimer', category: 'user.contact',                action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    // Draft/unsigned signer rows ride with their envelope deletion (below).
+    { table: 'agreement_signers', column: 'email',                category: 'user.contact.email',          action: 'delete',    condition: 'draft_only' },
+
+    // ── agreement_requests (envelope) ─────────────────────────────────────────
+    // Signed envelope: anonymize the denormalized client identity, keep the seal.
+    { table: 'agreement_requests', column: 'client_name',  category: 'user.name',          action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    { table: 'agreement_requests', column: 'client_email', category: 'user.contact.email', action: 'anonymize', legalBasis: 'art_17_3_e', retention: 'P6Y', condition: 'signed_only' },
+    // Draft/unsigned envelope: delete the ROW (locator = client_email).
+    { table: 'agreement_requests', column: 'client_email', category: 'user.contact.email', action: 'delete', condition: 'draft_only' },
+
+    // ── inspections (non-agreement client PII: null in-place, current behavior) ─
+    { table: 'inspections', column: 'client_name',  category: 'user.name',           action: 'null' },
+    { table: 'inspections', column: 'client_email', category: 'user.contact.email',  action: 'null' },
+    { table: 'inspections', column: 'client_phone', category: 'user.contact.phone',  action: 'null' },
+
+    // ── contacts (CRM client/agent PII) ───────────────────────────────────────
+    // `name` is NOT NULL, and a CRM contact carries no legal-evidence retention
+    // basis, so the row is DELETED outright (locator = email) rather than nulled.
+    { table: 'contacts', column: 'email', category: 'user.contact.email', action: 'delete' },
+];

@@ -132,14 +132,29 @@ describe('AdminService', () => {
         });
 
         const result = await adminService.eraseClientData(tenantId, clientEmail);
+        // Legacy additive contract.
         expect(result.matched).toBe(1);
         expect(result.deletedAgreements).toBe(1);
+        // Richer orchestrator summary (Track I-a).
+        expect(result.status).toBe('completed');
+        expect(result.logId).toBeTruthy();
+        expect(Array.isArray(result.decisions)).toBe(true);
+        expect(typeof result.anonymizedCount).toBe('number');
+        expect(typeof result.deletedCount).toBe('number');
+        expect(typeof result.retainedCount).toBe('number');
 
         const insp = await testDb.select().from(inspections).where(eq(inspections.id as any, 'insp-1')).get();
         expect(insp).toBeDefined();
         expect(insp!.clientName).toBeNull();
+        expect(insp!.clientEmail).toBeNull();
 
         const agree = await testDb.select().from(inspectionAgreements).where(eq(inspectionAgreements.id as any, 'agree-1')).get();
         expect(agree).toBeUndefined();
+
+        // An append-only erasure_log decision row was written (Art. 5(2)/30).
+        const logs = await testDb.select().from(schema.erasureLog).all();
+        expect(logs.length).toBe(1);
+        expect(logs[0].subjectEmail).toBe(clientEmail);
+        expect(logs[0].status).toBe('completed');
     });
 });
