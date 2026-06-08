@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and, lte, sql, desc } from 'drizzle-orm';
-import { automations, automationLogs, inspections, tenants } from '../lib/db/schema';
+import { automations, automationLogs, inspections, tenants, agreementRequests, inspectionServices, tenantConfigs } from '../lib/db/schema';
 import { reportUrl } from '../lib/public-urls';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 import { nanoid } from 'nanoid';
@@ -214,6 +215,55 @@ export class AutomationService {
         return null; // buying_agent/selling_agent/inspector resolved at delivery
     }
 
+    /**
+     * Track J (D4) — evaluate a rule's send-time gates against the CURRENT world.
+     * Returns a skip reason when a gate fails so flush() can mark the log 'skipped'.
+     * channel='sms' is a defensive skip (Track L will implement the sender).
+     */
+    private async evaluateConditions(
+        db: DrizzleD1Database,
+        automation: typeof automations.$inferSelect,
+        inspection: typeof inspections.$inferSelect,
+    ): Promise<{ ok: true } | { ok: false; reason: string }> {
+        if (automation.channel === 'sms') return { ok: false, reason: 'channel sms not supported yet' };
+        if (!automation.conditions) return { ok: true };
+
+        let cond: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] };
+        try {
+            cond = JSON.parse(automation.conditions);
+        } catch {
+            // Malformed JSON → fail OPEN (treat as no gates) so a corrupt blob
+            // doesn't trap the log in 'pending' forever. Warn so the ungated send
+            // is observable (conditions are app-serialized, so this implies a bug
+            // or manual DB edit). Never log the blob contents.
+            logger.warn('AutomationService.evaluateConditions: malformed conditions JSON, sending ungated',
+                { automationId: automation.id });
+            return { ok: true };
+        }
+
+        if (cond.requirePaid && inspection.paymentStatus !== 'paid') {
+            return { ok: false, reason: 'condition: not paid' };
+        }
+        if (cond.requireSigned) {
+            const signed = await db.select({ id: agreementRequests.id }).from(agreementRequests)
+                .where(and(
+                    eq(agreementRequests.tenantId, inspection.tenantId),
+                    eq(agreementRequests.inspectionId, inspection.id),
+                    eq(agreementRequests.status, 'signed'),
+                )).limit(1);
+            if (signed.length === 0) return { ok: false, reason: 'condition: agreement not signed' };
+        }
+        if (cond.serviceIds && cond.serviceIds.length > 0) {
+            const rows = await db.select({ serviceId: inspectionServices.serviceId }).from(inspectionServices)
+                .where(eq(inspectionServices.inspectionId, inspection.id));
+            const have = new Set(rows.map(r => r.serviceId));
+            if (!cond.serviceIds.some(id => have.has(id))) {
+                return { ok: false, reason: 'condition: service not matched' };
+            }
+        }
+        return { ok: true };
+    }
+
     async flush(resendApiKey: string, senderEmail: string, appName: string, appBaseUrl: string, batchSize = 50): Promise<void> {
         const db = this.getDrizzle();
         const now = new Date().toISOString();
@@ -237,6 +287,13 @@ export class AutomationService {
 
         for (const { log, automation, inspection, tenant } of pending) {
             try {
+                const verdict = await this.evaluateConditions(db, automation, inspection);
+                if (!verdict.ok) {
+                    await db.update(automationLogs).set({ status: 'skipped', error: verdict.reason })
+                        .where(eq(automationLogs.id, log.id));
+                    continue;
+                }
+
                 const vars: Record<string, string> = {
                     client_name:      inspection.clientName ?? '',
                     property_address: inspection.propertyAddress,
@@ -285,6 +342,19 @@ export class AutomationService {
                             .where(eq(automationLogs.id, log.id));
                         continue;
                     }
+                }
+
+                const needsReviewUrl = automation.bodyTemplate.includes('{{review_url}}') ||
+                                       automation.subjectTemplate.includes('{{review_url}}');
+                if (needsReviewUrl) {
+                    const cfg = await db.select({ reviewUrl: tenantConfigs.reviewUrl }).from(tenantConfigs)
+                        .where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
+                    if (!cfg?.reviewUrl) {
+                        await db.update(automationLogs).set({ status: 'skipped', error: 'review_url not configured' })
+                            .where(eq(automationLogs.id, log.id));
+                        continue;
+                    }
+                    vars.review_url = cfg.reviewUrl;
                 }
 
                 const subject = interpolate(automation.subjectTemplate, vars);
