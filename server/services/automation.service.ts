@@ -62,7 +62,21 @@ export class AutomationService {
 
     async list(tenantId: string) {
         const db = this.getDrizzle();
-        return db.select().from(automations).where(eq(automations.tenantId, tenantId));
+        const rows = await db.select().from(automations).where(eq(automations.tenantId, tenantId));
+        // Track L (A) — the `channels` column is a JSON STRING at rest, but the API
+        // surface (AutomationSchema) types it as string[]. Parse on output so the
+        // BFF / typed client see a truthful array.
+        return rows.map((r) => this.serializeRow(r));
+    }
+
+    /**
+     * Track L (A) — project a raw automations row to the API shape, parsing the
+     * JSON `channels` column to a `string[]`. Keeps the typed response honest
+     * (AutomationSchema.channels is `string[]`) without changing the DB column.
+     */
+    private serializeRow<T extends { channels: string | null }>(row: T): Omit<T, 'channels'> & { channels: ('email' | 'sms')[] } {
+        const { channels, ...rest } = row;
+        return { ...rest, channels: this.parseChannels(channels) };
     }
 
     async create(tenantId: string, data: {
@@ -89,7 +103,8 @@ export class AutomationService {
             smsBody:  smsBody ?? null,
             active: true, isDefault: false, createdAt: new Date(),
         });
-        return (await db.select().from(automations).where(eq(automations.id, id)))[0];
+        // Track L (A) — parse channels on output to match the typed API shape.
+        return this.serializeRow((await db.select().from(automations).where(eq(automations.id, id)))[0]);
     }
 
     async update(tenantId: string, id: string, data: Partial<{
@@ -115,7 +130,8 @@ export class AutomationService {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial patch → table's typed columns; matches the file's create() cast pattern
         await db.update(automations).set(patch as any)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId)));
-        return (await db.select().from(automations).where(eq(automations.id, id)))[0];
+        // Track L (A) — parse channels on output to match the typed API shape.
+        return this.serializeRow((await db.select().from(automations).where(eq(automations.id, id)))[0]);
     }
 
     async delete(tenantId: string, id: string): Promise<void> {

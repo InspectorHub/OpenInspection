@@ -35,7 +35,7 @@ import { ensureClientContact } from '../lib/sms/ensure-client-contact';
 import { resolveOptinToken } from '../lib/sms/optin-token';
 import { normalizeE164 } from '../lib/sms/phone';
 import { validateTwilioSignature, sendTwilioSms } from '../lib/sms/send-sms';
-import { loadTwilioForTenant } from '../lib/sms/resolve-twilio';
+import { loadTwilioForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
 import { loadTenantSecrets } from '../lib/secrets-cache';
 import {
     SmsOptinResolveSchema, SmsOptinConfirmSchema, SmsAttestSchema, SmsTestSendSchema, SmsConsentQuerySchema,
@@ -230,6 +230,25 @@ const testSendRoute = createRoute(withMcpMetadata({
     description: 'Sends a one-off test SMS to the supplied number using the tenant-resolved Twilio credentials (platform env or tenant own). Fail-closed: returns success=false when no creds resolve or the number is unparseable.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
+const smsConfigRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/sms/config',
+    tags: ['admin', 'sms'],
+    summary: 'Effective SMS sender configuration (mode + source, no secrets)',
+    middleware: [requireRole(['owner', 'admin'])],
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({
+            success: z.literal(true),
+            data: z.object({
+                mode: z.enum(['platform', 'own']),
+                effectiveSource: z.enum(['platform', 'own', 'none']),
+            }),
+        }) } }, description: 'Effective SMS configuration' },
+    },
+    operationId: 'getSmsConfig',
+    description: 'Returns the tenant SMS sender mode and the effective credential source (platform env, tenant own, or none) WITHOUT leaking any secret values. Drives the "Using platform SMS" / "Using your Twilio" line in Settings.',
+}, { scopes: ['read'], tier: 'extended' }));
+
 const consentStatusRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/sms/consent',
@@ -290,6 +309,29 @@ export const smsAdminRoutes = createApiRouter()
         const contactId = insp.clientContactId;
         const latest = contactId ? await new SmsConsentService(c.env.DB).getLatest(tenantId, contactId) : null;
         return c.json({ success: true as const, data: { consent: latest ?? 'none' } }, 200);
+    })
+    .openapi(smsConfigRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const db = drizzle(c.env.DB);
+        const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId)).get().catch(() => null);
+        const mode = (cfg?.smsMode as 'platform' | 'own') ?? 'platform';
+        // Decrypt the tenant's own Twilio secrets to test PRESENCE only (never echoed).
+        const dec = (await loadTenantSecrets(
+            c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+        ).catch(() => null)) ?? {};
+        const tenantBag = {
+            TWILIO_ACCOUNT_SID: dec['TWILIO_ACCOUNT_SID'],
+            TWILIO_AUTH_TOKEN: dec['TWILIO_AUTH_TOKEN'],
+            TWILIO_FROM_NUMBER: dec['TWILIO_FROM_NUMBER'],
+        };
+        const platformBag = {
+            TWILIO_ACCOUNT_SID: c.env.TWILIO_ACCOUNT_SID,
+            TWILIO_AUTH_TOKEN: c.env.TWILIO_AUTH_TOKEN,
+            TWILIO_FROM_NUMBER: c.env.TWILIO_FROM_NUMBER,
+        };
+        const effectiveSource = resolveTwilioSource(mode, tenantBag, platformBag);
+        return c.json({ success: true as const, data: { mode, effectiveSource } }, 200);
     });
 
 export type SmsPublicApi = typeof smsPublicRoutes;

@@ -27,6 +27,25 @@ export function resolveTwilio(
     return complete(platform) ?? own;
 }
 
+/**
+ * Track L (D) — which credential set `resolveTwilio` would pick, as a label, for
+ * the Settings "effective source" line. Mirrors resolveTwilio's decision exactly
+ * (own wins only with mode==='own' + complete tenant creds; else platform; else
+ * tenant fallback; else none) WITHOUT exposing any secret value.
+ */
+export function resolveTwilioSource(
+    mode: 'platform' | 'own',
+    tenant: CredBag,
+    platform: CredBag,
+): 'own' | 'platform' | 'none' {
+    const isComplete = (b: CredBag) =>
+        Boolean(b.TWILIO_ACCOUNT_SID && b.TWILIO_AUTH_TOKEN && b.TWILIO_FROM_NUMBER);
+    const ownComplete = isComplete(tenant);
+    if (mode === 'own' && ownComplete) return 'own';
+    if (isComplete(platform)) return 'platform';
+    return ownComplete ? 'own' : 'none';
+}
+
 export interface TwilioLoaderEnv {
     DB: D1Database;
     TENANT_CACHE: KVNamespace;

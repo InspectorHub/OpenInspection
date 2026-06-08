@@ -31,7 +31,8 @@ describe('AutomationService create/update — conditions + channels (Track J/L)'
             delayMinutes: 1440, subjectTemplate: 's', bodyTemplate: 'b',
             conditions: { requirePaid: true, serviceIds: ['svc-1'] },
         });
-        expect(JSON.parse(row.channels)).toEqual(['email']);
+        // Track L (Part A) — channels parsed on output; conditions stays a JSON string.
+        expect(row.channels).toEqual(['email']);
         expect(JSON.parse(row.conditions!)).toEqual({ requirePaid: true, serviceIds: ['svc-1'] });
     });
 
@@ -45,7 +46,7 @@ describe('AutomationService create/update — conditions + channels (Track J/L)'
             conditions: null, channels: ['email', 'sms'], smsBody: 'hi',
         });
         expect(updated.conditions).toBeNull();
-        expect(JSON.parse(updated.channels)).toEqual(['email', 'sms']);
+        expect(updated.channels).toEqual(['email', 'sms']);
     });
 });
 

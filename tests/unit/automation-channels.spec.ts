@@ -31,7 +31,8 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
             delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
             channels: ['email', 'sms'], smsBody: 'Your report is ready',
         });
-        expect(JSON.parse(row.channels)).toEqual(['email', 'sms']);
+        // Track L (Part A) — create/update parse channels on output (array, not JSON string).
+        expect(row.channels).toEqual(['email', 'sms']);
         expect(row.smsBody).toBe('Your report is ready');
     });
 
@@ -40,7 +41,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
             name: 'Default', trigger: 'report.published', recipient: 'client',
             delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
         });
-        expect(JSON.parse(row.channels)).toEqual(['email']);
+        expect(row.channels).toEqual(['email']);
         expect(row.smsBody).toBeNull();
     });
 
@@ -52,7 +53,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         const updated = await svc.update(TENANT, created.id, {
             channels: ['email', 'sms'], smsBody: 'hi',
         });
-        expect(JSON.parse(updated.channels)).toEqual(['email', 'sms']);
+        expect(updated.channels).toEqual(['email', 'sms']);
         expect(updated.smsBody).toBe('hi');
     });
 
@@ -99,6 +100,18 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
             .where(eq(schema.automationLogs.inspectionId, inspId)).all())
             .filter((l) => l.automationId === created.id);
         expect(logs.map((l) => l.channel)).toEqual(['email']);
+    });
+
+    it('list() parses the JSON channels column to a string[] on output (Part A)', async () => {
+        await svc.create(TENANT, {
+            name: 'L1', trigger: 'report.published', recipient: 'client',
+            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
+            channels: ['email', 'sms'], smsBody: 'sms',
+        });
+        const rows = await svc.list(TENANT);
+        const row = rows.find((r) => r.name === 'L1');
+        expect(Array.isArray(row?.channels)).toBe(true);
+        expect(row?.channels).toEqual(['email', 'sms']);
     });
 
     it('enqueueReminders fans out a pending log per channel with channel-appropriate recipient', async () => {
