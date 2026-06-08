@@ -2735,11 +2735,13 @@ export const inspectionsRoutes = createApiRouter()
         // warning audit entry rather than a 5xx — the report itself remains
         // viewable through the existing /reports/:id path.
         const userId = (c.get('user') as { sub?: string } | undefined)?.sub;
+        let publishedVersion: number | null = null;
         if (userId) {
             try {
                 const out = await c.var.services.reportVersion.snapshotOnPublish(
                     tenantId, id, userId, body.summary,
                 );
+                publishedVersion = out.versionNumber;
                 logger.info('report-version snapshot saved', {
                     inspectionId:  id,
                     versionNumber: out.versionNumber,
@@ -2773,8 +2775,8 @@ export const inspectionsRoutes = createApiRouter()
                         reportPdf.markQueued(id, tenantId, 'full'),
                     ]);
                     await Promise.allSettled([
-                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion }),
-                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion }),
+                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion, versionNumber: publishedVersion }),
+                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion, versionNumber: publishedVersion }),
                     ]);
                 } catch (err) {
                     logger.error('[publish] PDF render enqueue failed', { inspectionId: id }, err instanceof Error ? err : undefined);
