@@ -190,6 +190,76 @@ describe('runErasure', () => {
         expect(decisions.some(d => d.action === 'delete')).toBe(true);
     });
 
+    it('partially-signed envelope (policy=all, subject signed, co-signer pending) -> anonymize (NOT delete), evidence kept', async () => {
+        // Envelope is NOT terminally signed (status 'viewed', signed_at NULL) but
+        // ONE signer (the subject) has already signed with collected evidence.
+        // Under completionPolicy 'all' the envelope stays incomplete until the
+        // co-signer signs. The subject's signed row holds legal evidence that must
+        // be anonymized-and-retained, NOT hard-deleted.
+        const inspId = 'insp-partial';
+        const reqId = 'req-partial';
+        const subjectSignedAtMs = Date.UTC(2024, 5, 15);
+        await db.insert(schema.inspections).values({
+            id: inspId, tenantId: TENANT_A, propertyAddress: '4 Main',
+            clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, clientPhone: '555-2222',
+            date: '2026-06-04', status: 'in_progress', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+        });
+        await db.insert(schema.agreementRequests).values({
+            id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
+            clientEmail: SUBJECT_EMAIL, clientName: 'Jane Subject', token: 'tok-partial',
+            status: 'viewed', signedAt: null, completionPolicy: 'all',
+            contentSnapshot: 'Agreement text', contentHash: 'hash-partial', createdAt: new Date(),
+        });
+        await db.insert(schema.agreementSigners).values([
+            {
+                id: 'signer-partial-subject', tenantId: TENANT_A, requestId: reqId,
+                name: 'Jane Subject', email: SUBJECT_EMAIL, role: 'client', status: 'signed',
+                signatureBase64: 'partial-subject-sig-keep',
+                signedAt: new Date(subjectSignedAtMs), viewedAt: new Date(subjectSignedAtMs - 1000),
+                ipAddress: '7.7.7.7', userAgent: 'Mozilla/Subject', channel: 'remote', createdAt: new Date(),
+            },
+            {
+                id: 'signer-partial-pending', tenantId: TENANT_A, requestId: reqId,
+                name: 'John Pending', email: OTHER_EMAIL, role: 'co_client', status: 'pending',
+                createdAt: new Date(),
+            },
+        ]);
+
+        const summary = await runErasure(db, {
+            tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6,
+        });
+
+        // The envelope must NOT be deleted.
+        const env = await db.select().from(schema.agreementRequests)
+            .where(eq(schema.agreementRequests.id, reqId)).get();
+        expect(env).toBeTruthy();
+        expect(env!.clientName).toBeNull();
+        expect(env!.clientEmail).toBe('[erased]'); // NOT NULL -> sentinel-cleared
+        expect(env!.status).toBe('viewed'); // status untouched
+
+        // Subject's signed row: anonymized but signature + signed_at KEPT.
+        const subjectSigner = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.id, 'signer-partial-subject')).get();
+        expect(subjectSigner).toBeTruthy();
+        expect(subjectSigner!.name).toBe('[erased]');
+        expect(subjectSigner!.email).toBe('[erased]');
+        expect(subjectSigner!.ipAddress).toBeNull();
+        expect(subjectSigner!.userAgent).toBeNull();
+        expect(subjectSigner!.signatureBase64).toBe('partial-subject-sig-keep');
+        expect(subjectSigner!.signedAt).toBeTruthy();
+
+        // Decision log: anonymize action with legalBasis art_17_3_e (NOT delete).
+        const logs = await db.select().from(schema.erasureLog).all();
+        const decisions = JSON.parse(logs[0].decisionsJson) as Array<Record<string, unknown>>;
+        const signerDecision = decisions.find(d => d.table === 'agreement_signers' && d.action === 'anonymize');
+        expect(signerDecision).toBeTruthy();
+        expect(signerDecision!.legalBasis).toBe('art_17_3_e');
+        // retentionExpiry anchors to the subject signer's signed_at (envelope signedAt is NULL).
+        expect(signerDecision!.retentionExpiry).toBe(Date.UTC(2030, 5, 15));
+        // No delete decision for the agreement tables.
+        expect(decisions.some(d => d.table === 'agreement_requests' && d.action === 'delete')).toBe(false);
+    });
+
     it('non-agreement client PII (inspections + contacts) -> nulled', async () => {
         await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
         await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });

@@ -6,13 +6,17 @@
  * decision row (Art. 5(2)/30 accountability).
  *
  * Decision policy (spec §3 D2/D5):
- *  - SIGNED agreement rows (envelope status 'signed' OR signedAt not null) ->
- *    ANONYMIZE the satellite PII (D5 field set). KEEP signature_base64,
- *    signed_at, viewed_at, role, channel, content_snapshot, content_hash, and
- *    the entire esign_audit_logs chain. legalBasis art_17_3_e; retentionExpiry =
- *    signedAt + retentionYears (encoded as a Unix-MS integer).
- *  - DRAFT / unsigned envelopes (pending/sent/viewed/declined/expired, never
- *    signed) -> DELETE the envelope row + its signer rows.
+ *  - EVIDENCE-BEARING agreement rows (envelope status 'signed' OR signedAt not
+ *    null OR ANY signer row has signed) -> ANONYMIZE the satellite PII (D5 field
+ *    set). KEEP signature_base64, signed_at, viewed_at, role, channel,
+ *    content_snapshot, content_hash, and the entire esign_audit_logs chain.
+ *    legalBasis art_17_3_e; retentionExpiry = (envelope signedAt, else earliest
+ *    signer signed_at) + retentionYears (encoded as a Unix-MS integer). A
+ *    partially-signed envelope (e.g. completionPolicy 'all', one signer signed,
+ *    envelope still 'viewed'/signed_at NULL) is evidence-bearing, NOT a draft.
+ *  - TRUE-DRAFT envelopes (NO signer has EVER signed: pending/sent/viewed/
+ *    declined/expired with every signer unsigned) -> DELETE the envelope row +
+ *    its signer rows.
  *  - Non-agreement client PII (inspections client columns, contacts) -> NULL
  *    in-place (the pre-existing behavior).
  *
@@ -155,18 +159,55 @@ export async function runErasure(
         for (const e of extra as typeof envelopes) if (!seen.has(e.id)) { envelopes.push(e); seen.add(e.id); }
     }
 
-    const isSigned = (e: { status: string; signedAt: unknown }) => e.status === 'signed' || toMs(e.signedAt) != null;
-    const signedEnvelopes = envelopes.filter(isSigned);
-    const draftEnvelopes = envelopes.filter((e) => !isSigned(e));
+    // An envelope holds retainable signed EVIDENCE if the envelope itself is
+    // signed OR ANY of its signer rows has signed — even when the envelope is
+    // still incomplete (e.g. completionPolicy 'all', one signer signed, others
+    // pending; envelope status 'viewed'/'sent', signed_at NULL). Such a partial
+    // envelope already carries collected signature evidence (image + IP + UA +
+    // audit chain) that must be ANONYMIZED-and-retained, never hard-deleted.
+    // Load, in ONE grouped query (tenant-scoped, no N+1), the request ids that
+    // have at least one signed signer row, and the EARLIEST signer signed_at per
+    // request (used to anchor retentionExpiry when the envelope's own signedAt is
+    // NULL). Only envelopes where NO signer has EVER signed are true drafts.
+    const earliestSignerSignedAt = new Map<string, number>();
+    const envelopeIds = envelopes.map((e) => e.id);
+    if (envelopeIds.length > 0) {
+        const allSigners = await db.select().from(agreementSigners)
+            .where(and(eq(agreementSigners.tenantId, tenantId), inArray(agreementSigners.requestId, envelopeIds)))
+            .all();
+        for (const s of allSigners as Array<{ requestId: string; status: string; signedAt: unknown }>) {
+            const sMs = toMs(s.signedAt);
+            const hasSigned = s.status === 'signed' || sMs != null;
+            if (!hasSigned) continue;
+            if (sMs != null) {
+                const prev = earliestSignerSignedAt.get(s.requestId);
+                if (prev == null || sMs < prev) earliestSignerSignedAt.set(s.requestId, sMs);
+            } else if (!earliestSignerSignedAt.has(s.requestId)) {
+                // Signed signer without a timestamp: record presence; a later row
+                // with a real timestamp may still tighten the anchor.
+                earliestSignerSignedAt.set(s.requestId, Number.POSITIVE_INFINITY);
+            }
+        }
+    }
+    const hasSignedEvidence = (e: { id: string; status: string; signedAt: unknown }) =>
+        e.status === 'signed' || toMs(e.signedAt) != null || earliestSignerSignedAt.has(e.id);
+    const evidenceEnvelopes = envelopes.filter(hasSignedEvidence);
+    const draftEnvelopes = envelopes.filter((e) => !hasSignedEvidence(e));
 
-    // ── 1) Signed envelopes: anonymize the SUBJECT'S signer rows (D5) ─────────
-    // Tenant + subject email scoped, restricted to signed envelopes so other
-    // signers and unrelated rows are never touched. Idempotent: a re-run finds
-    // email already cleared -> matches 0 rows.
-    for (const env of signedEnvelopes) {
-        const signedAtMs = toMs(env.signedAt);
-        const anonExtra: Pick<ErasureDecision, 'legalBasis' | 'retentionExpiry'> = signedAtMs != null
-            ? { legalBasis: 'art_17_3_e', retentionExpiry: addYearsMs(signedAtMs, retentionYears) }
+    // ── 1) Evidence envelopes: anonymize the SUBJECT'S signer rows (D5) ───────
+    // Tenant + subject email scoped, restricted to evidence-bearing envelopes so
+    // other signers and unrelated rows are never touched. Idempotent: a re-run
+    // finds email already cleared -> matches 0 rows.
+    for (const env of evidenceEnvelopes) {
+        // Anchor retentionExpiry on the envelope's signedAt when present; else on
+        // the earliest signer signed_at (a real signing event). When neither
+        // yields a finite timestamp (signed but timestamp-less), omit
+        // retentionExpiry and keep legalBasis only.
+        const envSignedAtMs = toMs(env.signedAt);
+        const signerAnchor = earliestSignerSignedAt.get(env.id);
+        const anchorMs = envSignedAtMs ?? (signerAnchor != null && Number.isFinite(signerAnchor) ? signerAnchor : null);
+        const anonExtra: Pick<ErasureDecision, 'legalBasis' | 'retentionExpiry'> = anchorMs != null
+            ? { legalBasis: 'art_17_3_e', retentionExpiry: addYearsMs(anchorMs, retentionYears) }
             : { legalBasis: 'art_17_3_e' };
         await step('agreement_signers', 'anonymize', anonExtra, async () => {
             // Shared satellite-PII SET (name/email sentinel, rest NULL). KEEP
@@ -203,7 +244,7 @@ export async function runErasure(
         });
     }
 
-    // ── 2) Draft/unsigned envelopes: delete signer rows then the envelope ─────
+    // ── 2) True-draft envelopes (NO signer ever signed): delete rows ──────────
     if (draftEnvelopes.length > 0) {
         const draftIds = draftEnvelopes.map((e) => e.id);
         await step('agreement_signers', 'delete', {}, async () => {
