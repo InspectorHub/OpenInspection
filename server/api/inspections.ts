@@ -4,7 +4,8 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { getBookingHost } from '../lib/url';
-import { reportUrl as buildReportUrl } from '../lib/public-urls';
+import { reportUrl as buildReportUrl, agreementSignUrl } from '../lib/public-urls';
+import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { contentDisposition } from '../lib/content-disposition';
 import { logger } from '../lib/logger';
@@ -25,6 +26,9 @@ import {
     PublishInspectionSchema,
     InspectionRecipientsResponseSchema,
     InspectionPeopleResponseSchema,
+    InspectionHubResponseSchema,
+    SendAgreementRequestSchema,
+    AgreementRequestCreatedSchema,
     ReportDataResponseSchema,
     CancelInspectionSchema,
     DashboardResponseSchema,
@@ -50,7 +54,7 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors, tenants } from '../lib/db/schema';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
@@ -1393,6 +1397,64 @@ const peopleRoute = createRoute(withMcpMetadata({
 
 
 /**
+ * GET /api/inspections/:id/hub
+ *
+ * Issue #111 — single aggregate payload powering the `/inspections/:id` hub
+ * page. One round trip drives all six blocks (People / Schedule / Services /
+ * Agreement / Invoice / Report status). 404 when the inspection does not exist
+ * or belongs to another tenant.
+ */
+const hubRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/{id}/hub',
+    tags: ['inspections'],
+    summary: 'Aggregate hub payload (people, schedule, services, agreement, invoice, report status)',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string().min(1).describe('Inspection identifier') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: InspectionHubResponseSchema } },
+            description: 'Inspection hub payload',
+        },
+        404: { description: 'Inspection not found in this tenant' },
+    },
+    operationId: 'getInspectionHub',
+    description: 'Returns one aggregate payload for the inspection hub page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection\'s agreement requests, the most recent invoice, and the publish-readiness summary.',
+}, { scopes: ['read'], tier: 'extended' }));
+
+/**
+ * POST /api/inspections/:id/agreement-requests
+ *
+ * Task 7 (Issue #111) — the hub Agreement card "Send agreement" button. Creates
+ * a signing request and emails it to the client. Both body fields are optional:
+ * agreementId defaults to the tenant's first agreement template, email defaults
+ * to the inspection's clientEmail. 422 when no template exists, no email is
+ * resolvable, or the supplied agreementId does not belong to the tenant.
+ */
+const sendAgreementRequestRoute = createRoute(withMcpMetadata({
+    method:  'post',
+    path:    '/{id}/agreement-requests',
+    tags: ['inspections'],
+    summary: 'Create + email an agreement signing request for an inspection',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string().min(1).describe('Inspection identifier') }),
+        body: { content: { 'application/json': { schema: SendAgreementRequestSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: AgreementRequestCreatedSchema } },
+            description: 'Signing request created and emailed',
+        },
+        404: { description: 'Inspection not found in this tenant' },
+        422: { description: 'No agreement template, no resolvable email, or agreement not in this tenant' },
+    },
+    operationId: 'createInspectionAgreementRequest',
+    description: 'Creates an agreement signing request for the inspection, emails it to the client, marks it sent, and returns the created request.',
+}, { scopes: ['write'], tier: 'extended' }));
+
+
+/**
  * POST /api/inspections/:id/publish
  */
 const publishRoute = createRoute(withMcpMetadata({
@@ -2567,6 +2629,95 @@ export const inspectionsRoutes = createApiRouter()
         const { id }   = c.req.valid('param');
         const card     = await c.var.services.inspection.getPeopleCard(id, tenantId);
         return c.json({ success: true, data: card }, 200);
+    })
+    .openapi(hubRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id }   = c.req.valid('param');
+
+        // Tenant slug for building /report/:tenantSlug/:id links. Public/standalone
+        // paths set requestedTenantSlug via tenant routing; saas AUTHENTICATED
+        // requests resolve the tenant from the JWT and never set it — fall back
+        // to a tenants.slug lookup by the verified tenantId.
+        let tenantSlug = c.get('requestedTenantSlug') ?? '';
+        if (!tenantSlug) {
+            const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+                .from(tenants)
+                .where(eq(tenants.id, tenantId))
+                .get();
+            tenantSlug = row?.slug ?? '';
+        }
+
+        const data = await c.var.services.inspection.getInspectionHub(id, tenantId, tenantSlug);
+        if (!data) return c.json({ success: false, error: 'Inspection not found' }, 404);
+        return c.json({ success: true, data }, 200);
+    })
+    .openapi(sendAgreementRequestRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id }   = c.req.valid('param');
+        const body     = c.req.valid('json');
+        const db       = drizzle(c.env.DB);
+
+        // 404 if the inspection is missing or belongs to another tenant.
+        const inspection = await db.select().from(inspectionTable)
+            .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId))).get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        // Resolve the agreement template: explicit id (tenant-scoped) or the
+        // tenant's first agreement (same gatekeeper as GET .../agreement).
+        let agreement;
+        if (body.agreementId) {
+            agreement = await db.select().from(agreements)
+                .where(and(eq(agreements.id, body.agreementId), eq(agreements.tenantId, tenantId))).get();
+            if (!agreement) throw Errors.UnprocessableEntity('The selected agreement template was not found in this workspace.');
+        } else {
+            agreement = await db.select().from(agreements)
+                .where(eq(agreements.tenantId, tenantId)).get();
+            if (!agreement) throw Errors.UnprocessableEntity('No agreement template exists yet. Create one in Settings before sending.');
+        }
+
+        // Resolve the recipient: explicit email or the inspection's client email.
+        const clientEmail = body.email ?? inspection.clientEmail ?? null;
+        if (!clientEmail) throw Errors.UnprocessableEntity('No client email on this inspection. Add a client email or enter one to send.');
+
+        // Create the signing request (tenant-scoped inside the service).
+        const request = await c.var.services.agreement.createSigningRequest(tenantId, {
+            agreementId: agreement.id,
+            clientEmail,
+            clientName: inspection.clientName ?? null,
+            inspectionId: id,
+        });
+
+        // Build the public sign URL exactly like the admin send path.
+        const slug = c.get('requestedTenantSlug') ?? '';
+        const signUrl = agreementSignUrl(getBookingHost(c), slug, request.token);
+
+        // Sign the email with the assigned inspector's rebooking footer (B-4a).
+        const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
+        await c.var.services.email.sendAgreementRequest(
+            clientEmail, inspection.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c),
+        );
+
+        // Flip the row to 'sent' (the admin path stamps a request.sent audit
+        // event; the hub surfaces row status directly, so we persist it).
+        const sentAt = new Date();
+        await db.update(agreementRequests)
+            .set({ status: 'sent', sentAt })
+            .where(and(eq(agreementRequests.id, request.id), eq(agreementRequests.tenantId, tenantId)));
+
+        auditFromContext(c, 'agreement.send', 'agreement_request', {
+            entityId: request.id,
+            metadata: { agreementId: agreement.id, clientEmail, inspectionId: id },
+        });
+
+        return c.json({
+            success: true as const,
+            data: {
+                id:          request.id,
+                status:      'sent',
+                clientEmail,
+                createdAt:   safeISODate(request.createdAt),
+            },
+        }, 200);
     })
     .openapi(publishRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;

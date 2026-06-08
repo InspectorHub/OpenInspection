@@ -614,6 +614,41 @@ export const bookingsRoutes = createApiRouter()
             throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
         }
 
+        // IA-18 (#111) — capture the booker as a Client contact and link it to
+        // ALL inspections this booking created so their client appears in
+        // Contacts and on the inspection hub People card.
+        //
+        // Placement: AFTER arbitration. A losing booker self-revokes and throws
+        // above, so we never stamp a contact onto inspections that were just
+        // deleted. (A stray contact row is harmless on its own — what we avoid
+        // is a clientContactId pointing at vanished inspections.) It also runs
+        // BEFORE the side-effect block to keep the synchronous DB writes
+        // grouped before async waitUntil work.
+        //
+        // Non-fatal: a booking must NEVER fail because of contact bookkeeping.
+        // Any error is logged (NO client email — only inspection ids + message)
+        // and swallowed; the inspection rows already committed regardless.
+        if (body.clientEmail || body.clientName) {
+            try {
+                const { id: clientContactId } = await c.var.services.contact.upsertClientContact(tenantId, {
+                    name:  body.clientName,
+                    email: body.clientEmail,
+                    type:  'client',
+                });
+                await db.update(inspections)
+                    .set({ clientContactId })
+                    .where(and(
+                        inArray(inspections.id, allInspectionIds),
+                        eq(inspections.tenantId, tenantId),
+                    ));
+            } catch (e) {
+                logger.warn('booking.client-contact.upsert.failed', {
+                    inspectionIds: allInspectionIds,
+                    error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+
         // Sprint 1 C-6 — map window option to a human-readable label for the
         // calendar event + confirmation email.
         const windowLabel: Record<typeof body.timeSlot, string> = {

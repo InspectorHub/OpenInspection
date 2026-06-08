@@ -17,6 +17,23 @@ export const CreateInvoiceSchema = z.object({
 
 export const UpdateInvoiceSchema = CreateInvoiceSchema.partial().openapi('UpdateInvoice');
 
+/**
+ * Task 8 (Issue #111) — body for POST /api/invoices/request-payment. The hub
+ * Invoice card "Request payment" button posts here; the endpoint resolves (or
+ * creates) the inspection's invoice, marks it sent, and emails the client a pay
+ * link. Tenant scope comes from the JWT, never the body.
+ */
+export const RequestPaymentSchema = z.object({
+    inspectionId: z.string().uuid().describe('Inspection whose invoice to send a payment request for'),
+}).openapi('RequestPayment');
+
+export const RequestPaymentResponseSchema = z.object({
+    id: z.string().describe('Invoice row id'),
+    status: z.enum(['draft', 'sent', 'partial', 'paid']).describe('Invoice status after the request (sent)'),
+    amountCents: z.number().describe('Amount requested, in cents (money authority chain)'),
+    sentAt: z.string().nullable().describe('ISO timestamp the request was marked sent'),
+}).openapi('RequestPaymentResponse');
+
 export const MarkInvoicePaidSchema = z.object({
     method: z.enum(['card', 'check', 'cash', 'offline', 'other']).optional()
         .describe('How the invoice was paid: card (online) or an offline method recorded by the inspector — check, cash, offline, or other.'),

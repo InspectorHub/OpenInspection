@@ -9,6 +9,8 @@ export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
+  // Issue #111 — read-only inspection hub ("where does this job stand?").
+  route("inspections/:id", "routes/inspection-hub.tsx"),
   // Full-screen editor (own chrome, no sidebar)
   route("inspections/:id/edit", "routes/inspection-edit.tsx"),
   route("templates/:id/edit", "routes/template-edit.tsx"),
@@ -96,13 +98,15 @@ export default [
     route("dashboard", "routes/dashboard.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),
+    // IA-18 (#111) — contact detail (record + inspection history + stats).
+    route("contacts/:id", "routes/contact-detail.tsx"),
     route("invoices", "routes/invoices.tsx"),
     route("notifications", "routes/notifications.tsx"),
     route("templates", "routes/templates.tsx"),
     route("team", "routes/team.tsx"),
     route("metrics", "routes/metrics.tsx"),
     route("apprentice-review", "routes/apprentice-review.tsx"),
-    route("reports", "routes/reports.tsx"),
+    route("reports", "routes/reports-redirect.tsx"),
     layout("routes/settings-layout.tsx", [
       route("settings", "routes/settings-hub.tsx"),
       route("settings/profile", "routes/settings-profile.tsx"),
