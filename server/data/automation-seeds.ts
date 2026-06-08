@@ -15,6 +15,7 @@ export const AUTOMATION_SEEDS = [
         delayMinutes:    0,
         subjectTemplate: 'Your inspection is scheduled — {{property_address}}',
         bodyTemplate:    '<p>Hi {{client_name}},</p><p>Your inspection at <strong>{{property_address}}</strong> has been scheduled for <strong>{{scheduled_date}}</strong>.</p><p>Your inspector: {{inspector_name}}</p><p>— {{company_name}}</p>',
+        smsBody:         '{{company_name}}: your inspection at {{property_address}} is set for {{scheduled_date}}. Reply STOP to opt out; questions? call {{company_phone}}',
         isDefault: true,
     },
     {
@@ -33,6 +34,7 @@ export const AUTOMATION_SEEDS = [
         delayMinutes:    0,
         subjectTemplate: 'Reminder: Inspection tomorrow — {{property_address}}',
         bodyTemplate:    '<p>Hi {{client_name}},</p><p>Just a reminder that your inspection at <strong>{{property_address}}</strong> is scheduled for <strong>{{scheduled_date}}</strong>.</p><p>— {{company_name}}</p>',
+        smsBody:         '{{company_name}}: reminder — your inspection at {{property_address}} is {{scheduled_date}}. Reply STOP to opt out; questions? call {{company_phone}}',
         isDefault: true,
     },
     {
@@ -51,6 +53,7 @@ export const AUTOMATION_SEEDS = [
         delayMinutes:    0,
         subjectTemplate: 'Your inspection report is ready — {{property_address}}',
         bodyTemplate:    '<p>Hi {{client_name}},</p><p>Your inspection report for <strong>{{property_address}}</strong> is ready to view.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>',
+        smsBody:         '{{company_name}}: your inspection report for {{property_address}} is ready: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}',
         isDefault: true,
     },
     {

@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq, and, lte, gte, sql, desc, notInArray, ne } from 'drizzle-orm';
-import { automations, automationLogs, inspections, tenants, agreementRequests, inspectionServices, tenantConfigs } from '../lib/db/schema';
+import { eq, and, lte, gte, sql, desc, notInArray, ne, max } from 'drizzle-orm';
+import { automations, automationLogs, inspections, tenants, agreementRequests, inspectionServices, tenantConfigs, smsDisclosureVersions } from '../lib/db/schema';
 import { reportUrl } from '../lib/public-urls';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 import { nanoid } from 'nanoid';
@@ -9,6 +9,11 @@ import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { NotificationService } from './notification.service';
 import type { AgreementService } from './agreement.service';
+
+// Track L (D7) — default TCPA SMS opt-in disclosure (version 1). Seeded once by
+// ensureSeeds (SaaS) and the standalone raw-SQL path; kept identical in both.
+export const SMS_DISCLOSURE_V1 =
+    'By providing your phone number and opting in, you agree to receive appointment and report text messages from {{company_name}}. Message and data rates may apply. Reply STOP to opt out, HELP for help.';
 
 function interpolate(template: string, vars: Record<string, string>): string {
     return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
@@ -29,6 +34,11 @@ export class AutomationService {
 
     async ensureSeeds(tenantId: string): Promise<void> {
         const db = this.getDrizzle();
+        // Track L — ensure the global SMS disclosure v1 exists (guarded; idempotent).
+        // Tenant-independent: the disclosure ledger is platform-wide, so a max-version
+        // check keeps re-runs (and concurrent tenants) from creating a 2nd version.
+        await this.ensureSmsDisclosureV1();
+
         const existing = await db.select().from(automations)
             .where(and(eq(automations.tenantId, tenantId), eq(automations.isDefault, true)));
         if (existing.length >= AUTOMATION_SEEDS.length) return;
@@ -38,9 +48,10 @@ export class AutomationService {
         );
         if (toInsert.length === 0) return;
 
-        // D1 caps prepared-statement bind parameters at 100. Each row binds
-        // 11 columns, so chunk to 8 rows / 88 binds per insert.
-        const CHUNK_SIZE = 8;
+        // D1 caps prepared-statement bind parameters at 100. Each row now binds
+        // 13 columns (Track L added channels + sms_body), so chunk to 7 rows /
+        // 91 binds per insert (under the 100 cap).
+        const CHUNK_SIZE = 7;
         const rows = toInsert.map(seed => ({
             id:              nanoid(),
             tenantId,
@@ -50,6 +61,8 @@ export class AutomationService {
             delayMinutes:    seed.delayMinutes,
             subjectTemplate: seed.subjectTemplate,
             bodyTemplate:    seed.bodyTemplate,
+            channels:        JSON.stringify((seed as { channels?: string[] }).channels ?? ['email']),
+            smsBody:         (seed as { smsBody?: string }).smsBody ?? null,
             active:          (seed as { defaultActive?: boolean }).defaultActive ?? true,
             isDefault:       true,
             createdAt:       new Date(),
@@ -58,6 +71,20 @@ export class AutomationService {
             await db.insert(automations).values(rows.slice(i, i + CHUNK_SIZE));
         }
         logger.info('AutomationService: seeded default rules', { tenantId, count: toInsert.length });
+    }
+
+    // Track L (D7) — seed the default TCPA disclosure (version 1) once. Guarded by
+    // a max-version check so re-running ensureSeeds never creates a duplicate.
+    private async ensureSmsDisclosureV1(): Promise<void> {
+        const db = this.getDrizzle();
+        const cur = await db.select({ v: max(smsDisclosureVersions.version) })
+            .from(smsDisclosureVersions).get();
+        if ((cur?.v ?? 0) >= 1) return;
+        await db.insert(smsDisclosureVersions).values({
+            version:     1,
+            text:        SMS_DISCLOSURE_V1,
+            publishedAt: new Date(),
+        });
     }
 
     async list(tenantId: string) {
