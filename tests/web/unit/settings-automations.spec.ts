@@ -160,7 +160,9 @@ describe('settings-automations action', () => {
         }));
         expect(postAutomation).toHaveBeenCalledTimes(1);
         const arg = postAutomation.mock.calls[0][0];
-        expect(arg.json.channel).toBe('email');
+        // Track L: the save payload sends channels[] (email-only) instead of the
+        // retired singular `channel`. Full multi-channel editor lands in Task 9.
+        expect(arg.json.channels).toEqual(['email']);
         expect(arg.json.conditions).toEqual({ requirePaid: true, serviceIds: ['svc-1', 'svc-2'] });
         expect(res).toEqual({ ok: true, error: undefined });
     });

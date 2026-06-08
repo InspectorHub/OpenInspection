@@ -8,7 +8,7 @@ import { createCalendarEvent } from './calendar';
 import { Errors } from '../lib/errors';
 import { checkRateLimit } from '../lib/rate-limit';
 import { logger } from '../lib/logger';
-import { getBookingHost } from '../lib/url';
+import { getBookingHost, getBaseUrl } from '../lib/url';
 import {
     PublicBookingSchema,
     InspectorsResponseSchema,
@@ -711,6 +711,7 @@ export const bookingsRoutes = createApiRouter()
         // Non-fatal: a booking must NEVER fail because of contact bookkeeping.
         // Any error is logged (NO client email — only inspection ids + message)
         // and swallowed; the inspection rows already committed regardless.
+        let bookingClientContactId: string | null = null;
         if (body.clientEmail || body.clientName) {
             try {
                 const { id: clientContactId } = await c.var.services.contact.upsertClientContact(tenantId, {
@@ -718,6 +719,7 @@ export const bookingsRoutes = createApiRouter()
                     email: body.clientEmail,
                     type:  'client',
                 });
+                bookingClientContactId = clientContactId;
                 await db.update(inspections)
                     .set({ clientContactId })
                     .where(and(
@@ -728,6 +730,24 @@ export const bookingsRoutes = createApiRouter()
                 logger.warn('booking.client-contact.upsert.failed', {
                     inspectionIds: allInspectionIds,
                     error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+
+        // Track L (D6, path A) — self-book SMS opt-in. The checkbox is unchecked by
+        // default; when ticked we record a `granted` consent event (captured_via=
+        // booking_form) keyed on the client contact. Non-fatal: a consent write must
+        // never fail the booking (the inspection rows already committed).
+        if (body.smsOptin && bookingClientContactId) {
+            try {
+                const { SmsConsentService } = await import('../services/sms-consent.service');
+                await new SmsConsentService(c.env.DB).record(
+                    tenantId, bookingClientContactId, 'granted', 'booking_form',
+                    { ip: c.req.header('CF-Connecting-IP'), userAgent: c.req.header('User-Agent') },
+                );
+            } catch (e) {
+                logger.warn('booking.sms-optin.record.failed', {
+                    inspectionId, error: e instanceof Error ? e.message : String(e),
                 });
             }
         }
@@ -783,6 +803,22 @@ export const bookingsRoutes = createApiRouter()
                 licenseNumber: inspector.licenseNumber ?? null,
                 slug:          inspector.slug ?? null,
             } : undefined;
+            // Track L (D6, path B) — double-opt-in link injected at the RENDERER
+            // level (not gated on any automation rule) so disabling a rule never
+            // removes the only opt-in path. The token self-describes (tenant,
+            // contact) — see lib/sms/optin-token.ts. Best-effort: a token failure
+            // simply omits the link.
+            let smsOptinUrl: string | undefined;
+            if (bookingClientContactId && c.env.JWT_SECRET) {
+                try {
+                    const { mintOptinToken } = await import('../lib/sms/optin-token');
+                    const token = await mintOptinToken(tenantId, bookingClientContactId, c.env.JWT_SECRET);
+                    smsOptinUrl = `${getBaseUrl(c)}/sms-optin/${encodeURIComponent(token)}`;
+                } catch (e) {
+                    logger.warn('booking.sms-optin.mint.failed', { inspectionId, error: e instanceof Error ? e.message : String(e) });
+                }
+            }
+
             await emailService.sendBookingConfirmation(
                 body.clientEmail,
                 body.clientName,
@@ -801,6 +837,7 @@ export const bookingsRoutes = createApiRouter()
                 },
                 sigInspector,
                 getBookingHost(c),
+                smsOptinUrl,
             ).catch(e => logger.error('Booking confirmation email failed', {}, e instanceof Error ? e : undefined));
         })());
 

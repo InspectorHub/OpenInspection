@@ -46,6 +46,8 @@ import type {
     SecretsApi,
     ServicesApi,
     SessionContextApi,
+    SmsPublicApi,
+    SmsAdminApi,
     TagsApi,
     TeamApi,
     TemplateMigrationsApi,
@@ -146,6 +148,8 @@ export interface Api {
     secrets:            ReturnType<typeof hc<SecretsApi>>;
     services:           ReturnType<typeof hc<ServicesApi>>;
     sessionContext:     ReturnType<typeof hc<SessionContextApi>>;
+    smsPublic:          ReturnType<typeof hc<SmsPublicApi>>;
+    smsAdmin:           ReturnType<typeof hc<SmsAdminApi>>;
     tags:               ReturnType<typeof hc<TagsApi>>;
     team:               ReturnType<typeof hc<TeamApi>>;
     templateMigrations: ReturnType<typeof hc<TemplateMigrationsApi>>;
@@ -206,6 +210,8 @@ const MOUNT: Record<keyof Api, string> = {
     secrets:            "/api/admin",
     services:           "/api/services",
     sessionContext:     "/api/session",
+    smsPublic:          "/api/public",
+    smsAdmin:           "/api/admin",
     tags:               "/api/tags",
     team:               "/api/team",
     templateMigrations: "/api/templates",
@@ -284,6 +290,8 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         secrets:            mk<SecretsApi>(MOUNT.secrets),
         services:           mk<ServicesApi>(MOUNT.services),
         sessionContext:     mk<SessionContextApi>(MOUNT.sessionContext),
+        smsPublic:          mk<SmsPublicApi>(MOUNT.smsPublic),
+        smsAdmin:           mk<SmsAdminApi>(MOUNT.smsAdmin),
         tags:               mk<TagsApi>(MOUNT.tags),
         team:               mk<TeamApi>(MOUNT.team),
         templateMigrations: mk<TemplateMigrationsApi>(MOUNT.templateMigrations),

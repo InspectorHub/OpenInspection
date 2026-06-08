@@ -80,6 +80,12 @@ export interface AppEnv {
     STRIPE_SECRET_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;
 
+    // Track L — Twilio SMS (platform-default in SaaS; merged from tenant secrets
+    // by integrationSecretsMiddleware for BYO/standalone).
+    TWILIO_ACCOUNT_SID?: string;
+    TWILIO_AUTH_TOKEN?: string;
+    TWILIO_FROM_NUMBER?: string;
+
     // Rate Limiting
     RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
 

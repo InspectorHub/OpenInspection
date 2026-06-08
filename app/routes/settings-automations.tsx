@@ -11,10 +11,13 @@ export function meta() {
 interface Rule {
   id: string; name: string; trigger: string; recipient: string;
   delayMinutes: number; subjectTemplate: string; bodyTemplate: string;
-  conditions: string | null; channel: string; active: boolean; isDefault: boolean;
+  // Track L: channels[] supersedes the dead `channel` shadow; sms_body added.
+  // (Full multi-channel editor lands in Task 9; these keep the page type-safe.)
+  conditions: string | null; channels: string[]; smsBody: string | null;
+  active: boolean; isDefault: boolean;
 }
 interface Svc { id: string; name: string; }
-interface LogRow { id: string; recipientEmail: string; sendAt: string; status: string; error: string | null; }
+interface LogRow { id: string; recipient: string; channel: string; sendAt: string; status: string; error: string | null; }
 
 export const TRIGGER_LABELS: Record<string, string> = {
   "inspection.created": "Inspection created",
@@ -99,7 +102,8 @@ export async function action({ request, context }: Route.ActionArgs) {
       delayMinutes: Number(form.get("delayMinutes") ?? 0),
       subjectTemplate: String(form.get("subjectTemplate") ?? ""),
       bodyTemplate: String(form.get("bodyTemplate") ?? ""),
-      channel: "email",
+      // Track L: email-only until the Task 9 multi-channel editor lands.
+      channels: ["email"],
       conditions,
     };
     const id = String(form.get("id") ?? "");
@@ -158,7 +162,7 @@ export default function SettingsAutomations() {
                   <div className="flex items-center gap-2">
                     <p className="text-[13px] font-bold text-ih-fg-1">{rule.name}</p>
                     {rule.isDefault && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase tracking-widest">Default</span>}
-                    {rule.channel === "sms" && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase">SMS</span>}
+                    {(rule.channels ?? []).includes("sms") &&<span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase">SMS</span>}
                   </div>
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {rule.recipient}</p>
                 </div>
@@ -186,7 +190,7 @@ export default function SettingsAutomations() {
           <div className="divide-y divide-ih-border">
             {recentLogs.map((l) => (
               <div key={l.id} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
-                <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipientEmail}</span>
+                <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipient}</span>
                 <span className="text-ih-fg-3">{new Date(l.sendAt).toLocaleString()}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                   l.status === "sent" ? "bg-ih-ok-bg text-ih-ok-fg" :

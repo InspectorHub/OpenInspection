@@ -29,7 +29,7 @@ export class SmsConsentService {
     /** Append a consent event for a client contact, stamping the current disclosure version. */
     async record(
         tenantId: string, contactId: string, action: ConsentAction, capturedVia: CapturedVia,
-        meta: { ip?: string; userAgent?: string },
+        meta: { ip?: string | undefined; userAgent?: string | undefined },
     ) {
         const db = this.getDrizzle();
         const disc = await this.currentDisclosure();
