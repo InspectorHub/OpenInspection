@@ -314,6 +314,85 @@ export const InspectionPeopleSchema = z.object({
 
 export const InspectionPeopleResponseSchema = createApiResponseSchema(InspectionPeopleSchema).openapi('InspectionPeopleResponse');
 
+// Issue #111 — single aggregate payload for the `/inspections/:id` hub page.
+// One round trip drives six blocks (People / Schedule / Services / Agreement /
+// Invoice / Report status). Every field is explicit (no z.any()).
+export const InspectionHubSchema = z.object({
+  inspection: z.object({
+    id:                z.string().describe('Inspection identifier'),
+    propertyAddress:   z.string().describe('Subject property address'),
+    clientName:        z.string().nullable().describe('Denormalized client name cache'),
+    clientEmail:       z.string().nullable().describe('Denormalized client email cache'),
+    clientPhone:       z.string().nullable().describe('Denormalized client phone cache'),
+    clientContactId:   z.string().nullable().describe('contacts.id of the client, when linked'),
+    status:            z.string().describe('Inspection lifecycle status'),
+    date:              z.string().nullable().describe('Scheduled inspection date (YYYY-MM-DD)'),
+    inspectorId:       z.string().nullable().describe('Assigned inspector users.id'),
+    templateId:        z.string().nullable().describe('Selected template id'),
+    price:             z.number().describe('Denormalized price cache in cents (authority chain tier 3)'),
+    paymentStatus:     z.string().describe('Payment status: unpaid | partial | paid'),
+    paymentRequired:   z.boolean().describe('Whether report is payment-gated'),
+    agreementRequired: z.boolean().describe('Whether report is agreement-gated'),
+    coverPhoto:        z.string().nullable().describe('inspection_media_pool id used as the cover image'),
+    referredByAgentId: z.string().nullable().describe('Buyer agent contacts.id'),
+    sellingAgentId:    z.string().nullable().describe('Listing agent contacts.id'),
+    createdAt:         z.string().nullable().describe('ISO creation timestamp'),
+  }).describe('Core inspection fields for the hub header'),
+  tenantSlug: z.string().describe('Tenant slug, for building /report/:tenantSlug/:id links'),
+  people: InspectionPeopleSchema.describe('Inspector + client + agents (reuses the people-card aggregation)'),
+  services: z.array(z.object({
+    id:        z.string().describe('inspection_services row id'),
+    name:      z.string().describe('Service name snapshot'),
+    priceCents: z.number().describe('Effective line price (priceOverride ?? priceSnapshot)'),
+  })).describe('Booked service lines'),
+  agreements: z.array(z.object({
+    id:   z.string().describe('Agreement template id'),
+    name: z.string().describe('Agreement template name'),
+  })).describe("Tenant's agreement templates (for a send-agreement dropdown)"),
+  agreementRequests: z.array(z.object({
+    id:          z.string().describe('agreement_requests row id'),
+    status:      z.string().describe('pending | sent | viewed | signed | declined | expired'),
+    clientEmail: z.string().describe('Recipient email'),
+    signedAt:    z.string().nullable().describe('ISO sign timestamp, null until signed'),
+    createdAt:   z.string().nullable().describe('ISO creation timestamp'),
+  })).describe('Agreement requests for this inspection, newest first'),
+  invoice: z.object({
+    id:         z.string().describe('Invoice id'),
+    status:     z.string().describe('draft | sent | partial | paid'),
+    amountCents: z.number().describe('Invoice total in cents'),
+    sentAt:     z.string().nullable().describe('ISO sent timestamp'),
+    paidAt:     z.string().nullable().describe('ISO paid timestamp'),
+  }).nullable().describe('Most recent invoice for the inspection, or null'),
+  publishReadiness: z.object({
+    ready:         z.boolean().describe('True when every required defect field is filled'),
+    blockingCount: z.number().describe('Count of defects blocking publish'),
+  }).describe('Report-status gate summary (reuses computePublishReadiness)'),
+}).openapi('InspectionHub');
+
+export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHubSchema).openapi('InspectionHubResponse');
+
+/**
+ * Task 7 (Issue #111) — body for POST /api/inspections/:id/agreement-requests.
+ * Both fields optional: agreementId defaults to the tenant's first agreement
+ * template, email defaults to the inspection's clientEmail.
+ */
+export const SendAgreementRequestSchema = z.object({
+  // Plain non-empty string, NOT .uuid(): agreements.id is TEXT and the handler
+  // already 422s when the id doesn't resolve inside the tenant — a format gate
+  // would only reject legitimate non-UUID rows (e.g. imported/seeded data).
+  agreementId: z.string().min(1).optional().describe('Agreement template id; defaults to the tenant first agreement'),
+  email: z.string().email().optional().describe('Recipient email; defaults to inspection.clientEmail'),
+}).openapi('SendAgreementRequest');
+
+export const AgreementRequestCreatedSchema = createApiResponseSchema(
+  z.object({
+    id:          z.string().describe('agreement_requests row id'),
+    status:      z.string().describe('Request status (sent)'),
+    clientEmail: z.string().describe('Recipient email'),
+    createdAt:   z.string().nullable().describe('ISO creation timestamp'),
+  }),
+).openapi('AgreementRequestCreatedResponse');
+
 export const ReportItemSchema = z.object({
   id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
   label: z.string().describe('TODO describe label field for the OpenInspection MCP integration'),

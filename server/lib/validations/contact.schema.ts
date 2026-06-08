@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { createApiResponseSchema } from './shared.schema';
 
 export const CreateContactSchema = z.object({
     type: z.enum(['agent', 'client']).default('client').openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
@@ -30,6 +31,35 @@ export const ContactListQuerySchema = z.object({
     limit: z.coerce.number().min(1).max(200).default(50).describe('TODO describe limit field for the OpenInspection MCP integration'),
     offset: z.coerce.number().min(0).default(0).describe('TODO describe offset field for the OpenInspection MCP integration'),
 }).openapi('ContactListQuery');
+
+// ─── IA-18 (#111) — contact detail page payload ─────────────────────────────
+export const ContactDetailSchema = z.object({
+    contact: z.object({
+        id:         z.string().describe('Contact id'),
+        type:       z.enum(['agent', 'client']).describe('Contact type'),
+        name:       z.string().describe('Contact name'),
+        email:      z.string().nullable().describe('Contact email'),
+        phone:      z.string().nullable().describe('Contact phone'),
+        agency:     z.string().nullable().describe('Agency (agents only)'),
+        notes:      z.string().nullable().describe('Free-text notes'),
+        createdAt:  z.string().describe('ISO creation timestamp'),
+        archivedAt: z.string().nullable().describe('ISO soft-delete timestamp, null when active'),
+    }).describe('The contact record'),
+    inspections: z.array(z.object({
+        id:              z.string().describe('Inspection id'),
+        propertyAddress: z.string().describe('Subject property address'),
+        date:            z.string().describe('Scheduled date (YYYY-MM-DD)'),
+        status:          z.string().describe('Inspection lifecycle status'),
+        price:           z.number().describe('Denormalized price cache in cents'),
+        paymentStatus:   z.string().describe('Payment status: unpaid | partial | paid'),
+    })).describe('Inspection history for this contact, newest first'),
+    stats: z.object({
+        inspectionCount:   z.number().describe('Total linked inspections'),
+        totalRevenueCents: z.number().describe('Sum of PAID invoice amounts in cents'),
+    }).describe('Aggregate stats'),
+}).openapi('ContactDetail');
+
+export const ContactDetailResponseSchema = createApiResponseSchema(ContactDetailSchema).openapi('ContactDetailResponse');
 
 // ─── CSV bulk import (preview + commit) ─────────────────────────────────────
 export const ContactImportPreviewSchema = z.object({

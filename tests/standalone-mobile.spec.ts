@@ -151,14 +151,11 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
         }
     });
 
-    test('M-06: Reports page renders empty state on mobile', async ({ page }) => {
+    test('M-06: /reports 301-redirects to the dashboard Published tab on mobile', async ({ page }) => {
+        // #111: the standalone Reports page is retired. /reports is now a 301 redirect
+        // to /dashboard?workflow=published (the Published tab absorbs the report list).
         await gotoMobile(page, '/reports', adminToken);
-        await expect(page.locator('h1:has-text("Reports")')).toBeVisible();
-        // The mobile empty state lives in #reportsCardList. The desktop table also
-        // renders the same text but is wrapped in `hidden md:block` so its text
-        // node is not visible on a 375px viewport.
-        const mobileEmpty = page.locator('#reportsCardList >> text=No reports in this category yet.');
-        await expect(mobileEmpty).toBeVisible({ timeout: 8000 });
+        await expect(page).toHaveURL(/\/dashboard\?.*workflow=published/);
     });
 
     test('M-07: Marketplace renders without horizontal overflow on mobile', async ({ page }) => {
