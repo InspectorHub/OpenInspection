@@ -8,7 +8,7 @@ import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
 import { resolvePortalAccess, resolveObserverAccess } from '../lib/public-access';
 import { contentDisposition } from '../lib/content-disposition';
-import { loadVerifyData } from '../lib/verify-data';
+import { loadVerifyData, loadReportVerifyData } from '../lib/verify-data';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
 
@@ -309,6 +309,29 @@ const verifyRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login signature-chain verification for a signed agreement envelope. Returns chain validity + key fingerprint for independent verification.',
 }, { scopes: [], tier: 'extended' }));
 
+// #120 — public report-version verifier (court-friendly). Recomputes the
+// content hash, verifies the Ed25519 signature, and checks the prev_hash chain.
+// Mirrors the e-sign verifier above; exposes no PII beyond a masked address.
+const reportVerifyRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/verify/report/{token}',
+    tags: ['public'],
+    summary: 'Public report-version verification (court-friendly)',
+    request: { params: z.object({ token: z.string().describe('report_versions verification token') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({
+            versionNumber: z.number(), isAmendment: z.boolean(), publishedAt: z.number(),
+            contentHash: z.string().nullable(), keyFingerprint: z.string().nullable(),
+            keyAlgorithm: z.string(), legacy: z.boolean(),
+            hashValid: z.boolean(), signatureValid: z.boolean(), chainValid: z.boolean(),
+            propertyAddressMasked: z.string(),
+        })) } }, description: 'Verification result' },
+        404: { description: 'Token not found' },
+    },
+    operationId: 'getPublicReportVerify',
+    description: 'Public, no-login verification of a published report version: recomputes the content hash, verifies the Ed25519 signature, and checks the prev_hash chain.',
+}, { scopes: [], tier: 'extended' }));
+
 export const publicReportRoutes = createApiRouter()
     .openapi(verifyRoute, async (c) => {
         const { envelopeId } = c.req.valid('param');
@@ -338,6 +361,24 @@ export const publicReportRoutes = createApiRouter()
                 })),
             },
         }, 200);
+    })
+    .openapi(reportVerifyRoute, async (c) => {
+        const { token } = c.req.valid('param');
+        const data = await loadReportVerifyData(c, token);
+        if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
+        return c.json({ success: true as const, data: {
+            versionNumber: data.verify.versionNumber,
+            isAmendment:   data.verify.isAmendment,
+            publishedAt:   data.verify.publishedAt,
+            contentHash:   data.verify.contentHash,
+            keyFingerprint: data.verify.keyFingerprint,
+            keyAlgorithm:  'Ed25519',
+            legacy:        data.verify.legacy,
+            hashValid:     data.verify.hashValid,
+            signatureValid: data.verify.signatureValid,
+            chainValid:    data.verify.chainValid,
+            propertyAddressMasked: data.propertyAddressMasked,
+        } }, 200);
     })
     .openapi(reportRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');
