@@ -8,6 +8,10 @@
  * rule + row-state, executes, and writes one `erasure_log` decision row.
  *
  * G2 fills `ERASURE_MANIFEST`; this scaffold (G1) ships the type + an empty array.
+ *
+ * Executor: `erasure-orchestrator.ts` — the concrete Drizzle executor that
+ * realizes these rules. Binding verified by
+ * `tests/unit/erasure-manifest-coverage.spec.ts` (drift guard).
  */
 
 /**
@@ -80,4 +84,46 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // `name` is NOT NULL, and a CRM contact carries no legal-evidence retention
     // basis, so the row is DELETED outright (locator = email) rather than nulled.
     { table: 'contacts', column: 'email', category: 'user.contact.email', action: 'delete' },
+];
+
+// ── Out-of-scope PII columns (v1 deliberate exclusions) ──────────────────────
+//
+// These columns hold email/PII that the orchestrator intentionally does NOT
+// touch in v1. Each entry documents the rationale so the catalogue remains
+// honest about coverage vs. gaps. Update this list (and the orchestrator) when
+// a v2 erasure task is scheduled.
+//
+export const ERASURE_OUT_OF_SCOPE: Array<{
+    table: string;
+    column: string;
+    reason: string;
+}> = [
+    {
+        table: 'invoices',
+        column: 'client_email',
+        reason:
+            'Financial record retained under Art. 17(3)(b) legal obligation ' +
+            '(tax/accounting, typically 6–7 years). Excluded by design.',
+    },
+    {
+        table: 'concierge_confirm_tokens',
+        column: 'client_email',
+        reason:
+            'Short-lived audit token reference (7-day TTL on the token row); ' +
+            'expires naturally. Excluded by design.',
+    },
+    {
+        table: 'concierge_bookings',
+        column: 'contact_email',
+        reason:
+            'Client booking PII. TODO(v2): add an erasure step for this table ' +
+            '(delete or anonymize the booking row on erasure request).',
+    },
+    {
+        table: 'inspection_requests',
+        column: 'client_email',
+        reason:
+            'Multi-inspection booking PII. TODO(v2): add an erasure step for ' +
+            'this table (null or delete on erasure request).',
+    },
 ];

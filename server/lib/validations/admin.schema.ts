@@ -237,10 +237,34 @@ export const AgreementResponseSchema = createApiResponseSchema(z.object({
 })).openapi('AgreementResponse');
 
 export const EraseDataResponseSchema = createApiResponseSchema(z.object({
-    message: z.string().describe('TODO describe message field for the OpenInspection MCP integration'),
-    templates: z.number().optional().describe('TODO describe templates field for the OpenInspection MCP integration'),
-    inspections: z.number().optional().describe('TODO describe inspections field for the OpenInspection MCP integration'),
-    results: z.number().optional().describe('TODO describe results field for the OpenInspection MCP integration'),
+    message: z.string().describe('Human-readable confirmation message.'),
+    // Legacy additive fields (preserved for existing callers).
+    templates: z.number().optional().describe('Legacy field — number of template rows affected.'),
+    inspections: z.number().optional().describe('Legacy field — number of inspection rows matched.'),
+    results: z.number().optional().describe('Legacy field — total result rows affected.'),
+    matched: z.number().optional().describe('Number of inspections the subject appeared on.'),
+    deletedAgreements: z.number().optional().describe('Legacy additive field — number of matched inspections (mirrors matched).'),
+    // Orchestrator summary fields (Track I-a).
+    status: z.enum(['completed', 'partially_completed', 'refused']).optional()
+        .describe('Overall erasure outcome. partially_completed means at least one step threw; the rest still landed.'),
+    logId: z.string().optional().describe('UUID of the append-only erasure_log decision row (Art. 5(2)/30).'),
+    anonymizedCount: z.number().int().optional()
+        .describe('Total rows anonymized (PII sentinel-cleared, evidence retained under Art. 17(3) exemption).'),
+    deletedCount: z.number().int().optional()
+        .describe('Total rows deleted (draft envelopes + signer rows + contact rows).'),
+    retainedCount: z.number().int().optional()
+        .describe('Total rows retained as anonymized evidence (signer rows + envelope rows, post-anonymization).'),
+    decisions: z.array(z.object({
+        table: z.string().describe('DB table the decision applies to.'),
+        action: z.enum(['delete', 'null', 'anonymize']).describe('Action taken on this table.'),
+        count: z.number().int().describe('Rows affected.'),
+        legalBasis: z.enum(['art_17_3_b', 'art_17_3_e']).optional()
+            .describe('GDPR Art. 17(3) exemption invoked, when retaining evidence.'),
+        retentionExpiry: z.number().optional()
+            .describe('Unix-MS integer: signedAt + retentionYears. Present on anonymize steps.'),
+        error: z.string().optional()
+            .describe('Set when this step threw (fail-closed accountability).'),
+    })).optional().describe('Per-table erasure decisions recorded in the log row.'),
 })).openapi('EraseDataResponse');
 
 export const TeamMembersResponseSchema = createApiResponseSchema(z.object({

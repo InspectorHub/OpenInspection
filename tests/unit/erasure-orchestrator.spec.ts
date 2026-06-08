@@ -95,6 +95,8 @@ describe('runErasure', () => {
 
         expect(summary.status).toBe('completed');
         expect(summary.anonymizedCount).toBeGreaterThan(0);
+        // retainedCount = 1 signer row + 1 envelope row anonymized under Art. 17(3)(e).
+        expect(summary.retainedCount).toBe(2);
         expect(summary.logId).toBeTruthy();
 
         // Subject signer: PII fields cleared. name/email are NOT NULL columns ->

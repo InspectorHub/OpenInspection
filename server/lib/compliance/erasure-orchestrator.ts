@@ -24,6 +24,10 @@
  * The manifest (`erasure-manifest.ts`) is the column-level catalogue / CI-lint
  * source of truth; this orchestrator is the concrete Drizzle executor that
  * realizes those rules with tenant-scoped, row-state-aware SQL.
+ *
+ * Binding: `tests/unit/erasure-manifest-coverage.spec.ts` asserts every
+ * manifest anonymize/delete/null rule is referenced in this file, preventing
+ * silent manifest↔orchestrator drift.
  */
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -193,7 +197,9 @@ export async function runErasure(
                     eq(agreementRequests.clientEmail, subjectEmail),
                 ))
                 .run();
-            return changeCount(res);
+            const c = changeCount(res);
+            retainedCount += c; // anonymized envelopes are also retained-under-exemption evidence
+            return c;
         });
     }
 
