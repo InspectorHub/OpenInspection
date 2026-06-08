@@ -50,7 +50,7 @@ export class AutomationService {
             delayMinutes:    seed.delayMinutes,
             subjectTemplate: seed.subjectTemplate,
             bodyTemplate:    seed.bodyTemplate,
-            active:          true,
+            active:          (seed as { defaultActive?: boolean }).defaultActive ?? true,
             isDefault:       true,
             createdAt:       new Date(),
         }));
