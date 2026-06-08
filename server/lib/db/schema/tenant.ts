@@ -308,6 +308,12 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // fields_override (the blockUnpaid → paymentRequired inheritance pattern).
     // Default LOOSE: missing fields downgrade to yellow warnings, not blocks.
     requireDefectFields: text('require_defect_fields', { enum: ['none', 'location', 'trade', 'both'] }).notNull().default('none'),
+    // Track I-a GDPR (D4) — signed-agreement retention window, in YEARS. Governs
+    // the final destruction of the anonymized sealed agreement artifact + chain
+    // (a Cron sweep destroys signature material on rows whose signedAt + this
+    // window has elapsed). Default 6 = the UK Limitation Act simple-contract
+    // limitation period (the standard e-sign-evidence retention basis).
+    agreementRetentionYears: integer('agreement_retention_years').notNull().default(6),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

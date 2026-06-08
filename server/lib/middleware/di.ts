@@ -175,7 +175,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.template = new TemplateService(c.env.DB);
                     break;
                 case 'agreement':
-                    target.agreement = new AgreementService(c.env.DB);
+                    target.agreement = new AgreementService(c.env.DB, {
+                        jwtSecret: c.env.JWT_SECRET,
+                        ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
+                    });
                     break;
                 case 'signingKey':
                     target.signingKey = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
@@ -199,7 +202,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.invoice = new InvoiceService(c.env.DB);
                     break;
                 case 'portalAccess':
-                    target.portalAccess = new PortalAccessService(c.env.DB);
+                    target.portalAccess = new PortalAccessService(c.env.DB, {
+                        jwtSecret: c.env.JWT_SECRET,
+                        ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
+                    });
                     break;
                 case 'service':
                     target.service = new ServiceService(c.env.DB);
@@ -316,7 +322,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.unit = new UnitService(c.env.DB);
                     break;
                 case 'observerLink':
-                    target.observerLink = new ObserverLinkService(c.env.DB);
+                    target.observerLink = new ObserverLinkService(c.env.DB, {
+                        jwtSecret: c.env.JWT_SECRET,
+                        ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
+                    });
                     break;
                 case 'reportVersion':
                     target.reportVersion = new ReportVersionService(c.env.DB);

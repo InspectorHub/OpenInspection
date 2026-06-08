@@ -249,7 +249,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         path === '/api/concierge/book-info' ||
         path === '/api/concierge/book' ||
         path === '/api/concierge/confirm-info';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/');
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/');
 
     // Design System 0520 subsystem D P5 — observer surfaces are gated by
     // the dedicated observer-cookie middleware, not JWT.
@@ -649,7 +649,16 @@ app.get('/sign/:tenant/:id', async (c) => {
     try {
         const pending = await c.var.services.agreement.findPendingByInspectionId(tenantId as string, id);
         if (pending) {
-            return c.redirect(agreementSignPath(tenantSlugFromPath as string, pending.token), 302);
+            // Prefer the first outstanding signer's real tier-2 link — the
+            // envelope's `token` is an UNDISTRIBUTED placeholder for envelope-v2
+            // (real tokens live per-signer) so redirecting to it would 404.
+            // `c.var.services.agreement` is DI-constructed with the JWT secret,
+            // so it can reconstruct the sealed signer token server-side. Fall
+            // back to the envelope token only as a last resort (legacy
+            // `createSigningRequest` envelopes whose plaintext token IS
+            // distributed still resolve).
+            const signerLink = await c.var.services.agreement.getFirstOutstandingSignerLink(tenantId as string, id);
+            return c.redirect(agreementSignPath(tenantSlugFromPath as string, signerLink ?? pending.token), 302);
         }
     } catch (e) {
         logger.warn('sign-redirect: lookup failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });

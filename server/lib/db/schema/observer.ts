@@ -8,7 +8,7 @@
  *
  * No `users` row is created — observers do not consume the seat quota.
  */
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const observerLinks = sqliteTable('observer_links', {
@@ -21,6 +21,9 @@ export const observerLinks = sqliteTable('observer_links', {
     expiresAt:       integer('expires_at').notNull(),
     revokedAt:       integer('revoked_at'),
     lastViewedAt:    integer('last_viewed_at'),
+    tokenHash:       text('token_hash'),
+    tokenEnc:        text('token_enc'),
 }, (t) => [
     index('observer_links_inspection_idx').on(t.inspectionId),
+    uniqueIndex('idx_observer_links_token_hash').on(t.tokenHash),
 ]);

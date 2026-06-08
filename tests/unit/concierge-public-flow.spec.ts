@@ -12,6 +12,7 @@ import {
     tenants,
     tenantConfigs,
 } from '../../server/lib/db/schema';
+import { hashToken } from '../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 /**
@@ -142,5 +143,35 @@ describe('concierge public flow', () => {
 
     it('getConfirmInfo throws on unknown confirmation token', async () => {
         await expect(getConfirmInfo(db, 'nope-nope-nope')).rejects.toThrow(/invalid/i);
+    });
+
+    // ─── Track I-a — concierge_invites hash-at-rest (tier-1) ──────────────────
+    describe('token hash-at-rest', () => {
+        it('(b) resolves a hash-stored invite when the plaintext is presented', async () => {
+            const plaintext = 'concierge-invite-plaintext-1234567890';
+            await db.insert(conciergeInvites).values({
+                token: 'x:sentinel-row-1',
+                tokenHash: await hashToken(plaintext),
+                tenantId: 't-1',
+                inspectorId: null,
+                expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+            } as any);
+            const r = await getBookInfo(db, plaintext);
+            expect(r.tenant.name).toBe('Acme Inspections');
+        });
+
+        it('(c) legacy plaintext invite resolves AND is upgraded in place', async () => {
+            // The beforeEach seed already inserted a plaintext-only invite
+            // (token='tok-abc-valid', no hash) — exercise the legacy fallback.
+            const r = await getBookInfo(db, 'tok-abc-valid');
+            expect(r.tenant.name).toBe('Acme Inspections');
+            const upgraded = await db
+                .select()
+                .from(conciergeInvites)
+                .where(eq(conciergeInvites.tokenHash, await hashToken('tok-abc-valid')))
+                .get();
+            expect(upgraded).toBeTruthy();
+            expect((upgraded as any)?.token).toMatch(/^x:/); // PK rewritten to sentinel
+        });
     });
 });

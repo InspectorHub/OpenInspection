@@ -2,21 +2,52 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspectionAccessTokens } from '../lib/db/schema/portal-access';
 import type { PortalAccessRow, PortalRole } from '../lib/public-access';
+import { mintToken, hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
+import { sealToken, openToken } from '../lib/config-crypto';
+import { Errors } from '../lib/errors';
+import { logger } from '../lib/logger';
 
 /**
  * Issues + resolves the PERSISTENT per-(recipient, order) portal tokens.
  * The token is STABLE for the (inspection, recipient) pair — re-issuing returns
  * the existing live token so old emails keep working. See memory
  * project_client_portal_token_model.
+ *
+ * Track I-a — hash-at-rest (tier-2). The plaintext token is never stored: the
+ * row carries `token_hash` (lookup) + `token_enc` (KEK-sealed, so the server
+ * can RECONSTRUCT the same link for re-issue / reminders). The legacy `token`
+ * column is cleared to a per-row sentinel on new writes and lazily on lookup of
+ * legacy plaintext rows (permanent fallback so OSS self-hosts upgrade with zero
+ * ops steps).
  */
 export class PortalAccessService {
-    constructor(private db: D1Database) {}
+    constructor(
+        private db: D1Database,
+        private secrets?: { jwtSecret: string; jwtSecretPrevious?: string },
+    ) {}
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private getDrizzle() { return drizzle(this.db as any); }
+    private getDrizzle() { return drizzle(this.db); }
 
     private newToken(): string {
-        return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+        return mintToken();
+    }
+
+    private requireSecrets(): { jwtSecret: string; jwtSecretPrevious?: string } {
+        if (!this.secrets) throw Errors.Internal('Token sealing key unavailable');
+        return this.secrets;
+    }
+
+    /**
+     * Reconstruct the plaintext link for a row. Prefers a non-sentinel legacy
+     * plaintext column (row not yet upgraded); otherwise opens the sealed
+     * token_enc (current → previous secret). Mirrors AgreementService.getSignerLink.
+     */
+    private async reconstruct(row: typeof inspectionAccessTokens.$inferSelect): Promise<string> {
+        const sentinel = deadTokenSentinel(row.id);
+        if (row.token && row.token !== sentinel) return row.token; // legacy not-yet-upgraded
+        if (!row.tokenEnc) throw Errors.Internal('Portal token cannot be reconstructed (no token_enc)');
+        const s = this.requireSecrets();
+        return openToken(row.tokenEnc, row.tenantId, s.jwtSecret, s.jwtSecretPrevious);
     }
 
     /** Idempotent: returns the existing live token for (inspection, recipient), else mints one. */
@@ -28,24 +59,42 @@ export class PortalAccessService {
                 eq(inspectionAccessTokens.recipientEmail, input.recipientEmail),
             ))
             .get();
-        if (existing && existing.revokedAt == null) return existing.token;
+        if (existing && existing.revokedAt == null) {
+            // Stable link — reconstruct the SAME plaintext rather than rotate.
+            return this.reconstruct(existing);
+        }
 
+        const s = this.requireSecrets();
         const token = this.newToken();
+        const tokenHash = await hashToken(token);
+        const tokenEnc = await sealToken(token, input.tenantId, s.jwtSecret);
         if (existing) {
             // Revoked previously → re-arm the same row with a fresh token.
             await db.update(inspectionAccessTokens)
-                .set({ token, revokedAt: null, expiresAt: null, role: input.role ?? existing.role, createdAt: Date.now() })
+                .set({
+                    token: deadTokenSentinel(existing.id),
+                    tokenHash,
+                    tokenEnc,
+                    revokedAt: null,
+                    expiresAt: null,
+                    role: input.role ?? existing.role,
+                    createdAt: Date.now(),
+                })
                 .where(eq(inspectionAccessTokens.id, existing.id))
                 .run();
             return token;
         }
+        const id = crypto.randomUUID();
         await db.insert(inspectionAccessTokens).values({
-            id: crypto.randomUUID(),
+            id,
             tenantId: input.tenantId,
             inspectionId: input.inspectionId,
             recipientEmail: input.recipientEmail,
             role: input.role ?? 'client',
-            token,
+            // Never distributed — satisfies NOT NULL + UNIQUE on the legacy column.
+            token: deadTokenSentinel(id),
+            tokenHash,
+            tokenEnc,
             createdAt: Date.now(),
             expiresAt: null,
             revokedAt: null,
@@ -56,9 +105,28 @@ export class PortalAccessService {
     /** Single-row lookup for the public-access guard. */
     async resolveToken(token: string): Promise<PortalAccessRow | null> {
         const db = this.getDrizzle();
-        const row = await db.select().from(inspectionAccessTokens)
-            .where(eq(inspectionAccessTokens.token, token))
-            .get();
+        const row = await resolveTokenRow<typeof inspectionAccessTokens.$inferSelect>({
+            presented: token,
+            byHash: async (hash) =>
+                (await db.select().from(inspectionAccessTokens).where(eq(inspectionAccessTokens.tokenHash, hash)).get()) ?? null,
+            byPlaintext: async (t) =>
+                (await db.select().from(inspectionAccessTokens).where(eq(inspectionAccessTokens.token, t)).get()) ?? null,
+            upgrade: async (legacy, hash) => {
+                const setValues: Partial<typeof inspectionAccessTokens.$inferInsert> = {
+                    tokenHash: hash,
+                    token: deadTokenSentinel(legacy.id),
+                };
+                // Best-effort seal so re-issue can reconstruct after upgrade.
+                if (this.secrets) {
+                    try {
+                        setValues.tokenEnc = await sealToken(token, legacy.tenantId, this.secrets.jwtSecret);
+                    } catch (e) {
+                        logger.warn('portal-access.upgrade.seal.failed', { error: e instanceof Error ? e.message : String(e) });
+                    }
+                }
+                await db.update(inspectionAccessTokens).set(setValues).where(eq(inspectionAccessTokens.id, legacy.id)).run();
+            },
+        });
         if (!row) return null;
         return {
             inspectionId: row.inspectionId,

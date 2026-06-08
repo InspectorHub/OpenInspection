@@ -26,5 +26,19 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
         .where(eq(schema.tenants.id, reqRow.tenantId))
         .get();
     const tenantSlug = tenantRow?.slug ?? '';
-    return { reqRow, agreement, auditRows, verify, pubKey, tenantSlug };
+    // Track I-a — per-signer roster for the public verifier. NO emails are
+    // exposed (privacy): only name, role, status, signedAt, channel. Ordered by
+    // creation to match the signature order on the rendered document.
+    const signers = await db.select({
+        name: schema.agreementSigners.name,
+        role: schema.agreementSigners.role,
+        status: schema.agreementSigners.status,
+        signedAt: schema.agreementSigners.signedAt,
+        channel: schema.agreementSigners.channel,
+    })
+        .from(schema.agreementSigners)
+        .where(eq(schema.agreementSigners.requestId, envelopeId))
+        .orderBy(asc(schema.agreementSigners.createdAt))
+        .all();
+    return { reqRow, agreement, auditRows, verify, pubKey, tenantSlug, signers };
 }

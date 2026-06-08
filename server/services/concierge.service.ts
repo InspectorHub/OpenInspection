@@ -1,5 +1,5 @@
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import {
     inspections,
     tenantConfigs,
@@ -12,6 +12,7 @@ import {
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import { hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
 import type { EmailService } from './email.service';
 
 /**
@@ -275,11 +276,7 @@ export class ConciergeService {
      */
     async confirmByClient(token: string): Promise<{ inspectionId: string }> {
         const db = this.getDrizzle();
-        const row = await db
-            .select()
-            .from(conciergeConfirmTokens)
-            .where(eq(conciergeConfirmTokens.token, token))
-            .get();
+        const row = await this.resolveConfirmToken(token);
         if (!row) throw Errors.NotFound('Token not found');
         if (row.confirmedAt) throw Errors.Conflict('Token already used');
         const expMs = toMs(row.expiresAt);
@@ -295,11 +292,21 @@ export class ConciergeService {
                     eq(inspections.tenantId, row.tenantId),
                 ),
             );
-        // Mark token used.
+        // Mark token used. resolveConfirmToken returns the PRE-upgrade snapshot,
+        // so row.token may be the original plaintext while the DB column was just
+        // rewritten to a sentinel by the lazy upgrade. Key on the hash (set by
+        // both hash-native creation and the upgrade) OR the snapshot token
+        // (covers a legacy row whose upgrade write failed) — exactly one row
+        // can match either.
         await db
             .update(conciergeConfirmTokens)
             .set({ confirmedAt: new Date() })
-            .where(eq(conciergeConfirmTokens.token, token));
+            .where(
+                or(
+                    eq(conciergeConfirmTokens.tokenHash, await hashToken(token)),
+                    eq(conciergeConfirmTokens.token, row.token),
+                ),
+            );
 
         // Notify the originating agent. The referredByAgentId on the
         // inspection points at the agent's contact row in this tenant; the
@@ -336,7 +343,8 @@ export class ConciergeService {
         } catch (err) {
             // Email failures must not block the state transition.
             logger.warn('concierge.confirmedAgentEmail.failed', {
-                token,
+                tenantId: row.tenantId,
+                inspectionId: row.inspectionId,
                 error: err instanceof Error ? err.message : String(err),
             });
         }
@@ -354,13 +362,31 @@ export class ConciergeService {
      * along with `expired` and `alreadyConfirmed` flags so the page can render
      * the right state. Returns null when the token does not exist.
      */
+    /**
+     * Track I-a — resolve a presented confirm token to its row. Hash-first
+     * (token_hash) with a permanent legacy plaintext fallback that lazily
+     * upgrades the row in place. `token` is the PK; the upgrade rewrites it to a
+     * random sentinel and stores token_hash. Tier-1: hash only (single-use).
+     */
+    private async resolveConfirmToken(token: string): Promise<typeof conciergeConfirmTokens.$inferSelect | null> {
+        const db = this.getDrizzle();
+        return resolveTokenRow<typeof conciergeConfirmTokens.$inferSelect>({
+            presented: token,
+            byHash: async (hash) =>
+                (await db.select().from(conciergeConfirmTokens).where(eq(conciergeConfirmTokens.tokenHash, hash)).get()) ?? null,
+            byPlaintext: async (t) =>
+                (await db.select().from(conciergeConfirmTokens).where(eq(conciergeConfirmTokens.token, t)).get()) ?? null,
+            upgrade: async (legacy, hash) => {
+                await db.update(conciergeConfirmTokens)
+                    .set({ tokenHash: hash, token: deadTokenSentinel(crypto.randomUUID()) })
+                    .where(eq(conciergeConfirmTokens.token, legacy.token));
+            },
+        });
+    }
+
     async resolveToken(token: string): Promise<ConciergeTokenView | null> {
         const db = this.getDrizzle();
-        const row = await db
-            .select()
-            .from(conciergeConfirmTokens)
-            .where(eq(conciergeConfirmTokens.token, token))
-            .get();
+        const row = await this.resolveConfirmToken(token);
         if (!row) return null;
 
         const insp = await db
@@ -445,7 +471,11 @@ export class ConciergeService {
         const db = this.getDrizzle();
         const token = mintToken();
         await db.insert(conciergeConfirmTokens).values({
-            token,
+            // `token` is the PK; the plaintext is never stored. A per-row random
+            // sentinel keeps the PK unique while the real token lives only in the
+            // email + token_hash. Tier-1: hash only (single-use magic link).
+            token: deadTokenSentinel(crypto.randomUUID()),
+            tokenHash: await hashToken(token),
             inspectionId,
             tenantId,
             clientEmail,
@@ -559,12 +589,23 @@ export interface ConfirmInfoResult {
  * integration is tracked in a separate plan. The route is wired and the
  * frontend renders so the customer can still submit a free-form slot.
  */
+async function resolveConciergeInvite(db: DrizzleD1Database, token: string): Promise<BookingInviteRow | null> {
+    return resolveTokenRow<BookingInviteRow>({
+        presented: token,
+        byHash: async (hash) =>
+            (await db.select().from(conciergeInvites).where(eq(conciergeInvites.tokenHash, hash)).get()) as BookingInviteRow | undefined ?? null,
+        byPlaintext: async (t) =>
+            (await db.select().from(conciergeInvites).where(eq(conciergeInvites.token, t)).get()) as BookingInviteRow | undefined ?? null,
+        upgrade: async (legacy, hash) => {
+            await db.update(conciergeInvites)
+                .set({ tokenHash: hash, token: deadTokenSentinel(crypto.randomUUID()) })
+                .where(eq(conciergeInvites.token, legacy.token));
+        },
+    });
+}
+
 export async function getBookInfo(db: DrizzleD1Database, token: string): Promise<BookInfoResult> {
-    const invite = (await db
-        .select()
-        .from(conciergeInvites)
-        .where(eq(conciergeInvites.token, token))
-        .get()) as BookingInviteRow | undefined;
+    const invite = await resolveConciergeInvite(db, token);
     if (!invite) throw new Error('Invalid token');
     if (new Date(invite.expiresAt) < new Date()) throw new Error('Token expired');
 
@@ -602,11 +643,7 @@ export async function createBooking(
     db: DrizzleD1Database,
     input: CreateBookingInput,
 ): Promise<CreateBookingResult> {
-    const invite = (await db
-        .select()
-        .from(conciergeInvites)
-        .where(eq(conciergeInvites.token, input.token))
-        .get()) as BookingInviteRow | undefined;
+    const invite = await resolveConciergeInvite(db, input.token);
     if (!invite) throw new Error('Invalid token');
     if (new Date(invite.expiresAt) < new Date()) throw new Error('Token expired');
 

@@ -18,7 +18,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { guestInvites, users, tenants } from '../lib/db/schema';
 import { hashPassword } from '../lib/password';
-import { generateRandomToken } from '../lib/random-token';
+import { mintToken, hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
 import { computeSeatsUsed } from '../lib/middleware/seat-guard';
 
 const DEFAULT_DURATION_SECONDS = 86_400;
@@ -64,9 +64,50 @@ export class GuestInviteService {
      * invite grants. Returns null for unknown / expired / already-claimed tokens
      * so the page renders its "link unavailable" state.
      */
+    /**
+     * Track I-a — resolve a presented invite token to its row. Hash-first
+     * (token_hash), with a permanent legacy plaintext fallback that lazily
+     * upgrades the row in place (writes token_hash, clears the plaintext to a
+     * per-row sentinel). Tier-1: hash only — guest invites are short-lived and
+     * single-use, so no token_enc reconstruction is needed.
+     */
+    private async resolveInvite(token: string): Promise<typeof guestInvites.$inferSelect | null> {
+        const db = this.getDrizzle();
+        return resolveTokenRow<typeof guestInvites.$inferSelect>({
+            presented: token,
+            byHash: async (hash) =>
+                (await db.select().from(guestInvites).where(eq(guestInvites.tokenHash, hash)).get()) ?? null,
+            byPlaintext: async (t) =>
+                (await db.select().from(guestInvites).where(eq(guestInvites.token, t)).get()) ?? null,
+            upgrade: async (legacy, hash) => {
+                await db.update(guestInvites)
+                    .set({ tokenHash: hash, token: deadTokenSentinel(legacy.id) })
+                    .where(eq(guestInvites.id, legacy.id));
+            },
+        });
+    }
+
+    /**
+     * Public, no-JWT pre-lookup for the /guest/claim route: resolve a presented
+     * token to its tenant + seat cap WITHOUT the expired/claimed gating that
+     * getInviteInfo applies (the route needs the tenant even for an expired
+     * invite so claim() can return the precise error kind). Hash-first with the
+     * same permanent legacy plaintext fallback + lazy upgrade. Returns null only
+     * when the token matches no row.
+     */
+    async resolveTenantForToken(token: string): Promise<{ tenantId: string; maxUsers: number } | null> {
+        const invite = await this.resolveInvite(token);
+        if (!invite) return null;
+        const db = this.getDrizzle();
+        const tenant = await db.select({ maxUsers: tenants.maxUsers }).from(tenants)
+            .where(eq(tenants.id, invite.tenantId)).get();
+        if (!tenant) return null;
+        return { tenantId: invite.tenantId, maxUsers: tenant.maxUsers };
+    }
+
     async getInviteInfo(token: string): Promise<{ workspaceName: string; role: string; expiresAt: number } | null> {
         const db = this.getDrizzle();
-        const invite = await db.select().from(guestInvites).where(eq(guestInvites.token, token)).get();
+        const invite = await this.resolveInvite(token);
         if (!invite) return null;
         if (invite.claimedByUserId) return null;
         if (invite.expiresAt < Math.floor(Date.now() / 1000)) return null;
@@ -82,14 +123,16 @@ export class GuestInviteService {
     }> {
         const db        = this.getDrizzle();
         const id        = crypto.randomUUID();
-        const token     = generateRandomToken();
+        const token     = mintToken();
         const duration  = input.durationSeconds ?? DEFAULT_DURATION_SECONDS;
         const expiresAt = Math.floor(Date.now() / 1000) + duration;
 
         await db.insert(guestInvites).values({
             id,
             tenantId,
-            token,
+            // Never distributed — satisfies NOT NULL + UNIQUE on the legacy column.
+            token:           deadTokenSentinel(id),
+            tokenHash:       await hashToken(token),
             role:            input.role,
             durationSeconds: duration,
             expiresAt,
@@ -117,7 +160,7 @@ export class GuestInviteService {
         }
 
         const db     = this.getDrizzle();
-        const invite = await db.select().from(guestInvites).where(eq(guestInvites.token, token)).get();
+        const invite = await this.resolveInvite(token);
         if (!invite) return { kind: 'not_found' };
         if (invite.claimedByUserId) return { kind: 'claimed' };
         if (invite.expiresAt < Math.floor(Date.now() / 1000)) return { kind: 'expired' };
@@ -160,6 +203,19 @@ export class GuestInviteService {
 
     async list(tenantId: string) {
         const db = this.getDrizzle();
-        return await db.select().from(guestInvites).where(eq(guestInvites.tenantId, tenantId)).all();
+        // Token material is projected OUT (post hash-at-rest sweep the
+        // plaintext column holds a dead sentinel and tokenHash must never
+        // reach a caller that might route it to a client).
+        return await db.select({
+            id:              guestInvites.id,
+            tenantId:        guestInvites.tenantId,
+            role:            guestInvites.role,
+            durationSeconds: guestInvites.durationSeconds,
+            expiresAt:       guestInvites.expiresAt,
+            claimedByUserId: guestInvites.claimedByUserId,
+            claimedAt:       guestInvites.claimedAt,
+            createdBy:       guestInvites.createdBy,
+            createdAt:       guestInvites.createdAt,
+        }).from(guestInvites).where(eq(guestInvites.tenantId, tenantId)).all();
     }
 }

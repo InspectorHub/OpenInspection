@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { ConciergeService } from '../../server/services/concierge.service';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
+import { hashToken } from '../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { EmailService } from '../../server/services/email.service';
 
@@ -77,6 +78,12 @@ describe('ConciergeService — A3', () => {
         sendConciergeInspectorReview: ReturnType<typeof vi.fn>;
         sendConciergeConfirmedToAgent: ReturnType<typeof vi.fn>;
         sendConciergeCancelledToAgent: ReturnType<typeof vi.fn>;
+    };
+
+    /** The plaintext confirm token is only ever in the email — never stored. */
+    const emailedToken = (): string => {
+        const calls = stubEmail.sendConciergeClientConfirm.mock.calls;
+        return calls[calls.length - 1]?.[1]?.token as string;
     };
 
     beforeEach(async () => {
@@ -188,8 +195,7 @@ describe('ConciergeService — A3', () => {
         it('clears concierge_status, sets inspection.status = "confirmed", marks token used', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             const created = await svc.createBooking(baseParams());
-            const tokens = await testDb.select().from(schema.conciergeConfirmTokens).all();
-            const tok = tokens[0].token;
+            const tok = emailedToken();
 
             const result = await svc.confirmByClient(tok);
 
@@ -208,16 +214,15 @@ describe('ConciergeService — A3', () => {
             await testDb.update(schema.conciergeConfirmTokens)
                 .set({ expiresAt: new Date(Date.now() - 1000) })
                 .where(eq(schema.conciergeConfirmTokens.inspectionId, created.inspectionId));
-            const tokens = await testDb.select().from(schema.conciergeConfirmTokens).all();
-            await expect(svc.confirmByClient(tokens[0].token)).rejects.toThrow(/expired/i);
+            await expect(svc.confirmByClient(emailedToken())).rejects.toThrow(/expired/i);
         });
 
         it('rejects already-confirmed token (single-use)', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             await svc.createBooking(baseParams());
-            const tokens = await testDb.select().from(schema.conciergeConfirmTokens).all();
-            await svc.confirmByClient(tokens[0].token);
-            await expect(svc.confirmByClient(tokens[0].token)).rejects.toThrow(/already/i);
+            const tok = emailedToken();
+            await svc.confirmByClient(tok);
+            await expect(svc.confirmByClient(tok)).rejects.toThrow(/already/i);
         });
 
         it('rejects unknown token', async () => {
@@ -228,8 +233,7 @@ describe('ConciergeService — A3', () => {
         it('emails the agent that the booking was confirmed', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             await svc.createBooking(baseParams());
-            const tokens = await testDb.select().from(schema.conciergeConfirmTokens).all();
-            await svc.confirmByClient(tokens[0].token);
+            await svc.confirmByClient(emailedToken());
             expect(stubEmail.sendConciergeConfirmedToAgent).toHaveBeenCalledTimes(1);
             // Agent's email is jane@realty.com (from seed users insert).
             expect(stubEmail.sendConciergeConfirmedToAgent.mock.calls[0]?.[0]).toBe('jane@realty.com');
@@ -240,9 +244,8 @@ describe('ConciergeService — A3', () => {
         it('returns inspection summary + expired=false for a fresh token', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             const created = await svc.createBooking(baseParams());
-            const tokens = await testDb.select().from(schema.conciergeConfirmTokens).all();
 
-            const view = await svc.resolveToken(tokens[0].token);
+            const view = await svc.resolveToken(emailedToken());
 
             expect(view).not.toBeNull();
             expect(view?.expired).toBe(false);
@@ -257,17 +260,16 @@ describe('ConciergeService — A3', () => {
             await testDb.update(schema.conciergeConfirmTokens)
                 .set({ expiresAt: new Date(Date.now() - 1000) })
                 .where(eq(schema.conciergeConfirmTokens.inspectionId, created.inspectionId));
-            const tokens = await testDb.select().from(schema.conciergeConfirmTokens).all();
-            const view = await svc.resolveToken(tokens[0].token);
+            const view = await svc.resolveToken(emailedToken());
             expect(view?.expired).toBe(true);
         });
 
         it('returns alreadyConfirmed=true once redeemed', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             await svc.createBooking(baseParams());
-            const tokens = await testDb.select().from(schema.conciergeConfirmTokens).all();
-            await svc.confirmByClient(tokens[0].token);
-            const view = await svc.resolveToken(tokens[0].token);
+            const tok = emailedToken();
+            await svc.confirmByClient(tok);
+            const view = await svc.resolveToken(tok);
             expect(view?.alreadyConfirmed).toBe(true);
         });
 
@@ -275,6 +277,73 @@ describe('ConciergeService — A3', () => {
             await seedFixture(testDb);
             const view = await svc.resolveToken('does-not-exist');
             expect(view).toBeNull();
+        });
+    });
+
+    // ─── Track I-a — confirm-token hash-at-rest (tier-1) ──────────────────────
+    describe('token hash-at-rest', () => {
+        it('(a) createBooking stores hash, NOT plaintext (PK is a sentinel)', async () => {
+            await seedFixture(testDb, { reviewRequired: false });
+            await svc.createBooking(baseParams());
+            const tok = emailedToken();
+            const rows = await testDb.select().from(schema.conciergeConfirmTokens).all();
+            expect(rows).toHaveLength(1);
+            expect(rows[0].token).toMatch(/^x:/);          // sentinel
+            expect(rows[0].token).not.toBe(tok);
+            expect(rows[0].tokenHash).toBe(await hashToken(tok));
+        });
+
+        it('(b) presenting the emailed plaintext resolves via the hash path', async () => {
+            await seedFixture(testDb, { reviewRequired: false });
+            await svc.createBooking(baseParams());
+            const view = await svc.resolveToken(emailedToken());
+            expect(view).not.toBeNull();
+        });
+
+        it('(c) legacy plaintext row resolves AND is upgraded in place', async () => {
+            await seedFixture(testDb, { reviewRequired: false });
+            const created = await svc.createBooking(baseParams());
+            // Simulate a pre-hash legacy row: plaintext PK, no hash.
+            const legacyToken = 'legacy-concierge-confirm-token-1234567890';
+            await testDb.insert(schema.conciergeConfirmTokens).values({
+                token: legacyToken,
+                inspectionId: created.inspectionId,
+                tenantId: T1,
+                clientEmail: 'legacy@x.com',
+                expiresAt: new Date(Date.now() + 86_400_000),
+                confirmedAt: null,
+                createdAt: new Date(),
+            });
+            const view = await svc.resolveToken(legacyToken);
+            expect(view).not.toBeNull();
+            const upgraded = await testDb.select().from(schema.conciergeConfirmTokens)
+                .where(eq(schema.conciergeConfirmTokens.tokenHash, await hashToken(legacyToken))).get();
+            expect(upgraded).toBeTruthy();
+            expect(upgraded?.token).toMatch(/^x:/);     // PK rewritten to sentinel
+            expect(upgraded?.clientEmail).toBe('legacy@x.com');
+        });
+
+        it('(c2) legacy plaintext confirm is single-use (mark-used survives the lazy upgrade)', async () => {
+            await seedFixture(testDb, { reviewRequired: false });
+            const created = await svc.createBooking(baseParams());
+            const legacyToken = 'legacy-concierge-confirm-token-replay-99';
+            await testDb.insert(schema.conciergeConfirmTokens).values({
+                token: legacyToken,
+                inspectionId: created.inspectionId,
+                tenantId: T1,
+                clientEmail: 'legacy@x.com',
+                expiresAt: new Date(Date.now() + 86_400_000),
+                confirmedAt: null,
+                createdAt: new Date(),
+            });
+            // First confirm succeeds; the lazy upgrade rewrites the PK to a
+            // sentinel mid-flight — confirmedAt must land on the row anyway.
+            await svc.confirmByClient(legacyToken);
+            const upgraded = await testDb.select().from(schema.conciergeConfirmTokens)
+                .where(eq(schema.conciergeConfirmTokens.tokenHash, await hashToken(legacyToken))).get();
+            expect(upgraded?.confirmedAt).toBeTruthy();
+            // Replay must be rejected.
+            await expect(svc.confirmByClient(legacyToken)).rejects.toThrow(/already/i);
         });
     });
 });

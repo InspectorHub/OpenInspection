@@ -12,9 +12,6 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import { guestInvites, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { sendSuccess } from '../lib/response';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -87,29 +84,20 @@ export const guestRoutes = createApiRouter()
     })
     .openapi(claimRoute, async (c) => {
         const body = c.req.valid('json');
-        const db   = drizzle(c.env.DB);
 
         const links = getLegalLinks(c.env);
         if (links && body.termsAccepted !== true) {
             throw Errors.BadRequest('You must accept the terms to create an account.');
         }
 
-        // Look up the invite to discover which tenant it belongs to. We do
-        // this before the service call so the 404 path stays cheap and so we
-        // can fetch the tenant's seat cap without touching ScopedDB (which
-        // needs a JWT we don't have on this route).
-        const invite = await db.select().from(guestInvites)
-            .where(eq(guestInvites.token, body.token))
-            .get();
-        if (!invite) throw Errors.NotFound('Invalid or unknown invite token');
-
-        const tenant = await db.select().from(tenants)
-            .where(eq(tenants.id, invite.tenantId))
-            .get();
-        if (!tenant) throw Errors.NotFound('Invite tenant no longer exists');
+        // Resolve the invite's tenant + seat cap before the service call so we
+        // can pass maxUsers without touching ScopedDB (which needs a JWT we
+        // don't have on this route). Hash-aware — the token is stored hashed.
+        const resolved = await c.var.services.guestInvite.resolveTenantForToken(body.token);
+        if (!resolved) throw Errors.NotFound('Invalid or unknown invite token');
 
         const out = await c.var.services.guestInvite.claim(body.token, body, {
-            maxUsers: tenant.maxUsers,
+            maxUsers: resolved.maxUsers,
             ...(links ? { termsAccepted: buildTermsAcceptedBlob(links, {
                 ip: c.req.header('CF-Connecting-IP'),
                 country: (c.req.raw.cf?.country as string | undefined),
@@ -126,7 +114,7 @@ export const guestRoutes = createApiRouter()
             case 'not_found':
                 throw Errors.NotFound('Invalid or unknown invite token');
             case 'over_quota':
-                throw Errors.SeatLimitReached({ used: tenant.maxUsers, max: tenant.maxUsers, billingPortalUrl: null });
+                throw Errors.SeatLimitReached({ used: resolved.maxUsers, max: resolved.maxUsers, billingPortalUrl: null });
             case 'invalid':
                 throw Errors.Validation({ reason: out.reason });
         }

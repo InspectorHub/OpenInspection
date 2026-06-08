@@ -10,6 +10,9 @@ export type AuditEvent =
     | 'request.viewed'
     | 'agreement.signed'
     | 'agreement.inspector_signed'
+    | 'signer.signed'
+    | 'signer.declined'
+    | 'signer.reminded'
     | 'workflow.complete';
 
 /**
@@ -31,10 +34,14 @@ export class AuditLogService {
     }
 
     /**
-     * Append a new event to the chain. Idempotent for terminal events
-     * ('agreement.signed', 'workflow.complete') via UNIQUE INDEX —
-     * concurrent appends will fail with constraint error rather than
-     * fork the chain.
+     * Append a new event to the chain. The PARTIAL unique index
+     * `idx_esign_audit_logs_event_dedup` (on tenant_id, request_id, event,
+     * WHERE event NOT LIKE 'signer.%') makes envelope-level events
+     * ('agreement.signed', 'workflow.complete', …) idempotent — a duplicate
+     * append hits the constraint and returns the existing row instead of
+     * forking the chain. Per-signer events ('signer.signed', 'signer.declined')
+     * are EXCLUDED from the index so a multi-signer envelope can legitimately
+     * append the same event type once per signer.
      */
     async append(
         tenantId: string,
@@ -69,8 +76,10 @@ export class AuditLogService {
                 createdAt: Date.now(),
             });
         } catch (e) {
-            // UNIQUE INDEX on (tenant_id, request_id, event) for terminal events
-            // means double-appends are silently OK — return the existing row.
+            // Partial UNIQUE INDEX on (tenant_id, request_id, event) for
+            // envelope-level (non-signer) events means double-appends are
+            // idempotent — return the existing row. Per-signer events are not
+            // covered by the index, so they never reach this branch.
             const existing = await this.getDrizzle().select().from(esignAuditLogs)
                 .where(and(
                     eq(esignAuditLogs.tenantId, tenantId),

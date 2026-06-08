@@ -24,8 +24,11 @@ export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {
     createdAt:      integer('created_at').notNull(),
     expiresAt:      integer('expires_at'),   // null = open (order active)
     revokedAt:      integer('revoked_at'),   // null = live
+    tokenHash:      text('token_hash'),
+    tokenEnc:       text('token_enc'),
 }, (t) => [
     uniqueIndex('idx_iat_token').on(t.token),
     index('idx_iat_inspection').on(t.tenantId, t.inspectionId),
     uniqueIndex('idx_iat_recipient').on(t.inspectionId, t.recipientEmail),
+    uniqueIndex('idx_iat_token_hash').on(t.tokenHash),
 ]);
