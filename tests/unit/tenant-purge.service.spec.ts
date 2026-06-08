@@ -125,6 +125,33 @@ describe('TenantPurgeService.purge', () => {
         expect(signers).toHaveLength(0);
     });
 
+    it('erasure_log rows for the tenant are deleted on whole-tenant purge', async () => {
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        // Seed an erasure_log row scoped to the tenant (subject_email is PII).
+        await testDb.insert(schema.erasureLog).values({
+            id: 'elog-1',
+            tenantId: TENANT,
+            subjectEmail: 'subject@privacy.com',
+            requestedBy: 'admin-sub',
+            identityBasis: 'admin_action',
+            status: 'completed',
+            decisionsJson: '[]',
+            retainedCount: 0,
+            anonymizedCount: 0,
+            deletedCount: 0,
+            createdAt: Date.now(),
+        });
+
+        const r2 = makeR2([]);
+        const kv = makeKv();
+        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        await svc.purge(TENANT);
+
+        const remaining = await testDb.select().from(schema.erasureLog).all();
+        expect(remaining).toHaveLength(0);
+    });
+
     it('destruction record is non-personal (no email/name/address columns)', async () => {
         const { drizzle } = await import('drizzle-orm/d1');
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);

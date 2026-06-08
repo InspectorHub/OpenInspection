@@ -1557,7 +1557,9 @@ export const adminRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
         const adminService = c.var.services.admin;
-        const counts = await adminService.eraseClientData(tenantId, body.clientEmail);
+        const counts = await adminService.eraseClientData(tenantId, body.clientEmail, {
+            requestedBy: c.get('user')?.sub,
+        });
         
         auditFromContext(c, 'data.delete', 'client', {
             metadata: { clientEmail: body.clientEmail, ...counts },

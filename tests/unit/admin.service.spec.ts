@@ -200,4 +200,29 @@ describe('AdminService', () => {
         expect(logs[0].subjectEmail).toBe(clientEmail);
         expect(logs[0].status).toBe('completed');
     });
+
+    it('eraseClientData persists requestedBy in erasure_log for Art. 30 accountability', async () => {
+        const tenantId = 't1';
+        const clientEmail = 'actor-test@privacy.com';
+        const actorSub = 'user-sub-abc123';
+
+        await testDb.insert(inspections).values({
+            id: 'insp-actor',
+            tenantId,
+            propertyAddress: '99 Actor Ave',
+            clientName: 'Actor Client',
+            clientEmail,
+            status: 'draft',
+            paymentStatus: 'unpaid',
+            price: 0,
+            date: new Date().toISOString().split('T')[0],
+            createdAt: new Date(),
+        });
+
+        await adminService.eraseClientData(tenantId, clientEmail, { requestedBy: actorSub });
+
+        const logs = await testDb.select().from(schema.erasureLog).all();
+        expect(logs.length).toBe(1);
+        expect(logs[0].requestedBy).toBe(actorSub);
+    });
 });
