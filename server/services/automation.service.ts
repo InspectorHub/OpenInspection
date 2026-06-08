@@ -67,17 +67,22 @@ export class AutomationService {
     async create(tenantId: string, data: {
         name: string; trigger: string; recipient: string;
         delayMinutes: number; subjectTemplate: string; bodyTemplate: string;
+        conditions?: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
+        channel?: 'email' | 'sms';
     }) {
         const db = this.getDrizzle();
         const id = nanoid();
+        const { conditions, channel, ...rest } = data;
         await db.insert(automations).values({
-            id, tenantId, ...data,
+            id, tenantId, ...rest,
             // Casts narrow the public string param to the schema's enum literal
             // union; runtime values are validated by the API zod schema.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            trigger:   data.trigger as any,
+            trigger:   rest.trigger as any,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            recipient: data.recipient as any,
+            recipient: rest.recipient as any,
+            conditions: conditions ? JSON.stringify(conditions) : null,
+            channel:    channel ?? 'email',
             active: true, isDefault: false, createdAt: new Date(),
         });
         return (await db.select().from(automations).where(eq(automations.id, id)))[0];
@@ -86,14 +91,22 @@ export class AutomationService {
     async update(tenantId: string, id: string, data: Partial<{
         name: string; trigger: string; recipient: string;
         delayMinutes: number; subjectTemplate: string; bodyTemplate: string; active: boolean;
+        conditions: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
+        channel: 'email' | 'sms';
     }>) {
         const db = this.getDrizzle();
         const existing = await db.select().from(automations)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId))).limit(1);
         if (!existing[0]) throw Errors.NotFound('Automation not found');
-        // Same enum-narrowing as create() — public Partial<{string}> → table's enum literals.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await db.update(automations).set(data as any)
+        const { conditions, ...rest } = data;
+        const patch: Record<string, unknown> = { ...rest };
+        // Key-presence (not truthiness) so an explicit `conditions: null` clears
+        // the row while an omitted key leaves it untouched. The zod layer strips
+        // absent keys, so `undefined` should not reach here; the guard is belt-
+        // and-braces for direct (non-API) callers.
+        if ('conditions' in data) patch.conditions = conditions ? JSON.stringify(conditions) : null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial patch → table's typed columns; matches the file's create() cast pattern
+        await db.update(automations).set(patch as any)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId)));
         return (await db.select().from(automations).where(eq(automations.id, id)))[0];
     }
