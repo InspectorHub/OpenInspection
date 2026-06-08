@@ -270,16 +270,29 @@ const reportGateRoute = createRoute(withMcpMetadata({
 
 // Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
 // loadVerifyData; this is the base JSON route the verify page consumes.
+const VerifySignerSchema = z.object({
+    name: z.string(),
+    role: z.string(),
+    status: z.string(),
+    signedAt: z.string().nullable(),
+    channel: z.string().nullable(),
+});
+
 const VerifyResponseSchema = z.object({
     envelopeId: z.string(),
     documentTitle: z.string().nullable(),
     clientName: z.string().nullable(),
-    clientEmail: z.string().nullable(),
     chainValid: z.boolean(),
     chainReason: z.string().nullable(),
     keyFingerprint: z.string().nullable(),
     keyAlgorithm: z.string(),
     eventCount: z.number(),
+    // Track I-a — the pinned content snapshot ("what was signed") + its hash, and
+    // the per-signer roster (no emails — privacy). Snapshot is null on
+    // pre-feature envelopes signed before snapshots were introduced.
+    contentSnapshot: z.string().nullable(),
+    contentHash: z.string().nullable(),
+    signers: z.array(VerifySignerSchema),
 });
 
 const verifyRoute = createRoute(withMcpMetadata({
@@ -307,12 +320,22 @@ export const publicReportRoutes = createApiRouter()
                 envelopeId,
                 documentTitle: data.agreement?.name ?? null,
                 clientName: data.reqRow.clientName,
-                clientEmail: data.reqRow.clientEmail,
+                // clientEmail deliberately NOT exposed — this is a public, no-auth
+                // endpoint; the signer roster below is email-free for the same reason.
                 chainValid: data.verify.valid,
                 chainReason: data.verify.valid ? null : (data.verify.reason as string),
                 keyFingerprint: data.pubKey?.fingerprint ?? null,
                 keyAlgorithm: 'Ed25519',
                 eventCount: data.auditRows.length,
+                contentSnapshot: data.reqRow.contentSnapshot ?? null,
+                contentHash: data.reqRow.contentHash ?? null,
+                signers: data.signers.map((s) => ({
+                    name: s.name,
+                    role: s.role,
+                    status: s.status,
+                    signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
+                    channel: s.channel ?? null,
+                })),
             },
         }, 200);
     })
@@ -463,7 +486,7 @@ export const publicReportRoutes = createApiRouter()
         const { tenant, id } = c.req.valid('param');
         const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
-        const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant);
+        const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant, c.var.services.agreement);
         return c.json({ success: true as const, data: gate }, 200);
     });
 

@@ -1,7 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import publicReportRoutes from '../../server/api/public-report';
 import type { HonoConfig } from '../../server/types/hono';
+
+vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { eq, asc } from 'drizzle-orm';
+import { createTestDb, setupSchema } from './db';
+import * as schema from '../../server/lib/db/schema';
+import { InspectionService } from '../../server/services/inspection.service';
+import { AgreementService } from '../../server/services/agreement.service';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 /**
  * C-10 ③-A.1 — GET /api/public/report/:tenant/:id integration shape.
@@ -153,6 +162,144 @@ describe('GET /api/public/report-gate/:tenant/:id — ③-A.2', () => {
         expect(body.success).toBe(true);
         expect(body.data.reason).toBe('payment');
         expect(body.data.amountCents).toBe(45000);
-        expect(getReportGate).toHaveBeenCalledWith('insp1', 't1', 'WRONG-TENANT');
+        // Task 7 — the route now threads the agreement service through as the
+        // 4th arg (undefined here since this stub omits it).
+        expect(getReportGate).toHaveBeenCalledWith('insp1', 't1', 'WRONG-TENANT', undefined);
+    });
+});
+
+/**
+ * Track I-a Task 7 — getReportGate combined-checkout routing (real DB).
+ * When BOTH the agreement and payment gates are outstanding, the gate's CTA
+ * points at the combined /checkout/{slug}/{signerToken} page ('Sign & pay'),
+ * with `reason` staying 'agreement' for compat. Single-outstanding behaviors
+ * stay byte-compatible (legacy /agreements/sign and /r/:id/invoice URLs).
+ */
+describe('InspectionService.getReportGate — combined checkout routing (Task 7)', () => {
+    const TENANT_ID = '00000000-0000-0000-0000-000000000001';
+    const INSP_ID = '00000000-0000-0000-0000-000000000010';
+    const AGR_ID = '00000000-0000-0000-0000-000000000020';
+    const SLUG = 'acme';
+    const JWT_SECRET = 'test-secret';
+
+    let db: BetterSQLite3Database<typeof schema>;
+    let sqlite: any;
+
+    async function seed(inspOver: Partial<typeof schema.inspections.$inferInsert> = {}) {
+        await db.insert(schema.tenants).values({
+            id: TENANT_ID, name: 'Acme', slug: SLUG, status: 'active',
+            deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
+        } as any);
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT_ID, siteName: 'Acme Inspections', primaryColor: '#ff5500', updatedAt: new Date(),
+        } as any);
+        await db.insert(schema.inspections).values({
+            id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
+            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid',
+            price: 50000, agreementRequired: true, paymentRequired: true, createdAt: new Date(),
+            ...inspOver,
+        } as any);
+        await db.insert(schema.agreements).values({
+            id: AGR_ID, tenantId: TENANT_ID, name: 'Standard Agreement',
+            content: 'ORIGINAL agreement text', version: 1, createdAt: new Date(),
+        } as any);
+    }
+
+    async function createEnvelope() {
+        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
+            signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
+            completionPolicy: 'all',
+        });
+        const signers = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId))
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+        return { token: r.token, requestId: r.requestId, signers };
+    }
+
+    function makeService() {
+        const inspection = new InspectionService({} as D1Database);
+        const agreement = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        return { inspection, agreement };
+    }
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db as BetterSQLite3Database<typeof schema>;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        (mockDrizzle as any).mockReturnValue(db);
+    });
+
+    afterEach(() => sqlite.close());
+
+    it('BOTH outstanding -> combined checkout URL + "Sign & pay", reason stays agreement', async () => {
+        await seed({ agreementRequired: true, paymentRequired: true, paymentStatus: 'unpaid' });
+        const { token, signers } = await createEnvelope();
+        const { inspection, agreement } = makeService();
+
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        expect(gate).not.toBeNull();
+        expect(gate!.reason).toBe('agreement');
+        expect(gate!.actionLabel).toBe('Sign & pay');
+        // The signer token in the URL is reconstructed server-side; it is the
+        // SAME tier-2 token the public sign page uses (round-trips to the signer).
+        expect(gate!.actionUrl).toBe(`/checkout/${SLUG}/${token}`);
+        // Token in the URL resolves back to our signer.
+        const resolved = await agreement.getSignerByPresentedToken(token);
+        expect(resolved?.signer.id).toBe(signers[0].id);
+    });
+
+    it('ONLY agreement outstanding -> /agreements/sign URL carries the REAL signer token', async () => {
+        await seed({ agreementRequired: true, paymentRequired: false, paymentStatus: 'unpaid' });
+        const { token, signers } = await createEnvelope();
+        const { inspection, agreement } = makeService();
+
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        expect(gate!.reason).toBe('agreement');
+        expect(gate!.actionLabel).toBe('Sign agreement');
+        // The agreement-only sign URL must route through the first outstanding
+        // signer's real tier-2 token — NOT the undistributed envelope placeholder.
+        expect(gate!.actionUrl).toBe(`/agreements/sign/${SLUG}/${token}`);
+        expect(gate!.actionUrl).not.toContain('/checkout/');
+        // The token round-trips back to signer 1 (proves it is the signer link,
+        // not the placeholder envelope token) and never carries a sentinel.
+        expect(gate!.actionUrl).not.toContain('x:');
+        const resolved = await agreement.getSignerByPresentedToken(token);
+        expect(resolved?.signer.id).toBe(signers[0].id);
+    });
+
+    it('multi-signer agreement-only gate URL resolves to signer 1, never a sentinel', async () => {
+        await seed({ agreementRequired: true, paymentRequired: false, paymentStatus: 'unpaid' });
+        // Two-signer envelope: the gate must route to signer 1's real token.
+        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
+            signers: [
+                { name: 'Jane', email: 'jane@test.com', role: 'client' },
+                { name: 'John', email: 'john@test.com', role: 'co_client' },
+            ],
+            completionPolicy: 'all',
+        });
+        const signers = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, r.requestId))
+            .orderBy(asc(schema.agreementSigners.createdAt)).all();
+        const { inspection, agreement } = makeService();
+
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        expect(gate!.reason).toBe('agreement');
+        const urlToken = gate!.actionUrl.split('/').pop()!;
+        expect(urlToken).not.toContain('x:');
+        const resolved = await agreement.getSignerByPresentedToken(urlToken);
+        expect(resolved?.signer.id).toBe(signers[0].id);
+    });
+
+    it('ONLY payment outstanding -> legacy /r/:id/invoice URL unchanged', async () => {
+        await seed({ agreementRequired: false, paymentRequired: true, paymentStatus: 'unpaid' });
+        const { inspection, agreement } = makeService();
+
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        expect(gate!.reason).toBe('payment');
+        expect(gate!.actionLabel).toBe('Pay invoice');
+        expect(gate!.actionUrl).toBe(`/r/${INSP_ID}/invoice`);
     });
 });

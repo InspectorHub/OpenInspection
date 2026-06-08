@@ -82,32 +82,56 @@ Returns the rendered HTML report page. Publicly accessible — no auth required.
 ---
 
 ### `GET /api/inspections/:id/agreement`
-Returns the inspection agreement text for a client to review before signing.
+Returns the agreement to sign on-site. Find-or-creates the signing **envelope**
+(`agreement_requests` + `agreement_signers`) so the on-site surface reads the
+SAME pinned snapshot + signer set as the emailed flow. Returns
+`{ "agreement": null }` when the tenant has no agreement template configured.
 
 **Response:**
 ```json
 {
   "agreement": {
+    "id": "agr-123",
     "name": "Standard Terms",
     "content": "# Standard Inspection Agreement\n\n..."
-  }
+  },
+  "requestId": "env-456",
+  "completionPolicy": "all",
+  "signers": [
+    { "id": "sgr-1", "name": "Jane", "email": "jane@x.com", "role": "client", "status": "sent" }
+  ]
 }
 ```
+
+`agreement.{id,name,content}` is a backward-compatible subset; new fields are additive.
 
 ---
 
 ### `POST /api/inspections/:id/sign`
-Record a client's e-signature on the inspection agreement.
+Record an on-site e-signature. The signature rides the agreement **envelope**
+(snapshot + Spec 5H audit chain + per-signer receipt email), and on completion
+runs the same pipeline as the emailed flow. Requires a configured agreement
+template — signing against no template is rejected (closes the prior legal hole
+where on-site signatures had zero legal evidence).
 
 **Request body:**
 ```json
-{ "signatureBase64": "data:image/png;base64,..." }
+{
+  "signatureBase64": "data:image/png;base64,...",
+  "signerId": "sgr-1",
+  "onBehalfOf": "Jane Doe",
+  "onBehalfDisclaimer": "..."
+}
 ```
+`signerId`/`onBehalfOf`/`onBehalfDisclaimer` are optional. Without `signerId`,
+the first non-terminal signer is targeted.
 
 **Response:**
 ```json
-{ "success": true }
+{ "success": true, "data": { "signed": true, "signerId": "sgr-1", "envelopeStatus": "signed" } }
 ```
+A repeat sign returns `{ "signed": true, "alreadySigned": true, ... }`. With no
+template configured, responds `409` with `{ "code": "no_agreement_template" }`.
 
 ---
 

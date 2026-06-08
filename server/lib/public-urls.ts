@@ -67,6 +67,19 @@ export function agreementSignPath(tenantSlug: string, token: string): string {
     return `/agreements/sign/${tenantSlug}/${token}`;
 }
 
-export function m2mAgreementRenderUrl(host: string, tenantSlug: string, token: string): string {
-    return joinUrl(host, `/m2m/agreement-render/${tenantSlug}/${token}`);
+/**
+ * Track I-a Task 8 — combined Sign & pay link. Used in agreement-request
+ * emails when the inspection requires payment AND has an outstanding invoice;
+ * otherwise the standalone agreementSignUrl is used.
+ */
+export function checkoutUrl(host: string, tenantSlug: string, token: string): string {
+    return joinUrl(host, `/checkout/${tenantSlug}/${token}`);
+}
+
+/**
+ * Track I-a — keyed by the stable envelope requestId (the legacy plaintext
+ * `token` column is no longer distributed; signer tokens live per-signer).
+ */
+export function m2mAgreementRenderUrl(host: string, tenantSlug: string, requestId: string): string {
+    return joinUrl(host, `/m2m/agreement-render/${tenantSlug}/${requestId}`);
 }

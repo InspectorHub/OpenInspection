@@ -54,12 +54,13 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, inspectionAgreements, users, contacts, inspectionMediaPool, inspectionInspectors, tenants } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, agreementSigners, users, contacts, inspectionMediaPool, inspectionInspectors, tenants } from '../lib/db/schema';
+import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../lib/sign-effects';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
 import { findScheduleConflicts } from '../lib/schedule-conflicts';
-import { eq, inArray, and } from 'drizzle-orm';
+import { eq, inArray, and, asc } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { SignatureUser } from '../lib/inspector-signature';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -3210,8 +3211,14 @@ export const inspectionsRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
 
-        const existing = await db.select().from(inspectionAgreements)
-            .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId))).get();
+        // Track I-a — signed truth rides the envelope: a signed agreement_requests
+        // row for this inspection (any channel — emailed OR on-site) lights it.
+        const existing = await db.select({ id: agreementRequests.id }).from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.inspectionId, id),
+                eq(agreementRequests.tenantId, tenantId),
+                eq(agreementRequests.status, 'signed'),
+            )).limit(1).get();
 
         return c.json({ success: true, data: { signed: !!existing } }, 200);
     })
@@ -3219,54 +3226,214 @@ export const inspectionsRoutes = createApiRouter()
         const id = c.req.param('id') as string;
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
+        const svc = c.var.services.agreement;
 
-        // Verify inspection exists
-        const inspection = await db.select().from(inspectionTable)
+        // Verify inspection exists (404 distinct from "no template").
+        const inspection = await db.select({ id: inspectionTable.id }).from(inspectionTable)
             .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId))).get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
-        // Get the first agreement for this tenant
-        const agreement = await db.select().from(agreements)
-            .where(eq(agreements.tenantId, tenantId)).get();
-        if (!agreement) {
-            return c.json({ success: true, data: { agreement: null } }, 200);
+        // Track I-a — ride the envelope: find-or-create the signing request so the
+        // on-site signing surface reads the SAME snapshot + signer set as the
+        // emailed flow. No template configured → { agreement: null } as before.
+        let env: Awaited<ReturnType<typeof svc.findOrCreate>>;
+        try {
+            env = await svc.findOrCreate(tenantId, id);
+        } catch (e) {
+            if (e instanceof Error && /No agreement template configured/.test(e.message)) {
+                return c.json({ success: true, data: { agreement: null } }, 200);
+            }
+            throw e;
         }
 
-        return c.json({ success: true, data: { agreement: { id: agreement.id, name: agreement.name, content: agreement.content } } }, 200);
+        const envelope = await db.select().from(agreementRequests)
+            .where(eq(agreementRequests.id, env.requestId)).get();
+        if (!envelope) throw Errors.NotFound('Agreement request not found');
+
+        const snapshot = await svc.getSnapshotForRequest(envelope);
+        const agreementRow = await db.select({ name: agreements.name }).from(agreements)
+            .where(eq(agreements.id, envelope.agreementId)).get();
+        const signerRows = await svc.listSigners(tenantId, env.requestId);
+
+        return c.json({
+            success: true,
+            data: {
+                // Backward-compatible subset: callers reading data.agreement.{id,name,content} still work.
+                agreement: { id: envelope.agreementId, name: agreementRow?.name ?? 'Agreement', content: snapshot.content },
+                requestId: env.requestId,
+                completionPolicy: envelope.completionPolicy,
+                signers: signerRows.map((s) => ({ id: s.id, name: s.name, email: s.email, role: s.role, status: s.status })),
+            },
+        }, 200);
     })
     .post('/:id/sign', async (c) => {
         const id = c.req.param('id') as string;
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
+        const svc = c.var.services.agreement;
 
         // Verify inspection exists
-        const inspection = await db.select().from(inspectionTable)
+        const inspection = await db.select({ id: inspectionTable.id }).from(inspectionTable)
             .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId))).get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
         const raw = await c.req.json();
-        const parsed = z.object({ signatureBase64: z.string().min(1).describe('TODO describe signatureBase64 field for the OpenInspection MCP integration') }).safeParse(raw);
+        const parsed = z.object({
+            signatureBase64: z.string().min(1).describe('Base64-encoded signature image (data URL or raw base64) drawn by the signer on-site.'),
+            signerId: z.string().optional().describe('Target signer within the envelope; defaults to the first non-terminal signer.'),
+            onBehalfOf: z.string().max(200).optional().describe('Name of the party an authorized agent signs for.'),
+            onBehalfDisclaimer: z.string().max(2000).optional().describe('Disclaimer the authorized agent attests to when signing on behalf of another.'),
+        }).safeParse(raw);
         if (!parsed.success) return c.json({ success: false, error: { message: 'Invalid signature data', code: 'validation_error' } }, 400);
         const body = parsed.data;
 
-        // Check if already signed
-        const existing = await db.select().from(inspectionAgreements)
-            .where(and(eq(inspectionAgreements.inspectionId, id), eq(inspectionAgreements.tenantId, tenantId))).get();
-        if (existing) {
-            return c.json({ success: true, data: { alreadySigned: true } }, 200);
+        // Idempotency at the inspection level: if a signed envelope already
+        // exists for this inspection, short-circuit (don't spin a fresh envelope).
+        // Preserves the old `{ alreadySigned: true }` contract.
+        const alreadySignedEnv = await db.select({ id: agreementRequests.id, status: agreementRequests.status })
+            .from(agreementRequests)
+            .where(and(
+                eq(agreementRequests.inspectionId, id),
+                eq(agreementRequests.tenantId, tenantId),
+                eq(agreementRequests.status, 'signed'),
+            )).limit(1).get();
+        if (alreadySignedEnv) {
+            return c.json({ success: true, data: { signed: true, alreadySigned: true, envelopeStatus: 'signed' } }, 200);
         }
 
-        await db.insert(inspectionAgreements).values({
-            id: crypto.randomUUID(),
-            tenantId,
-            inspectionId: id,
-            signatureBase64: body.signatureBase64,
-            signedAt: new Date(),
-            ipAddress: c.req.header('CF-Connecting-IP') || null,
-            userAgent: c.req.header('User-Agent') || null,
+        // Track I-a — on-site signing rides the envelope so every signature carries
+        // a snapshot + audit chain + receipt. An envelope requires a template; the
+        // old flow recorded signatures against nothing (the legal hole we close).
+        let env: Awaited<ReturnType<typeof svc.findOrCreate>>;
+        try {
+            env = await svc.findOrCreate(tenantId, id);
+        } catch (e) {
+            if (e instanceof Error && /No agreement template configured/.test(e.message)) {
+                return c.json({ success: false, error: { code: 'no_agreement_template', message: 'Create an agreement template before collecting signatures' } }, 409);
+            }
+            throw e;
+        }
+
+        const envelope = await db.select().from(agreementRequests)
+            .where(eq(agreementRequests.id, env.requestId)).get();
+        if (!envelope) throw Errors.NotFound('Agreement request not found');
+
+        const signers = await db.select().from(agreementSigners)
+            .where(eq(agreementSigners.requestId, env.requestId))
+            .orderBy(asc(agreementSigners.createdAt)).all();
+
+        // Pick the target signer: explicit signerId, else first non-terminal.
+        let signer;
+        if (body.signerId) {
+            signer = signers.find((s) => s.id === body.signerId);
+            if (!signer) throw Errors.NotFound('Signer not found');
+        } else {
+            signer = signers.find((s) => !['signed', 'declined', 'expired'].includes(s.status));
+            if (!signer) {
+                // Every signer is terminal — nothing left to sign.
+                throw Errors.Conflict('Agreement is no longer signable');
+            }
+        }
+
+        // Idempotent — an already-signed signer short-circuits without re-firing effects.
+        if (signer.status === 'signed') {
+            return c.json({ success: true, data: { signed: true, alreadySigned: true, signerId: signer.id, envelopeStatus: envelope.status } }, 200);
+        }
+
+        // Terminal-state guard: declined / expired signers must never reach the audit append.
+        if (signer.status === 'declined' || signer.status === 'expired') {
+            throw Errors.Conflict('Agreement is no longer signable');
+        }
+
+        const plaintext = await svc.getSignerLink(env.requestId, signer.id);
+
+        const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
+        const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
+        const country = c.req.header('cf-ipcountry') || null;
+        const tsMs = Date.now();
+
+        // Spec 5H P0 — audit-before-mutation per-signer append (chain integrity
+        // survives a partial failure). Hash the signature image for cert reference.
+        const sigBytes = (() => {
+            try {
+                const b64 = body.signatureBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+                const bin = atob(b64);
+                const out = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+                return out;
+            } catch { return new Uint8Array(); }
+        })();
+        const sigHash = sigBytes.length > 0
+            ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', sigBytes)))
+                .map((b) => b.toString(16).padStart(2, '0')).join('')
+            : null;
+        try {
+            await c.var.services.auditLog.append(envelope.tenantId, envelope.id, 'signer.signed', {
+                envelopeId: envelope.id,
+                signerId: signer.id,
+                signerEmail: signer.email,
+                signerRole: signer.role,
+                channel: 'in_person',
+                contentHash: envelope.contentHash ?? null,
+                onBehalfOf: body.onBehalfOf ?? null,
+                country,
+                ip,
+                signatureImageHash: sigHash ? `sha256:${sigHash}` : null,
+                tsMs,
+                ua,
+            });
+        } catch (e) {
+            logger.warn('audit.append.signer-signed.failed', { requestId: envelope.id, signerId: signer.id, error: (e as Error).message });
+        }
+
+        const result = await svc.markSignedBySigner(plaintext, body.signatureBase64, {
+            signedAtMs: tsMs,
+            channel: 'in_person',
+            ipAddress: ip,
+            userAgent: ua,
+            onBehalfOf: body.onBehalfOf ?? null,
+            onBehalfDisclaimer: body.onBehalfDisclaimer ?? null,
         });
 
-        return c.json({ success: true, data: { signed: true } }, 200);
+        // Spec 2A — per-signer automation event (fires on EVERY sign).
+        if (result.inspectionId) {
+            c.var.services.automation.trigger({
+                tenantId: result.tenantId,
+                inspectionId: result.inspectionId,
+                triggerEvent: 'agreement.signer_signed',
+                companyName: c.env.APP_NAME || 'OpenInspection',
+                reportBaseUrl: c.env.APP_BASE_URL || '',
+            }).catch(() => {});
+        }
+
+        // Envelope completion side-effects fire EXACTLY ONCE.
+        if (result.envelopeCompletedNow) {
+            await runEnvelopeCompletionPipeline(c, {
+                requestId: result.requestId,
+                tenantId: result.tenantId,
+                inspectionId: result.inspectionId,
+                clientEmail: envelope.clientEmail ?? null,
+                clientName: envelope.clientName ?? null,
+                agreementId: envelope.agreementId,
+            });
+        }
+
+        // Per-signer in-person receipt — every signer gets a receipt at their own
+        // email EXCEPT when this same sign completed the envelope and the signer
+        // IS the envelope client (the completion pipeline already emailed them).
+        const completedSelf = result.envelopeCompletedNow
+            && !!envelope.clientEmail
+            && signer.email.trim().toLowerCase() === envelope.clientEmail.trim().toLowerCase();
+        if (!completedSelf) {
+            await runSignerReceiptEffects(c, {
+                signerEmail: signer.email,
+                signerName: signer.name,
+                inspectionId: result.inspectionId,
+                requestId: result.requestId,
+            });
+        }
+
+        return c.json({ success: true, data: { signed: true, signerId: signer.id, envelopeStatus: result.envelopeStatus } }, 200);
     })
     .get('/:id/presence/ws', async (c) => {
         if (c.req.header('Upgrade') !== 'websocket') {

@@ -141,6 +141,34 @@
       "when": 1780796334074,
       "tag": "0019_hot_anita_blake",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1780825048850,
+      "tag": "0020_awesome_typhoid_mary",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1780842798704,
+      "tag": "0021_jazzy_mister_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1780875149813,
+      "tag": "0022_conscious_scrambler",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1780878457631,
+      "tag": "0023_free_harpoon",
+      "breakpoints": true
     }
   ]
 }

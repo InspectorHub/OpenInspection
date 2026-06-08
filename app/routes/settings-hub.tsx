@@ -50,6 +50,12 @@ const GROUPS = [
     icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
   },
   {
+    to: "/settings/compliance",
+    title: "Compliance",
+    desc: "GDPR retention window, erasure request records.",
+    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+  },
+  {
     to: "/settings/security",
     title: "Account",
     desc: "Password, two-factor, security.",

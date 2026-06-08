@@ -5,7 +5,7 @@
  * indicators rendered next to each inspection row:
  *
  *   - 📄 report ready      → status is `completed` or `delivered`
- *   - 📋 agreement signed  → at least one signed inspection_agreements row
+ *   - 📋 agreement signed  → at least one signed agreement_requests envelope
  *   - ✈️ sent              → status is `delivered` (publish workflow ran)
  *   - 🚩 flag              → row is in the "Needs Attention" bucket
  *                            (e.g. agreement unsigned past threshold,

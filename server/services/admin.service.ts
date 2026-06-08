@@ -9,9 +9,13 @@ import {
     inspectionResults,
     templates,
     inspectionAgreements,
+    agreementRequests,
+    agreementSigners,
     tenants,
+    tenantConfigs,
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { runErasure } from '../lib/compliance/erasure-orchestrator';
 
 import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { safeTimestamp } from '../lib/date';
@@ -69,20 +73,66 @@ export class AdminService {
      */
     async getExport(tenantId: string) {
         const db = this.getDrizzle();
-        const [tenantInspections, tenantTemplates, tenantAgreements] = await Promise.all([
+        // Track I-a — the live agreement evidence (envelopes + per-signer records).
+        // Columns are projected EXPLICITLY so token material (token / token_hash /
+        // token_enc) is never serialized into a data-subject export, mirroring the
+        // observer/guest list-projection posture. `select()` (star) on these tables
+        // would leak the token columns.
+        const [tenantInspections, tenantTemplates, tenantAgreements, tenantAgreementRequests, tenantAgreementSigners] = await Promise.all([
             db.select().from(inspections).where(eq(inspections.tenantId, tenantId)),
             db.select().from(templates).where(eq(templates.tenantId, tenantId)),
             db.select().from(agreements).where(eq(agreements.tenantId, tenantId)),
+            db.select({
+                id: agreementRequests.id,
+                inspectionId: agreementRequests.inspectionId,
+                agreementId: agreementRequests.agreementId,
+                clientEmail: agreementRequests.clientEmail,
+                clientName: agreementRequests.clientName,
+                status: agreementRequests.status,
+                signatureBase64: agreementRequests.signatureBase64,
+                signedAt: agreementRequests.signedAt,
+                viewedAt: agreementRequests.viewedAt,
+                sentAt: agreementRequests.sentAt,
+                inspectorSignatureBase64: agreementRequests.inspectorSignatureBase64,
+                inspectorSignedAt: agreementRequests.inspectorSignedAt,
+                // Public verifier token — printed on the signed PDF / QR code so
+                // anyone can verify the seal; deliberately included (NOT auth
+                // material). The auth columns (token / tokenHash / tokenEnc) are
+                // intentionally NOT projected here — see the star-select caveat above.
+                verificationToken: agreementRequests.verificationToken,
+                contentSnapshot: agreementRequests.contentSnapshot,
+                contentHash: agreementRequests.contentHash,
+                completionPolicy: agreementRequests.completionPolicy,
+                purgedAt: agreementRequests.purgedAt,
+                createdAt: agreementRequests.createdAt,
+            }).from(agreementRequests).where(eq(agreementRequests.tenantId, tenantId)),
+            db.select({
+                id: agreementSigners.id,
+                requestId: agreementSigners.requestId,
+                name: agreementSigners.name,
+                email: agreementSigners.email,
+                role: agreementSigners.role,
+                contactId: agreementSigners.contactId,
+                status: agreementSigners.status,
+                signatureBase64: agreementSigners.signatureBase64,
+                signedAt: agreementSigners.signedAt,
+                viewedAt: agreementSigners.viewedAt,
+                ipAddress: agreementSigners.ipAddress,
+                userAgent: agreementSigners.userAgent,
+                channel: agreementSigners.channel,
+                onBehalfOf: agreementSigners.onBehalfOf,
+                onBehalfDisclaimer: agreementSigners.onBehalfDisclaimer,
+                lastRemindedAt: agreementSigners.lastRemindedAt,
+                createdAt: agreementSigners.createdAt,
+            }).from(agreementSigners).where(eq(agreementSigners.tenantId, tenantId)),
         ]);
 
         const inspectionIds = tenantInspections.map((i) => i.id);
         let results: Record<string, unknown>[] = [];
-        let signers: Record<string, unknown>[] = [];
 
         if (inspectionIds.length > 0) {
-            [results, signers] = await Promise.all([
+            [results] = await Promise.all([
                 db.select().from(inspectionResults).where(dbAnd(inArray(inspectionResults.inspectionId, inspectionIds), eq(inspectionResults.tenantId, tenantId))),
-                db.select().from(inspectionAgreements).where(dbAnd(inArray(inspectionAgreements.inspectionId, inspectionIds), eq(inspectionAgreements.tenantId, tenantId))),
             ]);
         }
 
@@ -91,27 +141,68 @@ export class AdminService {
             templates: tenantTemplates,
             agreements: tenantAgreements,
             inspectionResults: results,
-            inspectionAgreements: signers
+            // Live multi-signer agreement evidence (token material projected out).
+            agreementRequests: tenantAgreementRequests,
+            agreementSigners: tenantAgreementSigners,
+            // Back-compat: dead `inspection_agreements` table key retained for export
+            // shape stability; always [] (superseded by agreement_requests/signers).
+            inspectionAgreements: [] as Record<string, unknown>[],
         };
     }
 
     /**
-     * Perfroms GDPR-compliant erasure of client personal data.
+     * Performs GDPR-compliant erasure of a client's personal data (Track I-a).
+     *
+     * Delegates to the manifest-driven {@link runErasure} orchestrator, which
+     * anonymizes signed-agreement satellite PII (keeping the signature + audit
+     * chain under the Art. 17(3)(e) exemption), deletes draft envelopes, nulls
+     * non-agreement client columns, and writes one append-only `erasure_log`
+     * decision row. The retention window comes from
+     * `tenant_configs.agreement_retention_years`.
+     *
+     * Return shape is ADDITIVE: legacy `{ matched, deletedAgreements }` fields
+     * are preserved for existing callers, alongside the richer orchestrator
+     * summary `{ status, anonymizedCount, deletedCount, retainedCount,
+     * decisions, logId }`.
      */
-    async eraseClientData(tenantId: string, clientEmail: string) {
+    async eraseClientData(tenantId: string, clientEmail: string, opts?: { requestedBy?: string; identityBasis?: string }) {
         const db = this.getDrizzle();
+
+        // How many inspections this subject is on — preserves the legacy
+        // `matched`/`deletedAgreements` contract for existing callers.
         const matched = await db.select({ id: inspections.id })
             .from(inspections)
             .where(dbAnd(eq(inspections.tenantId, tenantId), eq(inspections.clientEmail, clientEmail)));
-
         const matchedIds = matched.map((r) => r.id);
-        if (matchedIds.length === 0) return { matched: 0, deletedAgreements: 0 };
 
-        await db.delete(inspectionAgreements).where(dbAnd(inArray(inspectionAgreements.inspectionId, matchedIds), eq(inspectionAgreements.tenantId, tenantId)));
-        await db.update(inspections).set({ clientName: null, clientEmail: null })
-            .where(dbAnd(eq(inspections.tenantId, tenantId), eq(inspections.clientEmail, clientEmail)));
+        // Dead `inspection_agreements` table — harmless legacy cleanup retained
+        // for back-compat (the live agreement evidence lives in
+        // agreement_requests / agreement_signers, handled by the orchestrator).
+        if (matchedIds.length > 0) {
+            await db.delete(inspectionAgreements)
+                .where(dbAnd(inArray(inspectionAgreements.inspectionId, matchedIds), eq(inspectionAgreements.tenantId, tenantId)));
+        }
 
-        return { matched: matchedIds.length, deletedAgreements: matchedIds.length };
+        // Per-tenant retention window (default 6) from tenant_configs.
+        const cfg = await db.select({ years: tenantConfigs.agreementRetentionYears })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+        const retentionYears = cfg?.years ?? 6;
+
+        const summary = await runErasure(db, {
+            tenantId,
+            subjectEmail: clientEmail,
+            retentionYears,
+            ...(opts?.requestedBy ? { requestedBy: opts.requestedBy } : {}),
+            identityBasis: opts?.identityBasis ?? 'admin_action',
+        });
+
+        return {
+            // Legacy additive fields.
+            matched: matchedIds.length,
+            deletedAgreements: matchedIds.length,
+            // Richer orchestrator summary.
+            ...summary,
+        };
     }
 
     /**

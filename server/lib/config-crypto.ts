@@ -199,6 +199,72 @@ export async function openSecrets(
     }
 }
 
+// ─── Track I-a — tier-2 token sealing ───────────────────────────────────────
+// Independent HKDF purpose key (NOT the tenant DEK — tokens must seal even for
+// tenants that never saved secrets). Shares the KEK salt with a distinct info
+// string. Format 't1:<ivB64>:<cipherB64>', AAD = `token:${tenantId}` binds the
+// ciphertext to its tenant. Rotation contract matches the KEK: the current
+// secret seals, the previous secret is a read-fallback (JWT_SECRET_PREVIOUS
+// window).
+
+const TOKEN_KEK_INFO = new TextEncoder().encode('token-enc-v1');
+
+async function deriveTokenKey(jwtSecret: string): Promise<CryptoKey> {
+    const material = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(jwtSecret), 'HKDF', false, ['deriveKey'],
+    );
+    return crypto.subtle.deriveKey(
+        { name: 'HKDF', hash: 'SHA-256', salt: KEK_SALT, info: TOKEN_KEK_INFO },
+        material,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt'],
+    );
+}
+
+/** AAD scoped to the token namespace so a token blob never decrypts as a secrets blob. */
+function tokenAad(tenantId: string): Uint8Array<ArrayBuffer> {
+    return aad(`token:${tenantId}`);
+}
+
+/** Seals a tier-2 token under a tenant-bound key. Returns `t1:<ivB64>:<cipherB64>`. */
+export async function sealToken(token: string, tenantId: string, jwtSecret: string): Promise<string> {
+    const key = await deriveTokenKey(jwtSecret);
+    const iv = randomBytes(12);
+    const cipher = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv, additionalData: tokenAad(tenantId) },
+        key, new TextEncoder().encode(token),
+    );
+    return `t1:${toB64(iv)}:${toB64(cipher)}`;
+}
+
+/** Opens a `t1:` token_enc (current → previous KEK). Throws on format/AAD/key mismatch. */
+export async function openToken(
+    tokenEnc: string,
+    tenantId: string,
+    jwtSecret: string,
+    jwtSecretPrevious?: string,
+): Promise<string> {
+    const parts = tokenEnc.split(':');
+    if (parts.length !== 3 || parts[0] !== 't1') throw new Error('Invalid token_enc format');
+    const ivB64 = parts[1];
+    const cipherB64 = parts[2];
+    const attempt = async (secret: string): Promise<string> => {
+        const key = await deriveTokenKey(secret);
+        const plain = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: fromB64(ivB64), additionalData: tokenAad(tenantId) },
+            key, fromB64(cipherB64),
+        );
+        return new TextDecoder().decode(plain);
+    };
+    try {
+        return await attempt(jwtSecret);
+    } catch (err) {
+        if (!jwtSecretPrevious) throw err;
+        return attempt(jwtSecretPrevious);
+    }
+}
+
 /**
  * Mask a secret for safe display in API responses.
  * "re_1ABCxyz" → "re_1••••••••xyz" (first 4 + 8 dots + last 4 if long enough)

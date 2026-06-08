@@ -196,12 +196,34 @@ export const AgreementListResponseSchema = createApiResponseSchema(z.array(z.obj
     createdAt: z.date().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }))).openapi('AgreementListResponse');
 
+/** Track I-a Task 9 — one recipient row in a multi-signer envelope. */
+export const SignerInputSchema = z.object({
+    name: z.string().min(1).max(120).openapi({ example: 'John Smith' }).describe('Full name of this signer as it appears on the agreement'),
+    email: z.string().email().openapi({ example: 'client@example.com' }).describe('Email address the per-signer signing link is sent to'),
+    role: z.enum(['client', 'co_client', 'agent', 'other']).optional().openapi({ example: 'client' }).describe('Relationship of this signer to the inspection (client, co_client, agent, other)'),
+    contactId: z.string().uuid().nullable().optional().describe('Optional contacts.id this signer was picked from, when available'),
+}).openapi('AgreementSignerInput');
+
 export const SendAgreementSchema = z.object({
     agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
-    clientEmail: z.string().email().openapi({ example: 'client@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
+    // Track I-a Task 9 — `clientEmail` is only consumed on the legacy
+    // single-recipient path; the multi-signer path keys recipients off the
+    // `signers` array. Optional here, gated by the refine below so exactly one
+    // of the two paths is always satisfiable.
+    clientEmail: z.string().email().optional().openapi({ example: 'client@example.com' }).describe('Recipient email for the legacy single-signer send; omit when `signers` is provided'),
     clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     inspectionId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
-}).openapi('SendAgreement');
+    // Track I-a Task 9 — multi-signer envelope. When `signers` is provided the
+    // send routes through AgreementService.findOrCreate (signer rows + snapshot
+    // pinning + per-signer links). Omitted → legacy single-recipient behavior.
+    signers: z.array(SignerInputSchema).min(1).max(10).optional().describe('Optional multi-signer recipient list; when present routes through the envelope model'),
+    completionPolicy: z.enum(['all', 'one']).optional().openapi({ example: 'all' }).describe('Whether all signers must sign or any one signature completes the envelope'),
+}).refine(
+    // Valid request = legacy path (clientEmail present) OR multi-signer path
+    // (signers non-empty). The handler routes on these same two conditions.
+    (v) => Boolean(v.clientEmail) || (Array.isArray(v.signers) && v.signers.length > 0),
+    { message: 'Provide clientEmail (single-signer) or a non-empty signers list (multi-signer).', path: ['clientEmail'] },
+).openapi('SendAgreement');
 
 export const AgreementResponseSchema = createApiResponseSchema(z.object({
     agreement: z.object({
@@ -215,10 +237,34 @@ export const AgreementResponseSchema = createApiResponseSchema(z.object({
 })).openapi('AgreementResponse');
 
 export const EraseDataResponseSchema = createApiResponseSchema(z.object({
-    message: z.string().describe('TODO describe message field for the OpenInspection MCP integration'),
-    templates: z.number().optional().describe('TODO describe templates field for the OpenInspection MCP integration'),
-    inspections: z.number().optional().describe('TODO describe inspections field for the OpenInspection MCP integration'),
-    results: z.number().optional().describe('TODO describe results field for the OpenInspection MCP integration'),
+    message: z.string().describe('Human-readable confirmation message.'),
+    // Legacy additive fields (preserved for existing callers).
+    templates: z.number().optional().describe('Legacy field — number of template rows affected.'),
+    inspections: z.number().optional().describe('Legacy field — number of inspection rows matched.'),
+    results: z.number().optional().describe('Legacy field — total result rows affected.'),
+    matched: z.number().optional().describe('Number of inspections the subject appeared on.'),
+    deletedAgreements: z.number().optional().describe('Legacy additive field — number of matched inspections (mirrors matched).'),
+    // Orchestrator summary fields (Track I-a).
+    status: z.enum(['completed', 'partially_completed', 'refused']).optional()
+        .describe('Overall erasure outcome. partially_completed means at least one step threw; the rest still landed.'),
+    logId: z.string().optional().describe('UUID of the append-only erasure_log decision row (Art. 5(2)/30).'),
+    anonymizedCount: z.number().int().optional()
+        .describe('Total rows anonymized (PII sentinel-cleared, evidence retained under Art. 17(3) exemption).'),
+    deletedCount: z.number().int().optional()
+        .describe('Total rows deleted (draft envelopes + signer rows + contact rows).'),
+    retainedCount: z.number().int().optional()
+        .describe('Total rows retained as anonymized evidence (signer rows + envelope rows, post-anonymization).'),
+    decisions: z.array(z.object({
+        table: z.string().describe('DB table the decision applies to.'),
+        action: z.enum(['delete', 'null', 'anonymize']).describe('Action taken on this table.'),
+        count: z.number().int().describe('Rows affected.'),
+        legalBasis: z.enum(['art_17_3_b', 'art_17_3_e']).optional()
+            .describe('GDPR Art. 17(3) exemption invoked, when retaining evidence.'),
+        retentionExpiry: z.number().optional()
+            .describe('Unix-MS integer: signedAt + retentionYears. Present on anonymize steps.'),
+        error: z.string().optional()
+            .describe('Set when this step threw (fail-closed accountability).'),
+    })).optional().describe('Per-table erasure decisions recorded in the log row.'),
 })).openapi('EraseDataResponse');
 
 export const TeamMembersResponseSchema = createApiResponseSchema(z.object({

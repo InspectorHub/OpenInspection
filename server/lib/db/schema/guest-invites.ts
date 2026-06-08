@@ -9,7 +9,7 @@
  * Per the simplified seat-quota model (spec amendment): guests count
  * against tenants.max_users on claim — no separate per-guest billing.
  */
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const guestInvites = sqliteTable('guest_invites', {
@@ -23,6 +23,8 @@ export const guestInvites = sqliteTable('guest_invites', {
     claimedAt:         integer('claimed_at'),
     createdBy:         text('created_by').notNull(),
     createdAt:         text('created_at').notNull().default(sql`(datetime('now'))`),
+    tokenHash:         text('token_hash'),
 }, (t) => [
     index('guest_invites_tenant_idx').on(t.tenantId),
+    uniqueIndex('idx_guest_invites_token_hash').on(t.tokenHash),
 ]);

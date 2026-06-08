@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 import { GuestInviteService } from '../../server/services/guest-invite.service';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
+import { hashToken, deadTokenSentinel } from '../../server/lib/token-hash';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -90,5 +91,44 @@ describe('GuestInviteService (subsystem C P6)', () => {
         const minted = await svc.mint(TENANT, { role: 'lead', durationSeconds: 86_400, createdBy: 'u-admin' });
         const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'short' }, { maxUsers: 10 });
         expect(out.kind).toBe('invalid');
+    });
+
+    // ─── Track I-a — hash-at-rest (tier-1) ───────────────────────────────────
+    it('(a) mint stores hash, NOT plaintext (legacy column is a sentinel)', async () => {
+        const minted = await svc.mint(TENANT, { role: 'lead', durationSeconds: 86_400, createdBy: 'u-admin' });
+        const row = await testDb.select().from(schema.guestInvites).where(eq(schema.guestInvites.id, minted.id)).get();
+        expect(row?.token).toBe(deadTokenSentinel(minted.id));
+        expect(row?.token).not.toBe(minted.token);
+        expect(row?.tokenHash).toBe(await hashToken(minted.token));
+    });
+
+    it('(b) presenting the plaintext resolves via the hash path (getInviteInfo + claim)', async () => {
+        const minted = await svc.mint(TENANT, { role: 'specialist', durationSeconds: 3600, createdBy: 'u-admin' });
+        const info = await svc.getInviteInfo(minted.token);
+        expect(info?.role).toBe('specialist');
+        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10 });
+        expect(out.kind).toBe('ok');
+    });
+
+    it('(c) legacy plaintext row resolves AND is upgraded in place', async () => {
+        const legacyToken = 'legacy-guest-plaintext-token-1234567890';
+        const id = crypto.randomUUID();
+        await testDb.insert(schema.guestInvites).values({
+            id, tenantId: TENANT, token: legacyToken, role: 'office',
+            durationSeconds: 86_400, expiresAt: Math.floor(Date.now() / 1000) + 3600,
+            createdBy: 'u-admin', createdAt: new Date().toISOString(),
+        });
+        const info = await svc.getInviteInfo(legacyToken);
+        expect(info?.role).toBe('office');
+        const row = await testDb.select().from(schema.guestInvites).where(eq(schema.guestInvites.id, id)).get();
+        expect(row?.tokenHash).toBe(await hashToken(legacyToken));
+        expect(row?.token).toBe(deadTokenSentinel(id));
+    });
+
+    it('resolveTenantForToken resolves a hashed token to tenant + cap', async () => {
+        const minted = await svc.mint(TENANT, { role: 'lead', durationSeconds: 86_400, createdBy: 'u-admin' });
+        const resolved = await svc.resolveTenantForToken(minted.token);
+        expect(resolved?.tenantId).toBe(TENANT);
+        expect(typeof resolved?.maxUsers).toBe('number');
     });
 });
