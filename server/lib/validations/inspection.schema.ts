@@ -377,10 +377,11 @@ export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHub
  * template, email defaults to the inspection's clientEmail.
  */
 export const SendAgreementRequestSchema = z.object({
-  // Plain non-empty string, NOT .uuid(): agreements.id is TEXT and the handler
-  // already 422s when the id doesn't resolve inside the tenant — a format gate
-  // would only reject legitimate non-UUID rows (e.g. imported/seeded data).
-  agreementId: z.string().min(1).optional().describe('Agreement template id; defaults to the tenant first agreement'),
+  // Canonical UUID: agreements.id is always crypto.randomUUID() in production
+  // (the Spectora import preserves external ids only for template-internal items,
+  // never as the agreements PK). Pre-launch we enforce the canonical format rather
+  // than tolerate non-UUID ids — only test seeds were ever non-UUID.
+  agreementId: z.string().uuid().optional().describe('Agreement template id; defaults to the tenant first agreement'),
   email: z.string().email().optional().describe('Recipient email; defaults to inspection.clientEmail'),
 }).openapi('SendAgreementRequest');
 

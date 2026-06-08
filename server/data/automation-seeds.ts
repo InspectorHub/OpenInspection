@@ -144,4 +144,27 @@ export const AUTOMATION_SEEDS = [
         bodyTemplate:    '<p>Hi {{client_name}},</p><p>The results for your {{event_type_name}} at {{property_address}} are now available in your inspection report.</p><p>— {{company_name}}</p>',
         isDefault: true,
     },
+    // Track J (#122) — post-delivery follow-up. One day after the report is
+    // published, thank the client and invite questions.
+    {
+        name:            'Post-inspection follow-up',
+        trigger:         'report.published' as const,
+        recipient:       'client' as const,
+        delayMinutes:    1440, // 1 day
+        subjectTemplate: 'Following up on your inspection — {{property_address}}',
+        bodyTemplate:    '<p>Hi {{client_name}},</p><p>We hope your inspection report for <strong>{{property_address}}</strong> was helpful. If anything in it raised a question, just reply to this email — we are happy to walk you through it.</p><p>— {{company_name}}</p>',
+        isDefault: true,
+    },
+    // Track J (#122) — review request. Three days after publish. Seeded INACTIVE
+    // and engine-skips until tenant_configs.review_url is set (fail-closed).
+    {
+        name:            'Review request',
+        trigger:         'report.published' as const,
+        recipient:       'client' as const,
+        delayMinutes:    4320, // 3 days
+        subjectTemplate: 'How did we do? — {{property_address}}',
+        bodyTemplate:    '<p>Hi {{client_name}},</p><p>Thanks again for choosing us for your inspection at <strong>{{property_address}}</strong>. If you have a moment, a short review really helps other homebuyers find us:</p><p><a href="{{review_url}}">Leave a review</a></p><p>— {{company_name}}</p>',
+        isDefault: true,
+        defaultActive: false,
+    },
 ] as const;

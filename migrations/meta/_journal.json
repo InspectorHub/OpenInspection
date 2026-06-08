@@ -169,6 +169,13 @@
       "when": 1780878457631,
       "tag": "0023_free_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1780903233574,
+      "tag": "0024_conscious_roughhouse",
+      "breakpoints": true
     }
   ]
 }

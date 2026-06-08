@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, lte, sql, desc } from 'drizzle-orm';
-import { automations, automationLogs, inspections, tenants } from '../lib/db/schema';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { eq, and, lte, gte, sql, desc, notInArray } from 'drizzle-orm';
+import { automations, automationLogs, inspections, tenants, agreementRequests, inspectionServices, tenantConfigs } from '../lib/db/schema';
 import { reportUrl } from '../lib/public-urls';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
 import { nanoid } from 'nanoid';
@@ -49,7 +50,7 @@ export class AutomationService {
             delayMinutes:    seed.delayMinutes,
             subjectTemplate: seed.subjectTemplate,
             bodyTemplate:    seed.bodyTemplate,
-            active:          true,
+            active:          (seed as { defaultActive?: boolean }).defaultActive ?? true,
             isDefault:       true,
             createdAt:       new Date(),
         }));
@@ -67,17 +68,22 @@ export class AutomationService {
     async create(tenantId: string, data: {
         name: string; trigger: string; recipient: string;
         delayMinutes: number; subjectTemplate: string; bodyTemplate: string;
+        conditions?: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
+        channel?: 'email' | 'sms';
     }) {
         const db = this.getDrizzle();
         const id = nanoid();
+        const { conditions, channel, ...rest } = data;
         await db.insert(automations).values({
-            id, tenantId, ...data,
+            id, tenantId, ...rest,
             // Casts narrow the public string param to the schema's enum literal
             // union; runtime values are validated by the API zod schema.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            trigger:   data.trigger as any,
+            trigger:   rest.trigger as any,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            recipient: data.recipient as any,
+            recipient: rest.recipient as any,
+            conditions: conditions ? JSON.stringify(conditions) : null,
+            channel:    channel ?? 'email',
             active: true, isDefault: false, createdAt: new Date(),
         });
         return (await db.select().from(automations).where(eq(automations.id, id)))[0];
@@ -86,14 +92,22 @@ export class AutomationService {
     async update(tenantId: string, id: string, data: Partial<{
         name: string; trigger: string; recipient: string;
         delayMinutes: number; subjectTemplate: string; bodyTemplate: string; active: boolean;
+        conditions: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
+        channel: 'email' | 'sms';
     }>) {
         const db = this.getDrizzle();
         const existing = await db.select().from(automations)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId))).limit(1);
         if (!existing[0]) throw Errors.NotFound('Automation not found');
-        // Same enum-narrowing as create() — public Partial<{string}> → table's enum literals.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await db.update(automations).set(data as any)
+        const { conditions, ...rest } = data;
+        const patch: Record<string, unknown> = { ...rest };
+        // Key-presence (not truthiness) so an explicit `conditions: null` clears
+        // the row while an omitted key leaves it untouched. The zod layer strips
+        // absent keys, so `undefined` should not reach here; the guard is belt-
+        // and-braces for direct (non-API) callers.
+        if ('conditions' in data) patch.conditions = conditions ? JSON.stringify(conditions) : null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial patch → table's typed columns; matches the file's create() cast pattern
+        await db.update(automations).set(patch as any)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId)));
         return (await db.select().from(automations).where(eq(automations.id, id)))[0];
     }
@@ -201,6 +215,69 @@ export class AutomationService {
         return null; // buying_agent/selling_agent/inspector resolved at delivery
     }
 
+    /**
+     * Track J (D4) — evaluate a rule's send-time gates against the CURRENT world.
+     * Returns a skip reason when a gate fails so flush() can mark the log 'skipped'.
+     * channel='sms' is a defensive skip (Track L will implement the sender).
+     */
+    private async evaluateConditions(
+        db: DrizzleD1Database,
+        automation: typeof automations.$inferSelect,
+        inspection: typeof inspections.$inferSelect,
+    ): Promise<{ ok: true } | { ok: false; reason: string }> {
+        if (automation.channel === 'sms') return { ok: false, reason: 'channel sms not supported yet' };
+        // Track J (D7) — a reminder enqueued for an inspection that has since
+        // reached a terminal status (cancelled/completed/delivered/published) is
+        // stale; suppress it (e.g. don't send "don't forget tomorrow" for a
+        // cancelled inspection). NOTE: a reschedule to a DIFFERENT date is a known
+        // v1 limitation — the reminder still fires at the originally-computed time,
+        // because we don't currently mutate reminder logs when an inspection's date
+        // changes. event_id has no unique index on purpose: Spec 4D reminder+follow-up
+        // logs intentionally share an inspection-event id, so the cron's
+        // check-then-insert dedup (safe because CF cron runs are effectively serial)
+        // is the chosen guard rather than a DB unique constraint.
+        if (automation.trigger === 'inspection.reminder' &&
+            ['cancelled', 'completed', 'delivered', 'published'].includes(inspection.status)) {
+            return { ok: false, reason: 'inspection no longer active' };
+        }
+        if (!automation.conditions) return { ok: true };
+
+        let cond: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] };
+        try {
+            cond = JSON.parse(automation.conditions);
+        } catch {
+            // Malformed JSON → fail OPEN (treat as no gates) so a corrupt blob
+            // doesn't trap the log in 'pending' forever. Warn so the ungated send
+            // is observable (conditions are app-serialized, so this implies a bug
+            // or manual DB edit). Never log the blob contents.
+            logger.warn('AutomationService.evaluateConditions: malformed conditions JSON, sending ungated',
+                { automationId: automation.id });
+            return { ok: true };
+        }
+
+        if (cond.requirePaid && inspection.paymentStatus !== 'paid') {
+            return { ok: false, reason: 'condition: not paid' };
+        }
+        if (cond.requireSigned) {
+            const signed = await db.select({ id: agreementRequests.id }).from(agreementRequests)
+                .where(and(
+                    eq(agreementRequests.tenantId, inspection.tenantId),
+                    eq(agreementRequests.inspectionId, inspection.id),
+                    eq(agreementRequests.status, 'signed'),
+                )).limit(1);
+            if (signed.length === 0) return { ok: false, reason: 'condition: agreement not signed' };
+        }
+        if (cond.serviceIds && cond.serviceIds.length > 0) {
+            const rows = await db.select({ serviceId: inspectionServices.serviceId }).from(inspectionServices)
+                .where(eq(inspectionServices.inspectionId, inspection.id));
+            const have = new Set(rows.map(r => r.serviceId));
+            if (!cond.serviceIds.some(id => have.has(id))) {
+                return { ok: false, reason: 'condition: service not matched' };
+            }
+        }
+        return { ok: true };
+    }
+
     async flush(resendApiKey: string, senderEmail: string, appName: string, appBaseUrl: string, batchSize = 50): Promise<void> {
         const db = this.getDrizzle();
         const now = new Date().toISOString();
@@ -224,6 +301,13 @@ export class AutomationService {
 
         for (const { log, automation, inspection, tenant } of pending) {
             try {
+                const verdict = await this.evaluateConditions(db, automation, inspection);
+                if (!verdict.ok) {
+                    await db.update(automationLogs).set({ status: 'skipped', error: verdict.reason })
+                        .where(eq(automationLogs.id, log.id));
+                    continue;
+                }
+
                 const vars: Record<string, string> = {
                     client_name:      inspection.clientName ?? '',
                     property_address: inspection.propertyAddress,
@@ -240,7 +324,10 @@ export class AutomationService {
                 };
 
                 // Spec 4D — populate event vars when log was created by EventService.
-                if (log.eventId) {
+                // Spec 4D event-vars apply only to logs linked to a real inspection
+                // event. Track J reminders reuse event_id as a "reminder:<rule>:<insp>"
+                // dedup key that never matches an inspectionEvents row, so skip the lookup.
+                if (log.eventId && !log.eventId.startsWith('reminder:')) {
                     try {
                         const { eventTypes, inspectionEvents } = await import('../lib/db/schema');
                         const ev = await db.select().from(inspectionEvents).where(eq(inspectionEvents.id, log.eventId)).get();
@@ -274,6 +361,19 @@ export class AutomationService {
                     }
                 }
 
+                const needsReviewUrl = automation.bodyTemplate.includes('{{review_url}}') ||
+                                       automation.subjectTemplate.includes('{{review_url}}');
+                if (needsReviewUrl) {
+                    const cfg = await db.select({ reviewUrl: tenantConfigs.reviewUrl }).from(tenantConfigs)
+                        .where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
+                    if (!cfg?.reviewUrl) {
+                        await db.update(automationLogs).set({ status: 'skipped', error: 'review_url not configured' })
+                            .where(eq(automationLogs.id, log.id));
+                        continue;
+                    }
+                    vars.review_url = cfg.reviewUrl;
+                }
+
                 const subject = interpolate(automation.subjectTemplate, vars);
                 const html    = interpolate(automation.bodyTemplate, vars);
                 const from    = senderEmail || `noreply@${appName.toLowerCase().replace(/\s+/g, '')}.com`;
@@ -301,6 +401,63 @@ export class AutomationService {
                 logger.error('AutomationService.flush: exception', {}, err instanceof Error ? err : undefined);
             }
         }
+    }
+
+    /**
+     * Track J (D7) — appointment reminders. Cron-fired daily. For each active
+     * inspection.reminder rule, scan upcoming inspections within the rule's lead
+     * window and enqueue a pending automation_log at (inspection date − lead),
+     * floored to now+5min. Deduped on eventId = reminder:<ruleId>:<inspectionId>
+     * so re-scans don't double-create. The existing flush() sends it when due and
+     * re-checks conditions per D4. Reminders are day-granular (inspections.date is
+     * date-only); we anchor the appointment at 09:00 UTC.
+     */
+    async enqueueReminders(nowMs: number): Promise<number> {
+        const db = this.getDrizzle();
+        const rules = await db.select().from(automations)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .where(and(eq(automations.trigger, 'inspection.reminder' as any), eq(automations.active, true)));
+        if (rules.length === 0) return 0;
+
+        const todayStr = new Date(nowMs).toISOString().slice(0, 10);
+        let created = 0;
+
+        for (const rule of rules) {
+            // Window upper bound = lead + 1.5d buffer so a same-day cron still
+            // catches an appointment whose lead window opens within the next day.
+            const upperStr = new Date(nowMs + rule.delayMinutes * 60_000 + 36 * 3600_000)
+                .toISOString().slice(0, 10);
+            const upcoming = await db.select().from(inspections)
+                .where(and(
+                    eq(inspections.tenantId, rule.tenantId),
+                    gte(inspections.date, todayStr),
+                    lte(inspections.date, upperStr),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    notInArray(inspections.status, ['cancelled', 'completed', 'delivered', 'published'] as any),
+                ));
+
+            for (const insp of upcoming) {
+                if (!insp.clientEmail) continue;
+                const eventId = `reminder:${rule.id}:${insp.id}`;
+                const dup = await db.select({ id: automationLogs.id }).from(automationLogs)
+                    .where(eq(automationLogs.eventId, eventId)).limit(1);
+                if (dup.length > 0) continue;
+
+                // tz-naive: 09:00 UTC is an approximate anchor (inspections.date is date-only, no tenant tz here).
+                const inspMs = Date.parse(`${insp.date}T09:00:00Z`);
+                if (Number.isNaN(inspMs)) continue;
+                let sendAt = inspMs - rule.delayMinutes * 60_000;
+                if (sendAt < nowMs) sendAt = nowMs + 5 * 60_000;
+
+                await db.insert(automationLogs).values({
+                    id: nanoid(), tenantId: rule.tenantId, automationId: rule.id,
+                    inspectionId: insp.id, recipientEmail: insp.clientEmail,
+                    sendAt: new Date(sendAt).toISOString(), status: 'pending', eventId,
+                });
+                created++;
+            }
+        }
+        return created;
     }
 
     async getLogs(tenantId: string, inspectionId: string) {

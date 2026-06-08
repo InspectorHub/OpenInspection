@@ -527,6 +527,10 @@ export const automations = sqliteTable('automations', {
             'agreement.signer_signed',
             'agreement.viewed', 'agreement.declined', 'agreement.expired',
             'event.created', 'event.completed',
+            // Track J (D7) — the one time-relative trigger. Cron-fired by
+            // AutomationService.enqueueReminders(); delayMinutes is the lead
+            // time BEFORE inspections.date (not a post-event delay).
+            'inspection.reminder',
         ],
     }).notNull(),
     recipient: text('recipient', {
@@ -535,6 +539,12 @@ export const automations = sqliteTable('automations', {
     delayMinutes: integer('delay_minutes').notNull().default(0),
     subjectTemplate: text('subject_template').notNull(),
     bodyTemplate: text('body_template').notNull(),
+    // Track J (D2) — send-time gates, JSON: { requirePaid?: bool, requireSigned?: bool, serviceIds?: string[] }.
+    // null = no gates. Evaluated in flush() at delivery, NOT at trigger time.
+    conditions: text('conditions'),
+    // Track J (D3) — delivery channel. SMS reserved for Track L; the UI greys it
+    // and flush() defensively skips channel='sms'. Enum is type-layer only.
+    channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),

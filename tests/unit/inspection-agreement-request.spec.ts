@@ -126,19 +126,14 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         expect(sendAgreementRequest.mock.calls[0][2]).toBe('Standard Agreement');
     });
 
-    it('accepts a non-UUID agreementId (agreements.id is TEXT, not a UUID column)', async () => {
-        // Regression: the body schema once gated agreementId with .uuid(), which
-        // 422'd legitimate non-UUID rows (seeded/imported templates). agreements.id
-        // is plain TEXT; tenant ownership — not id format — is what gates the send.
-        const TEXT_ID = 'agr-seeded-not-a-uuid';
-        await seedAgreement(TEXT_ID, 'Seeded Agreement');
-        const res = await post({ agreementId: TEXT_ID });
-        expect(res.status).toBe(200);
-        const body = (await res.json()) as { data: { id: string } };
-        const row = await db.select().from(schema.agreementRequests)
-            .where(eq(schema.agreementRequests.id, body.data.id)).get();
-        expect(row?.agreementId).toBe(TEXT_ID);
-        expect(sendAgreementRequest).toHaveBeenCalledTimes(1);
+    it('rejects a non-UUID agreementId (canonical UUID enforced; production ids are always randomUUID)', async () => {
+        // agreements.id is always crypto.randomUUID() in production (the Spectora
+        // import preserves external ids only for template-internal items, never as
+        // the PK). Pre-launch we enforce the canonical format rather than tolerate
+        // non-UUID ids — the schema's .uuid() gate rejects malformed ids up front.
+        const res = await post({ agreementId: 'agr-not-a-uuid' });
+        expect(res.status).toBe(400);
+        expect(sendAgreementRequest).not.toHaveBeenCalled();
     });
 
     it('explicit body overrides win over the defaults', async () => {
