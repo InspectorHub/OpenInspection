@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { AdminService } from '../../server/services/admin.service';
 import { MockKV } from './mocks';
 import { createTestDb, setupSchema } from './db';
-import { users, tenantInvites, inspections, inspectionAgreements, tenants, templates } from '../../server/lib/db/schema';
+import { users, tenantInvites, inspections, inspectionAgreements, tenants, templates, agreements, agreementRequests, agreementSigners } from '../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../server/lib/db/schema';
@@ -81,6 +81,49 @@ describe('AdminService', () => {
         const invite = await testDb.select().from(tenantInvites).where(eq(tenantInvites.id as any, result.inviteId)).get();
         expect(invite).toBeDefined();
         expect(invite!.email).toBe(email);
+    });
+
+    it('getExport includes agreement_requests + agreement_signers, projects token material OUT', async () => {
+        const tenantId = 't1';
+
+        await testDb.insert(agreements).values({
+            id: 'agr-tpl', tenantId, name: 'Tpl', content: 'body', createdAt: new Date(),
+        } as any);
+        await testDb.insert(agreementRequests).values({
+            id: 'req-1', tenantId, agreementId: 'agr-tpl',
+            clientEmail: 'client@example.com', clientName: 'Client',
+            token: 'PLAINTEXT-TOKEN-XYZ', tokenHash: 'HASH-REQ-ABC',
+            status: 'signed', signatureBase64: 'data:image/png;base64,SIG',
+            signedAt: new Date(), createdAt: new Date(),
+        } as any);
+        await testDb.insert(agreementSigners).values({
+            id: 'sgn-1', tenantId, requestId: 'req-1',
+            name: 'Client', email: 'client@example.com', role: 'client',
+            tokenHash: 'HASH-SGN-DEF', tokenEnc: 't1:iv:CIPHER-GHI',
+            status: 'signed', signatureBase64: 'data:image/png;base64,SIG2',
+            signedAt: new Date(), createdAt: new Date(),
+        } as any);
+
+        const result: any = await adminService.getExport(tenantId);
+
+        expect(Array.isArray(result.agreementRequests)).toBe(true);
+        expect(result.agreementRequests).toHaveLength(1);
+        expect(Array.isArray(result.agreementSigners)).toBe(true);
+        expect(result.agreementSigners).toHaveLength(1);
+        // Subject signature + content survive the export (it's their data).
+        expect(result.agreementRequests[0].signatureBase64).toBe('data:image/png;base64,SIG');
+        expect(result.agreementSigners[0].email).toBe('client@example.com');
+        // Back-compat key retained (dead table -> empty).
+        expect('inspectionAgreements' in result).toBe(true);
+
+        // NO token material anywhere in the serialized export.
+        const serialized = JSON.stringify(result);
+        expect(serialized).not.toContain('PLAINTEXT-TOKEN-XYZ');
+        expect(serialized).not.toContain('HASH-REQ-ABC');
+        expect(serialized).not.toContain('HASH-SGN-DEF');
+        expect(serialized).not.toContain('CIPHER-GHI');
+        expect(serialized.toLowerCase()).not.toContain('tokenhash');
+        expect(serialized.toLowerCase()).not.toContain('tokenenc');
     });
 
     it('should perform GDPR erasure of client data', async () => {

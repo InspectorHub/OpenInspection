@@ -143,4 +143,19 @@ export async function scheduled(
     } catch (e) {
         logger.error('[cron] _pending cleanup failed', {}, e instanceof Error ? e : undefined);
     }
+
+    // 6. Track I-a GDPR retention sweep (spec §7) — final destruction of
+    //    past-window signed-agreement signatures (signature_base64 -> NULL +
+    //    purged_at marker). Keeps the esign_audit_logs chain. Idempotent,
+    //    tenant-batched (single grouped query joined to tenant_configs).
+    try {
+        const { runRetentionSweep } = await import('./lib/compliance/retention-sweep');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const summary = await runRetentionSweep(drizzle(env.DB) as any, Date.now());
+        if (summary.purgedEnvelopes > 0) {
+            logger.info('[cron] retention sweep purged signatures', summary);
+        }
+    } catch (e) {
+        logger.error('[cron] retention sweep failed', {}, e instanceof Error ? e : undefined);
+    }
 }

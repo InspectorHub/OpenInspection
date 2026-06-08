@@ -422,6 +422,13 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     contentHash:     text('content_hash'),                // SHA-256 hex of contentSnapshot
     completionPolicy: text('completion_policy', { enum: ['all', 'one'] }).notNull().default('all'),
     tokenHash:       text('token_hash'),                  // lazy hash upgrade of legacy plaintext `token`
+    // Track I-a GDPR (spec §7) — final-destruction marker. NULL while the signed
+    // evidence is within its retention window; set to the sweep timestamp when the
+    // daily retention sweep destroys signature_base64 past the window. Distinct
+    // from `status` (which stays the truthful 'signed' — the agreement WAS signed
+    // and the esign_audit_logs chain still attests it); this is the idempotency
+    // guard so a re-run skips already-purged rows. No PII.
+    purgedAt:        integer('purged_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => [
     uniqueIndex('idx_agreement_requests_verify_token').on(t.verificationToken),

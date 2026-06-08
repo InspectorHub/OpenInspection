@@ -9,6 +9,8 @@ import {
     inspectionResults,
     templates,
     inspectionAgreements,
+    agreementRequests,
+    agreementSigners,
     tenants,
     tenantConfigs,
 } from '../lib/db/schema';
@@ -71,20 +73,62 @@ export class AdminService {
      */
     async getExport(tenantId: string) {
         const db = this.getDrizzle();
-        const [tenantInspections, tenantTemplates, tenantAgreements] = await Promise.all([
+        // Track I-a — the live agreement evidence (envelopes + per-signer records).
+        // Columns are projected EXPLICITLY so token material (token / token_hash /
+        // token_enc) is never serialized into a data-subject export, mirroring the
+        // observer/guest list-projection posture. `select()` (star) on these tables
+        // would leak the token columns.
+        const [tenantInspections, tenantTemplates, tenantAgreements, tenantAgreementRequests, tenantAgreementSigners] = await Promise.all([
             db.select().from(inspections).where(eq(inspections.tenantId, tenantId)),
             db.select().from(templates).where(eq(templates.tenantId, tenantId)),
             db.select().from(agreements).where(eq(agreements.tenantId, tenantId)),
+            db.select({
+                id: agreementRequests.id,
+                inspectionId: agreementRequests.inspectionId,
+                agreementId: agreementRequests.agreementId,
+                clientEmail: agreementRequests.clientEmail,
+                clientName: agreementRequests.clientName,
+                status: agreementRequests.status,
+                signatureBase64: agreementRequests.signatureBase64,
+                signedAt: agreementRequests.signedAt,
+                viewedAt: agreementRequests.viewedAt,
+                sentAt: agreementRequests.sentAt,
+                inspectorSignatureBase64: agreementRequests.inspectorSignatureBase64,
+                inspectorSignedAt: agreementRequests.inspectorSignedAt,
+                verificationToken: agreementRequests.verificationToken,
+                contentSnapshot: agreementRequests.contentSnapshot,
+                contentHash: agreementRequests.contentHash,
+                completionPolicy: agreementRequests.completionPolicy,
+                purgedAt: agreementRequests.purgedAt,
+                createdAt: agreementRequests.createdAt,
+            }).from(agreementRequests).where(eq(agreementRequests.tenantId, tenantId)),
+            db.select({
+                id: agreementSigners.id,
+                requestId: agreementSigners.requestId,
+                name: agreementSigners.name,
+                email: agreementSigners.email,
+                role: agreementSigners.role,
+                contactId: agreementSigners.contactId,
+                status: agreementSigners.status,
+                signatureBase64: agreementSigners.signatureBase64,
+                signedAt: agreementSigners.signedAt,
+                viewedAt: agreementSigners.viewedAt,
+                ipAddress: agreementSigners.ipAddress,
+                userAgent: agreementSigners.userAgent,
+                channel: agreementSigners.channel,
+                onBehalfOf: agreementSigners.onBehalfOf,
+                onBehalfDisclaimer: agreementSigners.onBehalfDisclaimer,
+                lastRemindedAt: agreementSigners.lastRemindedAt,
+                createdAt: agreementSigners.createdAt,
+            }).from(agreementSigners).where(eq(agreementSigners.tenantId, tenantId)),
         ]);
 
         const inspectionIds = tenantInspections.map((i) => i.id);
         let results: Record<string, unknown>[] = [];
-        let signers: Record<string, unknown>[] = [];
 
         if (inspectionIds.length > 0) {
-            [results, signers] = await Promise.all([
+            [results] = await Promise.all([
                 db.select().from(inspectionResults).where(dbAnd(inArray(inspectionResults.inspectionId, inspectionIds), eq(inspectionResults.tenantId, tenantId))),
-                db.select().from(inspectionAgreements).where(dbAnd(inArray(inspectionAgreements.inspectionId, inspectionIds), eq(inspectionAgreements.tenantId, tenantId))),
             ]);
         }
 
@@ -93,7 +137,12 @@ export class AdminService {
             templates: tenantTemplates,
             agreements: tenantAgreements,
             inspectionResults: results,
-            inspectionAgreements: signers
+            // Live multi-signer agreement evidence (token material projected out).
+            agreementRequests: tenantAgreementRequests,
+            agreementSigners: tenantAgreementSigners,
+            // Back-compat: dead `inspection_agreements` table key retained for export
+            // shape stability; always [] (superseded by agreement_requests/signers).
+            inspectionAgreements: [] as Record<string, unknown>[],
         };
     }
 
