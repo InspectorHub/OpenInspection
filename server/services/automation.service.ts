@@ -554,20 +554,22 @@ export class AutomationService {
         const creds = await sms.resolveCreds(inspection.tenantId);
         if (!creds) return void (await skip('sms not configured'));
 
+        // Load the tenant config row once for the SMS vars: company_phone is used
+        // unconditionally by the seeded copy ("questions? call {{company_phone}}"),
+        // and review_url is the fail-closed consumer below.
+        const cfg = await db.select({ companyPhone: tenantConfigs.companyPhone, reviewUrl: tenantConfigs.reviewUrl })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
+
         const vars: Record<string, string> = {
             client_name:      inspection.clientName ?? '',
             property_address: inspection.propertyAddress,
             scheduled_date:   inspection.date,
             report_url:       reportUrl(appHost, tenant.slug, inspection.id),
             company_name:     appName,
-            // company_phone comes from tenants.phone when present; the column may not
-            // exist on every deploy's tenants row, so read defensively (→ '').
-            company_phone:    (tenant as { phone?: string | null }).phone ?? '',
+            company_phone:    cfg?.companyPhone ?? '',
         };
         // review_url fail-closed (same rule as the email path).
         if (automation.smsBody.includes('{{review_url}}')) {
-            const cfg = await db.select({ reviewUrl: tenantConfigs.reviewUrl }).from(tenantConfigs)
-                .where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
             if (!cfg?.reviewUrl) return void (await skip('review_url not configured'));
             vars.review_url = cfg.reviewUrl;
         }

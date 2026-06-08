@@ -232,6 +232,8 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Track J (#122) — per-company Google/Yelp/Facebook review link. The
     // "Review request" automation stays inert until this is set (fail-closed).
     reviewUrl: text('review_url'),
+    // Track L — company contact phone shown in client SMS ({{company_phone}}).
+    companyPhone: text('company_phone'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
     // DEAD (C-15, 2026-06-06): legacy AES-GCM secrets store, soft-retired —
     // nothing reads or writes it anymore (D1 can't drop columns on FK-referenced
