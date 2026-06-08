@@ -2321,7 +2321,11 @@ export const adminRoutes = createApiRouter()
     })
     .openapi(tenantConfigGetRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const config = await c.var.services.branding.getBranding(tenantId);
+        // getBranding needs explicit defaults (it returns them when no config row
+        // exists); we only read config flags here, so the branding defaults are
+        // throwaway placeholders. Without this arg a brand-new tenant with no
+        // tenant_configs row would TypeError on undefined defaults.
+        const config = await c.var.services.branding.getBranding(tenantId, { siteName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown> | undefined;
         return c.json({
             success: true as const,
             data: {
