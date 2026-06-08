@@ -622,6 +622,104 @@ export class InspectionService {
     }
 
     /**
+     * #119 — Re-inspection. Creates a NEW draft inspection linked to a published
+     * baseline (the original OR a prior re-inspection). Seeds inspection_results.data
+     * for ONLY the selected items, each `{ original, followupStatus: null }`, where
+     * `original` carries the root finding forward from the baseline's latest published
+     * report_versions snapshot (or the propagated `.original` if the baseline is itself
+     * a re-inspection).
+     *
+     * GATE: the baseline must be published — i.e. have ≥1 report_versions row.
+     */
+    async createReinspection(
+        tenantId: string,
+        baselineId: string,
+        opts: { selectedItemIds: string[]; inspectorId?: string },
+    ): Promise<Inspection> {
+        const db = this.getDrizzle();
+
+        const baseline = await db.select().from(inspections)
+            .where(and(eq(inspections.id, baselineId), eq(inspections.tenantId, tenantId))).get();
+        if (!baseline) throw new Error('Baseline inspection not found');
+
+        const latestVersion = await db.select().from(reportVersions)
+            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, baselineId)))
+            .orderBy(desc(reportVersions.versionNumber)).limit(1).get();
+        if (!latestVersion) throw new Error('Cannot re-inspect an unpublished baseline');
+
+        const rootId = baseline.rootInspectionId ?? baseline.id;
+        const existingRounds = await db.select().from(inspections)
+            .where(and(eq(inspections.tenantId, tenantId), eq(inspections.rootInspectionId, rootId))).all();
+        const round = existingRounds.length + 1;
+
+        // The latest published snapshot is the carry-forward source. snapshotOnPublish
+        // serialises { inspection, data, units }; we read .data[itemId].
+        const baseSnapshot = JSON.parse(latestVersion.snapshotJson) as {
+            data?: Record<string, Record<string, unknown>>;
+        };
+        const baselineIsReinspection = baseline.sourceInspectionId != null;
+
+        const seeded: Record<string, unknown> = {};
+        for (const itemId of opts.selectedItemIds) {
+            const item = baseSnapshot.data?.[itemId] ?? {};
+            // When the baseline is itself a re-inspection AND its snapshot item already
+            // carries a propagated `.original` root finding, forward THAT (so round N
+            // always shows the root defect, never the intermediate follow-up state).
+            const original = baselineIsReinspection && item.original
+                ? item.original
+                : { rating: item.rating ?? null, notes: item.notes ?? null, photos: item.photos ?? [] };
+            seeded[itemId] = { original, followupStatus: null };
+        }
+
+        const id = crypto.randomUUID();
+        const createdAt = new Date();
+        await db.insert(inspections).values({
+            id,
+            tenantId,
+            // Reuse the baseline's property + client + template fields.
+            inspectorId:             opts.inspectorId ?? baseline.inspectorId ?? null,
+            propertyAddress:         baseline.propertyAddress,
+            addressPlaceId:          baseline.addressPlaceId,
+            addressStreet:           baseline.addressStreet,
+            addressCity:             baseline.addressCity,
+            addressState:            baseline.addressState,
+            addressZip:              baseline.addressZip,
+            addressCounty:           baseline.addressCounty,
+            addressLat:              baseline.addressLat,
+            addressLng:              baseline.addressLng,
+            clientContactId:         baseline.clientContactId,
+            clientName:              baseline.clientName,
+            clientEmail:             baseline.clientEmail,
+            clientPhone:             baseline.clientPhone,
+            templateId:              baseline.templateId,
+            templateSnapshot:        baseline.templateSnapshot,
+            templateSnapshotVersion: baseline.templateSnapshotVersion,
+            date:                    createdAt.toISOString(),
+            status:                  'draft',
+            paymentStatus:           'unpaid',
+            price:                   0,
+            paymentRequired:         false,
+            agreementRequired:       false,
+            createdAt,
+            // #119 link columns.
+            sourceInspectionId: baselineId,
+            rootInspectionId:   rootId,
+            reinspectionRound:  round,
+        });
+
+        await db.insert(inspectionResults).values({
+            id:           crypto.randomUUID(),
+            tenantId,
+            inspectionId: id,
+            data:         seeded as unknown as object,
+            lastSyncedAt: createdAt,
+        });
+
+        const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
+        return created as unknown as Inspection;
+    }
+
+    /**
      * IA-1: Post-create hook — write priceOverride onto inspection_services rows
      * that were already inserted by createInspection. Called by the handler AFTER
      * createInspection returns so it can use the resolved inspection id.
