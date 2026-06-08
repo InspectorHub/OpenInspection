@@ -24,6 +24,7 @@ import {
     InspectionListResponseSchema,
     InspectionCountsSchema,
     PublishInspectionSchema,
+    CreateReinspectionSchema,
     InspectionRecipientsResponseSchema,
     InspectionPeopleResponseSchema,
     InspectionHubResponseSchema,
@@ -1488,6 +1489,30 @@ const publishRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for publishInspection (POST /{id}/publish, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
+/**
+ * Issue #119 (Re-inspections) Task 4 — POST /api/inspections/:id/reinspect
+ * Creates a new linked inspection that carries forward the selected still-open
+ * flagged items from a published baseline report. 400 when the baseline is not
+ * published.
+ */
+const reinspectRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/reinspect',
+    tags: ['inspections'],
+    summary: 'Create a re-inspection from this (published) baseline report',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Baseline inspection id (original or a prior re-inspection; must be published).') }),
+        body: { content: { 'application/json': { schema: CreateReinspectionSchema } } },
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ id: z.string(), reinspectionRound: z.number() })) } }, description: 'Re-inspection created' },
+        400: { description: 'Baseline not published / invalid' },
+    },
+    operationId: 'createReinspection',
+    description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report.',
+}, { scopes: ['write'], tier: 'extended' }));
+
 
 // ── Spec 5A.6 — POST /api/inspections/:id/pdf/refresh ──────────────────────────
 // Re-enqueue Summary + Full PDF rendering. Inspector / admin only.
@@ -2786,6 +2811,20 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         return c.json({ success: true, data: result }, 200);
+    })
+    .openapi(reinspectRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        const body = c.req.valid('json');
+        try {
+            const created = await c.var.services.inspection.createReinspection(tenantId, id, {
+                selectedItemIds: body.selectedItemIds,
+                inspectorId: body.inspectorId,
+            });
+            return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound ?? 1 } }, 200);
+        } catch (err) {
+            return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);
+        }
     })
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/pdf/refresh',
