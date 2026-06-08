@@ -20,7 +20,7 @@ import { ApprenticeService } from './apprentice.service';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import type { AgreementService } from './agreement.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
-import { parseReinspectionStatuses } from '../lib/reinspection-status';
+import { parseReinspectionStatuses, isOpenStatus } from '../lib/reinspection-status';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
 import { InvoiceService } from './invoice.service';
@@ -718,6 +718,115 @@ export class InspectionService {
 
         const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
         return created as unknown as Inspection;
+    }
+
+    /**
+     * #119 (Task 6) — Candidate items for the "Create re-inspection" modal.
+     * Returns the baseline's still-open flagged items so the UI can pre-check
+     * the ones worth carrying forward. Computed off the SAME published snapshot
+     * `createReinspection` reads, so the returned `itemId`s are exactly the keys
+     * accepted as `selectedItemIds`.
+     *
+     * `open` default-check rule (mirrors the task spec):
+     *   - ORIGINAL baseline (no sourceInspectionId): item is open when its rating
+     *     bucket is `defect` or `monitor`.
+     *   - RE-INSPECTION baseline: item is open when its `followupStatus` is a
+     *     non-closed status (via isOpenStatus + the tenant's status set).
+     *
+     * Returns [] when the baseline is unpublished (no snapshot) — the caller
+     * gates the action on publication anyway, and the modal renders an empty
+     * state. Labels come from the baseline's templateSnapshot; an unmatched key
+     * degrades to the raw item id.
+     */
+    async getReinspectCandidates(
+        tenantId: string,
+        baselineId: string,
+    ): Promise<Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }>> {
+        const db = this.getDrizzle();
+
+        const baseline = await db.select().from(inspections)
+            .where(and(eq(inspections.id, baselineId), eq(inspections.tenantId, tenantId))).get();
+        if (!baseline) return [];
+
+        const latestVersion = await db.select().from(reportVersions)
+            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, baselineId)))
+            .orderBy(desc(reportVersions.versionNumber)).limit(1).get();
+        if (!latestVersion) return [];  // unpublished baseline → no candidates
+
+        const baselineIsReinspection = baseline.sourceInspectionId != null;
+
+        // Snapshot data is keyed by findingKey (unit:section:item) or, for legacy
+        // inspections, the plain item id — the same keys createReinspection reads.
+        const snapshot = JSON.parse(latestVersion.snapshotJson) as {
+            data?: Record<string, Record<string, unknown>>;
+        };
+        const snapData = snapshot.data ?? {};
+
+        // Resolve item labels from the baseline's templateSnapshot (authoritative
+        // shape once an inspection exists). Both {sections:[...]} and flat-array
+        // formats are supported, matching getReportData's schema resolution.
+        const labelByItemId = new Map<string, string>();
+        const rawSnap = baseline.templateSnapshot as unknown;
+        const tplSnap = rawSnap
+            ? (typeof rawSnap === 'string' ? JSON.parse(rawSnap as string) : rawSnap)
+            : null;
+        const sections: Array<{ id?: string; items?: Array<Record<string, unknown>> }> = Array.isArray(tplSnap)
+            ? [{ id: 'general', items: tplSnap as Array<Record<string, unknown>> }]
+            : Array.isArray((tplSnap as { sections?: unknown })?.sections)
+                ? (tplSnap as { sections: Array<{ id?: string; items?: Array<Record<string, unknown>> }> }).sections
+                : [];
+        for (const sec of sections) {
+            for (const it of sec.items ?? []) {
+                const itemId = String(it.id ?? '');
+                if (!itemId) continue;
+                const label = String(it.label ?? it.title ?? it.name ?? itemId);
+                labelByItemId.set(itemId, label);
+                // Also map the composite findingKey so snapshot keys resolve.
+                labelByItemId.set(findingKey(DEFAULT_UNIT, String(sec.id ?? ''), itemId), label);
+            }
+        }
+
+        // Rating levels for bucket resolution (original-baseline rule). Read from
+        // the templateSnapshot.ratingSystem when present; absence degrades to the
+        // legacy string-bucket map inside getRatingBucket.
+        const snapLevels = !Array.isArray(tplSnap)
+            ? (tplSnap as { ratingSystem?: { levels?: unknown[] } } | null)?.ratingSystem?.levels
+            : undefined;
+        const levels: RatingLevel[] = Array.isArray(snapLevels)
+            ? mapRatingSystemLevels(snapLevels as Array<Record<string, unknown>>)
+            : [];
+
+        // Resolve the tenant's configured follow-up status set (re-inspection rule).
+        const configRow = await db.select({ reinspectionStatuses: tenantConfigs.reinspectionStatuses })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+        const resolvedStatuses = parseReinspectionStatuses(configRow?.reinspectionStatuses ?? null);
+
+        const out: Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }> = [];
+        for (const [itemId, entry] of Object.entries(snapData)) {
+            const rating = (entry.rating ?? null) as string | null;
+            const notes = (entry.notes ?? null) as string | null;
+            // A re-inspection snapshot may already carry the propagated root finding.
+            const original = (entry.original ?? null) as { notes?: string | null } | null;
+            const originalNotes = baselineIsReinspection && original ? (original.notes ?? null) : notes;
+
+            let open: boolean;
+            if (baselineIsReinspection) {
+                open = isOpenStatus((entry.followupStatus ?? null) as string | null, resolvedStatuses);
+            } else {
+                const bucket = getRatingBucket(rating, levels);
+                open = bucket === 'defect' || bucket === 'monitor';
+            }
+
+            out.push({
+                itemId,
+                label: labelByItemId.get(itemId) ?? itemId,
+                originalNotes,
+                open,
+            });
+        }
+        // Open items first, then by label — the pre-checked carry-forward set surfaces on top.
+        out.sort((a, b) => (a.open === b.open ? a.label.localeCompare(b.label) : a.open ? -1 : 1));
+        return out;
     }
 
     /**

@@ -1513,6 +1513,36 @@ const reinspectRoute = createRoute(withMcpMetadata({
     description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report.',
 }, { scopes: ['write'], tier: 'extended' }));
 
+/**
+ * Issue #119 (Re-inspections) Task 6 — GET /api/inspections/:id/reinspect-candidates
+ * The still-open flagged items off a published baseline, so the hub's
+ * "Create re-inspection" modal can list them with the carry-forward set
+ * pre-checked. Empty array when the baseline is unpublished.
+ */
+const reinspectCandidatesRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{id}/reinspect-candidates',
+    tags: ['inspections'],
+    summary: 'Candidate carry-forward items for a re-inspection',
+    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    request: { params: z.object({ id: z.string().min(1).describe('Baseline inspection id (the published report to re-inspect).') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({
+                candidates: z.array(z.object({
+                    itemId: z.string(),
+                    label: z.string(),
+                    originalNotes: z.string().nullable(),
+                    open: z.boolean(),
+                })),
+            })) } },
+            description: 'Re-inspection candidate items',
+        },
+    },
+    operationId: 'getReinspectCandidates',
+    description: 'Returns the baseline report\'s flagged items (still-open ones pre-flagged) so the inspector can choose which to carry forward into a new re-inspection.',
+}, { scopes: ['read'], tier: 'extended' }));
+
 
 // ── Spec 5A.6 — POST /api/inspections/:id/pdf/refresh ──────────────────────────
 // Re-enqueue Summary + Full PDF rendering. Inspector / admin only.
@@ -2825,6 +2855,12 @@ export const inspectionsRoutes = createApiRouter()
         } catch (err) {
             return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);
         }
+    })
+    .openapi(reinspectCandidatesRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        const candidates = await c.var.services.inspection.getReinspectCandidates(tenantId, id);
+        return c.json({ success: true, data: { candidates } }, 200);
     })
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/pdf/refresh',
