@@ -38,6 +38,10 @@ import {
     agreementSigners,
     erasureLog,
 } from '../db/schema';
+import {
+    ANONYMIZE_SIGNER_PII,
+    ANONYMIZE_REQUEST_PII,
+} from './anonymize-pii';
 
 /** A single recorded erasure decision (serialized into `decisions_json`). */
 export interface ErasureDecision {
@@ -71,14 +75,6 @@ export interface ErasureSummary {
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
 // Both expose the same query-builder surface used here.
 type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown };
-
-/**
- * Sentinel written into NOT NULL PII columns on anonymize (`name`, `email`).
- * Nullable PII columns are set to NULL; NOT NULL columns cannot be, so they get
- * this non-PII marker instead (matches the standing "sentinel-clear for NOT NULL
- * columns" convention). The value carries no personal data.
- */
-const ERASED_SENTINEL = '[erased]';
 
 /** Driver-tolerant row-count extraction (D1: meta.changes; better-sqlite3: changes). */
 function changeCount(res: unknown): number {
@@ -173,9 +169,12 @@ export async function runErasure(
             ? { legalBasis: 'art_17_3_e', retentionExpiry: addYearsMs(signedAtMs, retentionYears) }
             : { legalBasis: 'art_17_3_e' };
         await step('agreement_signers', 'anonymize', anonExtra, async () => {
-            // name + email are NOT NULL -> sentinel-clear; the rest are nullable.
+            // Shared satellite-PII SET (name/email sentinel, rest NULL). KEEP
+            // signature_base64 — it is the retained evidence on a DSAR. The
+            // retention sweep reuses ANONYMIZE_SIGNER_PII and adds signature
+            // destruction; sharing the SET keeps the two paths byte-identical.
             const res = await db.update(agreementSigners)
-                .set({ name: ERASED_SENTINEL, email: ERASED_SENTINEL, ipAddress: null, userAgent: null, onBehalfOf: null, onBehalfDisclaimer: null })
+                .set(ANONYMIZE_SIGNER_PII)
                 .where(and(
                     eq(agreementSigners.tenantId, tenantId),
                     eq(agreementSigners.requestId, env.id),
@@ -188,9 +187,10 @@ export async function runErasure(
         });
         // Envelope denormalized client identity.
         await step('agreement_requests', 'anonymize', anonExtra, async () => {
-            // client_email is NOT NULL -> sentinel-clear; client_name nullable.
+            // Shared satellite-PII SET (client_email sentinel, client_name NULL).
+            // KEEP signature_base64 on a DSAR; the sweep reuses this same SET.
             const res = await db.update(agreementRequests)
-                .set({ clientName: null, clientEmail: ERASED_SENTINEL })
+                .set(ANONYMIZE_REQUEST_PII)
                 .where(and(
                     eq(agreementRequests.tenantId, tenantId),
                     eq(agreementRequests.id, env.id),

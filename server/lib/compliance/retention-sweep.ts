@@ -1,11 +1,15 @@
 /**
  * Track I-a GDPR (spec §7) — the retention sweep (daily Cron step).
  *
- * FINAL DESTRUCTION of past-retention-window signed agreements' signature data.
- * The orchestrator (`erasure-orchestrator.ts`) anonymizes the SATELLITE PII on a
- * DSAR while KEEPING signature_base64 + the audit chain as the retained evidence;
- * this sweep is the back-end clock that destroys that signature once the tenant's
- * retention window has elapsed past `signedAt`.
+ * Past-retention-window data-minimization of signed agreements. The orchestrator
+ * (`erasure-orchestrator.ts`) anonymizes the SATELLITE PII on a DSAR while
+ * KEEPING signature_base64 + the audit chain as the retained evidence; this
+ * sweep is the back-end clock that, once the tenant's retention window has
+ * elapsed past `signedAt`, ANONYMIZES that same satellite PII AND destroys the
+ * signature in one pass. Retention-expiry is therefore a SELF-CONTAINED
+ * data-minimization clock — independent of whether any DSAR was ever filed
+ * (GDPR Art. 5(1)(e) storage limitation; we must not keep PII forever just
+ * because no one asked to erase it).
  *
  * For each tenant, a signed `agreement_requests` row is "past window" when
  *   signedAt + tenant_configs.agreement_retention_years < now.
@@ -14,7 +18,14 @@
  * scope). Already-purged rows (`purged_at IS NOT NULL`) are skipped → idempotent.
  *
  * Action per due envelope:
- *  - NULL `signature_base64` on the envelope AND on its `agreement_signers` rows.
+ *  - ANONYMIZE the satellite PII on the envelope + its `agreement_signers` rows
+ *    using the SHARED `ANONYMIZE_REQUEST_PII` / `ANONYMIZE_SIGNER_PII` SETs (the
+ *    SAME column→value mapping the erase orchestrator uses, so a row erased first
+ *    then swept stays byte-identical — '[erased]' sentinel for NOT NULL columns,
+ *    NULL for nullable). Idempotent on already-anonymized rows (re-setting the
+ *    same values is a no-op in effect).
+ *  - NULL `signature_base64` on the envelope AND on its `agreement_signers` rows
+ *    (the orchestrator KEEPS the signature on a DSAR; the sweep destroys it).
  *  - Set `agreement_requests.purged_at = now` (the destruction marker / idempotency
  *    guard). `status` STAYS 'signed' — the agreement WAS signed; the truthful state
  *    plus the surviving esign_audit_logs chain remain the tamper-evident attestation.
@@ -30,6 +41,10 @@ import {
     agreementSigners,
     tenantConfigs,
 } from '../db/schema';
+import {
+    ANONYMIZE_SIGNER_PII,
+    ANONYMIZE_REQUEST_PII,
+} from './anonymize-pii';
 
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
 type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown };
@@ -111,17 +126,22 @@ export async function runRetentionSweep(
 
     if (dueIds.length === 0) return { purgedEnvelopes: 0, purgedSigners: 0 };
 
-    // Destroy signer signatures for the due envelopes (keep the audit chain).
+    // Anonymize satellite PII + destroy signer signatures for the due envelopes
+    // (keep the audit chain). The PII SET is the SHARED `ANONYMIZE_SIGNER_PII`
+    // (same mapping the erase orchestrator uses → no drift); signature_base64 is
+    // layered on here because the sweep destroys the seal the orchestrator keeps.
     const signerRes = await db.update(agreementSigners)
-        .set({ signatureBase64: null })
+        .set({ ...ANONYMIZE_SIGNER_PII, signatureBase64: null })
         .where(inArray(agreementSigners.requestId, dueIds))
         .run();
     const purgedSigners = changeCount(signerRes);
 
-    // Destroy envelope signature + mark purged. The `purged_at IS NULL` guard in
-    // the WHERE keeps the count truthful and the operation idempotent under a race.
+    // Anonymize denormalized client identity + destroy envelope signature + mark
+    // purged. The `purged_at IS NULL` guard in the WHERE keeps the count truthful
+    // and the operation idempotent under a race. PII SET = shared
+    // `ANONYMIZE_REQUEST_PII`; signature_base64 + purged_at layered on here.
     const envRes = await db.update(agreementRequests)
-        .set({ signatureBase64: null, purgedAt: new Date(now) })
+        .set({ ...ANONYMIZE_REQUEST_PII, signatureBase64: null, purgedAt: new Date(now) })
         .where(and(inArray(agreementRequests.id, dueIds), isNull(agreementRequests.purgedAt)))
         .run();
     const purgedEnvelopes = changeCount(envRes);

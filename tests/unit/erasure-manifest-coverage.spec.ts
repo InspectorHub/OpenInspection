@@ -3,9 +3,15 @@
  * erasure-orchestrator.ts source, preventing silent manifest↔orchestrator
  * divergence (fix I-1).
  *
+ * The anonymize satellite-PII column set lives in the shared `anonymize-pii.ts`
+ * module (consumed by BOTH the orchestrator and the retention sweep so they
+ * cannot drift), so the anonymize-column scan binds the orchestrator source AND
+ * that shared module.
+ *
  * Cross-references:
  *   - Manifest:      server/lib/compliance/erasure-manifest.ts
  *   - Orchestrator:  server/lib/compliance/erasure-orchestrator.ts
+ *   - Shared SETs:   server/lib/compliance/anonymize-pii.ts
  */
 
 import { describe, it, expect } from 'vitest';
@@ -22,7 +28,15 @@ const orchestratorPath = path.resolve(
     __dirname,
     '../../server/lib/compliance/erasure-orchestrator.ts',
 );
-const orchestratorSource = fs.readFileSync(orchestratorPath, 'utf8');
+const sharedAnonymizePath = path.resolve(
+    __dirname,
+    '../../server/lib/compliance/anonymize-pii.ts',
+);
+// Anonymize columns are defined in the shared SET module and consumed by the
+// orchestrator; scan both so the binding holds wherever the columns live.
+const orchestratorSource =
+    fs.readFileSync(orchestratorPath, 'utf8') +
+    fs.readFileSync(sharedAnonymizePath, 'utf8');
 
 describe('erasure-manifest coverage', () => {
     it('every anonymize rule column (camelCase) appears in the orchestrator source', () => {

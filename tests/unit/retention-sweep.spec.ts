@@ -41,16 +41,38 @@ describe('runRetentionSweep', () => {
         sqlite.close();
     });
 
-    /** Seed a signed (already-anonymized) envelope + signer + one audit row. */
+    /**
+     * Seed a signed envelope + signer + one audit row.
+     *
+     * By default the row is ALREADY anonymized (clientEmail/name/email all
+     * '[erased]'), modelling a row a prior DSAR erased. Pass `pii: true` to seed
+     * the LIVE-PII shape instead (real name/email/ip/user_agent/on_behalf) —
+     * i.e. a row a sweep must anonymize itself because no erase ever ran.
+     */
     async function seedSignedEnvelope(opts: {
         id: string; tenantId: string; agreementId: string; signedAtMs: number;
+        pii?: boolean;
     }) {
+        const req = opts.pii
+            ? { clientEmail: 'jane@example.com', clientName: 'Jane Client' }
+            : { clientEmail: '[erased]', clientName: null };
+        const signer = opts.pii
+            ? {
+                name: 'Jane Client', email: 'jane@example.com',
+                ipAddress: '203.0.113.7', userAgent: 'Mozilla/5.0',
+                onBehalfOf: 'Acme LLC', onBehalfDisclaimer: 'authorized agent',
+            }
+            : {
+                name: '[erased]', email: '[erased]',
+                ipAddress: null, userAgent: null,
+                onBehalfOf: null, onBehalfDisclaimer: null,
+            };
         await testDb.insert(agreementRequests).values({
             id: opts.id,
             tenantId: opts.tenantId,
             agreementId: opts.agreementId,
-            clientEmail: '[erased]',
-            clientName: null,
+            clientEmail: req.clientEmail,
+            clientName: req.clientName,
             token: `tok-${opts.id}`,
             status: 'signed',
             signatureBase64: 'data:image/png;base64,ENVSIG',
@@ -61,8 +83,12 @@ describe('runRetentionSweep', () => {
             id: `${opts.id}-s1`,
             tenantId: opts.tenantId,
             requestId: opts.id,
-            name: '[erased]',
-            email: '[erased]',
+            name: signer.name,
+            email: signer.email,
+            ipAddress: signer.ipAddress,
+            userAgent: signer.userAgent,
+            onBehalfOf: signer.onBehalfOf,
+            onBehalfDisclaimer: signer.onBehalfDisclaimer,
             role: 'client',
             status: 'signed',
             signatureBase64: 'data:image/png;base64,SIGNERSIG',
@@ -103,9 +129,62 @@ describe('runRetentionSweep', () => {
         expect(audits.length).toBe(1);
     });
 
-    it('leaves within-window signed rows UNTOUCHED', async () => {
-        // t1 (6y): signed 3 years ago -> within window.
-        await seedSignedEnvelope({ id: 'e-recent', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 3 * YEAR_MS });
+    it('anonymizes satellite PII on a past-window row that was NEVER erased', async () => {
+        // t1 (6y): live-PII row signed 7 years ago, no DSAR ever ran. The sweep
+        // must anonymize the satellite PII AND destroy the signature in one pass
+        // (retention-expiry as a self-contained data-minimization clock).
+        await seedSignedEnvelope({ id: 'e-pii', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 7 * YEAR_MS, pii: true });
+
+        const summary = await runRetentionSweep(testDb as any, NOW);
+        expect(summary.purgedEnvelopes).toBe(1);
+
+        const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-pii')).get();
+        // Envelope: client_email sentinel, client_name NULL, signature destroyed.
+        expect(env!.clientEmail).toBe('[erased]');
+        expect(env!.clientName).toBeNull();
+        expect(env!.signatureBase64).toBeNull();
+        expect(env!.purgedAt).not.toBeNull();
+        expect(env!.status).toBe('signed');
+
+        const signer = await testDb.select().from(agreementSigners).where(eq(agreementSigners.id, 'e-pii-s1')).get();
+        // Signer: name/email sentinel; ip/user_agent/on_behalf NULL; signature gone.
+        expect(signer!.name).toBe('[erased]');
+        expect(signer!.email).toBe('[erased]');
+        expect(signer!.ipAddress).toBeNull();
+        expect(signer!.userAgent).toBeNull();
+        expect(signer!.onBehalfOf).toBeNull();
+        expect(signer!.onBehalfDisclaimer).toBeNull();
+        expect(signer!.signatureBase64).toBeNull();
+
+        // Audit chain row count unchanged (the surviving attestation).
+        const audits = await testDb.select().from(esignAuditLogs).where(eq(esignAuditLogs.requestId, 'e-pii')).all();
+        expect(audits.length).toBe(1);
+    });
+
+    it('is idempotent on PII for a past-window row already erased (no double-mangle)', async () => {
+        // Already-anonymized by a prior erase (name/email '[erased]'), signature
+        // still present. The sweep destroys the signature + marks purged; the
+        // anonymize fields STAY '[erased]' (byte-identical, no error).
+        await seedSignedEnvelope({ id: 'e-pre', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 7 * YEAR_MS });
+
+        const summary = await runRetentionSweep(testDb as any, NOW);
+        expect(summary.purgedEnvelopes).toBe(1);
+
+        const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-pre')).get();
+        expect(env!.clientEmail).toBe('[erased]');
+        expect(env!.clientName).toBeNull();
+        expect(env!.signatureBase64).toBeNull();
+        expect(env!.purgedAt).not.toBeNull();
+
+        const signer = await testDb.select().from(agreementSigners).where(eq(agreementSigners.id, 'e-pre-s1')).get();
+        expect(signer!.name).toBe('[erased]');
+        expect(signer!.email).toBe('[erased]');
+        expect(signer!.signatureBase64).toBeNull();
+    });
+
+    it('leaves within-window signed rows UNTOUCHED (PII + signature intact)', async () => {
+        // t1 (6y): live-PII row signed 3 years ago -> within window -> nothing.
+        await seedSignedEnvelope({ id: 'e-recent', tenantId: 't1', agreementId: 'agr-tpl', signedAtMs: NOW - 3 * YEAR_MS, pii: true });
 
         const summary = await runRetentionSweep(testDb as any, NOW);
         expect(summary.purgedEnvelopes).toBe(0);
@@ -113,8 +192,17 @@ describe('runRetentionSweep', () => {
         const env = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-recent')).get();
         expect(env!.signatureBase64).toBe('data:image/png;base64,ENVSIG');
         expect(env!.purgedAt).toBeNull();
+        // PII fully intact within window.
+        expect(env!.clientEmail).toBe('jane@example.com');
+        expect(env!.clientName).toBe('Jane Client');
         const signer = await testDb.select().from(agreementSigners).where(eq(agreementSigners.id, 'e-recent-s1')).get();
         expect(signer!.signatureBase64).toBe('data:image/png;base64,SIGNERSIG');
+        expect(signer!.name).toBe('Jane Client');
+        expect(signer!.email).toBe('jane@example.com');
+        expect(signer!.ipAddress).toBe('203.0.113.7');
+        expect(signer!.userAgent).toBe('Mozilla/5.0');
+        expect(signer!.onBehalfOf).toBe('Acme LLC');
+        expect(signer!.onBehalfDisclaimer).toBe('authorized agent');
     });
 
     it('applies the PER-TENANT retention year (t2 = 2y purges a 3-year-old row)', async () => {
