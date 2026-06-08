@@ -20,6 +20,7 @@ import { ApprenticeService } from './apprentice.service';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import type { AgreementService } from './agreement.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
+import { parseReinspectionStatuses } from '../lib/reinspection-status';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
 import { InvoiceService } from './invoice.service';
@@ -1802,6 +1803,11 @@ export class InspectionService {
                 limitations?: CannedState[];
                 defects?:     DefectState[];
             };
+            // #119 — on a re-inspection result, the carried item retains a
+            // snapshot of the original finding plus the follow-up disposition.
+            original?:       { rating?: string | null; notes?: string | null; photos?: PhotoEntry[] };
+            followupStatus?: string | null;
+            followupNotes?:  string | null;
         }
 
         // Feature #20 — prefer the per-inspection templateSnapshot over the
@@ -2039,6 +2045,22 @@ export class InspectionService {
                         // (custom rows carry isCustom: true).
                         defects: [...defects, ...customDefects],
                     },
+                    // #119 — re-inspection passthrough. Null on normal reports;
+                    // the report page only consults these when data.reinspection
+                    // is set. `original.photos` are resolved to display URLs so
+                    // the left column can render the baseline finding grayscale.
+                    original: res.original
+                        ? {
+                            rating: res.original.rating ?? null,
+                            notes:  res.original.notes ?? null,
+                            photos: (res.original.photos || []).map((p: PhotoEntry) => {
+                                const displayKey = p.annotatedKey || p.key;
+                                return { key: displayKey, originalKey: p.key, url: makePhotoUrl(displayKey) };
+                            }),
+                        }
+                        : null,
+                    followupStatus: res.followupStatus ?? null,
+                    followupNotes:  res.followupNotes ?? null,
                 };
             }),
         }));
@@ -2121,10 +2143,29 @@ export class InspectionService {
             })),
         };
 
+        // #119 — re-inspection context for the report page. When this
+        // inspection is a re-inspection, the page renders only the carried
+        // items with a left(original)/right(follow-up) layout. The status
+        // catalog is the tenant's (falls back to defaults) so the follow-up
+        // badge can resolve a human label from item.followupStatus.
+        const reinspection = inspection.sourceInspectionId
+            ? {
+                round: inspection.reinspectionRound ?? 1,
+                rootInspectionId: inspection.rootInspectionId,
+                statuses: parseReinspectionStatuses(
+                    (await db.select({ s: tenantConfigs.reinspectionStatuses })
+                        .from(tenantConfigs)
+                        .where(eq(tenantConfigs.tenantId, tenantId))
+                        .get())?.s ?? null,
+                ),
+            }
+            : null;
+
         return {
             inspection: { ...inspection, inspectorName },
             theme: reportTheme,
             amendmentTrail,
+            reinspection,
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
             sections,
             ratingLevels: levels.length > 0 ? levels : [
