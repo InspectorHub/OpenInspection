@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq, and, lte, gte, sql, desc, notInArray } from 'drizzle-orm';
+import { eq, and, lte, gte, sql, desc, notInArray, ne } from 'drizzle-orm';
 import { automations, automationLogs, inspections, tenants, agreementRequests, inspectionServices, tenantConfigs } from '../lib/db/schema';
 import { reportUrl } from '../lib/public-urls';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
@@ -347,19 +347,54 @@ export class AutomationService {
         return { ok: true };
     }
 
-    async flush(resendApiKey: string, senderEmail: string, appName: string, appBaseUrl: string, batchSize = 50): Promise<void> {
+    async flush(
+        resendApiKey: string, senderEmail: string, appName: string, appBaseUrl: string,
+        sms?: { resolveCreds: (tenantId: string) => Promise<import('../lib/sms/resolve-twilio').TwilioCreds | null> } | null,
+        batchSize = 50,
+    ): Promise<void> {
         const db = this.getDrizzle();
         const now = new Date().toISOString();
+        const nowMs = Date.parse(now);
 
-        const pending = await db.select({
+        // Shared 4-table join so both flush queries (non-reminder fast path +
+        // reminder live-due path) select the same shape.
+        const baseSelect = () => db.select({
             log: automationLogs, automation: automations, inspection: inspections, tenant: tenants,
         })
             .from(automationLogs)
             .innerJoin(automations, eq(automationLogs.automationId, automations.id))
             .innerJoin(inspections, eq(automationLogs.inspectionId, inspections.id))
-            .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
-            .where(and(eq(automationLogs.status, 'pending'), lte(automationLogs.sendAt, now)))
+            .innerJoin(tenants, eq(tenants.id, inspections.tenantId));
+
+        // Non-reminder logs: indexed, batch-limited fast path (unchanged semantics —
+        // gated on the stored send_at).
+        const normal = await baseSelect()
+            .where(and(
+                eq(automationLogs.status, 'pending'),
+                lte(automationLogs.sendAt, now),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ne(automations.trigger, 'inspection.reminder' as any),
+            ))
             .limit(batchSize);
+
+        // Reminder logs: fetch ALL pending (bounded — enqueueReminders only creates
+        // them inside the lead window), then compute the due moment LIVE from the
+        // CURRENT inspection.date and keep the due ones. This makes a reschedule
+        // "just work" with zero log writes: flush ignores the stored send_at for
+        // reminders. Reminders not yet due stay pending and re-evaluate next tick.
+        const reminderRows = await baseSelect()
+            .where(and(
+                eq(automationLogs.status, 'pending'),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                eq(automations.trigger, 'inspection.reminder' as any),
+            ));
+        const dueReminders = reminderRows.filter(({ automation, inspection }) => {
+            const inspMs = Date.parse(`${inspection.date}T09:00:00Z`);
+            if (Number.isNaN(inspMs)) return false;
+            return inspMs - automation.delayMinutes * 60_000 <= nowMs; // derived due-time
+        });
+
+        const pending = [...normal, ...dueReminders];
 
         if (pending.length === 0) return;
         logger.info('AutomationService.flush: processing', { count: pending.length });
@@ -373,6 +408,19 @@ export class AutomationService {
                 const verdict = await this.evaluateConditions(db, automation, inspection);
                 if (!verdict.ok) {
                     await db.update(automationLogs).set({ status: 'skipped', error: verdict.reason })
+                        .where(eq(automationLogs.id, log.id));
+                    continue;
+                }
+
+                // Track L — branch per the log's own channel. SMS resolves its own
+                // creds + consent in deliverSms; the email path below self-skips when
+                // no Resend key is configured (rather than 401-looping forever).
+                if (log.channel === 'sms') {
+                    await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost);
+                    continue;
+                }
+                if (!resendApiKey) {
+                    await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
                         .where(eq(automationLogs.id, log.id));
                     continue;
                 }
@@ -469,6 +517,71 @@ export class AutomationService {
                 }).where(eq(automationLogs.id, log.id));
                 logger.error('AutomationService.flush: exception', {}, err instanceof Error ? err : undefined);
             }
+        }
+    }
+
+    /**
+     * Track L — deliver one SMS automation log via Twilio. Client logs are gated
+     * on a recorded 'granted' consent event (agents/inspector are implied; D5);
+     * creds resolve through the injected sms.resolveCreds (per-tenant platform/own).
+     * Renders the rule's plain-text smsBody with the var map, fail-closed on an
+     * unconfigured review_url. Maps Twilio ok→sent / !ok→failed; every guard skips
+     * the log with a reason. Never throws (caller's try/catch marks failed otherwise).
+     */
+    private async deliverSms(
+        db: DrizzleD1Database,
+        ctx: { log: typeof automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
+               inspection: typeof inspections.$inferSelect; tenant: typeof tenants.$inferSelect },
+        sms: { resolveCreds: (tenantId: string) => Promise<import('../lib/sms/resolve-twilio').TwilioCreds | null> } | null | undefined,
+        appName: string, appHost: string,
+    ): Promise<void> {
+        const { log, automation, inspection, tenant } = ctx;
+        const skip = (reason: string) =>
+            db.update(automationLogs).set({ status: 'skipped', error: reason }).where(eq(automationLogs.id, log.id));
+
+        if (!automation.smsBody?.trim()) return void (await skip('no sms body'));
+        if (!sms) return void (await skip('sms not configured'));
+
+        // Consent gate — client only (agents/inspector implied; D5).
+        if (automation.recipient === 'client') {
+            const { SmsConsentService } = await import('./sms-consent.service');
+            const consentSvc = new SmsConsentService(this.db);
+            const contactId = inspection.clientContactId;
+            const latest = contactId ? await consentSvc.getLatest(inspection.tenantId, contactId) : null;
+            if (latest !== 'granted') return void (await skip('no sms consent'));
+        }
+
+        const creds = await sms.resolveCreds(inspection.tenantId);
+        if (!creds) return void (await skip('sms not configured'));
+
+        const vars: Record<string, string> = {
+            client_name:      inspection.clientName ?? '',
+            property_address: inspection.propertyAddress,
+            scheduled_date:   inspection.date,
+            report_url:       reportUrl(appHost, tenant.slug, inspection.id),
+            company_name:     appName,
+            // company_phone comes from tenants.phone when present; the column may not
+            // exist on every deploy's tenants row, so read defensively (→ '').
+            company_phone:    (tenant as { phone?: string | null }).phone ?? '',
+        };
+        // review_url fail-closed (same rule as the email path).
+        if (automation.smsBody.includes('{{review_url}}')) {
+            const cfg = await db.select({ reviewUrl: tenantConfigs.reviewUrl }).from(tenantConfigs)
+                .where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
+            if (!cfg?.reviewUrl) return void (await skip('review_url not configured'));
+            vars.review_url = cfg.reviewUrl;
+        }
+        const body = interpolate(automation.smsBody, vars);
+
+        const { sendTwilioSms } = await import('../lib/sms/send-sms');
+        const res = await sendTwilioSms(creds, log.recipient, body);
+        if (res.ok) {
+            await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date().toISOString() })
+                .where(eq(automationLogs.id, log.id));
+        } else {
+            await db.update(automationLogs).set({ status: 'failed', error: res.error })
+                .where(eq(automationLogs.id, log.id));
+            logger.error('AutomationService.flush: twilio send failed', { logId: log.id });
         }
     }
 
