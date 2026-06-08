@@ -109,6 +109,16 @@ export async function scheduled(
         logger.error('[cron] QBO CDC failed', {}, e instanceof Error ? e : undefined);
     }
 
+    // 3a. Track J — enqueue inspection.reminder logs (no email key needed to enqueue;
+    //     the flush below sends due ones). Idempotent per (rule, inspection).
+    try {
+        const svc = new AutomationService(env.DB);
+        const n = await svc.enqueueReminders(Date.now());
+        if (n > 0) logger.info('[cron] enqueued inspection reminders', { count: n });
+    } catch (e) {
+        logger.error('[cron] reminder enqueue failed', {}, e instanceof Error ? e : undefined);
+    }
+
     // 3. Automation email queue flush
     if (!env.RESEND_API_KEY) {
         logger.info('scheduled: RESEND_API_KEY not set, skipping automation flush');

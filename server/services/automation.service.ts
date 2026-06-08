@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq, and, lte, sql, desc } from 'drizzle-orm';
+import { eq, and, lte, gte, sql, desc, notInArray } from 'drizzle-orm';
 import { automations, automationLogs, inspections, tenants, agreementRequests, inspectionServices, tenantConfigs } from '../lib/db/schema';
 import { reportUrl } from '../lib/public-urls';
 import { AUTOMATION_SEEDS } from '../data/automation-seeds';
@@ -226,6 +226,20 @@ export class AutomationService {
         inspection: typeof inspections.$inferSelect,
     ): Promise<{ ok: true } | { ok: false; reason: string }> {
         if (automation.channel === 'sms') return { ok: false, reason: 'channel sms not supported yet' };
+        // Track J (D7) — a reminder enqueued for an inspection that has since
+        // reached a terminal status (cancelled/completed/delivered/published) is
+        // stale; suppress it (e.g. don't send "don't forget tomorrow" for a
+        // cancelled inspection). NOTE: a reschedule to a DIFFERENT date is a known
+        // v1 limitation — the reminder still fires at the originally-computed time,
+        // because we don't currently mutate reminder logs when an inspection's date
+        // changes. event_id has no unique index on purpose: Spec 4D reminder+follow-up
+        // logs intentionally share an inspection-event id, so the cron's
+        // check-then-insert dedup (safe because CF cron runs are effectively serial)
+        // is the chosen guard rather than a DB unique constraint.
+        if (automation.trigger === 'inspection.reminder' &&
+            ['cancelled', 'completed', 'delivered', 'published'].includes(inspection.status)) {
+            return { ok: false, reason: 'inspection no longer active' };
+        }
         if (!automation.conditions) return { ok: true };
 
         let cond: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] };
@@ -310,7 +324,10 @@ export class AutomationService {
                 };
 
                 // Spec 4D — populate event vars when log was created by EventService.
-                if (log.eventId) {
+                // Spec 4D event-vars apply only to logs linked to a real inspection
+                // event. Track J reminders reuse event_id as a "reminder:<rule>:<insp>"
+                // dedup key that never matches an inspectionEvents row, so skip the lookup.
+                if (log.eventId && !log.eventId.startsWith('reminder:')) {
                     try {
                         const { eventTypes, inspectionEvents } = await import('../lib/db/schema');
                         const ev = await db.select().from(inspectionEvents).where(eq(inspectionEvents.id, log.eventId)).get();
@@ -384,6 +401,63 @@ export class AutomationService {
                 logger.error('AutomationService.flush: exception', {}, err instanceof Error ? err : undefined);
             }
         }
+    }
+
+    /**
+     * Track J (D7) — appointment reminders. Cron-fired daily. For each active
+     * inspection.reminder rule, scan upcoming inspections within the rule's lead
+     * window and enqueue a pending automation_log at (inspection date − lead),
+     * floored to now+5min. Deduped on eventId = reminder:<ruleId>:<inspectionId>
+     * so re-scans don't double-create. The existing flush() sends it when due and
+     * re-checks conditions per D4. Reminders are day-granular (inspections.date is
+     * date-only); we anchor the appointment at 09:00 UTC.
+     */
+    async enqueueReminders(nowMs: number): Promise<number> {
+        const db = this.getDrizzle();
+        const rules = await db.select().from(automations)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .where(and(eq(automations.trigger, 'inspection.reminder' as any), eq(automations.active, true)));
+        if (rules.length === 0) return 0;
+
+        const todayStr = new Date(nowMs).toISOString().slice(0, 10);
+        let created = 0;
+
+        for (const rule of rules) {
+            // Window upper bound = lead + 1.5d buffer so a same-day cron still
+            // catches an appointment whose lead window opens within the next day.
+            const upperStr = new Date(nowMs + rule.delayMinutes * 60_000 + 36 * 3600_000)
+                .toISOString().slice(0, 10);
+            const upcoming = await db.select().from(inspections)
+                .where(and(
+                    eq(inspections.tenantId, rule.tenantId),
+                    gte(inspections.date, todayStr),
+                    lte(inspections.date, upperStr),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    notInArray(inspections.status, ['cancelled', 'completed', 'delivered', 'published'] as any),
+                ));
+
+            for (const insp of upcoming) {
+                if (!insp.clientEmail) continue;
+                const eventId = `reminder:${rule.id}:${insp.id}`;
+                const dup = await db.select({ id: automationLogs.id }).from(automationLogs)
+                    .where(eq(automationLogs.eventId, eventId)).limit(1);
+                if (dup.length > 0) continue;
+
+                // tz-naive: 09:00 UTC is an approximate anchor (inspections.date is date-only, no tenant tz here).
+                const inspMs = Date.parse(`${insp.date}T09:00:00Z`);
+                if (Number.isNaN(inspMs)) continue;
+                let sendAt = inspMs - rule.delayMinutes * 60_000;
+                if (sendAt < nowMs) sendAt = nowMs + 5 * 60_000;
+
+                await db.insert(automationLogs).values({
+                    id: nanoid(), tenantId: rule.tenantId, automationId: rule.id,
+                    inspectionId: insp.id, recipientEmail: insp.clientEmail,
+                    sendAt: new Date(sendAt).toISOString(), status: 'pending', eventId,
+                });
+                created++;
+            }
+        }
+        return created;
     }
 
     async getLogs(tenantId: string, inspectionId: string) {
