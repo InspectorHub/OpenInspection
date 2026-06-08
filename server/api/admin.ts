@@ -43,7 +43,7 @@ import { applyInspectorPreSign } from '../services/agreement.service';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validations/shared.schema';
-import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs } from '../lib/db/schema';
+import { templates, agreements as agreementTable, agreements as agreementsTable, agreementRequests as agreementRequestsTable, inspections, inspectionResults, comments, tenantConfigs, erasureLog } from '../lib/db/schema';
 import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
@@ -930,6 +930,7 @@ const TenantConfigGetResponseSchema = z.object({
         conciergeReviewRequired: z.boolean().describe('Whether bookings require concierge review before confirmation'),
         blockUnsignedAgreement: z.boolean().describe('Whether unsigned agreements block inspection start'),
         allowInspectorChoice: z.boolean().describe('Whether the public booking page offers an inspector dropdown'),
+        agreementRetentionYears: z.number().int().describe('Years signed agreements are retained before the GDPR retention sweep destroys them (Track I-a). Default 6.'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -960,6 +961,7 @@ const TenantConfigPatchSchema = z.object({
     conciergeReviewRequired: z.boolean().optional().describe('Whether agent-submitted bookings require owner/admin approval before the client receives a confirmation link.'),
     blockUnsignedAgreement: z.boolean().optional().describe('Whether clients must sign the inspection agreement before a booking is confirmed.'),
     allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
+    agreementRetentionYears: z.number().int().min(1).max(99).optional().describe('How many years signed agreements / signatures are retained before the GDPR retention sweep destroys them (Track I-a). Integer 1–99; default 6 ≈ UK simple-contract limitation period.'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -1065,6 +1067,50 @@ const brSmokeRoute = createRoute(withMcpMetadata({
     },
     operationId: 'brSmokeProbe',
     description: 'Operator diagnostic for confirming Browser Run is enabled before enabling the per-tenant PDF pipeline.',
+}, { scopes: ['admin'], tier: 'extended' }));
+
+
+// -----------------------------------------------------------------------------
+// GET /api/admin/compliance/erasure-log — recent DSAR (erasure) decision records
+// -----------------------------------------------------------------------------
+// Track I-a (spec §8/§9). The append-only accountability record (GDPR Art. 5(2) /
+// Art. 30) made VISIBLE in Settings → Compliance. Tenant-scoped, newest first.
+// Exposes ONLY the fields the admin already has visibility into: subject_email
+// (they typed it to initiate the erasure), status, counts, and the parsed
+// decision array. NO token material, NO requested_by / identity_basis PII.
+// decisions_json is operator-written and tolerant-read (it can carry extra
+// keys / legacy shapes); keep the response schema permissive so a corrupt or
+// evolving payload never blocks the accountability view.
+const ErasureLogRowSchema = z.object({
+    id:              z.string(),
+    subjectEmail:    z.string().describe('Data subject whose erasure was requested (admin already sees this).'),
+    status:          z.string().describe('completed | partially_completed | refused.'),
+    retainedCount:   z.number(),
+    anonymizedCount: z.number(),
+    deletedCount:    z.number(),
+    decisions:       z.array(z.unknown()).describe('Parsed decisions_json: [{ table, action, count, legalBasis?, retentionExpiry? }].'),
+    createdAt:       z.number().describe('Unix ms.'),
+}).openapi('ErasureLogRow');
+
+const ErasureLogResponseSchema = z.object({
+    success: z.literal(true),
+    data:    z.array(ErasureLogRowSchema),
+}).openapi('ErasureLogResponse');
+
+const erasureLogRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/compliance/erasure-log',
+    tags: ['admin'],
+    summary: 'Recent GDPR erasure (DSAR) decision records for the tenant',
+    middleware: [requireRole(['owner', 'admin'])] as const,
+    responses: {
+        200: {
+            content: { 'application/json': { schema: ErasureLogResponseSchema } },
+            description: 'Up to 50 most-recent erasure log rows, newest first. No token material.',
+        },
+    },
+    operationId: 'listComplianceErasureLog',
+    description: 'Returns the tenant-scoped append-only erasure accountability record (Track I-a). Newest first, capped at 50. Exposes subject_email + status + counts + parsed decisions only.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -2282,6 +2328,7 @@ export const adminRoutes = createApiRouter()
                 conciergeReviewRequired: config?.conciergeReviewRequired ?? false,
                 blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
                 allowInspectorChoice: config?.allowInspectorChoice ?? false,
+                agreementRetentionYears: config?.agreementRetentionYears ?? 6,
             },
         }, 200);
     })
@@ -2298,6 +2345,9 @@ export const adminRoutes = createApiRouter()
         }
         if (body.allowInspectorChoice !== undefined) {
             update.allowInspectorChoice = body.allowInspectorChoice;
+        }
+        if (body.agreementRetentionYears !== undefined) {
+            update.agreementRetentionYears = body.agreementRetentionYears;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);
@@ -2479,6 +2529,49 @@ export const adminRoutes = createApiRouter()
             success: true as const,
             data: { bindingPresent: true, probedUrl, status, ok, contentType, contentLength, durationMs, error, hint },
         }, 200);
+    })
+    .openapi(erasureLogRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const db = drizzle(c.env.DB);
+
+        const rows = await db
+            .select({
+                id:              erasureLog.id,
+                subjectEmail:    erasureLog.subjectEmail,
+                status:          erasureLog.status,
+                retainedCount:   erasureLog.retainedCount,
+                anonymizedCount: erasureLog.anonymizedCount,
+                deletedCount:    erasureLog.deletedCount,
+                decisionsJson:   erasureLog.decisionsJson,
+                createdAt:       erasureLog.createdAt,
+            })
+            .from(erasureLog)
+            .where(eq(erasureLog.tenantId, tenantId))
+            .orderBy(descDz(erasureLog.createdAt))
+            .limit(50);
+
+        const data = rows.map((r) => {
+            // decisions_json is written by the orchestrator; tolerate corruption.
+            let decisions: unknown[] = [];
+            try {
+                const parsed = JSON.parse(r.decisionsJson);
+                if (Array.isArray(parsed)) decisions = parsed;
+            } catch {
+                decisions = [];
+            }
+            return {
+                id:              r.id,
+                subjectEmail:    r.subjectEmail,
+                status:          r.status,
+                retainedCount:   r.retainedCount,
+                anonymizedCount: r.anonymizedCount,
+                deletedCount:    r.deletedCount,
+                decisions,
+                createdAt:       r.createdAt,
+            };
+        });
+
+        return c.json({ success: true as const, data }, 200);
     })
     .openapi(togglePdfPipelineRoute, async (c) => {
         const tenantId = c.get('tenantId');
