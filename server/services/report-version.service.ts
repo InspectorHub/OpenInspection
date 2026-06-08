@@ -13,7 +13,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc } from 'drizzle-orm';
 import { reportVersions, inspections, inspectionResults, inspectionUnits } from '../lib/db/schema';
 import { computeDiff, type Snapshot, type DiffPayload } from '../lib/version-diff';
-import { SigningKeyService, sha256Hex, base64UrlEncode } from './signing-key.service';
+import { SigningKeyService, sha256Hex, base64UrlEncode, base64UrlDecode } from './signing-key.service';
 
 const MAX_SNAPSHOT_BYTES = 1024 * 1024;  // 1 MB
 
@@ -110,6 +110,55 @@ export class ReportVersionService {
         });
 
         return { versionNumber: nextVersion, ...(summary ? { summary } : {}) };
+    }
+
+    async verifyByToken(token: string) {
+        const db = this.getDrizzle();
+        const row = await db.select().from(reportVersions)
+            .where(eq(reportVersions.verificationToken, token)).get();
+        if (!row) return null;
+
+        const legacy = !row.contentHash || !row.signature;
+        const recomputed = await sha256Hex(row.snapshotJson);
+        const hashValid = !legacy && recomputed === row.contentHash;
+
+        let signatureValid = false;
+        if (!legacy) {
+            const signing = new SigningKeyService(this.db, this.encryptionSecret);
+            const pub = await signing.getPublicKey(row.tenantId);
+            if (pub) {
+                signatureValid = await crypto.subtle.verify(
+                    { name: 'Ed25519' }, pub.publicKey,
+                    base64UrlDecode(row.signature!) as unknown as ArrayBuffer,
+                    new TextEncoder().encode(recomputed),
+                );
+            }
+        }
+
+        let chainValid: boolean;
+        if (row.versionNumber > 1) {
+            const prev = await db.select().from(reportVersions).where(and(
+                eq(reportVersions.tenantId, row.tenantId),
+                eq(reportVersions.inspectionId, row.inspectionId),
+                eq(reportVersions.versionNumber, row.versionNumber - 1),
+            )).get();
+            chainValid = !!prev && prev.contentHash === row.prevHash;
+        } else {
+            chainValid = row.prevHash == null;
+        }
+
+        return {
+            inspectionId:  row.inspectionId,
+            versionNumber: row.versionNumber,
+            isAmendment:   row.isAmendment,
+            publishedAt:   row.publishedAt,
+            contentHash:   row.contentHash ?? null,
+            keyFingerprint: row.keyFingerprint ?? null,
+            legacy,
+            hashValid,
+            signatureValid,
+            chainValid,
+        };
     }
 
     async list(tenantId: string, inspectionId: string) {

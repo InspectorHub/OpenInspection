@@ -105,4 +105,31 @@ describe('ReportVersionService (subsystem D P7 T7.2)', () => {
         expect(v2.isAmendment).toBe(true);
         expect(v2.summary).toBe('corrected roof note');
     });
+
+    it('verifyByToken validates an untampered version (hash + signature + chain)', async () => {
+        await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+        const row = await testDb.select().from(schema.reportVersions).get();
+        const res = await svc.verifyByToken(row!.verificationToken!);
+        expect(res).not.toBeNull();
+        expect(res!.hashValid).toBe(true);
+        expect(res!.signatureValid).toBe(true);
+        expect(res!.chainValid).toBe(true);
+        expect(res!.versionNumber).toBe(1);
+        expect(res!.isAmendment).toBe(false);
+    });
+
+    it('verifyByToken detects a tampered snapshot (hash mismatch)', async () => {
+        await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+        const row = await testDb.select().from(schema.reportVersions).get();
+        await testDb.update(schema.reportVersions)
+            .set({ snapshotJson: '{"inspection":{"id":"hacked"},"data":{},"units":[]}' })
+            .where(schema_eq(schema.reportVersions.id, row!.id));
+        const res = await svc.verifyByToken(row!.verificationToken!);
+        expect(res!.hashValid).toBe(false);
+        expect(res!.signatureValid).toBe(false);
+    });
+
+    it('verifyByToken returns null for an unknown token', async () => {
+        expect(await svc.verifyByToken('no-such-token')).toBeNull();
+    });
 });
