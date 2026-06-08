@@ -28,6 +28,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, asc } from 'drizzle-orm';
 import * as schema from '../../server/lib/db/schema';
 import { ReportVersionService } from '../../server/services/report-version.service';
+import { ReportPdfService } from '../../server/services/report-pdf.service';
 import { SigningKeyService } from '../../server/services/signing-key.service';
 import publicReportRoutes from '../../server/api/public-report';
 import type { HonoConfig } from '../../server/types/hono';
@@ -263,5 +264,75 @@ describe('#120 report amendments — end-to-end (real workerd)', () => {
         // cross-tenant leak.
         const res404 = await verify(crypto.randomUUID());
         expect(res404.status).toBe(404);
+    });
+});
+
+describe('#120 markQueued is version-scoped (real workerd)', () => {
+    // Migrations are already applied by the first describe's beforeAll against
+    // the shared per-file D1 — re-applying would fail ("table already exists").
+    beforeEach(clearAll);
+
+    // markQueued only touches D1 (this.db via getDrizzle) — it needs neither
+    // the BROWSER nor the R2 binding — so it is testable in the workers harness.
+    const pdfService = () => new ReportPdfService(b.DB, undefined, undefined);
+
+    const insertReadyV1 = async () => {
+        const db = drizzle(b.DB);
+        await db.insert(schema.reportPdfs).values({
+            id: crypto.randomUUID(),
+            tenantId: TENANT,
+            inspectionId: INSPECTION,
+            type: 'full',
+            r2Key: `${TENANT}/${INSPECTION}/reports/v1/full.pdf`,
+            renderedAt: Date.now(),
+            sourceVersion: 1,
+            versionNumber: 1,
+            sizeBytes: 1024,
+            status: 'ready',
+            error: null,
+        });
+    };
+
+    it('markQueued does not mutate a different version\'s archived row', async () => {
+        await seedInspection(TENANT, INSPECTION);
+        await insertReadyV1();
+
+        await pdfService().markQueued(INSPECTION, TENANT, 'full', 2);
+
+        const db = drizzle(b.DB);
+        const rows = await db.select().from(schema.reportPdfs)
+            .where(and(
+                eq(schema.reportPdfs.inspectionId, INSPECTION),
+                eq(schema.reportPdfs.type, 'full'),
+            ))
+            .orderBy(asc(schema.reportPdfs.versionNumber))
+            .all();
+        // v1 archived row is untouched; a NEW v2 queued row was created.
+        expect(rows).toHaveLength(2);
+        const v1 = rows.find((r) => r.versionNumber === 1);
+        const v2 = rows.find((r) => r.versionNumber === 2);
+        expect(v1!.status).toBe('ready');
+        expect(v2).toBeTruthy();
+        expect(v2!.status).toBe('queued');
+    });
+
+    it('markQueued on the same version replaces in place', async () => {
+        await seedInspection(TENANT, INSPECTION);
+        await insertReadyV1();
+
+        await pdfService().markQueued(INSPECTION, TENANT, 'full', 1);
+
+        const db = drizzle(b.DB);
+        const rows = await db.select().from(schema.reportPdfs)
+            .where(and(
+                eq(schema.reportPdfs.inspectionId, INSPECTION),
+                eq(schema.reportPdfs.type, 'full'),
+            ))
+            .all();
+        // Exactly one row for (inspection, 'full', v1), now queued — no
+        // NULL-version placeholder leaked.
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.versionNumber).toBe(1);
+        expect(rows[0]!.status).toBe('queued');
     });
 });

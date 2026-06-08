@@ -158,11 +158,20 @@ export class ReportPdfService {
 
     /**
      * Mark a record as queued for re-render. Used by POST /api/reports/:id/pdf/refresh
-     * before kicking off the render workflow.
+     * before kicking off the render workflow. Version-scoped (#120): operates only
+     * on the row matching the given versionNumber (or the legacy NULL-version row
+     * when null) so re-publishing never mutates a different version's archived row.
      */
-    async markQueued(inspectionId: string, tenantId: string, type: ReportPdfType): Promise<void> {
+    async markQueued(inspectionId: string, tenantId: string, type: ReportPdfType, versionNumber: number | null = null): Promise<void> {
         const db = this.getDrizzle();
-        const existing = await this.getPdfRecord(inspectionId, tenantId, type);
+        const existing = await db.select().from(reportPdfs).where(and(
+            eq(reportPdfs.inspectionId, inspectionId),
+            eq(reportPdfs.tenantId, tenantId),
+            eq(reportPdfs.type, type),
+            versionNumber != null
+                ? eq(reportPdfs.versionNumber, versionNumber)
+                : isNull(reportPdfs.versionNumber),
+        )).get();
         if (existing) {
             await db.update(reportPdfs)
                 .set({ status: 'queued', error: null })
@@ -181,6 +190,7 @@ export class ReportPdfService {
             sizeBytes: null,
             status: 'queued',
             error: null,
+            versionNumber,
         });
     }
 }

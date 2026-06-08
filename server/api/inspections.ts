@@ -2771,8 +2771,8 @@ export const inspectionsRoutes = createApiRouter()
             const renderBoth = async () => {
                 try {
                     await Promise.all([
-                        reportPdf.markQueued(id, tenantId, 'summary'),
-                        reportPdf.markQueued(id, tenantId, 'full'),
+                        reportPdf.markQueued(id, tenantId, 'summary', publishedVersion),
+                        reportPdf.markQueued(id, tenantId, 'full', publishedVersion),
                     ]);
                     await Promise.allSettled([
                         reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion, versionNumber: publishedVersion }),
@@ -2816,15 +2816,24 @@ export const inspectionsRoutes = createApiRouter()
         const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
         const sourceVersion = Date.now();
 
+        // Refresh re-renders the CURRENT (highest) version in place rather than
+        // corrupting a different version's archived row (#120). Resolve the
+        // current version per type and pass it consistently to markQueued and
+        // renderAndStore.
+        const currentSummary = await reportPdf.getPdfRecord(id, tenantId, 'summary');
+        const currentFull    = await reportPdf.getPdfRecord(id, tenantId, 'full');
+        const summaryVersion = currentSummary?.versionNumber ?? null;
+        const fullVersion    = currentFull?.versionNumber ?? null;
+
         await Promise.all([
-            reportPdf.markQueued(id, tenantId, 'summary'),
-            reportPdf.markQueued(id, tenantId, 'full'),
+            reportPdf.markQueued(id, tenantId, 'summary', summaryVersion),
+            reportPdf.markQueued(id, tenantId, 'full', fullVersion),
         ]);
         c.executionCtx.waitUntil((async () => {
             try {
                 await Promise.allSettled([
-                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion }),
-                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion }),
+                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion, versionNumber: summaryVersion }),
+                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion, versionNumber: fullVersion }),
                 ]);
             } catch (err) {
                 logger.error('[pdf/refresh] background render failed', { inspectionId: id }, err instanceof Error ? err : undefined);
