@@ -20,6 +20,13 @@ export interface ScheduledEnv {
     QBO_CLIENT_ID?: string;
     QBO_CLIENT_SECRET?: string;
     QBO_WEBHOOK_SECRET?: string;
+    // Track L — platform-default Twilio creds + the KV used by loadTwilioForTenant
+    // to read per-tenant secrets. The cron SMS runtime is built only when both
+    // TENANT_CACHE and JWT_SECRET are present (else SMS logs self-skip 'not configured').
+    TWILIO_ACCOUNT_SID?: string;
+    TWILIO_AUTH_TOKEN?: string;
+    TWILIO_FROM_NUMBER?: string;
+    TENANT_CACHE?: KVNamespace;
     // Core -> portal user-sync transport (A-13/A-14). Producer binding to the
     // sync queue; the outbox sweeper republishes pending rows through it.
     // Optional — sweeper is a no-op when missing (standalone).
@@ -119,21 +126,33 @@ export async function scheduled(
         logger.error('[cron] reminder enqueue failed', {}, e instanceof Error ? e : undefined);
     }
 
-    // 3. Automation email queue flush
-    if (!env.RESEND_API_KEY) {
-        logger.info('scheduled: RESEND_API_KEY not set, skipping automation flush');
-    } else {
-        try {
-            const svc = new AutomationService(env.DB);
-            await svc.flush(
-                env.RESEND_API_KEY,
-                env.SENDER_EMAIL || '',
-                env.APP_NAME || 'OpenInspection',
-                env.APP_BASE_URL || '',
-            );
-        } catch (e) {
-            logger.error('[cron] automation flush failed', {}, e instanceof Error ? e : undefined);
-        }
+    // 3. Automation queue flush (email + SMS). Always runs: email logs self-skip
+    //    when RESEND_API_KEY is empty; SMS logs resolve their own per-tenant Twilio
+    //    creds (platform env or tenant own) via the runtime built from env below.
+    try {
+        const svc = new AutomationService(env.DB);
+        const sms = (env.TENANT_CACHE && env.JWT_SECRET)
+            ? {
+                resolveCreds: (tenantId: string) =>
+                    import('./lib/sms/resolve-twilio').then(({ loadTwilioForTenant }) =>
+                        loadTwilioForTenant({
+                            DB: env.DB, TENANT_CACHE: env.TENANT_CACHE!, JWT_SECRET: env.JWT_SECRET!,
+                            ...(env.JWT_SECRET_PREVIOUS ? { JWT_SECRET_PREVIOUS: env.JWT_SECRET_PREVIOUS } : {}),
+                            ...(env.TWILIO_ACCOUNT_SID ? { TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID } : {}),
+                            ...(env.TWILIO_AUTH_TOKEN ? { TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN } : {}),
+                            ...(env.TWILIO_FROM_NUMBER ? { TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER } : {}),
+                        }, tenantId)),
+              }
+            : null;
+        await svc.flush(
+            env.RESEND_API_KEY || '',
+            env.SENDER_EMAIL || '',
+            env.APP_NAME || 'OpenInspection',
+            env.APP_BASE_URL || '',
+            sms,
+        );
+    } catch (e) {
+        logger.error('[cron] automation flush failed', {}, e instanceof Error ? e : undefined);
     }
 
     // 4. Sweep the user-sync outbox onto the sync queue (no-op for standalone —

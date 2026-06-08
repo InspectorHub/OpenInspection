@@ -104,6 +104,8 @@ export default function BookingPage() {
   const [customTime, setCustomTime] = useState("09:00");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  // Track L (D6, path A) — unchecked-by-default SMS opt-in (TCPA consent).
+  const [smsOptin, setSmsOptin] = useState(false);
   const [chosenInspectorId, setChosenInspectorId] = useState<string | null>(preselected?.id ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -190,6 +192,7 @@ export default function BookingPage() {
           services: [...selectedServices].map(id => ({ serviceId: id })),
           clientName,
           clientEmail,
+          ...(smsOptin ? { smsOptin: true } : {}),
           ...(turnstileToken ? { turnstileToken } : {}),
           ...(agentRefSlug ? { agentRefSlug } : {}),
         }),
@@ -450,6 +453,20 @@ export default function BookingPage() {
                     />
                   </label>
                 </div>
+                {/* Track L (D6, path A) — unchecked SMS opt-in (TCPA consent). */}
+                <label className="flex items-start gap-3 mt-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={smsOptin}
+                    onChange={(e) => setSmsOptin(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary"
+                  />
+                  <span className="text-[13px] text-ih-fg-3 leading-relaxed">
+                    Text me appointment &amp; report updates. By checking this box you agree to
+                    receive automated text messages about your inspection. Message &amp; data rates
+                    may apply; reply STOP to opt out. Consent is not a condition of booking.
+                  </span>
+                </label>
               </div>
             </section>
           )}

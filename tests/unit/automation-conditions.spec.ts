@@ -24,26 +24,29 @@ beforeEach(async () => {
     svc = new AutomationService({} as D1Database);
 });
 
-describe('AutomationService create/update — conditions + channel (Track J)', () => {
-    it('serializes conditions to JSON and defaults channel to email', async () => {
+describe('AutomationService create/update — conditions + channels (Track J/L)', () => {
+    it('serializes conditions to JSON and defaults channels to email-only', async () => {
         const row = await svc.create(TENANT, {
             name: 'Follow-up', trigger: 'report.published', recipient: 'client',
             delayMinutes: 1440, subjectTemplate: 's', bodyTemplate: 'b',
             conditions: { requirePaid: true, serviceIds: ['svc-1'] },
         });
-        expect(row.channel).toBe('email');
+        // Track L (Part A) — channels parsed on output; conditions stays a JSON string.
+        expect(row.channels).toEqual(['email']);
         expect(JSON.parse(row.conditions!)).toEqual({ requirePaid: true, serviceIds: ['svc-1'] });
     });
 
-    it('update can clear conditions and set channel', async () => {
+    it('update can clear conditions and change channels', async () => {
         const created = await svc.create(TENANT, {
             name: 'R', trigger: 'report.published', recipient: 'client',
             delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
             conditions: { requireSigned: true },
         });
-        const updated = await svc.update(TENANT, created.id, { conditions: null, channel: 'sms' });
+        const updated = await svc.update(TENANT, created.id, {
+            conditions: null, channels: ['email', 'sms'], smsBody: 'hi',
+        });
         expect(updated.conditions).toBeNull();
-        expect(updated.channel).toBe('sms');
+        expect(updated.channels).toEqual(['email', 'sms']);
     });
 });
 
@@ -73,7 +76,8 @@ async function seedRuleAndLog(opts: {
     const logId = crypto.randomUUID();
     await db.insert(schema.automationLogs).values({
         id: logId, tenantId: TENANT, automationId: ruleId, inspectionId: opts.inspectionId,
-        recipientEmail: 'jane@example.com', sendAt: new Date(Date.now() - 1000).toISOString(),
+        recipient: 'jane@example.com', channel: opts.channel ?? 'email',
+        sendAt: new Date(Date.now() - 1000).toISOString(),
         status: 'pending',
     } as never);
     return logId;
@@ -123,16 +127,6 @@ describe('AutomationService.flush — send-time gates (Track J)', () => {
         const logId = await seedRuleAndLog({ conditions: { serviceIds: ['svc-x'] }, inspectionId: insp });
         await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
         expect((await statusOf(logId)).status).toBe('skipped');
-    });
-
-    it('channel sms is skipped defensively', async () => {
-        const insp = await seedInspection({ paymentStatus: 'paid' });
-        const logId = await seedRuleAndLog({ channel: 'sms', inspectionId: insp });
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
-        const s = await statusOf(logId);
-        expect(s.status).toBe('skipped');
-        expect(s.error).toMatch(/sms/);
-        expect(fetch).not.toHaveBeenCalled();
     });
 
     it('review_url body is skipped (fail-closed) until tenant_configs.review_url is set, then sends', async () => {

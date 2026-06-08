@@ -85,10 +85,12 @@ function actionArgs(form: Record<string, string | string[]>): ActionArgs {
 const RULE = {
     id: 'r1', name: 'Report Ready', trigger: 'report.published', recipient: 'client',
     delayMinutes: 0, subjectTemplate: 'S', bodyTemplate: 'B', conditions: null,
-    channel: 'email', active: true, isDefault: true,
+    // Track L: rules carry channels[] (parsed on output) + smsBody, not the dead
+    // singular `channel`. Mirrors AutomationSchema after Task 9 Part A.
+    channels: ['email'], smsBody: null, active: true, isDefault: true,
 };
 const LOG = {
-    id: 'l1', recipientEmail: 'jane@x.com', sendAt: '2026-06-01T00:00:00Z',
+    id: 'l1', recipient: 'jane@x.com', channel: 'email', sendAt: '2026-06-01T00:00:00Z',
     status: 'skipped', error: 'review_url not configured',
 };
 
@@ -160,7 +162,9 @@ describe('settings-automations action', () => {
         }));
         expect(postAutomation).toHaveBeenCalledTimes(1);
         const arg = postAutomation.mock.calls[0][0];
-        expect(arg.json.channel).toBe('email');
+        // Track L: the save payload sends channels[] (email-only) instead of the
+        // retired singular `channel`. Full multi-channel editor lands in Task 9.
+        expect(arg.json.channels).toEqual(['email']);
         expect(arg.json.conditions).toEqual({ requirePaid: true, serviceIds: ['svc-1', 'svc-2'] });
         expect(res).toEqual({ ok: true, error: undefined });
     });
@@ -198,5 +202,42 @@ describe('settings-automations action', () => {
     it('intent=save-review-url PATCHes tenant-config (empty → null)', async () => {
         await action(actionArgs({ intent: 'save-review-url', reviewUrl: '' }));
         expect(patchTenantConfig).toHaveBeenCalledWith({ json: { reviewUrl: null } });
+    });
+
+    // ── Track L (Task 9) — multi-channel save serialization ─────────────────────
+    it('intent=save with channels=[email,sms] serializes both channels + smsBody', async () => {
+        const res = await action(actionArgs({
+            intent: 'save', name: 'Multi', trigger: 'report.published', recipient: 'client',
+            delayMinutes: '0', subjectTemplate: 'S', bodyTemplate: 'B',
+            channels: ['email', 'sms'], smsBody: 'Your report is ready {{report_url}}',
+        }));
+        expect(postAutomation).toHaveBeenCalledTimes(1);
+        const arg = postAutomation.mock.calls[0][0];
+        expect(arg.json.channels).toEqual(['email', 'sms']);
+        expect(arg.json.smsBody).toBe('Your report is ready {{report_url}}');
+        expect(res).toEqual({ ok: true, error: undefined });
+    });
+
+    it('intent=save drops smsBody (null) when sms is NOT an enabled channel', async () => {
+        await action(actionArgs({
+            intent: 'save', name: 'EmailOnly', trigger: 'report.published', recipient: 'client',
+            delayMinutes: '0', subjectTemplate: 'S', bodyTemplate: 'B',
+            channels: ['email'], smsBody: 'leftover sms text',
+        }));
+        const arg = postAutomation.mock.calls[0][0];
+        expect(arg.json.channels).toEqual(['email']);
+        // smsBody is nulled because the sms channel is off — never persists stale copy.
+        expect(arg.json.smsBody).toBeNull();
+    });
+
+    it('intent=save with channels=[sms] sends sms-only + smsBody, no hardcoded email', async () => {
+        await action(actionArgs({
+            intent: 'save', name: 'SmsOnly', trigger: 'report.published', recipient: 'client',
+            delayMinutes: '0', subjectTemplate: '(no email)', bodyTemplate: '(no email)',
+            channels: ['sms'], smsBody: 'SMS body here',
+        }));
+        const arg = postAutomation.mock.calls[0][0];
+        expect(arg.json.channels).toEqual(['sms']);
+        expect(arg.json.smsBody).toBe('SMS body here');
     });
 });

@@ -176,6 +176,20 @@
       "when": 1780903233574,
       "tag": "0024_conscious_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1780927844876,
+      "tag": "0025_grey_nitro",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1780934320075,
+      "tag": "0026_premium_white_tiger",
+      "breakpoints": true
     }
   ]
 }

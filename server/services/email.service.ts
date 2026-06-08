@@ -540,6 +540,7 @@ export class EmailService {
         icsEvent?: IcsEvent,
         inspector?: SignatureUser,
         host?: string,
+        smsOptinUrl?: string,
     ) {
         const attachments = icsEvent ? [this.icsAttachment(icsEvent)] : undefined;
         const calendarHint = icsEvent
@@ -566,10 +567,18 @@ export class EmailService {
             html: appendSignature(fallbackBody, inspector, host),
         }, signatureHtml ? { signatureHtml } : undefined);
         if (!rendered.enabled) return;
+        // Track L (D6, path B) — append the SMS double-opt-in link. Injected here
+        // (renderer level) so it survives template overrides and is never gated on
+        // a specific automation rule being enabled.
+        const optinBlock = smsOptinUrl
+            ? `<p style="margin: 20px 0 0; padding-top: 16px; border-top: 1px solid #e2e8f0; color:#475569; font-size:14px;">
+                    Prefer text updates? <a href="${smsOptinUrl}" style="color:#4f46e5; font-weight:600;">Also text me appointment &amp; report updates</a>. Message &amp; data rates may apply; reply STOP to opt out.
+               </p>`
+            : '';
         await this.sendEmail(
             [to],
             rendered.subject,
-            rendered.html,
+            optinBlock ? `${rendered.html}${optinBlock}` : rendered.html,
             attachments,
             { inspector },
         );

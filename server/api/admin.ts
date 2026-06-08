@@ -932,6 +932,8 @@ const TenantConfigGetResponseSchema = z.object({
         allowInspectorChoice: z.boolean().describe('Whether the public booking page offers an inspector dropdown'),
         agreementRetentionYears: z.number().int().describe('Years signed agreements are retained before the GDPR retention sweep destroys them (Track I-a). Default 6.'),
         reviewUrl: z.string().nullable().optional().describe('Track J (#122) — company review link, or null.'),
+        smsMode: z.enum(['platform', 'own']).describe('Track L (D3) — SMS sender mode.'),
+        companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -964,6 +966,8 @@ const TenantConfigPatchSchema = z.object({
     allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
     agreementRetentionYears: z.number().int().min(1).max(99).optional().describe('How many years signed agreements / signatures are retained before the GDPR retention sweep destroys them (Track I-a). Integer 1–99; default 6 ≈ UK simple-contract limitation period.'),
     reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
+    smsMode: z.enum(['platform', 'own']).optional().describe('Track L (D3) — SMS sender mode: platform env or tenant-own Twilio.'),
+    companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -2338,6 +2342,8 @@ export const adminRoutes = createApiRouter()
                 allowInspectorChoice: config?.allowInspectorChoice ?? false,
                 agreementRetentionYears: config?.agreementRetentionYears ?? 6,
                 reviewUrl: config?.reviewUrl ?? null,
+                smsMode: (config?.smsMode as 'platform' | 'own') ?? 'platform',
+                companyPhone: (config?.companyPhone as string | null) ?? null,
             },
         }, 200);
     })
@@ -2360,6 +2366,12 @@ export const adminRoutes = createApiRouter()
         }
         if (body.reviewUrl !== undefined) {
             update.reviewUrl = body.reviewUrl || null;
+        }
+        if (body.smsMode !== undefined) {
+            update.smsMode = body.smsMode;
+        }
+        if (body.companyPhone !== undefined) {
+            update.companyPhone = body.companyPhone || null;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

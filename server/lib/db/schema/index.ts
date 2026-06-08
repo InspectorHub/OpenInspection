@@ -64,4 +64,5 @@ export { inspectionConflicts } from './inspection-conflicts';
 export { inspectionAccessTokens } from './portal-access';
 
 // Track I-a GDPR (spec §4) — append-only DSAR erasure decision log.
-export { erasureLog } from './compliance';
+// Track L (D7) — SMS consent ledger + disclosure versions.
+export { erasureLog, smsDisclosureVersions, smsConsentLog } from './compliance';

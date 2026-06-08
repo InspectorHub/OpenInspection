@@ -46,6 +46,7 @@ import tenantPresenceRoutes from './api/tenant-presence';
 import inspectionPrefsRoutes from './api/inspection-prefs';
 import aiRoutes from './api/ai';
 import bookingsRoutes from './api/bookings';
+import { smsPublicRoutes, smsAdminRoutes } from './api/sms';
 import adminRoutes from './api/admin';
 import adminBrandingRoutes from './api/admin/branding';
 import secretsRoutes from './api/secrets';
@@ -466,6 +467,8 @@ const routes = app
   .route('/api/public', repairRequestRoutes)
   // UC-C-7 — public share-token mint (customer Forward report flow).
   .route('/api/public', publicShareRoutes)
+  // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
+  .route('/api/public', smsPublicRoutes)
   .route('/api/admin', adminRoutes)
   // Branding sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/admin', adminBrandingRoutes)
@@ -473,6 +476,8 @@ const routes = app
   .route('/api/admin', evidenceRoutes)
   // Secret UI化 — GET/PUT/POST /api/admin/secrets for all 14 integration keys
   .route('/api/admin', secretsRoutes)
+  // Track L — authed SMS consent attestation + test-send + consent status.
+  .route('/api/admin', smsAdminRoutes)
   // Email-template CRUD + preview — GET/PUT/POST /api/admin/email-templates
   .route('/api/admin', emailTemplateRoutes)
   .route('/api/agent', agentRoutes)

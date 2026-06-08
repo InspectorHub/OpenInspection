@@ -49,6 +49,7 @@ export type { RepairRequestsApi }     from '../../server/api/repair-requests';
 export type { EmailTemplatesApi }     from '../../server/api/email-templates';
 export type { SecretsApi }            from '../../server/api/secrets';
 export type { ServicesApi }           from '../../server/api/services';
+export type { SmsPublicApi, SmsAdminApi } from '../../server/api/sms';
 export type { SessionContextApi }     from '../../server/api/session-context';
 export type { TagsApi }               from '../../server/api/tags';
 export type { TeamApi }               from '../../server/api/team';

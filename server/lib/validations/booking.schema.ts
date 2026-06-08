@@ -42,6 +42,9 @@ export const PublicBookingSchema = z.object({
     // this tenant, and persists the linked inspectorContactId on
     // inspections.referredByAgentId.
     agentRefSlug: z.string().min(2).max(64).optional().openapi({ example: 'jane-tester' }).describe('TODO describe agentRefSlug field for the OpenInspection MCP integration'),
+    // Track L (D6, path A) — unchecked SMS opt-in. When true, the submit records a
+    // `granted` SMS consent event (captured_via=booking_form) for the client contact.
+    smsOptin: z.boolean().optional().openapi({ example: false }).describe('Client self-book SMS opt-in (TCPA consent). When true, records a granted consent event.'),
 }).refine(
     (data) => data.timeSlot !== 'custom' || !!data.customTime,
     { message: 'customTime is required when timeSlot is custom', path: ['customTime'] },

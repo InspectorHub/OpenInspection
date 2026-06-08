@@ -57,7 +57,8 @@ describe('AutomationService.enqueueReminders (Track J D7)', () => {
         const [log] = await logsFor(i);
         expect(log.status).toBe('pending');
         expect(log.automationId).toBe(ruleId);
-        expect(log.eventId).toBe(`reminder:${ruleId}:${i}`);
+        // Track L — dedup key is now per-channel (default email-only rule → :email).
+        expect(log.eventId).toBe(`reminder:${ruleId}:${i}:email`);
         expect(Date.parse(log.sendAt)).toBe(Date.parse('2026-05-30T09:00:00Z'));
     });
 

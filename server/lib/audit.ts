@@ -72,7 +72,9 @@ export type AuditAction =
     | 'inspection.property_facts.autofill'
     | 'inspection.template_snapshot.update'
     | 'inspection.rating_system.switch'
-    | 'admin.migrate_finding_keys';
+    | 'admin.migrate_finding_keys'
+    | 'sms.consent.attest'
+    | 'sms.test_send';
 
 export interface AuditParams {
     db: D1Database;

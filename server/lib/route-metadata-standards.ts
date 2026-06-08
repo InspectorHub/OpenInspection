@@ -16,6 +16,7 @@ export const VALID_TAGS = [
     'audit', 'marketplace', 'recommendations', 'agreements', 'webhooks',
     'public', 'calendar', 'tags', 'ratings', 'guest',
     'profile', 'identity', 'automations', 'integrations', 'qbo',
+    'sms',
 ] as const;
 
 export type ValidTag = typeof VALID_TAGS[number];

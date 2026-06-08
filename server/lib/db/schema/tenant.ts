@@ -222,12 +222,18 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // inspector's name overrides the display name and their email becomes the
     // default Reply-To.
     emailMode: text('email_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
+    // Track L (D3) — SMS sender mode, mirrors email_mode. 'platform' uses the
+    // platform Twilio env; 'own' uses the tenant's three TWILIO_* secrets (only
+    // when all three are present, else platform fallback — see resolve-twilio.ts).
+    smsMode: text('sms_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
     senderDisplayName: text('sender_display_name'),
     useInspectorFromName: integer('use_inspector_from_name', { mode: 'boolean' }).notNull().default(false),
     billingUrl: text('billing_url'),
     // Track J (#122) — per-company Google/Yelp/Facebook review link. The
     // "Review request" automation stays inert until this is set (fail-closed).
     reviewUrl: text('review_url'),
+    // Track L — company contact phone shown in client SMS ({{company_phone}}).
+    companyPhone: text('company_phone'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
     // DEAD (C-15, 2026-06-06): legacy AES-GCM secrets store, soft-retired —
     // nothing reads or writes it anymore (D1 can't drop columns on FK-referenced

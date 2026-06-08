@@ -41,6 +41,10 @@ export const INTEGRATION_SECRET_KEYS = [
     'STRIPE_SECRET_KEY',
     'STRIPE_PUBLISHABLE_KEY',
     'STRIPE_WEBHOOK_SECRET',
+    // Track L — Twilio SMS credentials (BYO; platform-default in SaaS via env).
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN',
+    'TWILIO_FROM_NUMBER',
     'APP_BASE_URL',
 ] as const;
 
@@ -62,6 +66,9 @@ const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }
     // Cloudflare Turnstile secrets: 0x = real, 1x/2x/3x = documented test secrets.
     { key: 'TURNSTILE_SECRET_KEY', re: /^[0-3]x/, hint: 'must start with 0x (or a 1x/2x/3x test secret)' },
     { key: 'APP_BASE_URL', re: /^https?:\/\//, hint: 'must be an http(s):// URL' },
+    { key: 'TWILIO_ACCOUNT_SID', re: /^AC[0-9a-fA-F]{32}$/, hint: 'must be an Account SID (starts with AC, 34 chars)' },
+    { key: 'TWILIO_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
+    // TWILIO_AUTH_TOKEN has no stable public prefix — not format-gated.
 ];
 
 /** Returns the first format violation among NEW (non-masked) values, or null. */

@@ -11,10 +11,13 @@ export function meta() {
 interface Rule {
   id: string; name: string; trigger: string; recipient: string;
   delayMinutes: number; subjectTemplate: string; bodyTemplate: string;
-  conditions: string | null; channel: string; active: boolean; isDefault: boolean;
+  // Track L: channels[] supersedes the dead `channel` shadow; sms_body added.
+  // (Full multi-channel editor lands in Task 9; these keep the page type-safe.)
+  conditions: string | null; channels: string[]; smsBody: string | null;
+  active: boolean; isDefault: boolean;
 }
 interface Svc { id: string; name: string; }
-interface LogRow { id: string; recipientEmail: string; sendAt: string; status: string; error: string | null; }
+interface LogRow { id: string; recipient: string; channel: string; sendAt: string; status: string; error: string | null; }
 
 export const TRIGGER_LABELS: Record<string, string> = {
   "inspection.created": "Inspection created",
@@ -34,6 +37,15 @@ export const TRIGGER_LABELS: Record<string, string> = {
 };
 const RECIPIENTS = ["client", "buying_agent", "selling_agent", "inspector", "all"] as const;
 const PLACEHOLDERS = ["client_name", "property_address", "scheduled_date", "report_url", "invoice_url", "payment_url", "company_name", "review_url"];
+// Track L — SMS bodies are plain text; the renderable var set differs from email
+// (no subject, no HTML; company_phone is the SMS call-back number).
+const SMS_PLACEHOLDERS = ["client_name", "property_address", "scheduled_date", "report_url", "review_url", "company_name", "company_phone"];
+
+/** GSM-ish segment estimate: 160 chars for one segment, 153 for each concatenated part. */
+function smsSegments(len: number): number {
+  if (len === 0) return 0;
+  return len <= 160 ? 1 : Math.ceil(len / 153);
+}
 
 interface Conditions { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[]; }
 
@@ -92,6 +104,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       requireSigned: form.get("requireSigned") === "on",
       serviceIds,
     });
+    // Track L (Task 9) — multi-channel: read the checked channels; ≥1 is enforced
+    // client-side (the Save button disables when none) AND server-side (zod .min(1)).
+    const channels = form.getAll("channels").map(String).filter((c) => c === "email" || c === "sms");
+    const smsBody = String(form.get("smsBody") ?? "").trim();
     const json = {
       name: String(form.get("name") ?? ""),
       trigger: String(form.get("trigger") ?? ""),
@@ -99,7 +115,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       delayMinutes: Number(form.get("delayMinutes") ?? 0),
       subjectTemplate: String(form.get("subjectTemplate") ?? ""),
       bodyTemplate: String(form.get("bodyTemplate") ?? ""),
-      channel: "email",
+      channels: channels.length ? channels : ["email"],
+      // Persist the SMS body only when SMS is an enabled channel; else clear it.
+      smsBody: channels.includes("sms") ? smsBody : null,
       conditions,
     };
     const id = String(form.get("id") ?? "");
@@ -158,7 +176,7 @@ export default function SettingsAutomations() {
                   <div className="flex items-center gap-2">
                     <p className="text-[13px] font-bold text-ih-fg-1">{rule.name}</p>
                     {rule.isDefault && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase tracking-widest">Default</span>}
-                    {rule.channel === "sms" && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase">SMS</span>}
+                    {(rule.channels ?? []).includes("sms") &&<span className="text-[9px] font-bold px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3 rounded uppercase">SMS</span>}
                   </div>
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {rule.recipient}</p>
                 </div>
@@ -186,7 +204,9 @@ export default function SettingsAutomations() {
           <div className="divide-y divide-ih-border">
             {recentLogs.map((l) => (
               <div key={l.id} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
-                <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipientEmail}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                  l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.channel ?? "email"}</span>
+                <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipient}</span>
                 <span className="text-ih-fg-3">{new Date(l.sendAt).toLocaleString()}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                   l.status === "sent" ? "bg-ih-ok-bg text-ih-ok-fg" :
@@ -211,6 +231,18 @@ function AutomationEditor({ rule, services, onClose }: { rule: Rule | null; serv
   const fetcher = useFetcher<{ ok: boolean; error?: string }>();
   const submitting = fetcher.state !== "idle";
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Track L (Task 9) — channel multi-select. Default email for a new rule.
+  const initialChannels = rule?.channels?.length ? rule.channels : ["email"];
+  const [emailOn, setEmailOn] = useState(initialChannels.includes("email"));
+  const [smsOn, setSmsOn] = useState(initialChannels.includes("sms"));
+  const [smsBody, setSmsBody] = useState(rule?.smsBody ?? "");
+  const noChannel = !emailOn && !smsOn;
+  const smsLen = smsBody.length;
+  const segments = smsSegments(smsLen);
+  // Mirror the server gate (smsBodyRequiredWhenSms): SMS on ⇒ non-empty body.
+  const smsBodyMissing = smsOn && smsBody.trim().length === 0;
+  const saveBlocked = noChannel || smsBodyMissing;
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.ok) onClose();
@@ -254,14 +286,21 @@ function AutomationEditor({ rule, services, onClose }: { rule: Rule | null; serv
           </div>
         </fieldset>
 
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-3">
           <legend className="text-[12px] font-bold text-ih-fg-2 uppercase tracking-wide">Do this</legend>
-          <div className="flex gap-2">
-            <select disabled defaultValue="email" title="SMS coming soon (Track L)"
-              className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-muted text-[13px] text-ih-fg-3">
-              <option value="email">Email</option>
-              <option value="sms">SMS (coming soon)</option>
-            </select>
+
+          {/* Channel multi-select + recipient + delay */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-[13px] text-ih-fg-2">
+                <input type="checkbox" name="channels" value="email" checked={emailOn}
+                  onChange={(e) => setEmailOn(e.target.checked)} /> Email
+              </label>
+              <label className="flex items-center gap-1.5 text-[13px] text-ih-fg-2">
+                <input type="checkbox" name="channels" value="sms" checked={smsOn}
+                  onChange={(e) => setSmsOn(e.target.checked)} /> SMS
+              </label>
+            </div>
             <select name="recipient" defaultValue={rule?.recipient ?? "client"}
               className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]">
               {RECIPIENTS.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -269,11 +308,48 @@ function AutomationEditor({ rule, services, onClose }: { rule: Rule | null; serv
             <input name="delayMinutes" type="number" min={0} defaultValue={rule?.delayMinutes ?? 0}
               className="w-24 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" title="Delay in minutes (for reminders: minutes BEFORE the inspection)" />
           </div>
-          <input name="subjectTemplate" required defaultValue={rule?.subjectTemplate ?? ""} placeholder="Subject"
-            className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" />
-          <textarea name="bodyTemplate" required defaultValue={rule?.bodyTemplate ?? ""} rows={6} placeholder="Body (HTML)"
-            className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-input text-[13px] font-mono" />
-          <p className="text-[11px] text-ih-fg-3">Placeholders: {PLACEHOLDERS.map((p) => `{{${p}}}`).join(" ")}</p>
+          {noChannel && (
+            <p className="text-[11px] text-ih-watch-fg">Pick at least one delivery channel.</p>
+          )}
+
+          {/* Email section — subject + HTML body. Inputs are NOT `required` so a
+              SMS-only rule can save with no email content; the server-side
+              templates are NOT NULL but keep their existing values on edit. */}
+          {emailOn && (
+            <div className="space-y-2 rounded-md border border-ih-border p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Email</p>
+              <input name="subjectTemplate" required={emailOn} defaultValue={rule?.subjectTemplate ?? ""} placeholder="Subject"
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" />
+              <textarea name="bodyTemplate" required={emailOn} defaultValue={rule?.bodyTemplate ?? ""} rows={6} placeholder="Body (HTML)"
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-input text-[13px] font-mono" />
+              <p className="text-[11px] text-ih-fg-3">Placeholders: {PLACEHOLDERS.map((p) => `{{${p}}}`).join(" ")}</p>
+            </div>
+          )}
+          {/* When email is off we still must satisfy the NOT NULL subject/body
+              columns on save — carry the existing (or empty) values as hidden. */}
+          {!emailOn && (
+            <>
+              <input type="hidden" name="subjectTemplate" value={rule?.subjectTemplate ?? "(no email)"} />
+              <input type="hidden" name="bodyTemplate" value={rule?.bodyTemplate ?? "(no email)"} />
+            </>
+          )}
+
+          {/* SMS section — plain-text body + live counter. */}
+          {smsOn && (
+            <div className="space-y-2 rounded-md border border-ih-border p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">SMS</p>
+              <textarea name="smsBody" value={smsBody} onChange={(e) => setSmsBody(e.target.value)}
+                rows={4} placeholder="Plain-text SMS body" aria-label="SMS body"
+                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" />
+              <div className="flex items-center justify-between text-[11px] text-ih-fg-3">
+                <span>Placeholders: {SMS_PLACEHOLDERS.map((p) => `{{${p}}}`).join(" ")}</span>
+                <span className="tabular-nums shrink-0 ml-2">
+                  {smsLen} chars{smsLen > 160 ? ` · ~${segments} segments` : ""}
+                </span>
+              </div>
+            </div>
+          )}
+          {!smsOn && <input type="hidden" name="smsBody" value="" />}
         </fieldset>
 
         {fetcher.data && fetcher.data.ok === false && (
@@ -293,7 +369,9 @@ function AutomationEditor({ rule, services, onClose }: { rule: Rule | null; serv
           )}
           <div className="flex-1" />
           <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">Cancel</button>
-          <button type="submit" disabled={submitting} className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">Save</button>
+          <button type="submit" disabled={submitting || saveBlocked}
+            title={noChannel ? "Pick at least one delivery channel" : smsBodyMissing ? "Add an SMS body" : undefined}
+            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">Save</button>
         </div>
       </fetcher.Form>
     </div>

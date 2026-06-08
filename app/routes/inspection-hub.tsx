@@ -79,7 +79,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   }
   const body = await res.json();
   const hub = ((body as Record<string, unknown>).data ?? {}) as unknown as HubData;
-  return { hub };
+
+  // Track L (E) — client SMS consent status for the People card. Best-effort:
+  // a failure degrades to "none" (the attest affordance still renders).
+  const consentRes = await api.smsAdmin.sms.consent.$get({ query: { inspectionId: id } }).catch(() => null);
+  const smsConsent =
+    consentRes && consentRes.ok
+      ? (((await consentRes.json()) as { data?: { consent?: "granted" | "revoked" | "none" } }).data?.consent ?? "none")
+      : "none";
+
+  return { hub, smsConsent };
 }
 
 /* ------------------------------------------------------------------ */
@@ -132,6 +141,20 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return { ok: true, intent: "request-payment" as const, error: undefined };
   }
 
+  if (intent === "attest-sms") {
+    // Track L (E) — inspector attestation that the client agreed to receive texts.
+    const res = await api.smsAdmin.sms.attest.$post({ json: { inspectionId: id } });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return {
+        ok: false,
+        intent: "attest-sms" as const,
+        error: err?.error?.message ?? "Could not record consent. Please try again.",
+      };
+    }
+    return { ok: true, intent: "attest-sms" as const, error: undefined };
+  }
+
   if (intent === "publish") {
     // theme: the editor's PublishModal posts no `theme`, so it rides the
     // schema default ('modern'). We send the same value explicitly here —
@@ -178,9 +201,13 @@ function humanizeStatus(status: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function InspectionHubPage() {
-  const { hub } = useLoaderData<typeof loader>();
+  const { hub, smsConsent } = useLoaderData<typeof loader>();
   const { inspection, people, services, tenantSlug } = hub;
   const blocks = deriveBlockStates(hub);
+
+  // Track L (E) — SMS consent attestation. Dedicated fetcher (never share).
+  const attestSms = useFetcher<typeof action>();
+  const attesting = attestSms.state !== "idle";
 
   // Send-agreement modal — its own dedicated fetcher (B-17: never share
   // fetchers between mutations). Close on success; the loader revalidation
@@ -341,6 +368,12 @@ export default function InspectionHubPage() {
                       {people.client.phone}
                     </a>
                   )}
+                  {/* Track L (E) — SMS consent status + inspector attestation */}
+                  <ClientSmsConsent
+                    consent={smsConsent}
+                    fetcher={attestSms}
+                    attesting={attesting}
+                  />
                 </div>
               ) : inspection.clientName ? (
                 // Bare-text fallback when only the denormalized name is present.
@@ -768,6 +801,54 @@ function RequestPaymentModal({
           </div>
         </fetcher.Form>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Client SMS consent status + attestation (Track L)                 */
+/* ------------------------------------------------------------------ */
+
+function ClientSmsConsent({
+  consent,
+  fetcher,
+  attesting,
+}: {
+  consent: "granted" | "revoked" | "none";
+  fetcher: ReturnType<typeof useFetcher<typeof action>>;
+  attesting: boolean;
+}) {
+  const error =
+    fetcher.data?.intent === "attest-sms" && !fetcher.data.ok
+      ? fetcher.data.error
+      : undefined;
+
+  const label =
+    consent === "granted" ? "granted" : consent === "revoked" ? "revoked" : "not recorded";
+  const tone =
+    consent === "granted" ? "text-ih-ok-fg" : consent === "revoked" ? "text-ih-bad-fg" : "text-ih-fg-4";
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+      <span className="text-ih-fg-3">
+        Client SMS: <span className={`font-bold ${tone}`}>{label}</span>
+      </span>
+      {/* Offer the attestation only when not already granted. Framed as an
+          inspector confirmation that the client agreed (not a consent-less
+          override) — the deliberate basis for phone/in-person bookings. */}
+      {consent !== "granted" && (
+        <fetcher.Form method="post">
+          <input type="hidden" name="intent" value="attest-sms" />
+          <button
+            type="submit"
+            disabled={attesting}
+            className="text-[11px] font-bold text-ih-primary hover:underline disabled:opacity-60"
+          >
+            {attesting ? "Recording…" : "Client agreed to receive texts — I confirm"}
+          </button>
+        </fetcher.Form>
+      )}
+      {error && <span className="text-ih-bad-fg">{error}</span>}
     </div>
   );
 }
