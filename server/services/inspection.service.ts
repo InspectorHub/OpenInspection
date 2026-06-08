@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests, agreements } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests, agreements, reportVersions } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
@@ -1994,9 +1994,39 @@ export class InspectionService {
             bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
         };
 
+        // #120 — amendment trail. Surfaced to the client report page so a
+        // re-published report shows "Amended on …" + per-version reasons.
+        // Only meaningful when there is more than one published version; live
+        // edits do not create versions, so the banner stays hidden until an
+        // actual re-publish. Reason reuses report_versions.summary.
+        const versionRows = await db.select({
+            versionNumber: reportVersions.versionNumber,
+            publishedAt:   reportVersions.publishedAt,
+            summary:       reportVersions.summary,
+            isAmendment:   reportVersions.isAmendment,
+        })
+            .from(reportVersions)
+            .where(and(
+                eq(reportVersions.tenantId, tenantId),
+                eq(reportVersions.inspectionId, inspectionId),
+            ))
+            .orderBy(desc(reportVersions.versionNumber))
+            .all();
+        const amendmentTrail = {
+            amended: versionRows.length > 1,
+            latestVersion: versionRows[0]?.versionNumber ?? 0,
+            versions: versionRows.map(v => ({
+                versionNumber: v.versionNumber,
+                publishedAt:   v.publishedAt,
+                reason:        v.summary ?? null,
+                isAmendment:   v.isAmendment,
+            })),
+        };
+
         return {
             inspection: { ...inspection, inspectorName },
             theme: reportTheme,
+            amendmentTrail,
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
             sections,
             ratingLevels: levels.length > 0 ? levels : [

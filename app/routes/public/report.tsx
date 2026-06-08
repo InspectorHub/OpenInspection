@@ -23,6 +23,20 @@ interface InspectorSignature {
  userId?: string;
 }
 
+// #120 — amendment trail attached by the server's getReportData. Only
+// meaningful (`amended === true`) once a report has been re-published, since
+// live edits never create a new version row.
+interface AmendmentTrail {
+ amended: boolean;
+ latestVersion: number;
+ versions: Array<{
+  versionNumber: number;
+  publishedAt: number;
+  reason: string | null;
+  isAmendment: boolean;
+ }>;
+}
+
 interface ReportData {
  address: string;
  date: string | null;
@@ -32,6 +46,7 @@ interface ReportData {
  defectSummary: { safety: number; recommendation: number; maintenance: number };
  reportTheme?: string;
  inspectorSignature?: InspectorSignature | null;
+ amendmentTrail?: AmendmentTrail;
 }
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
@@ -108,6 +123,26 @@ export default function ReportPage() {
  {report.clientName && <span> for {report.clientName}</span>}
  </p>
  </div>
+
+ {/* #120 — amendment banner. Only renders after an actual re-publish
+ (versions.length > 1); live edits never create a version. Optional
+ chaining keeps it safe if the payload type lags the server. */}
+ {report.amendmentTrail?.amended && (
+ <div className="mb-6 rounded-lg border border-ih-watch-fg/30 bg-ih-watch-bg p-3 text-[13px] text-ih-watch-fg">
+ <p className="font-semibold">
+ This report was amended (version {report.amendmentTrail.latestVersion}).
+ </p>
+ <ul className="mt-2 space-y-1">
+ {report.amendmentTrail.versions.map((v) => (
+ <li key={v.versionNumber}>
+ v{v.versionNumber} &middot;{" "}
+ {new Date(v.publishedAt * 1000).toLocaleDateString()}
+ {v.reason ? ` — ${v.reason}` : ""}
+ </li>
+ ))}
+ </ul>
+ </div>
+ )}
 
  {/* Defect summary badges */}
  <div className="flex gap-2 mb-6">
