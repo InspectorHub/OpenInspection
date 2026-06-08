@@ -205,14 +205,18 @@ export const SignerInputSchema = z.object({
 }).openapi('AgreementSignerInput');
 
 export const SendAgreementSchema = z.object({
-    agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
+    // Plain non-empty string, NOT .uuid(): agreements.id / inspections.id are TEXT
+    // columns and may hold non-UUID values (e.g. Spectora-imported or seeded rows).
+    // The handler resolves them by tenant-scoped lookup, so .uuid() would only reject
+    // legitimate non-UUID rows. (Matches the hub send fix in inspection.schema.ts.)
+    agreementId: z.string().min(1).openapi({ example: 'agr-0c1f2e3d' }).describe('Agreement template id (TEXT; not necessarily a UUID)'),
     // Track I-a Task 9 — `clientEmail` is only consumed on the legacy
     // single-recipient path; the multi-signer path keys recipients off the
     // `signers` array. Optional here, gated by the refine below so exactly one
     // of the two paths is always satisfiable.
     clientEmail: z.string().email().optional().openapi({ example: 'client@example.com' }).describe('Recipient email for the legacy single-signer send; omit when `signers` is provided'),
     clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    inspectionId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().min(1).optional().openapi({ example: 'insp-0c1f2e3d' }).describe('Inspection id (TEXT; not necessarily a UUID)'),
     // Track I-a Task 9 — multi-signer envelope. When `signers` is provided the
     // send routes through AgreementService.findOrCreate (signer rows + snapshot
     // pinning + per-signer links). Omitted → legacy single-recipient behavior.

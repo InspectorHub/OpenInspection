@@ -148,6 +148,33 @@ describe('POST /api/admin/agreements/send — multi-signer', () => {
         expect(emailSend).toHaveBeenCalledTimes(2);
     });
 
+    it('accepts NON-UUID agreementId / inspectionId (TEXT ids, e.g. Spectora-imported or seeded rows)', async () => {
+        // Regression: the body schema once gated agreementId/inspectionId with
+        // .uuid(), which 400'd legitimate non-UUID rows. agreements.id and
+        // inspections.id are TEXT columns; the handler resolves them by tenant-
+        // scoped lookup. Mirrors the hub send fix in inspection.schema.ts.
+        const TEXT_AGR = 'agr-seeded-not-a-uuid';
+        const TEXT_INSP = 'insp-seeded-not-a-uuid';
+        await db.insert(schema.inspections).values({ id: TEXT_INSP, tenantId: TENANT, propertyAddress: '2 Oak St', clientName: 'Pat', clientEmail: 'pat@test.com', date: '2026-06-02', status: 'draft', paymentStatus: 'unpaid', price: 40000, agreementRequired: true, paymentRequired: false, createdAt: new Date() });
+        await db.insert(schema.agreements).values({ id: TEXT_AGR, tenantId: TENANT, name: 'Imported Agreement', content: 'Imported text...', version: 1, createdAt: new Date() });
+
+        const res = await buildApp().request('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agreementId: TEXT_AGR,
+                inspectionId: TEXT_INSP,
+                completionPolicy: 'all',
+                signers: [{ name: 'Pat', email: 'pat@test.com', role: 'client' }],
+            }),
+        }, ENV, EXEC);
+        // Must NOT be rejected by UUID validation — reaches the handler and sends.
+        expect(res.status).toBe(200);
+        const body = await res.json() as { success: boolean; data: { requestId: string } };
+        expect(body.success).toBe(true);
+        expect(body.data.requestId).toBeTruthy();
+    });
+
     it('rejects a request with neither clientEmail nor signers', async () => {
         const res = await buildApp().request('/api/admin/agreements/send', {
             method: 'POST',
