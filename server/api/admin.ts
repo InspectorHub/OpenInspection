@@ -931,6 +931,7 @@ const TenantConfigGetResponseSchema = z.object({
         blockUnsignedAgreement: z.boolean().describe('Whether unsigned agreements block inspection start'),
         allowInspectorChoice: z.boolean().describe('Whether the public booking page offers an inspector dropdown'),
         agreementRetentionYears: z.number().int().describe('Years signed agreements are retained before the GDPR retention sweep destroys them (Track I-a). Default 6.'),
+        reviewUrl: z.string().nullable().optional().describe('Track J (#122) — company review link, or null.'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -962,6 +963,7 @@ const TenantConfigPatchSchema = z.object({
     blockUnsignedAgreement: z.boolean().optional().describe('Whether clients must sign the inspection agreement before a booking is confirmed.'),
     allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
     agreementRetentionYears: z.number().int().min(1).max(99).optional().describe('How many years signed agreements / signatures are retained before the GDPR retention sweep destroys them (Track I-a). Integer 1–99; default 6 ≈ UK simple-contract limitation period.'),
+    reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -2335,6 +2337,7 @@ export const adminRoutes = createApiRouter()
                 blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
                 allowInspectorChoice: config?.allowInspectorChoice ?? false,
                 agreementRetentionYears: config?.agreementRetentionYears ?? 6,
+                reviewUrl: config?.reviewUrl ?? null,
             },
         }, 200);
     })
@@ -2354,6 +2357,9 @@ export const adminRoutes = createApiRouter()
         }
         if (body.agreementRetentionYears !== undefined) {
             update.agreementRetentionYears = body.agreementRetentionYears;
+        }
+        if (body.reviewUrl !== undefined) {
+            update.reviewUrl = body.reviewUrl || null;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);
