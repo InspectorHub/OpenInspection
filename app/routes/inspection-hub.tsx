@@ -96,7 +96,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // endpoint returns [] for unpublished anyway). Best-effort: a failure degrades
   // to an empty list and the action gates publication server-side.
   let reinspectCandidates: ReinspectCandidate[] = [];
-  if (hub.inspection?.status === "published") {
+  if (hub.inspection?.status === "published" || hub.inspection?.status === "delivered") {
     const candRes = await api.inspections[":id"]["reinspect-candidates"]
       .$get({ param: { id } })
       .catch(() => null);
@@ -631,7 +631,7 @@ export default function InspectionHubPage() {
               <p className="text-[12px] text-ih-fg-3 mb-3">
                 Report delivered to the client.
               </p>
-              {inspection.status === "published" && (
+              {reportPublished && (
                 <Button
                   variant="secondary"
                   size="sm"
