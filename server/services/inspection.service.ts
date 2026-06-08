@@ -648,6 +648,16 @@ export class InspectionService {
             .orderBy(desc(reportVersions.versionNumber)).limit(1).get();
         if (!latestVersion) throw new Error('Cannot re-inspect an unpublished baseline');
 
+        // When an explicit inspectorId is supplied, it MUST resolve to a user in
+        // this tenant. inspector_id has a DB FK to users.id; a foreign-tenant or
+        // bogus id would either violate the FK at runtime or assign the round to
+        // another tenant's user. Validate before use; omitted → baseline fallback.
+        if (opts.inspectorId) {
+            const owner = await db.select({ id: users.id }).from(users)
+                .where(and(eq(users.id, opts.inspectorId), eq(users.tenantId, tenantId))).get();
+            if (!owner) throw new Error('Inspector not found in this workspace');
+        }
+
         const rootId = baseline.rootInspectionId ?? baseline.id;
         const existingRounds = await db.select().from(inspections)
             .where(and(eq(inspections.tenantId, tenantId), eq(inspections.rootInspectionId, rootId))).all();

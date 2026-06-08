@@ -4,6 +4,7 @@ import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import { readLegalLinks } from "~/lib/legal-links.server";
+import { sectionsWithCarriedItems } from "~/lib/reinspection-report";
 
 export function meta() {
  return [{ title: "Inspection Report - OpenInspection" }];
@@ -237,8 +238,12 @@ export default function ReportPage() {
  row — left = original finding (grayscale photos), right = follow-up
  status badge + new notes/photos (full colour). */
  <div className="space-y-3">
- {report.sections.flatMap((section) =>
- (section.items ?? []).map((item) => (
+ {/* R7 / Track B — render ONLY the carried items. getReportData
+    builds sections[].items from the FULL template snapshot, so
+    non-carried items arrive with original == null; the helper
+    filters them out and drops sections left empty. */}
+ {sectionsWithCarriedItems(report.sections).flatMap((section) =>
+ section.items.map((item) => (
  <div
  key={item.id}
  className="rounded-lg border border-ih-border overflow-hidden"

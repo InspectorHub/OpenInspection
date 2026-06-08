@@ -103,4 +103,17 @@ describe('InspectionService.createReinspection (#119)', () => {
         await expect(svc.createReinspection(TENANT, DRAFT, { selectedItemIds: ['x'], inspectorId: 'user-a' }))
             .rejects.toThrow(/published/i);
     });
+
+    it('rejects an inspectorId that does not belong to the tenant', async () => {
+        await expect(svc.createReinspection(TENANT, ORIGINAL, {
+            selectedItemIds: ['item-a'], inspectorId: 'ghost-user',
+        })).rejects.toThrow(/inspector/i);
+    });
+
+    it('accepts a valid seeded tenant user as inspectorId', async () => {
+        const out = await svc.createReinspection(TENANT, ORIGINAL, {
+            selectedItemIds: ['item-a'], inspectorId: 'user-a',
+        });
+        expect(out.inspectorId).toBe('user-a');
+    });
 });
