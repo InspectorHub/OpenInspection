@@ -180,7 +180,7 @@ export class AutomationService {
             }
             const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000).toISOString();
             return [{ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
-                      inspectionId: ctx.inspectionId, recipientEmail: email,
+                      inspectionId: ctx.inspectionId, recipient: email,
                       sendAt, deliveredAt: null, status: 'pending' as const, error: null }];
         });
 
@@ -381,7 +381,7 @@ export class AutomationService {
                 const res = await fetch('https://api.resend.com/emails', {
                     method: 'POST',
                     headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ from, to: [log.recipientEmail], subject, html }),
+                    body: JSON.stringify({ from, to: [log.recipient], subject, html }),
                 });
 
                 if (res.ok) {
@@ -451,7 +451,7 @@ export class AutomationService {
 
                 await db.insert(automationLogs).values({
                     id: nanoid(), tenantId: rule.tenantId, automationId: rule.id,
-                    inspectionId: insp.id, recipientEmail: insp.clientEmail,
+                    inspectionId: insp.id, recipient: insp.clientEmail,
                     sendAt: new Date(sendAt).toISOString(), status: 'pending', eventId,
                 });
                 created++;

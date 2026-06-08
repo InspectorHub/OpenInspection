@@ -40,3 +40,28 @@ export const erasureLog = sqliteTable('erasure_log', {
 }, (t) => [
     index('idx_erasure_log_tenant').on(t.tenantId, t.createdAt),
 ]);
+
+// Track L (D7) — the TCPA disclosure shown at SMS opt-in. version is monotonic;
+// the current (max) version is shown to clients and stamped on each consent event.
+export const smsDisclosureVersions = sqliteTable('sms_disclosure_versions', {
+    version:     integer('version').primaryKey(),
+    text:        text('text').notNull(),
+    publishedAt: integer('published_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
+// Track L (D7) — append-only SMS consent ledger (mirrors erasure_log). Current
+// consent state = latest event per (tenant_id, contact_id). Never updated/deleted.
+export const smsConsentLog = sqliteTable('sms_consent_log', {
+    id:                text('id').primaryKey(),
+    tenantId:          text('tenant_id').notNull(),
+    contactId:         text('contact_id').notNull(),   // the consumer (client) contact
+    recipientType:     text('recipient_type', { enum: ['client'] }).notNull(),
+    action:            text('action', { enum: ['granted', 'revoked'] }).notNull(),
+    disclosureVersion: integer('disclosure_version').notNull(),
+    capturedVia:       text('captured_via', { enum: ['booking_form', 'optin_link', 'admin'] }).notNull(),
+    ip:                text('ip'),
+    userAgent:         text('user_agent'),
+    createdAt:         integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    index('idx_sms_consent_contact').on(t.tenantId, t.contactId, t.createdAt),
+]);

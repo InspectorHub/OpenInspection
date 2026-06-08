@@ -222,6 +222,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // inspector's name overrides the display name and their email becomes the
     // default Reply-To.
     emailMode: text('email_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
+    // Track L (D3) — SMS sender mode, mirrors email_mode. 'platform' uses the
+    // platform Twilio env; 'own' uses the tenant's three TWILIO_* secrets (only
+    // when all three are present, else platform fallback — see resolve-twilio.ts).
+    smsMode: text('sms_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
     senderDisplayName: text('sender_display_name'),
     useInspectorFromName: integer('use_inspector_from_name', { mode: 'boolean' }).notNull().default(false),
     billingUrl: text('billing_url'),

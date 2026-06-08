@@ -542,9 +542,15 @@ export const automations = sqliteTable('automations', {
     // Track J (D2) — send-time gates, JSON: { requirePaid?: bool, requireSigned?: bool, serviceIds?: string[] }.
     // null = no gates. Evaluated in flush() at delivery, NOT at trigger time.
     conditions: text('conditions'),
-    // Track J (D3) — delivery channel. SMS reserved for Track L; the UI greys it
-    // and flush() defensively skips channel='sms'. Enum is type-layer only.
+    // Track J (D2/D3) — DEAD shadow (Track L). Superseded by `channels` below.
+    // Pre-launch; not dropped because D1 can't rebuild an FK-bearing table.
+    // -- DEAD (2026-06-08, Track L): replaced by channels[]. Do not read/write.
     channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
+    // Track L (D2) — enabled delivery channels, JSON string[] e.g. '["email","sms"]'.
+    // A firing emits one automation_logs row per channel. Default email-only.
+    channels: text('channels').notNull().default('["email"]'),
+    // Track L (D2) — plain-text SMS template (no HTML, no subject). Null until SMS enabled.
+    smsBody: text('sms_body'),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -557,7 +563,10 @@ export const automationLogs = sqliteTable('automation_logs', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     automationId: text('automation_id').notNull(),
     inspectionId: text('inspection_id').notNull(),
-    recipientEmail: text('recipient_email').notNull(),
+    // Track L — holds the email address for email logs, the E.164 phone for sms logs.
+    recipient: text('recipient').notNull(),   // RENAMED from recipient_email (0025)
+    // Track L — the log's own delivery channel (a multi-channel rule emits one log each).
+    channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
     sendAt: text('send_at').notNull(),
     deliveredAt: text('delivered_at'),
     status: text('status', { enum: ['pending', 'sent', 'failed', 'skipped'] }).notNull().default('pending'),
