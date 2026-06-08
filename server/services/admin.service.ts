@@ -95,6 +95,10 @@ export class AdminService {
                 sentAt: agreementRequests.sentAt,
                 inspectorSignatureBase64: agreementRequests.inspectorSignatureBase64,
                 inspectorSignedAt: agreementRequests.inspectorSignedAt,
+                // Public verifier token — printed on the signed PDF / QR code so
+                // anyone can verify the seal; deliberately included (NOT auth
+                // material). The auth columns (token / tokenHash / tokenEnc) are
+                // intentionally NOT projected here — see the star-select caveat above.
                 verificationToken: agreementRequests.verificationToken,
                 contentSnapshot: agreementRequests.contentSnapshot,
                 contentHash: agreementRequests.contentHash,

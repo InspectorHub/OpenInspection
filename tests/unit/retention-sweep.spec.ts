@@ -128,6 +128,30 @@ describe('runRetentionSweep', () => {
         expect(env!.purgedAt).not.toBeNull();
     });
 
+    it('applies the DEFAULT 6y when a tenant has NO tenant_configs row (leftJoin null -> coalesce 6)', async () => {
+        // A third tenant with NO tenant_configs row -> years comes back null from
+        // the leftJoin and the sweep must coalesce it to DEFAULT_RETENTION_YEARS (6).
+        await testDb.insert(tenants).values({ id: 't3', name: 'T3', slug: 't3', createdAt: new Date(NOW) });
+        await testDb.insert(agreements).values({
+            id: 'agr-tpl3', tenantId: 't3', name: 'Tpl', content: 'b', createdAt: new Date(NOW),
+        } as any);
+        // Older than 6y -> swept under the default window.
+        await seedSignedEnvelope({ id: 'e-noconf-old', tenantId: 't3', agreementId: 'agr-tpl3', signedAtMs: NOW - 7 * YEAR_MS });
+        // Younger than 6y -> kept.
+        await seedSignedEnvelope({ id: 'e-noconf-young', tenantId: 't3', agreementId: 'agr-tpl3', signedAtMs: NOW - 5 * YEAR_MS });
+
+        const summary = await runRetentionSweep(testDb as any, NOW);
+        expect(summary.purgedEnvelopes).toBe(1);
+
+        const old = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-noconf-old')).get();
+        expect(old!.signatureBase64).toBeNull();
+        expect(old!.purgedAt).not.toBeNull();
+
+        const young = await testDb.select().from(agreementRequests).where(eq(agreementRequests.id, 'e-noconf-young')).get();
+        expect(young!.signatureBase64).toBe('data:image/png;base64,ENVSIG');
+        expect(young!.purgedAt).toBeNull();
+    });
+
     it('leaves never-signed (draft) rows untouched', async () => {
         await testDb.insert(agreementRequests).values({
             id: 'e-draft', tenantId: 't1', agreementId: 'agr-tpl',
