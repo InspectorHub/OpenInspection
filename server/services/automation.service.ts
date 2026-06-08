@@ -69,11 +69,11 @@ export class AutomationService {
         name: string; trigger: string; recipient: string;
         delayMinutes: number; subjectTemplate: string; bodyTemplate: string;
         conditions?: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
-        channel?: 'email' | 'sms';
+        channels?: ('email' | 'sms')[]; smsBody?: string | null;
     }) {
         const db = this.getDrizzle();
         const id = nanoid();
-        const { conditions, channel, ...rest } = data;
+        const { conditions, channels, smsBody, ...rest } = data;
         await db.insert(automations).values({
             id, tenantId, ...rest,
             // Casts narrow the public string param to the schema's enum literal
@@ -83,7 +83,10 @@ export class AutomationService {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             recipient: rest.recipient as any,
             conditions: conditions ? JSON.stringify(conditions) : null,
-            channel:    channel ?? 'email',
+            // Track L — channels is the live field; the dead `channel` column is left
+            // to its DB default ('email') so its NOT NULL constraint stays satisfied.
+            channels: JSON.stringify(channels?.length ? channels : ['email']),
+            smsBody:  smsBody ?? null,
             active: true, isDefault: false, createdAt: new Date(),
         });
         return (await db.select().from(automations).where(eq(automations.id, id)))[0];
@@ -93,19 +96,22 @@ export class AutomationService {
         name: string; trigger: string; recipient: string;
         delayMinutes: number; subjectTemplate: string; bodyTemplate: string; active: boolean;
         conditions: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
-        channel: 'email' | 'sms';
+        channels: ('email' | 'sms')[]; smsBody: string | null;
     }>) {
         const db = this.getDrizzle();
         const existing = await db.select().from(automations)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId))).limit(1);
         if (!existing[0]) throw Errors.NotFound('Automation not found');
-        const { conditions, ...rest } = data;
+        const { conditions, channels, smsBody, ...rest } = data;
         const patch: Record<string, unknown> = { ...rest };
         // Key-presence (not truthiness) so an explicit `conditions: null` clears
         // the row while an omitted key leaves it untouched. The zod layer strips
         // absent keys, so `undefined` should not reach here; the guard is belt-
         // and-braces for direct (non-API) callers.
         if ('conditions' in data) patch.conditions = conditions ? JSON.stringify(conditions) : null;
+        // Track L — channels/sms_body persist on the same key-presence contract.
+        if ('channels' in data) patch.channels = JSON.stringify(channels?.length ? channels : ['email']);
+        if ('smsBody' in data) patch.smsBody = smsBody ?? null;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial patch → table's typed columns; matches the file's create() cast pattern
         await db.update(automations).set(patch as any)
             .where(and(eq(automations.id, id), eq(automations.tenantId, tenantId)));
@@ -171,18 +177,24 @@ export class AutomationService {
         if (filteredRules.length === 0) return;
 
         const now = new Date();
-        const logs = filteredRules.flatMap(rule => {
-            const email = this.resolveEmail(rule.recipient as string, insp);
-            if (!email) {
-                logger.info('AutomationService.trigger: no email resolved (will fan out at delivery)',
-                    { ruleId: rule.id, recipient: rule.recipient });
-                return [];
+        // Track L — fan out one pending log per enabled channel, each stamped with
+        // the channel-appropriate recipient (email address or normalized E.164 phone).
+        const logs: (typeof automationLogs.$inferInsert)[] = [];
+        for (const rule of filteredRules) {
+            const channels = this.parseChannels(rule.channels);
+            for (const channel of channels) {
+                const addr = await this.resolveAddress(rule.recipient as string, channel, insp, db);
+                if (!addr) {
+                    logger.info('AutomationService.trigger: no address resolved for channel (skipping log)',
+                        { ruleId: rule.id, recipient: rule.recipient, channel });
+                    continue;
+                }
+                const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000).toISOString();
+                logs.push({ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
+                            inspectionId: ctx.inspectionId, recipient: addr, channel,
+                            sendAt, deliveredAt: null, status: 'pending' as const, error: null });
             }
-            const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000).toISOString();
-            return [{ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
-                      inspectionId: ctx.inspectionId, recipient: email,
-                      sendAt, deliveredAt: null, status: 'pending' as const, error: null }];
-        });
+        }
 
         logger.info('AutomationService.trigger: logs prepared',
             { event: ctx.triggerEvent, count: logs.length });
@@ -210,22 +222,79 @@ export class AutomationService {
         logger.info('AutomationService: enqueued', { event: ctx.triggerEvent, count: logs.length });
     }
 
-    private resolveEmail(recipient: string, insp: typeof inspections.$inferSelect): string | null {
-        if (recipient === 'client') return insp.clientEmail ?? null;
-        return null; // buying_agent/selling_agent/inspector resolved at delivery
+    /**
+     * Track L — resolve the delivery address for a (recipient, channel) pair.
+     * email → existing behavior (client only; agents/inspector deferred). sms →
+     * E.164 phone for client / selling_agent / buying_agent / inspector. Returns
+     * null → the caller skips creating that log (never throws).
+     */
+    private async resolveAddress(
+        recipient: string, channel: 'email' | 'sms',
+        insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
+    ): Promise<string | null> {
+        if (channel === 'email') {
+            return recipient === 'client' ? (insp.clientEmail ?? null) : null;
+        }
+        // channel === 'sms'
+        const { contacts, users } = await import('../lib/db/schema');
+        const phoneOf = async (contactId: string | null | undefined) => {
+            if (!contactId) return null;
+            const c = await db.select({ phone: contacts.phone }).from(contacts)
+                .where(eq(contacts.id, contactId)).get().catch(() => null);
+            return c?.phone ?? null;
+        };
+        let raw: string | null = null;
+        if (recipient === 'client') {
+            raw = insp.clientPhone ?? (await phoneOf(insp.clientContactId));
+        } else if (recipient === 'selling_agent') {
+            raw = await phoneOf(insp.sellingAgentId);
+        } else if (recipient === 'buying_agent') {
+            // referredByAgentId is an unkeyed TEXT (backward-compat); treat it as a
+            // contacts.id and resolve a phone if it happens to be one, else null.
+            raw = await phoneOf(insp.referredByAgentId);
+        } else if (recipient === 'inspector') {
+            // Verified against server/lib/db/schema/inspection.ts: the assigned
+            // inspector is `inspections.inspector_id` (text FK → users.id, line 46).
+            // `lead_inspector_id` (team mode) is the primary when set and falls back
+            // to inspector_id per its schema comment, so prefer lead then inspector.
+            // (The inspection_inspectors join table from DB-8 is a query face only;
+            // inspectorId/leadInspectorId remain canonical for single-value reads.)
+            const inspectorId = insp.leadInspectorId ?? insp.inspectorId ?? null;
+            if (inspectorId) {
+                const u = await db.select({ phone: users.phone }).from(users)
+                    .where(eq(users.id, inspectorId)).get().catch(() => null);
+                raw = u?.phone ?? null;
+            }
+        }
+        const { normalizeE164 } = await import('../lib/sms/phone');
+        return normalizeE164(raw);
+    }
+
+    /**
+     * Track L — parse the JSON `channels` column into a validated channel list.
+     * Defends against malformed/empty JSON (or a NULL legacy row) by falling back
+     * to email-only, so a corrupt blob never traps a rule from firing.
+     */
+    private parseChannels(raw: string | null): ('email' | 'sms')[] {
+        if (!raw) return ['email'];
+        try {
+            const arr = JSON.parse(raw);
+            const valid = Array.isArray(arr) ? arr.filter((c) => c === 'email' || c === 'sms') : [];
+            return valid.length ? valid : ['email'];
+        } catch { return ['email']; }
     }
 
     /**
      * Track J (D4) — evaluate a rule's send-time gates against the CURRENT world.
      * Returns a skip reason when a gate fails so flush() can mark the log 'skipped'.
-     * channel='sms' is a defensive skip (Track L will implement the sender).
+     * Track L — SMS gating (consent/credentials) now lives per-channel in flush(),
+     * NOT here; this evaluates channel-agnostic conditions only.
      */
     private async evaluateConditions(
         db: DrizzleD1Database,
         automation: typeof automations.$inferSelect,
         inspection: typeof inspections.$inferSelect,
     ): Promise<{ ok: true } | { ok: false; reason: string }> {
-        if (automation.channel === 'sms') return { ok: false, reason: 'channel sms not supported yet' };
         // Track J (D7) — a reminder enqueued for an inspection that has since
         // reached a terminal status (cancelled/completed/delivered/published) is
         // stale; suppress it (e.g. don't send "don't forget tomorrow" for a
@@ -437,24 +506,38 @@ export class AutomationService {
                 ));
 
             for (const insp of upcoming) {
-                if (!insp.clientEmail) continue;
-                const eventId = `reminder:${rule.id}:${insp.id}`;
-                const dup = await db.select({ id: automationLogs.id }).from(automationLogs)
-                    .where(eq(automationLogs.eventId, eventId)).limit(1);
-                if (dup.length > 0) continue;
+                // Track L — fan out one reminder log per enabled channel. Per-channel
+                // address resolution replaces the old single clientEmail guard.
+                const channels = this.parseChannels(rule.channels);
+                for (const channel of channels) {
+                    const addr = await this.resolveAddress(rule.recipient as string, channel, insp, db);
+                    if (!addr) continue;
+                    // Dedup key is per-channel so email + sms reminders for the same
+                    // (rule, inspection) coexist and each de-dupes independently.
+                    const eventId = `reminder:${rule.id}:${insp.id}:${channel}`;
+                    const dup = await db.select({ id: automationLogs.id }).from(automationLogs)
+                        .where(eq(automationLogs.eventId, eventId)).limit(1);
+                    if (dup.length > 0) continue;
 
-                // tz-naive: 09:00 UTC is an approximate anchor (inspections.date is date-only, no tenant tz here).
-                const inspMs = Date.parse(`${insp.date}T09:00:00Z`);
-                if (Number.isNaN(inspMs)) continue;
-                let sendAt = inspMs - rule.delayMinutes * 60_000;
-                if (sendAt < nowMs) sendAt = nowMs + 5 * 60_000;
+                    // tz-naive: 09:00 UTC is an approximate anchor (inspections.date is date-only, no tenant tz here).
+                    const inspMs = Date.parse(`${insp.date}T09:00:00Z`);
+                    if (Number.isNaN(inspMs)) continue;
+                    // send_at here is a DISPLAY ESTIMATE only — flush() derives the real
+                    // reminder due-time live from the current inspection.date (Task 7),
+                    // so a reschedule (a `date` write on the inspection) needs no update
+                    // to this row. We still write the estimate: the column is NOT NULL
+                    // and it is a useful default for display/sort.
+                    let sendAt = inspMs - rule.delayMinutes * 60_000;
+                    if (sendAt < nowMs) sendAt = nowMs + 5 * 60_000;
 
-                await db.insert(automationLogs).values({
-                    id: nanoid(), tenantId: rule.tenantId, automationId: rule.id,
-                    inspectionId: insp.id, recipient: insp.clientEmail,
-                    sendAt: new Date(sendAt).toISOString(), status: 'pending', eventId,
-                });
-                created++;
+                    await db.insert(automationLogs).values({
+                        id: nanoid(), tenantId: rule.tenantId, automationId: rule.id,
+                        inspectionId: insp.id, recipient: addr, channel,
+                        // send_at is a display estimate; flush() derives the real due-time live from inspection.date
+                        sendAt: new Date(sendAt).toISOString(), status: 'pending', eventId,
+                    });
+                    created++;
+                }
             }
         }
         return created;
