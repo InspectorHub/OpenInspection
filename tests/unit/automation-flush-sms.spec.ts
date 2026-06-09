@@ -117,10 +117,14 @@ describe('flush() — derived reminder due-time (Track L Step 3b)', () => {
     }
 
     it('processes a reminder whose DERIVED due is now (date=tomorrow) despite a far-future send_at', async () => {
-        const tomorrow = new Date(Date.now() + 24 * 3600_000).toISOString().slice(0, 10);
-        const logId = await seedReminder(tomorrow);
+        // Use today's date so the derived due-time = today@09:00Z − 1440min = yesterday@09:00Z,
+        // which is always in the past regardless of the time-of-day the test runs.
+        // Using tomorrow caused flakiness before 09:00 UTC: tomorrow@09:00Z − 1440min =
+        // today@09:00Z, which is in the future until 09:00 UTC passes.
+        const today = new Date().toISOString().slice(0, 10);
+        const logId = await seedReminder(today);
         await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
-        // tomorrow@09:00Z − 1440min(=1 day) ≈ today@09:00Z <= now → due → sent.
+        // today@09:00Z − 1440min(=1 day) = yesterday@09:00Z ≤ now → always due → sent.
         expect((await statusOf(logId))?.status).toBe('sent');
         expect(fetch).toHaveBeenCalledTimes(1);
     });
