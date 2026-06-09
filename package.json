@@ -73,7 +73,7 @@
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
-    "hono": "^4.12.18",
+    "hono": "^4.12.21",
     "isbot": "^5.1.0",
     "node-diff3": "^3.1.2",
     "otpauth": "^9.5.1",
@@ -137,7 +137,8 @@
     "wrangler": "^4.95.0"
   },
   "overrides": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "uuid": "^11.1.1"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.15",
