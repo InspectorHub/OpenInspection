@@ -3,6 +3,7 @@ import { ReportVersionService } from '../../server/services/report-version.servi
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { eq as schema_eq } from 'drizzle-orm';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -34,7 +35,7 @@ describe('ReportVersionService (subsystem D P7 T7.2)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         await seed(testDb);
-        svc = new ReportVersionService({} as D1Database);
+        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
     });
 
     it('snapshotOnPublish writes version 1', async () => {
@@ -79,5 +80,56 @@ describe('ReportVersionService (subsystem D P7 T7.2)', () => {
 
     it('snapshotOnPublish is tenant-scoped (foreign tenant treated as not_found)', async () => {
         await expect(svc.snapshotOnPublish('other-tenant', INSPECTION, 'user-a')).rejects.toThrow(/not found/i);
+    });
+
+    it('v1 signs content, has null prev_hash, is not an amendment', async () => {
+        const out = await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+        const row = await testDb.select().from(schema.reportVersions)
+            .where(schema_eq(schema.reportVersions.versionNumber, 1)).get();
+        expect(row?.contentHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(row?.prevHash).toBeNull();
+        expect(row?.isAmendment).toBe(false);
+        expect(row?.signature).toBeTruthy();
+        expect(row?.keyFingerprint).toBeTruthy();
+        expect(row?.verificationToken).toBeTruthy();
+        expect(out.versionNumber).toBe(1);
+    });
+
+    it('v2 chains prev_hash to v1 content_hash and is an amendment', async () => {
+        await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+        await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a', 'corrected roof note');
+        const rows = await testDb.select().from(schema.reportVersions).all();
+        const v1 = rows.find(r => r.versionNumber === 1)!;
+        const v2 = rows.find(r => r.versionNumber === 2)!;
+        expect(v2.prevHash).toBe(v1.contentHash);
+        expect(v2.isAmendment).toBe(true);
+        expect(v2.summary).toBe('corrected roof note');
+    });
+
+    it('verifyByToken validates an untampered version (hash + signature + chain)', async () => {
+        await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+        const row = await testDb.select().from(schema.reportVersions).get();
+        const res = await svc.verifyByToken(row!.verificationToken!);
+        expect(res).not.toBeNull();
+        expect(res!.hashValid).toBe(true);
+        expect(res!.signatureValid).toBe(true);
+        expect(res!.chainValid).toBe(true);
+        expect(res!.versionNumber).toBe(1);
+        expect(res!.isAmendment).toBe(false);
+    });
+
+    it('verifyByToken detects a tampered snapshot (hash mismatch)', async () => {
+        await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+        const row = await testDb.select().from(schema.reportVersions).get();
+        await testDb.update(schema.reportVersions)
+            .set({ snapshotJson: '{"inspection":{"id":"hacked"},"data":{},"units":[]}' })
+            .where(schema_eq(schema.reportVersions.id, row!.id));
+        const res = await svc.verifyByToken(row!.verificationToken!);
+        expect(res!.hashValid).toBe(false);
+        expect(res!.signatureValid).toBe(false);
+    });
+
+    it('verifyByToken returns null for an unknown token', async () => {
+        expect(await svc.verifyByToken('no-such-token')).toBeNull();
     });
 });

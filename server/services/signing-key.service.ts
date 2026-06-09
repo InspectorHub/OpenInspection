@@ -113,7 +113,7 @@ export class SigningKeyService {
 
 // ----- helpers -----
 
-function base64UrlEncode(bytes: Uint8Array): string {
+export function base64UrlEncode(bytes: Uint8Array): string {
     let s = '';
     for (let i = 0; i < bytes.byteLength; i++) s += String.fromCharCode(bytes[i]);
     return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

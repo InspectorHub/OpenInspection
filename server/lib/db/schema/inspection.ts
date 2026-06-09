@@ -137,6 +137,13 @@ export const inspections = sqliteTable('inspections', {
     leadInspectorId:     text('lead_inspector_id'),
     helperInspectorIds:  text('helper_inspector_ids').notNull().default('[]'),
     dataVersion:         integer('data_version').notNull().default(0),
+    // #119 — re-inspection linkage (app-layer refs, no DB FK per Schema Rules).
+    // source = the baseline this re-inspection carried from (original OR a prior
+    // re-inspection). root = the original at the chain root (grouping). round =
+    // creation order among re-inspections sharing root. All NULL on originals.
+    sourceInspectionId: text('source_inspection_id'),
+    rootInspectionId:   text('root_inspection_id'),
+    reinspectionRound:  integer('reinspection_round'),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),
@@ -146,6 +153,7 @@ export const inspections = sqliteTable('inspections', {
     index('idx_inspections_tenant_date').on(t.tenantId, t.date),
     index('idx_inspections_tenant_client_email').on(t.tenantId, t.clientEmail),
     index('idx_inspections_inspector_date').on(t.inspectorId, t.date),
+    index('idx_inspections_root').on(t.rootInspectionId),
 ]);
 
 // Sprint 2 S2-2 — A single customer booking can spawn multiple inspections

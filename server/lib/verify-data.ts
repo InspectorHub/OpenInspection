@@ -42,3 +42,20 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
         .all();
     return { reqRow, agreement, auditRows, verify, pubKey, tenantSlug, signers };
 }
+
+/**
+ * #120 — public report-version verifier loader. Token = report_versions.
+ * verification_token. No PII beyond the masked property address is exposed.
+ */
+export async function loadReportVerifyData(c: Context<HonoConfig>, token: string) {
+    const verify = await c.var.services.reportVersion.verifyByToken(token);
+    if (!verify) return null;
+    const db = drizzle(c.env.DB, { schema });
+    const ins = await db.select({ propertyAddress: schema.inspections.propertyAddress })
+        .from(schema.inspections)
+        .where(eq(schema.inspections.id, verify.inspectionId))
+        .get();
+    // Mask the address to a coarse form (no unit/number) for a public endpoint.
+    const masked = (ins?.propertyAddress ?? '').replace(/^\S+\s/, '••• ');
+    return { verify, propertyAddressMasked: masked };
+}

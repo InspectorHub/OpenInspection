@@ -190,6 +190,20 @@
       "when": 1780934320075,
       "tag": "0026_premium_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1780942509743,
+      "tag": "0027_medical_ulik",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1780945921745,
+      "tag": "0028_goofy_hedge_knight",
+      "breakpoints": true
     }
   ]
 }

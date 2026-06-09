@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests, agreements } from '../lib/db/schema';
+import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, invoices, inspectionMediaPool, tenants, agreementRequests, agreements, reportVersions } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
@@ -20,6 +20,7 @@ import { ApprenticeService } from './apprentice.service';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import type { AgreementService } from './agreement.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
+import { parseReinspectionStatuses, isOpenStatus } from '../lib/reinspection-status';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
 import { InvoiceService } from './invoice.service';
@@ -619,6 +620,223 @@ export class InspectionService {
             inspectorId: newInspection.inspectorId as string | null,
             createdAt: safeISODate(newInspection.createdAt)
         } as Inspection;
+    }
+
+    /**
+     * #119 — Re-inspection. Creates a NEW draft inspection linked to a published
+     * baseline (the original OR a prior re-inspection). Seeds inspection_results.data
+     * for ONLY the selected items, each `{ original, followupStatus: null }`, where
+     * `original` carries the root finding forward from the baseline's latest published
+     * report_versions snapshot (or the propagated `.original` if the baseline is itself
+     * a re-inspection).
+     *
+     * GATE: the baseline must be published — i.e. have ≥1 report_versions row.
+     */
+    async createReinspection(
+        tenantId: string,
+        baselineId: string,
+        opts: { selectedItemIds: string[]; inspectorId?: string },
+    ): Promise<Inspection> {
+        const db = this.getDrizzle();
+
+        const baseline = await db.select().from(inspections)
+            .where(and(eq(inspections.id, baselineId), eq(inspections.tenantId, tenantId))).get();
+        if (!baseline) throw new Error('Baseline inspection not found');
+
+        const latestVersion = await db.select().from(reportVersions)
+            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, baselineId)))
+            .orderBy(desc(reportVersions.versionNumber)).limit(1).get();
+        if (!latestVersion) throw new Error('Cannot re-inspect an unpublished baseline');
+
+        // When an explicit inspectorId is supplied, it MUST resolve to a user in
+        // this tenant. inspector_id has a DB FK to users.id; a foreign-tenant or
+        // bogus id would either violate the FK at runtime or assign the round to
+        // another tenant's user. Validate before use; omitted → baseline fallback.
+        if (opts.inspectorId) {
+            const owner = await db.select({ id: users.id }).from(users)
+                .where(and(eq(users.id, opts.inspectorId), eq(users.tenantId, tenantId))).get();
+            if (!owner) throw new Error('Inspector not found in this workspace');
+        }
+
+        const rootId = baseline.rootInspectionId ?? baseline.id;
+        const existingRounds = await db.select().from(inspections)
+            .where(and(eq(inspections.tenantId, tenantId), eq(inspections.rootInspectionId, rootId))).all();
+        const round = existingRounds.length + 1;
+
+        // The latest published snapshot is the carry-forward source. snapshotOnPublish
+        // serialises { inspection, data, units }; we read .data[itemId].
+        const baseSnapshot = JSON.parse(latestVersion.snapshotJson) as {
+            data?: Record<string, Record<string, unknown>>;
+        };
+        const baselineIsReinspection = baseline.sourceInspectionId != null;
+
+        const seeded: Record<string, unknown> = {};
+        for (const itemId of opts.selectedItemIds) {
+            const item = baseSnapshot.data?.[itemId] ?? {};
+            // When the baseline is itself a re-inspection AND its snapshot item already
+            // carries a propagated `.original` root finding, forward THAT (so round N
+            // always shows the root defect, never the intermediate follow-up state).
+            const original = baselineIsReinspection && item.original
+                ? item.original
+                : { rating: item.rating ?? null, notes: item.notes ?? null, photos: item.photos ?? [] };
+            seeded[itemId] = { original, followupStatus: null };
+        }
+
+        const id = crypto.randomUUID();
+        const createdAt = new Date();
+        await db.insert(inspections).values({
+            id,
+            tenantId,
+            // Reuse the baseline's property + client + template fields.
+            inspectorId:             opts.inspectorId ?? baseline.inspectorId ?? null,
+            propertyAddress:         baseline.propertyAddress,
+            addressPlaceId:          baseline.addressPlaceId,
+            addressStreet:           baseline.addressStreet,
+            addressCity:             baseline.addressCity,
+            addressState:            baseline.addressState,
+            addressZip:              baseline.addressZip,
+            addressCounty:           baseline.addressCounty,
+            addressLat:              baseline.addressLat,
+            addressLng:              baseline.addressLng,
+            clientContactId:         baseline.clientContactId,
+            clientName:              baseline.clientName,
+            clientEmail:             baseline.clientEmail,
+            clientPhone:             baseline.clientPhone,
+            templateId:              baseline.templateId,
+            templateSnapshot:        baseline.templateSnapshot,
+            templateSnapshotVersion: baseline.templateSnapshotVersion,
+            date:                    createdAt.toISOString(),
+            status:                  'draft',
+            paymentStatus:           'unpaid',
+            price:                   0,
+            paymentRequired:         false,
+            agreementRequired:       false,
+            createdAt,
+            // #119 link columns.
+            sourceInspectionId: baselineId,
+            rootInspectionId:   rootId,
+            reinspectionRound:  round,
+        });
+
+        await db.insert(inspectionResults).values({
+            id:           crypto.randomUUID(),
+            tenantId,
+            inspectionId: id,
+            data:         seeded as unknown as object,
+            lastSyncedAt: createdAt,
+        });
+
+        const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
+        return created as unknown as Inspection;
+    }
+
+    /**
+     * #119 (Task 6) — Candidate items for the "Create re-inspection" modal.
+     * Returns the baseline's still-open flagged items so the UI can pre-check
+     * the ones worth carrying forward. Computed off the SAME published snapshot
+     * `createReinspection` reads, so the returned `itemId`s are exactly the keys
+     * accepted as `selectedItemIds`.
+     *
+     * `open` default-check rule (mirrors the task spec):
+     *   - ORIGINAL baseline (no sourceInspectionId): item is open when its rating
+     *     bucket is `defect` or `monitor`.
+     *   - RE-INSPECTION baseline: item is open when its `followupStatus` is a
+     *     non-closed status (via isOpenStatus + the tenant's status set).
+     *
+     * Returns [] when the baseline is unpublished (no snapshot) — the caller
+     * gates the action on publication anyway, and the modal renders an empty
+     * state. Labels come from the baseline's templateSnapshot; an unmatched key
+     * degrades to the raw item id.
+     */
+    async getReinspectCandidates(
+        tenantId: string,
+        baselineId: string,
+    ): Promise<Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }>> {
+        const db = this.getDrizzle();
+
+        const baseline = await db.select().from(inspections)
+            .where(and(eq(inspections.id, baselineId), eq(inspections.tenantId, tenantId))).get();
+        if (!baseline) return [];
+
+        const latestVersion = await db.select().from(reportVersions)
+            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, baselineId)))
+            .orderBy(desc(reportVersions.versionNumber)).limit(1).get();
+        if (!latestVersion) return [];  // unpublished baseline → no candidates
+
+        const baselineIsReinspection = baseline.sourceInspectionId != null;
+
+        // Snapshot data is keyed by findingKey (unit:section:item) or, for legacy
+        // inspections, the plain item id — the same keys createReinspection reads.
+        const snapshot = JSON.parse(latestVersion.snapshotJson) as {
+            data?: Record<string, Record<string, unknown>>;
+        };
+        const snapData = snapshot.data ?? {};
+
+        // Resolve item labels from the baseline's templateSnapshot (authoritative
+        // shape once an inspection exists). Both {sections:[...]} and flat-array
+        // formats are supported, matching getReportData's schema resolution.
+        const labelByItemId = new Map<string, string>();
+        const rawSnap = baseline.templateSnapshot as unknown;
+        const tplSnap = rawSnap
+            ? (typeof rawSnap === 'string' ? JSON.parse(rawSnap as string) : rawSnap)
+            : null;
+        const sections: Array<{ id?: string; items?: Array<Record<string, unknown>> }> = Array.isArray(tplSnap)
+            ? [{ id: 'general', items: tplSnap as Array<Record<string, unknown>> }]
+            : Array.isArray((tplSnap as { sections?: unknown })?.sections)
+                ? (tplSnap as { sections: Array<{ id?: string; items?: Array<Record<string, unknown>> }> }).sections
+                : [];
+        for (const sec of sections) {
+            for (const it of sec.items ?? []) {
+                const itemId = String(it.id ?? '');
+                if (!itemId) continue;
+                const label = String(it.label ?? it.title ?? it.name ?? itemId);
+                labelByItemId.set(itemId, label);
+                // Also map the composite findingKey so snapshot keys resolve.
+                labelByItemId.set(findingKey(DEFAULT_UNIT, String(sec.id ?? ''), itemId), label);
+            }
+        }
+
+        // Rating levels for bucket resolution (original-baseline rule). Read from
+        // the templateSnapshot.ratingSystem when present; absence degrades to the
+        // legacy string-bucket map inside getRatingBucket.
+        const snapLevels = !Array.isArray(tplSnap)
+            ? (tplSnap as { ratingSystem?: { levels?: unknown[] } } | null)?.ratingSystem?.levels
+            : undefined;
+        const levels: RatingLevel[] = Array.isArray(snapLevels)
+            ? mapRatingSystemLevels(snapLevels as Array<Record<string, unknown>>)
+            : [];
+
+        // Resolve the tenant's configured follow-up status set (re-inspection rule).
+        const configRow = await db.select({ reinspectionStatuses: tenantConfigs.reinspectionStatuses })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+        const resolvedStatuses = parseReinspectionStatuses(configRow?.reinspectionStatuses ?? null);
+
+        const out: Array<{ itemId: string; label: string; originalNotes: string | null; open: boolean }> = [];
+        for (const [itemId, entry] of Object.entries(snapData)) {
+            const rating = (entry.rating ?? null) as string | null;
+            const notes = (entry.notes ?? null) as string | null;
+            // A re-inspection snapshot may already carry the propagated root finding.
+            const original = (entry.original ?? null) as { notes?: string | null } | null;
+            const originalNotes = baselineIsReinspection && original ? (original.notes ?? null) : notes;
+
+            let open: boolean;
+            if (baselineIsReinspection) {
+                open = isOpenStatus((entry.followupStatus ?? null) as string | null, resolvedStatuses);
+            } else {
+                const bucket = getRatingBucket(rating, levels);
+                open = bucket === 'defect' || bucket === 'monitor';
+            }
+
+            out.push({
+                itemId,
+                label: labelByItemId.get(itemId) ?? itemId,
+                originalNotes,
+                open,
+            });
+        }
+        // Open items first, then by label — the pre-checked carry-forward set surfaces on top.
+        out.sort((a, b) => (a.open === b.open ? a.label.localeCompare(b.label) : a.open ? -1 : 1));
+        return out;
     }
 
     /**
@@ -1704,6 +1922,11 @@ export class InspectionService {
                 limitations?: CannedState[];
                 defects?:     DefectState[];
             };
+            // #119 — on a re-inspection result, the carried item retains a
+            // snapshot of the original finding plus the follow-up disposition.
+            original?:       { rating?: string | null; notes?: string | null; photos?: PhotoEntry[] };
+            followupStatus?: string | null;
+            followupNotes?:  string | null;
         }
 
         // Feature #20 — prefer the per-inspection templateSnapshot over the
@@ -1941,6 +2164,22 @@ export class InspectionService {
                         // (custom rows carry isCustom: true).
                         defects: [...defects, ...customDefects],
                     },
+                    // #119 — re-inspection passthrough. Null on normal reports;
+                    // the report page only consults these when data.reinspection
+                    // is set. `original.photos` are resolved to display URLs so
+                    // the left column can render the baseline finding grayscale.
+                    original: res.original
+                        ? {
+                            rating: res.original.rating ?? null,
+                            notes:  res.original.notes ?? null,
+                            photos: (res.original.photos || []).map((p: PhotoEntry) => {
+                                const displayKey = p.annotatedKey || p.key;
+                                return { key: displayKey, originalKey: p.key, url: makePhotoUrl(displayKey) };
+                            }),
+                        }
+                        : null,
+                    followupStatus: res.followupStatus ?? null,
+                    followupNotes:  res.followupNotes ?? null,
                 };
             }),
         }));
@@ -1994,9 +2233,58 @@ export class InspectionService {
             bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
         };
 
+        // #120 — amendment trail. Surfaced to the client report page so a
+        // re-published report shows "Amended on …" + per-version reasons.
+        // Only meaningful when there is more than one published version; live
+        // edits do not create versions, so the banner stays hidden until an
+        // actual re-publish. Reason reuses report_versions.summary.
+        const versionRows = await db.select({
+            versionNumber: reportVersions.versionNumber,
+            publishedAt:   reportVersions.publishedAt,
+            summary:       reportVersions.summary,
+            isAmendment:   reportVersions.isAmendment,
+        })
+            .from(reportVersions)
+            .where(and(
+                eq(reportVersions.tenantId, tenantId),
+                eq(reportVersions.inspectionId, inspectionId),
+            ))
+            .orderBy(desc(reportVersions.versionNumber))
+            .all();
+        const amendmentTrail = {
+            amended: versionRows.length > 1,
+            latestVersion: versionRows[0]?.versionNumber ?? 0,
+            versions: versionRows.map(v => ({
+                versionNumber: v.versionNumber,
+                publishedAt:   v.publishedAt,
+                reason:        v.summary ?? null,
+                isAmendment:   v.isAmendment,
+            })),
+        };
+
+        // #119 — re-inspection context for the report page. When this
+        // inspection is a re-inspection, the page renders only the carried
+        // items with a left(original)/right(follow-up) layout. The status
+        // catalog is the tenant's (falls back to defaults) so the follow-up
+        // badge can resolve a human label from item.followupStatus.
+        const reinspection = inspection.sourceInspectionId
+            ? {
+                round: inspection.reinspectionRound ?? 1,
+                rootInspectionId: inspection.rootInspectionId,
+                statuses: parseReinspectionStatuses(
+                    (await db.select({ s: tenantConfigs.reinspectionStatuses })
+                        .from(tenantConfigs)
+                        .where(eq(tenantConfigs.tenantId, tenantId))
+                        .get())?.s ?? null,
+                ),
+            }
+            : null;
+
         return {
             inspection: { ...inspection, inspectorName },
             theme: reportTheme,
+            amendmentTrail,
+            reinspection,
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
             sections,
             ratingLevels: levels.length > 0 ? levels : [

@@ -323,6 +323,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // window has elapsed). Default 6 = the UK Limitation Act simple-contract
     // limitation period (the standard e-sign-evidence retention basis).
     agreementRetentionYears: integer('agreement_retention_years').notNull().default(6),
+    // #119 — configurable re-inspection status categories. JSON
+    // [{ key, label, closed:boolean }]; null = use the built-in default
+    // (Resolved/closed, Not resolved/open, Not inspected/open).
+    reinspectionStatuses: text('reinspection_statuses'),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 

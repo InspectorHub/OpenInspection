@@ -15,11 +15,15 @@ export const reportPdfs = sqliteTable('report_pdfs', {
     r2Key:         text('r2_key').notNull(),
     renderedAt:    integer('rendered_at').notNull(),
     sourceVersion: integer('source_version').notNull(),                                              // inspection.updatedAt timestamp at render time
+    // #120 — the report_versions.version_number this PDF renders. Nullable for
+    // pre-#120 rows; new publishes always set it. The archive is immutable per
+    // version; the "current" PDF is the highest version_number row.
+    versionNumber: integer('version_number'),
     sizeBytes:     integer('size_bytes'),
     status:        text('status', { enum: ['queued', 'rendering', 'ready', 'failed'] }).notNull().default('ready'),
     error:         text('error'),
 }, (t) => ({
-    uqInspectionType: uniqueIndex('uq_report_pdfs_inspection_type').on(t.inspectionId, t.type),
+    uqInspectionType: uniqueIndex('uq_report_pdfs_inspection_type').on(t.inspectionId, t.type, t.versionNumber),
     idxTenant:        index('idx_report_pdfs_tenant').on(t.tenantId),
     idxStatus:        index('idx_report_pdfs_status').on(t.status),
 }));

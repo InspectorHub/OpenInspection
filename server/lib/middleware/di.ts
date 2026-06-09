@@ -328,7 +328,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     });
                     break;
                 case 'reportVersion':
-                    target.reportVersion = new ReportVersionService(c.env.DB);
+                    target.reportVersion = new ReportVersionService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
                     break;
                 case 'apprentice':
                     target.apprentice = new ApprenticeService(c.env.DB);

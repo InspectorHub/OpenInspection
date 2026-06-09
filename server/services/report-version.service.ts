@@ -13,6 +13,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc } from 'drizzle-orm';
 import { reportVersions, inspections, inspectionResults, inspectionUnits } from '../lib/db/schema';
 import { computeDiff, type Snapshot, type DiffPayload } from '../lib/version-diff';
+import { SigningKeyService, sha256Hex, base64UrlEncode, base64UrlDecode } from './signing-key.service';
 
 const MAX_SNAPSHOT_BYTES = 1024 * 1024;  // 1 MB
 
@@ -32,7 +33,7 @@ function parseResultsData(raw: unknown): ResultsData {
 }
 
 export class ReportVersionService {
-    constructor(private db: D1Database) {}
+    constructor(private db: D1Database, private encryptionSecret: string) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -79,6 +80,17 @@ export class ReportVersionService {
             throw new Error('Snapshot exceeds 1 MB limit');
         }
 
+        const contentHash = await sha256Hex(snapshotJson);
+        const prevHash = prev?.contentHash ?? null;
+
+        const signing = new SigningKeyService(this.db, this.encryptionSecret);
+        const { privateKey, fingerprint } = await signing.ensureKeypair(tenantId);
+        const sigBytes = new Uint8Array(await crypto.subtle.sign(
+            { name: 'Ed25519' }, privateKey, new TextEncoder().encode(contentHash),
+        ));
+        const signature = base64UrlEncode(sigBytes);
+        const verificationToken = crypto.randomUUID();
+
         await db.insert(reportVersions).values({
             id:             crypto.randomUUID(),
             tenantId,
@@ -89,9 +101,64 @@ export class ReportVersionService {
             publishedAt:    Math.floor(Date.now() / 1000),
             publishedBy,
             createdAt:      new Date().toISOString(),
+            contentHash,
+            prevHash,
+            signature,
+            keyFingerprint: fingerprint,
+            isAmendment:    nextVersion > 1,
+            verificationToken,
         });
 
         return { versionNumber: nextVersion, ...(summary ? { summary } : {}) };
+    }
+
+    async verifyByToken(token: string) {
+        const db = this.getDrizzle();
+        const row = await db.select().from(reportVersions)
+            .where(eq(reportVersions.verificationToken, token)).get();
+        if (!row) return null;
+
+        const legacy = !row.contentHash || !row.signature;
+        const recomputed = await sha256Hex(row.snapshotJson);
+        const hashValid = !legacy && recomputed === row.contentHash;
+
+        let signatureValid = false;
+        if (!legacy) {
+            const signing = new SigningKeyService(this.db, this.encryptionSecret);
+            const pub = await signing.getPublicKey(row.tenantId);
+            if (pub) {
+                signatureValid = await crypto.subtle.verify(
+                    { name: 'Ed25519' }, pub.publicKey,
+                    base64UrlDecode(row.signature!) as unknown as ArrayBuffer,
+                    new TextEncoder().encode(recomputed),
+                );
+            }
+        }
+
+        let chainValid: boolean;
+        if (row.versionNumber > 1) {
+            const prev = await db.select().from(reportVersions).where(and(
+                eq(reportVersions.tenantId, row.tenantId),
+                eq(reportVersions.inspectionId, row.inspectionId),
+                eq(reportVersions.versionNumber, row.versionNumber - 1),
+            )).get();
+            chainValid = !!prev && prev.contentHash === row.prevHash;
+        } else {
+            chainValid = row.prevHash == null;
+        }
+
+        return {
+            inspectionId:  row.inspectionId,
+            versionNumber: row.versionNumber,
+            isAmendment:   row.isAmendment,
+            publishedAt:   row.publishedAt,
+            contentHash:   row.contentHash ?? null,
+            keyFingerprint: row.keyFingerprint ?? null,
+            legacy,
+            hashValid,
+            signatureValid,
+            chainValid,
+        };
     }
 
     async list(tenantId: string, inspectionId: string) {

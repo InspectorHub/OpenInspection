@@ -394,6 +394,17 @@ export const AgreementRequestCreatedSchema = createApiResponseSchema(
   }),
 ).openapi('AgreementRequestCreatedResponse');
 
+/**
+ * Issue #119 (Re-inspections) Task 4 — body for
+ * POST /api/inspections/:id/reinspect. The inspector picks which still-open
+ * flagged items carry forward into a new linked inspection off a published
+ * baseline report.
+ */
+export const CreateReinspectionSchema = z.object({
+  selectedItemIds: z.array(z.string().min(1)).min(1).describe('Item ids carried forward into the re-inspection (the still-open flagged items the inspector chose).'),
+  inspectorId: z.string().optional().describe('Inspector assigned to the re-inspection; defaults to the baseline inspector.'),
+}).openapi('CreateReinspection');
+
 export const ReportItemSchema = z.object({
   id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
   label: z.string().describe('TODO describe label field for the OpenInspection MCP integration'),
