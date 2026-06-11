@@ -111,7 +111,7 @@
     "@typescript/native-preview": "^7.0.0-dev.20260527.2",
     "better-sqlite3": "^12.8.0",
     "chart.js": "^4.5.1",
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.3",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.7",
     "eslint": "^9.39.4",
