@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, isNull, inArray, sql } from 'drizzle-orm';
+import { eq, and, desc, isNull, inArray, lt, sql } from 'drizzle-orm';
 import { notifications, users } from '../lib/db/schema';
 import { nanoid } from 'nanoid';
 
@@ -108,7 +108,9 @@ export class NotificationService {
         if (!opts.includeArchived) conds.push(isNull(notifications.archivedAt));
         if (opts.cursor) {
             const cursorDate = new Date(opts.cursor);
-            conds.push(sql`${notifications.createdAt} < ${cursorDate}`);
+            // Use lt() (not raw sql) so the cursor Date is encoded via the
+            // column's mode mapper instead of being bound as a raw Date object.
+            conds.push(lt(notifications.createdAt, cursorDate));
         }
         const rows = await db.select().from(notifications)
             .where(and(...conds))
