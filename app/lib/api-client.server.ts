@@ -52,6 +52,7 @@ import type {
     TeamApi,
     TemplateMigrationsApi,
     TenantPresenceApi,
+    UsageApi,
     UsersApi,
     WidgetApi,
 } from "../../packages/api-types";
@@ -154,6 +155,7 @@ export interface Api {
     team:               ReturnType<typeof hc<TeamApi>>;
     templateMigrations: ReturnType<typeof hc<TemplateMigrationsApi>>;
     tenantPresence:     ReturnType<typeof hc<TenantPresenceApi>>;
+    usage:              ReturnType<typeof hc<UsageApi>>;
     users:              ReturnType<typeof hc<UsersApi>>;
     widget:             ReturnType<typeof hc<WidgetApi>>;
 }
@@ -216,6 +218,7 @@ const MOUNT: Record<keyof Api, string> = {
     team:               "/api/team",
     templateMigrations: "/api/templates",
     tenantPresence:     "/api/tenant",
+    usage:              "/api/usage",
     users:              "/api/users",
     widget:             "/api/public/widget",
 };
@@ -296,6 +299,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         team:               mk<TeamApi>(MOUNT.team),
         templateMigrations: mk<TemplateMigrationsApi>(MOUNT.templateMigrations),
         tenantPresence:     mk<TenantPresenceApi>(MOUNT.tenantPresence),
+        usage:              mk<UsageApi>(MOUNT.usage),
         users:              mk<UsersApi>(MOUNT.users),
         widget:             mk<WidgetApi>(MOUNT.widget),
     };

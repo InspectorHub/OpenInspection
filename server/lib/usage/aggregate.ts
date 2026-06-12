@@ -13,3 +13,12 @@ export function aggregateUsage(rows: Array<typeof usageCounters.$inferSelect>): 
   }
   return [...byTenant.values()];
 }
+
+/** One tenant's usage summary, zero-filled when it has no counter rows yet. */
+export function summariseTenantUsage(
+  rows: Array<typeof usageCounters.$inferSelect>,
+  tenantId: string,
+): TenantUsage {
+  const mine = rows.filter((r) => r.tenantId === tenantId);
+  return aggregateUsage(mine)[0] ?? { tenantId, sms: 0, email: 0, r2Bytes: 0 };
+}

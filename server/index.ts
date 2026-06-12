@@ -40,6 +40,7 @@ import integrationsApiRoutes from './api/integrations';
 import analyticsRoutes from './api/analytics';
 import guestRoutes from './api/guest';
 import billingRoutes from './api/billing';
+import usageRoutes from './api/usage';
 import { registerPortalIntegration } from './portal/integration.module';
 import inspectionsRoutes from './api/inspections';
 import tenantPresenceRoutes from './api/tenant-presence';
@@ -428,6 +429,7 @@ const routes = app
   // Design System 0520 subsystem C — guest + billing.
   .route('/api/guest', guestRoutes)
   .route('/api/billing', billingRoutes)
+  .route('/api/usage', usageRoutes)
   // Design System 0520 subsystem E — identity / integrations / analytics.
   .route('/api/identities', identityRoutes)
   .route('/api/integrations', integrationsApiRoutes)
