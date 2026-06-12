@@ -56,10 +56,10 @@ export class EmailService {
         html: string,
         attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
         opts?: { inspector?: SenderInspector | undefined },
-    ) {
+    ): Promise<{ delivered: boolean }> {
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
             logger.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);
-            return;
+            return { delivered: false };
         }
 
         const resolved = this.identity
@@ -110,6 +110,7 @@ export class EmailService {
             // success — meter the send (best-effort; never blocks or breaks delivery).
             // Awaited (not waitUntil) so it works in scheduled/workflow contexts too.
             await this.meter?.record().catch(() => {});
+            return { delivered: true };
         } catch (err) {
             logger.error('[email] Delivery exception', {}, err instanceof Error ? err : undefined);
             throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email service unavailable');

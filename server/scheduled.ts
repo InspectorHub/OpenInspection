@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm';
 import { AutomationService } from './services/automation.service';
 import { maybeMetering } from './services/metering.service';
 import { AgreementService } from './services/agreement.service';
+import { buildTenantEmailService } from './lib/email/build-email-service';
+import type { EmailServiceEnv } from './lib/email/build-email-service';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
 import { qboConnections } from './lib/db/schema/qbo';
@@ -147,8 +149,7 @@ export async function scheduled(
               }
             : null;
         await svc.flush(
-            env.RESEND_API_KEY || '',
-            env.SENDER_EMAIL || '',
+            (tid) => buildTenantEmailService(env as EmailServiceEnv, tid),
             env.APP_NAME || 'OpenInspection',
             env.APP_BASE_URL || '',
             sms,

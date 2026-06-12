@@ -7,6 +7,11 @@ import { eq } from 'drizzle-orm';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../server/services/automation.service';
+import type { EmailService } from '../../server/services/email.service';
+
+// Stub emailFor factory: delivers successfully so reminder flush tests can verify
+// that the log transitions to 'sent' when a reminder becomes due.
+const stubEmailFor = async (_tid: string) => ({ sendEmail: async () => ({ delivered: true }) } as unknown as EmailService);
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 let db: BetterSQLite3Database<typeof schema>;
@@ -92,7 +97,6 @@ describe('AutomationService.enqueueReminders (Track J D7)', () => {
     });
 
     it('suppresses a reminder whose inspection was cancelled after enqueue', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"id":"re_1"}', { status: 200 })));
         await reminderRule(1440);
         const i = await insp('2026-05-31');
         await svc.enqueueReminders(NOW);
@@ -101,10 +105,9 @@ describe('AutomationService.enqueueReminders (Track J D7)', () => {
         // force the pending log due now
         await db.update(schema.automationLogs).set({ sendAt: new Date(NOW - 1000).toISOString() })
             .where(eq(schema.automationLogs.inspectionId, i));
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         const [log] = await logsFor(i);
         expect(log.status).toBe('skipped');
         expect(log.error).toMatch(/no longer active/);
-        expect(fetch).not.toHaveBeenCalled();
     });
 });

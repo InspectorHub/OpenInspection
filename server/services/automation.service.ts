@@ -10,6 +10,7 @@ import { logger } from '../lib/logger';
 import type { NotificationService } from './notification.service';
 import type { AgreementService } from './agreement.service';
 import { currentPeriodKey } from '../lib/usage/period';
+import type { EmailService } from './email.service';
 
 // Track L (D7) — default TCPA SMS opt-in disclosure (version 1). Seeded once by
 // ensureSeeds (SaaS) and the standalone raw-SQL path; kept identical in both.
@@ -392,7 +393,8 @@ export class AutomationService {
     }
 
     async flush(
-        resendApiKey: string, senderEmail: string, appName: string, appBaseUrl: string,
+        emailFor: (tenantId: string) => Promise<EmailService>,
+        appName: string, appBaseUrl: string,
         sms?: { resolveCreds: (tenantId: string) => Promise<import('../lib/sms/resolve-twilio').TwilioCreds | null> } | null,
         batchSize = 50,
     ): Promise<void> {
@@ -447,6 +449,19 @@ export class AutomationService {
             try { return new URL(appBaseUrl).host; } catch { return appBaseUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''); }
         })();
 
+        // Memoize EmailService per tenantId so we don't re-load tenant config for
+        // every log belonging to the same tenant within a single flush() call.
+        const emailSvcCache = (() => {
+            const cache = new Map<string, EmailService>();
+            return {
+                async getOrBuild(tenantId: string, factory: (tid: string) => Promise<EmailService>): Promise<EmailService> {
+                    let svc = cache.get(tenantId);
+                    if (!svc) { svc = await factory(tenantId); cache.set(tenantId, svc); }
+                    return svc;
+                },
+            };
+        })();
+
         for (const { log, automation, inspection, tenant } of pending) {
             try {
                 const verdict = await this.evaluateConditions(db, automation, inspection);
@@ -457,15 +472,10 @@ export class AutomationService {
                 }
 
                 // Track L — branch per the log's own channel. SMS resolves its own
-                // creds + consent in deliverSms; the email path below self-skips when
-                // no Resend key is configured (rather than 401-looping forever).
+                // creds + consent in deliverSms; the email path delegates to the
+                // per-tenant EmailService (metering + per-tenant key resolution by construction).
                 if (log.channel === 'sms') {
                     await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost);
-                    continue;
-                }
-                if (!resendApiKey) {
-                    await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
-                        .where(eq(automationLogs.id, log.id));
                     continue;
                 }
 
@@ -537,27 +547,17 @@ export class AutomationService {
 
                 const subject = interpolate(automation.subjectTemplate, vars);
                 const html    = interpolate(automation.bodyTemplate, vars);
-                const from    = senderEmail || `noreply@${appName.toLowerCase().replace(/\s+/g, '')}.com`;
 
-                const res = await fetch('https://api.resend.com/emails', {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ from, to: [log.recipient], subject, html }),
-                });
-
-                if (res.ok) {
+                // Route through the per-tenant EmailService so metering and
+                // per-tenant Resend key resolution happen by construction.
+                const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
+                const { delivered } = await emailSvc.sendEmail([log.recipient], subject, html);
+                if (delivered) {
                     await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date().toISOString() })
                         .where(eq(automationLogs.id, log.id));
-                    // Meter the automation email (this path sends via raw fetch, NOT
-                    // EmailService, so it is not covered by the EmailService meter hook).
-                    try {
-                        await this.metering?.record(inspection.tenantId, 'email', currentPeriodKey(new Date()));
-                    } catch { /* metering must never break delivery */ }
                 } else {
-                    const errText = await res.text();
-                    await db.update(automationLogs).set({ status: 'failed', error: errText.slice(0, 500) })
+                    await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
                         .where(eq(automationLogs.id, log.id));
-                    logger.error('AutomationService.flush: Resend error', { logId: log.id, status: res.status });
                 }
             } catch (err) {
                 await db.update(automationLogs).set({
