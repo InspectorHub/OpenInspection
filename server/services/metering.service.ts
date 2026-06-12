@@ -4,9 +4,9 @@ import { usageCounters } from '../lib/db/schema/usage';
 import { type UsageMetric } from '../lib/usage/period';
 
 /**
- * SaaS-only usage meter. Takes a raw D1Database and creates a drizzle handle per
- * call (matches admin.service so unit tests can mock `drizzle`). Standalone never
- * constructs this — see maybeMetering().
+ * Usage meter. Takes a raw D1Database and creates a drizzle handle per call
+ * (matches admin.service so unit tests can mock `drizzle`). Runs in every mode —
+ * see maybeMetering().
  */
 export class MeteringService {
   constructor(private db: D1Database) {}
@@ -38,9 +38,11 @@ export class MeteringService {
   }
 }
 
-/** The single metering gate. Returns a service only in SaaS; undefined otherwise
- *  (standalone → callers no-op via optional chaining). Works in request AND
- *  scheduled contexts because it keys on env, not on the request profile. */
-export function maybeMetering(env: { APP_MODE?: string; DB: D1Database }): MeteringService | undefined {
-  return env.APP_MODE === 'saas' ? new MeteringService(env.DB) : undefined;
+/** Construct the usage meter. Metering runs in every mode: the usage_counters
+ *  table exists in every deploy post-migration, and standalone rows all carry
+ *  tenantId = SINGLE_TENANT_ID (whole-instance usage). Kept as a factory (rather
+ *  than `new MeteringService` at call sites) so request + scheduled contexts share
+ *  one construction point. */
+export function maybeMetering(env: { APP_MODE?: string; DB: D1Database }): MeteringService {
+  return new MeteringService(env.DB);
 }

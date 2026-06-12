@@ -29,8 +29,9 @@ describe('MeteringService', () => {
     await svc.setGauge('t1', 'r2_bytes', 'lifetime', 250);
     expect((await svc.getAll()).find(r => r.metric === 'r2_bytes')?.value).toBe(250);
   });
-  it('maybeMetering returns undefined unless saas', () => {
-    expect(maybeMetering({ APP_MODE: undefined, DB: {} as any })).toBeUndefined();
+  it('maybeMetering returns a service in both standalone and saas', () => {
+    expect(maybeMetering({ APP_MODE: undefined, DB: {} as any })).toBeInstanceOf(MeteringService);
+    expect(maybeMetering({ APP_MODE: 'standalone', DB: {} as any })).toBeInstanceOf(MeteringService);
     expect(maybeMetering({ APP_MODE: 'saas', DB: {} as any })).toBeInstanceOf(MeteringService);
   });
 });
