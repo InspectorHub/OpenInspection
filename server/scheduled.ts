@@ -191,9 +191,12 @@ export async function scheduled(
         logger.error('[cron] retention sweep failed', {}, e instanceof Error ? e : undefined);
     }
 
-    // 7. Daily SaaS-only R2 usage measurement (03:00–03:05 UTC window fires once/day
-    //    on the */5 cron). Writes r2_bytes gauge per tenant via MeteringService.
-    if (env.APP_MODE === 'saas') {
+    // 7. Daily R2 usage measurement (03:00–03:05 UTC window fires once/day on the
+    //    */5 cron). Writes r2_bytes gauge per tenant via MeteringService. Runs in
+    //    every mode — standalone simply has one tenant in the table, so it records a
+    //    single whole-instance measurement, populating the /settings/usage Storage
+    //    figure everywhere.
+    {
         const now = new Date();
         if (now.getUTCHours() === 3 && now.getUTCMinutes() < 5) {
             try {
