@@ -98,6 +98,7 @@ export const guestRoutes = createApiRouter()
 
         const out = await c.var.services.guestInvite.claim(body.token, body, {
             maxUsers: resolved.maxUsers,
+            enforceSeatQuota: c.var.profile.hasSeatQuota,
             ...(links ? { termsAccepted: buildTermsAcceptedBlob(links, {
                 ip: c.req.header('CF-Connecting-IP'),
                 country: (c.req.raw.cf?.country as string | undefined),
