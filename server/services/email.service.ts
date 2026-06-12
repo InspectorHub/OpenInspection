@@ -33,6 +33,7 @@ export class EmailService {
         private appName: string,
         private identity?: EmailIdentityConfig,
         private renderer?: EmailTemplateRenderer,
+        private meter?: { record: () => Promise<void> },
     ) {}
 
     /** Render `trigger` via the template registry when a renderer is injected;
@@ -106,6 +107,9 @@ export class EmailService {
                 logger.error('[email] Resend delivery failed', { response: text });
                 throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email delivery failed');
             }
+            // success — meter the send (best-effort; never blocks or breaks delivery).
+            // Awaited (not waitUntil) so it works in scheduled/workflow contexts too.
+            await this.meter?.record().catch(() => {});
         } catch (err) {
             logger.error('[email] Delivery exception', {}, err instanceof Error ? err : undefined);
             throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email service unavailable');

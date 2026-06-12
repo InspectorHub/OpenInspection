@@ -3,6 +3,8 @@ import { BrandingService } from '../../services/branding.service';
 import { EmailTemplateService } from '../../services/email-template.service';
 import { EmailTemplateRenderer } from '../email-templates/renderer';
 import { loadTenantSecrets } from '../secrets-cache';
+import { maybeMetering } from '../../services/metering.service';
+import { currentPeriodKey } from '../usage/period';
 import type { EmailIdentityConfig } from './sender-identity';
 import type { TemplateOverride } from '../email-templates/types';
 
@@ -12,6 +14,7 @@ import type { TemplateOverride } from '../email-templates/types';
  */
 export interface EmailServiceEnv {
     DB: D1Database;
+    APP_MODE?: string;
     TENANT_CACHE: KVNamespace;
     JWT_SECRET: string;
     JWT_SECRET_PREVIOUS?: string;
@@ -49,7 +52,7 @@ export interface LoadedEmailConfig {
  * config in its async body) and `buildTenantEmailService` (non-request
  * contexts) both produce identical EmailService instances.
  */
-export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmailConfig): EmailService {
+export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmailConfig, meterTenantId?: string): EmailService {
     const { emailIdentity, emailBrand, dbSecrets, emailOverrides } = cfg;
     const ownReady =
         emailIdentity?.mode === 'own' &&
@@ -76,7 +79,11 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
         },
         ...(emailOverrides ? { overrides: emailOverrides } : {}),
     });
-    return new EmailService(resendKey, fromAddress, appName, emailIdentity, renderer);
+    const metering = maybeMetering(env);
+    const meter = metering && meterTenantId
+        ? { record: () => metering.record(meterTenantId, 'email', currentPeriodKey(new Date())) }
+        : undefined;
+    return new EmailService(resendKey, fromAddress, appName, emailIdentity, renderer, meter);
 }
 
 /**
@@ -125,5 +132,5 @@ export async function buildTenantEmailService(env: EmailServiceEnv, tenantId: st
     if (!tenantId) {
         return assembleTenantEmailService(env, { dbSecrets: {} });
     }
-    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId));
+    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId);
 }
