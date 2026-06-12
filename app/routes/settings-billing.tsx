@@ -138,6 +138,11 @@ export default function SettingsBillingPage() {
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{guests}</div>
                 </div>
               </div>
+              <div className="mt-4 pt-4 border-t border-ih-border">
+                <Link to="/settings/usage" className="text-ih-primary text-[13px] font-medium hover:underline">
+                  View SMS, email &amp; storage usage &rarr;
+                </Link>
+              </div>
             </section>
           )}
 
@@ -161,6 +166,11 @@ export default function SettingsBillingPage() {
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Active guests</div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{guests}</div>
                 </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-ih-border">
+                <Link to="/settings/usage" className="text-ih-primary text-[13px] font-medium hover:underline">
+                  View SMS, email &amp; storage usage &rarr;
+                </Link>
               </div>
             </section>
           )}
