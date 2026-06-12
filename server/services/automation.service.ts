@@ -548,6 +548,11 @@ export class AutomationService {
                 if (res.ok) {
                     await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date().toISOString() })
                         .where(eq(automationLogs.id, log.id));
+                    // Meter the automation email (this path sends via raw fetch, NOT
+                    // EmailService, so it is not covered by the EmailService meter hook).
+                    try {
+                        await this.metering?.record(inspection.tenantId, 'email', currentPeriodKey(new Date()));
+                    } catch { /* metering must never break delivery */ }
                 } else {
                     const errText = await res.text();
                     await db.update(automationLogs).set({ status: 'failed', error: errText.slice(0, 500) })
