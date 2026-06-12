@@ -4,7 +4,7 @@ import { logger } from '../lib/logger';
 import {
     inspections, inspectionResults, automationLogs, automations, templates,
     agreements, agreementRequests, agreementSigners, services, inspectionServices, discountCodes,
-    recommendations, comments, contacts, users, tenantConfigs, tenants,
+    comments, contacts, users, tenantConfigs, tenants,
     availability, availabilityOverrides, inspectionAgreements,
     eventTypes, inspectionEvents, tenantDestructionRecords,
     inspectionInspectors, serviceInspectors, erasureLog,
@@ -16,7 +16,7 @@ const TENANT_TABLES = [
     // Track I-a: signer rows (PII) hang off agreement_requests — purge them first.
     inspectionAgreements, agreementSigners, agreementRequests, agreements, automationLogs,
     inspectionEvents, eventTypes, automations,
-    inspectionServices, services, discountCodes, recommendations, comments, contacts,
+    inspectionServices, services, discountCodes, comments, contacts,
     availabilityOverrides, availability, inspectionResults, inspections, templates,
     // erasureLog holds subject_email PII scoped by tenantId — must be purged on
     // whole-tenant teardown. Per-subject erasure retains it (Art. 5(2)/30 proof).

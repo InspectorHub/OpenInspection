@@ -32,14 +32,13 @@
  */
 
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import {
     templates,
     agreements,
     comments,
     eventTypes,
     tags,
-    recommendations,
     ratingSystems,
     marketplaceLibraries,
 } from '../lib/db/schema';
@@ -243,27 +242,31 @@ export async function seedStarterContent(
         tagsSeeded = rows.length;
     }
 
-    // ── recommendations ─────────────────────────────────────────────────
+    // ── recommendations (repair-item comments) ──────────────────────────
+    // Comments-repair fold (2026-06-12): recommendations are now comments with
+    // repair fields (the `recommendations` table was dropped). Seed them as
+    // repair-item comments — same predicate RecommendationService reads back
+    // (repair_summary IS NOT NULL). Idempotent on (category, text).
     let recommendationsSeeded = 0;
     {
-        const existing = await d.select({ category: recommendations.category, name: recommendations.name })
-            .from(recommendations).where(eq(recommendations.tenantId, tenantId)).all();
+        const existing = await d.select({ category: comments.category, name: comments.text })
+            .from(comments).where(and(eq(comments.tenantId, tenantId), isNotNull(comments.repairSummary))).all();
         const existingKeys = new Set(existing.map(r => `${r.category ?? ''}::${r.name}`));
         const rows = RECOMMENDATIONS
             .filter(r => !existingKeys.has(`${r.category ?? ''}::${r.name}`))
             .map(r => ({
-                id:                   crypto.randomUUID(),
+                id:                crypto.randomUUID(),
                 tenantId,
-                category:             r.category,
-                name:                 r.name,
-                severity:             r.severity,
-                defaultEstimateMin:   r.defaultEstimateMin,
-                defaultEstimateMax:   r.defaultEstimateMax,
-                defaultRepairSummary: r.defaultRepairSummary,
-                createdByUserId:      null,
-                createdAt:            new Date(),
+                text:              r.name,
+                category:          r.category,
+                ratingBucket:      'defect',
+                severity:          r.severity,
+                repairSummary:     r.defaultRepairSummary,
+                estimateMinCents:  r.defaultEstimateMin,
+                estimateMaxCents:  r.defaultEstimateMax,
+                createdAt:         new Date(),
             }));
-        await batchInsert(d, recommendations, rows);
+        await batchInsert(d, comments, rows);
         recommendationsSeeded = rows.length;
     }
 
