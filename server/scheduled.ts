@@ -189,4 +189,23 @@ export async function scheduled(
     } catch (e) {
         logger.error('[cron] retention sweep failed', {}, e instanceof Error ? e : undefined);
     }
+
+    // 7. Daily SaaS-only R2 usage measurement (03:00–03:05 UTC window fires once/day
+    //    on the */5 cron). Writes r2_bytes gauge per tenant via MeteringService.
+    if (env.APP_MODE === 'saas') {
+        const now = new Date();
+        if (now.getUTCHours() === 3 && now.getUTCMinutes() < 5) {
+            try {
+                const { drizzle: drizzleR2 } = await import('drizzle-orm/d1');
+                const { tenants } = await import('./lib/db/schema/tenant');
+                const { MeteringService } = await import('./services/metering.service');
+                const { R2UsageService } = await import('./services/r2-usage.service');
+                const ids = (await drizzleR2(env.DB).select({ id: tenants.id }).from(tenants).all()).map(r => r.id);
+                await new R2UsageService(env.PHOTOS!, new MeteringService(env.DB)).measureAll(ids);
+                logger.info('[usage] R2 measurement complete', { tenants: ids.length });
+            } catch (err) {
+                logger.error('[usage] R2 measurement failed', {}, err instanceof Error ? err : undefined);
+            }
+        }
+    }
 }
