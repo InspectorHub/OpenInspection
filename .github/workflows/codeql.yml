@@ -1,0 +1,52 @@
+name: "CodeQL"
+
+# Advanced CodeQL setup (replaces default setup) so analysis also runs on
+# pull requests opened from forks. Default setup never analyzes fork PRs, which
+# left the code_scanning / code_quality branch rules waiting forever on
+# fork-first contributions. A workflow defined on the base branch runs for fork
+# PRs (with a read-only token and no secrets — CodeQL needs neither).
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+            quality: ""
+          - language: javascript-typescript
+            build-mode: none
+            quality: "code-quality"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          quality-queries: ${{ matrix.quality }}
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
