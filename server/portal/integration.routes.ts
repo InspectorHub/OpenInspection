@@ -326,7 +326,7 @@ api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
 api.get('/usage', requireServiceBinding, async (c) => {
     try {
         const rows = await drizzle(c.env.DB).select().from(usageCounters).all();
-        return c.json({ data: aggregateUsage(rows) });
+        return c.json({ success: true, data: aggregateUsage(rows) });
     } catch (error: unknown) {
         logger.error('usage aggregation failed', {}, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
