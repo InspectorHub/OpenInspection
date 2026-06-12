@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, inArray, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, inArray, lt, sql, desc, asc } from 'drizzle-orm';
 import { agreements, agreementRequests, agreementSigners, inspections } from '../lib/db/schema';
 import * as schema from '../lib/db/schema';
 import { Errors } from '../lib/errors';
@@ -497,14 +497,16 @@ export class AgreementService {
      */
     async expireOlderThan(days: number): Promise<number> {
         const db = this.getDrizzle();
-        // Use epoch milliseconds integer directly — better-sqlite3 cannot bind Date objects
-        // in comparison expressions, but D1 also expects an integer for timestamp columns.
-        const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+        // Compare via lt() with a Date so Drizzle encodes the cutoff through the
+        // sent_at column's mode mapper. (The previous raw-sql comparison bound a
+        // MILLISECOND cutoff against a SECONDS-stored column — always true — so the
+        // sweep expired every pending/sent/viewed envelope regardless of age.)
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
         await db.update(agreementRequests)
             .set({ status: 'expired' })
             .where(and(
                 inArray(agreementRequests.status, ['pending', 'sent', 'viewed']),
-                sql`${agreementRequests.sentAt} < ${cutoffMs}`,
+                lt(agreementRequests.sentAt, cutoff),
             ));
         // Track I-a — cascade expiry to signer rows under any expired envelope.
         // Idempotent: only non-terminal signers under an 'expired' envelope are
@@ -519,7 +521,7 @@ export class AgreementService {
         const expiredRows = await db.select().from(agreementRequests)
             .where(and(
                 eq(agreementRequests.status, 'expired'),
-                sql`${agreementRequests.sentAt} < ${cutoffMs}`,
+                lt(agreementRequests.sentAt, cutoff),
             ));
         const count = expiredRows.length;
         logger.info('AgreementService.expireOlderThan', { days, count });

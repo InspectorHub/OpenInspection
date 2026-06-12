@@ -1,7 +1,10 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { AutomationService } from './services/automation.service';
+import { maybeMetering } from './services/metering.service';
 import { AgreementService } from './services/agreement.service';
+import { buildTenantEmailService } from './lib/email/build-email-service';
+import type { EmailServiceEnv } from './lib/email/build-email-service';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
 import { qboConnections } from './lib/db/schema/qbo';
@@ -10,6 +13,7 @@ import type { SyncEnvelope } from './lib/sync-events/envelope';
 
 export interface ScheduledEnv {
     DB: D1Database;
+    APP_MODE?: string;
     PHOTOS?: R2Bucket;
     RESEND_API_KEY?: string;
     SENDER_EMAIL?: string;
@@ -119,7 +123,7 @@ export async function scheduled(
     // 3a. Track J — enqueue inspection.reminder logs (no email key needed to enqueue;
     //     the flush below sends due ones). Idempotent per (rule, inspection).
     try {
-        const svc = new AutomationService(env.DB);
+        const svc = new AutomationService(env.DB, undefined, undefined, maybeMetering(env));
         const n = await svc.enqueueReminders(Date.now());
         if (n > 0) logger.info('[cron] enqueued inspection reminders', { count: n });
     } catch (e) {
@@ -130,7 +134,7 @@ export async function scheduled(
     //    when RESEND_API_KEY is empty; SMS logs resolve their own per-tenant Twilio
     //    creds (platform env or tenant own) via the runtime built from env below.
     try {
-        const svc = new AutomationService(env.DB);
+        const svc = new AutomationService(env.DB, undefined, undefined, maybeMetering(env));
         const sms = (env.TENANT_CACHE && env.JWT_SECRET)
             ? {
                 resolveCreds: (tenantId: string) =>
@@ -145,8 +149,7 @@ export async function scheduled(
               }
             : null;
         await svc.flush(
-            env.RESEND_API_KEY || '',
-            env.SENDER_EMAIL || '',
+            (tid) => buildTenantEmailService(env as EmailServiceEnv, tid),
             env.APP_NAME || 'OpenInspection',
             env.APP_BASE_URL || '',
             sms,
@@ -186,5 +189,27 @@ export async function scheduled(
         }
     } catch (e) {
         logger.error('[cron] retention sweep failed', {}, e instanceof Error ? e : undefined);
+    }
+
+    // 7. Daily R2 usage measurement (03:00–03:05 UTC window fires once/day on the
+    //    */5 cron). Writes r2_bytes gauge per tenant via MeteringService. Runs in
+    //    every mode — standalone simply has one tenant in the table, so it records a
+    //    single whole-instance measurement, populating the /settings/usage Storage
+    //    figure everywhere.
+    {
+        const now = new Date();
+        if (now.getUTCHours() === 3 && now.getUTCMinutes() < 5) {
+            try {
+                const { drizzle: drizzleR2 } = await import('drizzle-orm/d1');
+                const { tenants } = await import('./lib/db/schema/tenant');
+                const { MeteringService } = await import('./services/metering.service');
+                const { R2UsageService } = await import('./services/r2-usage.service');
+                const ids = (await drizzleR2(env.DB).select({ id: tenants.id }).from(tenants).all()).map(r => r.id);
+                await new R2UsageService(env.PHOTOS!, new MeteringService(env.DB)).measureAll(ids);
+                logger.info('[usage] R2 measurement complete', { tenants: ids.length });
+            } catch (err) {
+                logger.error('[usage] R2 measurement failed', {}, err instanceof Error ? err : undefined);
+            }
+        }
     }
 }

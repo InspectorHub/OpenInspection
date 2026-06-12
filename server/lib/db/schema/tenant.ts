@@ -11,7 +11,11 @@ export const tenants = sqliteTable('tenants', {
     maxUsers: integer('max_users').notNull().default(5),
     deploymentMode: text('deployment_mode').notNull().default('shared'), // shared, silo
     // Design System 0520 subsystem E P8 — optional InterNACHI inspector
-    // certification number, rendered in the TeamCredit report footer.
+    // certification number, intended for the TeamCredit report footer.
+    // NOTE (2026-06-11, schema-cleanup): accepted by admin.schema.ts input
+    // validation but NEVER persisted or read anywhere — unwired since
+    // introduction. Either wire a writer/reader or retire the column + the
+    // validation field. Do not assume it holds data.
     nachiNumber: text('nachi_number'),
     // A-21 — high-water mark of the portal→core command sequence applied to
     // this tenant (envelope `tenantseq`). The cmd consumer drops any command
@@ -67,8 +71,14 @@ export const users = sqliteTable('users', {
     role: text('role').notNull().default('admin'),
     googleRefreshToken: text('google_refresh_token'),
     googleCalendarId: text('google_calendar_id'),
+    // -- DEAD (2026-06-11, schema-cleanup): the OAuth flow only persists/reads
+    // google_refresh_token (access tokens are re-minted on demand). These two
+    // columns have zero reads/writes across server, app, and packages. Frozen
+    // (D1 can't drop columns on the FK-referenced users table). Do not read/write.
     googleAccessToken: text('google_access_token'),
     googleTokenExpiry: integer('google_token_expiry'),
+    // -- DEAD (2026-06-11, schema-cleanup): never read or written. The codebase
+    // uses Intl/toLocaleString locale APIs, not this column. Frozen. Do not reuse.
     locale: text('locale'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -106,6 +116,8 @@ export const users = sqliteTable('users', {
     // magic-link signup. Nullable: NULL for pre-migration users and for
     // teammates who join via team invite (only the tenant owner answers
     // the role survey at signup).
+    // -- DEAD (2026-06-11, schema-cleanup): zero reads/writes across the repo.
+    // The signup ICP signal was never wired to a writer. Frozen. Do not reuse.
     signupRole:           text('signup_role'),
     // Account soft-delete marker — set by POST /api/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
@@ -145,7 +157,8 @@ export const syncOutbox = sqliteTable('sync_outbox', {
     id:           text('id').primaryKey(),
     eventType:    text('event_type').notNull(),
     payload:      text('payload').notNull(),
-    status:       text('status').notNull().default('pending'),
+    // Schema Rules: state-machine column declares its enum (type-layer only).
+    status:       text('status', { enum: ['pending', 'published', 'failed'] }).notNull().default('pending'),
     attempts:     integer('attempts').notNull().default(0),
     createdAt:    integer('created_at').notNull(),
     lastTriedAt:  integer('last_tried_at'),
@@ -161,6 +174,9 @@ export const syncOutbox = sqliteTable('sync_outbox', {
 export const slugReservations = sqliteTable('slug_reservations', {
     slug: text('slug').primaryKey(),
     reason: text('reason').notNull(),
+    // -- DEAD (2026-06-11, schema-cleanup): write-only seed column, never read
+    // by any lookup (reservations are checked by slug PK presence alone).
+    // Retained because it is NOT NULL and populated by the seed migration.
     blockedAt: integer('blocked_at').notNull(),
 });
 
@@ -193,7 +209,8 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     email: text('email').notNull(),
     role: text('role').notNull().default('inspector'),
-    status: text('status').notNull().default('pending'),
+    // Schema Rules: state-machine column declares its enum (type-layer only).
+    status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
     // Design System 0520 subsystem C P5 — carry apprentice mentor +
     // specialist section assignment from the InviteSeatModal into the
@@ -307,6 +324,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     enablePdfPipeline: integer('enable_pdf_pipeline', { mode: 'boolean' }).notNull().default(false),
     // Spec 5H D2 — tenant-default for newly-created inspections'
     // auto_sign_on_publish flag. False by default.
+    // -- DEAD (2026-06-11, schema-cleanup): zero reads/writes across the repo —
+    // the auto-sign-on-publish default was never wired to a reader. Frozen
+    // (tenant_configs is FK-referenced; D1 can't drop). Do not reuse the name.
     autoSignOnPublishDefault: integer('auto_sign_on_publish_default', { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
     teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
@@ -379,7 +399,8 @@ export const agentTenantLinks = sqliteTable('agent_tenant_links', {
     // Optional pointer to the contacts row this link was promoted from. NULL
     // when the agent self-signed-up before the inspector added them as a contact.
     inspectorContactId:  text('inspector_contact_id'),
-    status:              text('status').notNull().default('active'), // pending | active | revoked
+    // Schema Rules: state-machine column declares its enum (type-layer only).
+    status:              text('status', { enum: ['pending', 'active', 'revoked'] }).notNull().default('active'),
     invitedByUserId:     text('invited_by_user_id'),
     createdAt:           integer('created_at', { mode: 'timestamp' }).notNull(),
     revokedAt:           integer('revoked_at', { mode: 'timestamp' }),

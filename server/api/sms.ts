@@ -37,6 +37,7 @@ import { normalizeE164 } from '../lib/sms/phone';
 import { validateTwilioSignature, sendTwilioSms } from '../lib/sms/send-sms';
 import { loadTwilioForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
 import { loadTenantSecrets } from '../lib/secrets-cache';
+import { maybeMetering } from '../services/metering.service';
 import {
     SmsOptinResolveSchema, SmsOptinConfirmSchema, SmsAttestSchema, SmsTestSendSchema, SmsConsentQuerySchema,
 } from '../lib/validations/sms.schema';
@@ -295,6 +296,13 @@ export const smsAdminRoutes = createApiRouter()
         if (!creds) return c.json({ success: false, error: 'SMS is not configured. Set your Twilio credentials first.' }, 200);
 
         const res = await sendTwilioSms(creds, normalized, 'This is a test message from your inspection company. SMS is configured correctly.');
+        if (res.ok) {
+            const metering = maybeMetering(c.env);
+            if (metering) {
+                const { currentPeriodKey } = await import('../lib/usage/period');
+                await metering.record(tenantId, 'sms', currentPeriodKey(new Date())).catch(() => {});
+            }
+        }
         auditFromContext(c, 'sms.test_send', 'tenant', { metadata: { ok: res.ok } });
         return res.ok ? c.json({ success: true }, 200) : c.json({ success: false, error: res.error }, 200);
     })

@@ -54,13 +54,13 @@ describe('GuestInviteService (subsystem C P6)', () => {
 
     it('claim returns over_quota when tenant at cap', async () => {
         const minted = await svc.mint(TENANT, { role: 'lead', durationSeconds: 86_400, createdBy: 'u-admin' });
-        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 0 });
+        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 0, enforceSeatQuota: true });
         expect(out.kind).toBe('over_quota');
     });
 
     it('claim creates user with role + expires_at when under quota', async () => {
         const minted = await svc.mint(TENANT, { role: 'specialist', durationSeconds: 3600, createdBy: 'u-admin' });
-        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10 });
+        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10, enforceSeatQuota: true });
         expect(out.kind).toBe('ok');
         if (out.kind === 'ok') {
             const user = await testDb.select().from(schema.users).where(eq(schema.users.id, out.userId)).get();
@@ -70,26 +70,26 @@ describe('GuestInviteService (subsystem C P6)', () => {
     });
 
     it('claim returns not_found for unknown token', async () => {
-        const out = await svc.claim('not-a-token', { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10 });
+        const out = await svc.claim('not-a-token', { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10, enforceSeatQuota: true });
         expect(out.kind).toBe('not_found');
     });
 
     it('claim returns claimed when token already used', async () => {
         const minted = await svc.mint(TENANT, { role: 'lead', durationSeconds: 86_400, createdBy: 'u-admin' });
-        await svc.claim(minted.token, { name: 'A', email: 'a@x', password: 'pw01234567' }, { maxUsers: 10 });
-        const out = await svc.claim(minted.token, { name: 'B', email: 'b@x', password: 'pw01234567' }, { maxUsers: 10 });
+        await svc.claim(minted.token, { name: 'A', email: 'a@x', password: 'pw01234567' }, { maxUsers: 10, enforceSeatQuota: true });
+        const out = await svc.claim(minted.token, { name: 'B', email: 'b@x', password: 'pw01234567' }, { maxUsers: 10, enforceSeatQuota: true });
         expect(out.kind).toBe('claimed');
     });
 
     it('claim returns expired past expiry', async () => {
         const minted = await svc.mint(TENANT, { role: 'lead', durationSeconds: -1, createdBy: 'u-admin' });
-        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10 });
+        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10, enforceSeatQuota: true });
         expect(out.kind).toBe('expired');
     });
 
     it('claim rejects short passwords (min length enforced)', async () => {
         const minted = await svc.mint(TENANT, { role: 'lead', durationSeconds: 86_400, createdBy: 'u-admin' });
-        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'short' }, { maxUsers: 10 });
+        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'short' }, { maxUsers: 10, enforceSeatQuota: true });
         expect(out.kind).toBe('invalid');
     });
 
@@ -106,7 +106,7 @@ describe('GuestInviteService (subsystem C P6)', () => {
         const minted = await svc.mint(TENANT, { role: 'specialist', durationSeconds: 3600, createdBy: 'u-admin' });
         const info = await svc.getInviteInfo(minted.token);
         expect(info?.role).toBe('specialist');
-        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10 });
+        const out = await svc.claim(minted.token, { name: 'G', email: 'g@x', password: 'pw01234567' }, { maxUsers: 10, enforceSeatQuota: true });
         expect(out.kind).toBe('ok');
     });
 

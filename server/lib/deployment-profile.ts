@@ -26,6 +26,7 @@ export interface DeploymentProfile {
 
     hasBilling: boolean;
     hasSeatQuota: boolean;
+    hasUsageQuota: boolean;
     billingPortalUrl: string | null;
     /** Base URL the browser is sent to for saas login-bounce + "Switch workspace".
      *  Derived from PORTAL_API_URL (trailing slash stripped); null in standalone. */
@@ -43,7 +44,7 @@ const FIXED_TENANT_FALLBACK = '00000000-0000-0000-0000-000000000000';
 export const STANDALONE_PROFILE: DeploymentProfile = {
     mode: 'standalone',
     fixedTenantId: FIXED_TENANT_FALLBACK,
-    hasBilling: false, hasSeatQuota: false, billingPortalUrl: null,
+    hasBilling: false, hasSeatQuota: false, hasUsageQuota: false, billingPortalUrl: null,
     loginRedirectBase: null,
     hasSetupWizard: true,
     aiDevMockFallback: true,
@@ -53,7 +54,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
 export const SAAS_PROFILE: DeploymentProfile = {
     mode: 'saas',
     fixedTenantId: null,
-    hasBilling: true, hasSeatQuota: true, billingPortalUrl: null,
+    hasBilling: true, hasSeatQuota: true, hasUsageQuota: true, billingPortalUrl: null,
     loginRedirectBase: null,
     hasSetupWizard: false,
     aiDevMockFallback: false,

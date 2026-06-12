@@ -79,7 +79,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
 
     // One place decides own-vs-platform Resend + branded renderer, shared with
     // non-request contexts (workflows/scheduled) via assembleTenantEmailService.
-    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg);
+    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg, c.get('tenantId'));
 
     // Build the core->portal outbox sink, gated on the SYNC_QUEUE producer
     // binding — the transport itself. No queue → no sink → append() no-ops:

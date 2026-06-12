@@ -8,6 +8,10 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../server/services/automation.service';
 import { SmsConsentService } from '../../server/services/sms-consent.service';
+import type { EmailService } from '../../server/services/email.service';
+
+// Stub emailFor factory: returns a no-op EmailService (SMS tests don't exercise the email path).
+const stubEmailFor = async (_tid: string) => ({ sendEmail: async () => ({ delivered: true }) } as unknown as EmailService);
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 let db: BetterSQLite3Database<typeof schema>;
@@ -60,7 +64,7 @@ describe('flush() — SMS branch (Track L)', () => {
 
     it('client SMS without consent → skipped', async () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
-        await svc.flush('', '', 'Acme', 'https://acme.example.com', smsRuntime);
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
         const r = await statusOf(logId);
         expect(r?.status).toBe('skipped');
         expect(r?.error).toMatch(/consent/);
@@ -70,7 +74,7 @@ describe('flush() — SMS branch (Track L)', () => {
     it('client SMS with granted consent → sent via Twilio', async () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
-        await svc.flush('', '', 'Acme', 'https://acme.example.com', smsRuntime);
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
         expect((await statusOf(logId))?.status).toBe('sent');
         const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
         expect(url).toContain('/Accounts/ACx/Messages.json');
@@ -80,7 +84,7 @@ describe('flush() — SMS branch (Track L)', () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         smsRuntime.resolveCreds.mockResolvedValueOnce(null);
-        await svc.flush('', '', 'Acme', 'https://acme.example.com', smsRuntime);
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
         expect((await statusOf(logId))?.status).toBe('skipped');
         expect((await statusOf(logId))?.error).toMatch(/not configured/);
         expect(fetch).not.toHaveBeenCalled();
@@ -123,17 +127,16 @@ describe('flush() — derived reminder due-time (Track L Step 3b)', () => {
         // today@09:00Z, which is in the future until 09:00 UTC passes.
         const today = new Date().toISOString().slice(0, 10);
         const logId = await seedReminder(today);
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         // today@09:00Z − 1440min(=1 day) = yesterday@09:00Z ≤ now → always due → sent.
+        // Email now routes through stubEmailFor (not raw fetch), so we verify status only.
         expect((await statusOf(logId))?.status).toBe('sent');
-        expect(fetch).toHaveBeenCalledTimes(1);
     });
 
     it('leaves a reminder pending when its DERIVED due is in the future (date two weeks out)', async () => {
         const twoWeeks = new Date(Date.now() + 14 * 24 * 3600_000).toISOString().slice(0, 10);
         const logId = await seedReminder(twoWeeks);
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         expect((await statusOf(logId))?.status).toBe('pending');
-        expect(fetch).not.toHaveBeenCalled();
     });
 });

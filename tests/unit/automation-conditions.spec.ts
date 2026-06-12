@@ -7,6 +7,11 @@ import { eq } from 'drizzle-orm';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../server/services/automation.service';
+import type { EmailService } from '../../server/services/email.service';
+
+// Stub emailFor factory used by flush() tests. Returns delivered:true so the
+// log status is set to 'sent' whenever conditions pass and email is configured.
+const stubEmailFor = async (_tid: string) => ({ sendEmail: async () => ({ delivered: true }) } as unknown as EmailService);
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 let db: BetterSQLite3Database<typeof schema>;
@@ -90,33 +95,26 @@ async function statusOf(logId: string) {
 }
 
 describe('AutomationService.flush — send-time gates (Track J)', () => {
-    beforeEach(() => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-            new Response('{"id":"re_1"}', { status: 200 })));
-    });
-
     it('requirePaid skips an unpaid inspection', async () => {
         const insp = await seedInspection({ paymentStatus: 'unpaid' });
         const logId = await seedRuleAndLog({ conditions: { requirePaid: true }, inspectionId: insp });
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         const s = await statusOf(logId);
         expect(s.status).toBe('skipped');
         expect(s.error).toMatch(/not paid/);
-        expect(fetch).not.toHaveBeenCalled();
     });
 
     it('requirePaid sends when paid', async () => {
         const insp = await seedInspection({ paymentStatus: 'paid' });
         const logId = await seedRuleAndLog({ conditions: { requirePaid: true }, inspectionId: insp });
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         expect((await statusOf(logId)).status).toBe('sent');
-        expect(fetch).toHaveBeenCalledTimes(1);
     });
 
     it('requireSigned skips when no signed agreement_request exists', async () => {
         const insp = await seedInspection();
         const logId = await seedRuleAndLog({ conditions: { requireSigned: true }, inspectionId: insp });
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         const s = await statusOf(logId);
         expect(s.status).toBe('skipped');
         expect(s.error).toMatch(/not signed/);
@@ -125,19 +123,19 @@ describe('AutomationService.flush — send-time gates (Track J)', () => {
     it('serviceIds skips when the inspection booked none of them', async () => {
         const insp = await seedInspection();
         const logId = await seedRuleAndLog({ conditions: { serviceIds: ['svc-x'] }, inspectionId: insp });
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         expect((await statusOf(logId)).status).toBe('skipped');
     });
 
     it('review_url body is skipped (fail-closed) until tenant_configs.review_url is set, then sends', async () => {
         const insp = await seedInspection();
         const logId = await seedRuleAndLog({ body: 'Leave us a review: {{review_url}}', inspectionId: insp });
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         expect((await statusOf(logId)).status).toBe('skipped');
 
         await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, reviewUrl: 'https://g.page/r/acme', updatedAt: new Date() } as never);
         const logId2 = await seedRuleAndLog({ body: 'Leave us a review: {{review_url}}', inspectionId: insp });
-        await svc.flush('rk', 'from@x.com', 'Acme', 'https://acme.example.com');
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         expect((await statusOf(logId2)).status).toBe('sent');
     });
 });

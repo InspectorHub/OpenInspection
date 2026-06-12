@@ -116,12 +116,14 @@ describe('AgreementService', () => {
     });
 
     it('expireOlderThan marks pending/sent/viewed rows older than N days as expired', async () => {
-        const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
-        // Backdate sent_at to 20 days ago
+        const { requestId } = await svc.findOrCreate(TENANT_A, INSP_ID);
+        // Backdate sent_at to 20 days ago. Match by envelope id — agreement_requests.token
+        // is an internal random UUID, NOT the plaintext signer token findOrCreate returns,
+        // so a where(token) update matches nothing.
         const twentyDaysAgo = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
         await testDb.update(schema.agreementRequests)
             .set({ sentAt: twentyDaysAgo })
-            .where(eq(schema.agreementRequests.token, token));
+            .where(eq(schema.agreementRequests.id, requestId));
         const count = await svc.expireOlderThan(14);
         expect(count).toBe(1);
         const after = await testDb.select().from(schema.agreementRequests).all();

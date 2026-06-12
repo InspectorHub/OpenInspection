@@ -55,5 +55,6 @@ export type { TagsApi }               from '../../server/api/tags';
 export type { TeamApi }               from '../../server/api/team';
 export type { TemplateMigrationsApi } from '../../server/api/template-migrations';
 export type { TenantPresenceApi }     from '../../server/api/tenant-presence';
+export type { UsageApi }              from '../../server/api/usage';
 export type { UsersApi }              from '../../server/api/users';
 export type { WidgetApi }             from '../../server/api/widget';

@@ -12,6 +12,8 @@ import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
 import { requireServiceBinding } from './service-binding-guard';
+import { aggregateUsage } from '../lib/usage/aggregate';
+import { usageCounters } from '../lib/db/schema/usage';
 
 const api = new Hono<HonoConfig>();
 
@@ -311,6 +313,22 @@ api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
     return c.json({ success: true, data: report });
     } catch (error: unknown) {
         logger.error('secrets reencrypt failed', {}, error instanceof Error ? error : undefined);
+        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
+    }
+});
+
+/**
+ * GET /api/integration/usage
+ * Platform monitoring: aggregated usage counters across all tenants.
+ * Returns raw sms/email cumulative sums and r2_bytes gauge per tenant.
+ * M2M-guarded by the router mount (requireServiceBinding inherited).
+ */
+api.get('/usage', requireServiceBinding, async (c) => {
+    try {
+        const rows = await drizzle(c.env.DB).select().from(usageCounters).all();
+        return c.json({ success: true, data: aggregateUsage(rows) });
+    } catch (error: unknown) {
+        logger.error('usage aggregation failed', {}, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
     }
 });

@@ -131,6 +131,7 @@ export default [
       route("settings/booking", "routes/settings-booking.tsx"),
       route("settings/catalog/booking", "routes/settings-catalog-booking.tsx"),
       route("settings/billing", "routes/settings-billing.tsx"),
+      route("settings/usage", "routes/settings-usage.tsx"),
       route("settings/security", "routes/settings-security.tsx"),
     ]),
     route("comments", "routes/comments.tsx"),

@@ -39,6 +39,12 @@ export interface ClaimIdentity {
 export interface ClaimContext {
     /** Tenant's seat quota — passed in by the route via portal M2M sync. */
     maxUsers: number;
+    /**
+     * Whether to enforce the seat cap.  Set to `profile.hasSeatQuota` (true in
+     * SaaS, false in standalone).  When false the quota check is skipped
+     * entirely so self-hosted deployments are genuinely unlimited.
+     */
+    enforceSeatQuota: boolean;
     /** Optional terms-acceptance blob (env-gated: set only when TERMS_URL/PRIVACY_URL configured). */
     termsAccepted?: { at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string };
 }
@@ -165,16 +171,21 @@ export class GuestInviteService {
         if (invite.claimedByUserId) return { kind: 'claimed' };
         if (invite.expiresAt < Math.floor(Date.now() / 1000)) return { kind: 'expired' };
 
-        // Quota check — defer to the shared computeSeatsUsed helper so
-        // permanent members + active guests are counted the same way
-        // here, in the seat-guard middleware, and on the billing summary.
-        const tenantUsers = await db.select({ id: users.id, expiresAt: users.expiresAt })
-            .from(users)
-            .where(eq(users.tenantId, invite.tenantId))
-            .all();
-        const used = computeSeatsUsed(tenantUsers, Math.floor(Date.now() / 1000));
-        if (used >= ctx.maxUsers) {
-            return { kind: 'over_quota' };
+        // Quota check — only enforced when ctx.enforceSeatQuota is true (SaaS).
+        // Standalone deployments set enforceSeatQuota=false so self-hosted users
+        // are genuinely unlimited and never silently capped at max_users.
+        if (ctx.enforceSeatQuota) {
+            // Defer to the shared computeSeatsUsed helper so permanent members
+            // + active guests are counted the same way here, in the seat-guard
+            // middleware, and on the billing summary.
+            const tenantUsers = await db.select({ id: users.id, expiresAt: users.expiresAt })
+                .from(users)
+                .where(eq(users.tenantId, invite.tenantId))
+                .all();
+            const used = computeSeatsUsed(tenantUsers, Math.floor(Date.now() / 1000));
+            if (used >= ctx.maxUsers) {
+                return { kind: 'over_quota' };
+            }
         }
 
         // Create user.
