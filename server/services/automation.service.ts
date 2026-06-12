@@ -9,6 +9,7 @@ import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { NotificationService } from './notification.service';
 import type { AgreementService } from './agreement.service';
+import { currentPeriodKey } from '../lib/usage/period';
 
 // Track L (D7) — default TCPA SMS opt-in disclosure (version 1). Seeded once by
 // ensureSeeds (SaaS) and the standalone raw-SQL path; kept identical in both.
@@ -28,7 +29,7 @@ interface TriggerContext {
 }
 
 export class AutomationService {
-    constructor(private db: D1Database, private notification?: NotificationService, private agreementService?: AgreementService) {}
+    constructor(private db: D1Database, private notification?: NotificationService, private agreementService?: AgreementService, private metering?: import('./metering.service').MeteringService) {}
 
     private getDrizzle() { return drizzle(this.db); }
 
@@ -623,6 +624,9 @@ export class AutomationService {
         if (res.ok) {
             await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date().toISOString() })
                 .where(eq(automationLogs.id, log.id));
+            try {
+                await this.metering?.record(tenant.id, 'sms', currentPeriodKey(new Date()));
+            } catch { /* metering must never break delivery */ }
         } else {
             await db.update(automationLogs).set({ status: 'failed', error: res.error })
                 .where(eq(automationLogs.id, log.id));

@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { AutomationService } from './services/automation.service';
+import { maybeMetering } from './services/metering.service';
 import { AgreementService } from './services/agreement.service';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
@@ -10,6 +11,7 @@ import type { SyncEnvelope } from './lib/sync-events/envelope';
 
 export interface ScheduledEnv {
     DB: D1Database;
+    APP_MODE?: string;
     PHOTOS?: R2Bucket;
     RESEND_API_KEY?: string;
     SENDER_EMAIL?: string;
@@ -119,7 +121,7 @@ export async function scheduled(
     // 3a. Track J — enqueue inspection.reminder logs (no email key needed to enqueue;
     //     the flush below sends due ones). Idempotent per (rule, inspection).
     try {
-        const svc = new AutomationService(env.DB);
+        const svc = new AutomationService(env.DB, undefined, undefined, maybeMetering(env));
         const n = await svc.enqueueReminders(Date.now());
         if (n > 0) logger.info('[cron] enqueued inspection reminders', { count: n });
     } catch (e) {
@@ -130,7 +132,7 @@ export async function scheduled(
     //    when RESEND_API_KEY is empty; SMS logs resolve their own per-tenant Twilio
     //    creds (platform env or tenant own) via the runtime built from env below.
     try {
-        const svc = new AutomationService(env.DB);
+        const svc = new AutomationService(env.DB, undefined, undefined, maybeMetering(env));
         const sms = (env.TENANT_CACHE && env.JWT_SECRET)
             ? {
                 resolveCreds: (tenantId: string) =>
