@@ -76,6 +76,7 @@ import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
+import contractorTypesRoutes from './api/contractor-types';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionRequestsRoutes from './api/inspection-requests';
@@ -501,6 +502,7 @@ const routes = app
   // Import sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/contacts', contactsImportRoutes)
   .route('/api/recommendations', recommendationsRoutes)
+  .route('/api/contractor-types', contractorTypesRoutes)
   .route('/api/rating-systems', ratingSystemsRoutes)
   .route('/api', eventsRoutes)
   .route('/api/invoices', invoiceRoutes)
