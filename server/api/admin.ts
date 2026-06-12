@@ -2070,6 +2070,10 @@ export const adminRoutes = createApiRouter()
             searchKeywords: comments.searchKeywords,
             libraryId:      comments.libraryId,
             severity:       comments.severity,
+            repairSummary:               comments.repairSummary,
+            estimateMinCents:            comments.estimateMinCents,
+            estimateMaxCents:            comments.estimateMaxCents,
+            recommendedContractorTypeId: comments.recommendedContractorTypeId,
             createdAt:      comments.createdAt,
             useCount:       commentUsage.useCount,
             lastUsedAt:     commentUsage.lastUsedAt,
@@ -2128,6 +2132,10 @@ export const adminRoutes = createApiRouter()
             searchKeywords: null as string | null,
             itemLabel: null as string | null,
             severity: null as string | null,
+            repairSummary: null as string | null,
+            estimateMinCents: null as number | null,
+            estimateMaxCents: null as number | null,
+            recommendedContractorTypeId: null as string | null,
             createdAt: new Date(),
         };
         await db.insert(comments).values(row);
