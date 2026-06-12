@@ -29,7 +29,6 @@ export {
 } from './inspection';
 export { commercialSubtypes } from './commercial-subtypes';
 export { contacts } from './contact';
-export { recommendations } from './recommendation';
 export { contractorTypes } from './contractor-types';
 export { invoices } from './invoice';
 export {
