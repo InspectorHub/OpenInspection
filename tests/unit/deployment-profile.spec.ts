@@ -79,4 +79,9 @@ describe('getDeploymentProfile factory', () => {
         const profile = getDeploymentProfile(env);
         expect(profile.billingPortalUrl).toBeNull();
     });
+
+    it('exposes hasUsageQuota: false standalone, true saas', () => {
+        expect(getDeploymentProfile({ APP_MODE: undefined } as any).hasUsageQuota).toBe(false);
+        expect(getDeploymentProfile({ APP_MODE: 'saas', PORTAL_API_URL: 'https://p' } as any).hasUsageQuota).toBe(true);
+    });
 });
