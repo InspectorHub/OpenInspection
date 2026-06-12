@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { z } from 'zod';
 import { ContractorTypeService } from '../../server/services/contractor-type.service';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
@@ -34,5 +35,26 @@ describe('ContractorTypeService', () => {
     await svc.delete(a.id, T);
     list = await svc.listByTenant(T);
     expect(list.map(x => x.name)).toEqual(['Licensed Electrician']);
+  });
+
+  it('updates and deletes rows whose id is a bare-hex (migration-seeded) id, not a UUID', async () => {
+    // Migration 0030 back-fills existing tenants with ids from lower(hex(randomblob(16))):
+    // a 32-char bare-hex string with no dashes — NOT a valid UUID. The route param schema
+    // must therefore accept min(1) strings, never z.string().uuid(), or PATCH/DELETE 400s.
+    const bareHexId = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+    expect(bareHexId).toMatch(/^[0-9a-f]{32}$/);
+    expect(z.string().uuid().safeParse(bareHexId).success).toBe(false);
+    expect(z.string().min(1).safeParse(bareHexId).success).toBe(true);
+
+    await testDb.insert(schema.contractorTypes).values({
+      id: bareHexId, tenantId: T, name: 'Roofer', sortOrder: 1, createdAt: new Date(),
+    });
+
+    const updated = await svc.update(bareHexId, T, { name: 'Licensed Roofer' });
+    expect(updated.name).toBe('Licensed Roofer');
+
+    await svc.delete(bareHexId, T);
+    const list = await svc.listByTenant(T);
+    expect(list.find(x => x.id === bareHexId)).toBeUndefined();
   });
 });
