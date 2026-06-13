@@ -119,6 +119,10 @@ export const users = sqliteTable('users', {
     termsAccepted: text('terms_accepted', { mode: 'json' }).$type<{
         at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string;
     } | null>(),
+    // Role permission-template overrides (2026-06-13). Nullable JSON map of the
+    // four toggleable capabilities; absent/null = pure role template.
+    permissionOverrides: text('permission_overrides', { mode: 'json' })
+      .$type<import('../../auth/capabilities').PermissionOverrides | null>(),
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
     // DB-2: soft-deleted rows must not block re-inviting the same email.
