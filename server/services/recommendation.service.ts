@@ -22,12 +22,14 @@ export interface Recommendation {
     severity: 'satisfactory' | 'monitor' | 'defect';
     defaultEstimateMin: number | null; defaultEstimateMax: number | null;
     defaultRepairSummary: string; createdByUserId: string | null; createdAt: number | null;
+    recommendedContractorTypeId: string | null;
 }
 export interface CreateRecommendationInput {
     category?: string | null; name: string;
     severity: 'satisfactory' | 'monitor' | 'defect';
     defaultEstimateMin?: number | null; defaultEstimateMax?: number | null;
     defaultRepairSummary: string; createdByUserId?: string | null;
+    recommendedContractorTypeId?: string | null;
 }
 export type UpdateRecommendationInput = Partial<CreateRecommendationInput>;
 
@@ -41,6 +43,7 @@ function toRec(c: CommentRow): Recommendation {
         defaultEstimateMin: c.estimateMinCents ?? null,
         defaultEstimateMax: c.estimateMaxCents ?? null,
         defaultRepairSummary: c.repairSummary ?? '',
+        recommendedContractorTypeId: c.recommendedContractorTypeId ?? null,
         createdByUserId: null,
         createdAt: createdAt instanceof Date ? createdAt.getTime() : (createdAt ?? null),
     };
@@ -60,6 +63,7 @@ export class RecommendationService {
             repairSummary: input.defaultRepairSummary,
             estimateMinCents: input.defaultEstimateMin ?? null,
             estimateMaxCents: input.defaultEstimateMax ?? null,
+            recommendedContractorTypeId: input.recommendedContractorTypeId ?? null,
             createdAt: new Date(),
         };
         await db.insert(comments).values(row);
@@ -94,6 +98,7 @@ export class RecommendationService {
         if (patch.defaultEstimateMin !== undefined)   updates.estimateMinCents = patch.defaultEstimateMin ?? null;
         if (patch.defaultEstimateMax !== undefined)   updates.estimateMaxCents = patch.defaultEstimateMax ?? null;
         if (patch.defaultRepairSummary !== undefined) updates.repairSummary = patch.defaultRepairSummary;
+        if (patch.recommendedContractorTypeId !== undefined) updates.recommendedContractorTypeId = patch.recommendedContractorTypeId ?? null;
         await db.update(comments).set(updates).where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
         const refetched = await this.getById(id, tenantId);
         if (!refetched) throw Errors.Internal('Failed to read back updated recommendation');

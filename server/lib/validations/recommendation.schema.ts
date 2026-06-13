@@ -9,6 +9,7 @@ export const CreateRecommendationSchema = z.object({
     defaultEstimateMin:   z.number().int().nonnegative().nullable().optional().describe('TODO describe defaultEstimateMin field for the OpenInspection MCP integration'),
     defaultEstimateMax:   z.number().int().nonnegative().nullable().optional().describe('TODO describe defaultEstimateMax field for the OpenInspection MCP integration'),
     defaultRepairSummary: z.string().min(1).max(2000).describe('TODO describe defaultRepairSummary field for the OpenInspection MCP integration'),
+    recommendedContractorTypeId: z.string().nullable().optional().describe('Soft reference to contractor_types.id (no DB FK). Suggested contractor for this repair item.'),
 }).openapi('CreateRecommendation');
 
 export const UpdateRecommendationSchema = CreateRecommendationSchema.partial().openapi('UpdateRecommendation');
@@ -22,6 +23,7 @@ export const RecommendationSchema = z.object({
     defaultEstimateMin:   z.number().int().nullable().describe('TODO describe defaultEstimateMin field for the OpenInspection MCP integration'),
     defaultEstimateMax:   z.number().int().nullable().describe('TODO describe defaultEstimateMax field for the OpenInspection MCP integration'),
     defaultRepairSummary: z.string().describe('TODO describe defaultRepairSummary field for the OpenInspection MCP integration'),
+    recommendedContractorTypeId: z.string().nullable().describe('Soft reference to contractor_types.id; suggested contractor for this repair item.'),
     createdByUserId:      z.string().nullable().describe('TODO describe createdByUserId field for the OpenInspection MCP integration'),
     createdAt:            z.union([z.string(), z.date(), z.number()]).describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }).openapi('Recommendation');
