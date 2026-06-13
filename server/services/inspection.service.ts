@@ -2317,6 +2317,10 @@ export class InspectionService {
             theme: reportTheme,
             amendmentTrail,
             reinspection,
+            // DB-16 — resolved report cover image URL (cover_photo_id holds the
+            // R2 key of an attached/pool photo). null when the inspector has not
+            // picked a cover. The renderer consumes this directly.
+            coverPhotoUrl: inspection.coverPhotoId ? makePhotoUrl(inspection.coverPhotoId) : null,
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
             sections,
             ratingLevels: levels.length > 0 ? levels : [
