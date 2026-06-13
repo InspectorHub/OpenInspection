@@ -417,6 +417,12 @@ export const ReportItemSchema = z.object({
   recommendation: z.string().nullable().optional().describe('TODO describe recommendation field for the OpenInspection MCP integration'),
   estimateMin: z.number().nullable().optional().describe('TODO describe estimateMin field for the OpenInspection MCP integration'),
   estimateMax: z.number().nullable().optional().describe('TODO describe estimateMax field for the OpenInspection MCP integration'),
+  repairItems: z.array(z.object({
+    summary: z.string(),
+    estimateMin: z.number().nullable(),
+    estimateMax: z.number().nullable(),
+    contractorType: z.string().nullable(),
+  })).optional().describe('Attached repair items snapshotted on this finding (dollars, not cents).'),
 }).openapi('ReportItem');
 
 export const ReportSectionSchema = z.object({

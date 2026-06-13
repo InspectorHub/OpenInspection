@@ -44,6 +44,22 @@ export interface CustomCommentEntry {
   photos?: Array<{ key: string }>;
 }
 
+/**
+ * Task 6 — a repair item (Recommendation) snapshotted onto a finding. Stored
+ * under `result.recommendations[]`. The aggregate read endpoint
+ * (`GET /api/inspections/:id/recommendations`) and offline diff3 union both key
+ * on `recommendationId`. Estimate/summary/contractor are snapshotted at attach
+ * time so later catalog edits never silently rewrite a published finding.
+ */
+export interface AttachedRepairItem {
+  recommendationId: string;
+  estimateSnapshotMin: number | null;
+  estimateSnapshotMax: number | null;
+  summarySnapshot: string;
+  contractorTypeSnapshot: string | null;
+  attachedAt: number;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Pure helpers                                                       */
 /* ------------------------------------------------------------------ */
@@ -632,6 +648,75 @@ export function useFindings(
     [results, setResults, fetcher, setDirty, setSaveStatus, tryEnqueueOffline],
   );
 
+  /* ---------------------------------------------------------------- */
+  /*  Repair items (Task 6)                                           */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Attach a repair item to a finding (replace-or-append by recommendationId).
+   * Same persist-the-freshly-computed-map discipline as addPhotoToItem: we read
+   * the CURRENT entry from `results`, build the next blob, setResults(() => next)
+   * AND submit THAT `next` (never the closure's `results`, which would serialize
+   * the pre-attach array and silently drop the new item).
+   */
+  const attachRepairItem = useCallback(
+    (itemId: string, snap: AttachedRepairItem) => {
+      const sid = sectionIdForItem(itemId);
+      if (!sid) return;
+      const key = fKey(sid, itemId);
+      const existing =
+        (results[key] as Record<string, unknown>) ||
+        (results[itemId] as Record<string, unknown>) ||
+        {};
+      const current = (existing.recommendations as AttachedRepairItem[]) || [];
+      const idx = current.findIndex((r) => r.recommendationId === snap.recommendationId);
+      const recommendations =
+        idx >= 0
+          ? current.map((r, i) => (i === idx ? snap : r))
+          : [...current, snap];
+      const updated = { ...existing, recommendations };
+      const next = { ...results, [key]: updated, [itemId]: updated };
+      setResults(() => next);
+      setDirty(true);
+      setSaveStatus("saving");
+      if (!tryEnqueueOffline("save-all", undefined, "results", next as Record<string, unknown>)) {
+        fetcher.submit(
+          { intent: "save-all", data: JSON.stringify(next) },
+          { method: "POST" },
+        );
+      }
+    },
+    [results, sectionIdForItem, setResults, fetcher, setDirty, setSaveStatus, tryEnqueueOffline],
+  );
+
+  /** Detach a repair item from a finding (filter out by recommendationId). */
+  const detachRepairItem = useCallback(
+    (itemId: string, recommendationId: string) => {
+      const sid = sectionIdForItem(itemId);
+      if (!sid) return;
+      const key = fKey(sid, itemId);
+      const existing =
+        (results[key] as Record<string, unknown>) ||
+        (results[itemId] as Record<string, unknown>) ||
+        {};
+      const current = (existing.recommendations as AttachedRepairItem[]) || [];
+      const recommendations = current.filter((r) => r.recommendationId !== recommendationId);
+      if (recommendations.length === current.length) return; // nothing to detach
+      const updated = { ...existing, recommendations };
+      const next = { ...results, [key]: updated, [itemId]: updated };
+      setResults(() => next);
+      setDirty(true);
+      setSaveStatus("saving");
+      if (!tryEnqueueOffline("save-all", undefined, "results", next as Record<string, unknown>)) {
+        fetcher.submit(
+          { intent: "save-all", data: JSON.stringify(next) },
+          { method: "POST" },
+        );
+      }
+    },
+    [results, sectionIdForItem, setResults, fetcher, setDirty, setSaveStatus, tryEnqueueOffline],
+  );
+
   return {
     getResult,
     setRating,
@@ -648,6 +733,8 @@ export function useFindings(
     getPhotoCount,
     addCustomDefect,
     toggleCustomDefect,
+    attachRepairItem,
+    detachRepairItem,
     debounceSave,
     saveNow,
   };

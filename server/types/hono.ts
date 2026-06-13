@@ -170,6 +170,7 @@ import { MessageService } from '../services/message.service';
 import { NotificationService } from '../services/notification.service';
 import { WidgetService } from '../services/widget.service';
 import { RecommendationService } from '../services/recommendation.service';
+import { ContractorTypeService } from '../services/contractor-type.service';
 import { EventService } from '../services/event.service';
 import { TotpService } from '../services/totp.service';
 import { TemplateSeedService } from '../services/template-seed.service';
@@ -217,6 +218,7 @@ export interface AppServices {
     notification: NotificationService;
     widget: WidgetService;
     recommendation: RecommendationService;
+    contractorType: ContractorTypeService;
     event: EventService;
     totp: TotpService;
     templateSeed: TemplateSeedService;

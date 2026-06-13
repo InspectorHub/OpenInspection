@@ -1,6 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-gate";
 import { createApi } from "~/lib/api-client.server";
+import { ErrorState } from "~/components/ErrorState";
 import { brandTokens } from "~/lib/brand";
 
 export function meta() {
@@ -84,9 +85,10 @@ export default function ReportGatePage() {
 
   if (error || !gate) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-ih-fg-3">Report not found.</p>
-      </div>
+      <ErrorState
+        title="Report not found"
+        message="This report link is invalid or has expired. Please contact your inspector for an up-to-date link."
+      />
     );
   }
 

@@ -13,7 +13,7 @@ export const VALID_TAGS = [
     'auth', 'inspections', 'bookings', 'templates', 'team',
     'agents', 'ai', 'invoices', 'services', 'messages',
     'notifications', 'contacts', 'metrics', 'admin', 'sysadmin',
-    'audit', 'marketplace', 'recommendations', 'agreements', 'webhooks',
+    'audit', 'marketplace', 'recommendations', 'contractor-types', 'agreements', 'webhooks',
     'public', 'calendar', 'tags', 'ratings', 'guest',
     'profile', 'identity', 'automations', 'integrations', 'qbo',
     'sms',

@@ -3,6 +3,8 @@ import { TabStrip } from "@core/shared-ui";
 import { CloneLastButton } from "./CloneLastButton";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
+import { RepairItemsPanel } from "./RepairItemsPanel";
+import type { AttachedRepairItem } from "../../hooks/useFindings";
 import type { ItemAttribute } from "../../lib/types";
 import { renderTemplate } from "../../lib/mustache";
 import { shouldTriggerSlash } from "../../lib/slash-trigger";
@@ -143,6 +145,12 @@ interface ItemEditorProps {
   * Rendered in the photo strip after confirmed server photos.
   */
  queuedPreviews?: Array<{ name: string; objectUrl: string }>;
+ /** Task 6 — repair items already snapshotted onto this finding. */
+ attachedRepairItems?: AttachedRepairItem[];
+ /** Task 6 — attach a repair item to this item (snapshots estimate + contractor). */
+ onAttachRepairItem?: (itemId: string, snap: AttachedRepairItem) => void;
+ /** Task 6 — detach a repair item from this item by recommendationId. */
+ onDetachRepairItem?: (itemId: string, recommendationId: string) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -176,6 +184,9 @@ export function ItemEditor({
  onSearchLibrary,
  onSaveDefectToLibrary,
  queuedPreviews,
+ attachedRepairItems,
+ onAttachRepairItem,
+ onDetachRepairItem,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -716,6 +727,16 @@ export function ItemEditor({
  )
  )}
  </>
+ )}
+
+ {/* Task 6 — attach repair items (snapshot estimate + contractor) to this
+ finding. Only on the Defects tab; only when the parent wires the callbacks. */}
+ {activeTab === "defects" && onAttachRepairItem && onDetachRepairItem && (
+ <RepairItemsPanel
+ attached={attachedRepairItems ?? []}
+ onAttach={(snap) => onAttachRepairItem(item.id, snap)}
+ onDetach={(rid) => onDetachRepairItem(item.id, rid)}
+ />
  )}
  </div>
  </div>

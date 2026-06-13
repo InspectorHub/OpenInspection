@@ -20,6 +20,7 @@ const PUBLIC_PREFIXES = [
     '/book/',
     '/embed/book/',
     '/inspector/',
+    '/report-view/',
     '/report/',
     '/sign/',
     '/agreements/sign/',

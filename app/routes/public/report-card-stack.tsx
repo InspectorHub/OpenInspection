@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
+import { getToken } from "~/lib/session.server";
+import { ErrorState } from "~/components/ErrorState";
 import { photoDisplayName, withDownload } from "~/lib/photo-name";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
@@ -39,6 +41,13 @@ interface ReportItem {
  recommendation?: string | null;
  estimateMin?: number | null;
  estimateMax?: number | null;
+ /** Task 8 — attached repair items snapshotted on this finding (dollars). */
+ repairItems?: {
+ summary: string;
+ estimateMin: number | null;
+ estimateMax: number | null;
+ contractorType: string | null;
+ }[];
  value?: unknown;
  unit?: string | null;
  /** FE-3/B-20 — resolved canned + custom defects (server emits both). */
@@ -80,7 +89,11 @@ interface LoaderResult {
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
  try {
- const api = createApi(context);
+ // Relay the owner's session JWT when present so the inspector/admin can
+ // preview their own report tokenlessly (resolveOwnerPreview server-side).
+ // Public client viewers carry no session → getToken returns null → unchanged.
+ const sessionToken = (await getToken(context, request)) ?? undefined;
+ const api = createApi(context, { token: sessionToken });
  const token = new URL(request.url).searchParams.get("token") ?? undefined;
  const [res, brand] = await Promise.all([
  api.publicReport.report[":tenant"][":id"].$get({
@@ -91,11 +104,18 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  ]);
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;
+ // getReportData nests property/inspector/date under `inspection` and names
+ // the theme `theme`. Read those (falling back to any top-level aliases) so the
+ // report header shows the real address + inspector instead of blanks.
+ const meta = d as unknown as {
+   inspection?: { propertyAddress?: string | null; date?: string | null; inspectorName?: string | null };
+   theme?: string;
+ } | undefined;
  return {
  inspectionId: d?.inspectionId ?? params.id ?? "",
- address: d?.address ?? "",
- date: d?.date ?? "",
- inspectorName: d?.inspectorName ?? null,
+ address: d?.address ?? meta?.inspection?.propertyAddress ?? "",
+ date: d?.date ?? meta?.inspection?.date ?? "",
+ inspectorName: d?.inspectorName ?? meta?.inspection?.inspectorName ?? null,
  stats: d?.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
  sections: d?.sections ?? [],
  showEstimates: d?.showEstimates ?? false,
@@ -105,7 +125,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  isDelivered: d?.isDelivered ?? false,
  brand,
  error: res.ok ? null : "Report not found",
- reportTheme: (d as unknown as Record<string, unknown>)?.reportTheme as string | undefined,
+ reportTheme: ((d as unknown as Record<string, unknown>)?.reportTheme as string | undefined) ?? meta?.theme,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -171,10 +191,16 @@ export default function ReportCardStackPage() {
  const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
 
  if (data.error) {
+ const notFound = data.error === "Report not found";
  return (
- <div className="min-h-screen flex items-center justify-center p-6">
- <p className="text-ih-fg-3">{data.error}</p>
- </div>
+ <ErrorState
+ title={notFound ? "Report not found" : "Report unavailable"}
+ message={
+ notFound
+ ? "This report link is invalid or has expired. Please contact your inspector for an up-to-date link."
+ : "We couldn't load this report right now. Please try again in a moment."
+ }
+ />
  );
  }
 
@@ -470,6 +496,24 @@ export default function ReportCardStackPage() {
  {item.estimateMax?.toLocaleString() ?? "?"}
  </span>
  )}
+ </div>
+ )}
+
+ {(item.repairItems?.length ?? 0) > 0 && (
+ <div className="mt-2 space-y-1.5">
+ {item.repairItems!.map((ri, i) => (
+ <div key={i} className="flex items-center gap-2 flex-wrap text-[12px]">
+ <span className="font-semibold text-ih-fg-2">{ri.summary}</span>
+ {ri.contractorType && (
+ <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg uppercase">{ri.contractorType}</span>
+ )}
+ {data.showEstimates && (ri.estimateMin != null || ri.estimateMax != null) && (
+ <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
+ ${ri.estimateMin?.toLocaleString() ?? "?"} – ${ri.estimateMax?.toLocaleString() ?? "?"}
+ </span>
+ )}
+ </div>
+ ))}
  </div>
  )}
 

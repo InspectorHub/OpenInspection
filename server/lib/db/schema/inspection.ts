@@ -381,6 +381,13 @@ export const comments = sqliteTable('comments', {
     // existing plural `itemLabels` which stores all matched labels.
     itemLabel: text('item_label'),
     severity: text('severity'),
+    // Comments-repair fold (2026-06-12): deficiency comments carry repair fields.
+    // Intended for rating_bucket='defect'; enforced in UI/validation, not DDL.
+    repairSummary:     text('repair_summary'),
+    estimateMinCents:  integer('estimate_min_cents'),
+    estimateMaxCents:  integer('estimate_max_cents'),
+    // Soft ref → contractor_types.id (no DB FK per schema rules). Stale ref acceptable.
+    recommendedContractorTypeId: text('recommended_contractor_type_id'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => [
     index('idx_comments_tenant').on(t.tenantId),

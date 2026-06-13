@@ -28,6 +28,7 @@ import { MessageService } from '../../services/message.service';
 import { NotificationService } from '../../services/notification.service';
 import { WidgetService } from '../../services/widget.service';
 import { RecommendationService } from '../../services/recommendation.service';
+import { ContractorTypeService } from '../../services/contractor-type.service';
 import { EventService } from '../../services/event.service';
 import { TotpService } from '../../services/totp.service';
 import { TemplateSeedService } from '../../services/template-seed.service';
@@ -230,6 +231,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'recommendation':
                     target.recommendation = new RecommendationService(c.env.DB);
+                    break;
+                case 'contractorType':
+                    target.contractorType = new ContractorTypeService(c.env.DB);
                     break;
                 case 'event':
                     target.event = new EventService(c.env.DB);

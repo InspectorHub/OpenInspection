@@ -57,6 +57,7 @@ describe('seedStarterContent', () => {
         expect(result.recommendationsSeeded).toBeGreaterThan(0);
         expect(result.ratingSystemsSeeded).toBeGreaterThan(0);
         expect(result.marketplaceLibrariesSeeded).toBeGreaterThan(0);
+        expect(result.contractorTypesSeeded).toBe(10);
     });
 
     it('is idempotent — calling twice does not duplicate rows', async () => {
@@ -74,6 +75,7 @@ describe('seedStarterContent', () => {
         expect(second.recommendationsSeeded).toBe(0);
         expect(second.ratingSystemsSeeded).toBe(0);
         expect(second.marketplaceLibrariesSeeded).toBe(0);
+        expect(second.contractorTypesSeeded).toBe(0);
     });
 
     it('agreement template content starts with bolded disclaimer', async () => {
@@ -115,5 +117,22 @@ describe('seedStarterContent', () => {
         expect(colorByName['Needs maintenance']).toBe('yellow');
         expect(colorByName['Cosmetic']).toBe('gray');
         expect(colorByName['Follow-up needed']).toBe('blue');
+    });
+
+    it('seeds the 10 standard contractor types in order', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await seedStarterContent({} as any, tenantId);
+        const rows = await testDb.select({ name: schema.contractorTypes.name, sortOrder: schema.contractorTypes.sortOrder })
+            .from(schema.contractorTypes)
+            .where(eq(schema.contractorTypes.tenantId, tenantId))
+            .all();
+        const ordered = rows
+            .sort((a, b) => (a.sortOrder as number) - (b.sortOrder as number))
+            .map(r => r.name as string);
+        expect(ordered).toEqual([
+            'Licensed Electrician', 'Plumber', 'Roofer', 'HVAC Technician',
+            'General Contractor', 'Structural Engineer', 'Foundation Specialist',
+            'Pest/Termite', 'Chimney Sweep', 'Grading/Drainage',
+        ]);
     });
 });

@@ -50,6 +50,7 @@ import {
 import { CreateTemplateSchema, UpdateTemplateSchema, TemplateSchemaV2Schema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { AggregatedRecommendationsResponseSchema } from '../lib/validations/recommendation.schema';
+import { aggregateAttachedRecommendations } from '../lib/aggregate-recommendations';
 import { UpdateMediaAnnotationsSchema } from '../lib/validations/media.schema';
 import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema';
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
@@ -2316,39 +2317,12 @@ export const inspectionsRoutes = createApiRouter()
     .openapi(aggregateRecommendationsRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
-         
+
         const db = drizzle(c.env.DB);
         const row = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
-        const data = (row?.data as Record<string, { recommendations?: Array<Record<string, unknown>> }>) ?? {};
-
-        const items: Array<{ recommendationId: string; estimateSnapshotMin: number | null; estimateSnapshotMax: number | null; summarySnapshot: string; attachedAt: number; itemId: string }> = [];
-        let estimateMinSum = 0;
-        let estimateMaxSum = 0;
-        for (const [itemId, item] of Object.entries(data)) {
-            const recs = item?.recommendations ?? [];
-            for (const rec of recs) {
-                const r = rec as { recommendationId?: string; estimateSnapshotMin?: number | null; estimateSnapshotMax?: number | null; summarySnapshot?: string; attachedAt?: number };
-                items.push({
-                    recommendationId:    r.recommendationId ?? '',
-                    estimateSnapshotMin: r.estimateSnapshotMin ?? null,
-                    estimateSnapshotMax: r.estimateSnapshotMax ?? null,
-                    summarySnapshot:     r.summarySnapshot ?? '',
-                    attachedAt:          r.attachedAt ?? 0,
-                    itemId,
-                });
-                estimateMinSum += r.estimateSnapshotMin ?? 0;
-                estimateMaxSum += r.estimateSnapshotMax ?? 0;
-            }
-        }
-
-        return c.json({
-            success: true as const,
-            data: {
-                items,
-                totals: { count: items.length, estimateMinSum, estimateMaxSum },
-            },
-        }, 200);
+        const { items, totals } = aggregateAttachedRecommendations(row?.data as Record<string, unknown> | undefined);
+        return c.json({ success: true as const, data: { items, totals } }, 200);
     })
     .openapi(createInspectionRoute, async (c) => {
         const body = c.req.valid('json');

@@ -76,6 +76,7 @@ import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
+import contractorTypesRoutes from './api/contractor-types';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionRequestsRoutes from './api/inspection-requests';
@@ -251,7 +252,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         path === '/api/concierge/book-info' ||
         path === '/api/concierge/book' ||
         path === '/api/concierge/confirm-info';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/');
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/');
 
     // Design System 0520 subsystem D P5 — observer surfaces are gated by
     // the dedicated observer-cookie middleware, not JWT.
@@ -501,6 +502,7 @@ const routes = app
   // Import sub-router — extracted to fix hono/client type-collapse (C-10)
   .route('/api/contacts', contactsImportRoutes)
   .route('/api/recommendations', recommendationsRoutes)
+  .route('/api/contractor-types', contractorTypesRoutes)
   .route('/api/rating-systems', ratingSystemsRoutes)
   .route('/api', eventsRoutes)
   .route('/api/invoices', invoiceRoutes)

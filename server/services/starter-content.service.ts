@@ -12,6 +12,7 @@
  *   - 4 tags                  (Safety concern / Needs maintenance / Cosmetic / Follow-up needed)
  *   - 80 recommendations      (from server/data/recommendation-seeds.ts)
  *   - 4 rating systems        (from server/data/rating-system-seeds.ts)
+ *   - 10 contractor types     (standard repair-contractor taxonomy)
  *   - N marketplace libraries (global; idempotent at the libraries table)
  *
  * "Idempotent" means: safe to call twice — the second call inserts 0 rows
@@ -24,6 +25,7 @@
  *   tags                     → (tenantId, name)                       (enforced by uniqueIndex)
  *   recommendations          → (tenantId, category, name)
  *   rating_systems           → (tenantId, slug)                       (enforced by uniqueIndex)
+ *   contractor_types         → (tenantId, name)
  *   marketplace_libraries    → (name)                                  (global table — name unique)
  *
  * The function never throws on individual-row insert failure unless the
@@ -32,16 +34,16 @@
  */
 
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import {
     templates,
     agreements,
     comments,
     eventTypes,
     tags,
-    recommendations,
     ratingSystems,
     marketplaceLibraries,
+    contractorTypes,
 } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 
@@ -77,6 +79,22 @@ import { TAGS } from './starter-content/fixtures/tags';
 import { RECOMMENDATIONS } from './starter-content/fixtures/recommendations';
 import { RATING_SYSTEMS } from './starter-content/fixtures/rating-systems';
 import { MARKETPLACE_LIBRARIES } from './starter-content/fixtures/marketplace';
+
+// Comments-repair fold (2026-06-12) — the standard contractor-type taxonomy.
+// MUST match migration 0030's backfill list exactly so a freshly-provisioned
+// tenant gets the same dropdown as tenants that existed at migration time.
+const CONTRACTOR_TYPES: ReadonlyArray<{ name: string; sortOrder: number }> = [
+    { name: 'Licensed Electrician',   sortOrder: 1 },
+    { name: 'Plumber',                sortOrder: 2 },
+    { name: 'Roofer',                 sortOrder: 3 },
+    { name: 'HVAC Technician',        sortOrder: 4 },
+    { name: 'General Contractor',     sortOrder: 5 },
+    { name: 'Structural Engineer',    sortOrder: 6 },
+    { name: 'Foundation Specialist',  sortOrder: 7 },
+    { name: 'Pest/Termite',           sortOrder: 8 },
+    { name: 'Chimney Sweep',          sortOrder: 9 },
+    { name: 'Grading/Drainage',       sortOrder: 10 },
+];
 
 /**
  * Insert many rows in as few D1 round-trips as possible: multi-row INSERTs
@@ -120,6 +138,7 @@ export interface StarterContentResult {
     recommendationsSeeded:     number;
     ratingSystemsSeeded:       number;
     marketplaceLibrariesSeeded: number;
+    contractorTypesSeeded:     number;
 }
 
 /**
@@ -243,27 +262,31 @@ export async function seedStarterContent(
         tagsSeeded = rows.length;
     }
 
-    // ── recommendations ─────────────────────────────────────────────────
+    // ── recommendations (repair-item comments) ──────────────────────────
+    // Comments-repair fold (2026-06-12): recommendations are now comments with
+    // repair fields (the `recommendations` table was dropped). Seed them as
+    // repair-item comments — same predicate RecommendationService reads back
+    // (repair_summary IS NOT NULL). Idempotent on (category, text).
     let recommendationsSeeded = 0;
     {
-        const existing = await d.select({ category: recommendations.category, name: recommendations.name })
-            .from(recommendations).where(eq(recommendations.tenantId, tenantId)).all();
+        const existing = await d.select({ category: comments.category, name: comments.text })
+            .from(comments).where(and(eq(comments.tenantId, tenantId), isNotNull(comments.repairSummary))).all();
         const existingKeys = new Set(existing.map(r => `${r.category ?? ''}::${r.name}`));
         const rows = RECOMMENDATIONS
             .filter(r => !existingKeys.has(`${r.category ?? ''}::${r.name}`))
             .map(r => ({
-                id:                   crypto.randomUUID(),
+                id:                crypto.randomUUID(),
                 tenantId,
-                category:             r.category,
-                name:                 r.name,
-                severity:             r.severity,
-                defaultEstimateMin:   r.defaultEstimateMin,
-                defaultEstimateMax:   r.defaultEstimateMax,
-                defaultRepairSummary: r.defaultRepairSummary,
-                createdByUserId:      null,
-                createdAt:            new Date(),
+                text:              r.name,
+                category:          r.category,
+                ratingBucket:      'defect',
+                severity:          r.severity,
+                repairSummary:     r.defaultRepairSummary,
+                estimateMinCents:  r.defaultEstimateMin,
+                estimateMaxCents:  r.defaultEstimateMax,
+                createdAt:         new Date(),
             }));
-        await batchInsert(d, recommendations, rows);
+        await batchInsert(d, comments, rows);
         recommendationsSeeded = rows.length;
     }
 
@@ -302,6 +325,27 @@ export async function seedStarterContent(
         ratingSystemsSeeded = rows.length;
     }
 
+    // ── contractor types ────────────────────────────────────────────────
+    // Standard contractor taxonomy (e.g. "Licensed Electrician") backing the
+    // repair-item contractor dropdown. Idempotent on (tenant, name) — a tenant
+    // that already has any contractor_types is skipped row-by-row.
+    let contractorTypesSeeded = 0;
+    {
+        const existing = await d.select({ name: contractorTypes.name }).from(contractorTypes)
+            .where(eq(contractorTypes.tenantId, tenantId)).all();
+        const existingNames = new Set(existing.map(r => r.name as string));
+        const now = new Date();
+        const rows = CONTRACTOR_TYPES.filter(ct => !existingNames.has(ct.name)).map(ct => ({
+            id:        crypto.randomUUID(),
+            tenantId,
+            name:      ct.name,
+            sortOrder: ct.sortOrder,
+            createdAt: now,
+        }));
+        await batchInsert(d, contractorTypes, rows);
+        contractorTypesSeeded = rows.length;
+    }
+
     // ── marketplace libraries (GLOBAL table) ────────────────────────────
     // The marketplace_libraries table has no tenant_id — it is a shared
     // catalogue of importable content. We still idempotently insert the
@@ -338,6 +382,7 @@ export async function seedStarterContent(
         recommendationsSeeded,
         ratingSystemsSeeded,
         marketplaceLibrariesSeeded,
+        contractorTypesSeeded,
     };
     logger.info('starter-content.seeded', { tenantId, ...result });
     return result;

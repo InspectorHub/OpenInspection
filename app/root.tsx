@@ -20,6 +20,7 @@ import {
   bootstrapServiceWorker,
   type SWRegistrarLike,
 } from "~/lib/offline/sw-bootstrap";
+import { ErrorState } from "~/components/ErrorState";
 
 export function loader({ request }: Route.LoaderArgs): UiPrefs {
   return parseUiPrefs(request.headers.get("Cookie"));
@@ -113,21 +114,25 @@ export default function Root() {
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   if (isRouteErrorResponse(error)) {
+    const is404 = error.status === 404;
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold">{error.status}</h1>
-          <p className="text-ih-fg-3 mt-2">{error.statusText}</p>
-        </div>
-      </div>
+      <ErrorState
+        code={error.status}
+        title={is404 ? "Page not found" : error.statusText || "Something went wrong"}
+        message={
+          is404
+            ? "The page you're looking for doesn't exist or may have moved."
+            : "An unexpected error occurred. Please try again in a moment."
+        }
+        action={{ label: "Go to homepage", href: "/" }}
+      />
     );
   }
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold">Error</h1>
-        <p className="text-ih-fg-3 mt-2">Something went wrong</p>
-      </div>
-    </div>
+    <ErrorState
+      title="Something went wrong"
+      message="An unexpected error occurred. Please try again, or head back to the homepage."
+      action={{ label: "Go to homepage", href: "/" }}
+    />
   );
 }

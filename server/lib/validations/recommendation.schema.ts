@@ -9,6 +9,7 @@ export const CreateRecommendationSchema = z.object({
     defaultEstimateMin:   z.number().int().nonnegative().nullable().optional().describe('TODO describe defaultEstimateMin field for the OpenInspection MCP integration'),
     defaultEstimateMax:   z.number().int().nonnegative().nullable().optional().describe('TODO describe defaultEstimateMax field for the OpenInspection MCP integration'),
     defaultRepairSummary: z.string().min(1).max(2000).describe('TODO describe defaultRepairSummary field for the OpenInspection MCP integration'),
+    recommendedContractorTypeId: z.string().nullable().optional().describe('Soft reference to contractor_types.id (no DB FK). Suggested contractor for this repair item.'),
 }).openapi('CreateRecommendation');
 
 export const UpdateRecommendationSchema = CreateRecommendationSchema.partial().openapi('UpdateRecommendation');
@@ -22,6 +23,7 @@ export const RecommendationSchema = z.object({
     defaultEstimateMin:   z.number().int().nullable().describe('TODO describe defaultEstimateMin field for the OpenInspection MCP integration'),
     defaultEstimateMax:   z.number().int().nullable().describe('TODO describe defaultEstimateMax field for the OpenInspection MCP integration'),
     defaultRepairSummary: z.string().describe('TODO describe defaultRepairSummary field for the OpenInspection MCP integration'),
+    recommendedContractorTypeId: z.string().nullable().describe('Soft reference to contractor_types.id; suggested contractor for this repair item.'),
     createdByUserId:      z.string().nullable().describe('TODO describe createdByUserId field for the OpenInspection MCP integration'),
     createdAt:            z.union([z.string(), z.date(), z.number()]).describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }).openapi('Recommendation');
@@ -46,6 +48,7 @@ export const AttachedRecommendationItemSchema = z.object({
     estimateSnapshotMin: z.number().int().nullable().describe('TODO describe estimateSnapshotMin field for the OpenInspection MCP integration'),
     estimateSnapshotMax: z.number().int().nullable().describe('TODO describe estimateSnapshotMax field for the OpenInspection MCP integration'),
     summarySnapshot:     z.string().describe('TODO describe summarySnapshot field for the OpenInspection MCP integration'),
+    contractorTypeSnapshot: z.string().nullable().describe('Contractor type name captured at attach time.'),
     attachedAt:          z.number().int().nonnegative().describe('TODO describe attachedAt field for the OpenInspection MCP integration'),
     itemId:              z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
 }).openapi('AttachedRecommendationItem');
