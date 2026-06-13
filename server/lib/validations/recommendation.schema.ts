@@ -48,6 +48,7 @@ export const AttachedRecommendationItemSchema = z.object({
     estimateSnapshotMin: z.number().int().nullable().describe('TODO describe estimateSnapshotMin field for the OpenInspection MCP integration'),
     estimateSnapshotMax: z.number().int().nullable().describe('TODO describe estimateSnapshotMax field for the OpenInspection MCP integration'),
     summarySnapshot:     z.string().describe('TODO describe summarySnapshot field for the OpenInspection MCP integration'),
+    contractorTypeSnapshot: z.string().nullable().describe('Contractor type name captured at attach time.'),
     attachedAt:          z.number().int().nonnegative().describe('TODO describe attachedAt field for the OpenInspection MCP integration'),
     itemId:              z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
 }).openapi('AttachedRecommendationItem');
