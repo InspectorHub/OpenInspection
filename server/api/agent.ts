@@ -7,6 +7,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { inspections } from '../lib/db/schema/inspection';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
+import { ROLE } from '../lib/auth/roles';
 import {
     AgentReportsQuerySchema,
     AgentReportsResponseSchema,
@@ -245,7 +246,7 @@ export const agentRoutes = createApiRouter()
 
         // Admins/owners can pass ?agentId= to view any agent's reports
         const agentId =
-            userRole === 'admin'
+            userRole === ROLE.ADMIN
                 ? (queryAgentId ?? user.sub)
                 : user.sub;
 

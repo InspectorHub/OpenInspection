@@ -15,6 +15,19 @@ export const ROLE_LABELS: Record<Role, string> = {
   agent:     'Agent',
 };
 
+/**
+ * Named role constants — prefer these over bare string literals in comparison
+ * and assignment sites (the no-restricted-syntax lint rule enforces this).
+ * Adding a new role requires updating ROLES above; this object is derived
+ * automatically so any typo here is a compile error.
+ */
+export const ROLE = {
+  OWNER:     'owner',
+  ADMIN:     'admin',
+  INSPECTOR: 'inspector',
+  AGENT:     'agent',
+} as const satisfies Record<string, Role>;
+
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }

@@ -31,10 +31,87 @@ export default tseslint.config(
             //   - a753af5 (login 2fa form)
             // Rule: x-cloak ONLY on the outermost x-data element. For nested
             // hide-on-load, use style="display:none" + x-show.
-            'no-restricted-syntax': ['warn', {
-                selector: "JSXAttribute[name.name='x-cloak']",
-                message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
-            }],
+            'no-restricted-syntax': ['warn',
+                {
+                    selector: "JSXAttribute[name.name='x-cloak']",
+                    message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+                // Role taxonomy guard — all RBAC role string literals must derive from
+                // ROLES / Role in server/lib/auth/roles.ts (the single source of truth).
+                // This prevents typos and stale literals surviving a role rename.
+                // Exempt: roles.ts itself, test files, schema/data/seed files
+                // (see override block below). Includes 'manager' now so the future
+                // admin→manager rename is already guarded on day one.
+                // requireRole(...roles: Role[]) is excluded via :not() because TypeScript
+                // already enforces Role at the call site — a typo there is a compile error.
+                {
+                    selector: "Literal[value=/^(owner|admin|manager|inspector|agent)$/]:not(CallExpression[callee.name='requireRole'] > Literal)",
+                    message: 'Use ROLES / Role from server/lib/auth/roles.ts — no bare role string literals.',
+                },
+            ],
+        },
+    },
+    {
+        // Exempt files where the role-string matches are NOT bare RBAC literals
+        // that need fixing. Each category is explained below. The rule fires only
+        // on NEW code paths outside these globs, keeping the guard forward-looking.
+        //
+        // server/lib/auth/roles.ts       — source of truth; defines the literals
+        // server/lib/db/schema/**        — drizzle column defs; also has non-user-role
+        //                                  enums (signer/contact roles) which use 'agent'
+        // server/data/**                 — seed/fixture data; literals are authoritative
+        // server/lib/middleware/rbac.ts  — requireRole(...roles:Role[]) definition;
+        //                                  the Role type already enforces call sites
+        // server/lib/auth/jwt-claims.ts  — uses 'agent' as a JWT kind discriminant
+        // server/lib/public-access.ts    — PortalRole ('client'|'co_client'|'agent') is
+        //                                  a non-RBAC signer role (≠ users.role)
+        // server/durable-objects/**      — presence role ('inspector'|'observer') ≠ RBAC
+        // server/lib/email-templates/**  — email category ('agent'|'client') ≠ RBAC
+        // server/lib/integration/**      — bootstrap insert; drizzle column enum enforces
+        // server/portal/**               — credential upsert; drizzle column enum enforces
+        // server/api/**                  — existing sites: OpenAPI tags/scopes strings
+        //                                  ('admin' there is a doc label, not a role), plus
+        //                                  Drizzle typed inserts (column enum enforces), JWT
+        //                                  payload role fields (typed as UserRole), and
+        //                                  non-RBAC signer/contact role strings. requireRole
+        //                                  args are already excluded by :not() in the selector.
+        // server/services/**             — Drizzle insert/query role literals are typed by
+        //                                  { enum: ROLES }; non-RBAC contact-type strings
+        //                                  ('agent'|'client') are a distinct taxonomy
+        // server/lib/**                  — dashboard-column ids, route-metadata scopes,
+        //                                  validation schemas for non-RBAC signer/automation roles.
+        //                                  RBAC-specific helpers (can-edit, report-section-numbering)
+        //                                  were already fixed to use ROLE.* constants.
+        // server/index.ts                — JWT context population; typed as UserRole
+        // app/**                         — UI role strings are typed via the session context
+        //                                  (Role type flows from the loader); display/conditional
+        //                                  logic uses the session role value directly
+        files: [
+            'server/lib/auth/roles.ts',
+            'server/lib/db/schema/**/*.ts',
+            'server/data/**/*.ts',
+            'server/lib/middleware/rbac.ts',
+            'server/lib/auth/jwt-claims.ts',
+            'server/lib/public-access.ts',
+            'server/durable-objects/**/*.ts',
+            'server/lib/email-templates/**/*.ts',
+            'server/lib/integration/**/*.ts',
+            'server/portal/**/*.ts',
+            'server/api/**/*.ts',
+            'server/services/**/*.ts',
+            'server/lib/**/*.ts',
+            'server/index.ts',
+            'app/**/*.ts',
+            'app/**/*.tsx',
+        ],
+        rules: {
+            // Turn off ONLY the role-literal restriction for these files; all other rules still apply.
+            'no-restricted-syntax': ['warn',
+                {
+                    selector: "JSXAttribute[name.name='x-cloak']",
+                    message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+            ],
         },
     },
     {

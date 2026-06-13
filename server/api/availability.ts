@@ -6,6 +6,7 @@ import { availability, availabilityOverrides } from '../lib/db/schema';
 import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
+import { ROLE } from '../lib/auth/roles';
 import {
     AvailabilitySchema,
     OverrideSchema,
@@ -172,7 +173,7 @@ export const availabilityRoutes = createApiRouter()
         const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
 
-        if (queryId && queryId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+        if (queryId && queryId !== user.sub && ![ROLE.ADMIN, ROLE.OWNER].includes(userRole)) {
             throw Errors.Forbidden('Can only view your own availability');
         }
 
@@ -199,7 +200,7 @@ export const availabilityRoutes = createApiRouter()
 
         const inspectorId = body.inspectorId || user.sub;
 
-        if (inspectorId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+        if (inspectorId !== user.sub && ![ROLE.ADMIN, ROLE.OWNER].includes(userRole)) {
             throw Errors.Forbidden('Can only manage your own availability');
         }
 
@@ -215,7 +216,7 @@ export const availabilityRoutes = createApiRouter()
         const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
 
-        if (queryId && queryId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+        if (queryId && queryId !== user.sub && ![ROLE.ADMIN, ROLE.OWNER].includes(userRole)) {
             throw Errors.Forbidden('Can only view your own availability');
         }
 
@@ -240,7 +241,7 @@ export const availabilityRoutes = createApiRouter()
         const body = c.req.valid('json');
 
         const inspectorId = body.inspectorId || user.sub;
-        if (inspectorId !== user.sub && !['admin', 'owner'].includes(userRole)) {
+        if (inspectorId !== user.sub && ![ROLE.ADMIN, ROLE.OWNER].includes(userRole)) {
             throw Errors.Forbidden('Can only manage your own availability');
         }
 

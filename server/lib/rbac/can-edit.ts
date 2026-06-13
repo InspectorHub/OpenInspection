@@ -1,3 +1,5 @@
+import { ROLE } from '../auth/roles';
+
 /**
  * Design System 0520 subsystem C phase 4 — canEdit permission matrix.
  *
@@ -47,8 +49,8 @@ export function canEdit(
 ): boolean {
     const role = user.role;
 
-    if (role === 'owner' || role === 'admin') return true;
-    if (role === 'agent')  return false;
+    if (role === ROLE.OWNER || role === ROLE.ADMIN) return true;
+    if (role === ROLE.AGENT)  return false;
 
     const helpers = safeJsonArray(inspection.helperInspectorIds);
     const onInspection =
@@ -57,7 +59,7 @@ export function canEdit(
         helpers.includes(user.id);
     if (!onInspection) return false;
 
-    if (role === 'inspector') return true;
+    if (role === ROLE.INSPECTOR) return true;
 
     // Unknown / new roles default to deny — safer than fail-open.
     return false;
