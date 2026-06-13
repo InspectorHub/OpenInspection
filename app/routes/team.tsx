@@ -38,7 +38,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {
   owner: "primary",
-  admin: "info",
+  manager: "info",
   inspector: "neutral",
   lead: "info",
   specialist: "sat",

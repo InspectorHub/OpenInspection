@@ -5,8 +5,8 @@ describe('getCapabilities', () => {
   it('inspector defaults: publish on, schedule self, no financial, no contacts', () => {
     expect(getCapabilities('inspector', null)).toMatchObject({ publish: true, scheduleOthers: false, financial: false, manageContacts: false });
   });
-  it('admin (manager) defaults: all four on', () => {
-    expect(getCapabilities('admin', null)).toMatchObject({ publish: true, scheduleOthers: true, financial: true, manageContacts: true });
+  it('manager defaults: all four on', () => {
+    expect(getCapabilities('manager', null)).toMatchObject({ publish: true, scheduleOthers: true, financial: true, manageContacts: true });
   });
   it('overrides win over role defaults', () => {
     const c = getCapabilities('inspector', { financial: true, publish: false });

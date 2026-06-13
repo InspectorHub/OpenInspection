@@ -49,7 +49,7 @@ export function canEdit(
 ): boolean {
     const role = user.role;
 
-    if (role === ROLE.OWNER || role === ROLE.ADMIN) return true;
+    if (role === ROLE.OWNER || role === ROLE.MANAGER) return true;
     if (role === ROLE.AGENT)  return false;
 
     const helpers = safeJsonArray(inspection.helperInspectorIds);

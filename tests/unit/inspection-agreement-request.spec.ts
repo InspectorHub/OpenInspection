@@ -36,7 +36,7 @@ const SLUG = 'acme';
 let db: BetterSQLite3Database<typeof schema>;
 let sendAgreementRequest: ReturnType<typeof vi.fn>;
 
-function buildApp(role = 'admin') {
+function buildApp(role = 'manager') {
     const app = new OpenAPIHono<HonoConfig>();
     sendAgreementRequest = vi.fn().mockResolvedValue(undefined);
     app.use('*', async (c, next) => {
@@ -66,14 +66,14 @@ const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com' } as never;
 // auditFromContext reads c.executionCtx.waitUntil — supply a stub.
 const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
 
-function send(path: string, body: string, role = 'admin') {
+function send(path: string, body: string, role = 'manager') {
     const req = new Request(`https://acme.example.com${path}`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body,
     });
     return buildApp(role).fetch(req, ENV, CTX);
 }
 
-async function post(body: unknown, role = 'admin') {
+async function post(body: unknown, role = 'manager') {
     return send(`/api/inspections/${INSP_ID}/agreement-requests`, JSON.stringify(body), role);
 }
 

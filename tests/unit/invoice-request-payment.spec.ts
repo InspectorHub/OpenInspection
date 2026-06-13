@@ -36,7 +36,7 @@ const SLUG = 'acme';
 let db: BetterSQLite3Database<typeof schema>;
 let sendInvoiceRequest: ReturnType<typeof vi.fn>;
 
-function buildApp(role = 'admin') {
+function buildApp(role = 'manager') {
     const app = new OpenAPIHono<HonoConfig>();
     sendInvoiceRequest = vi.fn().mockResolvedValue(undefined);
     app.use('*', async (c, next) => {
@@ -65,7 +65,7 @@ function buildApp(role = 'admin') {
 const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com' } as never;
 const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
 
-function post(body: unknown, role = 'admin') {
+function post(body: unknown, role = 'manager') {
     const req = new Request('https://acme.example.com/api/invoices/request-payment', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     });

@@ -29,7 +29,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     // owner/admin always pass; layered here so an inspector granted
     // {financial:true} (and added to the role list in a future change) would be
     // governed by the capability rather than a bare role check.
-    middleware: [requireRole('owner', 'admin', 'inspector'), requireCapability('financial')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('financial')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(InvoiceResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -44,7 +44,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
 const createInvoiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["invoices"], summary: "Create invoice for current tenant",
-    middleware: [requireRole('owner', 'admin')],
+    middleware: [requireRole('owner', 'manager')],
     request: { body: { content: { 'application/json': { schema: CreateInvoiceSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
@@ -60,7 +60,7 @@ const createInvoiceRoute = createRoute(withMcpMetadata({
 const markSentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-sent',
     tags: ["invoices"], summary: 'Mark invoice as sent',
-    middleware: [requireRole('owner', 'admin')],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Success' },
@@ -73,7 +73,7 @@ const markSentRoute = createRoute(withMcpMetadata({
 const markPaidRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-paid',
     tags: ["invoices"], summary: 'Mark invoice as paid',
-    middleware: [requireRole('owner', 'admin')],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: z.object({ id: z.string().uuid().describe('Invoice id to mark as paid.') }).describe('Path params for the mark-paid endpoint.'),
         body: { content: { 'application/json': { schema: MarkInvoicePaidSchema } } },
@@ -89,7 +89,7 @@ const markPaidRoute = createRoute(withMcpMetadata({
 const deleteInvoiceRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["invoices"], summary: "Delete invoice for current tenant",
-    middleware: [requireRole('owner', 'admin')],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' },
@@ -112,7 +112,7 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
 const requestPaymentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/request-payment',
     tags: ['invoices'], summary: 'Create + email an invoice payment request for an inspection',
-    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { body: { content: { 'application/json': { schema: RequestPaymentSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: RequestPaymentResponseSchema } }, description: 'Invoice marked sent and emailed' },

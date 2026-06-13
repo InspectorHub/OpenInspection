@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 
-type Role = "owner" | "admin" | "inspector" | "agent";
+type Role = "owner" | "manager" | "inspector" | "agent";
 
 const ROLE_DESC: Record<Role, string> = {
  owner: "Full access, including billing and ownership transfer.",
- admin: "Full access to inspections, templates, and team management.",
+ manager: "Full access to inspections, templates, and team management.",
  inspector: "Create and edit inspections they're assigned to.",
  agent: "Read-only buyer-agent view.",
 };
@@ -70,7 +70,7 @@ export function InviteSeatModal({ open, onClose }: InviteSeatModalProps) {
  <label className="block">
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Role</span>
  <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
- <option value="admin">Admin</option>
+ <option value="manager">Manager</option>
  <option value="inspector">Inspector</option>
  <option value="agent">Agent</option>
  </select>

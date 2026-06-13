@@ -89,7 +89,7 @@ describe('inspector capability-resolution for role-widened endpoints', () => {
     // manageContacts) now admit 'inspector' through the requireRole gate so the
     // capability becomes the EFFECTIVE gate. An inspector is still default-denied;
     // only an explicit {financial:true}/{manageContacts:true} override lets them
-    // through. Owner/admin default true and are unaffected.
+    // through. Owner/manager default true and are unaffected.
     it('inspector financial: override true → allowed, null → denied', () => {
         expect(getCapabilities('inspector', { financial: true }).financial).toBe(true);
         expect(getCapabilities('inspector', null).financial).toBe(false);
@@ -98,11 +98,11 @@ describe('inspector capability-resolution for role-widened endpoints', () => {
         expect(getCapabilities('inspector', { manageContacts: true }).manageContacts).toBe(true);
         expect(getCapabilities('inspector', null).manageContacts).toBe(false);
     });
-    it('owner/admin financial + manageContacts default true (role gate widening is a no-op for them)', () => {
+    it('owner/manager financial + manageContacts default true (role gate widening is a no-op for them)', () => {
         expect(getCapabilities('owner', null).financial).toBe(true);
         expect(getCapabilities('owner', null).manageContacts).toBe(true);
-        expect(getCapabilities('admin', null).financial).toBe(true);
-        expect(getCapabilities('admin', null).manageContacts).toBe(true);
+        expect(getCapabilities('manager', null).financial).toBe(true);
+        expect(getCapabilities('manager', null).manageContacts).toBe(true);
     });
 });
 

@@ -24,7 +24,7 @@ const listTeamMembersRoute = createRoute(withMcpMetadata({
     path: '/members',
     tags: ["team"],
     summary: 'List team members and pending invites',
-    middleware: [requireRole('admin', 'owner', 'inspector')],
+    middleware: [requireRole('manager', 'owner', 'inspector')],
     responses: {
         200: {
             content: {
@@ -48,7 +48,7 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/invite',
     tags: ["team"],
     summary: 'Invite a new team member',
-    middleware: [requireRole('admin', 'owner'), requireSeatAvailable],
+    middleware: [requireRole('manager', 'owner'), requireSeatAvailable],
     request: {
         body: {
             content: {
@@ -81,7 +81,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/members/{id}',
     tags: ["team"],
     summary: 'Remove a team member',
-    middleware: [requireRole('admin', 'owner')],
+    middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
@@ -167,7 +167,7 @@ export const teamRoutes = createApiRouter()
         tags: ['team'],
         summary: "Get tenant team-page default toggles",
         description: "Returns the boolean toggles that govern the team page: teamModeDefault. Used to drive UI state.",
-        middleware: [requireRole('owner', 'admin', 'inspector')] as const,
+        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['read'], tier: 'extended' }), async (c) => {
         const tenantId = c.get('tenantId');
@@ -189,7 +189,7 @@ export const teamRoutes = createApiRouter()
         tags: ['team'],
         summary: "Update tenant team-page default toggles",
         description: "Patches any subset of the team-page toggles (teamModeDefault). Missing keys leave existing values unchanged.",
-        middleware: [requireRole('owner', 'admin')] as const,
+        middleware: [requireRole('owner', 'manager')] as const,
         request: { body: { content: { 'application/json': { schema: DefaultsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['admin'], tier: 'extended' }), async (c) => {

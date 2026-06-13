@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, isNull, inArray, lt, sql } from 'drizzle-orm';
 import { notifications, users } from '../lib/db/schema';
+import { ROLE } from '../lib/auth/roles';
 import { nanoid } from 'nanoid';
 
 export type NotificationType =
@@ -79,7 +80,7 @@ export class NotificationService {
             .from(users)
             .where(and(
                 eq(users.tenantId, tenantId),
-                inArray(users.role, ['owner', 'admin']),
+                inArray(users.role, [ROLE.OWNER, ROLE.MANAGER]),
             ));
         if (admins.length === 0) return 0;
         const now = new Date();

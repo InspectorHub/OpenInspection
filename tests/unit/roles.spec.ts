@@ -3,7 +3,7 @@ import { ROLES, ROLE_LABELS, isRole } from '../../server/lib/auth/roles';
 
 describe('roles source-of-truth', () => {
   it('exposes exactly the four canonical roles', () => {
-    expect([...ROLES]).toEqual(['owner', 'admin', 'inspector', 'agent']);
+    expect([...ROLES]).toEqual(['owner', 'manager', 'inspector', 'agent']);
   });
 
   it('has a label for every role', () => {

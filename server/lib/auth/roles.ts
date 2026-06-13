@@ -4,13 +4,13 @@
  * than re-declaring string literals, so a role add/rename/remove is a one-line
  * change with the compiler flagging every stale callsite.
  */
-export const ROLES = ['owner', 'admin', 'inspector', 'agent'] as const;
+export const ROLES = ['owner', 'manager', 'inspector', 'agent'] as const;
 
 export type Role = typeof ROLES[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
   owner:     'Owner',
-  admin:     'Admin',     // renamed to 'Manager' in a later task
+  manager:   'Manager',
   inspector: 'Inspector',
   agent:     'Agent',
 };
@@ -23,7 +23,7 @@ export const ROLE_LABELS: Record<Role, string> = {
  */
 export const ROLE = {
   OWNER:     'owner',
-  ADMIN:     'admin',
+  MANAGER:   'manager',
   INSPECTOR: 'inspector',
   AGENT:     'agent',
 } as const satisfies Record<string, Role>;

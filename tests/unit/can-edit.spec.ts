@@ -21,9 +21,9 @@ const baseInspection = {
 };
 
 describe('canEdit (subsystem C P4)', () => {
-    it('owner / admin can edit anything', () => {
+    it('owner / manager can edit anything', () => {
         expect(canEdit({ id: 'u', role: 'owner', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
-        expect(canEdit({ id: 'u', role: 'admin', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
+        expect(canEdit({ id: 'u', role: 'manager', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
     });
 
     it('inspector can edit own inspections', () => {

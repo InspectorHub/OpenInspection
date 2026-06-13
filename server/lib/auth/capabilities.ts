@@ -7,7 +7,7 @@ export type PermissionOverrides = Partial<CapabilitySet>;
 
 const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
   owner:     { publish: true,  scheduleOthers: true,  financial: true,  manageContacts: true },
-  admin:     { publish: true,  scheduleOthers: true,  financial: true,  manageContacts: true },
+  manager:   { publish: true,  scheduleOthers: true,  financial: true,  manageContacts: true },
   inspector: { publish: true,  scheduleOthers: false, financial: false, manageContacts: false },
   agent:     { publish: false, scheduleOthers: false, financial: false, manageContacts: false },
 };

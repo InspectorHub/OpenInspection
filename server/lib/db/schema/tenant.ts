@@ -66,10 +66,10 @@ export const users = sqliteTable('users', {
     // check those before any reuse. Global AGENT slugs (tenant_id IS NULL,
     // role='agent') still use this column actively — do not repurpose.
     slug: text('slug'),
-    // DDL default 'admin' is FROZEN (D1 cannot alter column defaults without a
+    // DDL default is FROZEN (D1 cannot alter column defaults without a
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
     // explicit role — audited 2026-06-05; enforced by review, not DDL.
-    role: text('role', { enum: ROLES }).notNull().default('admin'),
+    role: text('role', { enum: ROLES }).notNull().default('manager'),
     googleRefreshToken: text('google_refresh_token'),
     googleCalendarId: text('google_calendar_id'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),

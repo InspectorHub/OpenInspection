@@ -236,7 +236,7 @@ const inspectorsRoute = createRoute(withMcpMetadata({
 export const agentRoutes = createApiRouter()
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
-        await requireRole('admin')(c, async () => {});
+        await requireRole('manager')(c, async () => {});
 
         const tenantId = c.get('tenantId');
         const user = c.get('user');
@@ -246,7 +246,7 @@ export const agentRoutes = createApiRouter()
 
         // Admins/owners can pass ?agentId= to view any agent's reports
         const agentId =
-            userRole === ROLE.ADMIN
+            userRole === ROLE.MANAGER
                 ? (queryAgentId ?? user.sub)
                 : user.sub;
 
@@ -270,7 +270,7 @@ export const agentRoutes = createApiRouter()
         return c.json({ success: true, data: groups }, 200);
     })
     .openapi(getLeaderboardRoute, async (c) => {
-        await requireRole('owner', 'admin', 'inspector', 'agent')(c, async () => {});
+        await requireRole('owner', 'manager', 'inspector', 'agent')(c, async () => {});
 
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
