@@ -48,7 +48,7 @@ const confirmViewRoute = createRoute(withMcpMetadata({
     path: '/confirm-view',
     tags: ["bookings"],
     summary: 'Read a concierge magic-link token for the public confirm page',
-    request: { query: z.object({ token: z.string().min(8).max(128) }) },
+    request: { query: z.object({ token: z.string().min(8).max(128).describe('Concierge magic-link token from the emailed confirm URL; identifies the booking to display.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: ConfirmViewResponseSchema } },
