@@ -8,6 +8,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { inspectionsRoutes } from '../../server/api/inspections';
+import { InspectionService } from '../../server/services/inspection.service';
 import type { HonoConfig } from '../../server/types/hono';
 
 /**
@@ -40,9 +41,16 @@ function buildApp(role: string) {
         c.set('userRole', role as never);
         c.set('tenantId', TENANT);
         c.set('user', { sub: USER_ID } as never);
+        // getInspection is stubbed (avoids seeding the full join), but the
+        // DB-16 cover validation needs the REAL isInspectionPhotoKey running
+        // against the in-memory DB — delegate just that method to a real service.
+        const realSvc = new InspectionService({} as D1Database);
         c.set(
             'services',
-            { inspection: { getInspection: vi.fn().mockResolvedValue({ inspection: { status: 'draft' } }) } } as never,
+            { inspection: {
+                getInspection: vi.fn().mockResolvedValue({ inspection: { status: 'draft' } }),
+                isInspectionPhotoKey: (iid: string, tid: string, key: string) => realSvc.isInspectionPhotoKey(iid, tid, key),
+            } } as never,
         );
         await next();
     });
@@ -105,35 +113,53 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
     });
 
     // ── DB-16: coverPhotoId write path ──────────────────────────────────────
-    const POOL_ID = '550e8400-e29b-41d4-a716-446655440042';
+    // Cover now holds an R2 photo KEY (attached item photo or pool photo),
+    // validated by isInspectionPhotoKey — NOT a pool row id.
+    const POOL_KEY = 'tenants/t/insp/_pool_abc.jpg';
+    const ATTACHED_KEY = 'tenants/t/insp/item-1_def.jpg';
 
-    async function seedPoolRow(over: Partial<{ id: string; inspectionId: string; tenantId: string }> = {}) {
+    async function seedPoolRow(over: Partial<{ r2Key: string; inspectionId: string; tenantId: string }> = {}) {
         await db.insert(schema.inspectionMediaPool).values({
-            id: over.id ?? POOL_ID,
+            id: crypto.randomUUID(),
             inspectionId: over.inspectionId ?? INSP_ID,
             tenantId: over.tenantId ?? TENANT,
-            r2Key: 'tenants/t/p.jpg', url: '/p.jpg', uploadedAt: 1,
+            r2Key: over.r2Key ?? POOL_KEY, url: '/p.jpg', uploadedAt: 1,
         } as never);
     }
 
-    it('DB-16: sets coverPhotoId when it references a pool row of this inspection', async () => {
+    async function seedAttachedPhoto() {
+        await db.insert(schema.inspectionResults).values({
+            id: crypto.randomUUID(), tenantId: TENANT, inspectionId: INSP_ID,
+            data: { 'item-1': { photos: [{ key: ATTACHED_KEY }] } } as never,
+            lastSyncedAt: new Date(),
+        } as never);
+    }
+
+    it('DB-16: sets coverPhotoId to a pool photo key of this inspection (200)', async () => {
         await seedPoolRow();
-        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(200);
+        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
-        expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBe(POOL_ID);
+        expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBe(POOL_KEY);
     });
 
-    it('DB-16: rejects a coverPhotoId belonging to a DIFFERENT inspection (400)', async () => {
+    it('DB-16: sets coverPhotoId to an attached item photo key (200)', async () => {
+        await seedAttachedPhoto();
+        expect(await patch('admin', { coverPhotoId: ATTACHED_KEY })).toBe(200);
+        const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
+        expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBe(ATTACHED_KEY);
+    });
+
+    it('DB-16: rejects a photo key belonging to a DIFFERENT inspection (400)', async () => {
         await seedPoolRow({ inspectionId: '550e8400-e29b-41d4-a716-446655449999' });
-        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(400);
+        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(400);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBeNull();
     });
 
-    it('DB-16: rejects a dangling coverPhotoId (400) and accepts null to clear', async () => {
-        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(400); // no pool row at all
+    it('DB-16: rejects a dangling key (400) and accepts null to clear', async () => {
+        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(400); // no such photo at all
         await seedPoolRow();
-        expect(await patch('admin', { coverPhotoId: POOL_ID })).toBe(200);
+        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(200);
         expect(await patch('admin', { coverPhotoId: null })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBeNull();

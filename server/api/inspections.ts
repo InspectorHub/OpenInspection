@@ -56,7 +56,7 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, agreementSigners, users, contacts, inspectionMediaPool, inspectionInspectors, tenants } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, agreementSigners, users, contacts, inspectionInspectors, tenants } from '../lib/db/schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../lib/sign-effects';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
@@ -2189,19 +2189,13 @@ export const inspectionsRoutes = createApiRouter()
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
-        // DB-16 — coverPhotoId must reference a media-pool row owned by THIS
-        // inspection (null clears the cover). Reject dangling/foreign ids so
-        // the preflight gate + report renderer can always resolve the R2 key.
+        // DB-16 — coverPhotoId holds the R2 key of a photo belonging to THIS
+        // inspection (an attached item photo or a loose pool photo); null clears
+        // the cover. Reject foreign/dangling keys so the preflight gate + report
+        // renderer can always resolve the image.
         if (typeof body.coverPhotoId === 'string') {
-            const pool = await db.select({ id: inspectionMediaPool.id })
-                .from(inspectionMediaPool)
-                .where(and(
-                    eq(inspectionMediaPool.id, body.coverPhotoId),
-                    eq(inspectionMediaPool.tenantId, tenantId),
-                    eq(inspectionMediaPool.inspectionId, id),
-                ))
-                .get();
-            if (!pool) {
+            const ok = await c.var.services.inspection.isInspectionPhotoKey(id, tenantId, body.coverPhotoId);
+            if (!ok) {
                 return c.json({ success: false as const, error: { code: 'INVALID_COVER_PHOTO', message: 'coverPhotoId does not reference a photo of this inspection' } }, 400);
             }
         }

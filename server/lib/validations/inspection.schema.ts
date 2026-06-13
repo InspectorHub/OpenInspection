@@ -127,10 +127,10 @@ export const UpdateInspectionSchema = z.object({
     referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('TODO describe referralSource field for the OpenInspection MCP integration'),
     reportThemeOverride: z.enum(['modern', 'classic', 'minimal']).nullable().optional().openapi({ example: 'classic' }).describe('TODO describe reportThemeOverride field for the OpenInspection MCP integration'),
     // DB-16 — report cover photo. References an inspection_media_pool row id
-    // belonging to THIS inspection (validated in the PATCH handler); null
-    // clears the cover. The editor UI for picking it lands with Track H —
-    // this write path makes preflight's `coverPhotoSet` attainable via API.
-    coverPhotoId: z.string().uuid().nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440042' }).describe('Report cover photo — an inspection_media_pool row id owned by this inspection; null clears it.'),
+    // belonging to THIS inspection (validated in the PATCH handler via
+    // isInspectionPhotoKey); null clears the cover. The value is an R2 photo
+    // key (attached item photo or pool photo), not a UUID.
+    coverPhotoId: z.string().min(1).nullable().optional().openapi({ example: 'tenant/insp/itemId_uuid.jpg' }).describe('Report cover photo — the R2 key of a photo belonging to this inspection (attached item photo or pool photo); null clears it.'),
     // Track H (IA-7) — per-inspection override of the tenant's
     // require_defect_fields publish-gate policy; null = inherit.
     requireDefectFieldsOverride: z.enum(['none', 'location', 'trade', 'both']).nullable().optional().describe('Per-inspection override of which defect fields the publish gate requires; null inherits the tenant default.'),
@@ -333,7 +333,7 @@ export const InspectionHubSchema = z.object({
     paymentStatus:     z.string().describe('Payment status: unpaid | partial | paid'),
     paymentRequired:   z.boolean().describe('Whether report is payment-gated'),
     agreementRequired: z.boolean().describe('Whether report is agreement-gated'),
-    coverPhoto:        z.string().nullable().describe('inspection_media_pool id used as the cover image'),
+    coverPhoto:        z.string().nullable().describe('R2 key of the photo used as the report cover image'),
     referredByAgentId: z.string().nullable().describe('Buyer agent contacts.id'),
     sellingAgentId:    z.string().nullable().describe('Listing agent contacts.id'),
     createdAt:         z.string().nullable().describe('ISO creation timestamp'),
