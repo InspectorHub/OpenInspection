@@ -3,6 +3,7 @@ import { Link, useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/settings-contractor-types";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 
 interface ContractorType { id: string; name: string; sortOrder: number }
 
@@ -52,7 +53,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 const INPUT = "px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none";
 
-function ContractorTypeRow({ t, idx, count, onMove }: { t: ContractorType; idx: number; count: number; onMove: (idx: number, dir: -1 | 1) => void }) {
+function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: ContractorType; idx: number; count: number; onMove: (idx: number, dir: -1 | 1) => void; onRequestDelete: () => void }) {
   const fetcher = useFetcher<typeof action>();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(t.name);
@@ -74,11 +75,7 @@ function ContractorTypeRow({ t, idx, count, onMove }: { t: ContractorType; idx: 
         <>
           <span className="flex-1 font-bold text-[13px] text-ih-fg-1">{t.name}</span>
           <button onClick={() => { setEditing(true); setName(t.name); }} className="text-[12px] text-ih-primary hover:underline font-bold">Rename</button>
-          <fetcher.Form method="POST" onSubmit={(e) => { if (!confirm("Delete this contractor type?")) e.preventDefault(); }}>
-            <input type="hidden" name="intent" value="delete" />
-            <input type="hidden" name="id" value={t.id} />
-            <button type="submit" aria-label={`Delete ${t.name}`} className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
-          </fetcher.Form>
+          <button onClick={onRequestDelete} aria-label={`Delete ${t.name}`} className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
         </>
       )}
     </div>
@@ -89,6 +86,8 @@ export default function SettingsContractorTypes() {
   const { types } = useLoaderData<typeof loader>();
   const createFetcher = useFetcher<typeof action>();
   const reorderFetcher = useFetcher<typeof action>();
+  const deleteFetcher = useFetcher<typeof action>();
+  const [pendingDelete, setPendingDelete] = useState<ContractorType | null>(null);
   const [newName, setNewName] = useState("");
 
   function move(idx: number, dir: -1 | 1) {
@@ -128,10 +127,22 @@ export default function SettingsContractorTypes() {
       ) : (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg divide-y divide-ih-border">
           {types.map((t, idx) => (
-            <ContractorTypeRow key={t.id} t={t} idx={idx} count={types.length} onMove={move} />
+            <ContractorTypeRow key={t.id} t={t} idx={idx} count={types.length} onMove={move} onRequestDelete={() => setPendingDelete(t)} />
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete contractor type"
+        message={pendingDelete ? `Delete "${pendingDelete.name}"? This can't be undone.` : ""}
+        busy={deleteFetcher.state !== "idle"}
+        onConfirm={() => {
+          if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { Route } from "./+types/repair-items";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 
 export function meta() {
   return [{ title: "Repair Items - OpenInspection" }];
@@ -90,6 +91,8 @@ const EMPTY = {
 export default function RepairItemsPage() {
   const { items, contractorTypes } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
+  const deleteFetcher = useFetcher<typeof action>();
+  const [pendingDelete, setPendingDelete] = useState<RepairItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const ctName = (id: string | null) => contractorTypes.find((c) => c.id === id)?.name ?? null;
@@ -149,7 +152,7 @@ export default function RepairItemsPage() {
               </div>
               <div className="mt-3 flex gap-3">
                 <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary hover:underline font-bold">Edit</button>
-                <DeleteRepairItemButton id={it.id} />
+                <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
               </div>
             </Card>
           ))}
@@ -192,22 +195,23 @@ export default function RepairItemsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete repair item"
+        message={pendingDelete ? `Delete "${pendingDelete.name}"? This can't be undone.` : ""}
+        busy={deleteFetcher.state !== "idle"}
+        onConfirm={() => {
+          if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
 
-const INPUT = "w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none";
-
-function DeleteRepairItemButton({ id }: { id: string }) {
-  const fetcher = useFetcher();
-  return (
-    <fetcher.Form method="POST" onSubmit={(e) => { if (!confirm("Delete this repair item?")) e.preventDefault(); }}>
-      <input type="hidden" name="intent" value="delete" />
-      <input type="hidden" name="id" value={id} />
-      <button type="submit" className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
-    </fetcher.Form>
-  );
-}
+const INPUT ="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
