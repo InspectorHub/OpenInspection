@@ -68,12 +68,19 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   const saveFetcher = useFetcher<{ ok: boolean; intent?: string }>();
   const templateChangedAtSubmit = useRef(false);
 
+  type CoverPhoto = { key: string; url: string; label: string };
   type SheetData = {
     inspection: Record<string, unknown> | null;
     templates: Template[];
     members: Array<{ id: string; email: string }>;
+    photos: CoverPhoto[];
   };
   const loadFetcher = useFetcher<SheetData>();
+  // DB-16 — report cover picker. `photos` are all of the inspection's photos;
+  // `coverKey` is the chosen cover R2 key (optimistic; PATCHed via coverFetcher).
+  const [photos, setPhotos] = useState<CoverPhoto[]>([]);
+  const [coverKey, setCoverKey] = useState<string>("");
+  const coverFetcher = useFetcher();
 
   // Trigger load when the sheet opens or inspectionId changes
   useEffect(() => {
@@ -105,8 +112,18 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     }
     setTemplates(d.templates ?? []);
     setInspectors((d.members ?? []) as Inspector[]);
+    setPhotos(d.photos ?? []);
+    // Cover key lives on the inspection row; the detail API exposes it as
+    // `coverPhotoId` (raw) or `coverPhoto` (formatted) — read either.
+    setCoverKey(((insp?.coverPhotoId ?? insp?.coverPhoto) as string | null) ?? "");
     setLoading(false);
   }, [loadFetcher.data]);
+
+  function selectCover(key: string) {
+    const next = coverKey === key ? "" : key; // click current cover to clear
+    setCoverKey(next);
+    coverFetcher.submit({ intent: "set-cover", coverPhotoId: next }, { method: "post" });
+  }
 
   // Sync loading state with fetcher
   useEffect(() => {
@@ -270,6 +287,37 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                   </select>
                   <p className="mt-1 text-[11px] text-ih-fg-4">Overrides the workspace default for this inspection only.</p>
                 </label>
+              </fieldset>
+
+              {/* DB-16 — report cover photo picker (pick any inspection photo) */}
+              <fieldset className="space-y-2">
+                <legend className={labelClass}>Report cover photo</legend>
+                {photos.length === 0 ? (
+                  <p className="text-[12px] text-ih-fg-4">No photos yet. Add photos to an inspection item, then choose one as the report cover.</p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {photos.map((p) => {
+                        const selected = coverKey === p.key;
+                        return (
+                          <button
+                            key={p.key}
+                            type="button"
+                            onClick={() => selectCover(p.key)}
+                            title={selected ? "Current cover — click to clear" : `Set as cover${p.label ? ` (${p.label})` : ""}`}
+                            className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${selected ? "border-ih-primary" : "border-ih-border hover:border-ih-primary/60"}`}
+                          >
+                            <img src={p.url} alt={p.label || "Photo"} className="w-full h-full object-cover" loading="lazy" />
+                            {selected && (
+                              <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[9px] font-bold text-center py-0.5">COVER</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1 text-[11px] text-ih-fg-4">Shown on the report cover page. Click the selected photo to clear it.</p>
+                  </>
+                )}
               </fieldset>
 
               <div className="flex items-center justify-end gap-3 border-t border-ih-border pt-4">

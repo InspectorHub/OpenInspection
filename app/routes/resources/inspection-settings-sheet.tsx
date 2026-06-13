@@ -20,21 +20,31 @@ interface Member {
     role: string;
 }
 
+// DB-16 — a flat photo the inspector can pick as the report cover.
+interface CoverPhoto {
+    key: string;
+    url: string;
+    label: string;
+}
+
+const EMPTY = { inspection: null, templates: [] as Template[], members: [] as Member[], photos: [] as CoverPhoto[] };
+
 export async function loader({ request, context }: Route.LoaderArgs) {
     const token = await getToken(context, request);
-    if (!token) return { inspection: null, templates: [] as Template[], members: [] as Member[] };
+    if (!token) return EMPTY;
 
     const url = new URL(request.url);
     const inspectionId = url.searchParams.get("inspectionId") ?? "";
-    if (!inspectionId) return { inspection: null, templates: [] as Template[], members: [] as Member[] };
+    if (!inspectionId) return EMPTY;
 
     const api = createApi(context, { token });
     const hdr = { headers: { "x-token-relay": "1" } } as const;
 
-    const [inspRes, tplRes, membersRes] = await Promise.all([
+    const [inspRes, tplRes, membersRes, mediaRes] = await Promise.all([
         api.inspections[":id"].$get({ param: { id: inspectionId } }, hdr).catch(() => null),
         api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }, hdr).catch(() => null),
         api.team.members.$get({}, hdr).catch(() => null),
+        api.inspections[":id"].media.$get({ param: { id: inspectionId } }, hdr).catch(() => null),
     ]);
 
     let inspection: Record<string, unknown> | null = null;
@@ -60,5 +70,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         }
     }
 
-    return { inspection, templates, members };
+    // DB-16 — flatten attached + pool photos into one pickable cover list.
+    const photos: CoverPhoto[] = [];
+    if (mediaRes?.ok) {
+        const body = (await mediaRes.json()) as {
+            data?: {
+                attached?: Array<{ key: string; url: string; itemLabel?: string }>;
+                pool?: Array<{ key: string; url: string }>;
+            };
+        };
+        for (const a of body?.data?.attached ?? []) {
+            if (a?.key && a?.url) photos.push({ key: a.key, url: a.url, label: a.itemLabel ?? "" });
+        }
+        for (const p of body?.data?.pool ?? []) {
+            if (p?.key && p?.url) photos.push({ key: p.key, url: p.url, label: "Unattached" });
+        }
+    }
+
+    return { inspection, templates, members, photos };
 }
