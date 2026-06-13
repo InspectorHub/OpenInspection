@@ -71,6 +71,7 @@ interface LoaderResult {
  address: string;
  date: string;
  inspectorName: string | null;
+ coverPhotoUrl: string | null;
  stats: { total: number; satisfactory: number; monitor: number; defect: number };
  sections: ReportSection[];
  showEstimates: boolean;
@@ -116,6 +117,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  address: d?.address ?? meta?.inspection?.propertyAddress ?? "",
  date: d?.date ?? meta?.inspection?.date ?? "",
  inspectorName: d?.inspectorName ?? meta?.inspection?.inspectorName ?? null,
+ coverPhotoUrl: d?.coverPhotoUrl ?? null,
  stats: d?.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
  sections: d?.sections ?? [],
  showEstimates: d?.showEstimates ?? false,
@@ -141,6 +143,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  messageToken: null,
  isDelivered: false,
  brand: EMPTY_BRAND,
+ coverPhotoUrl: null,
  error: "Service unavailable",
  } satisfies LoaderResult;
  }
@@ -301,6 +304,20 @@ export default function ReportCardStackPage() {
  {data.date} &middot; Inspector: {data.inspectorName || "N/A"}
  </p>
  </div>
+
+ {/* Cover photo (DB-16) — the inspector-chosen report cover image. Hidden
+     gracefully if the underlying photo was removed (onError). */}
+ {data.coverPhotoUrl && (
+ <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
+ <img
+ src={data.coverPhotoUrl}
+ alt={`Cover photo — ${data.address}`}
+ className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
+ loading="lazy"
+ onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
+ />
+ </div>
+ )}
 
  {/* Stats */}
  <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
