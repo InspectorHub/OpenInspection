@@ -69,4 +69,42 @@ describe('TeamService.createInvite — canonical roles', () => {
         expect(row?.mentorId).toBeNull();
         expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
     });
+
+    it('stores only the overrides that differ from the role template', async () => {
+        // Inspector template = publish:true, scheduleOthers:false, financial:false,
+        // manageContacts:false. publish:true matches the template (dropped);
+        // scheduleOthers:true differs (kept).
+        const out = await svc.createInvite({
+            tenantId: TENANT,
+            email:    'diff@acme.test',
+            role:     'inspector',
+            permissionOverrides: { publish: true, scheduleOthers: true },
+        });
+        const row = await testDb.select().from(schema.tenantInvites)
+            .where(eq(schema.tenantInvites.id, out.token)).get();
+        expect(row?.permissionOverrides).toEqual({ scheduleOthers: true });
+    });
+
+    it('stores null when every requested override equals the role template', async () => {
+        const out = await svc.createInvite({
+            tenantId: TENANT,
+            email:    'samedefault@acme.test',
+            role:     'inspector',
+            permissionOverrides: { publish: true, financial: false },
+        });
+        const row = await testDb.select().from(schema.tenantInvites)
+            .where(eq(schema.tenantInvites.id, out.token)).get();
+        expect(row?.permissionOverrides ?? null).toBeNull();
+    });
+
+    it('stores null when no overrides are supplied', async () => {
+        const out = await svc.createInvite({
+            tenantId: TENANT,
+            email:    'none@acme.test',
+            role:     'manager',
+        });
+        const row = await testDb.select().from(schema.tenantInvites)
+            .where(eq(schema.tenantInvites.id, out.token)).get();
+        expect(row?.permissionOverrides ?? null).toBeNull();
+    });
 });

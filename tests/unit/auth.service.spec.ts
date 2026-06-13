@@ -138,6 +138,35 @@ describe('AuthService', () => {
         expect(dbUser?.name).toBe('Jamie Rivera');
     });
 
+    it('joinTeam carries the invite permission overrides onto the new member row', async () => {
+        const token = 'invite-overrides';
+        await testDb.insert(tenantInvites).values({
+            id: token, tenantId: 't1', email: 'override@example.com', role: 'inspector',
+            status: 'pending', expiresAt: new Date(Date.now() + 1000000), invitedBy: 'u1',
+            // Inspector template has publish:true — this invite grants the extra
+            // scheduleOthers capability and revokes publish.
+            permissionOverrides: { publish: false, scheduleOthers: true },
+        } as any);
+
+        await authService.joinTeam(token, 'password');
+
+        const dbUser = await testDb.select().from(users).where(eq(users.email as any, 'override@example.com')).get();
+        expect(dbUser?.permissionOverrides).toEqual({ publish: false, scheduleOthers: true });
+    });
+
+    it('joinTeam leaves permission overrides null when the invite used the pure role template', async () => {
+        const token = 'invite-no-overrides';
+        await testDb.insert(tenantInvites).values({
+            id: token, tenantId: 't1', email: 'plain@example.com', role: 'inspector',
+            status: 'pending', expiresAt: new Date(Date.now() + 1000000), invitedBy: 'u1',
+        } as any);
+
+        await authService.joinTeam(token, 'password');
+
+        const dbUser = await testDb.select().from(users).where(eq(users.email as any, 'plain@example.com')).get();
+        expect(dbUser?.permissionOverrides ?? null).toBeNull();
+    });
+
     it('getInviteInfo returns email + workspace name for a live invite, null otherwise (C-10 ③-B)', async () => {
         await testDb.insert(tenantInvites).values({
             id: 'inv-live', tenantId: 't1', email: 'peek@example.com', role: 'inspector',

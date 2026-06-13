@@ -206,6 +206,11 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     // never replayed onto the users row; no behavior depends on it.
     mentorId:           text('mentor_id'),
     assignedSectionIds: text('assigned_section_ids').notNull().default('[]'),
+    // Role permission-template overrides (2026-06-13). Mirrors
+    // users.permission_overrides — carries the inviter's chosen toggle diffs
+    // through accept onto the new users row. Null = pure role template.
+    permissionOverrides: text('permission_overrides', { mode: 'json' })
+      .$type<import('../../auth/capabilities').PermissionOverrides | null>(),
 }, (t) => [
     index('idx_invites_tenant').on(t.tenantId),
     // DB-9 — at most one OUTSTANDING invite per (tenant, email). Partial so an

@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_invites` ADD `permission_overrides` text;

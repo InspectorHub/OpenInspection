@@ -15,6 +15,13 @@
       "when": 1781360816154,
       "tag": "0001_loose_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1781366102424,
+      "tag": "0003_invite_permission_overrides",
+      "breakpoints": true
     }
   ]
 }

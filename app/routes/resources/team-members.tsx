@@ -40,9 +40,23 @@ export async function action({ request, context }: Route.ActionArgs) {
 
         if (!email) return { ok: false, intent, error: "Email is required", url: null };
 
+        // Advanced-permissions disclosure ships a JSON map of the capability
+        // diffs vs the role template. Absent/empty → pure role template.
+        let permissionOverrides: Record<string, boolean> | undefined;
+        const rawOverrides = fd.get("permissionOverrides");
+        if (typeof rawOverrides === "string" && rawOverrides.trim()) {
+            try {
+                const parsed = JSON.parse(rawOverrides) as Record<string, boolean>;
+                if (parsed && Object.keys(parsed).length > 0) permissionOverrides = parsed;
+            } catch {
+                // Ignore malformed override payloads — the server re-derives from
+                // the role template, so dropping them fails safe.
+            }
+        }
+
         try {
             const res = await api.team.invite.$post({
-                json: { email, role } as Parameters<typeof api.team.invite.$post>[0]["json"],
+                json: { email, role, permissionOverrides } as Parameters<typeof api.team.invite.$post>[0]["json"],
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({})) as { error?: string };

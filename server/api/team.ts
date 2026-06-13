@@ -129,6 +129,7 @@ export const teamRoutes = createApiRouter()
             tenantId,
             email: body.email,
             role:  body.role,
+            permissionOverrides: body.permissionOverrides ?? null,
         });
 
         const inviteLink = `${getBaseUrl(c)}/join?token=${token}`;
