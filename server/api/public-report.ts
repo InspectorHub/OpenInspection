@@ -1,4 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants } from '../lib/db/schema';
@@ -10,7 +11,70 @@ import { resolvePortalAccess, resolveObserverAccess } from '../lib/public-access
 import { contentDisposition } from '../lib/content-disposition';
 import { loadVerifyData, loadReportVerifyData } from '../lib/verify-data';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
+import { verifyJwt, type JwtKeyring } from '../lib/jwt-keyring';
+import { classifyJwtPayload } from '../lib/auth/jwt-claims';
+import type { HonoConfig } from '../types/hono';
 import { logger } from '../lib/logger';
+
+/**
+ * Testable core of the owner-session preview fallback. Given a raw session JWT
+ * (Bearer value, already stripped of the "Bearer " prefix), the per-request
+ * keyring, and an optional KV getter for password-change invalidation, returns
+ * the authenticated user's tenantId — or null on ANY failure (missing token,
+ * bad signature, expired, non-tenant class, or KV-invalidated). Fail-closed so
+ * an invalid token can never widen public access.
+ *
+ * Ownership of a specific inspection is NOT asserted here; the caller hands the
+ * returned tenantId to a tenant-scoped query (getReportData), which 404s on a
+ * cross-tenant id.
+ */
+export async function resolveOwnerPreviewToken(
+    token: string | undefined,
+    keyring: JwtKeyring | undefined,
+    kvGet?: (key: string) => Promise<string | null>,
+): Promise<string | null> {
+    if (!token || !keyring) return null;
+    try {
+        const payload = await verifyJwt(token, keyring);
+        const classification = classifyJwtPayload(payload);
+        if (classification?.kind !== 'tenant') return null;
+        // Honor KV session invalidation (password change/reset/delete) — mirror
+        // the global jwtAuthMiddleware so a revoked owner token can't preview.
+        const userId = payload.sub as string | undefined;
+        const tokenIat = payload.iat as number | undefined;
+        if (userId && kvGet) {
+            const invalidatedAt = await kvGet(`pwchanged:${userId}`);
+            if (invalidatedAt) {
+                const invalidatedTs = parseInt(invalidatedAt, 10);
+                if (!tokenIat || tokenIat < invalidatedTs) return null;
+            }
+        }
+        return classification.tenantId;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Owner-session preview fallback for the public report endpoints.
+ *
+ * The owner's "View report" link (dashboard / inspection hub) deep-links into
+ * the public report tokenlessly so the inspector/admin can preview exactly what
+ * a client sees. Those routes are otherwise gated by a per-recipient portal
+ * token, which the owner does not hold. The global JWT middleware skips
+ * `/api/public/*` (server/index.ts), so the owner's relayed session Bearer token
+ * is never verified upstream — we verify it HERE instead.
+ */
+async function resolveOwnerPreview(c: Context<HonoConfig>): Promise<string | null> {
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    // Public client viewers carry no Bearer token — bail before touching the
+    // keyring or KV so the common (tokenless-public) path stays side-effect-free.
+    if (!token) return null;
+    const keyring = await c.var.keyringPromise?.catch(() => undefined);
+    const kv = c.env?.TENANT_CACHE;
+    return resolveOwnerPreviewToken(token, keyring, kv ? (k) => kv.get(k) : undefined);
+}
 
 /**
  * Public, no-login portal endpoints (`/api/public/*`). Access is gated by the
@@ -392,6 +456,10 @@ export const publicReportRoutes = createApiRouter()
             const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
             if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
         }
+        // Owner-session preview: an authenticated tenant user (inspector/admin)
+        // may preview their own report without a recipient token. Ownership of
+        // THIS inspection is enforced by getReportData's tenant-scoped query.
+        if (!tenantId) tenantId = await resolveOwnerPreview(c);
         if (!tenantId) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
@@ -411,6 +479,10 @@ export const publicReportRoutes = createApiRouter()
             const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
             if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
         }
+        // Owner-session preview — same fallback as the report data route so the
+        // owner's tokenless preview can load its photos (the key is re-checked
+        // against this tenant + inspection below).
+        if (!tenantId) tenantId = await resolveOwnerPreview(c);
         if (!tenantId) return c.notFound();
         if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/${inspectionId}/...` — reject anything

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
+import { getToken } from "~/lib/session.server";
 import { photoDisplayName, withDownload } from "~/lib/photo-name";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
@@ -87,7 +88,11 @@ interface LoaderResult {
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
  try {
- const api = createApi(context);
+ // Relay the owner's session JWT when present so the inspector/admin can
+ // preview their own report tokenlessly (resolveOwnerPreview server-side).
+ // Public client viewers carry no session → getToken returns null → unchanged.
+ const sessionToken = (await getToken(context, request)) ?? undefined;
+ const api = createApi(context, { token: sessionToken });
  const token = new URL(request.url).searchParams.get("token") ?? undefined;
  const [res, brand] = await Promise.all([
  api.publicReport.report[":tenant"][":id"].$get({
