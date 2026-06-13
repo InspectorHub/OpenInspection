@@ -9,7 +9,7 @@ import { makeCustomDefect } from "~/lib/custom-defects";
 import { sanitizeSettingsPatch } from "~/lib/settings-patch";
 import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
-import { useFindings } from "~/hooks/useFindings";
+import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
 import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "~/hooks/useKeyboard";
@@ -1497,6 +1497,14 @@ export default function InspectionEditPage() {
  });
  }}
  queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}
+ attachedRepairItems={
+ (state.activeItemId
+ ? (findings.getResult(state.activeItemId, state.currentSection?.id)
+ .recommendations as AttachedRepairItem[] | undefined)
+ : undefined) ?? []
+ }
+ onAttachRepairItem={findings.attachRepairItem}
+ onDetachRepairItem={findings.detachRepairItem}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">

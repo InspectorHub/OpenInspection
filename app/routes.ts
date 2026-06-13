@@ -85,6 +85,7 @@ export default [
   // BFF resource routes (no UI) — Token-Relay endpoints for editor hooks
   // (Track H / C-12: client code never fetches /api directly).
   route("resources/comments-library", "routes/resources/comments-library.tsx"),
+  route("resources/repair-items", "routes/resources/repair-items.tsx"),
   route("resources/identities", "routes/resources/identities.tsx"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
