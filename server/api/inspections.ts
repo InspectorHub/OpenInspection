@@ -972,6 +972,7 @@ const servePhotoRoute = createRoute(withMcpMetadata({
         query: z.object({
             key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
+            w: z.string().optional().describe('Optional max width in pixels for an on-the-fly thumbnail (grid previews); omitted serves the full-resolution original.'),
         }),
     },
     responses: {
@@ -2416,13 +2417,43 @@ export const inspectionsRoutes = createApiRouter()
     .openapi(servePhotoRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
-        const { key, download } = c.req.valid('query');
+        const { key, download, w } = c.req.valid('query');
         if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/${inspectionId}/...`; reject anything
         // outside this caller's tenant + the inspection in the path.
         if (!key.startsWith(`${tenantId}/${id}/`)) return c.notFound();
         const obj = await c.env.PHOTOS.get(key);
         if (!obj) return c.notFound();
+
+        // DB-16 — optional on-the-fly thumbnail (`?w=`) for grid previews so the
+        // browser doesn't download full-resolution originals. Uses the Cloudflare
+        // Images binding when available; ANY failure (no binding / no entitlement /
+        // non-image) falls back to streaming the original, so it never regresses.
+        const width = w ? Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000) : 0;
+        const images = (c.env as unknown as { IMAGES?: {
+            input(s: ReadableStream): { transform(o: { width: number }): { output(o: { format: string }): Promise<{ response(): Response }> } };
+        } }).IMAGES;
+        if (width > 0 && images && obj.body) {
+            try {
+                const out = await images.input(obj.body).transform({ width }).output({ format: 'image/webp' });
+                const r = out.response();
+                const h = new Headers(r.headers);
+                h.set('Cache-Control', 'private, max-age=300');
+                return new Response(r.body, { status: 200, headers: h });
+            } catch (err) {
+                logger.warn('[photo] thumbnail transform failed — serving original', { key, width, error: String(err) });
+                // fall through to original below (re-fetch since the stream was consumed)
+                const orig = await c.env.PHOTOS.get(key);
+                if (orig) {
+                    const hh = new Headers();
+                    hh.set('Content-Type', orig.httpMetadata?.contentType || 'application/octet-stream');
+                    hh.set('Cache-Control', 'private, max-age=300');
+                    return new Response(orig.body, { status: 200, headers: hh });
+                }
+                return c.notFound();
+            }
+        }
+
         const headers = new Headers();
         headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
         headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download === '1'));

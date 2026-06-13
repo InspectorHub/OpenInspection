@@ -64,12 +64,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  api.inspections[":id"].results.$get({ param: { id } }),
  api.inspections[":id"]["report-data"].$get({ param: { id } }),
  // Track H (C-12): tag library moved off the client-side fetch into the loader.
  api.tags.index.$get().catch(() => null),
+ // tenantSlug for the "Preview full report" link (/report-view/:slug/:id).
+ api.sessionContext.context.$get().catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -122,7 +124,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  tagLibrary = tagsBody.data ?? [];
  }
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary };
+ let tenantSlug: string | null = null;
+ if (sessRes?.ok) {
+ const sb = await sessRes.json() as { data?: { branding?: { tenantSlug?: string | null } } };
+ tenantSlug = sb.data?.branding?.tenantSlug ?? null;
+ }
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug };
 }
 
 /**
@@ -2352,6 +2360,22 @@ export default function InspectionEditPage() {
  />
  Auto-sign
  </label>
+
+ {/* Preview full report — opens the whole report (all sections) in a new tab.
+     Owner preview works on drafts (tokenless via the report-view loader). */}
+ {loaderData.tenantSlug && (
+ <button
+ onClick={() => window.open(`/report-view/${loaderData.tenantSlug}/${state.inspection.id}`, "_blank", "noopener")}
+ className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+ title="Preview the full report (all sections) in a new tab"
+ >
+ <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+ </svg>
+ Preview report
+ </button>
+ )}
 
  {/* Sign now button */}
  <button

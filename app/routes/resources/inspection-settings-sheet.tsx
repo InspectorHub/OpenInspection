@@ -76,10 +76,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // surface the same photo twice; the cover grid must show each photo once.
     const photos: CoverPhoto[] = [];
     const seen = new Set<string>();
+    // Request small thumbnails (?w=240) for the grid so the browser doesn't pull
+    // full-resolution originals; the photo endpoint resizes when CF Images is
+    // available and falls back to the original otherwise.
+    const thumb = (url: string) => (url.includes("?") ? `${url}&w=240` : `${url}?w=240`);
     const pushPhoto = (key?: string, url?: string, label = "") => {
         if (!key || !url || seen.has(key)) return;
         seen.add(key);
-        photos.push({ key, url, label });
+        photos.push({ key, url: thumb(url), label });
     };
     if (mediaRes?.ok) {
         const body = (await mediaRes.json()) as {
