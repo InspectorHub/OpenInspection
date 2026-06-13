@@ -1,3 +1,5 @@
+import { parseFindingKey } from './finding-key';
+
 export interface AggregatedRecItem {
     recommendationId: string;
     estimateSnapshotMin: number | null;
@@ -30,7 +32,7 @@ export function aggregateAttachedRecommendations(data: Record<string, unknown> |
     let estimateMaxSum = 0;
 
     for (const [rawKey, rawItem] of Object.entries(data ?? {})) {
-        const itemId = rawKey.includes(':') ? rawKey.slice(rawKey.lastIndexOf(':') + 1) : rawKey;
+        const itemId = parseFindingKey(rawKey).itemId;
         const recs = (rawItem as { recommendations?: Array<Record<string, unknown>> } | null)?.recommendations ?? [];
         for (const rec of recs) {
             const r = rec as {
