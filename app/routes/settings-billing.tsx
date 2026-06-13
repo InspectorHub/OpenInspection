@@ -240,7 +240,7 @@ export default function SettingsBillingPage() {
           )}
           <section className="bg-ih-bg-card border border-ih-border rounded-md p-5 text-[12px] text-ih-fg-3 leading-relaxed">
             <div className="font-bold text-ih-fg-1 mb-1.5 text-[13px]">Add a seat</div>
-            Add a permanent inspector or generate a guest invite link in{" "}
+            Add an inspector in{" "}
             <Link to="/settings/team" className="font-semibold text-ih-primary hover:underline">Team settings</Link>.
           </section>
         </aside>
