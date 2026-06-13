@@ -54,31 +54,34 @@ export function RepairItemsPanel({
     <div className="mt-3 border-t border-ih-border pt-3">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Repair items</span>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="text-[12px] text-ih-primary font-bold hover:underline">+ Attach repair item</button>
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="repair-items-disclosure" className="text-[12px] text-ih-primary font-bold hover:underline">+ Attach repair item</button>
       </div>
 
       {attached.length > 0 && (
         <ul className="mt-2 space-y-1.5">
-          {attached.map((a) => (
-            <li key={a.recommendationId} className="flex items-start justify-between gap-2 text-[12px]">
-              <div>
-                <p className="text-ih-fg-2">{a.summarySnapshot}</p>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  {estimateText(a.estimateSnapshotMin, a.estimateSnapshotMax) && (
-                    <span className="text-[11px] tabular-nums text-ih-ok-fg">{estimateText(a.estimateSnapshotMin, a.estimateSnapshotMax)}</span>
-                  )}
-                  {a.contractorTypeSnapshot && <span className="text-[11px] text-ih-info-fg">{a.contractorTypeSnapshot}</span>}
+          {attached.map((a) => {
+            const est = estimateText(a.estimateSnapshotMin, a.estimateSnapshotMax);
+            return (
+              <li key={a.recommendationId} className="flex items-start justify-between gap-2 text-[12px]">
+                <div>
+                  <p className="text-ih-fg-2">{a.summarySnapshot}</p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    {est && (
+                      <span className="text-[11px] tabular-nums text-ih-ok-fg">{est}</span>
+                    )}
+                    {a.contractorTypeSnapshot && <span className="text-[11px] text-ih-info-fg">{a.contractorTypeSnapshot}</span>}
+                  </div>
                 </div>
-              </div>
-              <button type="button" onClick={() => onDetach(a.recommendationId)} className="text-ih-bad-fg hover:underline shrink-0" aria-label={`Remove ${a.summarySnapshot}`}>Remove</button>
-            </li>
-          ))}
+                <button type="button" onClick={() => onDetach(a.recommendationId)} className="text-ih-bad-fg hover:underline shrink-0" aria-label={`Remove ${a.summarySnapshot}`}>Remove</button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {open && (
-        <div className="mt-2 border border-ih-border rounded-md p-2 bg-ih-bg-muted/40">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search repair items…" autoFocus
+        <div id="repair-items-disclosure" className="mt-2 border border-ih-border rounded-md p-2 bg-ih-bg-muted/40">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search repair items…" aria-label="Search repair items" autoFocus
             className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-card text-[12px] text-ih-fg-1 focus:border-ih-primary outline-none" />
           <ul className="mt-2 max-h-48 overflow-auto divide-y divide-ih-border">
             {filtered.length === 0 ? (
