@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { requireCapability, type OverrideResolver } from '../../server/lib/middleware/require-capability';
-import { coerceOverrides, type PermissionOverrides } from '../../server/lib/auth/capabilities';
+import { coerceOverrides, getCapabilities, type PermissionOverrides } from '../../server/lib/auth/capabilities';
 import { AppError } from '../../server/lib/errors';
 import type { Role } from '../../server/lib/auth/roles';
 
@@ -81,6 +81,28 @@ describe('requireCapability middleware', () => {
         app.get('/gated', requireCapability('publish', async () => null), (c) => c.json({ ok: true }));
         const res = await app.request('/gated');
         expect(res.status).toBe(401);
+    });
+});
+
+describe('inspector capability-resolution for role-widened endpoints', () => {
+    // These endpoints (invoices list → financial; contact create/update/delete →
+    // manageContacts) now admit 'inspector' through the requireRole gate so the
+    // capability becomes the EFFECTIVE gate. An inspector is still default-denied;
+    // only an explicit {financial:true}/{manageContacts:true} override lets them
+    // through. Owner/admin default true and are unaffected.
+    it('inspector financial: override true → allowed, null → denied', () => {
+        expect(getCapabilities('inspector', { financial: true }).financial).toBe(true);
+        expect(getCapabilities('inspector', null).financial).toBe(false);
+    });
+    it('inspector manageContacts: override true → allowed, null → denied', () => {
+        expect(getCapabilities('inspector', { manageContacts: true }).manageContacts).toBe(true);
+        expect(getCapabilities('inspector', null).manageContacts).toBe(false);
+    });
+    it('owner/admin financial + manageContacts default true (role gate widening is a no-op for them)', () => {
+        expect(getCapabilities('owner', null).financial).toBe(true);
+        expect(getCapabilities('owner', null).manageContacts).toBe(true);
+        expect(getCapabilities('admin', null).financial).toBe(true);
+        expect(getCapabilities('admin', null).manageContacts).toBe(true);
     });
 });
 
