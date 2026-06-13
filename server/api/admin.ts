@@ -2167,7 +2167,7 @@ export const adminRoutes = createApiRouter()
         const existing = await db.select().from(comments)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Comment not found');
-        const patch: Record<string, unknown> = {
+        const patch: Partial<typeof comments.$inferInsert> = {
             text,
             category: category ?? null,
             ratingBucket: ratingBucket ?? null,
@@ -2180,7 +2180,7 @@ export const adminRoutes = createApiRouter()
         await db.update(comments)
             .set(patch)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
-        const updated = { ...existing, ...patch };
+        const updated = { ...existing, ...patch } as typeof comments.$inferSelect;
         auditFromContext(c, 'comment.updated', 'comment', {
             entityId: id,
             metadata: {

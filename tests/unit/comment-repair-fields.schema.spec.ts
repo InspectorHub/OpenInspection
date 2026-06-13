@@ -10,6 +10,7 @@ describe('comment repair fields schemas', () => {
     });
     expect(parsed.repairSummary).toBe('Replace the double-tapped breaker');
     expect(parsed.estimateMinCents).toBe(15000);
+    expect(parsed.estimateMaxCents).toBe(40000);
     expect(parsed.recommendedContractorTypeId).toBe('ct-electrician');
   });
 
