@@ -21,16 +21,28 @@ FROM `recommendations`;
 --> statement-breakpoint
 -- Seed the default contractor-type list into every existing tenant.
 -- id = random 128-bit hex; created_at in epoch ms (timestamp_ms column).
+-- One plain INSERT..SELECT per type (NO compound UNION): D1 distributes a
+-- `tenants CROSS JOIN (… UNION ALL …)` into a per-tenant compound SELECT and
+-- trips "too many terms in compound SELECT" (SQLITE_ERROR 7500) even at a
+-- handful of tenants. Separate non-compound statements sidestep the limit.
 INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
-SELECT lower(hex(randomblob(16))), t.`id`, ct.`name`, ct.`ord`, CAST(strftime('%s','now') AS INTEGER) * 1000
-FROM `tenants` t
-CROSS JOIN (
-  SELECT 'Licensed Electrician' AS name, 1 AS ord UNION ALL
-  SELECT 'Plumber', 2 UNION ALL SELECT 'Roofer', 3 UNION ALL
-  SELECT 'HVAC Technician', 4 UNION ALL SELECT 'General Contractor', 5 UNION ALL
-  SELECT 'Structural Engineer', 6 UNION ALL SELECT 'Foundation Specialist', 7 UNION ALL
-  SELECT 'Pest/Termite', 8 UNION ALL SELECT 'Chimney Sweep', 9 UNION ALL
-  SELECT 'Grading/Drainage', 10
-) ct;
---> statement-breakpoint
+SELECT lower(hex(randomblob(16))), t.`id`, 'Licensed Electrician', 1, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'Plumber', 2, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'Roofer', 3, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'HVAC Technician', 4, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'General Contractor', 5, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'Structural Engineer', 6, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'Foundation Specialist', 7, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'Pest/Termite', 8, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'Chimney Sweep', 9, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
+INSERT INTO `contractor_types` (`id`,`tenant_id`,`name`,`sort_order`,`created_at`)
+SELECT lower(hex(randomblob(16))), t.`id`, 'Grading/Drainage', 10, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM `tenants` t;--> statement-breakpoint
 DROP TABLE `recommendations`;
