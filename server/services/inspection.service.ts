@@ -21,7 +21,6 @@ import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import type { AgreementService } from './agreement.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
 import { mapRepairItems } from '../lib/report-repair-items';
-export { mapRepairItems } from '../lib/report-repair-items';
 import { parseReinspectionStatuses, isOpenStatus } from '../lib/reinspection-status';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';

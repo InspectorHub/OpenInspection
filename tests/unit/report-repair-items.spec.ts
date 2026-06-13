@@ -21,4 +21,11 @@ describe('report repair items mapping', () => {
     const out = mapRepairItems({ recommendations: [{ summarySnapshot: 'x', estimateSnapshotMin: null, estimateSnapshotMax: null, contractorTypeSnapshot: null }] });
     expect(out).toEqual([{ summary: 'x', estimateMin: null, estimateMax: null, contractorType: null }]);
   });
+
+  it('skips recommendations with an empty summary', () => {
+    const out = mapRepairItems({ recommendations: [
+      { summarySnapshot: '', estimateSnapshotMin: 100, estimateSnapshotMax: 200, contractorTypeSnapshot: null },
+    ] });
+    expect(out).toBeUndefined();
+  });
 });
