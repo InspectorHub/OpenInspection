@@ -2115,7 +2115,7 @@ export const adminRoutes = createApiRouter()
     })
     .openapi(createCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const { text, category, ratingBucket, section } = c.req.valid('json');
+        const { text, category, ratingBucket, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
         const db = drizzle(c.env.DB);
         const row = {
             id: crypto.randomUUID(),
@@ -2132,10 +2132,10 @@ export const adminRoutes = createApiRouter()
             searchKeywords: null as string | null,
             itemLabel: null as string | null,
             severity: null as string | null,
-            repairSummary: null as string | null,
-            estimateMinCents: null as number | null,
-            estimateMaxCents: null as number | null,
-            recommendedContractorTypeId: null as string | null,
+            repairSummary: repairSummary ?? null,
+            estimateMinCents: estimateMinCents ?? null,
+            estimateMaxCents: estimateMaxCents ?? null,
+            recommendedContractorTypeId: recommendedContractorTypeId ?? null,
             createdAt: new Date(),
         };
         await db.insert(comments).values(row);
@@ -2162,17 +2162,21 @@ export const adminRoutes = createApiRouter()
     .openapi(updateCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const { text, category, ratingBucket, section } = c.req.valid('json');
+        const { text, category, ratingBucket, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
         const db = drizzle(c.env.DB);
         const existing = await db.select().from(comments)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Comment not found');
-        const patch = {
+        const patch: Record<string, unknown> = {
             text,
             category: category ?? null,
             ratingBucket: ratingBucket ?? null,
             section: section ?? null,
         };
+        if (repairSummary !== undefined) patch.repairSummary = repairSummary ?? null;
+        if (estimateMinCents !== undefined) patch.estimateMinCents = estimateMinCents ?? null;
+        if (estimateMaxCents !== undefined) patch.estimateMaxCents = estimateMaxCents ?? null;
+        if (recommendedContractorTypeId !== undefined) patch.recommendedContractorTypeId = recommendedContractorTypeId ?? null;
         await db.update(comments)
             .set(patch)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
