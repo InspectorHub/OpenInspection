@@ -1508,7 +1508,7 @@ export class InspectionService {
         sectionId?: string,
     ): Promise<{ key: string; itemId: string; photoIndex: number }> {
         if (!itemId) throw Errors.BadRequest('itemId is required');
-        const { inspection } = await this.getInspection(inspectionId, tenantId); // ownership check
+        await this.getInspection(inspectionId, tenantId); // ownership check
         const db = this.getDrizzle();
 
         const poolRow = await db.select().from(inspectionMediaPool)
@@ -1552,19 +1552,15 @@ export class InspectionService {
             });
         }
 
-        // DB-6: skip the DELETE when this pool row is the report cover.
-        // The pool row stays alive so coverPhotoId remains a valid reference
-        // and the preflight gate + report renderer can still resolve the R2 key.
-        // The photo key has already been written to results.data, so the item
-        // still gets the photo — only the pool row lives on as a cover anchor.
-        const isCover = (inspection.coverPhotoId as string | null) === poolId;
-        if (!isCover) {
-            await db.delete(inspectionMediaPool)
-                .where(and(
-                    eq(inspectionMediaPool.id, poolId),
-                    eq(inspectionMediaPool.tenantId, tenantId),
-                ));
-        }
+        // The pool row is a staging pointer only; once the photo key is written
+        // into results.data the pool row is always removed (the R2 object is
+        // preserved). DB-16: the report cover now references an R2 key, not a
+        // pool row id, so there is no longer a "cover anchor" reason to keep it.
+        await db.delete(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.id, poolId),
+                eq(inspectionMediaPool.tenantId, tenantId),
+            ));
 
         return { key: poolRow.r2Key, itemId, photoIndex };
     }
@@ -1772,16 +1768,7 @@ export class InspectionService {
         tenantId: string,
         poolId: string,
     ): Promise<void> {
-        // DB-6 (symmetric guard): fetch inspection for ownership check AND cover check.
-        const { inspection } = await this.getInspection(inspectionId, tenantId);
-
-        // Refuse hard-delete when the pool row is the current report cover.
-        // The user explicitly asked to delete, so rejecting is correct (not silently keeping).
-        // They must pick a different cover first, mirroring the attachPoolPhoto strategy-A guard.
-        if ((inspection.coverPhotoId as string | null) === poolId) {
-            throw Errors.BadRequest('This photo is the report cover — choose a different cover before deleting it');
-        }
-
+        await this.getInspection(inspectionId, tenantId); // ownership check
         const db = this.getDrizzle();
 
         const row = await db.select().from(inspectionMediaPool)
@@ -1804,6 +1791,49 @@ export class InspectionService {
                 logger.warn('[media-pool] R2 delete failed', { key: row.r2Key, error: String(err) });
             });
         }
+    }
+
+    /**
+     * DB-16 — is `key` the R2 key of a photo belonging to this inspection?
+     * The report cover (`inspections.cover_photo_id`) holds an R2 key; this
+     * validates a chosen cover. True when `key` matches any attached item photo
+     * (`inspection_results.data[*].photos[].key` or `.annotatedKey`) or any loose
+     * `inspection_media_pool` row's r2Key. Tenant-scoped; false for foreign keys.
+     */
+    async isInspectionPhotoKey(inspectionId: string, tenantId: string, key: string): Promise<boolean> {
+        if (!key) return false;
+        const db = this.getDrizzle();
+
+        // 1. Loose pool photos.
+        const pool = await db.select({ r2Key: inspectionMediaPool.r2Key })
+            .from(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.inspectionId, inspectionId),
+                eq(inspectionMediaPool.tenantId, tenantId),
+            ))
+            .all();
+        if (pool.some(p => p.r2Key === key)) return true;
+
+        // 2. Attached item photos in inspection_results.data[*].photos[].
+        const rows = await db.select({ data: inspectionResults.data })
+            .from(inspectionResults)
+            .where(and(
+                eq(inspectionResults.inspectionId, inspectionId),
+                eq(inspectionResults.tenantId, tenantId),
+            ))
+            .all();
+        for (const row of rows) {
+            const data = (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) as
+                Record<string, { photos?: Array<{ key?: string; annotatedKey?: string }> }> | null;
+            if (!data) continue;
+            for (const entry of Object.values(data)) {
+                const photos = Array.isArray(entry?.photos) ? entry.photos : [];
+                for (const p of photos) {
+                    if (p?.key === key || p?.annotatedKey === key) return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -2287,6 +2317,10 @@ export class InspectionService {
             theme: reportTheme,
             amendmentTrail,
             reinspection,
+            // DB-16 — resolved report cover image URL (cover_photo_id holds the
+            // R2 key of an attached/pool photo). null when the inspector has not
+            // picked a cover. The renderer consumes this directly.
+            coverPhotoUrl: inspection.coverPhotoId ? makePhotoUrl(inspection.coverPhotoId) : null,
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
             sections,
             ratingLevels: levels.length > 0 ? levels : [

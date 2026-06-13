@@ -13,6 +13,7 @@
  *   - getReportData resolves recommendation slugs to human-readable labels.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { InspectionService } from '../../server/services/inspection.service';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
@@ -197,6 +198,24 @@ describe('Sprint 2 S2-4 — repair estimate range', () => {
         });
         const report = await svc.getReportData(INSPECTION_ID, TENANT);
         expect(report.showEstimates).toBe(false);
+    });
+
+    it('getReportData returns coverPhotoUrl=null when no cover is set', async () => {
+        await svc.updateResults(INSPECTION_ID, TENANT, { 'roof-shingles': { rating: 'Satisfactory' } });
+        const report = await svc.getReportData(INSPECTION_ID, TENANT);
+        expect(report.coverPhotoUrl).toBeNull();
+    });
+
+    it('getReportData resolves coverPhotoUrl via makePhotoUrl when cover_photo_id is set', async () => {
+        const COVER_KEY = 'tenants/t/insp/item_cover.jpg';
+        await testDb.update(schema.inspections)
+            .set({ coverPhotoId: COVER_KEY })
+            .where(eq(schema.inspections.id, INSPECTION_ID));
+        const report = await svc.getReportData(
+            INSPECTION_ID, TENANT,
+            (key) => `https://cdn.example/${key}`,
+        );
+        expect(report.coverPhotoUrl).toBe(`https://cdn.example/${COVER_KEY}`);
     });
 
     it('getReportData reflects tenant_configs.show_estimates=true', async () => {

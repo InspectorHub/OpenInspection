@@ -56,7 +56,7 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, agreementSigners, users, contacts, inspectionMediaPool, inspectionInspectors, tenants } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, agreementSigners, users, contacts, inspectionInspectors, tenants } from '../lib/db/schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../lib/sign-effects';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
@@ -972,6 +972,7 @@ const servePhotoRoute = createRoute(withMcpMetadata({
         query: z.object({
             key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
+            w: z.string().optional().describe('Optional max width in pixels for an on-the-fly thumbnail (grid previews); omitted serves the full-resolution original.'),
         }),
     },
     responses: {
@@ -2189,19 +2190,13 @@ export const inspectionsRoutes = createApiRouter()
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
-        // DB-16 — coverPhotoId must reference a media-pool row owned by THIS
-        // inspection (null clears the cover). Reject dangling/foreign ids so
-        // the preflight gate + report renderer can always resolve the R2 key.
+        // DB-16 — coverPhotoId holds the R2 key of a photo belonging to THIS
+        // inspection (an attached item photo or a loose pool photo); null clears
+        // the cover. Reject foreign/dangling keys so the preflight gate + report
+        // renderer can always resolve the image.
         if (typeof body.coverPhotoId === 'string') {
-            const pool = await db.select({ id: inspectionMediaPool.id })
-                .from(inspectionMediaPool)
-                .where(and(
-                    eq(inspectionMediaPool.id, body.coverPhotoId),
-                    eq(inspectionMediaPool.tenantId, tenantId),
-                    eq(inspectionMediaPool.inspectionId, id),
-                ))
-                .get();
-            if (!pool) {
+            const ok = await c.var.services.inspection.isInspectionPhotoKey(id, tenantId, body.coverPhotoId);
+            if (!ok) {
                 return c.json({ success: false as const, error: { code: 'INVALID_COVER_PHOTO', message: 'coverPhotoId does not reference a photo of this inspection' } }, 400);
             }
         }
@@ -2422,13 +2417,43 @@ export const inspectionsRoutes = createApiRouter()
     .openapi(servePhotoRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
-        const { key, download } = c.req.valid('query');
+        const { key, download, w } = c.req.valid('query');
         if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/${inspectionId}/...`; reject anything
         // outside this caller's tenant + the inspection in the path.
         if (!key.startsWith(`${tenantId}/${id}/`)) return c.notFound();
         const obj = await c.env.PHOTOS.get(key);
         if (!obj) return c.notFound();
+
+        // DB-16 — optional on-the-fly thumbnail (`?w=`) for grid previews so the
+        // browser doesn't download full-resolution originals. Uses the Cloudflare
+        // Images binding when available; ANY failure (no binding / no entitlement /
+        // non-image) falls back to streaming the original, so it never regresses.
+        const width = w ? Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000) : 0;
+        const images = (c.env as unknown as { IMAGES?: {
+            input(s: ReadableStream): { transform(o: { width: number }): { output(o: { format: string }): Promise<{ response(): Response }> } };
+        } }).IMAGES;
+        if (width > 0 && images && obj.body) {
+            try {
+                const out = await images.input(obj.body).transform({ width }).output({ format: 'image/webp' });
+                const r = out.response();
+                const h = new Headers(r.headers);
+                h.set('Cache-Control', 'private, max-age=300');
+                return new Response(r.body, { status: 200, headers: h });
+            } catch (err) {
+                logger.warn('[photo] thumbnail transform failed — serving original', { key, width, error: String(err) });
+                // fall through to original below (re-fetch since the stream was consumed)
+                const orig = await c.env.PHOTOS.get(key);
+                if (orig) {
+                    const hh = new Headers();
+                    hh.set('Content-Type', orig.httpMetadata?.contentType || 'application/octet-stream');
+                    hh.set('Cache-Control', 'private, max-age=300');
+                    return new Response(orig.body, { status: 200, headers: hh });
+                }
+                return c.notFound();
+            }
+        }
+
         const headers = new Headers();
         headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
         headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download === '1'));

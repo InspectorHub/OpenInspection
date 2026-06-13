@@ -31,12 +31,11 @@ export default [
     route("verify", "routes/public/verify-offline.tsx"),
     route("v/:token", "routes/public/verify-token.tsx"),
     route("observe/inspections/:id", "routes/public/observe.tsx"),
-    route(
-      "concierge/book/:tenant/:slug",
-      "routes/public/concierge-book.tsx",
-    ),
-    route("concierge/confirm", "routes/public/concierge-confirm.tsx"),
     route("concierge/expired", "routes/public/concierge-expired.tsx"),
+    // Flow A — client redeems the agent-concierge magic link emailed as
+    // ${APP_BASE_URL}/confirm/<token>. Shows booking details then POSTs the
+    // confirm and follows the server-chosen redirect (agreement / report).
+    route("confirm/:token", "routes/public/concierge-confirm-token.tsx"),
     route(
       "inspector/:tenant/:slug",
       "routes/public/inspector-profile.tsx",
