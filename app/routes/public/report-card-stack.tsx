@@ -39,6 +39,13 @@ interface ReportItem {
  recommendation?: string | null;
  estimateMin?: number | null;
  estimateMax?: number | null;
+ /** Task 8 — attached repair items snapshotted on this finding (dollars). */
+ repairItems?: {
+ summary: string;
+ estimateMin: number | null;
+ estimateMax: number | null;
+ contractorType: string | null;
+ }[];
  value?: unknown;
  unit?: string | null;
  /** FE-3/B-20 — resolved canned + custom defects (server emits both). */
@@ -470,6 +477,24 @@ export default function ReportCardStackPage() {
  {item.estimateMax?.toLocaleString() ?? "?"}
  </span>
  )}
+ </div>
+ )}
+
+ {(item.repairItems?.length ?? 0) > 0 && (
+ <div className="mt-2 space-y-1.5">
+ {item.repairItems!.map((ri, i) => (
+ <div key={i} className="flex items-center gap-2 flex-wrap text-[12px]">
+ <span className="font-semibold text-ih-fg-2">{ri.summary}</span>
+ {ri.contractorType && (
+ <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg uppercase">{ri.contractorType}</span>
+ )}
+ {data.showEstimates && (ri.estimateMin != null || ri.estimateMax != null) && (
+ <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
+ ${ri.estimateMin?.toLocaleString() ?? "?"} – ${ri.estimateMax?.toLocaleString() ?? "?"}
+ </span>
+ )}
+ </div>
+ ))}
  </div>
  )}
 
