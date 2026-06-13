@@ -15,6 +15,7 @@ import type {
     CalendarApi,
     CalendarEventsApi,
     ConciergeApi,
+    ContractorTypesApi,
     ContactsApi,
     ContactsImportApi,
     CoreAuthApi,
@@ -119,6 +120,7 @@ export interface Api {
     calendar:           ReturnType<typeof hc<CalendarApi>>;
     calendarEvents:     ReturnType<typeof hc<CalendarEventsApi>>;
     concierge:          ReturnType<typeof hc<ConciergeApi>>;
+    contractorTypes:    ReturnType<typeof hc<ContractorTypesApi>>;
     contacts:           ReturnType<typeof hc<ContactsApi>>;
     contactsImport:     ReturnType<typeof hc<ContactsImportApi>>;
     data:               ReturnType<typeof hc<DataApi>>;
@@ -182,6 +184,7 @@ const MOUNT: Record<keyof Api, string> = {
     calendar:           "/api/calendar",
     calendarEvents:     "/api/calendar/events",
     concierge:          "/api/concierge",
+    contractorTypes:    "/api/contractor-types",
     contacts:           "/api/contacts",
     contactsImport:     "/api/contacts",
     data:               "/api/data",
@@ -263,6 +266,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         calendar:           mk<CalendarApi>(MOUNT.calendar),
         calendarEvents:     mk<CalendarEventsApi>(MOUNT.calendarEvents),
         concierge:          mk<ConciergeApi>(MOUNT.concierge),
+        contractorTypes:    mk<ContractorTypesApi>(MOUNT.contractorTypes),
         contacts:           mk<ContactsApi>(MOUNT.contacts),
         contactsImport:     mk<ContactsImportApi>(MOUNT.contactsImport),
         data:               mk<DataApi>(MOUNT.data),

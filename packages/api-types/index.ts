@@ -19,6 +19,7 @@ export type { BookingsApi }           from '../../server/api/bookings';
 export type { CalendarApi }           from '../../server/api/calendar';
 export type { CalendarEventsApi }     from '../../server/api/calendar-events';
 export type { ConciergeApi }          from '../../server/api/concierge';
+export type { ContractorTypesApi }    from '../../server/api/contractor-types';
 export type { ContactsApi }           from '../../server/api/contacts';
 export type { ContactsImportApi }     from '../../server/api/contacts/import';
 export type { CoreAuthApi }           from '../../server/api/auth';
