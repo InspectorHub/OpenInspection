@@ -26,6 +26,40 @@ const ConfirmResponseSchema = createApiResponseSchema(
     }),
 ).openapi('ConciergeConfirmResponse');
 
+const ConfirmViewResponseSchema = createApiResponseSchema(
+    z.object({
+        inspection: z.object({
+            propertyAddress: z.string(),
+            date:            z.string(),
+            clientName:      z.string().nullable(),
+            agreementRequired: z.boolean(),
+        }),
+        inspector: z.object({
+            name:     z.string().nullable(),
+            photoUrl: z.string().nullable(),
+        }).nullable(),
+        expired:          z.boolean(),
+        alreadyConfirmed: z.boolean(),
+    }),
+).openapi('ConciergeConfirmViewResponse');
+
+const confirmViewRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/confirm-view',
+    tags: ["bookings"],
+    summary: 'Read a concierge magic-link token for the public confirm page',
+    request: { query: z.object({ token: z.string().min(8).max(128) }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: ConfirmViewResponseSchema } },
+            description: 'Booking summary for the confirm landing page (expired/alreadyConfirmed flags included)',
+        },
+        404: { description: 'Token not found' },
+    },
+    operationId: "viewConciergeConfirm",
+    description: "Public unauthenticated read of a concierge confirm token — renders the /confirm/:token landing page before the client confirms.",
+}, { scopes: [], tier: 'extended' }));
+
 const confirmRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/confirm',
@@ -47,6 +81,29 @@ const confirmRoute = createRoute(withMcpMetadata({
 }, { scopes: [], tier: 'extended' }));
 
 export const conciergeRoutes = createApiRouter()
+    .openapi(confirmViewRoute, async (c) => {
+        const { token } = c.req.valid('query');
+        const view = await c.var.services.concierge.resolveToken(token);
+        if (!view) {
+            return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
+        }
+        return c.json({
+            success: true as const,
+            data: {
+                inspection: {
+                    propertyAddress:   view.inspection.propertyAddress,
+                    date:              view.inspection.date,
+                    clientName:        view.inspection.clientName,
+                    agreementRequired: view.inspection.agreementRequired,
+                },
+                inspector: view.inspector
+                    ? { name: view.inspector.name, photoUrl: view.inspector.photoUrl }
+                    : null,
+                expired:          view.expired,
+                alreadyConfirmed: view.alreadyConfirmed,
+            },
+        }, 200);
+    })
     .openapi(confirmRoute, async (c) => {
         const { token } = c.req.valid('json');
         const result = await c.var.services.concierge.confirmByClient(token);
