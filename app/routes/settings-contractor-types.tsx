@@ -59,15 +59,15 @@ function ContractorTypeRow({ t, idx, count, onMove }: { t: ContractorType; idx: 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex flex-col">
-        <button onClick={() => onMove(idx, -1)} disabled={idx === 0} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label="Move up">▲</button>
-        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label="Move down">▼</button>
+        <button onClick={() => onMove(idx, -1)} disabled={idx === 0} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} up`}>▲</button>
+        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} down`}>▼</button>
       </div>
       {editing ? (
         <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={() => setEditing(false)}>
           <input type="hidden" name="intent" value="rename" />
           <input type="hidden" name="id" value={t.id} />
           <input name="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus className={`flex-1 ${INPUT} py-1.5`} />
-          <button type="submit" className="text-[12px] text-ih-primary font-bold">Save</button>
+          <button type="submit" disabled={!name.trim()} className="text-[12px] text-ih-primary font-bold disabled:opacity-50">Save</button>
           <button type="button" onClick={() => { setEditing(false); setName(t.name); }} className="text-[12px] text-ih-fg-3">Cancel</button>
         </fetcher.Form>
       ) : (
@@ -77,7 +77,7 @@ function ContractorTypeRow({ t, idx, count, onMove }: { t: ContractorType; idx: 
           <fetcher.Form method="POST" onSubmit={(e) => { if (!confirm("Delete this contractor type?")) e.preventDefault(); }}>
             <input type="hidden" name="intent" value="delete" />
             <input type="hidden" name="id" value={t.id} />
-            <button type="submit" className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
+            <button type="submit" aria-label={`Delete ${t.name}`} className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
           </fetcher.Form>
         </>
       )}
@@ -92,6 +92,7 @@ export default function SettingsContractorTypes() {
   const [newName, setNewName] = useState("");
 
   function move(idx: number, dir: -1 | 1) {
+    if (reorderFetcher.state !== "idle") return;
     const next = [...types];
     const j = idx + dir;
     if (j < 0 || j >= next.length) return;
