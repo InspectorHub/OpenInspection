@@ -590,6 +590,12 @@ export const automationLogs = sqliteTable('automation_logs', {
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),
+    // DB-9 — idempotency: one log row per (automation, inspection, event). Guards
+    // against retry double-sends. Partial (event_id present) so legacy rows that
+    // predate event-id stamping aren't forced unique on a NULL key.
+    uniqueIndex('uq_automation_logs_event')
+        .on(t.automationId, t.inspectionId, t.eventId)
+        .where(sql`event_id IS NOT NULL`),
 ]);
 
 // Spec 4D — Inspection Events

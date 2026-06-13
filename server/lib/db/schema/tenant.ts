@@ -219,6 +219,11 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     assignedSectionIds: text('assigned_section_ids').notNull().default('[]'),
 }, (t) => [
     index('idx_invites_tenant').on(t.tenantId),
+    // DB-9 — at most one OUTSTANDING invite per (tenant, email). Partial so an
+    // accepted invite doesn't block re-inviting later (history is preserved).
+    uniqueIndex('uq_tenant_invites_pending_email')
+        .on(t.tenantId, t.email)
+        .where(sql`status = 'pending'`),
 ]);
 
 export const tenantConfigs = sqliteTable('tenant_configs', {
