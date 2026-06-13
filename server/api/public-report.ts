@@ -459,15 +459,20 @@ export const publicReportRoutes = createApiRouter()
         // Owner-session preview: an authenticated tenant user (inspector/admin)
         // may preview their own report without a recipient token. Ownership of
         // THIS inspection is enforced by getReportData's tenant-scoped query.
-        if (!tenantId) tenantId = await resolveOwnerPreview(c);
+        let ownerPreview = false;
+        if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
         if (!tenantId) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
-        // A-9: render photo URLs against the public token-scoped serve route so
-        // the no-login viewer can fetch them (the default authed URL would 401).
+        // Photo URLs: a no-login client viewer fetches via the public token-scoped
+        // serve route. For an OWNER preview there is no recipient token — and a
+        // browser <img> request carries only the session cookie (no Bearer), which
+        // the public route's owner-preview cannot read — so point owner-preview
+        // images at the authed editor photo route, where the cookie authenticates.
         const tk = token ?? '';
-        const makePhotoUrl = (key: string) =>
-            `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
+        const makePhotoUrl = ownerPreview
+            ? (key: string) => `/api/inspections/${id}/photo?key=${encodeURIComponent(key)}`
+            : (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
         const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl);
         return c.json({ success: true as const, data }, 200);
     })

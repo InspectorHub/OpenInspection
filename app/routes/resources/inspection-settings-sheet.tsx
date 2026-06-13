@@ -98,3 +98,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
     return { inspection, templates, members, photos };
 }
+
+// The sheet loads this data once when it opens (explicit fetcher.load) and then
+// manages cover/save state locally. Without this guard, React Router revalidates
+// the fetcher.load after every editor mutation (save-settings, set-cover,
+// upload-cover), which reloads the sheet into its loading state and flickers the
+// whole panel. Explicit .load() on open still runs — shouldRevalidate only gates
+// automatic revalidation.
+export function shouldRevalidate() {
+    return false;
+}
