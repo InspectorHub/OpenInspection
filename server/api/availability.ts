@@ -27,7 +27,7 @@ const listAvailabilityRoute = createRoute(withMcpMetadata({
     tags: ['bookings'],
     summary: 'List recurring weekly availability',
     description: 'Returns the recurring weekly availability slots for an inspector. Defaults to the caller; admins can query any inspector via the inspectorId query parameter.',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
     request: {
         query: z.object({
             inspectorId: z.string().uuid().optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
@@ -56,7 +56,7 @@ const updateScheduleRoute = createRoute(withMcpMetadata({
     tags: ['bookings'],
     summary: 'Replace weekly availability schedule',
     description: 'Replaces the inspector\'s recurring weekly schedule wholesale with the supplied slots. Admins can edit any inspector; others may only edit their own.',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
     request: {
         body: {
             content: {
@@ -88,7 +88,7 @@ const listOverridesRoute = createRoute(withMcpMetadata({
     tags: ['bookings'],
     summary: 'List availability override entries',
     description: 'Returns availability override entries (blocked dates and custom slots) for an inspector. Used by the calendar UI to render day-level adjustments.',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
     request: {
         query: z.object({
             inspectorId: z.string().uuid().optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
@@ -116,7 +116,7 @@ const createOverrideRoute = createRoute(withMcpMetadata({
     tags: ['bookings'],
     summary: 'Create an availability override',
     description: 'Adds a single availability override (block a date, add an unusual slot). Admins may create overrides for any inspector; others only for themselves.',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
     request: {
         body: {
             content: {
@@ -148,7 +148,7 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
     tags: ['bookings'],
     summary: 'Delete an availability override',
     description: 'Removes the specified availability override entry, restoring the default recurring schedule for that date.',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('UUID of the availability override entry to delete.') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },

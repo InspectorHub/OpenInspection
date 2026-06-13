@@ -1,11 +1,11 @@
 export interface User {
     sub: string;
     /**
-     * Subsystem C P5 extended the role surface from the legacy 3-role
-     * model (owner/admin/inspector) to a 4-role inspector hierarchy
-     * (lead/specialist/apprentice/office). `inspector` is retained as a
-     * legacy alias for `lead` and is normalised by ROLE_ALIASES in
-     * server/lib/middleware/rbac.ts so existing tokens keep verifying.
+     * Canonical role taxonomy is owner/admin/inspector/agent (see
+     * server/lib/auth/roles.ts). The extra hierarchy values
+     * (lead/specialist/apprentice/office) are legacy and survive only in
+     * the canEdit matrix (server/lib/rbac/can-edit.ts); no alias shim
+     * remains — `inspector` is used directly at every requireRole callsite.
      */
     role: 'owner' | 'admin' | 'inspector' | 'agent'
         | 'lead' | 'specialist' | 'apprentice' | 'office';

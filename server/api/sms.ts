@@ -208,7 +208,7 @@ const attestRoute = createRoute(withMcpMetadata({
     path: '/sms/attest',
     tags: ['admin', 'sms'],
     summary: 'Inspector attestation — confirm the client agreed to receive texts',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     request: { body: { content: { 'application/json': { schema: SmsAttestSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Consent recorded' },
@@ -222,7 +222,7 @@ const testSendRoute = createRoute(withMcpMetadata({
     path: '/sms/test',
     tags: ['admin', 'sms'],
     summary: 'Send a one-off test SMS using the resolved Twilio creds',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     request: { body: { content: { 'application/json': { schema: SmsTestSendSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean(), error: z.string().optional() }) } }, description: 'Send result' },
@@ -236,7 +236,7 @@ const smsConfigRoute = createRoute(withMcpMetadata({
     path: '/sms/config',
     tags: ['admin', 'sms'],
     summary: 'Effective SMS sender configuration (mode + source, no secrets)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     responses: {
         200: { content: { 'application/json': { schema: z.object({
             success: z.literal(true),
@@ -255,7 +255,7 @@ const consentStatusRoute = createRoute(withMcpMetadata({
     path: '/sms/consent',
     tags: ['admin', 'sms'],
     summary: 'Latest SMS consent status for an inspection client',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'admin', 'inspector')],
     request: { query: SmsConsentQuerySchema },
     responses: {
         200: { content: { 'application/json': { schema: z.object({

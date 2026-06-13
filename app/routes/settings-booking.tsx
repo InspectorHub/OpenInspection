@@ -177,8 +177,8 @@ export default function SettingsBookingPage() {
   const isAdmin = ctx?.user?.role === "owner" || ctx?.user?.role === "admin";
 
   // Show picker only to admins; restrict to the roles that can hold a
-  // schedule ('lead' is the canonical alias of 'inspector' — see rbac.ts
-  // ROLE_ALIASES; the availability API accepts both).
+  // schedule. 'lead' is a legacy value kept for any pre-existing member rows;
+  // 'inspector' is the canonical role.
   const pickerMembers = isAdmin
     ? data.members.filter((m) => ['owner', 'admin', 'inspector', 'lead'].includes(m.role))
     : [];

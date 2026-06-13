@@ -11,7 +11,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 const listContactsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["contacts"], summary: "List contacts for current tenant",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'admin', 'inspector')],
     request: { query: ContactListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -27,7 +27,7 @@ const listContactsRoute = createRoute(withMcpMetadata({
 const getContactDetailRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["contacts"], summary: "Contact detail: record + inspection history + stats",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'admin', 'inspector')],
     request: { params: z.object({ id: z.string().min(1).describe('Contact identifier') }) },
     responses: {
         200: {
@@ -44,7 +44,7 @@ const getContactDetailRoute = createRoute(withMcpMetadata({
 const createContactRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["contacts"], summary: "Create contact for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     request: { body: { content: { 'application/json': { schema: CreateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
@@ -60,7 +60,7 @@ const createContactRoute = createRoute(withMcpMetadata({
 const updateContactRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
     tags: ["contacts"], summary: "Replace contact for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: UpdateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -79,7 +79,7 @@ const updateContactRoute = createRoute(withMcpMetadata({
 const deleteContactRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["contacts"], summary: "Delete contact for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {

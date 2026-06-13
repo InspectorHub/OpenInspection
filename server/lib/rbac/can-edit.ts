@@ -16,9 +16,8 @@
  *   - specialist     → same as lead AND sectionId in user.assignedSectionIds
  *   - agent (legacy) → false (subsystem A buyer-agent view is read-only)
  *
- * Legacy 'inspector' role is aliased to 'lead' via normaliseRole.
+ * The 'inspector' role takes the same path as 'lead' (on-inspection write).
  */
-import { normaliseRole } from '../middleware/rbac';
 
 export interface CanEditUser {
     id:                 string;
@@ -48,7 +47,7 @@ export function canEdit(
     inspection: CanEditInspection,
     sectionId?: string,
 ): boolean {
-    const role = normaliseRole(user.role);
+    const role = user.role;
 
     if (role === 'owner' || role === 'admin') return true;
     if (role === 'office') return false;
@@ -61,7 +60,7 @@ export function canEdit(
         helpers.includes(user.id);
     if (!onInspection) return false;
 
-    if (role === 'lead' || role === 'apprentice') return true;
+    if (role === 'inspector' || role === 'lead' || role === 'apprentice') return true;
 
     if (role === 'specialist') {
         if (!sectionId) return false;

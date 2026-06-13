@@ -25,7 +25,7 @@ const listTeamMembersRoute = createRoute(withMcpMetadata({
     path: '/members',
     tags: ["team"],
     summary: 'List team members and pending invites',
-    middleware: [requireRole(['admin', 'owner', 'inspector', 'viewer'])],
+    middleware: [requireRole('admin', 'owner', 'inspector')],
     responses: {
         200: {
             content: {
@@ -49,7 +49,7 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/invite',
     tags: ["team"],
     summary: 'Invite a new team member',
-    middleware: [requireRole(['admin', 'owner']), requireSeatAvailable],
+    middleware: [requireRole('admin', 'owner'), requireSeatAvailable],
     request: {
         body: {
             content: {
@@ -82,7 +82,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/members/{id}',
     tags: ["team"],
     summary: 'Remove a team member',
-    middleware: [requireRole(['admin', 'owner'])],
+    middleware: [requireRole('admin', 'owner')],
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
@@ -113,7 +113,7 @@ const listApprenticeReviewsRoute = createRoute(withMcpMetadata({
     path:       '/apprentice-reviews',
     tags: ["team"],
     summary:    "List the caller's pending apprentice reviews",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
     responses:  { 200: { description: 'ok' } },
     operationId: "listTeamApprenticeReviews",
     description: "Auto-generated placeholder for listTeamApprenticeReviews (GET /apprentice-reviews, team domain). TODO: replace with a real description sourced from the handler."
@@ -124,7 +124,7 @@ const decideApprenticeReviewRoute = createRoute(withMcpMetadata({
     path:       '/apprentice-reviews/{id}/decide',
     tags: ["team"],
     summary:    'Approve / reject / edit an apprentice-submitted item field',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: z.object({
@@ -147,7 +147,7 @@ const mintGuestInviteRoute = createRoute(withMcpMetadata({
     path:       '/guests',
     tags: ["team"],
     summary:    'Mint a one-time guest invite link',
-    middleware: [requireRole(['admin', 'owner']), requireSeatAvailable] as const,
+    middleware: [requireRole('admin', 'owner'), requireSeatAvailable] as const,
     request: {
         body: { content: { 'application/json': { schema: z.object({
             role:            z.enum(['lead', 'specialist', 'apprentice', 'office']).describe('TODO describe role field for the OpenInspection MCP integration'),
@@ -330,7 +330,7 @@ export const teamRoutes = createApiRouter()
         tags: ['team'],
         summary: "Get tenant team-page default toggles",
         description: "Returns the three boolean toggles that govern the team page: teamModeDefault, apprenticeReviewRequired, guestInvitesEnabled. Used to drive UI state.",
-        middleware: [requireRole(['owner', 'admin', 'inspector', 'lead'])] as const,
+        middleware: [requireRole('owner', 'admin', 'inspector')] as const,
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['read'], tier: 'extended' }), async (c) => {
         const tenantId = c.get('tenantId');
@@ -356,7 +356,7 @@ export const teamRoutes = createApiRouter()
         tags: ['team'],
         summary: "Update tenant team-page default toggles",
         description: "Patches any subset of the three team-page toggles (teamModeDefault, apprenticeReviewRequired, guestInvitesEnabled). Missing keys leave existing values unchanged.",
-        middleware: [requireRole(['owner', 'admin'])] as const,
+        middleware: [requireRole('owner', 'admin')] as const,
         request: { body: { content: { 'application/json': { schema: DefaultsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['admin'], tier: 'extended' }), async (c) => {
@@ -383,7 +383,7 @@ export const teamRoutes = createApiRouter()
         tags: ['team'],
         summary: 'List apprentices with mentor and review counts',
         description: 'Returns every apprentice in the tenant along with their mentor name and pending-review count. Drives the Apprentices section of the team page.',
-        middleware: [requireRole(['owner', 'admin', 'inspector', 'lead'])] as const,
+        middleware: [requireRole('owner', 'admin', 'inspector')] as const,
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['read'], tier: 'extended' }), async (c) => {
         const tenantId = c.get('tenantId');
@@ -429,7 +429,7 @@ export const teamRoutes = createApiRouter()
         tags: ['team', 'guest'],
         summary: 'List active guest accounts in tenant',
         description: 'Returns all active (non-expired) guest user accounts in the tenant: filter is `expires_at IS NOT NULL AND > now`. Used by the team-page guest panel.',
-        middleware: [requireRole(['owner', 'admin'])] as const,
+        middleware: [requireRole('owner', 'admin')] as const,
         responses: { 200: { description: 'ok' } },
     }, { scopes: ['read'], tier: 'extended' }), async (c) => {
         const tenantId = c.get('tenantId');
@@ -466,7 +466,7 @@ export const teamRoutes = createApiRouter()
         tags: ['team', 'guest'],
         summary: 'Revoke guest access immediately',
         description: 'Marks the specified guest account as expired (sets expires_at = now). Idempotent — revoking an already-expired guest returns 200 success.',
-        middleware: [requireRole(['owner', 'admin'])] as const,
+        middleware: [requireRole('owner', 'admin')] as const,
         request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
         responses: { 200: { description: 'ok' }, 404: { description: 'not found' } },
     }, { scopes: ['admin'], tier: 'extended' }), async (c) => {

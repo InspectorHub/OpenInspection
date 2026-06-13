@@ -98,7 +98,7 @@ const getSecretsRoute = createRoute(withMcpMetadata({
     path: '/secrets',
     tags: ['admin'],
     summary: 'Get integration secrets (masked)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     responses: {
         200: {
             content: { 'application/json': { schema: SecretsResponseSchema } },
@@ -115,7 +115,7 @@ const putSecretsRoute = createRoute(withMcpMetadata({
     path: '/secrets',
     tags: ['admin'],
     summary: 'Save tenant integration API secrets',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     request: {
         body: { content: { 'application/json': { schema: SecretsInputSchema } } },
     },
@@ -136,7 +136,7 @@ const postSecretsRoute = createRoute(withMcpMetadata({
     path: '/secrets',
     tags: ['admin'],
     summary: 'Save integration secrets (POST alias)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'admin')],
     request: {
         body: { content: { 'application/json': { schema: SecretsInputSchema } } },
     },

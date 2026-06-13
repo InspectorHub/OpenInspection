@@ -6,7 +6,7 @@
  *   leadInspectorId / helperInspectorIds).
  * Specialist → on-inspection AND sectionId in user.assigned_section_ids.
  * Office → never (read-only seat).
- * Legacy 'inspector' aliased to 'lead' via the role-alias shim.
+ * 'inspector' takes the same on-inspection path as 'lead' (no alias shim).
  */
 import { describe, it, expect } from 'vitest';
 import { canEdit } from '../../server/lib/rbac/can-edit';
