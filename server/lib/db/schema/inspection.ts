@@ -557,10 +557,6 @@ export const automations = sqliteTable('automations', {
     // Track J (D2) — send-time gates, JSON: { requirePaid?: bool, requireSigned?: bool, serviceIds?: string[] }.
     // null = no gates. Evaluated in flush() at delivery, NOT at trigger time.
     conditions: text('conditions'),
-    // Track J (D2/D3) — DEAD shadow (Track L). Superseded by `channels` below.
-    // Pre-launch; not dropped because D1 can't rebuild an FK-bearing table.
-    // -- DEAD (2026-06-08, Track L): replaced by channels[]. Do not read/write.
-    channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
     // Track L (D2) — enabled delivery channels, JSON string[] e.g. '["email","sms"]'.
     // A firing emits one automation_logs row per channel. Default email-only.
     channels: text('channels').notNull().default('["email"]'),

@@ -1,1 +1,0 @@
-ALTER TABLE `tenants` ADD `applied_cred_seq` integer DEFAULT 0 NOT NULL;
