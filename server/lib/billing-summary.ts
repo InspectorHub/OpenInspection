@@ -1,10 +1,11 @@
 /**
- * Design System 0520 subsystem C P9 T9.1 — billing summary aggregator.
+ * Billing summary aggregator.
  *
  * Pure helper used by both `GET /api/billing/summary` (this repo) and
- * the SettingsTeam page's "billing pointer" card (Phase 10). Splits the
- * (permanent / guest) breakdown so the UI can show them side-by-side
- * without an extra round trip.
+ * the SettingsTeam page's "billing pointer" card. Every member counts as
+ * one seat; the `permanent` / `guests` fields are retained for response
+ * shape stability (guests are always 0 since the guest subsystem was
+ * removed — `expires_at` is DEAD).
  */
 import { computeSeatsUsed, type SeatUser } from './middleware/seat-guard';
 
@@ -27,19 +28,14 @@ const DEFAULT_MAX_USERS = 1;
 export function summariseSeats(
     users: SeatUser[],
     tenant: TenantBillingFields,
-    nowSeconds: number,
 ): BillingSummary {
-    const seatsUsed = computeSeatsUsed(users, nowSeconds);
-    const guests    = users.filter(u =>
-        u.expiresAt != null && u.expiresAt > nowSeconds,
-    ).length;
-    const permanent = seatsUsed - guests;
+    const seatsUsed = computeSeatsUsed(users);
 
     return {
         tier:      tenant.tier      ?? DEFAULT_TIER,
         maxUsers:  tenant.maxUsers  ?? DEFAULT_MAX_USERS,
         seatsUsed,
-        permanent,
-        guests,
+        permanent: seatsUsed,
+        guests:    0,
     };
 }

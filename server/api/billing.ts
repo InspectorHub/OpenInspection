@@ -44,11 +44,10 @@ export const billingRoutes = createApiRouter()
         if (!tenant) throw Errors.NotFound('Tenant not found');
 
         const rows = await db.select({
-            id:        usersTbl.id,
-            expiresAt: usersTbl.expiresAt,
+            id: usersTbl.id,
         }).from(usersTbl).where(eq(usersTbl.tenantId, tenantId)).all();
 
-        const summary = summariseSeats(rows, tenant, Math.floor(Date.now() / 1000));
+        const summary = summariseSeats(rows, tenant);
 
         // Portal Customer Portal redirect URL — surfaced for the "Manage
         // billing" CTA on the page. Omitted when the portal isn't wired
