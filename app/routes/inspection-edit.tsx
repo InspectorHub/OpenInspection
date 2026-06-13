@@ -264,6 +264,27 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: res.ok, intent: "set-cover" };
  }
 
+ if (intent === "upload-cover") {
+ // DB-16 — direct cover upload (Spectora parity): upload an image to the
+ // loose media pool, then set it as the report cover in one step. Rides the
+ // BFF relay like every other mutation (no raw client fetch).
+ const file = formData.get("file");
+ if (!(file instanceof File)) return { ok: false as const, intent: "upload-cover" };
+ const up = await api.inspections[":id"].media.upload.$post({
+ param: { id: params.id },
+ form: { file },
+ });
+ if (!up.ok) return { ok: false as const, intent: "upload-cover" };
+ const body = (await up.json()) as { data?: { key?: string } };
+ const key = body.data?.key;
+ if (!key) return { ok: false as const, intent: "upload-cover" };
+ const patch = await api.inspections[":id"].$patch({
+ param: { id: params.id },
+ json: { coverPhotoId: key },
+ });
+ return { ok: patch.ok, intent: "upload-cover", coverKey: key };
+ }
+
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
  const res = await api.inspections[":id"].$patch({

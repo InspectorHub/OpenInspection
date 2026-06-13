@@ -71,7 +71,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
 
     // DB-16 — flatten attached + pool photos into one pickable cover list.
+    // Dedup by R2 key: results.data can store an item under BOTH a composite
+    // (unit::section::item) and a bare itemId key, which makes the media center
+    // surface the same photo twice; the cover grid must show each photo once.
     const photos: CoverPhoto[] = [];
+    const seen = new Set<string>();
+    const pushPhoto = (key?: string, url?: string, label = "") => {
+        if (!key || !url || seen.has(key)) return;
+        seen.add(key);
+        photos.push({ key, url, label });
+    };
     if (mediaRes?.ok) {
         const body = (await mediaRes.json()) as {
             data?: {
@@ -79,12 +88,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
                 pool?: Array<{ key: string; url: string }>;
             };
         };
-        for (const a of body?.data?.attached ?? []) {
-            if (a?.key && a?.url) photos.push({ key: a.key, url: a.url, label: a.itemLabel ?? "" });
-        }
-        for (const p of body?.data?.pool ?? []) {
-            if (p?.key && p?.url) photos.push({ key: p.key, url: p.url, label: "Unattached" });
-        }
+        for (const a of body?.data?.attached ?? []) pushPhoto(a?.key, a?.url, a?.itemLabel ?? "");
+        for (const p of body?.data?.pool ?? []) pushPhoto(p?.key, p?.url, "Unattached");
     }
 
     return { inspection, templates, members, photos };
