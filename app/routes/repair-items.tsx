@@ -137,7 +137,10 @@ export default function RepairItemsPage() {
                 {it.category && <Pill tone="gen">{it.category}</Pill>}
                 {(it.defaultEstimateMin != null || it.defaultEstimateMax != null) && (
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
-                    ${((it.defaultEstimateMin ?? 0) / 100).toLocaleString()} – ${((it.defaultEstimateMax ?? 0) / 100).toLocaleString()}
+                    {[
+                      it.defaultEstimateMin != null ? `$${(it.defaultEstimateMin / 100).toLocaleString()}` : null,
+                      it.defaultEstimateMax != null ? `$${(it.defaultEstimateMax / 100).toLocaleString()}` : null,
+                    ].filter(Boolean).join(" – ")}
                   </span>
                 )}
                 {ctName(it.recommendedContractorTypeId) && (
@@ -146,11 +149,7 @@ export default function RepairItemsPage() {
               </div>
               <div className="mt-3 flex gap-3">
                 <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary hover:underline font-bold">Edit</button>
-                <fetcher.Form method="POST" onSubmit={(e) => { if (!confirm("Delete this repair item?")) e.preventDefault(); }}>
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="id" value={it.id} />
-                  <button type="submit" className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
-                </fetcher.Form>
+                <DeleteRepairItemButton id={it.id} />
               </div>
             </Card>
           ))}
@@ -176,8 +175,8 @@ export default function RepairItemsPage() {
               </div>
               <Field label="Repair summary"><textarea value={form.defaultRepairSummary} onChange={(e) => setForm((f) => ({ ...f, defaultRepairSummary: e.target.value }))} rows={3} className={INPUT} /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Est. min ($)"><input type="number" min={0} step={1} value={form.estimateMinDollars} onChange={(e) => setForm((f) => ({ ...f, estimateMinDollars: e.target.value }))} className={INPUT} /></Field>
-                <Field label="Est. max ($)"><input type="number" min={0} step={1} value={form.estimateMaxDollars} onChange={(e) => setForm((f) => ({ ...f, estimateMaxDollars: e.target.value }))} className={INPUT} /></Field>
+                <Field label="Est. min ($)"><input type="number" min={0} step="any" value={form.estimateMinDollars} onChange={(e) => setForm((f) => ({ ...f, estimateMinDollars: e.target.value }))} className={INPUT} /></Field>
+                <Field label="Est. max ($)"><input type="number" min={0} step="any" value={form.estimateMaxDollars} onChange={(e) => setForm((f) => ({ ...f, estimateMaxDollars: e.target.value }))} className={INPUT} /></Field>
               </div>
               <Field label="Recommended contractor">
                 <select value={form.recommendedContractorTypeId} onChange={(e) => setForm((f) => ({ ...f, recommendedContractorTypeId: e.target.value }))} className={INPUT}>
@@ -198,11 +197,23 @@ export default function RepairItemsPage() {
 }
 
 const INPUT = "w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none";
+
+function DeleteRepairItemButton({ id }: { id: string }) {
+  const fetcher = useFetcher();
+  return (
+    <fetcher.Form method="POST" onSubmit={(e) => { if (!confirm("Delete this repair item?")) e.preventDefault(); }}>
+      <input type="hidden" name="intent" value="delete" />
+      <input type="hidden" name="id" value={id} />
+      <button type="submit" className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
+    </fetcher.Form>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">{label}</label>
+    <label className="block">
+      <span className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
