@@ -252,6 +252,18 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: res.ok, intent: "save-settings" };
  }
 
+ if (intent === "set-cover") {
+ // DB-16 — set/clear the report cover photo. The value is the R2 key of a
+ // photo belonging to this inspection (validated server-side); empty clears.
+ const raw = formData.get("coverPhotoId");
+ const coverPhotoId = raw ? String(raw) : null;
+ const res = await api.inspections[":id"].$patch({
+ param: { id: params.id },
+ json: { coverPhotoId },
+ });
+ return { ok: res.ok, intent: "set-cover" };
+ }
+
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
  const res = await api.inspections[":id"].$patch({
@@ -819,8 +831,12 @@ export default function InspectionEditPage() {
  /* Photo studio state */
  const [photoStudioOpen, setPhotoStudioOpen] = useState(false);
  const [photoStudioUrl, setPhotoStudioUrl] = useState<string | null>(null);
+ const [photoStudioKey, setPhotoStudioKey] = useState<string | null>(null);
  const [photoStudioIndex, setPhotoStudioIndex] = useState(0);
  const [photoStudioTotal, setPhotoStudioTotal] = useState(0);
+ // DB-16 — dedicated fetcher for set/clear report cover (avoids the
+ // shared-fetcher abort hazard; the loader revalidates the cover after).
+ const coverFetcher = useFetcher();
 
  /* Mobile shell state */
  const isMobile = useIsMobile();
@@ -1708,6 +1724,14 @@ export default function InspectionEditPage() {
  photoIndex={photoStudioIndex}
  totalPhotos={photoStudioTotal}
  sectionName={state.currentSection?.title || state.currentSection?.name || ""}
+ isCover={!!photoStudioKey && (state.inspection.coverPhotoId as string | null) === photoStudioKey}
+ onSetCover={photoStudioKey ? () => {
+  const isCover = (state.inspection.coverPhotoId as string | null) === photoStudioKey;
+  coverFetcher.submit(
+   { intent: "set-cover", coverPhotoId: isCover ? "" : photoStudioKey },
+   { method: "post" },
+  );
+ } : undefined}
  onSave={() => {
   setPhotoStudioOpen(false);
  }}
@@ -2459,10 +2483,12 @@ export default function InspectionEditPage() {
  const photos = (result?.photos as string[]) || [];
  if (photos.length > 0) {
   setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(photos[0])}`);
+  setPhotoStudioKey(photos[0]);
   setPhotoStudioIndex(1);
   setPhotoStudioTotal(photos.length);
  } else {
   setPhotoStudioUrl(null);
+  setPhotoStudioKey(null);
   setPhotoStudioIndex(0);
   setPhotoStudioTotal(0);
  }
