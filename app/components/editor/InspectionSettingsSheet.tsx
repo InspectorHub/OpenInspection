@@ -80,7 +80,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   // `coverKey` is the chosen cover R2 key (optimistic; PATCHed via coverFetcher).
   const [photos, setPhotos] = useState<CoverPhoto[]>([]);
   const [coverKey, setCoverKey] = useState<string>("");
-  const coverFetcher = useFetcher<{ ok: boolean; intent?: string; coverKey?: string }>();
+  const coverFetcher = useFetcher<{ ok: boolean; intent?: string; coverKey?: string; coverUrl?: string | null }>();
   const coverFileRef = useRef<HTMLInputElement>(null);
 
   // Trigger load when the sheet opens or inspectionId changes
@@ -135,17 +135,20 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
   }
 
-  // When an upload-cover round-trip succeeds, adopt the new cover key and reload
-  // the sheet data so the freshly uploaded photo appears in the grid.
+  // When an upload-cover round-trip succeeds, append the new photo to the grid
+  // and select it as cover — all in LOCAL state. We deliberately do NOT reload
+  // the sheet loader here (that would flicker the entire settings sheet).
   useEffect(() => {
     const d = coverFetcher.data;
     if (coverFetcher.state === "idle" && d?.intent === "upload-cover" && d.ok && d.coverKey) {
-      setCoverKey(d.coverKey);
-      if (open && inspectionId) {
-        loadFetcher.load(`/resources/inspection-settings-sheet?inspectionId=${encodeURIComponent(inspectionId)}`);
+      const key = d.coverKey;
+      const url = d.coverUrl ?? null;
+      setCoverKey(key);
+      if (url) {
+        setPhotos((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, url, label: "Uploaded" }, ...prev]));
       }
     }
-  }, [coverFetcher.state, coverFetcher.data, open, inspectionId]);
+  }, [coverFetcher.state, coverFetcher.data]);
 
   // Sync loading state with fetcher
   useEffect(() => {

@@ -125,6 +125,25 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  return { inspection, schema, results, ratingLevels, token, tagLibrary };
 }
 
+/**
+ * The editor holds its own optimistic state (useInspection) and persists every
+ * change through fetchers. Re-running this heavy loader after each mutation
+ * (rate / notes / save-settings / set-cover / upload-cover …) just reloads and
+ * flickers the whole editor. Skip revalidation for POST submissions; navigation
+ * and explicit `revalidator.revalidate()` (offline sync) still refresh because
+ * they carry no POST formMethod.
+ */
+export function shouldRevalidate({
+  formMethod,
+  defaultShouldRevalidate,
+}: {
+  formMethod?: string;
+  defaultShouldRevalidate: boolean;
+}) {
+  if (formMethod && formMethod.toUpperCase() === "POST") return false;
+  return defaultShouldRevalidate;
+}
+
 /* ------------------------------------------------------------------ */
 /* Action (BFF relay for client mutations) */
 /* ------------------------------------------------------------------ */
@@ -275,14 +294,16 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  form: { file },
  });
  if (!up.ok) return { ok: false as const, intent: "upload-cover" };
- const body = (await up.json()) as { data?: { key?: string } };
+ const body = (await up.json()) as { data?: { key?: string; url?: string } };
  const key = body.data?.key;
  if (!key) return { ok: false as const, intent: "upload-cover" };
  const patch = await api.inspections[":id"].$patch({
  param: { id: params.id },
  json: { coverPhotoId: key },
  });
- return { ok: patch.ok, intent: "upload-cover", coverKey: key };
+ // Return the uploaded photo's key + url so the sheet can append it to the
+ // grid locally — avoids reloading (and visibly flickering) the whole sheet.
+ return { ok: patch.ok, intent: "upload-cover", coverKey: key, coverUrl: body.data?.url ?? null };
  }
 
  if (intent === "toggle-auto-sign") {
