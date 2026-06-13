@@ -113,6 +113,7 @@ Browser → single Worker (Hono entry):
 
 | Doc | Topic |
 |---|---|
+| [`migrating-roles.md`](migrating-roles.md) | Mapping Spectora / ISN roles to OpenInspection's 4 roles + toggles |
 | [`01_architecture.md`](developers/01_architecture.md) | Single-worker architecture, request flow |
 | [`02_deploy.md`](developers/02_deploy.md) | Production deployment on Cloudflare |
 | [`03_api_reference.md`](developers/03_api_reference.md) | API endpoints and auth patterns |
