@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 
-type Mode = "permanent" | "guest";
 type Role = "lead" | "specialist" | "apprentice" | "office";
 
 const ROLE_DESC: Record<Role, string> = {
@@ -11,12 +10,6 @@ const ROLE_DESC: Record<Role, string> = {
  office: "Dashboard, scheduling, and billing. No inspection editing.",
 };
 
-const DURATIONS = [
- { seconds: 86400, label: "1 day", price: "$1.49" },
- { seconds: 259200, label: "3 days", price: "$4.47" },
- { seconds: 604800, label: "7 days", price: "$10.43" },
-] as const;
-
 interface InviteSeatModalProps {
  open: boolean;
  onClose: () => void;
@@ -25,14 +18,11 @@ interface InviteSeatModalProps {
 }
 
 export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: InviteSeatModalProps) {
- const [mode, setMode] = useState<Mode>("permanent");
  const [email, setEmail] = useState("");
  const [notify, setNotify] = useState(true);
  const [role, setRole] = useState<Role>("lead");
  const [mentorId, setMentorId] = useState("");
  const [sectionIds, setSectionIds] = useState<string[]>([]);
- const [durationSeconds, setDurationSeconds] = useState(86400);
- const [generatedUrl, setGeneratedUrl] = useState("");
  const [error, setError] = useState("");
 
  const inviteFetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null; url: string | null }>();
@@ -47,8 +37,6 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
   }
   if (d.intent === "invite") {
    onClose();
-  } else if (d.intent === "guest-invite" && d.url) {
-   setGeneratedUrl(d.url);
   }
  }, [inviteFetcher.data, onClose]);
 
@@ -70,32 +58,14 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
   inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }
 
- function submitGuest() {
-  if (submitting) return;
-  setError("");
-  const fd = new FormData();
-  fd.append("intent", "guest-invite");
-  fd.append("role", role);
-  fd.append("durationSeconds", String(durationSeconds));
-  inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
- }
-
  return (
  <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] flex items-center justify-center p-6" onClick={onClose} role="dialog" aria-modal="true" aria-label="Invite seat">
  <div className="max-w-md w-full bg-ih-bg-card rounded-xl shadow-ih-popover" onClick={(e) => e.stopPropagation()}>
  <header className="px-6 py-4 border-b border-ih-border flex items-center gap-4">
  <h2 className="text-lg font-bold flex-1 text-ih-fg-1">Invite</h2>
- <div className="flex gap-1">
- {(["permanent", "guest"] as const).map((m) => (
- <button key={m} onClick={() => setMode(m)} className={`px-3 py-1 rounded-md text-sm font-semibold transition-colors ${mode === m ? "bg-ih-primary text-white" : "text-ih-fg-3 hover:bg-ih-bg-muted"}`}>
- {m.charAt(0).toUpperCase() + m.slice(1)}
- </button>
- ))}
- </div>
  </header>
 
  <div className="p-6 space-y-4">
- {mode === "permanent" && (
  <div className="space-y-3">
  <label className="block">
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Email</span>
@@ -106,7 +76,6 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  Send email notification
  </label>
  </div>
- )}
 
  <label className="block">
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Role</span>
@@ -145,42 +114,12 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  </div>
  )}
 
- {mode === "guest" && (
- <>
- <div>
- <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Duration</span>
- <div className="flex gap-2 flex-wrap">
- {DURATIONS.map((d) => (
- <label key={d.seconds} className="flex items-center gap-1 text-sm text-ih-fg-3">
- <input type="radio" checked={durationSeconds === d.seconds} onChange={() => setDurationSeconds(d.seconds)} />
- <span>{d.label} <span className="text-xs text-ih-fg-4">{d.price}</span></span>
- </label>
- ))}
- </div>
- <p className="text-xs text-ih-fg-3 mt-2">Guest counts against your team's seat quota while active.</p>
- </div>
-
- {generatedUrl && (
- <div className="p-3 bg-ih-ok-bg border border-ih-ok rounded-md">
- <div className="text-[10px] font-bold uppercase text-ih-ok-fg mb-1">Invite link (one-time)</div>
- <input className="w-full px-2 py-1 text-xs rounded border border-ih-border bg-ih-bg-card text-ih-fg-1" readOnly value={generatedUrl} />
- <button className="mt-2 px-3 py-1 text-xs font-semibold rounded bg-ih-bg-card border border-ih-border text-ih-fg-3" onClick={() => navigator.clipboard.writeText(generatedUrl)}>Copy link</button>
- </div>
- )}
- </>
- )}
-
  {error && <p className="text-xs text-ih-bad-fg font-semibold">{error}</p>}
  </div>
 
  <footer className="px-6 py-4 border-t border-ih-border flex justify-end gap-2">
  <button onClick={onClose} className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted">Cancel</button>
- {mode === "permanent" && (
  <button onClick={submitPermanent} disabled={submitting} className="px-4 h-10 rounded-xl bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary-600 disabled:opacity-50">Send invite</button>
- )}
- {mode === "guest" && !generatedUrl && (
- <button onClick={submitGuest} disabled={submitting} className="px-4 h-10 rounded-xl bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary-600 disabled:opacity-50">Generate link</button>
- )}
  </footer>
  </div>
  </div>

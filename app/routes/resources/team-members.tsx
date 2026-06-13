@@ -2,7 +2,7 @@
  * C-12 — BFF resource route for TeamStrip / InviteSeatModal components.
  *
  * loader: GET /api/team/members — returns active members and pending invites
- * action: invite | guest-invite — proxies POST /api/team/invite and /api/team/guests
+ * action: invite — proxies POST /api/team/invite
  */
 import type { Route } from "./+types/team-members";
 import { getToken, requireToken } from "~/lib/session.server";
@@ -52,22 +52,6 @@ export async function action({ request, context }: Route.ActionArgs) {
                 return { ok: false, intent, error: body?.error ?? `HTTP ${res.status}`, url: null };
             }
             return { ok: true, intent, error: null, url: null };
-        } catch (e) {
-            return { ok: false, intent, error: e instanceof Error ? e.message : "Failed", url: null };
-        }
-    }
-
-    if (intent === "guest-invite") {
-        const role = (fd.get("role") ?? "lead") as string;
-        const durationSeconds = Number(fd.get("durationSeconds") ?? 86400);
-
-        try {
-            const res = await api.team.guests.$post({
-                json: { role, durationSeconds } as Parameters<typeof api.team.guests.$post>[0]["json"],
-            });
-            if (!res.ok) return { ok: false, intent, error: `HTTP ${res.status}`, url: null };
-            const body = await res.json() as { data?: { url?: string } };
-            return { ok: true, intent, error: null, url: body?.data?.url ?? null };
         } catch (e) {
             return { ok: false, intent, error: e instanceof Error ? e.message : "Failed", url: null };
         }

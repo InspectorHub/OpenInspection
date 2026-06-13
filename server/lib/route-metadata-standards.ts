@@ -14,7 +14,7 @@ export const VALID_TAGS = [
     'agents', 'ai', 'invoices', 'services', 'messages',
     'notifications', 'contacts', 'metrics', 'admin', 'sysadmin',
     'audit', 'marketplace', 'recommendations', 'contractor-types', 'agreements', 'webhooks',
-    'public', 'calendar', 'tags', 'ratings', 'guest',
+    'public', 'calendar', 'tags', 'ratings',
     'profile', 'identity', 'automations', 'integrations', 'qbo',
     'sms',
 ] as const;

@@ -94,21 +94,22 @@ export const users = sqliteTable('users', {
     // Design System 0520 subsystem C phase 1 — apprentice + specialist roles.
     //   mentorId            = nullable FK → users.id; required for apprentices
     //                          (apprentice writes route to mentor's review queue)
-    //   assignedSectionIds  = JSON array of section ids; non-empty restricts
-    //                          a specialist's edit scope. Empty = full access
-    //                          (lead / office) per canEdit() matrix.
-    //   expiresAt           = guest-invite expiry; non-null means the user
-    //                          was created via a guest token + auto-revokes
-    //                          past this epoch.
+    //   assignedSectionIds  = DEAD (2026-06-13). Formerly: JSON array of
+    //                          section ids restricting a specialist's edit
+    //                          scope. Specialist scoping deferred — no reads/writes.
+    //   expiresAt           = DEAD (2026-06-13, guest removal). Formerly the
+    //                          guest-invite expiry epoch — no reads/writes.
     mentorId:             text('mentor_id'),
+    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
     assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
+    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
     expiresAt:            integer('expires_at'),
     // Account soft-delete marker — set by POST /api/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
     deletedAt:            integer('deleted_at', { mode: 'timestamp' }),
     // Legal-links feature — set when the account was created through a public
-    // form (agent signup / agent invite / guest join) while the operator had
+    // form (agent signup / agent invite) while the operator had
     // TERMS_URL/PRIVACY_URL configured. JSON: {at, ip, country, termsUrl, privacyUrl}.
     // Nullable: absent for accounts created before the feature or when the
     // operator runs without configured legal docs.
@@ -306,6 +307,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
     teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
     apprenticeReviewRequired: integer('apprentice_review_required', { mode: 'boolean' }).notNull().default(false),
+    // DEAD (2026-06-13, guest removal) — no reads/writes
     guestInvitesEnabled:      integer('guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),
     // Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
     // Tenant default; per-inspection override on inspections.require_defect_

@@ -63,7 +63,6 @@ export default [
   route("setup", "routes/setup.tsx"),
   route("inspections/:id/form", "routes/form-renderer.tsx"),
   route("join/:token", "routes/join.tsx"),
-  route("guest-join/:token", "routes/guest-join.tsx"),
   route("conflict-resolver/:id", "routes/conflict-resolver.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
   // Standalone public — no layout (iframe-friendly)

@@ -45,9 +45,10 @@ export type { ReportPdf, NewReportPdf } from './report-pdf';
 export { signingKeys, esignAuditLogs } from './esign';
 export type { SigningKey, NewSigningKey, EsignAuditLog, NewEsignAuditLog } from './esign';
 export { qboConnections, qboEntityMap, qboSyncErrors } from './qbo';
-// Design System 0520 subsystem C — apprentice review queue + guest invites
+// Design System 0520 subsystem C — apprentice review queue
 export { apprenticeReviews } from './apprentice';
-export { guestInvites } from './guest-invites';
+// Guest invite subsystem removed 2026-06-13. The physical `guest_invites`
+// table is orphaned (D1 cannot drop tables) but all schema + code is gone.
 // Design System 0520 subsystem D — UnitTree hierarchy
 export { inspectionUnits } from './units';
 // Design System 0520 subsystem D — ObserverLink (no-account read-only links)

@@ -12,10 +12,9 @@ interface RosterPopoverProps {
   roster: RosterMember[];
   onClose: () => void;
   onInvitePermanent?: () => void;
-  onInviteGuest?: () => void;
 }
 
-export function RosterPopover({ open, roster, onClose, onInvitePermanent, onInviteGuest }: RosterPopoverProps) {
+export function RosterPopover({ open, roster, onClose, onInvitePermanent }: RosterPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,7 +58,6 @@ export function RosterPopover({ open, roster, onClose, onInvitePermanent, onInvi
 
         <div className="mt-4 pt-3 border-t border-ih-border flex gap-2">
           <button type="button" className="ih-btn ih-btn--sm ih-btn--secondary" onClick={onInvitePermanent} title="Send an email invite to a new permanent inspector">Add inspector</button>
-          <button type="button" className="ih-btn ih-btn--sm ih-btn--secondary" onClick={onInviteGuest} title="Generate a one-time guest invite link">Invite guest</button>
         </div>
       </div>
     </div>

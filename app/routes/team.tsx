@@ -51,7 +51,6 @@ const TABS = [
   { id: "active", label: "Active" },
   { id: "pending", label: "Pending Invites" },
   { id: "apprentices", label: "Apprentices" },
-  { id: "guests", label: "Guests" },
 ];
 
 export default function TeamPage() {
@@ -66,7 +65,6 @@ export default function TeamPage() {
     if (activeTab === "active") return m.status !== "pending" && m.role !== "apprentice";
     if (activeTab === "pending") return m.status === "pending";
     if (activeTab === "apprentices") return m.role === "apprentice";
-    if (activeTab === "guests") return m.role === "guest";
     return true;
   });
 

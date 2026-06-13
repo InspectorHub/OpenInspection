@@ -23,7 +23,6 @@ import type {
     EventsApi,
     EmailTemplatesApi,
     EvidenceApi,
-    GuestApi,
     IdentityApi,
     InspectionPrefsApi,
     InspectionRequestsApi,
@@ -127,7 +126,6 @@ export interface Api {
     events:             ReturnType<typeof hc<EventsApi>>;
     emailTemplates:     ReturnType<typeof hc<EmailTemplatesApi>>;
     evidence:           ReturnType<typeof hc<EvidenceApi>>;
-    guest:              ReturnType<typeof hc<GuestApi>>;
     identity:           ReturnType<typeof hc<IdentityApi>>;
     inspectionPrefs:    ReturnType<typeof hc<InspectionPrefsApi>>;
     inspectionRequests: ReturnType<typeof hc<InspectionRequestsApi>>;
@@ -191,7 +189,6 @@ const MOUNT: Record<keyof Api, string> = {
     events:             "/api",
     emailTemplates:     "/api/admin",
     evidence:           "/api/admin",
-    guest:              "/api/guest",
     identity:           "/api/identities",
     inspectionPrefs:    "/api/tenant/inspection-prefs",
     inspectionRequests: "/api/inspection-requests",
@@ -273,7 +270,6 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         events:             mk<EventsApi>(MOUNT.events),
         emailTemplates:     mk<EmailTemplatesApi>(MOUNT.emailTemplates),
         evidence:           mk<EvidenceApi>(MOUNT.evidence),
-        guest:              mk<GuestApi>(MOUNT.guest),
         identity:           mk<IdentityApi>(MOUNT.identity),
         inspectionPrefs:    mk<InspectionPrefsApi>(MOUNT.inspectionPrefs),
         inspectionRequests: mk<InspectionRequestsApi>(MOUNT.inspectionRequests),
