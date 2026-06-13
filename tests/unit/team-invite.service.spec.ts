@@ -72,23 +72,6 @@ describe('TeamService.createInvite — 4-role extensions (subsystem C P5.1)', ()
         expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
     });
 
-    it('rejects an apprentice invite without a mentor', async () => {
-        await expect(svc.createInvite({
-            tenantId: TENANT,
-            email:    'app@acme.test',
-            role:     'apprentice',
-        })).rejects.toThrow(/mentor.*required/i);
-    });
-
-    it('rejects when the named mentor does not exist in the tenant', async () => {
-        await expect(svc.createInvite({
-            tenantId: TENANT,
-            email:    'app@acme.test',
-            role:     'apprentice',
-            mentorId: 'no-such-user',
-        })).rejects.toThrow(/mentor/i);
-    });
-
     it('legacy lead/office invites still work with no extra fields', async () => {
         const out = await svc.createInvite({
             tenantId: TENANT,

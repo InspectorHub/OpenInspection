@@ -3076,12 +3076,6 @@ export const inspectionsRoutes = createApiRouter()
         if (out.kind === 'conflict') {
             return c.json({ success: false as const, error: { code: 'CONFLICT', current: out.current, yours: out.yours } }, 409);
         }
-        // Design System 0520 subsystem C phase 2 — apprentice writes get queued.
-        // Returns 200 + { kind: 'queued', reviewId } so the editor can update
-        // its UI to "Pending review" without retrying.
-        if (out.kind === 'queued') {
-            return c.json({ success: true as const, data: { kind: 'queued', reviewId: out.reviewId } }, 200);
-        }
         return c.json({ success: true as const, data: { kind: 'ok', newVersion: out.newVersion, by: out.by, at: out.at } }, 200);
     })
     .openapi(preflightRoute, async (c) => {

@@ -87,7 +87,7 @@ export default function SettingsBillingPage() {
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-ih-fg-1">Self-hosted &middot; no subscription</h3>
                   <p className="text-[13px] text-ih-fg-2 mt-1.5 leading-relaxed">
-                    This deployment runs in standalone mode. No per-seat charge, no Stripe. Add as many inspectors, apprentices, and guests as you need.
+                    This deployment runs in standalone mode. No per-seat charge, no Stripe. Add as many inspectors as you need.
                   </p>
                   <a href="https://github.com/InspectorHub/OpenInspection" target="_blank" rel="noopener"
                     className="mt-3 inline-flex items-center gap-1 text-[13px] font-bold text-ih-ok-fg hover:underline">

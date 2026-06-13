@@ -91,14 +91,16 @@ export const users = sqliteTable('users', {
     // per worker isolate). Powers TeamStrip "last active Nm ago" pill and the
     // soft-presence fallback when WebSocket cannot connect.
     lastActiveAt:     integer('last_active_at'),
-    // Design System 0520 subsystem C phase 1 — apprentice + specialist roles.
-    //   mentorId            = nullable FK → users.id; required for apprentices
-    //                          (apprentice writes route to mentor's review queue)
+    // Design System 0520 subsystem C phase 1 — role-extension columns.
+    //   mentorId            = DEAD (2026-06-13, apprentice subsystem removed).
+    //                          Formerly the apprentice's mentor FK → users.id —
+    //                          no reads/writes.
     //   assignedSectionIds  = DEAD (2026-06-13). Formerly: JSON array of
     //                          section ids restricting a specialist's edit
     //                          scope. Specialist scoping deferred — no reads/writes.
     //   expiresAt           = DEAD (2026-06-13, guest removal). Formerly the
     //                          guest-invite expiry epoch — no reads/writes.
+    // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
     mentorId:             text('mentor_id'),
     // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
     assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
@@ -193,9 +195,10 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-    // Design System 0520 subsystem C P5 — carry apprentice mentor +
-    // specialist section assignment from the InviteSeatModal into the
-    // eventual users row at accept time. NULL/empty for lead/office.
+    // Design System 0520 subsystem C P5 — carry role-extension fields from the
+    // InviteSeatModal into the eventual users row at accept time.
+    // DEAD (2026-06-13, apprentice subsystem removed) — written on invite but
+    // never replayed onto the users row; no behavior depends on it.
     mentorId:           text('mentor_id'),
     assignedSectionIds: text('assigned_section_ids').notNull().default('[]'),
 }, (t) => [
@@ -306,6 +309,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     enablePdfPipeline: integer('enable_pdf_pipeline', { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
     teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
+    // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
     apprenticeReviewRequired: integer('apprentice_review_required', { mode: 'boolean' }).notNull().default(false),
     // DEAD (2026-06-13, guest removal) — no reads/writes
     guestInvitesEnabled:      integer('guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),

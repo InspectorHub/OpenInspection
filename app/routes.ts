@@ -108,7 +108,6 @@ export default [
     route("templates", "routes/templates.tsx"),
     route("team", "routes/team.tsx"),
     route("metrics", "routes/metrics.tsx"),
-    route("apprentice-review", "routes/apprentice-review.tsx"),
     route("reports", "routes/reports-redirect.tsx"),
     layout("routes/settings-layout.tsx", [
       route("settings", "routes/settings-hub.tsx"),

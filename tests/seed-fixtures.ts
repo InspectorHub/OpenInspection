@@ -1,7 +1,7 @@
 /**
  * Design System 0520 P10 — E2E seed fixtures.
  *
- * Spawns a fresh standalone workspace + admin + lead + apprentice +
+ * Spawns a fresh standalone workspace + admin + a couple of inspectors +
  * a few inspections so the test.skip E2E specs across C/D/E can be
  * unskipped and run against `npm run dev`.
  *
@@ -12,8 +12,7 @@ import { execSync } from 'child_process';
 
 const ADMIN_EMAIL    = 'admin-seed@seed.test';
 const LEAD_EMAIL     = 'inspector-a@seed.test';
-const APPRENTICE_EMAIL = 'apprentice-1@seed.test';
-const MENTOR_EMAIL   = 'mentor-1@seed.test';
+const INSPECTOR_B_EMAIL = 'inspector-b@seed.test';
 const ADMIN_FULL_EMAIL = 'admin-full@seed.test';
 const MULTI_EMAIL    = 'multi-tenant-user@seed.test';
 const BRANCH_B_EMAIL = 'branch-b@seed.test';
@@ -60,13 +59,9 @@ export function seedFixtures(appDir: string): void {
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
         VALUES ('22222222-2222-2222-2222-222222222aa1', '${TENANT_A_ID}',
                 '${LEAD_EMAIL}', '${SEED_PASSWORD_HASH}', 'Lead Inspector', 'inspector', '${now}')`, cwd);
-    d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, mentor_id, created_at)
-        VALUES ('33333333-3333-3333-3333-333333333aa1', '${TENANT_A_ID}',
-                '${APPRENTICE_EMAIL}', '${SEED_PASSWORD_HASH}', 'Seed Apprentice', 'apprentice',
-                '22222222-2222-2222-2222-222222222aa1', '${now}')`, cwd);
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
-        VALUES ('44444444-4444-4444-4444-444444444aa1', '${TENANT_A_ID}',
-                '${MENTOR_EMAIL}', '${SEED_PASSWORD_HASH}', 'Seed Mentor', 'inspector', '${now}')`, cwd);
+        VALUES ('33333333-3333-3333-3333-333333333aa1', '${TENANT_A_ID}',
+                '${INSPECTOR_B_EMAIL}', '${SEED_PASSWORD_HASH}', 'Seed Inspector B', 'inspector', '${now}')`, cwd);
 
     // Seat-quota / at-cap admin for the over-quota E2E.
     d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
@@ -109,15 +104,14 @@ export function seedFixtures(appDir: string): void {
     d1(inspectionRow('seed-delivered-inspection',    '5 Delivered Ln',    'delivered'), cwd);
     d1(inspectionRow('seed-republished-inspection',  '6 Republished Ct',  'delivered'), cwd);
 
-    console.info('[seed-fixtures] Seeded tenants + 8 users + 6 inspections + 1 identity link.');
+    console.info('[seed-fixtures] Seeded tenants + 7 users + 6 inspections + 1 identity link.');
 }
 
 export const SEED_PASSWORD = 'seedpassword';
 export const SEED_EMAILS = {
     admin:        ADMIN_EMAIL,
     lead:         LEAD_EMAIL,
-    apprentice:   APPRENTICE_EMAIL,
-    mentor:       MENTOR_EMAIL,
+    inspectorB:   INSPECTOR_B_EMAIL,
     adminAtCap:   ADMIN_FULL_EMAIL,
     multiTenant:  MULTI_EMAIL,
     branchB:      BRANCH_B_EMAIL,

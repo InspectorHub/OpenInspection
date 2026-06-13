@@ -8,15 +8,10 @@
  * Role outcomes:
  *   - owner / admin  → always true
  *   - office         → always false (read-only seat by spec)
- *   - lead           → true when caller is on the inspection
+ *   - inspector      → true when caller is on the inspection
  *                       (inspectorId / leadInspectorId / helperInspectorIds)
- *   - apprentice     → same as lead at the canEdit boundary; the
- *                       apprentice-write-to-queue routing happens in
- *                       InspectionService.patchItem (subsystem C P2)
- *   - specialist     → same as lead AND sectionId in user.assignedSectionIds
+ *   - specialist     → same as inspector AND sectionId in user.assignedSectionIds
  *   - agent (legacy) → false (subsystem A buyer-agent view is read-only)
- *
- * The 'inspector' role takes the same path as 'lead' (on-inspection write).
  */
 
 export interface CanEditUser {
@@ -60,7 +55,7 @@ export function canEdit(
         helpers.includes(user.id);
     if (!onInspection) return false;
 
-    if (role === 'inspector' || role === 'lead' || role === 'apprentice') return true;
+    if (role === 'inspector') return true;
 
     if (role === 'specialist') {
         if (!sectionId) return false;

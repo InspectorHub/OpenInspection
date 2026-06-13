@@ -19,7 +19,6 @@ describe('computePreflightFromData (subsystem E P1.2)', () => {
         const out = computePreflightFromData(
             { ...baseInspection },
             { 'i-1': { rating: 'sat' }, 'i-2': { rating: null, value: null } },
-            0,
         );
         expect(out.allRated).toBe(false);
         expect(out.unratedCount).toBe(1);
@@ -29,14 +28,13 @@ describe('computePreflightFromData (subsystem E P1.2)', () => {
         const out = computePreflightFromData(
             { ...baseInspection },
             { 'i-1': { rating: 'sat' }, 'i-2': { value: true } },
-            0,
         );
         expect(out.allRated).toBe(true);
         expect(out.unratedCount).toBe(0);
     });
 
     it('allRated false when no items exist at all (empty inspection blocks publish)', () => {
-        const out = computePreflightFromData({ ...baseInspection }, {}, 0);
+        const out = computePreflightFromData({ ...baseInspection }, {});
         expect(out.allRated).toBe(false);
     });
 
@@ -44,7 +42,6 @@ describe('computePreflightFromData (subsystem E P1.2)', () => {
         const out = computePreflightFromData(
             { ...baseInspection, propertyFacts: { year_built: 1973, sqft: 1840 } },
             { 'i-1': { rating: 'sat' } },
-            0,
         );
         expect(out.propertyFactsComplete).toBe(false);
         expect(out.missingFacts).toEqual(['foundation', 'bedrooms', 'bathrooms']);
@@ -57,34 +54,21 @@ describe('computePreflightFromData (subsystem E P1.2)', () => {
                 bedrooms: 3, bathrooms: 2,
             } },
             { 'i-1': { rating: 'sat' } },
-            0,
         );
         expect(out.propertyFactsComplete).toBe(true);
         expect(out.missingFacts).toEqual([]);
     });
 
     it('coverPhotoSet reflects the column presence', () => {
-        const a = computePreflightFromData({ ...baseInspection, coverPhotoId: 'p-1' }, { 'i-1': { rating: 'sat' } }, 0);
-        const b = computePreflightFromData({ ...baseInspection, coverPhotoId: null }, { 'i-1': { rating: 'sat' } }, 0);
+        const a = computePreflightFromData({ ...baseInspection, coverPhotoId: 'p-1' }, { 'i-1': { rating: 'sat' } });
+        const b = computePreflightFromData({ ...baseInspection, coverPhotoId: null }, { 'i-1': { rating: 'sat' } });
         expect(a.coverPhotoSet).toBe(true);
         expect(b.coverPhotoSet).toBe(false);
     });
 
-    it('apprenticeReviewed false when pendingCount > 0', () => {
-        const out = computePreflightFromData({ ...baseInspection }, { 'i-1': { rating: 'sat' } }, 2);
-        expect(out.apprenticeReviewed).toBe(false);
-        expect(out.apprenticePending).toBe(2);
-    });
-
-    it('apprenticeReviewed true when pendingCount is undefined (subsystem C absent — graceful no-op)', () => {
-        const out = computePreflightFromData({ ...baseInspection }, { 'i-1': { rating: 'sat' } }, undefined);
-        expect(out.apprenticeReviewed).toBe(true);
-        expect(out.apprenticePending).toBe(0);
-    });
-
     it('agreementSigned reflects the timestamp column', () => {
-        const a = computePreflightFromData({ ...baseInspection, agreementSignedAt: 1_700_000_000 }, { 'i-1': { rating: 'sat' } }, 0);
-        const b = computePreflightFromData({ ...baseInspection, agreementSignedAt: null }, { 'i-1': { rating: 'sat' } }, 0);
+        const a = computePreflightFromData({ ...baseInspection, agreementSignedAt: 1_700_000_000 }, { 'i-1': { rating: 'sat' } });
+        const b = computePreflightFromData({ ...baseInspection, agreementSignedAt: null }, { 'i-1': { rating: 'sat' } });
         expect(a.agreementSigned).toBe(true);
         expect(b.agreementSigned).toBe(false);
     });

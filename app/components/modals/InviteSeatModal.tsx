@@ -1,27 +1,24 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 
-type Role = "lead" | "specialist" | "apprentice" | "office";
+type Role = "lead" | "specialist" | "office";
 
 const ROLE_DESC: Record<Role, string> = {
  lead: "Full access to inspections, templates, and team management.",
  specialist: "Access to assigned sections only.",
- apprentice: "Supervised access — requires mentor approval before publishing.",
  office: "Dashboard, scheduling, and billing. No inspection editing.",
 };
 
 interface InviteSeatModalProps {
  open: boolean;
  onClose: () => void;
- leads?: Array<{ id: string; email: string }>;
  sections?: Array<{ id: string; name: string }>;
 }
 
-export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: InviteSeatModalProps) {
+export function InviteSeatModal({ open, onClose, sections = [] }: InviteSeatModalProps) {
  const [email, setEmail] = useState("");
  const [notify, setNotify] = useState(true);
  const [role, setRole] = useState<Role>("lead");
- const [mentorId, setMentorId] = useState("");
  const [sectionIds, setSectionIds] = useState<string[]>([]);
  const [error, setError] = useState("");
 
@@ -53,7 +50,6 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
   fd.append("intent", "invite");
   fd.append("email", email);
   fd.append("role", role);
-  if (mentorId) fd.append("mentorId", mentorId);
   if (sectionIds.length > 0) fd.append("assignedSectionIds", JSON.stringify(sectionIds));
   inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }
@@ -82,21 +78,10 @@ export function InviteSeatModal({ open, onClose, leads = [], sections = [] }: In
  <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
  <option value="lead">Lead inspector</option>
  <option value="specialist">Specialist</option>
- <option value="apprentice">Apprentice</option>
  <option value="office">Office staff</option>
  </select>
  </label>
  <p className="text-xs text-ih-fg-3">{ROLE_DESC[role]}</p>
-
- {role === "apprentice" && (
- <label className="block">
- <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Mentor</span>
- <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={mentorId} onChange={(e) => setMentorId(e.target.value)}>
- <option value="">Select a lead inspector...</option>
- {leads.map((m) => <option key={m.id} value={m.id}>{m.email}</option>)}
- </select>
- </label>
- )}
 
  {role === "specialist" && (
  <div>

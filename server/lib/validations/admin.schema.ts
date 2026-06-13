@@ -48,8 +48,9 @@ export const InviteMemberSchema = z.object({
     email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
     role: z.enum(['admin', 'inspector', 'agent', 'owner', 'lead', 'specialist', 'apprentice', 'office'])
         .default('inspector').openapi({ example: 'lead' }).describe('TODO describe role field for the OpenInspection MCP integration'),
-    /** Required when role === 'apprentice'. Must be a user id from the
-     *  inviting tenant. Carried through to users.mentor_id at accept. */
+    /** DEAD (2026-06-13, apprentice subsystem removed). Optional; written to
+     *  the DEAD tenant_invites.mentor_id column when present but no longer
+     *  drives any behavior. Kept for back-compat with the invite payload. */
     mentorId: z.string().uuid().optional().openapi({ example: '6e9b6b1c-4a3f-4ae3-9c10-1f1c3f4d5e6a' }).describe('TODO describe mentorId field for the OpenInspection MCP integration'),
     /** Used when role === 'specialist'. Section ids from the active
      *  template. Carried through to users.assigned_section_ids JSON. */

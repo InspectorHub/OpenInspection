@@ -14,8 +14,8 @@ import { findingKey, DEFAULT_UNIT } from '../lib/finding-key';
  * path mutates, sharing the composite findingKey + version-bump semantics so
  * mixing single + batch writes is safe.
  *
- * Conflict adjudication, apprentice queueing and compound `defectFields` /
- * `itemAttribute` shape-folding live in InspectionService.patchItem — the
+ * Conflict adjudication and compound `defectFields` / `itemAttribute`
+ * shape-folding live in InspectionService.patchItem — the
  * batch service is intentionally simpler: forced last-writer-wins on each
  * scalar field. The form-renderer is the only caller and it serialises saves
  * locally; if we ever want batch + conflict the call site should funnel
