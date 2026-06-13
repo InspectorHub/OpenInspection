@@ -42,14 +42,6 @@ export class TeamService {
         tenantId: string;
         email: string;
         role: UserRole;
-        /** DEAD (2026-06-13, apprentice subsystem removed). Optional; written
-         *  to the DEAD `tenant_invites.mentor_id` column when present but no
-         *  longer drives any review-queue behavior. No reads. */
-        mentorId?: string;
-        /** Used when `role === 'specialist'`. Stored as JSON; replayed
-         *  onto users.assigned_section_ids at accept time. Defaults to
-         *  an empty array for non-specialist roles. */
-        assignedSectionIds?: string[];
     }) {
         const db = this.getDB();
 
@@ -72,8 +64,6 @@ export class TeamService {
             role: params.role,
             status: 'pending',
             expiresAt,
-            ...(params.mentorId ? { mentorId: params.mentorId } : {}),
-            assignedSectionIds: JSON.stringify(params.assignedSectionIds ?? []),
         });
 
         return { token: inviteToken, expiresAt };

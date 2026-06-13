@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+import { ROLES } from '../../auth/roles';
 
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
@@ -68,7 +69,7 @@ export const users = sqliteTable('users', {
     // DDL default 'admin' is FROZEN (D1 cannot alter column defaults without a
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
     // explicit role — audited 2026-06-05; enforced by review, not DDL.
-    role: text('role').notNull().default('admin'),
+    role: text('role', { enum: ROLES }).notNull().default('admin'),
     googleRefreshToken: text('google_refresh_token'),
     googleCalendarId: text('google_calendar_id'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
@@ -191,7 +192,7 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     email: text('email').notNull(),
-    role: text('role').notNull().default('inspector'),
+    role: text('role', { enum: ROLES }).notNull().default('inspector'),
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),

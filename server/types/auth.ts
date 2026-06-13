@@ -1,21 +1,15 @@
+import type { Role } from '../lib/auth/roles';
+
 export interface User {
     sub: string;
-    /**
-     * Canonical role taxonomy is owner/admin/inspector/agent (see
-     * server/lib/auth/roles.ts). The extra hierarchy values
-     * (lead/specialist/apprentice/office) are legacy and survive only in
-     * the canEdit matrix (server/lib/rbac/can-edit.ts); no alias shim
-     * remains — `inspector` is used directly at every requireRole callsite.
-     */
-    role: 'owner' | 'admin' | 'inspector' | 'agent'
-        | 'lead' | 'specialist' | 'apprentice' | 'office';
+    role: Role;
     // Agent Accounts A1 — tenantId is undefined for global agent accounts
     // (role='agent'). Each agent route resolves the active tenant per-request
     // via `resolveAgentTenant()`.
     tenantId?: string;
 }
 
-export type UserRole = User['role'];
+export type UserRole = Role;
 
 export interface BrandingConfig {
     siteName: string;

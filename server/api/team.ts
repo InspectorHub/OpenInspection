@@ -129,8 +129,6 @@ export const teamRoutes = createApiRouter()
             tenantId,
             email: body.email,
             role:  body.role,
-            ...(body.mentorId           ? { mentorId: body.mentorId }                   : {}),
-            ...(body.assignedSectionIds ? { assignedSectionIds: body.assignedSectionIds } : {}),
         });
 
         const inviteLink = `${getBaseUrl(c)}/join?token=${token}`;

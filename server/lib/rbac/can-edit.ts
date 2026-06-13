@@ -7,16 +7,17 @@
  *
  * Role outcomes:
  *   - owner / admin  → always true
- *   - office         → always false (read-only seat by spec)
  *   - inspector      → true when caller is on the inspection
  *                       (inspectorId / leadInspectorId / helperInspectorIds)
- *   - specialist     → same as inspector AND sectionId in user.assignedSectionIds
- *   - agent (legacy) → false (subsystem A buyer-agent view is read-only)
+ *   - agent          → false (buyer-agent view is read-only)
  */
 
 export interface CanEditUser {
     id:                 string;
     role:               string;
+    // Legacy field kept for back-compat with existing callers. Section-scope
+    // edit restrictions were removed when the specialist role was collapsed
+    // into a plain inspector (2026-06-13) — this is no longer consulted.
     assignedSectionIds: string;   // JSON-encoded string array
 }
 
@@ -40,12 +41,13 @@ function safeJsonArray(raw: string): string[] {
 export function canEdit(
     user: CanEditUser,
     inspection: CanEditInspection,
-    sectionId?: string,
+    // Section-scope edit restrictions were removed with the specialist role
+    // (2026-06-13). The param is retained for call-site stability but unused.
+    _sectionId?: string,
 ): boolean {
     const role = user.role;
 
     if (role === 'owner' || role === 'admin') return true;
-    if (role === 'office') return false;
     if (role === 'agent')  return false;
 
     const helpers = safeJsonArray(inspection.helperInspectorIds);
@@ -56,12 +58,6 @@ export function canEdit(
     if (!onInspection) return false;
 
     if (role === 'inspector') return true;
-
-    if (role === 'specialist') {
-        if (!sectionId) return false;
-        const sections = safeJsonArray(user.assignedSectionIds);
-        return sections.includes(sectionId);
-    }
 
     // Unknown / new roles default to deny — safer than fail-open.
     return false;

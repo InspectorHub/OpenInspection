@@ -37,15 +37,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (intent === "invite") {
         const email = fd.get("email") as string | null;
         const role = (fd.get("role") ?? "inspector") as string;
-        const mentorId = (fd.get("mentorId") as string | null) || undefined;
-        const sectionIdsRaw = fd.get("assignedSectionIds") as string | null;
-        const assignedSectionIds = sectionIdsRaw ? (JSON.parse(sectionIdsRaw) as string[]) : undefined;
 
         if (!email) return { ok: false, intent, error: "Email is required", url: null };
 
         try {
             const res = await api.team.invite.$post({
-                json: { email, role, mentorId, assignedSectionIds } as Parameters<typeof api.team.invite.$post>[0]["json"],
+                json: { email, role } as Parameters<typeof api.team.invite.$post>[0]["json"],
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({})) as { error?: string };

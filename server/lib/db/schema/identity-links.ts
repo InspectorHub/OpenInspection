@@ -7,10 +7,10 @@
  * JWT, then sets the canonical cookie so subsequent requests are
  * scoped to that workspace.
  *
- * `linkedRole` mirrors the workspace role of the linked user (admin /
- * inspector / lead / specialist / apprentice / office). `linkedDisplay-
- * Name` snapshots the tenant + display name at link-time so the menu
- * can render without a per-row join.
+ * `linkedRole` mirrors the workspace role of the linked user
+ * (owner / admin / inspector / agent). `linkedDisplayName` snapshots the
+ * tenant + display name at link-time so the menu can render without a
+ * per-row join.
  */
 import { sqliteTable, text, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';

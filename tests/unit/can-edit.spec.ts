@@ -1,11 +1,13 @@
 /**
- * Design System 0520 subsystem C phase 4 — canEdit permission matrix.
+ * canEdit permission matrix (roles collapsed to owner/admin/inspector/agent
+ * — 2026-06-13).
  *
  * Owners + admins → always.
  * Inspector → must be on the inspection (inspectorId /
- *   leadInspectorId / helperInspectorIds).
- * Specialist → on-inspection AND sectionId in user.assigned_section_ids.
- * Office → never (read-only seat).
+ *   leadInspectorId / helperInspectorIds). Section-scope restrictions
+ *   (formerly the specialist role) were removed; an on-inspection
+ *   inspector now has full edit access.
+ * Agent → never (buyer-agent surface, read-only).
  */
 import { describe, it, expect } from 'vitest';
 import { canEdit } from '../../server/lib/rbac/can-edit';
@@ -36,20 +38,11 @@ describe('canEdit (subsystem C P4)', () => {
         expect(canEdit({ id: 'u-helper-1', role: 'inspector', assignedSectionIds: '[]' }, baseInspection)).toBe(true);
     });
 
-    it('specialist needs sectionId AND that section in assigned list', () => {
-        const u = { id: 'u-helper-1', role: 'specialist', assignedSectionIds: '["s-roof"]' };
+    it('on-inspection inspector has full access regardless of sectionId (specialist scoping removed)', () => {
+        const u = { id: 'u-helper-1', role: 'inspector', assignedSectionIds: '["s-roof"]' };
         expect(canEdit(u, baseInspection, 's-roof')).toBe(true);
-        expect(canEdit(u, baseInspection, 's-elec')).toBe(false);
-    });
-
-    it('specialist without sectionId arg denies', () => {
-        const u = { id: 'u-helper-1', role: 'specialist', assignedSectionIds: '["s-roof"]' };
-        expect(canEdit(u, baseInspection)).toBe(false);
-    });
-
-    it('office can never edit', () => {
-        expect(canEdit({ id: 'u-lead', role: 'office', assignedSectionIds: '[]' }, baseInspection)).toBe(false);
-        expect(canEdit({ id: 'u-helper-1', role: 'office', assignedSectionIds: '[]' }, baseInspection)).toBe(false);
+        expect(canEdit(u, baseInspection, 's-elec')).toBe(true);
+        expect(canEdit(u, baseInspection)).toBe(true);
     });
 
     it('malformed helperInspectorIds JSON treated as empty', () => {

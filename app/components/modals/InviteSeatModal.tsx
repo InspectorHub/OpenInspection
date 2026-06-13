@@ -1,25 +1,24 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 
-type Role = "lead" | "specialist" | "office";
+type Role = "owner" | "admin" | "inspector" | "agent";
 
 const ROLE_DESC: Record<Role, string> = {
- lead: "Full access to inspections, templates, and team management.",
- specialist: "Access to assigned sections only.",
- office: "Dashboard, scheduling, and billing. No inspection editing.",
+ owner: "Full access, including billing and ownership transfer.",
+ admin: "Full access to inspections, templates, and team management.",
+ inspector: "Create and edit inspections they're assigned to.",
+ agent: "Read-only buyer-agent view.",
 };
 
 interface InviteSeatModalProps {
  open: boolean;
  onClose: () => void;
- sections?: Array<{ id: string; name: string }>;
 }
 
-export function InviteSeatModal({ open, onClose, sections = [] }: InviteSeatModalProps) {
+export function InviteSeatModal({ open, onClose }: InviteSeatModalProps) {
  const [email, setEmail] = useState("");
  const [notify, setNotify] = useState(true);
- const [role, setRole] = useState<Role>("lead");
- const [sectionIds, setSectionIds] = useState<string[]>([]);
+ const [role, setRole] = useState<Role>("inspector");
  const [error, setError] = useState("");
 
  const inviteFetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null; url: string | null }>();
@@ -39,10 +38,6 @@ export function InviteSeatModal({ open, onClose, sections = [] }: InviteSeatModa
 
  if (!open) return null;
 
- function toggleSection(id: string) {
- setSectionIds((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
- }
-
  function submitPermanent() {
   if (submitting) return;
   setError("");
@@ -50,7 +45,6 @@ export function InviteSeatModal({ open, onClose, sections = [] }: InviteSeatModa
   fd.append("intent", "invite");
   fd.append("email", email);
   fd.append("role", role);
-  if (sectionIds.length > 0) fd.append("assignedSectionIds", JSON.stringify(sectionIds));
   inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }
 
@@ -76,28 +70,12 @@ export function InviteSeatModal({ open, onClose, sections = [] }: InviteSeatModa
  <label className="block">
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Role</span>
  <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
- <option value="lead">Lead inspector</option>
- <option value="specialist">Specialist</option>
- <option value="office">Office staff</option>
+ <option value="admin">Admin</option>
+ <option value="inspector">Inspector</option>
+ <option value="agent">Agent</option>
  </select>
  </label>
  <p className="text-xs text-ih-fg-3">{ROLE_DESC[role]}</p>
-
- {role === "specialist" && (
- <div>
- <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Assigned sections</span>
- <div className="p-3 max-h-40 overflow-y-auto space-y-1 bg-ih-bg-muted rounded-md border border-ih-border">
- {sections.length === 0 ? (
- <p className="text-xs text-ih-fg-4">No template sections loaded yet.</p>
- ) : sections.map((s) => (
- <label key={s.id} className="flex items-center gap-2 text-sm text-ih-fg-3">
- <input type="checkbox" checked={sectionIds.includes(s.id)} onChange={() => toggleSection(s.id)} />
- <span>{s.name}</span>
- </label>
- ))}
- </div>
- </div>
- )}
 
  {error && <p className="text-xs text-ih-bad-fg font-semibold">{error}</p>}
  </div>
