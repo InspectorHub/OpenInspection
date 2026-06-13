@@ -197,7 +197,7 @@ CREATE TABLE `commercial_subtypes` (
 	`name` text NOT NULL,
 	`based_on` text,
 	`description` text,
-	`disabled` integer DEFAULT 0 NOT NULL,
+	`disabled` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -487,7 +487,7 @@ CREATE TABLE `inspection_requests` (
 	`scheduled_at` text NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`notes` text,
-	`total_amount` integer DEFAULT 0 NOT NULL,
+	`total_amount_cents` integer DEFAULT 0 NOT NULL,
 	`payment_status` text DEFAULT 'unpaid' NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
@@ -516,9 +516,9 @@ CREATE TABLE `inspection_services` (
 	`tenant_id` text NOT NULL,
 	`inspection_id` text NOT NULL,
 	`service_id` text NOT NULL,
-	`price_override` integer,
+	`price_override_cents` integer,
 	`name_snapshot` text NOT NULL,
-	`price_snapshot` integer NOT NULL,
+	`price_snapshot_cents` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`inspection_id`) REFERENCES `inspections`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON UPDATE no action ON DELETE no action
@@ -563,7 +563,7 @@ CREATE TABLE `inspections` (
 	`status` text DEFAULT 'draft' NOT NULL,
 	`payment_status` text DEFAULT 'unpaid' NOT NULL,
 	`referred_by_agent_id` text,
-	`price` integer DEFAULT 0 NOT NULL,
+	`price_cents` integer DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
 	`confirmed_at` text,
 	`cancel_reason` text,
@@ -572,7 +572,7 @@ CREATE TABLE `inspections` (
 	`agreement_required` integer DEFAULT false NOT NULL,
 	`auto_sign_on_publish` integer DEFAULT false NOT NULL,
 	`discount_code_id` text,
-	`discount_amount` integer,
+	`discount_amount_cents` integer,
 	`closing_date` text,
 	`referral_source` text,
 	`order_id` text,
@@ -698,12 +698,12 @@ CREATE TABLE `qbo_connections` (
 	`tenant_id` text PRIMARY KEY NOT NULL,
 	`realm_id` text NOT NULL,
 	`company_name` text,
-	`access_token` text NOT NULL,
-	`refresh_token` text NOT NULL,
+	`access_token_enc` text NOT NULL,
+	`refresh_token_enc` text NOT NULL,
 	`token_expires_at` integer NOT NULL,
 	`refresh_token_expires_at` integer NOT NULL,
 	`last_sync_at` integer,
-	`sync_enabled` integer DEFAULT 1 NOT NULL,
+	`sync_enabled` integer DEFAULT true NOT NULL,
 	`default_item_id` text DEFAULT '1' NOT NULL,
 	`created_at` integer NOT NULL
 );
@@ -803,7 +803,7 @@ CREATE TABLE `services` (
 	`tenant_id` text NOT NULL,
 	`name` text NOT NULL,
 	`description` text,
-	`price` integer NOT NULL,
+	`price_cents` integer NOT NULL,
 	`duration_minutes` integer,
 	`template_id` text,
 	`agreement_id` text,
@@ -853,7 +853,7 @@ CREATE TABLE `tags` (
 	`tenant_id` text NOT NULL,
 	`name` text NOT NULL,
 	`color` text,
-	`is_seed` integer DEFAULT 0 NOT NULL,
+	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
@@ -870,7 +870,7 @@ CREATE TABLE `templates` (
 	`property_type` text,
 	`commercial_subtype` text,
 	`description` text,
-	`featured` integer DEFAULT 0 NOT NULL,
+	`featured` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint

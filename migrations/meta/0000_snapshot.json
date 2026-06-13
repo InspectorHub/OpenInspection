@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f6777046-7699-4aa3-a005-1c2df2f18689",
+  "id": "1545305e-4e6f-4d67-8bb3-73ad5de4d0c4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -1420,7 +1420,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -3393,8 +3393,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "total_amount": {
-          "name": "total_amount",
+        "total_amount_cents": {
+          "name": "total_amount_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3601,8 +3601,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "price_override": {
-          "name": "price_override",
+        "price_override_cents": {
+          "name": "price_override_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -3615,8 +3615,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "price_snapshot": {
-          "name": "price_snapshot",
+        "price_snapshot_cents": {
+          "name": "price_snapshot_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3935,8 +3935,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "price": {
-          "name": "price",
+        "price_cents": {
+          "name": "price_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -4002,8 +4002,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "discount_amount": {
-          "name": "discount_amount",
+        "discount_amount_cents": {
+          "name": "discount_amount_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -4909,15 +4909,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "access_token": {
-          "name": "access_token",
+        "access_token_enc": {
+          "name": "access_token_enc",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "refresh_token": {
-          "name": "refresh_token",
+        "refresh_token_enc": {
+          "name": "refresh_token_enc",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -4950,7 +4950,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1
+          "default": true
         },
         "default_item_id": {
           "name": "default_item_id",
@@ -5605,8 +5605,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "price": {
-          "name": "price",
+        "price_cents": {
+          "name": "price_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -5950,7 +5950,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -6062,7 +6062,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         }
       },
       "indexes": {

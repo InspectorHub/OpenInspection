@@ -34,7 +34,7 @@ export const templates = sqliteTable('templates', {
     propertyType: text('property_type'),
     commercialSubtype: text('commercial_subtype'),
     description: text('description'),
-    featured: integer('featured').notNull().default(0),
+    featured: integer('featured', { mode: 'boolean' }).notNull().default(false),
 }, (t) => [
     index('idx_templates_tenant').on(t.tenantId),
     index('idx_templates_rating_system').on(t.ratingSystemId),
@@ -73,7 +73,7 @@ export const inspections = sqliteTable('inspections', {
     // or service-snapshot tiers. Use getEffectivePriceCents() (app/lib/effective-price.ts)
     // to read the authoritative price. Written by the inspection-create path as a
     // convenience snapshot; kept in sync when service lines change.
-    price:               integer('price').notNull().default(0),
+    price:               integer('price_cents').notNull().default(0),
     createdAt:           integer('created_at', { mode: 'timestamp' }).notNull(),
     // Phase 0 parity additions
     confirmedAt:         text('confirmed_at'),
@@ -85,7 +85,7 @@ export const inspections = sqliteTable('inspections', {
     // inspector's users.default_signature_base64 into inspection_results.data._inspector_signature.
     autoSignOnPublish:   integer('auto_sign_on_publish', { mode: 'boolean' }).notNull().default(false),
     discountCodeId:      text('discount_code_id').references(() => discountCodes.id),
-    discountAmount:      integer('discount_amount'),
+    discountAmount:      integer('discount_amount_cents'),
     closingDate:         text('closing_date'),
     referralSource:      text('referral_source'),
     orderId:             text('order_id'),
@@ -174,7 +174,7 @@ export const inspectionRequests = sqliteTable('inspection_requests', {
         enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'],
     }).notNull().default('pending'),
     notes:            text('notes'),
-    totalAmount:      integer('total_amount').notNull().default(0),
+    totalAmount:      integer('total_amount_cents').notNull().default(0),
     paymentStatus:    text('payment_status', {
         enum: ['unpaid', 'partial', 'paid'],
     }).notNull().default('unpaid'),
@@ -226,7 +226,7 @@ export const tags = sqliteTable('tags', {
     tenantId:  text('tenant_id').notNull(),
     name:      text('name').notNull(),
     color:     text('color'),
-    isSeed:    integer('is_seed').notNull().default(0),
+    isSeed:    integer('is_seed', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at').notNull(),
 }, (t) => ({
     tenantNameUnique: uniqueIndex('idx_tags_tenant_name').on(t.tenantId, t.name),
@@ -488,7 +488,7 @@ export const services = sqliteTable('services', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     name: text('name').notNull(),
     description: text('description'),
-    price: integer('price').notNull(), // cents
+    price: integer('price_cents').notNull(),
     durationMinutes: integer('duration_minutes'),
     templateId: text('template_id').references(() => templates.id),
     agreementId: text('agreement_id').references(() => agreements.id),
@@ -507,9 +507,9 @@ export const inspectionServices = sqliteTable('inspection_services', {
     // P-4 authority chain (tier 2): effective line price = priceOverride ?? priceSnapshot.
     // SUM across all lines for this inspection is authoritative over inspections.price
     // but subordinate to any invoice.amountCents. See getEffectivePriceCents().
-    priceOverride: integer('price_override'),
+    priceOverride: integer('price_override_cents'),
     nameSnapshot: text('name_snapshot').notNull(),
-    priceSnapshot: integer('price_snapshot').notNull(),
+    priceSnapshot: integer('price_snapshot_cents').notNull(),
 }, (t) => [
     index('idx_insp_services_tenant').on(t.tenantId),
     index('idx_insp_services_insp').on(t.inspectionId),

@@ -52,7 +52,7 @@ async function runQBOCDC(env: ScheduledEnv): Promise<void> {
     const invoiceSvc = new InvoiceService(env.DB);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = drizzle(env.DB as any);
-    const connections = await db.select().from(qboConnections).where(eq(qboConnections.syncEnabled, 1)).all();
+    const connections = await db.select().from(qboConnections).where(eq(qboConnections.syncEnabled, true)).all();
 
     for (const conn of connections) {
         try {

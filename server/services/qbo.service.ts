@@ -301,7 +301,7 @@ export class QBOService {
         };
         await db.insert(qboConnections).values({
             tenantId:      input.tenantId,
-            syncEnabled:   1,
+            syncEnabled:   true,
             defaultItemId: '1',
             createdAt:     now,
             ...baseValues,
@@ -315,10 +315,10 @@ export class QBOService {
         const db = this.getDrizzle();
         const row = await db.select().from(qboConnections).where(eq(qboConnections.tenantId, tenantId)).get();
         if (!row) return null;
-        const newEnabled = row.syncEnabled === 1 ? 0 : 1;
+        const newEnabled = !row.syncEnabled;
         await db.update(qboConnections).set({ syncEnabled: newEnabled })
             .where(eq(qboConnections.tenantId, tenantId));
-        return newEnabled === 1;
+        return newEnabled;
     }
 
     async resolveError(tenantId: string, errorId: string): Promise<void> {
@@ -726,7 +726,7 @@ export class QBOService {
     ): Promise<{ processed: number }> {
         const db = this.getDrizzle();
         const conn = await db.select().from(qboConnections)
-            .where(and(eq(qboConnections.tenantId, tenantId), eq(qboConnections.syncEnabled, 1))).get();
+            .where(and(eq(qboConnections.tenantId, tenantId), eq(qboConnections.syncEnabled, true))).get();
         if (!conn) return { processed: 0 };
 
         const sinceIso = this.toIso8601(conn.lastSyncAt ?? conn.createdAt);
@@ -771,7 +771,7 @@ export class QBOService {
             realmId:               row.realmId,
             companyName:           row.companyName,
             lastSyncAt:            row.lastSyncAt,
-            syncEnabled:           row.syncEnabled === 1,
+            syncEnabled:           row.syncEnabled,
             openErrors:            errorRows.length,
             refreshTokenExpiresAt: row.refreshTokenExpiresAt,
         };

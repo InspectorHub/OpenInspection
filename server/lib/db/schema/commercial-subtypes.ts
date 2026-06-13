@@ -7,7 +7,7 @@ export const commercialSubtypes = sqliteTable('commercial_subtypes', {
     name:        text('name').notNull(),
     basedOn:     text('based_on'),
     description: text('description'),
-    disabled:    integer('disabled').notNull().default(0),
+    disabled:    integer('disabled', { mode: 'boolean' }).notNull().default(false),
     createdAt:   integer('created_at').notNull(),
 }, (t) => ({
     tenantNameUnique: uniqueIndex('idx_commercial_subtypes_tenant_name').on(t.tenantId, t.name),

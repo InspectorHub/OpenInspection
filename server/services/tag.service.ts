@@ -86,7 +86,7 @@ export class TagService {
             tenantId,
             name,
             color:     input.color ?? null,
-            isSeed:    0,
+            isSeed:    false,
             createdAt: Date.now(),
         });
         const created = await this.get(id, tenantId);
@@ -157,7 +157,7 @@ export class TagService {
                 tenantId,
                 name:      seed.name,
                 color:     seed.color,
-                isSeed:    1,
+                isSeed:    true,
                 createdAt: now,
             });
             inserted++;
