@@ -410,7 +410,7 @@ export default function InspectionHubPage() {
             </Link>
             {reportShipped && (
               <Link
-                to={`/report/${tenantSlug}/${inspection.id}`}
+                to={`/report-view/${tenantSlug}/${inspection.id}`}
                 className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted"
               >
                 View report

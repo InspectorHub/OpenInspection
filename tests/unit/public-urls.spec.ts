@@ -8,8 +8,8 @@ describe('public URL builders', () => {
     it('uses http for localhost', () => {
         expect(bookingUrl('localhost:8788', 'acme', 'jane')).toBe('http://localhost:8788/book/acme/jane');
     });
-    it('reportUrl emits /report/<tenant>/<id>', () => {
-        expect(reportUrl('app.example.com', 'acme', 'abc-123')).toBe('https://app.example.com/report/acme/abc-123');
+    it('reportUrl emits /report-view/<tenant>/<id> (canonical renderer)', () => {
+        expect(reportUrl('app.example.com', 'acme', 'abc-123')).toBe('https://app.example.com/report-view/acme/abc-123');
     });
     it('signUrl emits /sign/<tenant>/<id>', () => {
         expect(signUrl('app.example.com', 'acme', 'abc-123')).toBe('https://app.example.com/sign/acme/abc-123');

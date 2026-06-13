@@ -43,7 +43,11 @@ export function inspectorCalendarUrl(host: string, tenantSlug: string, inspector
 }
 
 export function reportUrl(host: string, tenantSlug: string, inspectionId: string): string {
-    return joinUrl(host, `/report/${tenantSlug}/${inspectionId}`);
+    // Canonical published-report renderer is `/report-view/` (report-card-stack):
+    // the maintained, repair-item-aware view that matches the current
+    // getReportData shape. The legacy `/report/` route now 302-redirects here
+    // (preserving ?token=/?view=), so older emails + the PDF pipeline still work.
+    return joinUrl(host, `/report-view/${tenantSlug}/${inspectionId}`);
 }
 
 /**

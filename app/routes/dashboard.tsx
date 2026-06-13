@@ -830,7 +830,7 @@ export default function DashboardPage() {
           {/* #111: deep-link into the public report (Published tab, delivered/published only) */}
           {showReportLink && (
             <Link
-              to={`/report/${tenantSlug}/${insp.id}`}
+              to={`/report-view/${tenantSlug}/${insp.id}`}
               aria-label="View report"
               title="View report"
               onClick={(e) => e.stopPropagation()}

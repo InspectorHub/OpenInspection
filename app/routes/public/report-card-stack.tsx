@@ -3,6 +3,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
+import { ErrorState } from "~/components/ErrorState";
 import { photoDisplayName, withDownload } from "~/lib/photo-name";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
@@ -103,11 +104,18 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  ]);
  const body = res.ok ? await res.json() : {};
  const d = ((body as Record<string, unknown>).data ?? {}) as unknown as LoaderResult | undefined;
+ // getReportData nests property/inspector/date under `inspection` and names
+ // the theme `theme`. Read those (falling back to any top-level aliases) so the
+ // report header shows the real address + inspector instead of blanks.
+ const meta = d as unknown as {
+   inspection?: { propertyAddress?: string | null; date?: string | null; inspectorName?: string | null };
+   theme?: string;
+ } | undefined;
  return {
  inspectionId: d?.inspectionId ?? params.id ?? "",
- address: d?.address ?? "",
- date: d?.date ?? "",
- inspectorName: d?.inspectorName ?? null,
+ address: d?.address ?? meta?.inspection?.propertyAddress ?? "",
+ date: d?.date ?? meta?.inspection?.date ?? "",
+ inspectorName: d?.inspectorName ?? meta?.inspection?.inspectorName ?? null,
  stats: d?.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
  sections: d?.sections ?? [],
  showEstimates: d?.showEstimates ?? false,
@@ -117,7 +125,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  isDelivered: d?.isDelivered ?? false,
  brand,
  error: res.ok ? null : "Report not found",
- reportTheme: (d as unknown as Record<string, unknown>)?.reportTheme as string | undefined,
+ reportTheme: ((d as unknown as Record<string, unknown>)?.reportTheme as string | undefined) ?? meta?.theme,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -183,10 +191,16 @@ export default function ReportCardStackPage() {
  const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
 
  if (data.error) {
+ const notFound = data.error === "Report not found";
  return (
- <div className="min-h-screen flex items-center justify-center p-6">
- <p className="text-ih-fg-3">{data.error}</p>
- </div>
+ <ErrorState
+ title={notFound ? "Report not found" : "Report unavailable"}
+ message={
+ notFound
+ ? "This report link is invalid or has expired. Please contact your inspector for an up-to-date link."
+ : "We couldn't load this report right now. Please try again in a moment."
+ }
+ />
  );
  }
 
