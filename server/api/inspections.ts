@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { HonoConfig } from '../types/hono';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
 import { getBookingHost } from '../lib/url';
 import { reportUrl as buildReportUrl, agreementSignUrl } from '../lib/public-urls';
@@ -436,7 +437,13 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
             },
         },
     },
-    middleware: [requireRole('owner', 'admin', 'inspector')],
+    // Task 10 — bulk assignInspector is the canonical "schedule a DIFFERENT
+    // inspector" mutation, so the scheduleOthers capability gates this route.
+    // owner/admin always pass; an inspector only passes with an explicit
+    // {scheduleOthers:true} override. NOTE: this route also serves the
+    // updateStatus bulk action, which is correspondingly gated (acceptable —
+    // bulk status changes are an admin-grade operation).
+    middleware: [requireRole('owner', 'admin', 'inspector'), requireCapability('scheduleOthers')],
     responses: {
         200: {
             content: {
@@ -1465,7 +1472,10 @@ const publishRoute = createRoute(withMcpMetadata({
     path: '/{id}/publish',
     tags: ["inspections"],
     summary: "Publish inspection for current tenant",
-    middleware: [requireRole('owner', 'admin', 'inspector')] as const,
+    // Task 10 — publish capability layered on top of the role gate. owner/admin
+    // always pass; an inspector with permission_overrides {publish:false}
+    // ("requires review") is 403'd here.
+    middleware: [requireRole('owner', 'admin', 'inspector'), requireCapability('publish')] as const,
     request: {
         params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
@@ -2754,7 +2764,19 @@ export const inspectionsRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         const service = c.var.services.inspection;
-        const result = await service.publishInspection(id, tenantId, body);
+        // Build the publish options explicitly so `recipients` is omitted (not
+        // set to `undefined`) when absent — exactOptionalPropertyTypes rejects
+        // `recipients: X[] | undefined` against the service's optional param.
+        const publishOptions: Parameters<typeof service.publishInspection>[2] = {
+            theme: body.theme,
+            notifyClient: body.notifyClient,
+            notifyAgent: body.notifyAgent,
+            requireSignature: body.requireSignature,
+            requirePayment: body.requirePayment,
+            sendAgreementCopy: body.sendAgreementCopy,
+            ...(body.recipients ? { recipients: body.recipients } : {}),
+        };
+        const result = await service.publishInspection(id, tenantId, publishOptions);
 
         // Design System 0520 subsystem D phase 9 — Republish snapshot.
         // After the inspection's status flips to published, persist a frozen

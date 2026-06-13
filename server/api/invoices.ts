@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability } from '../lib/middleware/require-capability';
 import {
     CreateInvoiceSchema,
     InvoiceResponseSchema,
@@ -24,7 +25,11 @@ const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' 
 const listInvoicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["invoices"], summary: "List invoices for current tenant",
-    middleware: [requireRole('owner', 'admin')],
+    // Task 10 — financial capability gates the primary financial-data read.
+    // owner/admin always pass; layered here so an inspector granted
+    // {financial:true} (and added to the role list in a future change) would be
+    // governed by the capability rather than a bare role check.
+    middleware: [requireRole('owner', 'admin'), requireCapability('financial')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(InvoiceResponseSchema).describe('TODO describe data field for the OpenInspection MCP integration') }) } },

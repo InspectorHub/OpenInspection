@@ -32,9 +32,27 @@ export function getCapabilities(role: Role, overrides: PermissionOverrides | nul
 export function parseOverrides(json: string | null | undefined): PermissionOverrides | null {
   if (!json) return null;
   try {
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    const out: PermissionOverrides = {};
-    for (const cap of TOGGLEABLE) if (typeof parsed[cap] === 'boolean') out[cap] = parsed[cap] as boolean;
-    return Object.keys(out).length ? out : null;
+    return whitelistOverrides(JSON.parse(json) as Record<string, unknown>);
   } catch { return null; }
+}
+
+/**
+ * Coerce an unknown column value into PermissionOverrides. The
+ * `permission_overrides` column is drizzle `{ mode: 'json' }`, so a select may
+ * hand back an already-parsed object (json mode) OR a raw string (some drivers
+ * / test fixtures). Strings route through JSON.parse; objects are whitelisted
+ * directly. Either way only the four boolean capability keys survive — anything
+ * else (null, number, malformed JSON, extra keys) collapses to null.
+ */
+export function coerceOverrides(value: unknown): PermissionOverrides | null {
+  if (value == null) return null;
+  if (typeof value === 'string') return parseOverrides(value);
+  if (typeof value === 'object') return whitelistOverrides(value as Record<string, unknown>);
+  return null;
+}
+
+function whitelistOverrides(parsed: Record<string, unknown>): PermissionOverrides | null {
+  const out: PermissionOverrides = {};
+  for (const cap of TOGGLEABLE) if (typeof parsed[cap] === 'boolean') out[cap] = parsed[cap] as boolean;
+  return Object.keys(out).length ? out : null;
 }
