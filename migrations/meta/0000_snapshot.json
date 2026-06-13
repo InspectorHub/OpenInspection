@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d42dc265-6bc4-426c-a6e9-4d4a22089074",
+  "id": "1545305e-4e6f-4d67-8bb3-73ad5de4d0c4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -127,6 +127,42 @@
           "notNull": false,
           "autoincrement": false
         },
+        "content_snapshot": {
+          "name": "content_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completion_policy": {
+          "name": "completion_policy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'all'"
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "purged_at": {
+          "name": "purged_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -150,13 +186,6 @@
           ],
           "isUnique": true
         },
-        "idx_agreement_requests_token": {
-          "name": "idx_agreement_requests_token",
-          "columns": [
-            "token"
-          ],
-          "isUnique": false
-        },
         "idx_agreement_requests_tenant": {
           "name": "idx_agreement_requests_tenant",
           "columns": [
@@ -170,6 +199,13 @@
             "inspection_id"
           ],
           "isUnique": false
+        },
+        "idx_agreement_requests_token_hash": {
+          "name": "idx_agreement_requests_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -226,6 +262,182 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "agreement_signers": {
+      "name": "agreement_signers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'client'"
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "token_enc": {
+          "name": "token_enc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "signature_base64": {
+          "name": "signature_base64",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "signed_at": {
+          "name": "signed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "viewed_at": {
+          "name": "viewed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "on_behalf_of": {
+          "name": "on_behalf_of",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "on_behalf_disclaimer": {
+          "name": "on_behalf_disclaimer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_reminded_at": {
+          "name": "last_reminded_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_agreement_signers_tenant_request": {
+          "name": "idx_agreement_signers_tenant_request",
+          "columns": [
+            "tenant_id",
+            "request_id"
+          ],
+          "isUnique": false
+        },
+        "idx_agreement_signers_request_email": {
+          "name": "idx_agreement_signers_request_email",
+          "columns": [
+            "request_id",
+            "email"
+          ],
+          "isUnique": true
+        },
+        "idx_agreement_signers_token_hash": {
+          "name": "idx_agreement_signers_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -465,12 +677,20 @@
           "notNull": true,
           "autoincrement": false
         },
-        "recipient_email": {
-          "name": "recipient_email",
+        "recipient": {
+          "name": "recipient",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'email'"
         },
         "send_at": {
           "name": "send_at",
@@ -525,6 +745,16 @@
             "inspection_id"
           ],
           "isUnique": false
+        },
+        "uq_automation_logs_event": {
+          "name": "uq_automation_logs_event",
+          "columns": [
+            "automation_id",
+            "inspection_id",
+            "event_id"
+          ],
+          "isUnique": true,
+          "where": "event_id IS NOT NULL"
         }
       },
       "foreignKeys": {
@@ -604,6 +834,28 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "conditions": {
+          "name": "conditions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "channels": {
+          "name": "channels",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[\"email\"]'"
+        },
+        "sms_body": {
+          "name": "sms_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "active": {
@@ -718,6 +970,15 @@
             "inspector_id"
           ],
           "isUnique": false
+        },
+        "idx_availability_window_unique": {
+          "name": "idx_availability_window_unique",
+          "columns": [
+            "inspector_id",
+            "day_of_week",
+            "start_time"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -820,6 +1081,15 @@
             "inspector_id"
           ],
           "isUnique": false
+        },
+        "idx_avail_overrides_block_unique": {
+          "name": "idx_avail_overrides_block_unique",
+          "columns": [
+            "inspector_id",
+            "date"
+          ],
+          "isUnique": true,
+          "where": "is_available = 0"
         }
       },
       "foreignKeys": {
@@ -1027,6 +1297,34 @@
           "notNull": false,
           "autoincrement": false
         },
+        "repair_summary": {
+          "name": "repair_summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "estimate_min_cents": {
+          "name": "estimate_min_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "estimate_max_cents": {
+          "name": "estimate_max_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recommended_contractor_type_id": {
+          "name": "recommended_contractor_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1122,7 +1420,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -1309,6 +1607,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1324,6 +1629,13 @@
             "expires_at"
           ],
           "isUnique": false
+        },
+        "idx_concierge_confirm_token_hash": {
+          "name": "idx_concierge_confirm_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -1383,9 +1695,24 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(datetime('now'))"
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_concierge_invites_token_hash": {
+          "name": "idx_concierge_invites_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -1464,6 +1791,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1481,6 +1815,15 @@
             "tenant_id"
           ],
           "isUnique": false
+        },
+        "uq_contacts_tenant_email": {
+          "name": "uq_contacts_tenant_email",
+          "columns": [
+            "tenant_id",
+            "email"
+          ],
+          "isUnique": true,
+          "where": "email IS NOT NULL AND archived_at IS NULL"
         }
       },
       "foreignKeys": {
@@ -1498,6 +1841,60 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "contractor_types": {
+      "name": "contractor_types",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_contractor_types_tenant": {
+          "name": "idx_contractor_types_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -1733,6 +2130,112 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "erasure_log": {
+      "name": "erasure_log",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject_email": {
+          "name": "subject_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "identity_basis": {
+          "name": "identity_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "decisions_json": {
+          "name": "decisions_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retained_count": {
+          "name": "retained_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "anonymized_count": {
+          "name": "anonymized_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "deleted_count": {
+          "name": "deleted_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "response_note": {
+          "name": "response_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_erasure_log_tenant": {
+          "name": "idx_erasure_log_tenant",
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "esign_audit_logs": {
       "name": "esign_audit_logs",
       "columns": {
@@ -1824,7 +2327,8 @@
             "request_id",
             "event"
           ],
-          "isUnique": true
+          "isUnique": true,
+          "where": "event NOT LIKE 'signer.%'"
         }
       },
       "foreignKeys": {},
@@ -2013,6 +2517,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(datetime('now'))"
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -2023,22 +2534,155 @@
           ],
           "isUnique": true
         },
-        "guest_invites_token_idx": {
-          "name": "guest_invites_token_idx",
-          "columns": [
-            "token"
-          ],
-          "isUnique": false
-        },
         "guest_invites_tenant_idx": {
           "name": "guest_invites_tenant_idx",
           "columns": [
             "tenant_id"
           ],
           "isUnique": false
+        },
+        "idx_guest_invites_token_hash": {
+          "name": "idx_guest_invites_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "inspection_access_tokens": {
+      "name": "inspection_access_tokens",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "recipient_email": {
+          "name": "recipient_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'client'"
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "token_enc": {
+          "name": "token_enc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_iat_token": {
+          "name": "idx_iat_token",
+          "columns": [
+            "token"
+          ],
+          "isUnique": true
+        },
+        "idx_iat_inspection": {
+          "name": "idx_iat_inspection",
+          "columns": [
+            "tenant_id",
+            "inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_iat_recipient": {
+          "name": "idx_iat_recipient",
+          "columns": [
+            "inspection_id",
+            "recipient_email"
+          ],
+          "isUnique": true
+        },
+        "idx_iat_token_hash": {
+          "name": "idx_iat_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "inspection_access_tokens_tenant_id_tenants_id_fk": {
+          "name": "inspection_access_tokens_tenant_id_tenants_id_fk",
+          "tableFrom": "inspection_access_tokens",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -2151,6 +2795,13 @@
           "name": "id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -2419,6 +3070,76 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "inspection_inspectors": {
+      "name": "inspection_inspectors",
+      "columns": {
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'lead'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_insp_inspectors_tenant_user": {
+          "name": "idx_insp_inspectors_tenant_user",
+          "columns": [
+            "tenant_id",
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "idx_insp_inspectors_user": {
+          "name": "idx_insp_inspectors_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "inspection_inspectors_inspection_id_user_id_pk": {
+          "columns": [
+            "inspection_id",
+            "user_id"
+          ],
+          "name": "inspection_inspectors_inspection_id_user_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "inspection_item_tag_links": {
       "name": "inspection_item_tag_links",
       "columns": {
@@ -2672,8 +3393,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "total_amount": {
-          "name": "total_amount",
+        "total_amount_cents": {
+          "name": "total_amount_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -2808,6 +3529,13 @@
             "inspection_id"
           ],
           "isUnique": false
+        },
+        "uq_results_inspection": {
+          "name": "uq_results_inspection",
+          "columns": [
+            "inspection_id"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -2873,8 +3601,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "price_override": {
-          "name": "price_override",
+        "price_override_cents": {
+          "name": "price_override_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -2887,8 +3615,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "price_snapshot": {
-          "name": "price_snapshot",
+        "price_snapshot_cents": {
+          "name": "price_snapshot_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3142,6 +3870,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "client_contact_id": {
+          "name": "client_contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "client_name": {
           "name": "client_name",
           "type": "text",
@@ -3200,8 +3935,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "price": {
-          "name": "price",
+        "price_cents": {
+          "name": "price_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3267,8 +4002,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "discount_amount": {
-          "name": "discount_amount",
+        "discount_amount_cents": {
+          "name": "discount_amount_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -3430,6 +4165,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "require_defect_fields_override": {
+          "name": "require_defect_fields_override",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "request_id": {
           "name": "request_id",
           "type": "text",
@@ -3474,6 +4216,27 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "source_inspection_id": {
+          "name": "source_inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "root_inspection_id": {
+          "name": "root_inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reinspection_round": {
+          "name": "reinspection_round",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -3488,13 +4251,6 @@
           "name": "idx_inspections_tenant",
           "columns": [
             "tenant_id"
-          ],
-          "isUnique": false
-        },
-        "idx_inspections_status": {
-          "name": "idx_inspections_status",
-          "columns": [
-            "status"
           ],
           "isUnique": false
         },
@@ -3516,6 +4272,45 @@
           "name": "idx_inspections_agent",
           "columns": [
             "referred_by_agent_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspections_tenant_status": {
+          "name": "idx_inspections_tenant_status",
+          "columns": [
+            "tenant_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "idx_inspections_tenant_date": {
+          "name": "idx_inspections_tenant_date",
+          "columns": [
+            "tenant_id",
+            "date"
+          ],
+          "isUnique": false
+        },
+        "idx_inspections_tenant_client_email": {
+          "name": "idx_inspections_tenant_client_email",
+          "columns": [
+            "tenant_id",
+            "client_email"
+          ],
+          "isUnique": false
+        },
+        "idx_inspections_inspector_date": {
+          "name": "idx_inspections_inspector_date",
+          "columns": [
+            "inspector_id",
+            "date"
+          ],
+          "isUnique": false
+        },
+        "idx_inspections_root": {
+          "name": "idx_inspections_root",
+          "columns": [
+            "root_inspection_id"
           ],
           "isUnique": false
         }
@@ -3689,6 +4484,13 @@
         "paid_at": {
           "name": "paid_at",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payment_method": {
+          "name": "payment_method",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4039,6 +4841,20 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "token_enc": {
+          "name": "token_enc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -4049,19 +4865,19 @@
           ],
           "isUnique": true
         },
-        "observer_links_token_idx": {
-          "name": "observer_links_token_idx",
-          "columns": [
-            "token"
-          ],
-          "isUnique": false
-        },
         "observer_links_inspection_idx": {
           "name": "observer_links_inspection_idx",
           "columns": [
             "inspection_id"
           ],
           "isUnique": false
+        },
+        "idx_observer_links_token_hash": {
+          "name": "idx_observer_links_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},
@@ -4093,15 +4909,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "access_token": {
-          "name": "access_token",
+        "access_token_enc": {
+          "name": "access_token_enc",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "refresh_token": {
-          "name": "refresh_token",
+        "refresh_token_enc": {
+          "name": "refresh_token_enc",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -4134,7 +4950,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1
+          "default": true
         },
         "default_item_id": {
           "name": "default_item_id",
@@ -4437,116 +5253,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "recommendations": {
-      "name": "recommendations",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "severity": {
-          "name": "severity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "default_estimate_min": {
-          "name": "default_estimate_min",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "default_estimate_max": {
-          "name": "default_estimate_max",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "default_repair_summary": {
-          "name": "default_repair_summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_by_user_id": {
-          "name": "created_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_recommendations_tenant_category": {
-          "name": "idx_recommendations_tenant_category",
-          "columns": [
-            "tenant_id",
-            "category"
-          ],
-          "isUnique": false
-        },
-        "idx_recommendations_tenant": {
-          "name": "idx_recommendations_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "recommendations_tenant_id_tenants_id_fk": {
-          "name": "recommendations_tenant_id_tenants_id_fk",
-          "tableFrom": "recommendations",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "report_pdfs": {
       "name": "report_pdfs",
       "columns": {
@@ -4599,6 +5305,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "version_number": {
+          "name": "version_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "size_bytes": {
           "name": "size_bytes",
           "type": "integer",
@@ -4627,7 +5340,8 @@
           "name": "uq_report_pdfs_inspection_type",
           "columns": [
             "inspection_id",
-            "type"
+            "type",
+            "version_number"
           ],
           "isUnique": true
         },
@@ -4710,6 +5424,49 @@
           "notNull": false,
           "autoincrement": false
         },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "prev_hash": {
+          "name": "prev_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "signature": {
+          "name": "signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "key_fingerprint": {
+          "name": "key_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_amendment": {
+          "name": "is_amendment",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "verification_token": {
+          "name": "verification_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "published_at": {
           "name": "published_at",
           "type": "integer",
@@ -4749,10 +5506,71 @@
             "version_number"
           ],
           "isUnique": true
+        },
+        "idx_report_versions_verify_token": {
+          "name": "idx_report_versions_verify_token",
+          "columns": [
+            "verification_token"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "service_inspectors": {
+      "name": "service_inspectors",
+      "columns": {
+        "service_id": {
+          "name": "service_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_service_inspectors_tenant": {
+          "name": "idx_service_inspectors_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "service_inspectors_service_id_user_id_pk": {
+          "columns": [
+            "service_id",
+            "user_id"
+          ],
+          "name": "service_inspectors_service_id_user_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -4787,8 +5605,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "price": {
-          "name": "price",
+        "price_cents": {
+          "name": "price_cents",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -4974,6 +5792,127 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "sms_consent_log": {
+      "name": "sms_consent_log",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "recipient_type": {
+          "name": "recipient_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "disclosure_version": {
+          "name": "disclosure_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "captured_via": {
+          "name": "captured_via",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_sms_consent_contact": {
+          "name": "idx_sms_consent_contact",
+          "columns": [
+            "tenant_id",
+            "contact_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "sms_disclosure_versions": {
+      "name": "sms_disclosure_versions",
+      "columns": {
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "tags": {
       "name": "tags",
       "columns": {
@@ -5011,7 +5950,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -5123,10 +6062,17 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         }
       },
       "indexes": {
+        "idx_templates_tenant": {
+          "name": "idx_templates_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        },
         "idx_templates_rating_system": {
           "name": "idx_templates_rating_system",
           "columns": [
@@ -5425,6 +6371,69 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "usage_counters": {
+      "name": "usage_counters",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "metric": {
+          "name": "metric",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "period_key": {
+          "name": "period_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_usage_counters_tenant": {
+          "name": "idx_usage_counters_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "usage_counters_tenant_id_metric_period_key_pk": {
+          "columns": [
+            "tenant_id",
+            "metric",
+            "period_key"
+          ],
+          "name": "usage_counters_tenant_id_metric_period_key_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -5849,6 +6858,81 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "email_templates": {
+      "name": "email_templates",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "trigger": {
+          "name": "trigger",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "blocks": {
+          "name": "blocks",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "email_templates_tenant_id_tenants_id_fk": {
+          "name": "email_templates_tenant_id_tenants_id_fk",
+          "tableFrom": "email_templates",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "email_templates_tenant_id_trigger_pk": {
+          "columns": [
+            "tenant_id",
+            "trigger"
+          ],
+          "name": "email_templates_tenant_id_trigger_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "notifications": {
       "name": "notifications",
       "columns": {
@@ -5989,6 +7073,83 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "parked_cmd_events": {
+      "name": "parked_cmd_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "envelope": {
+          "name": "envelope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_parked_cmd_events_received_at": {
+          "name": "idx_parked_cmd_events_received_at",
+          "columns": [
+            "received_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "processed_cmd_events": {
+      "name": "processed_cmd_events",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cmd_type": {
+          "name": "cmd_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "slug_reservations": {
       "name": "slug_reservations",
       "columns": {
@@ -6002,13 +7163,6 @@
         "reason": {
           "name": "reason",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "blocked_at": {
-          "name": "blocked_at",
-          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -6135,6 +7289,51 @@
           "notNull": false,
           "autoincrement": false
         },
+        "sender_email": {
+          "name": "sender_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reply_to": {
+          "name": "reply_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email_mode": {
+          "name": "email_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'platform'"
+        },
+        "sms_mode": {
+          "name": "sms_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'platform'"
+        },
+        "sender_display_name": {
+          "name": "sender_display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "use_inspector_from_name": {
+          "name": "use_inspector_from_name",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
         "billing_url": {
           "name": "billing_url",
           "type": "text",
@@ -6142,8 +7341,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "ga_measurement_id": {
-          "name": "ga_measurement_id",
+        "review_url": {
+          "name": "review_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "company_phone": {
+          "name": "company_phone",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -6156,15 +7362,15 @@
           "notNull": false,
           "autoincrement": false
         },
-        "secrets": {
-          "name": "secrets",
+        "encrypted_secrets": {
+          "name": "encrypted_secrets",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "encrypted_secrets": {
-          "name": "encrypted_secrets",
+        "dek_enc": {
+          "name": "dek_enc",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -6269,16 +7475,16 @@
           "autoincrement": false,
           "default": false
         },
-        "enable_pdf_pipeline": {
-          "name": "enable_pdf_pipeline",
+        "allow_inspector_choice": {
+          "name": "allow_inspector_choice",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "auto_sign_on_publish_default": {
-          "name": "auto_sign_on_publish_default",
+        "enable_pdf_pipeline": {
+          "name": "enable_pdf_pipeline",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -6309,6 +7515,29 @@
           "autoincrement": false,
           "default": true
         },
+        "require_defect_fields": {
+          "name": "require_defect_fields",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'none'"
+        },
+        "agreement_retention_years": {
+          "name": "agreement_retention_years",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 6
+        },
+        "reinspection_statuses": {
+          "name": "reinspection_statuses",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "integer",
@@ -6333,6 +7562,91 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "tenant_destruction_records": {
+      "name": "tenant_destruction_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_slug": {
+          "name": "tenant_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rows_deleted": {
+          "name": "rows_deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "r2_objects": {
+          "name": "r2_objects",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "r2_bytes": {
+          "name": "r2_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "kv_keys": {
+          "name": "kv_keys",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "destroyed_at": {
+          "name": "destroyed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_destruction_tenant": {
+          "name": "idx_destruction_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        },
+        "idx_destruction_destroyed_at": {
+          "name": "idx_destruction_destroyed_at",
+          "columns": [
+            "destroyed_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -6407,6 +7721,15 @@
             "tenant_id"
           ],
           "isUnique": false
+        },
+        "uq_tenant_invites_pending_email": {
+          "name": "uq_tenant_invites_pending_email",
+          "columns": [
+            "tenant_id",
+            "email"
+          ],
+          "isUnique": true,
+          "where": "status = 'pending'"
         }
       },
       "foreignKeys": {
@@ -6445,8 +7768,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "subdomain": {
-          "name": "subdomain",
+        "slug": {
+          "name": "slug",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -6498,6 +7821,22 @@
           "notNull": false,
           "autoincrement": false
         },
+        "applied_cmd_seq": {
+          "name": "applied_cmd_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "applied_cred_seq": {
+          "name": "applied_cred_seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -6507,10 +7846,10 @@
         }
       },
       "indexes": {
-        "tenants_subdomain_unique": {
-          "name": "tenants_subdomain_unique",
+        "tenants_slug_unique": {
+          "name": "tenants_slug_unique",
           "columns": [
-            "subdomain"
+            "slug"
           ],
           "isUnique": true
         }
@@ -6629,27 +7968,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "google_access_token": {
-          "name": "google_access_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "google_token_expiry": {
-          "name": "google_token_expiry",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "locale": {
-          "name": "locale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "onboarding_state": {
           "name": "onboarding_state",
           "type": "text",
@@ -6746,16 +8064,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "signup_role": {
-          "name": "signup_role",
-          "type": "text",
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "integer",
+        "terms_accepted": {
+          "name": "terms_accepted",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -6775,7 +8093,8 @@
             "tenant_id",
             "email"
           ],
-          "isUnique": true
+          "isUnique": true,
+          "where": "deleted_at IS NULL"
         },
         "idx_users_tenant": {
           "name": "idx_users_tenant",

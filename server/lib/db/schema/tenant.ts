@@ -71,15 +71,6 @@ export const users = sqliteTable('users', {
     role: text('role').notNull().default('admin'),
     googleRefreshToken: text('google_refresh_token'),
     googleCalendarId: text('google_calendar_id'),
-    // -- DEAD (2026-06-11, schema-cleanup): the OAuth flow only persists/reads
-    // google_refresh_token (access tokens are re-minted on demand). These two
-    // columns have zero reads/writes across server, app, and packages. Frozen
-    // (D1 can't drop columns on the FK-referenced users table). Do not read/write.
-    googleAccessToken: text('google_access_token'),
-    googleTokenExpiry: integer('google_token_expiry'),
-    // -- DEAD (2026-06-11, schema-cleanup): never read or written. The codebase
-    // uses Intl/toLocaleString locale APIs, not this column. Frozen. Do not reuse.
-    locale: text('locale'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     // Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled.
@@ -112,13 +103,6 @@ export const users = sqliteTable('users', {
     mentorId:             text('mentor_id'),
     assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
     expiresAt:            integer('expires_at'),
-    // Trial Sample-Data Mode spec (2026-05-20) — ICP signal captured at
-    // magic-link signup. Nullable: NULL for pre-migration users and for
-    // teammates who join via team invite (only the tenant owner answers
-    // the role survey at signup).
-    // -- DEAD (2026-06-11, schema-cleanup): zero reads/writes across the repo.
-    // The signup ICP signal was never wired to a writer. Frozen. Do not reuse.
-    signupRole:           text('signup_role'),
     // Account soft-delete marker — set by POST /api/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
@@ -174,10 +158,6 @@ export const syncOutbox = sqliteTable('sync_outbox', {
 export const slugReservations = sqliteTable('slug_reservations', {
     slug: text('slug').primaryKey(),
     reason: text('reason').notNull(),
-    // -- DEAD (2026-06-11, schema-cleanup): write-only seed column, never read
-    // by any lookup (reservations are checked by slug PK presence alone).
-    // Retained because it is NOT NULL and populated by the seed migration.
-    blockedAt: integer('blocked_at').notNull(),
 });
 
 // Privacy & Compliance P3 (§3.2) — durable, non-personal proof that a tenant's
@@ -219,6 +199,11 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     assignedSectionIds: text('assigned_section_ids').notNull().default('[]'),
 }, (t) => [
     index('idx_invites_tenant').on(t.tenantId),
+    // DB-9 — at most one OUTSTANDING invite per (tenant, email). Partial so an
+    // accepted invite doesn't block re-inviting later (history is preserved).
+    uniqueIndex('uq_tenant_invites_pending_email')
+        .on(t.tenantId, t.email)
+        .where(sql`status = 'pending'`),
 ]);
 
 export const tenantConfigs = sqliteTable('tenant_configs', {
@@ -252,10 +237,6 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Track L — company contact phone shown in client SMS ({{company_phone}}).
     companyPhone: text('company_phone'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
-    // DEAD (C-15, 2026-06-06): legacy AES-GCM secrets store, soft-retired —
-    // nothing reads or writes it anymore (D1 can't drop columns on FK-referenced
-    // tables, so the column stays as a dead shadow). Canonical store below.
-    secrets: text('secrets'),
     // Secret UI化 (migration 0079) — AES-256-GCM encrypted JSON holding all
     // 14 integration API keys configurable via Settings UI. Supersedes the
     // `secrets` column which held a smaller subset. Worker env vars still
@@ -322,12 +303,6 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // PDF generation at publish time + the Refresh PDFs / Download PDF
     // dropdown in the report viewer.
     enablePdfPipeline: integer('enable_pdf_pipeline', { mode: 'boolean' }).notNull().default(false),
-    // Spec 5H D2 — tenant-default for newly-created inspections'
-    // auto_sign_on_publish flag. False by default.
-    // -- DEAD (2026-06-11, schema-cleanup): zero reads/writes across the repo —
-    // the auto-sign-on-publish default was never wired to a reader. Frozen
-    // (tenant_configs is FK-referenced; D1 can't drop). Do not reuse the name.
-    autoSignOnPublishDefault: integer('auto_sign_on_publish_default', { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
     teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
     apprenticeReviewRequired: integer('apprentice_review_required', { mode: 'boolean' }).notNull().default(false),

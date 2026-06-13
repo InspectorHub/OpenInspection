@@ -1,1 +1,0 @@
-ALTER TABLE `tenant_configs` DROP COLUMN `ga_measurement_id`;

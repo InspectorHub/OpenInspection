@@ -1,1 +1,0 @@
-ALTER TABLE `agreement_requests` ADD `purged_at` integer;

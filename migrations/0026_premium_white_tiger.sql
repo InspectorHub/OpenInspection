@@ -1,1 +1,0 @@
-ALTER TABLE `tenant_configs` ADD `company_phone` text;
