@@ -31,11 +31,6 @@ export default [
     route("verify", "routes/public/verify-offline.tsx"),
     route("v/:token", "routes/public/verify-token.tsx"),
     route("observe/inspections/:id", "routes/public/observe.tsx"),
-    route(
-      "concierge/book/:tenant/:slug",
-      "routes/public/concierge-book.tsx",
-    ),
-    route("concierge/confirm", "routes/public/concierge-confirm.tsx"),
     route("concierge/expired", "routes/public/concierge-expired.tsx"),
     route(
       "inspector/:tenant/:slug",
