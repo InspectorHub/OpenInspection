@@ -1,24 +1,10 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { agreementSignPath } from '../lib/public-urls';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-import {
-    BookInfoQuerySchema,
-    BookInfoResponseSchema,
-    BookRequestSchema,
-    BookResponseSchema,
-    ConfirmInfoQuerySchema,
-    ConfirmInfoResponseSchema,
-} from '../lib/validations/concierge.schema';
-import {
-    getBookInfo,
-    createBooking,
-    getConfirmInfo,
-} from '../services/concierge.service';
 
 /**
  * Agent Accounts A3 — POST /api/concierge/confirm
@@ -40,6 +26,40 @@ const ConfirmResponseSchema = createApiResponseSchema(
     }),
 ).openapi('ConciergeConfirmResponse');
 
+const ConfirmViewResponseSchema = createApiResponseSchema(
+    z.object({
+        inspection: z.object({
+            propertyAddress: z.string(),
+            date:            z.string(),
+            clientName:      z.string().nullable(),
+            agreementRequired: z.boolean(),
+        }),
+        inspector: z.object({
+            name:     z.string().nullable(),
+            photoUrl: z.string().nullable(),
+        }).nullable(),
+        expired:          z.boolean(),
+        alreadyConfirmed: z.boolean(),
+    }),
+).openapi('ConciergeConfirmViewResponse');
+
+const confirmViewRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/confirm-view',
+    tags: ["bookings"],
+    summary: 'Read a concierge magic-link token for the public confirm page',
+    request: { query: z.object({ token: z.string().min(8).max(128).describe('Concierge magic-link token from the emailed confirm URL; identifies the booking to display.') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: ConfirmViewResponseSchema } },
+            description: 'Booking summary for the confirm landing page (expired/alreadyConfirmed flags included)',
+        },
+        404: { description: 'Token not found' },
+    },
+    operationId: "viewConciergeConfirm",
+    description: "Public unauthenticated read of a concierge confirm token — renders the /confirm/:token landing page before the client confirms.",
+}, { scopes: [], tier: 'extended' }));
+
 const confirmRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/confirm',
@@ -60,74 +80,30 @@ const confirmRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for confirmConcierge (POST /confirm, bookings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: [], tier: 'extended' }));
 
-/* ------------------------------------------------------------------ */
-/*  Public booking flow routes (Tasks 15-17 of dead-routes-cleanup)    */
-/* ------------------------------------------------------------------ */
-
-// Shared error body for the public concierge 400s so the handlers can return a
-// typed { success:false, error } payload without an `as any` cast.
-const ConciergeErrorSchema = z.object({
-    success: z.literal(false),
-    error: z.object({ code: z.string(), message: z.string() }),
-});
-
-const bookInfoRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/book-info',
-    tags: ['bookings'],
-    summary: 'Public booking page bootstrap by invite token',
-    request: { query: BookInfoQuerySchema },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: BookInfoResponseSchema } },
-            description: 'Bootstrap payload — tenant brand, optional inspector, slot stubs, expiry',
-        },
-        400: { content: { 'application/json': { schema: ConciergeErrorSchema } }, description: 'Invite token missing, invalid, or expired' },
-    },
-    operationId: 'getConciergeBookInfo',
-    description:
-        'Public unauthenticated read of tenant brand + (placeholder) slot list for the concierge booking page. The token is an opaque invite secret embedded in the magic-link URL the inspector shared with the customer. Returns empty availableSlots until calendar integration ships.',
-}, { scopes: [], tier: 'extended' }));
-
-const bookRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/book',
-    tags: ['bookings'],
-    summary: 'Create booking from public concierge form',
-    request: {
-        body: { content: { 'application/json': { schema: BookRequestSchema } } },
-    },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: BookResponseSchema } },
-            description: 'Booking row created — returns id + confirmation token',
-        },
-        400: { content: { 'application/json': { schema: ConciergeErrorSchema } }, description: 'Invite token invalid/expired or form payload rejected' },
-    },
-    operationId: 'createConciergeBooking',
-    description:
-        'Public unauthenticated write that inserts a concierge_bookings row keyed by the invite token plus a freshly minted confirmation token the frontend hands to /confirm-info on the next page.',
-}, { scopes: [], tier: 'extended' }));
-
-const confirmInfoRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/confirm-info',
-    tags: ['bookings'],
-    summary: 'Read just-booked details by confirmation token',
-    request: { query: ConfirmInfoQuerySchema },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: ConfirmInfoResponseSchema } },
-            description: 'Booking summary — slot, address, contact, tenant',
-        },
-        400: { content: { 'application/json': { schema: ConciergeErrorSchema } }, description: 'Confirmation token missing or unknown' },
-    },
-    operationId: 'getConciergeConfirmInfo',
-    description:
-        'Public unauthenticated read of a freshly created concierge booking, keyed by the confirmation token returned from POST /book. Used to render the static confirm page after submission.',
-}, { scopes: [], tier: 'extended' }));
-
 export const conciergeRoutes = createApiRouter()
+    .openapi(confirmViewRoute, async (c) => {
+        const { token } = c.req.valid('query');
+        const view = await c.var.services.concierge.resolveToken(token);
+        if (!view) {
+            return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
+        }
+        return c.json({
+            success: true as const,
+            data: {
+                inspection: {
+                    propertyAddress:   view.inspection.propertyAddress,
+                    date:              view.inspection.date,
+                    clientName:        view.inspection.clientName,
+                    agreementRequired: view.inspection.agreementRequired,
+                },
+                inspector: view.inspector
+                    ? { name: view.inspector.name, photoUrl: view.inspector.photoUrl }
+                    : null,
+                expired:          view.expired,
+                alreadyConfirmed: view.alreadyConfirmed,
+            },
+        }, 200);
+    })
     .openapi(confirmRoute, async (c) => {
         const { token } = c.req.valid('json');
         const result = await c.var.services.concierge.confirmByClient(token);
@@ -168,54 +144,6 @@ export const conciergeRoutes = createApiRouter()
             success: true as const,
             data: { inspectionId: result.inspectionId, redirect },
         }, 200);
-    })
-    .openapi(bookInfoRoute, async (c) => {
-        const { token } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
-        try {
-            const data = await getBookInfo(db, token);
-            return c.json({ success: true as const, data }, 200);
-        } catch (e) {
-            logger.warn('concierge.bookInfo.failed', {
-                error: e instanceof Error ? e.message : String(e),
-            });
-            return c.json(
-                { success: false as const, error: { code: 'INVITE_INVALID', message: e instanceof Error ? e.message : 'invalid' } },
-                400,
-            );
-        }
-    })
-    .openapi(bookRoute, async (c) => {
-        const input = c.req.valid('json');
-        const db = drizzle(c.env.DB);
-        try {
-            const data = await createBooking(db, input);
-            return c.json({ success: true as const, data }, 200);
-        } catch (e) {
-            logger.warn('concierge.book.failed', {
-                error: e instanceof Error ? e.message : String(e),
-            });
-            return c.json(
-                { success: false as const, error: { code: 'BOOKING_FAILED', message: e instanceof Error ? e.message : 'failed' } },
-                400,
-            );
-        }
-    })
-    .openapi(confirmInfoRoute, async (c) => {
-        const { token } = c.req.valid('query');
-        const db = drizzle(c.env.DB);
-        try {
-            const data = await getConfirmInfo(db, token);
-            return c.json({ success: true as const, data }, 200);
-        } catch (e) {
-            logger.warn('concierge.confirmInfo.failed', {
-                error: e instanceof Error ? e.message : String(e),
-            });
-            return c.json(
-                { success: false as const, error: { code: 'CONFIRMATION_INVALID', message: e instanceof Error ? e.message : 'invalid' } },
-                400,
-            );
-        }
     });
 
 export type ConciergeApi = typeof conciergeRoutes;

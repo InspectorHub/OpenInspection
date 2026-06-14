@@ -20,21 +20,31 @@ interface Member {
     role: string;
 }
 
+// DB-16 — a flat photo the inspector can pick as the report cover.
+interface CoverPhoto {
+    key: string;
+    url: string;
+    label: string;
+}
+
+const EMPTY = { inspection: null, templates: [] as Template[], members: [] as Member[], photos: [] as CoverPhoto[] };
+
 export async function loader({ request, context }: Route.LoaderArgs) {
     const token = await getToken(context, request);
-    if (!token) return { inspection: null, templates: [] as Template[], members: [] as Member[] };
+    if (!token) return EMPTY;
 
     const url = new URL(request.url);
     const inspectionId = url.searchParams.get("inspectionId") ?? "";
-    if (!inspectionId) return { inspection: null, templates: [] as Template[], members: [] as Member[] };
+    if (!inspectionId) return EMPTY;
 
     const api = createApi(context, { token });
     const hdr = { headers: { "x-token-relay": "1" } } as const;
 
-    const [inspRes, tplRes, membersRes] = await Promise.all([
+    const [inspRes, tplRes, membersRes, mediaRes] = await Promise.all([
         api.inspections[":id"].$get({ param: { id: inspectionId } }, hdr).catch(() => null),
         api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }, hdr).catch(() => null),
         api.team.members.$get({}, hdr).catch(() => null),
+        api.inspections[":id"].media.$get({ param: { id: inspectionId } }, hdr).catch(() => null),
     ]);
 
     let inspection: Record<string, unknown> | null = null;
@@ -60,5 +70,41 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         }
     }
 
-    return { inspection, templates, members };
+    // DB-16 — flatten attached + pool photos into one pickable cover list.
+    // Dedup by R2 key: results.data can store an item under BOTH a composite
+    // (unit::section::item) and a bare itemId key, which makes the media center
+    // surface the same photo twice; the cover grid must show each photo once.
+    const photos: CoverPhoto[] = [];
+    const seen = new Set<string>();
+    // Request small thumbnails (?w=240) for the grid so the browser doesn't pull
+    // full-resolution originals; the photo endpoint resizes when CF Images is
+    // available and falls back to the original otherwise.
+    const thumb = (url: string) => (url.includes("?") ? `${url}&w=240` : `${url}?w=240`);
+    const pushPhoto = (key?: string, url?: string, label = "") => {
+        if (!key || !url || seen.has(key)) return;
+        seen.add(key);
+        photos.push({ key, url: thumb(url), label });
+    };
+    if (mediaRes?.ok) {
+        const body = (await mediaRes.json()) as {
+            data?: {
+                attached?: Array<{ key: string; url: string; itemLabel?: string }>;
+                pool?: Array<{ key: string; url: string }>;
+            };
+        };
+        for (const a of body?.data?.attached ?? []) pushPhoto(a?.key, a?.url, a?.itemLabel ?? "");
+        for (const p of body?.data?.pool ?? []) pushPhoto(p?.key, p?.url, "Unattached");
+    }
+
+    return { inspection, templates, members, photos };
+}
+
+// The sheet loads this data once when it opens (explicit fetcher.load) and then
+// manages cover/save state locally. Without this guard, React Router revalidates
+// the fetcher.load after every editor mutation (save-settings, set-cover,
+// upload-cover), which reloads the sheet into its loading state and flickers the
+// whole panel. Explicit .load() on open still runs — shouldRevalidate only gates
+// automatic revalidation.
+export function shouldRevalidate() {
+    return false;
 }

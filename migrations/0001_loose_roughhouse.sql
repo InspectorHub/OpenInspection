@@ -1,1 +1,0 @@
-ALTER TABLE `users` ADD `permission_overrides` text;

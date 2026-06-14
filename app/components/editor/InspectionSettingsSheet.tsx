@@ -68,12 +68,20 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   const saveFetcher = useFetcher<{ ok: boolean; intent?: string }>();
   const templateChangedAtSubmit = useRef(false);
 
+  type CoverPhoto = { key: string; url: string; label: string };
   type SheetData = {
     inspection: Record<string, unknown> | null;
     templates: Template[];
     members: Array<{ id: string; email: string }>;
+    photos: CoverPhoto[];
   };
   const loadFetcher = useFetcher<SheetData>();
+  // DB-16 — report cover picker. `photos` are all of the inspection's photos;
+  // `coverKey` is the chosen cover R2 key (optimistic; PATCHed via coverFetcher).
+  const [photos, setPhotos] = useState<CoverPhoto[]>([]);
+  const [coverKey, setCoverKey] = useState<string>("");
+  const coverFetcher = useFetcher<{ ok: boolean; intent?: string; coverKey?: string; coverUrl?: string | null }>();
+  const coverFileRef = useRef<HTMLInputElement>(null);
 
   // Trigger load when the sheet opens or inspectionId changes
   useEffect(() => {
@@ -105,8 +113,42 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     }
     setTemplates(d.templates ?? []);
     setInspectors((d.members ?? []) as Inspector[]);
+    setPhotos(d.photos ?? []);
+    // Cover key lives on the inspection row; the detail API exposes it as
+    // `coverPhotoId` (raw) or `coverPhoto` (formatted) — read either.
+    setCoverKey(((insp?.coverPhotoId ?? insp?.coverPhoto) as string | null) ?? "");
     setLoading(false);
   }, [loadFetcher.data]);
+
+  function selectCover(key: string) {
+    const next = coverKey === key ? "" : key; // click current cover to clear
+    setCoverKey(next);
+    coverFetcher.submit({ intent: "set-cover", coverPhotoId: next }, { method: "post" });
+  }
+
+  // DB-16 — direct cover upload (Spectora parity). The file rides the BFF relay
+  // via the editor route's `upload-cover` intent (pool upload + set cover).
+  function uploadCover(file: File) {
+    const fd = new FormData();
+    fd.append("intent", "upload-cover");
+    fd.append("file", file);
+    coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+  }
+
+  // When an upload-cover round-trip succeeds, append the new photo to the grid
+  // and select it as cover — all in LOCAL state. We deliberately do NOT reload
+  // the sheet loader here (that would flicker the entire settings sheet).
+  useEffect(() => {
+    const d = coverFetcher.data;
+    if (coverFetcher.state === "idle" && d?.intent === "upload-cover" && d.ok && d.coverKey) {
+      const key = d.coverKey;
+      const url = d.coverUrl ?? null;
+      setCoverKey(key);
+      if (url) {
+        setPhotos((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, url, label: "Uploaded" }, ...prev]));
+      }
+    }
+  }, [coverFetcher.state, coverFetcher.data]);
 
   // Sync loading state with fetcher
   useEffect(() => {
@@ -270,6 +312,56 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                   </select>
                   <p className="mt-1 text-[11px] text-ih-fg-4">Overrides the workspace default for this inspection only.</p>
                 </label>
+              </fieldset>
+
+              {/* DB-16 — report cover photo: pick an existing inspection photo OR upload one directly */}
+              <fieldset className="space-y-2">
+                <legend className={labelClass}>Report cover photo</legend>
+                <input
+                  ref={coverFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadCover(file);
+                    e.target.value = ""; // allow re-selecting the same file
+                  }}
+                />
+                {photos.length === 0 ? (
+                  <p className="text-[12px] text-ih-fg-4">No photos yet — upload one below, or add photos to an inspection item and pick one here.</p>
+                ) : (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    {photos.map((p) => {
+                      const selected = coverKey === p.key;
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => selectCover(p.key)}
+                          title={selected ? "Current cover — click to clear" : `Set as cover${p.label ? ` (${p.label})` : ""}`}
+                          className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${selected ? "border-ih-primary" : "border-ih-border hover:border-ih-primary/60"}`}
+                        >
+                          <img src={p.url} alt={p.label || "Photo"} className="w-full h-full object-cover" loading="lazy" />
+                          {selected && (
+                            <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[9px] font-bold text-center py-0.5">COVER</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => coverFileRef.current?.click()}
+                    disabled={coverFetcher.state !== "idle"}
+                    className="h-9 px-3 rounded-md border border-ih-border text-ih-fg-2 text-[12px] font-bold hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
+                  >
+                    {coverFetcher.state !== "idle" && coverFetcher.formData?.get("intent") === "upload-cover" ? "Uploading…" : "Upload cover photo"}
+                  </button>
+                  <span className="text-[11px] text-ih-fg-4">Shown on the report cover page. Click the selected photo to clear it.</span>
+                </div>
               </fieldset>
 
               <div className="flex items-center justify-end gap-3 border-t border-ih-border pt-4">

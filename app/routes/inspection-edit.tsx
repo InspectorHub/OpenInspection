@@ -64,12 +64,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  api.inspections[":id"].results.$get({ param: { id } }),
  api.inspections[":id"]["report-data"].$get({ param: { id } }),
  // Track H (C-12): tag library moved off the client-side fetch into the loader.
  api.tags.index.$get().catch(() => null),
+ // tenantSlug for the "Preview full report" link (/report-view/:slug/:id).
+ api.sessionContext.context.$get().catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -122,7 +124,32 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  tagLibrary = tagsBody.data ?? [];
  }
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary };
+ let tenantSlug: string | null = null;
+ if (sessRes?.ok) {
+ const sb = await sessRes.json() as { data?: { branding?: { tenantSlug?: string | null } } };
+ tenantSlug = sb.data?.branding?.tenantSlug ?? null;
+ }
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug };
+}
+
+/**
+ * The editor holds its own optimistic state (useInspection) and persists every
+ * change through fetchers. Re-running this heavy loader after each mutation
+ * (rate / notes / save-settings / set-cover / upload-cover …) just reloads and
+ * flickers the whole editor. Skip revalidation for POST submissions; navigation
+ * and explicit `revalidator.revalidate()` (offline sync) still refresh because
+ * they carry no POST formMethod.
+ */
+export function shouldRevalidate({
+  formMethod,
+  defaultShouldRevalidate,
+}: {
+  formMethod?: string;
+  defaultShouldRevalidate: boolean;
+}) {
+  if (formMethod && formMethod.toUpperCase() === "POST") return false;
+  return defaultShouldRevalidate;
 }
 
 /* ------------------------------------------------------------------ */
@@ -250,6 +277,41 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  console.error("[save-settings] PATCH failed", res.status, await res.text().catch(() => ""));
  }
  return { ok: res.ok, intent: "save-settings" };
+ }
+
+ if (intent === "set-cover") {
+ // DB-16 — set/clear the report cover photo. The value is the R2 key of a
+ // photo belonging to this inspection (validated server-side); empty clears.
+ const raw = formData.get("coverPhotoId");
+ const coverPhotoId = raw ? String(raw) : null;
+ const res = await api.inspections[":id"].$patch({
+ param: { id: params.id },
+ json: { coverPhotoId },
+ });
+ return { ok: res.ok, intent: "set-cover" };
+ }
+
+ if (intent === "upload-cover") {
+ // DB-16 — direct cover upload (Spectora parity): upload an image to the
+ // loose media pool, then set it as the report cover in one step. Rides the
+ // BFF relay like every other mutation (no raw client fetch).
+ const file = formData.get("file");
+ if (!(file instanceof File)) return { ok: false as const, intent: "upload-cover" };
+ const up = await api.inspections[":id"].media.upload.$post({
+ param: { id: params.id },
+ form: { file },
+ });
+ if (!up.ok) return { ok: false as const, intent: "upload-cover" };
+ const body = (await up.json()) as { data?: { key?: string; url?: string } };
+ const key = body.data?.key;
+ if (!key) return { ok: false as const, intent: "upload-cover" };
+ const patch = await api.inspections[":id"].$patch({
+ param: { id: params.id },
+ json: { coverPhotoId: key },
+ });
+ // Return the uploaded photo's key + url so the sheet can append it to the
+ // grid locally — avoids reloading (and visibly flickering) the whole sheet.
+ return { ok: patch.ok, intent: "upload-cover", coverKey: key, coverUrl: body.data?.url ?? null };
  }
 
  if (intent === "toggle-auto-sign") {
@@ -819,8 +881,12 @@ export default function InspectionEditPage() {
  /* Photo studio state */
  const [photoStudioOpen, setPhotoStudioOpen] = useState(false);
  const [photoStudioUrl, setPhotoStudioUrl] = useState<string | null>(null);
+ const [photoStudioKey, setPhotoStudioKey] = useState<string | null>(null);
  const [photoStudioIndex, setPhotoStudioIndex] = useState(0);
  const [photoStudioTotal, setPhotoStudioTotal] = useState(0);
+ // DB-16 — dedicated fetcher for set/clear report cover (avoids the
+ // shared-fetcher abort hazard; the loader revalidates the cover after).
+ const coverFetcher = useFetcher();
 
  /* Mobile shell state */
  const isMobile = useIsMobile();
@@ -1708,6 +1774,14 @@ export default function InspectionEditPage() {
  photoIndex={photoStudioIndex}
  totalPhotos={photoStudioTotal}
  sectionName={state.currentSection?.title || state.currentSection?.name || ""}
+ isCover={!!photoStudioKey && (state.inspection.coverPhotoId as string | null) === photoStudioKey}
+ onSetCover={photoStudioKey ? () => {
+  const isCover = (state.inspection.coverPhotoId as string | null) === photoStudioKey;
+  coverFetcher.submit(
+   { intent: "set-cover", coverPhotoId: isCover ? "" : photoStudioKey },
+   { method: "post" },
+  );
+ } : undefined}
  onSave={() => {
   setPhotoStudioOpen(false);
  }}
@@ -2287,6 +2361,22 @@ export default function InspectionEditPage() {
  Auto-sign
  </label>
 
+ {/* Preview full report — opens the whole report (all sections) in a new tab.
+     Owner preview works on drafts (tokenless via the report-view loader). */}
+ {loaderData.tenantSlug && (
+ <button
+ onClick={() => window.open(`/report-view/${loaderData.tenantSlug}/${state.inspection.id}`, "_blank", "noopener")}
+ className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+ title="Preview the full report (all sections) in a new tab"
+ >
+ <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+ </svg>
+ Preview
+ </button>
+ )}
+
  {/* Sign now button */}
  <button
  onClick={() => setSignModalOpen(true)}
@@ -2459,10 +2549,12 @@ export default function InspectionEditPage() {
  const photos = (result?.photos as string[]) || [];
  if (photos.length > 0) {
   setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(photos[0])}`);
+  setPhotoStudioKey(photos[0]);
   setPhotoStudioIndex(1);
   setPhotoStudioTotal(photos.length);
  } else {
   setPhotoStudioUrl(null);
+  setPhotoStudioKey(null);
   setPhotoStudioIndex(0);
   setPhotoStudioTotal(0);
  }
