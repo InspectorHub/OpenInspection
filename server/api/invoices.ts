@@ -309,11 +309,12 @@ async function resolveSignatureInspectorForEmail(
     try {
         const db = drizzle(c.env.DB);
         const row = await db.select({
-            name:          users.name,
-            email:         users.email,
-            phone:         users.phone,
-            licenseNumber: users.licenseNumber,
-            slug:          users.slug,
+            name:             users.name,
+            email:            users.email,
+            phone:            users.phone,
+            licenseNumber:    users.licenseNumber,
+            slug:             users.slug,
+            signatureEnabled: users.signatureEnabled,
         }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
         if (!row) return undefined;
         const tenantSlug = (c.get('requestedTenantSlug') as string | undefined) ?? null;

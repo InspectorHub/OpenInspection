@@ -1333,7 +1333,7 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
 
 // --- Track I-a Task 9 — agreement send helpers (module scope) -------------
 
-type SenderSignature = { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null };
+type SenderSignature = { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; signatureEnabled: boolean | null };
 
 /**
  * Look up the current admin/inspector's signature block so the recipient can
@@ -1345,10 +1345,11 @@ async function lookupSenderSignature(c: Context<HonoConfig>, tenantId: string): 
     if (!senderId) return undefined;
     try {
         const row = await drizzle(c.env.DB).select({
-            name:          schema.users.name,
-            email:         schema.users.email,
-            phone:         schema.users.phone,
-            licenseNumber: schema.users.licenseNumber,
+            name:             schema.users.name,
+            email:            schema.users.email,
+            phone:            schema.users.phone,
+            licenseNumber:    schema.users.licenseNumber,
+            signatureEnabled: schema.users.signatureEnabled,
         }).from(schema.users)
             .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
             .get();
@@ -1743,14 +1744,15 @@ export const adminRoutes = createApiRouter()
         // Sprint B-4a — append the sender (current admin/inspector) signature so
         // the client can rebook with this user via the embedded booking link.
         const senderId = c.get('user')?.sub;
-        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
+        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; signatureEnabled: boolean | null } | undefined;
         if (senderId) {
             try {
                 const row = await drizzle(c.env.DB).select({
-                    name:          schema.users.name,
-                    email:         schema.users.email,
-                    phone:         schema.users.phone,
-                    licenseNumber: schema.users.licenseNumber,
+                    name:             schema.users.name,
+                    email:            schema.users.email,
+                    phone:            schema.users.phone,
+                    licenseNumber:    schema.users.licenseNumber,
+                    signatureEnabled: schema.users.signatureEnabled,
                 }).from(schema.users)
                     .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
                     .get();
