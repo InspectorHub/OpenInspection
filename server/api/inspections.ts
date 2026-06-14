@@ -2951,6 +2951,7 @@ export const inspectionsRoutes = createApiRouter()
         method: 'get', path: '/{id}/pdf',
         tags: ["inspections"],
         summary: 'Download report PDF (Summary or Full)',
+        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
         request: {
             params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
             query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('TODO describe type field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
@@ -2959,13 +2960,6 @@ export const inspectionsRoutes = createApiRouter()
             200: {
                 content: { 'application/pdf': { schema: z.any().describe('TODO describe schema field for the OpenInspection MCP integration') } },
                 description: 'PDF bytes',
-            },
-            202: {
-                content: { 'application/json': { schema: createApiResponseSchema(z.object({
-                    status: z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
-                    error: z.string().nullable().optional().describe('TODO describe error field for the OpenInspection MCP integration'),
-                })) } },
-                description: 'PDF still rendering',
             },
         },
         operationId: "listInspectionPdf",
