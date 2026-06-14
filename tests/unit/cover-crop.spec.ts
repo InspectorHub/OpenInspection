@@ -12,3 +12,11 @@ describe('resolveCoverUrl', () => {
     expect(resolveCoverUrl({ coverImageKey: null, coverPhotoId: null }, make)).toBeNull();
   });
 });
+
+import { CoverCropSchema } from '../../server/lib/validations/inspection.schema';
+describe('CoverCropSchema', () => {
+  const valid = { aspect: '3:2', orientation: 'landscape', x: 0, y: 0, width: 1200, height: 800 };
+  it('accepts valid', () => { expect(CoverCropSchema.safeParse(valid).success).toBe(true); });
+  it('rejects unknown aspect', () => { expect(CoverCropSchema.safeParse({ ...valid, aspect: '5:4' }).success).toBe(false); });
+  it('rejects non-positive dims', () => { expect(CoverCropSchema.safeParse({ ...valid, width: 0 }).success).toBe(false); });
+});
