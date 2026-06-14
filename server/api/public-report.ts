@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { tenants, inspections } from '../lib/db/schema';
 import { verifyRenderToken } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
@@ -599,12 +599,18 @@ export const publicReportRoutes = createApiRouter()
             return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
         }
 
-        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        const db = drizzle(c.env.DB);
+        const insp = await db
+            .select({ status: inspections.status, dataVersion: inspections.dataVersion })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!insp) return c.notFound();
         const versions = await c.var.services.reportVersion.list(tenantId, id);
-        const versionNumber = resolveArchiveVersion(inspection.status, versions);
+        const versionNumber = resolveArchiveVersion(insp.status, versions);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenant, id, c.env.JWT_SECRET);
         const record = await c.var.services.reportPdf.getOrRender(id, tenantId, reportType, {
-            reportUrl, versionNumber, currentVersion: inspection.dataVersion ?? 0,
+            reportUrl, versionNumber, currentVersion: insp.dataVersion ?? 0,
         });
         const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.notFound();
