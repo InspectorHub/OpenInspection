@@ -157,6 +157,50 @@ export class ReportPdfService {
     }
 
     /**
+     * Look up an existing PDF record keyed by the exact versionNumber
+     * (or the NULL-version draft row when versionNumber is null).
+     */
+    async getPdfRecordForVersion(
+        inspectionId: string,
+        tenantId: string,
+        type: ReportPdfType,
+        versionNumber: number | null,
+    ): Promise<ReportPdf | null> {
+        const db = this.getDrizzle();
+        const row = await db.select().from(reportPdfs).where(and(
+            eq(reportPdfs.inspectionId, inspectionId),
+            eq(reportPdfs.tenantId, tenantId),
+            eq(reportPdfs.type, type),
+            versionNumber != null
+                ? eq(reportPdfs.versionNumber, versionNumber)
+                : isNull(reportPdfs.versionNumber),
+        )).get();
+        return row ?? null;
+    }
+
+    /**
+     * On-demand cache-or-render. Published reports pass an immutable versionNumber
+     * (render once → the #120 archive); drafts pass versionNumber=null + the live
+     * dataVersion as currentVersion (re-render when edits advance it).
+     */
+    async getOrRender(
+        inspectionId: string,
+        tenantId: string,
+        type: ReportPdfType,
+        opts: { reportUrl: string; versionNumber: number | null; currentVersion: number },
+    ): Promise<ReportPdf> {
+        const record = await this.getPdfRecordForVersion(inspectionId, tenantId, type, opts.versionNumber);
+        const fresh = record?.status === 'ready'
+            && (opts.versionNumber != null || !this.isStale(record, opts.currentVersion));
+        if (fresh && record) return record;
+        return this.renderAndStore(inspectionId, tenantId, type, {
+            reportUrl: opts.reportUrl,
+            sourceVersion: opts.currentVersion,
+            versionNumber: opts.versionNumber,
+        });
+    }
+
+    /**
      * Mark a record as queued for re-render. Used by POST /api/reports/:id/pdf/refresh
      * before kicking off the render workflow. Version-scoped (#120): operates only
      * on the row matching the given versionNumber (or the legacy NULL-version row

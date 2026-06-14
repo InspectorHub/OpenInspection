@@ -129,4 +129,69 @@ describe('ReportPdfService', () => {
         const rec = await svc.getPdfRecord(INSP_1, TENANT_A, 'full');
         await expect(svc.streamPdf(rec!)).rejects.toThrow(/not ready/);
     });
+
+    describe('getOrRender', () => {
+        const REPORT_URL = 'https://example.com/report/insp-1';
+
+        it('(a) cache hit on ready versioned record — does NOT re-render', async () => {
+            // Seed a ready versioned row by calling renderAndStore once.
+            await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                sourceVersion: 100,
+                versionNumber: 2,
+            });
+            // Reset call tracking so we can assert zero new renders.
+            vi.clearAllMocks();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+            (mockR2 as any).put = vi.fn(async () => undefined);
+
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                versionNumber: 2,
+                currentVersion: 999, // much higher — but versioned rows never re-render
+            });
+
+            expect(generatePdfFromUrl).toHaveBeenCalledTimes(0);
+            expect(rec.versionNumber).toBe(2);
+            expect(rec.status).toBe('ready');
+        });
+
+        it('(b) draft re-render when dataVersion advanced — DOES re-render', async () => {
+            // Seed a ready draft (versionNumber=null) row with sourceVersion=5.
+            await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                sourceVersion: 5,
+                versionNumber: null,
+            });
+            vi.clearAllMocks();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+            (mockR2 as any).put = vi.fn(async () => undefined);
+
+            // currentVersion=6 > sourceVersion=5 → stale → must re-render
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                versionNumber: null,
+                currentVersion: 6,
+            });
+
+            expect(generatePdfFromUrl).toHaveBeenCalledTimes(1);
+            expect(rec.sourceVersion).toBe(6);
+            expect(rec.status).toBe('ready');
+        });
+
+        it('(c) cache miss — renders and stores a new versioned row', async () => {
+            // No row exists at all.
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                versionNumber: 7,
+                currentVersion: 7,
+            });
+
+            expect(generatePdfFromUrl).toHaveBeenCalledTimes(1);
+            expect(rec.versionNumber).toBe(7);
+            expect(rec.status).toBe('ready');
+        });
+    });
 });
