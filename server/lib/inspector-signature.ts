@@ -30,6 +30,8 @@ export interface SignatureUser {
     slug?: string | null;
     /** Tenant slug — builds the company-level booking URL (`/book/<tenant>`). */
     tenantSlug?: string | null;
+    /** Per-inspector opt-in for the email footer; when false the footer is omitted. */
+    signatureEnabled?: boolean | null;
 }
 
 export interface SignatureOutput {
