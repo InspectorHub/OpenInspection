@@ -141,6 +141,11 @@ export const adminBrandingRoutes = createApiRouter()
         const file = formData.get('logo') as File;
         if (!file || !(file instanceof File)) throw Errors.BadRequest('No logo file provided.');
 
+        const MAX_LOGO_BYTES = 2_000_000;
+        const ALLOWED = ['image/png', 'image/svg+xml', 'image/jpeg', 'image/webp'];
+        if (file.size > MAX_LOGO_BYTES) throw Errors.BadRequest('logo > 2MB');
+        if (!ALLOWED.includes(file.type)) throw Errors.BadRequest('logo must be png, svg, jpeg, or webp');
+
         const brandingService = c.var.services.branding;
         const logoUrl = await brandingService.uploadLogo(c.get('tenantId'), file);
         return c.json({ success: true, data: { logoUrl } }, 200);
