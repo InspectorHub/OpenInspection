@@ -40,6 +40,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const fd = await request.formData();
+
+  const intent = fd.get("intent") as string | null;
+  if (intent === "logo-upload") {
+    const logo = fd.get("logo");
+    if (!(logo instanceof File) || logo.size === 0) {
+      return { success: false, error: "No valid logo provided", intent };
+    }
+    const api = createApi(context, { token });
+    const res = await api.adminBranding.branding.logo.$post({ form: { logo } });
+    const body = (await res.json().catch(() => null)) as { data?: { logoUrl?: string } } | null;
+    return { success: res.ok, intent, logoUrl: body?.data?.logoUrl ?? null };
+  }
+
   const submission = parseWithZod(fd, { schema: workspaceSchema });
   if (submission.status !== "success") {
     return submission.reply();
