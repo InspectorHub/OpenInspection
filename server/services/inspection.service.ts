@@ -38,7 +38,7 @@ export function resolveCoverUrl(
   ins: { coverImageKey?: string | null; coverPhotoId?: string | null },
   makePhotoUrl: (key: string) => string,
 ): string | null {
-  const key = ins.coverImageKey || ins.coverPhotoId;
+  const key = ins.coverImageKey ?? ins.coverPhotoId;
   return key ? makePhotoUrl(key) : null;
 }
 

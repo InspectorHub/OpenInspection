@@ -3175,7 +3175,10 @@ export const inspectionsRoutes = createApiRouter()
         const formData = await c.req.parseBody();
         const file = formData['image'] as File | undefined;
         if (!file) throw Errors.BadRequest('image file required');
-        const parsed = CoverCropSchema.safeParse(JSON.parse(String(formData['crop'] ?? '{}')));
+        let rawCrop: unknown;
+        try { rawCrop = JSON.parse(String(formData['crop'] ?? '{}')); }
+        catch { throw Errors.BadRequest('invalid crop'); }
+        const parsed = CoverCropSchema.safeParse(rawCrop);
         if (!parsed.success) throw Errors.BadRequest('invalid crop');
         const sourceKey = String(formData['sourceKey'] ?? '');
         const bytes = await file.arrayBuffer();
