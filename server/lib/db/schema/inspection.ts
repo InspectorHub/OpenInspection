@@ -106,6 +106,17 @@ export const inspections = sqliteTable('inspections', {
     // row used as the report cover image. NULL until the inspector picks
     // one; the Publish pre-flight surfaces this as a gate.
     coverPhotoId:        text('cover_photo_id'),
+    // Image Studio (cover crop) — re-editable crop transform applied to the
+    // SOURCE image (cover_photo_id), in source-pixel coords. NULL = uncropped.
+    coverCrop:           text('cover_crop', { mode: 'json' }).$type<{
+        aspect: '3:2' | '16:9' | '1.91:1' | '4:3';
+        orientation: 'landscape' | 'portrait';
+        x: number; y: number; width: number; height: number;
+    }>(),
+    // Image Studio (cover crop) — R2 key of the baked cropped derivative
+    // (JPEG, 2048px long edge). Report/OG/PDF read THIS when set; falls back
+    // to cover_photo_id (uncropped source) otherwise.
+    coverImageKey:       text('cover_image_key'),
     unit:                text('unit'),
     propertyType:        text('property_type'),
     commercialSubtype:   text('commercial_subtype'),
