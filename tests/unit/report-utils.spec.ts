@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeReportStats, getRatingColor, getRatingBucket } from '../../server/lib/report-utils';
+import { findingKey, DEFAULT_UNIT } from '../../server/lib/finding-key';
 
 const defaultLevels = [
   { id: 'S', label: 'Satisfactory', abbreviation: 'SAT', color: '#22c55e', severity: 'good' as const, isDefect: false },
@@ -69,6 +70,24 @@ describe('computeReportStats', () => {
     expect(stats.monitor).toBe(1);
     expect(stats.defect).toBe(1);
     expect(stats.other).toBe(1);
+  });
+
+  it('resolves ratings stored under composite findingKeys (editor write format)', () => {
+    // The editor stores ratings under `${DEFAULT_UNIT}:${sectionId}:${itemId}`,
+    // not the bare item id. The summary cards must resolve those the same way
+    // getReportData's per-item loop does, or they read 0 while items show buckets.
+    const composite: Record<string, { rating?: string }> = {
+      [findingKey(DEFAULT_UNIT, 's1', 'i1')]: { rating: 'D' },
+      [findingKey(DEFAULT_UNIT, 's1', 'i2')]: { rating: 'S' },
+      [findingKey(DEFAULT_UNIT, 's1', 'i3')]: { rating: 'M' },
+      [findingKey(DEFAULT_UNIT, 's2', 'i4')]: { rating: 'NI' },
+    };
+    const stats = computeReportStats(sections, composite, defaultLevels);
+    expect(stats.satisfactory).toBe(1);
+    expect(stats.monitor).toBe(1);
+    expect(stats.defect).toBe(1);
+    expect(stats.other).toBe(1);
+    expect(stats.sectionDefects['s1']).toBe(1);
   });
 
   it('computes per-section defect counts', () => {
