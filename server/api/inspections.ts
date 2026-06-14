@@ -76,6 +76,21 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
  * inspector or the lookup fails — callers should pass undefined through to
  * EmailService methods, which will skip the footer in that case.
  */
+/**
+ * Public tenant slug for building report links + headless render URLs. saas
+ * AUTHENTICATED routes resolve the tenant from the JWT and never set
+ * requestedTenantSlug, so fall back to a tenants.slug lookup by the verified
+ * tenantId (mirrors the hubRoute pattern). An empty slug yields /report-view//:id
+ * which 404s — fatal for the headless PDF render — so this fallback is mandatory.
+ */
+async function resolveTenantSlug(c: Context<HonoConfig>, tenantId: string): Promise<string> {
+    const fromCtx = c.get('requestedTenantSlug');
+    if (fromCtx) return fromCtx;
+    const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+        .from(tenants).where(eq(tenants.id, tenantId)).get();
+    return row?.slug ?? '';
+}
+
 async function resolveSignatureInspector(
     c: Context<HonoConfig>,
     inspectorId: string | null | undefined,
@@ -2542,7 +2557,7 @@ export const inspectionsRoutes = createApiRouter()
         await db.update(inspectionTable).set({ status: 'completed' }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         if (inspection.clientEmail) {
-            const tenantSlug = c.get('requestedTenantSlug') ?? '';
+            const tenantSlug = await resolveTenantSlug(c, tenantId);
             // linkUrl: plain URL for human-facing email body links (never render-token).
             const linkUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
             // renderUrl: token-bearing URL for the headless browser PDF render.
@@ -2600,7 +2615,7 @@ export const inspectionsRoutes = createApiRouter()
             throw Errors.BadRequest('No recipient email — set inspection.clientEmail or pass toEmail.');
         }
 
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         // linkUrl: plain URL for human-facing email body links (never render-token).
         const linkUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
         // renderUrl: token-bearing URL for the headless browser PDF render.
@@ -2848,7 +2863,7 @@ export const inspectionsRoutes = createApiRouter()
         // remains the universal fallback.
         const reportPdf = c.var.services.reportPdf;
         if (await reportPdf.isPipelineEnabled(tenantId)) {
-            const tenantSlug = c.get('requestedTenantSlug') ?? '';
+            const tenantSlug = await resolveTenantSlug(c, tenantId);
             // renderUrl: token-bearing URL for the headless browser PDF render.
             const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
             const sourceVersion = Date.now();
@@ -2916,7 +2931,7 @@ export const inspectionsRoutes = createApiRouter()
         if (!(await reportPdf.isPipelineEnabled(tenantId))) {
             throw Errors.Forbidden('PDF pipeline is disabled for this workspace. Enable it in Settings → Reports.');
         }
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         // renderUrl: token-bearing URL for the headless browser PDF render.
         const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const sourceVersion = Date.now();
@@ -2980,7 +2995,7 @@ export const inspectionsRoutes = createApiRouter()
         const versions = await c.var.services.reportVersion.list(tenantId, id);
         // Published/delivered → immutable archive version (#120). Drafts → null → keyed on dataVersion.
         const versionNumber = resolveArchiveVersion(inspection.status, versions);
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const record = await c.var.services.reportPdf.getOrRender(id, tenantId, type, {
             reportUrl,
@@ -3017,7 +3032,7 @@ export const inspectionsRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
         const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const url = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?view=agent&token=${token}`;
         return c.json({ success: true, data: { token, url } });
     })
@@ -3062,7 +3077,7 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const url = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?view=agent&token=${token}`;
 
         // Sprint B-4c — append the inspector's signature so the receiving agent
