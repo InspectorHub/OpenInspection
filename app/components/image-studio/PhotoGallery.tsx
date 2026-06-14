@@ -19,16 +19,47 @@ export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGall
   }, [inspectionId]);
   if (load.state === "loading" && photos.length === 0) return <p className="text-[13px] text-ih-fg-3 text-center py-8">Loading photos…</p>;
   if (photos.length === 0) return <p className="text-[13px] text-ih-fg-3 text-center py-8">No photos in this inspection yet.</p>;
+  // Action buttons live in the lightbox toolbar so they act on the photo being
+  // viewed (the fullscreen YARL overlay covers any side-panel controls).
+  const viewed = lightbox !== null ? photos[lightbox] : undefined;
+  const toolbarButtons = viewed
+    ? [
+        <button
+          key="annotate"
+          type="button"
+          onClick={() => {
+            setLightbox(null);
+            onAnnotate({ key: viewed.key, url: viewed.url });
+          }}
+          className="yarl__button"
+          style={{ fontSize: 13, fontWeight: 700, padding: "0 12px", color: "#fff" }}
+        >
+          Annotate
+        </button>,
+        <button
+          key="set-cover"
+          type="button"
+          onClick={() => {
+            setLightbox(null);
+            onSetCover({ key: viewed.key, url: viewed.url });
+          }}
+          className="yarl__button"
+          style={{ fontSize: 13, fontWeight: 700, padding: "0 12px", color: "#fff" }}
+        >
+          Set as cover
+        </button>,
+      ]
+    : undefined;
   return (
     <div className="space-y-3">
       <PhotoGrid items={photos.map((p) => ({ key: p.key, src: p.url, width: 4, height: 3, label: p.label }))} onClick={(i) => setLightbox(i)} />
-      <PhotoLightbox slides={photos.map((p) => ({ src: fullResUrl(p.url), alt: p.label }))} index={lightbox ?? 0} open={lightbox !== null} onClose={() => setLightbox(null)} />
-      {lightbox !== null && photos[lightbox] && (
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onAnnotate({ key: photos[lightbox].key, url: photos[lightbox].url })} className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:border-ih-primary hover:text-ih-primary">Annotate</button>
-          <button type="button" onClick={() => onSetCover({ key: photos[lightbox].key, url: photos[lightbox].url })} className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:border-ih-primary hover:text-ih-primary">Set as cover</button>
-        </div>
-      )}
+      <PhotoLightbox
+        slides={photos.map((p) => ({ src: fullResUrl(p.url), alt: p.label }))}
+        index={lightbox ?? 0}
+        open={lightbox !== null}
+        onClose={() => setLightbox(null)}
+        toolbarButtons={toolbarButtons}
+      />
     </div>
   );
 }
