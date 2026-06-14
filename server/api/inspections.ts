@@ -2557,8 +2557,11 @@ export const inspectionsRoutes = createApiRouter()
 
         if (inspection.clientEmail) {
             const tenantSlug = await resolveTenantSlug(c, tenantId);
-            // linkUrl: plain URL for human-facing email body links (never render-token).
-            const linkUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
+            // linkUrl: per-recipient TOKENIZED report link so the no-login client
+            // can open it (a plain URL 404s "Report not found"). Idempotent per
+            // (inspection, recipient) — re-sends keep the same stable link.
+            const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: inspection.clientEmail, role: 'client' });
+            const linkUrl = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?token=${encodeURIComponent(reportToken)}`;
             // renderUrl: token-bearing URL for the headless browser PDF render.
             const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
             const clientEmail = inspection.clientEmail;
@@ -2624,8 +2627,12 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         const tenantSlug = await resolveTenantSlug(c, tenantId);
-        // linkUrl: plain URL for human-facing email body links (never render-token).
-        const linkUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
+        // linkUrl: per-recipient TOKENIZED report link. The report viewer is
+        // gated (token / session / owner-preview); a plain URL 404s "Report not
+        // found" for a no-login recipient. issueToken is idempotent per
+        // (inspection, recipient), so re-sends reuse the same stable link.
+        const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: recipient, role: 'client' });
+        const linkUrl = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?token=${encodeURIComponent(reportToken)}`;
         // renderUrl: token-bearing URL for the headless browser PDF render.
         const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const address = inspection.propertyAddress as string;
