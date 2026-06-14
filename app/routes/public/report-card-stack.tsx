@@ -85,6 +85,7 @@ interface LoaderResult {
  error: string | null;
  reportTheme?: string;
  initialFilter: FilterKey;
+ printMode: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -94,6 +95,10 @@ interface LoaderResult {
 export async function loader({ params, request, context }: Route.LoaderArgs) {
  const initialFilter: FilterKey =
    new URL(request.url).searchParams.get("summary") === "1" ? "summary" : "all";
+ // Headless PDF renders carry ?print=1 (appended by generatePdfFromUrl). In that
+ // mode load images eagerly: Browser Rendering never scrolls, so loading={data.printMode ? "eager" : "lazy"}
+ // images below the fold would never load and the PDF would have blank photos.
+ const printMode = new URL(request.url).searchParams.get("print") === "1";
  try {
  // Relay the owner's session JWT when present so the inspector/admin can
  // preview their own report tokenlessly (resolveOwnerPreview server-side).
@@ -139,6 +144,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  error: res.ok ? null : "Report not found",
  reportTheme: ((d as unknown as Record<string, unknown>)?.reportTheme as string | undefined) ?? meta?.theme,
  initialFilter,
+ printMode,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -157,6 +163,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  coverPhotoUrl: null,
  error: "Service unavailable",
  initialFilter,
+ printMode,
  } satisfies LoaderResult;
  }
 }
@@ -356,7 +363,7 @@ export default function ReportCardStackPage() {
  src={data.coverPhotoUrl}
  alt={`Cover photo — ${data.address}`}
  className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
- loading="lazy"
+ loading={data.printMode ? "eager" : "lazy"}
  onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
  />
  </div>
@@ -531,7 +538,7 @@ export default function ReportCardStackPage() {
  alt={name}
  title={name}
  className="w-full h-20 object-cover rounded cursor-pointer"
- loading="lazy"
+ loading={data.printMode ? "eager" : "lazy"}
  onClick={() => setLightboxUrl(photo.url)}
  />
  );
@@ -588,7 +595,7 @@ export default function ReportCardStackPage() {
  alt={name}
  title={name}
  className="w-full h-32 object-cover rounded cursor-pointer"
- loading="lazy"
+ loading={data.printMode ? "eager" : "lazy"}
  onClick={() => setLightboxUrl(photo.url)}
  />
  <a
