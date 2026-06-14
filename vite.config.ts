@@ -14,6 +14,11 @@ const wranglerConfig =
   (existsSync("wrangler.local.jsonc") ? "wrangler.local.jsonc" : "wrangler.jsonc");
 
 export default defineConfig({
+  // Dependabot #14 / GHSA-gv7w-rqvm-qjhr: esbuild >=0.28.1 (security bump) lowers
+  // destructuring for the chrome87/es2020 target set by default. Those targets natively
+  // support destructuring, so tell esbuild to keep it (no runtime-semantics change) and
+  // avoid the vite:esbuild-transpile lowering errors.
+  esbuild: { supported: { destructuring: true } },
   resolve: {
     alias: {
       "~": path.resolve(__dirname, "app"),
