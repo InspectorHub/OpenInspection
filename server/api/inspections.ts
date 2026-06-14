@@ -11,7 +11,6 @@ import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { contentDisposition } from '../lib/content-disposition';
 import { logger } from '../lib/logger';
-import { generatePdfFromUrl } from '../lib/pdf';
 import { getCookie } from 'hono/cookie';
 import { verifyObserverCookie } from '../lib/observer-cookie';
 import { OBSERVER_COOKIE_NAME } from '../lib/middleware/observer-cookie';
@@ -2573,9 +2572,18 @@ export const inspectionsRoutes = createApiRouter()
             // Best-effort PDF: if BROWSER binding is missing or rendering fails,
             // fall back to the existing text-only "Report Ready" email so we
             // never block inspection completion on an optional dependency.
+            // Route through the PDF cache — if the publish flow already rendered
+            // this content, getOrRender returns the cached record at zero Browser
+            // Rendering cost.
             const deliver = async () => {
                 try {
-                    const pdf = await generatePdfFromUrl(c.env.BROWSER, renderUrl);
+                    const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+                    const versions = await c.var.services.reportVersion.list(tenantId, id);
+                    const versionNumber = resolveArchiveVersion(inspection.status, versions);
+                    const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
+                    const obj = await c.var.services.reportPdf.streamPdf(record);
+                    if (!obj) throw new Error('PDF unavailable');
+                    const pdf = await obj.arrayBuffer();
                     await c.var.services.email.sendInspectionReportPdf(clientEmail, address, linkUrl, pdf, sigInspector, sigHost);
                 } catch (err) {
                     logger.error('[complete] PDF generation failed, falling back to text-only email',
@@ -2627,7 +2635,15 @@ export const inspectionsRoutes = createApiRouter()
         const sigHost = getBookingHost(c);
 
         try {
-            const pdf = await generatePdfFromUrl(c.env.BROWSER, renderUrl);
+            // Route through the PDF cache — reuses an existing render when content
+            // is unchanged, avoiding a redundant Browser Rendering call.
+            const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+            const versions = await c.var.services.reportVersion.list(tenantId, id);
+            const versionNumber = resolveArchiveVersion(inspection.status, versions);
+            const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
+            const obj = await c.var.services.reportPdf.streamPdf(record);
+            if (!obj) throw new Error('PDF unavailable');
+            const pdf = await obj.arrayBuffer();
             await c.var.services.email.sendInspectionReportPdf(recipient, address, linkUrl, pdf, sigInspector, sigHost);
             auditFromContext(c, 'inspection.send_pdf', 'inspection', { entityId: id, metadata: { recipient } });
             return c.json({ success: true as const, data: { sentTo: recipient } }, 200);
@@ -2867,6 +2883,9 @@ export const inspectionsRoutes = createApiRouter()
             // renderUrl: token-bearing URL for the headless browser PDF render.
             const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
             const sourceVersion = Date.now();
+            // Content hash enables post-publish owner/client downloads to reuse this
+            // render instead of triggering a second Browser Rendering call.
+            const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
             const renderBoth = async () => {
                 try {
                     await Promise.all([
@@ -2874,8 +2893,8 @@ export const inspectionsRoutes = createApiRouter()
                         reportPdf.markQueued(id, tenantId, 'full', publishedVersion),
                     ]);
                     await Promise.allSettled([
-                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion }),
-                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion }),
+                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash }),
+                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash }),
                     ]);
                 } catch (err) {
                     logger.error('[publish] PDF render enqueue failed', { inspectionId: id }, err instanceof Error ? err : undefined);
@@ -2944,6 +2963,9 @@ export const inspectionsRoutes = createApiRouter()
         const currentFull    = await reportPdf.getPdfRecord(id, tenantId, 'full');
         const summaryVersion = currentSummary?.versionNumber ?? null;
         const fullVersion    = currentFull?.versionNumber ?? null;
+        // Store content_hash so post-refresh downloads reuse this render (force
+        // re-render is still guaranteed — renderAndStore always calls the browser).
+        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
 
         await Promise.all([
             reportPdf.markQueued(id, tenantId, 'summary', summaryVersion),
@@ -2952,8 +2974,8 @@ export const inspectionsRoutes = createApiRouter()
         c.executionCtx.waitUntil((async () => {
             try {
                 await Promise.allSettled([
-                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: summaryVersion }),
-                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: fullVersion }),
+                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: summaryVersion, contentHash }),
+                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: fullVersion,    contentHash }),
                 ]);
             } catch (err) {
                 logger.error('[pdf/refresh] background render failed', { inspectionId: id }, err instanceof Error ? err : undefined);
