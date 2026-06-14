@@ -4,7 +4,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
-import { getBookingHost } from '../lib/url';
+import { getBookingHost, resolveTenantSlug } from '../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, agreementSignUrl } from '../lib/public-urls';
 import { resolveArchiveVersion } from './inspections-pdf-helpers';
 import { safeISODate } from '../lib/date';
@@ -75,21 +75,6 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
  * inspector or the lookup fails — callers should pass undefined through to
  * EmailService methods, which will skip the footer in that case.
  */
-/**
- * Public tenant slug for building report links + headless render URLs. saas
- * AUTHENTICATED routes resolve the tenant from the JWT and never set
- * requestedTenantSlug, so fall back to a tenants.slug lookup by the verified
- * tenantId (mirrors the hubRoute pattern). An empty slug yields /report-view//:id
- * which 404s — fatal for the headless PDF render — so this fallback is mandatory.
- */
-export async function resolveTenantSlug(c: Context<HonoConfig>, tenantId: string): Promise<string> {
-    const fromCtx = c.get('requestedTenantSlug');
-    if (fromCtx) return fromCtx;
-    const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
-        .from(tenants).where(eq(tenants.id, tenantId)).get();
-    return row?.slug ?? '';
-}
-
 async function resolveSignatureInspector(
     c: Context<HonoConfig>,
     inspectorId: string | null | undefined,

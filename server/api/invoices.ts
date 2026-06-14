@@ -15,7 +15,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { normalizePaymentMethod } from '../lib/payment-method';
 import { inspections, inspectionServices, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
-import { getBookingHost } from '../lib/url';
+import { getBookingHost, resolveTenantSlug } from '../lib/url';
 import { paymentUrl } from '../lib/public-urls';
 import { logger } from '../lib/logger';
 import type { SignatureUser } from '../lib/inspector-signature';
@@ -317,7 +317,7 @@ async function resolveSignatureInspectorForEmail(
             signatureEnabled: users.signatureEnabled,
         }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
         if (!row) return undefined;
-        const tenantSlug = (c.get('requestedTenantSlug') as string | undefined) ?? null;
+        const tenantSlug = (await resolveTenantSlug(c, tenantId)) || null;
         return { ...row, tenantSlug };
     } catch (err) {
         logger.error('[email-signature] inspector lookup failed', { inspectorId }, err instanceof Error ? err : undefined);

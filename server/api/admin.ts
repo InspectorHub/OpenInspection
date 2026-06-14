@@ -7,7 +7,7 @@ import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { safeISODate } from '../lib/date';
-import { getBaseUrl, getBookingHost } from '../lib/url';
+import { getBaseUrl, getBookingHost, resolveTenantSlug } from '../lib/url';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { agreementSignUrl, checkoutUrl } from '../lib/public-urls';
 import { shouldUseCheckoutLink } from '../lib/agreement-link';
@@ -1604,7 +1604,7 @@ export const adminRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
         const svc = c.var.services.agreement;
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
 
         // Track I-a Task 9 — multi-signer envelope path. When `signers` is
         // provided AND the request is bound to an inspection, route through
@@ -1961,7 +1961,7 @@ export const adminRoutes = createApiRouter()
             ))
             .get();
         if (!signer) throw Errors.NotFound('Signer not found');
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const token = await svc.getSignerLink(requestId, signerId);
         const url = await buildSignUrl(c, tenantId, signer.inspectionId, tenantSlug, token);
         return c.json({ success: true as const, data: { url } }, 200);
@@ -1999,7 +1999,7 @@ export const adminRoutes = createApiRouter()
             throw Errors.RateLimited('This signer was reminded within the last hour.');
         }
 
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const token = await svc.getSignerLink(requestId, signerId);
         const signUrl = await buildSignUrl(c, tenantId, row.inspectionId, tenantSlug, token);
         const sigInspector = await lookupSenderSignature(c, tenantId);

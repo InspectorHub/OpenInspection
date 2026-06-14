@@ -2,7 +2,7 @@
 //
 // Regression test for: empty tenant slug on saas authenticated routes.
 //
-// Bug: server/api/inspections.ts resolveTenantSlug() returned '' on saas
+// Bug: resolveTenantSlug() (now in server/lib/url.ts) returned '' on saas
 // authenticated routes because those routes resolve the tenant from the JWT
 // and never set requestedTenantSlug on the Hono context.  An empty slug
 // produced /report-view//:id which 404'd the headless PDF render.
@@ -22,7 +22,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../server/lib/db/schema';
 
 // ------------------------------------------------------------------
-// We need resolveTenantSlug from server/api/inspections.ts.
+// We need resolveTenantSlug from server/lib/url.ts.
 // That module imports `drizzle` from 'drizzle-orm/d1' and passes
 // c.env.DB (a D1Database) to it.  In the test we intercept that call
 // and return our better-sqlite3 test database instead.
@@ -31,7 +31,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 // Import the function under test AFTER the mock is in place.
-import { resolveTenantSlug } from '../../server/api/inspections';
+import { resolveTenantSlug } from '../../server/lib/url';
 
 const TENANT_ID   = '00000000-0000-0000-0000-000000000099';
 const TENANT_SLUG = 'acme-inspect';
