@@ -1269,7 +1269,8 @@ const CommunicationResponseSchema = z.object({
     senderEmail:             z.string().nullable().describe('From: address for tenant transactional email.'),
     replyTo:                 z.string().nullable().describe('Reply-To: header for tenant transactional email.'),
     emailMode:               z.enum(['platform', 'own']).describe('platform = shared Resend; own = tenant Resend.'),
-    senderDisplayName:       z.string().nullable().describe('From: display name.'),
+    senderDisplayName:       z.string().nullable().describe('From: display name (override; falls back to siteName).'),
+    siteName:                z.string().nullable().describe('Canonical company name (from workspace branding).'),
     pointOfContact:          z.enum(['inspector', 'company']).describe('Who client-facing emails come from.'),
     resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
     templates:               z.array(z.object({
@@ -2711,6 +2712,7 @@ export const adminRoutes = createApiRouter()
                 replyTo: (cfg.replyTo as string | null) ?? null,
                 emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
                 senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
+                siteName: (cfg.siteName as string | null) ?? null,
                 pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
                 resendConfigured,
                 templates: [],

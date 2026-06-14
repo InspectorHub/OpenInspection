@@ -20,6 +20,7 @@ interface CommConfig {
   resendConfigured: boolean;
   emailMode: "platform" | "own";
   senderDisplayName: string | null;
+  siteName: string | null;
   pointOfContact: "inspector" | "company";
 }
 
@@ -61,6 +62,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       resendConfigured: Boolean(d?.resendConfigured),
       emailMode: (d?.emailMode as "platform" | "own") || "platform",
       senderDisplayName: (d?.senderDisplayName as string) || null,
+      siteName: (d?.siteName as string) || null,
       pointOfContact: ((d?.pointOfContact as string) === "inspector" ? "inspector" : "company") as "inspector" | "company",
     } as CommConfig,
     emailTemplates,
@@ -251,6 +253,12 @@ export default function SettingsCommunication() {
 
   const [mode, setMode] = useState<"platform" | "own">(config.emailMode);
   const [smsMode, setSmsMode] = useState<"platform" | "own">(smsConfig.mode);
+  // Override toggle: ON when senderDisplayName is set AND differs from siteName.
+  const [overrideName, setOverrideName] = useState<boolean>(
+    !!config.senderDisplayName && config.senderDisplayName !== config.siteName
+  );
+  // Track current PoC selection for the identity summary line.
+  const [poc, setPoc] = useState<"inspector" | "company">(config.pointOfContact);
 
   // Pending save state, per secret intent.
   const savingEmailSecrets =
@@ -412,14 +420,36 @@ export default function SettingsCommunication() {
                 )}
               </div>
             )}
-            <div>
-              <label htmlFor={emailFields.senderDisplayName.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Company display name</label>
-              <input
-                type="text" name={emailFields.senderDisplayName.name} id={emailFields.senderDisplayName.id}
-                defaultValue={config.senderDisplayName || ""} placeholder="Acme Inspections"
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-              />
-              <p className="text-[11px] text-ih-fg-4 mt-1">Shown as the From name on outbound email.</p>
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">From name</p>
+              <p className="text-[13px] text-ih-fg-2">
+                <strong>
+                  {config.siteName || config.senderDisplayName || (
+                    <Link to="/settings/workspace" className="text-ih-primary hover:underline">Set your company name in Settings &rsaquo; Workspace</Link>
+                  )}
+                </strong>
+                {config.siteName && (
+                  <span className="text-[11px] text-ih-fg-4 ml-2">(from Workspace settings)</span>
+                )}
+              </p>
+              <label className="flex items-center gap-2 text-[12px] text-ih-fg-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={overrideName}
+                  onChange={(e) => setOverrideName(e.currentTarget.checked)}
+                  className="h-4 w-4 border-ih-border"
+                />
+                Use a different name for email From
+              </label>
+              {overrideName ? (
+                <input
+                  type="text" name={emailFields.senderDisplayName.name} id={emailFields.senderDisplayName.id}
+                  defaultValue={config.senderDisplayName || ""} placeholder="Acme Inspections"
+                  className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
+                />
+              ) : (
+                <input type="hidden" name={emailFields.senderDisplayName.name} value="" />
+              )}
             </div>
             <div>
               <label htmlFor={emailFields.replyTo.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">
@@ -453,16 +483,30 @@ export default function SettingsCommunication() {
 
           <div className="space-y-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Point of contact</p>
-            {(["company", "inspector"] as const).map((poc) => (
-              <label key={poc} className="flex items-center gap-2 text-[13px] text-ih-fg-2 cursor-pointer">
+            {(["company", "inspector"] as const).map((p) => (
+              <label key={p} className="flex items-center gap-2 text-[13px] text-ih-fg-2 cursor-pointer">
                 <input
-                  type="radio" name={emailFields.pointOfContact.name} value={poc}
-                  defaultChecked={config.pointOfContact === poc}
+                  type="radio" name={emailFields.pointOfContact.name} value={p}
+                  defaultChecked={config.pointOfContact === p}
+                  onChange={() => setPoc(p)}
                   className="h-4 w-4 border-ih-border"
                 />
-                {poc === "company" ? "Company (reply-to address required)" : "Sending inspector (replies go to that inspector)"}
+                {p === "company" ? "Company (reply-to address required)" : "Sending inspector (replies go to that inspector)"}
               </label>
             ))}
+            <p className="text-[11px] text-ih-fg-4 pt-1">
+              Emails send as:{" "}
+              <strong>
+                {poc === "company"
+                  ? (overrideName && config.senderDisplayName ? config.senderDisplayName : (config.siteName || config.senderDisplayName || "your company"))
+                  : "the sending inspector"}
+              </strong>
+              {poc === "inspector"
+                ? ", replies go to that inspector"
+                : config.replyTo
+                  ? `, replies go to ${config.replyTo}`
+                  : ""}
+            </p>
           </div>
 
           {emailForm.errors && (

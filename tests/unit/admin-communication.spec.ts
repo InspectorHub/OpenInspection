@@ -37,14 +37,14 @@ describe('admin communication config — ③-D (B-4)', () => {
     it('GET returns senderEmail/replyTo + flags from branding config (tenant Resend key in the canonical store)', async () => {
         const getBranding = vi.fn().mockResolvedValue({
             senderEmail: 'noreply@acme.com', replyTo: 'office@acme.com', icsToken: 'icstok', googleRefreshToken: 'g',
-            emailMode: 'own', senderDisplayName: 'Acme Inspections', pointOfContact: 'inspector',
+            emailMode: 'own', senderDisplayName: 'Acme Inspections', siteName: 'Acme Home Inspections', pointOfContact: 'inspector',
         });
         // C-15: configured via the canonical encrypted_secrets store.
         vi.mocked(loadTenantSecrets).mockResolvedValue({ RESEND_API_KEY: 're_123' });
         const { app, env } = buildApp({ getBranding });
         const res = await app.request('/api/admin/communication', {}, env);
         expect(res.status).toBe(200);
-        const body = await res.json() as { data: { senderEmail: string; replyTo: string; resendConfigured: boolean; googleCalendarConnected: boolean; icsUrl: string | null; templates: unknown[]; emailMode: string; senderDisplayName: string; pointOfContact: string } };
+        const body = await res.json() as { data: { senderEmail: string; replyTo: string; resendConfigured: boolean; googleCalendarConnected: boolean; icsUrl: string | null; templates: unknown[]; emailMode: string; senderDisplayName: string; siteName: string | null; pointOfContact: string } };
         expect(body.data.senderEmail).toBe('noreply@acme.com');
         expect(body.data.replyTo).toBe('office@acme.com');
         expect(body.data.resendConfigured).toBe(true);
@@ -53,6 +53,7 @@ describe('admin communication config — ③-D (B-4)', () => {
         expect(Array.isArray(body.data.templates)).toBe(true);
         expect(body.data.emailMode).toBe('own');
         expect(body.data.senderDisplayName).toBe('Acme Inspections');
+        expect(body.data.siteName).toBe('Acme Home Inspections');
         expect(body.data.pointOfContact).toBe('inspector');
         expect(getBranding).toHaveBeenCalledWith('t1', expect.anything());
     });

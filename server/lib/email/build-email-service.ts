@@ -68,7 +68,7 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
     const platformColor = env.PRIMARY_COLOR || '#4f46e5';
     const renderer = new EmailTemplateRenderer({
         tenantBrand: {
-            name: emailBrand?.siteName || appName,
+            name: emailBrand?.siteName || emailIdentity?.senderDisplayName || appName,
             logoUrl: absoluteLogoUrl(emailBrand?.logoUrl, env.APP_BASE_URL),
             primaryColor: emailBrand?.primaryColor || platformColor,
         },
