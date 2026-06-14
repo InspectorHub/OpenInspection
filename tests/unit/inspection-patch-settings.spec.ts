@@ -144,7 +144,7 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
 
     it('DB-16: sets coverPhotoId to an attached item photo key (200)', async () => {
         await seedAttachedPhoto();
-        expect(await patch('admin', { coverPhotoId: ATTACHED_KEY })).toBe(200);
+        expect(await patch('manager', { coverPhotoId: ATTACHED_KEY })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBe(ATTACHED_KEY);
     });
