@@ -314,6 +314,19 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: patch.ok, intent: "upload-cover", coverKey: key, coverUrl: body.data?.url ?? null };
  }
 
+ if (intent === "crop-cover") {
+ const image = formData.get("image");
+ const sourceKey = String(formData.get("sourceKey") ?? "");
+ const crop = String(formData.get("crop") ?? "");
+ if (!(image instanceof File) || !sourceKey) return { ok: false as const, intent: "crop-cover" };
+ const res = await api.inspections[":id"].cover.$post({
+ param: { id: params.id },
+ form: { image, sourceKey, crop },
+ });
+ const body = (await res.json().catch(() => null)) as { data?: { coverImageKey?: string } } | null;
+ return { ok: res.ok, intent: "crop-cover", coverKey: body?.data?.coverImageKey ?? null };
+ }
+
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
  const res = await api.inspections[":id"].$patch({
