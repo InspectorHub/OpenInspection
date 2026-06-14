@@ -215,6 +215,26 @@ export default function ReportCardStackPage() {
  const tenant = params.tenant ?? "";
  const id = params.id ?? data.inspectionId;
 
+ // Dynamic rating summary — derived from THIS inspection's own rating system
+ // (Spectora-style) instead of fixed Satisfactory/Monitor/Defects buckets.
+ // Tally items by their rating level and render one card per level present,
+ // using the level's own label + color, ordered good→bad by severity bucket.
+ const BUCKET_RANK: Record<string, number> = { satisfactory: 0, monitor: 1, defect: 2, other: 3 };
+ const ratingTally = new Map<string, { label: string; color: string; bucket: string; count: number; seen: number }>();
+ let seenOrder = 0;
+ for (const it of data.sections.flatMap((s) => s.items)) {
+   if (!it.rating) continue;
+   const ex = ratingTally.get(it.rating);
+   if (ex) ex.count++;
+   else ratingTally.set(it.rating, { label: it.ratingLabel ?? it.rating, color: it.ratingColor, bucket: it.severityBucket, count: 1, seen: seenOrder++ });
+ }
+ const summaryCards: Array<{ label: string; value: number; color: string | null }> = [
+   { label: "Total", value: data.stats.total, color: null },
+   ...[...ratingTally.values()]
+     .sort((a, b) => (BUCKET_RANK[a.bucket] ?? 9) - (BUCKET_RANK[b.bucket] ?? 9) || a.seen - b.seen)
+     .map((l) => ({ label: l.label, value: l.count, color: l.color })),
+ ];
+
  const downloadPdf = async () => {
    if (generating) return;
    setGenerating(true);
@@ -372,14 +392,9 @@ export default function ReportCardStackPage() {
  {/* Stats */}
  <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
- {[
- { label: "Total", value: data.stats.total, color: "text-ih-fg-1" },
- { label: "Satisfactory", value: data.stats.satisfactory, color: "text-ih-ok-fg" },
- { label: "Monitor", value: data.stats.monitor, color: "text-ih-watch-fg" },
- { label: "Defects", value: data.stats.defect, color: "text-ih-bad-fg" },
- ].map((s) => (
+ {summaryCards.map((s) => (
  <div key={s.label} className="bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center">
- <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+ <div className={`text-2xl font-bold ${s.color ? "" : "text-ih-fg-1"}`} style={s.color ? { color: s.color } : undefined}>{s.value}</div>
  <div className="text-[11px] text-ih-fg-4 uppercase tracking-widest mt-1">
  {s.label}
  </div>
