@@ -101,10 +101,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  const sessionToken = (await getToken(context, request)) ?? undefined;
  const api = createApi(context, { token: sessionToken });
  const token = new URL(request.url).searchParams.get("token") ?? undefined;
+ // Forward the server-minted render token (headless PDF generation). The
+ // Browser Rendering browser loads /report-view/:tenant/:id?render=<token>;
+ // the data route resolves the tenant from it (see public-report.ts). Without
+ // forwarding it here the headless render gets "Report not found".
+ const render = new URL(request.url).searchParams.get("render") ?? undefined;
  const [res, brand] = await Promise.all([
  api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
- query: { token },
+ query: { token, render },
  }),
  resolveTenantBrand(context, params.tenant),
  ]);
