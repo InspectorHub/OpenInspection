@@ -138,7 +138,7 @@
     "wrangler": "^4.95.0"
   },
   "overrides": {
-    "esbuild": ">=0.28.1",
+    "esbuild": "^0.25.0",
     "uuid": "^11.1.1"
   },
   "optionalDependencies": {
