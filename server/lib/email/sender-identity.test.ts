@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSenderIdentity, type EmailIdentityConfig } from '../../../server/lib/email/sender-identity';
+import { resolveSenderIdentity, type EmailIdentityConfig } from './sender-identity';
 
 const base: EmailIdentityConfig = {
   mode: 'platform',
