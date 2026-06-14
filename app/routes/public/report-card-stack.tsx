@@ -66,6 +66,8 @@ interface ReportSection {
  alwaysPageBreak?: boolean;
 }
 
+type FilterKey = "all" | "defects" | "summary";
+
 interface LoaderResult {
  inspectionId: string;
  address: string;
@@ -82,6 +84,7 @@ interface LoaderResult {
  brand: TenantBrand;
  error: string | null;
  reportTheme?: string;
+ initialFilter: FilterKey;
 }
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +92,8 @@ interface LoaderResult {
 /* ------------------------------------------------------------------ */
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
+ const initialFilter: FilterKey =
+   new URL(request.url).searchParams.get("summary") === "1" ? "summary" : "all";
  try {
  // Relay the owner's session JWT when present so the inspector/admin can
  // preview their own report tokenlessly (resolveOwnerPreview server-side).
@@ -128,6 +133,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  brand,
  error: res.ok ? null : "Report not found",
  reportTheme: ((d as unknown as Record<string, unknown>)?.reportTheme as string | undefined) ?? meta?.theme,
+ initialFilter,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -145,6 +151,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  brand: EMPTY_BRAND,
  coverPhotoUrl: null,
  error: "Service unavailable",
+ initialFilter,
  } satisfies LoaderResult;
  }
 }
@@ -176,8 +183,6 @@ function getSectionIcon(title: string): string {
 /* Filter types */
 /* ------------------------------------------------------------------ */
 
-type FilterKey = "all" | "defects" | "summary";
-
 function isDefect(bucket: string): boolean {
  return /defect|safety|major/i.test(bucket);
 }
@@ -188,7 +193,7 @@ function isDefect(bucket: string): boolean {
 
 export default function ReportCardStackPage() {
  const data = useLoaderData<typeof loader>() as LoaderResult;
- const [filter, setFilter] = useState<FilterKey>("all");
+ const [filter, setFilter] = useState<FilterKey>(data.initialFilter ?? "all");
  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
  const [repairPanel, setRepairPanel] = useState(false);
  const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
