@@ -143,9 +143,10 @@ export default function TeamPage() {
         <h2 className="text-sm font-bold text-ih-fg-1 mb-3">Roles</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { role: "Lead inspector", desc: "Full edit, can publish." },
-            { role: "Specialist", desc: "Full edit within their assigned sections." },
-            { role: "Office staff", desc: "Read-only access to inspections and scheduling." },
+            { role: "Owner", desc: "Account holder. Full access, including billing." },
+            { role: "Manager", desc: "Back office: team, settings, scheduling, and all inspections." },
+            { role: "Inspector", desc: "Conducts inspections; edits and publishes reports." },
+            { role: "Agent", desc: "External agent. Read-only access to their own orders." },
           ].map((r) => (
             <div key={r.role} className="p-3 border border-ih-border rounded-md">
               <p className="text-[13px] font-bold text-ih-fg-1">{r.role}</p>
