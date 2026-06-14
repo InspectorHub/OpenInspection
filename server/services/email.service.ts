@@ -75,10 +75,15 @@ export class EmailService {
         const resolved = this.identity
             ? resolveSenderIdentity(this.identity, opts?.inspector)
             : {};
-        const baseFrom = this.senderEmail || `${this.appName} <noreply@example.com>`;
-        const from = resolved.fromName && this.senderEmail
+
+        if (!this.senderEmail) {
+            logger.error('[email] No sender (From) address configured — refusing to send', { to });
+            throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email is not configured (no sender address).');
+        }
+
+        const from = resolved.fromName
             ? `${resolved.fromName} <${this.senderEmail}>`
-            : baseFrom;
+            : this.senderEmail;
 
         const payload: Record<string, unknown> = {
             from,
