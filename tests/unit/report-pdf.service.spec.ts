@@ -193,5 +193,25 @@ describe('ReportPdfService', () => {
             expect(rec.versionNumber).toBe(7);
             expect(rec.status).toBe('ready');
         });
+
+        it('(d) versioned row exists with status=queued — re-renders', async () => {
+            // Seed a queued placeholder for version 3 (mirrors what markQueued creates).
+            await svc.markQueued(INSP_1, TENANT_A, 'full', 3);
+            // Reset call tracking so only the getOrRender render counts.
+            vi.clearAllMocks();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+            (mockR2 as any).put = vi.fn(async () => undefined);
+
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                versionNumber: 3,
+                currentVersion: 3,
+            });
+
+            expect(generatePdfFromUrl).toHaveBeenCalledTimes(1);
+            expect(rec.versionNumber).toBe(3);
+            expect(rec.status).toBe('ready');
+        });
     });
 });
