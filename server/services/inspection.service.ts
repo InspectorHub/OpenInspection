@@ -6,7 +6,7 @@ import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
 import { mapRatingSystemLevels } from '../lib/map-rating-levels';
 import { z } from 'zod';
-import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../lib/validations/inspection.schema';
+import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema, type CoverCrop } from '../lib/validations/inspection.schema';
 
 import { ScopedDB } from '../lib/db/scoped';
 import { escapeLikePattern } from '../lib/db/like-escape';
@@ -1855,6 +1855,32 @@ export class InspectionService {
             });
         }
         return { annotatedKey };
+    }
+
+    /**
+     * Image Studio (cover crop) — bakes a cropped JPEG derivative of the cover
+     * source image into R2 and records the re-editable crop transform. Mirrors
+     * saveAnnotation: the original source key (cover_photo_id) is preserved so
+     * the crop can be re-edited; the report reads cover_image_key first.
+     */
+    async setCroppedCover(
+        inspectionId: string,
+        tenantId: string,
+        sourceKey: string,
+        bakedBytes: ArrayBuffer,
+        crop: CoverCrop,
+    ): Promise<{ coverImageKey: string }> {
+        if (!this.r2) throw Errors.BadRequest('Storage not available');
+        await this.getInspection(inspectionId, tenantId);
+        const ok = await this.isInspectionPhotoKey(inspectionId, tenantId, sourceKey);
+        if (!ok) throw Errors.BadRequest('sourceKey does not reference a photo of this inspection');
+        const coverImageKey = `${tenantId}/${inspectionId}/cover_${crypto.randomUUID()}.jpg`;
+        await this.r2.put(coverImageKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
+        const db = this.getDrizzle();
+        await db.update(inspections)
+            .set({ coverPhotoId: sourceKey, coverImageKey, coverCrop: crop })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+        return { coverImageKey };
     }
 
     /**
