@@ -62,7 +62,6 @@ export default [
   route("setup", "routes/setup.tsx"),
   route("inspections/:id/form", "routes/form-renderer.tsx"),
   route("join/:token", "routes/join.tsx"),
-  route("guest-join/:token", "routes/guest-join.tsx"),
   route("conflict-resolver/:id", "routes/conflict-resolver.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
   // Standalone public — no layout (iframe-friendly)
@@ -108,7 +107,6 @@ export default [
     route("templates", "routes/templates.tsx"),
     route("team", "routes/team.tsx"),
     route("metrics", "routes/metrics.tsx"),
-    route("apprentice-review", "routes/apprentice-review.tsx"),
     route("reports", "routes/reports-redirect.tsx"),
     layout("routes/settings-layout.tsx", [
       route("settings", "routes/settings-hub.tsx"),

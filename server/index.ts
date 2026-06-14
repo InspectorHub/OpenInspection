@@ -38,7 +38,6 @@ import coreAuthRoutes from './api/auth';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
 import analyticsRoutes from './api/analytics';
-import guestRoutes from './api/guest';
 import billingRoutes from './api/billing';
 import usageRoutes from './api/usage';
 import { registerPortalIntegration } from './portal/integration.module';
@@ -252,13 +251,13 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         path === '/api/concierge/book-info' ||
         path === '/api/concierge/book' ||
         path === '/api/concierge/confirm-info';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path.startsWith('/api/guest/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/');
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/');
 
     // Design System 0520 subsystem D P5 — observer surfaces are gated by
     // the dedicated observer-cookie middleware, not JWT.
     const isObserverPublic = path.startsWith('/observe/') || path === OBSERVER_EXPIRED_PATH;
 
-    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || isObserverPublic || path === '/setup' || path === '/login' || path === '/join' || path === '/guest-join' || path.startsWith('/agreements/sign/')) return next();
+    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || isObserverPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
 
     // First-time setup is gated solely by the SETUP_CODE secret, validated in
     // POST /api/auth/setup. No KV bootstrap code is generated here.
@@ -427,8 +426,6 @@ const routes = app
   // Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
   .route('/api/auth', coreAuthRoutes)
   .route('/', coreAuthRoutes)
-  // Design System 0520 subsystem C — guest + billing.
-  .route('/api/guest', guestRoutes)
   .route('/api/billing', billingRoutes)
   .route('/api/usage', usageRoutes)
   // Design System 0520 subsystem E — identity / integrations / analytics.

@@ -11,7 +11,7 @@
  *   Twilio request signature, not a zod body) and are NOT part of the typed
  *   BFF client — Twilio calls them directly.
  *
- * Admin router (`smsAdminRoutes`, mounted /api/admin, requireRole owner/admin):
+ * Admin router (`smsAdminRoutes`, mounted /api/'manager', requireRole owner/'manager'):
  *   - POST /sms/attest {inspectionId}  — inspector attestation (admin) → granted.
  *   - POST /sms/test   {to}            — one-off test send via resolved creds.
  *   - GET  /sms/consent?inspectionId=  — latest client consent for the inspection.
@@ -208,7 +208,7 @@ const attestRoute = createRoute(withMcpMetadata({
     path: '/sms/attest',
     tags: ['admin', 'sms'],
     summary: 'Inspector attestation — confirm the client agreed to receive texts',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { body: { content: { 'application/json': { schema: SmsAttestSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Consent recorded' },
@@ -222,7 +222,7 @@ const testSendRoute = createRoute(withMcpMetadata({
     path: '/sms/test',
     tags: ['admin', 'sms'],
     summary: 'Send a one-off test SMS using the resolved Twilio creds',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { body: { content: { 'application/json': { schema: SmsTestSendSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean(), error: z.string().optional() }) } }, description: 'Send result' },
@@ -236,7 +236,7 @@ const smsConfigRoute = createRoute(withMcpMetadata({
     path: '/sms/config',
     tags: ['admin', 'sms'],
     summary: 'Effective SMS sender configuration (mode + source, no secrets)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: { content: { 'application/json': { schema: z.object({
             success: z.literal(true),
@@ -255,7 +255,7 @@ const consentStatusRoute = createRoute(withMcpMetadata({
     path: '/sms/consent',
     tags: ['admin', 'sms'],
     summary: 'Latest SMS consent status for an inspection client',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { query: SmsConsentQuerySchema },
     responses: {
         200: { content: { 'application/json': { schema: z.object({

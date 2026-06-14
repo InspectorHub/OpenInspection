@@ -54,15 +54,13 @@ export async function getSeatUsage(
     const rawMax = tenantRow[0]?.maxUsers;
     const max: number | null = rawMax == null || rawMax <= 0 ? null : rawMax;
 
-    // Subsystem C P5 — expired guests must NOT count against the cap.
-    // Fetch the (id, expiresAt) projection and defer to the shared
-    // pure helper so guest-claim, settings-billing, and the invite
-    // middleware all agree on what "used" means.
+    // Every member counts as one seat. Defer to the shared pure helper so
+    // settings-billing and the invite middleware all agree on "used".
     const rows = await drizzleDb
-        .select({ id: users.id, expiresAt: users.expiresAt })
+        .select({ id: users.id })
         .from(users)
         .where(eq(users.tenantId, tenantId));
-    const used = computeSeatsUsed(rows, Math.floor(Date.now() / 1000));
+    const used = computeSeatsUsed(rows);
 
     const remaining = max === null ? Number.POSITIVE_INFINITY : Math.max(0, max - used);
     return { used, max, remaining };

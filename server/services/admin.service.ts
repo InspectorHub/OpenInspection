@@ -16,6 +16,7 @@ import {
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { runErasure } from '../lib/compliance/erasure-orchestrator';
+import type { Role } from '../lib/auth/roles';
 
 import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { safeTimestamp } from '../lib/date';
@@ -60,7 +61,7 @@ export class AdminService {
             id: inviteId,
             tenantId,
             email,
-            role: role as 'owner' | 'admin' | 'inspector' | 'agent' | 'viewer',
+            role: role as Role,
             status: 'pending',
             expiresAt,
         });

@@ -24,7 +24,7 @@ export const marketplaceRoutes = createApiRouter()
     method: 'get', path: '/',
     tags: ["marketplace"],
     summary: "List marketplaces for current tenant",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: paginationQuerySchema.extend({
             search:   z.string().optional().describe('Free-text search over marketplace template names'),
@@ -62,7 +62,7 @@ export const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/{id}/import',
     tags: ["marketplace"],
     summary: 'Import marketplace template as tenant copy',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         201: {
@@ -90,7 +90,7 @@ export const marketplaceRoutes = createApiRouter()
     method: 'get', path: '/libraries',
     tags: ["marketplace"],
     summary: 'List marketplace libraries (comment packs, snippet packs)',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: z.object({ kind: z.enum(['comments', 'snippets']).optional().describe('TODO describe kind field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
@@ -112,7 +112,7 @@ export const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/{id}/update',
     tags: ["marketplace"],
     summary: 'Update tenant copy to latest marketplace version (creates new local copy)',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -164,7 +164,7 @@ export const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/libraries/{id}/import',
     tags: ["marketplace"],
     summary: 'Import marketplace library into tenant',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ rowCount: z.number().describe('TODO describe rowCount field for the OpenInspection MCP integration'), localFirstId: z.string().describe('TODO describe localFirstId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Imported' },
@@ -194,7 +194,7 @@ export const marketplaceRoutes = createApiRouter()
     method: 'post', path: '/libraries/{id}/update',
     tags: ["marketplace"],
     summary: 'Update tenant library import to latest marketplace version (adds new rows)',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -248,7 +248,7 @@ export const marketplaceRoutes = createApiRouter()
     tags: ["marketplace"],
     summary: 'Replace tenant library import (deletes prior rows + inserts new pack)',
     description: "Auto-generated placeholder for replaceMarketplace (POST /libraries/{libraryId}/imports/replace, marketplace domain). TODO: replace with a real description sourced from the handler.",
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: LibraryReplaceParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
@@ -316,7 +316,7 @@ export const marketplaceRoutes = createApiRouter()
     tags: ["marketplace"],
     summary: 'List per-import history events',
     description: "Auto-generated placeholder for listMarketplaceImportsHistory (GET /imports/history, marketplace domain). TODO: replace with a real description sourced from the handler.",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { query: ImportHistoryQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {

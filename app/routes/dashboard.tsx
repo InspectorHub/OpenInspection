@@ -250,7 +250,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       svcOptions = (sj.data ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price }));
     }
     // B-21 team step — non-admins get 403 → null → []; team step hidden for them.
-    const schedulingRoles = new Set(["owner", "admin", "inspector", "lead"]);
+    const schedulingRoles = new Set(["owner", "manager", "inspector"]);
     let teamMembers: WizardTeamMember[] = [];
     if (membersRes?.ok) {
       const mb = (await membersRes.json()) as { data?: Array<{ id: string; email: string; role: string; name?: string | null }> };

@@ -27,7 +27,7 @@ const listRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["inspections"],
     summary: "List inspection requests for current tenant",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { query: InspectionRequestListQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -44,7 +44,7 @@ const detailRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["inspections"],
     summary: "Get inspection request for current tenant",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -66,7 +66,7 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/by-inspection/{inspectionId}',
     tags: ["inspections"],
     summary: 'Get parent request by inspection id',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ inspectionId: z.string().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -90,7 +90,7 @@ const createReqRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["inspections"],
     summary: 'Create inspection request with N sub-inspections',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         body: { content: { 'application/json': { schema: CreateInspectionRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
@@ -109,7 +109,7 @@ const updateReqRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
     tags: ["inspections"],
     summary: "Replace inspection request for current tenant",
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: UpdateInspectionRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -129,7 +129,7 @@ const addSubRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/inspections',
     tags: ["inspections"],
     summary: 'Add a sub-inspection to an existing request',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {

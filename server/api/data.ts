@@ -6,7 +6,7 @@ import { Errors } from '../lib/errors';
 
 export const dataRoutes = createApiRouter()
     // GET /api/data/export/inspections — CSV download
-    .get('/export/inspections', requireRole(['owner', 'admin']), async (c) => {
+    .get('/export/inspections', requireRole('owner', 'manager'), async (c) => {
         const tenantId = c.get('tenantId');
         const svc = new DataService(c.env.DB);
         const csv = await svc.exportInspectionsCSV(tenantId);
@@ -19,7 +19,7 @@ export const dataRoutes = createApiRouter()
         });
     })
     // GET /api/data/export/contacts — CSV download
-    .get('/export/contacts', requireRole(['owner', 'admin']), async (c) => {
+    .get('/export/contacts', requireRole('owner', 'manager'), async (c) => {
         const tenantId = c.get('tenantId');
         const svc = new DataService(c.env.DB);
         const csv = await svc.exportContactsCSV(tenantId);
@@ -33,7 +33,7 @@ export const dataRoutes = createApiRouter()
     })
     // POST /api/data/import/contacts — multipart/form-data or text/csv body
     // Query: ?dry_run=true — parse and count rows without writing to DB
-    .post('/import/contacts', requireRole(['owner', 'admin']), async (c) => {
+    .post('/import/contacts', requireRole('owner', 'manager'), async (c) => {
         const tenantId = c.get('tenantId');
         const dryRun = c.req.query('dry_run') === 'true';
         const contentType = c.req.header('content-type') ?? '';

@@ -174,13 +174,12 @@ export default function SettingsBookingPage() {
   const slug = ctx?.branding?.currentUserSlug;
   // The current user's id is not in session context — we use role+members for the picker.
   // Admin/owner role means members loaded successfully (403 gate for non-admins).
-  const isAdmin = ctx?.user?.role === "owner" || ctx?.user?.role === "admin";
+  const isAdmin = ctx?.user?.role === "owner" || ctx?.user?.role === "manager";
 
   // Show picker only to admins; restrict to the roles that can hold a
-  // schedule ('lead' is the canonical alias of 'inspector' — see rbac.ts
-  // ROLE_ALIASES; the availability API accepts both).
+  // schedule.
   const pickerMembers = isAdmin
-    ? data.members.filter((m) => ['owner', 'admin', 'inspector', 'lead'].includes(m.role))
+    ? data.members.filter((m) => ['owner', 'manager', 'inspector'].includes(m.role))
     : [];
 
   return (

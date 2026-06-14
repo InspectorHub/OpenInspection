@@ -4,6 +4,15 @@ import { eq, and } from 'drizzle-orm';
 import { UserRole } from '../types/auth';
 import { Errors } from '../lib/errors';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
+import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
+
+/**
+ * Loose shape accepted from the validated invite body. Zod under
+ * `exactOptionalPropertyTypes` infers `boolean | undefined` per key, which is
+ * not assignable to the strict `PermissionOverrides`; `diffOverrides` reads each
+ * value through a `typeof === 'boolean'` guard so the looseness is safe.
+ */
+type RequestedOverrides = Partial<Record<Capability, boolean | undefined>>;
 
 export class TeamService {
     /**
@@ -42,26 +51,9 @@ export class TeamService {
         tenantId: string;
         email: string;
         role: UserRole;
-        /** Required when `role === 'apprentice'`. Must be a user in the
-         *  same tenant. Replayed onto users.mentor_id at accept time. */
-        mentorId?: string;
-        /** Used when `role === 'specialist'`. Stored as JSON; replayed
-         *  onto users.assigned_section_ids at accept time. Defaults to
-         *  an empty array for non-specialist roles. */
-        assignedSectionIds?: string[];
+        permissionOverrides?: RequestedOverrides | null;
     }) {
         const db = this.getDB();
-
-        // Subsystem C P5 — apprentice MUST have a mentor in the same
-        // tenant; the queue routing in InspectionService.patchItem
-        // refuses to enqueue without it.
-        if (params.role === 'apprentice') {
-            if (!params.mentorId) throw Errors.BadRequest('Mentor required for apprentice invites');
-            const mentor = await db.select({ id: users.id }).from(users)
-                .where(and(eq(users.id, params.mentorId), eq(users.tenantId, params.tenantId)))
-                .limit(1);
-            if (mentor.length === 0) throw Errors.BadRequest('Mentor must be a member of the same team');
-        }
 
         // Seat-quota enforcement now lives in features/seat-quota/middleware
         // (mounted on POST /api/team/invite). The service only needs to
@@ -70,6 +62,10 @@ export class TeamService {
             .where(and(eq(users.tenantId, params.tenantId), eq(users.email, params.email))).limit(1);
 
         if (existing.length > 0) throw Errors.Conflict('User is already a member');
+
+        // Only persist toggles that DIFFER from the role template, so an
+        // all-default invite stores null (single source of truth = the role).
+        const permissionOverrides = TeamService.diffOverrides(params.role, params.permissionOverrides);
 
         // Create Invite (7-day expiry)
         const inviteToken = crypto.randomUUID();
@@ -82,11 +78,28 @@ export class TeamService {
             role: params.role,
             status: 'pending',
             expiresAt,
-            ...(params.mentorId ? { mentorId: params.mentorId } : {}),
-            assignedSectionIds: JSON.stringify(params.assignedSectionIds ?? []),
+            permissionOverrides,
         });
 
         return { token: inviteToken, expiresAt };
+    }
+
+    /**
+     * Reduce a requested override map to only the capabilities whose value
+     * differs from the role's template default. Returns null when nothing
+     * differs (the role template already covers the request) so the stored
+     * column stays null. owner/agent capabilities are pinned by getCapabilities,
+     * so a diff against the effective template never persists a moot toggle.
+     */
+    static diffOverrides(role: UserRole, requested?: RequestedOverrides | null): PermissionOverrides | null {
+        if (!requested) return null;
+        const template = getCapabilities(role, null);
+        const diff: PermissionOverrides = {};
+        for (const cap of TOGGLEABLE) {
+            const value = requested[cap];
+            if (typeof value === 'boolean' && value !== template[cap]) diff[cap] = value;
+        }
+        return Object.keys(diff).length ? diff : null;
     }
 
     async removeMember(tenantId: string, userId: string, requesterId: string) {

@@ -11,7 +11,7 @@ export const metricsRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["metrics"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { query: MetricsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: { 200: { content: { 'application/json': { schema: MetricsApiResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Metrics' } },
     operationId: "listMetrics",

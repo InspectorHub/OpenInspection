@@ -23,7 +23,7 @@ const commentAssistRoute = createRoute(withMcpMetadata({
     path: '/comment-assist',
     tags: ["ai"],
     summary: "Create ai comment assist",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: {
             content: {
@@ -56,7 +56,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
     path: '/auto-summary',
     tags: ["ai"],
     summary: "Create ai auto summary",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: {
             content: {
@@ -95,7 +95,7 @@ const commentEditRoute = createRoute(withMcpMetadata({
     path: '/comment/edit',
     tags: ["ai"],
     summary: 'Rewrite a canned comment with AI assistance',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: { content: { 'application/json': { schema: CommentEditSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
@@ -114,7 +114,7 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
     path: '/suggest-comment',
     tags: ["ai"],
     summary: 'Suggest professional comments for a form item',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: {
             content: { 'application/json': { schema: SuggestCommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },

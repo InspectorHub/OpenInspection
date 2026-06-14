@@ -1,8 +1,8 @@
 /**
  * Shared url-safe random token generator.
  *
- * Used by GuestInviteService + ObserverLinkService to mint opaque
- * capability tokens stored in the DB. 32 bytes of crypto-random
+ * Used by ObserverLinkService to mint opaque capability tokens
+ * stored in the DB. 32 bytes of crypto-random
  * entropy → base64url (~43 chars, no padding) so the value is safe
  * to embed in URLs and cookies without further escaping.
  */

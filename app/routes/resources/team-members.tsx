@@ -2,7 +2,7 @@
  * C-12 — BFF resource route for TeamStrip / InviteSeatModal components.
  *
  * loader: GET /api/team/members — returns active members and pending invites
- * action: invite | guest-invite — proxies POST /api/team/invite and /api/team/guests
+ * action: invite — proxies POST /api/team/invite
  */
 import type { Route } from "./+types/team-members";
 import { getToken, requireToken } from "~/lib/session.server";
@@ -37,37 +37,32 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (intent === "invite") {
         const email = fd.get("email") as string | null;
         const role = (fd.get("role") ?? "inspector") as string;
-        const mentorId = (fd.get("mentorId") as string | null) || undefined;
-        const sectionIdsRaw = fd.get("assignedSectionIds") as string | null;
-        const assignedSectionIds = sectionIdsRaw ? (JSON.parse(sectionIdsRaw) as string[]) : undefined;
 
         if (!email) return { ok: false, intent, error: "Email is required", url: null };
 
+        // Advanced-permissions disclosure ships a JSON map of the capability
+        // diffs vs the role template. Absent/empty → pure role template.
+        let permissionOverrides: Record<string, boolean> | undefined;
+        const rawOverrides = fd.get("permissionOverrides");
+        if (typeof rawOverrides === "string" && rawOverrides.trim()) {
+            try {
+                const parsed = JSON.parse(rawOverrides) as Record<string, boolean>;
+                if (parsed && Object.keys(parsed).length > 0) permissionOverrides = parsed;
+            } catch {
+                // Ignore malformed override payloads — the server re-derives from
+                // the role template, so dropping them fails safe.
+            }
+        }
+
         try {
             const res = await api.team.invite.$post({
-                json: { email, role, mentorId, assignedSectionIds } as Parameters<typeof api.team.invite.$post>[0]["json"],
+                json: { email, role, permissionOverrides } as Parameters<typeof api.team.invite.$post>[0]["json"],
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({})) as { error?: string };
                 return { ok: false, intent, error: body?.error ?? `HTTP ${res.status}`, url: null };
             }
             return { ok: true, intent, error: null, url: null };
-        } catch (e) {
-            return { ok: false, intent, error: e instanceof Error ? e.message : "Failed", url: null };
-        }
-    }
-
-    if (intent === "guest-invite") {
-        const role = (fd.get("role") ?? "lead") as string;
-        const durationSeconds = Number(fd.get("durationSeconds") ?? 86400);
-
-        try {
-            const res = await api.team.guests.$post({
-                json: { role, durationSeconds } as Parameters<typeof api.team.guests.$post>[0]["json"],
-            });
-            if (!res.ok) return { ok: false, intent, error: `HTTP ${res.status}`, url: null };
-            const body = await res.json() as { data?: { url?: string } };
-            return { ok: true, intent, error: null, url: body?.data?.url ?? null };
         } catch (e) {
             return { ok: false, intent, error: e instanceof Error ? e.message : "Failed", url: null };
         }

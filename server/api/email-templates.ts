@@ -80,7 +80,7 @@ const listRoute = createRoute(withMcpMetadata({
     path: '/email-templates',
     tags: ['admin'],
     summary: 'List editable email templates',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: { 'application/json': { schema: TemplateListResponseSchema } },
@@ -97,7 +97,7 @@ const getRoute = createRoute(withMcpMetadata({
     path: '/email-templates/{trigger}',
     tags: ['admin'],
     summary: 'Get email template detail',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: TriggerParamSchema,
     },
@@ -121,7 +121,7 @@ const putRoute = createRoute(withMcpMetadata({
     path: '/email-templates/{trigger}',
     tags: ['admin'],
     summary: 'Save email template override',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: TriggerParamSchema,
         body: { content: { 'application/json': { schema: SaveEmailTemplateSchema } } },
@@ -150,7 +150,7 @@ const resetRoute = createRoute(withMcpMetadata({
     path: '/email-templates/{trigger}/reset',
     tags: ['admin'],
     summary: 'Reset email template to defaults',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: TriggerParamSchema,
     },
@@ -174,7 +174,7 @@ const previewRoute = createRoute(withMcpMetadata({
     path: '/email-templates/{trigger}/preview',
     tags: ['admin'],
     summary: 'Preview email template with unsaved edits',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: TriggerParamSchema,
         body: { content: { 'application/json': { schema: PreviewEmailTemplateSchema } } },

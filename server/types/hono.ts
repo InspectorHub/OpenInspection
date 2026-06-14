@@ -243,8 +243,6 @@ export interface AppServices {
     unit: import('../services/unit.service').UnitService;
     observerLink: import('../services/observer-link.service').ObserverLinkService;
     reportVersion: import('../services/report-version.service').ReportVersionService;
-    apprentice: import('../services/apprentice.service').ApprenticeService;
-    guestInvite: import('../services/guest-invite.service').GuestInviteService;
     identity: import('../services/identity.service').IdentityService;
     integrations: import('../services/integrations.service').IntegrationsService;
     analytics: import('../services/analytics.service').AnalyticsService;

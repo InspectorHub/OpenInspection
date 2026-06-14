@@ -20,7 +20,7 @@ const listRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/inspections/{inspectionId}',
     tags: ["messages"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ inspectionId: z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({
@@ -39,7 +39,7 @@ const sendRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/inspections/{inspectionId}',
     tags: ["messages"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ inspectionId: z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: z.object({
@@ -60,7 +60,7 @@ const sendRoute = createRoute(withMcpMetadata({
 const unreadRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/unread-count',
     tags: ["messages"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: { content: { 'application/json': { schema: z.object({
             success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
@@ -118,7 +118,7 @@ const uploadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/inspections/{inspectionId}/upload',
     tags: ["messages"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ inspectionId: z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({

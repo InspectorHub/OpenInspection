@@ -260,7 +260,7 @@ const skipSetupRoute = createRoute(withMcpMetadata({
     summary: 'Skip the onboarding wizard',
     description: 'Marks the in-app onboarding wizard as skipped for the current user. Does not affect tenant-level setup or any system configuration.',
     tags: ['auth'],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: {
             content: {
@@ -279,7 +279,7 @@ const dismissChecklistRoute = createRoute(withMcpMetadata({
     summary: 'Dismiss the onboarding checklist',
     description: 'Marks the dashboard onboarding checklist as dismissed for the current user. Idempotent — safe to call multiple times.',
     tags: ['auth'],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: {
             content: {
@@ -303,7 +303,7 @@ const markOnboardingFlagRoute = createRoute(withMcpMetadata({
     summary: 'Mark a one-time onboarding flag as seen',
     description: 'Sets a boolean flag in the current user\'s onboardingState. Allowlisted flags only: checklistDismissed, spectoraMappingSeen. Idempotent.',
     tags: ['auth'],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: {
             content: {

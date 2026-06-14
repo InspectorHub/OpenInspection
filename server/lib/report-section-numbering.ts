@@ -13,8 +13,10 @@
  * during render.
  */
 
+import { ROLE } from './auth/roles';
+
 /** Roles that may hop back into the editor from the published viewer. */
-const EDIT_ROLES = new Set(['owner', 'admin', 'inspector']);
+const EDIT_ROLES = new Set<string>([ROLE.OWNER, ROLE.MANAGER, ROLE.INSPECTOR]);
 
 /** Decide whether the current viewer should see the EDIT SECTION button.
  *  Accepts `null` / `undefined` (anonymous public viewer) and unknown

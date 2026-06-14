@@ -16,7 +16,6 @@ import { logger } from '../lib/logger';
 import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../lib/recommendation-categories';
 import { computePreflightFromData } from '../lib/preflight';
 import { decideFieldWrite, applyFieldWrite } from '../lib/field-version';
-import { ApprenticeService } from './apprentice.service';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import type { AgreementService } from './agreement.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
@@ -388,10 +387,7 @@ export class InspectionService {
      * Design System 0520 subsystem E P1.2 — Publish pre-flight gates.
      *
      * Loads the inspection + parsed inspection_results.data and
-     * delegates to the pure aggregator in server/lib/preflight.ts. The
-     * apprentice pending count is read from apprentice_reviews; if
-     * that table is missing (subsystem C not yet merged) we pass
-     * `undefined` so the gate gracefully no-ops to "reviewed".
+     * delegates to the pure aggregator in server/lib/preflight.ts.
      */
     async computePreflight(inspectionId: string, tenantId: string) {
         if (!this.sdb) throw new Error('ScopedDB session missing');
@@ -411,18 +407,6 @@ export class InspectionService {
             } catch { return {}; }
         })();
 
-        // Apprentice pending — subsystem C dependency. Wrap the query
-        // so a missing-table error degrades to undefined (gate passes).
-        let pendingApprenticeCount: number | undefined;
-        try {
-            const rows = await this.db.prepare(
-                'SELECT COUNT(*) AS cnt FROM apprentice_reviews WHERE inspection_id = ?1 AND tenant_id = ?2 AND status = "pending"'
-            ).bind(inspectionId, tenantId).first<{ cnt: number }>();
-            pendingApprenticeCount = rows?.cnt ?? 0;
-        } catch {
-            pendingApprenticeCount = undefined;
-        }
-
         return computePreflightFromData(
             {
                 coverPhotoId:      (ins.coverPhotoId as string | null) ?? null,
@@ -430,7 +414,6 @@ export class InspectionService {
                 agreementSignedAt: (ins.agreementSignedAt as number | null) ?? null,
             },
             items,
-            pendingApprenticeCount,
         );
     }
 
@@ -1638,48 +1621,12 @@ export class InspectionService {
         | { kind: 'ok'; newVersion: number; by: string; at: number }
         | { kind: 'conflict'; current: { value: unknown; by?: string; at?: number; v: number }; yours: { value: unknown; expectedVersion: number } }
         | { kind: 'not_found' }
-        | { kind: 'queued'; reviewId: string }
     > {
         // Verify ownership — throws if foreign tenant.
         try {
             await this.getInspection(inspectionId, tenantId);
         } catch {
             return { kind: 'not_found' };
-        }
-
-        // Design System 0520 subsystem C phase 2 — apprentice write-gating.
-        // If the caller is an apprentice AND we're NOT in force mode (mentor
-        // approval re-applies values with force: true), route the write into
-        // the apprentice_reviews queue instead of mutating inspection_results
-        // directly. Mentor decides → ApprenticeService.decide → this method
-        // again with { force: true } to land the value.
-        //
-        // Soft-detect role from the users row. apprentice_reviews table may
-        // not exist on standalone profiles that opted out of subsystem C —
-        // graceful no-op: any error here falls through to the legacy write
-        // path, never blocking a regular inspector save.
-        if (!opts?.force) {
-            try {
-                const u = await this.getDrizzle().select().from(users)
-                    .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
-                    .get();
-                if (u?.role === 'apprentice') {
-                    const apprenticeSvc = new ApprenticeService(this.db);
-                    const queued = await apprenticeSvc.submitForReview(
-                        tenantId, userId, inspectionId, itemId, field as 'rating' | 'notes' | 'value', value,
-                    );
-                    return queued;
-                }
-            } catch {
-                // Table missing, schema mismatch, or apprentice without mentor
-                // — fall through to legacy write path. The ApprenticeService
-                // itself throws explicitly when a mentor is missing; in that
-                // edge case the route surface should surface 400 rather than
-                // silently writing as inspector, so re-throw if it's that
-                // specific message.
-                // (Pragmatic MVP: any error → legacy path. Mentor-missing UX
-                // lives at the route layer via a separate guard.)
-            }
         }
 
         const db = this.getDrizzle();

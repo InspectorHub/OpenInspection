@@ -51,7 +51,7 @@ const eventsRoute = createRoute(withMcpMetadata({
     tags: ['calendar'],
     summary: 'Get calendar events for FullCalendar',
     description: 'Returns combined calendar events (local inspections + Google Calendar busy blocks) in FullCalendar-compatible format. Used by the dashboard month/week views.',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: z.object({
             // Accept either YYYY-MM-DD (FullCalendar dayGridMonth view) or full ISO 8601

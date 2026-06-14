@@ -49,7 +49,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>) {
         }
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
-    // Inject an owner identity so requireRole(['owner','admin']) passes for admin routes.
+    // Inject an owner identity so requireRole('owner','admin') passes for admin routes.
     app.use('*', async (c, next) => {
         c.set('tenantId', TENANT);
         c.set('userRole', 'owner');

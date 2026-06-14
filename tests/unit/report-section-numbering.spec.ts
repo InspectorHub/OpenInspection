@@ -11,9 +11,9 @@ import {
  */
 describe('report-section-numbering', () => {
     describe('canEditSection', () => {
-        it('grants edit to owner / admin / inspector', () => {
+        it('grants edit to owner / manager / inspector', () => {
             expect(canEditSection('owner')).toBe(true);
-            expect(canEditSection('admin')).toBe(true);
+            expect(canEditSection('manager')).toBe(true);
             expect(canEditSection('inspector')).toBe(true);
         });
         it('denies edit to client / agent / unknown roles', () => {

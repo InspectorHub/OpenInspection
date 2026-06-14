@@ -4,8 +4,6 @@ import { AdminService } from '../../services/admin.service';
 import { UnitService } from '../../services/unit.service';
 import { ObserverLinkService } from '../../services/observer-link.service';
 import { ReportVersionService } from '../../services/report-version.service';
-import { ApprenticeService } from '../../services/apprentice.service';
-import { GuestInviteService } from '../../services/guest-invite.service';
 import { AIService } from '../../services/ai.service';
 import { AuthService } from '../../services/auth.service';
 import { OutboxService } from '../../portal/outbox.service';
@@ -333,12 +331,6 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportVersion':
                     target.reportVersion = new ReportVersionService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
-                    break;
-                case 'apprentice':
-                    target.apprentice = new ApprenticeService(c.env.DB);
-                    break;
-                case 'guestInvite':
-                    target.guestInvite = new GuestInviteService(c.env.DB);
                     break;
                 case 'identity':
                     target.identity = new IdentityService(c.env.DB);

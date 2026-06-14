@@ -1,3 +1,5 @@
+import { ROLE } from '../auth/roles';
+
 /**
  * Design System 0520 subsystem C phase 4 — canEdit permission matrix.
  *
@@ -7,22 +9,17 @@
  *
  * Role outcomes:
  *   - owner / admin  → always true
- *   - office         → always false (read-only seat by spec)
- *   - lead           → true when caller is on the inspection
+ *   - inspector      → true when caller is on the inspection
  *                       (inspectorId / leadInspectorId / helperInspectorIds)
- *   - apprentice     → same as lead at the canEdit boundary; the
- *                       apprentice-write-to-queue routing happens in
- *                       InspectionService.patchItem (subsystem C P2)
- *   - specialist     → same as lead AND sectionId in user.assignedSectionIds
- *   - agent (legacy) → false (subsystem A buyer-agent view is read-only)
- *
- * Legacy 'inspector' role is aliased to 'lead' via normaliseRole.
+ *   - agent          → false (buyer-agent view is read-only)
  */
-import { normaliseRole } from '../middleware/rbac';
 
 export interface CanEditUser {
     id:                 string;
     role:               string;
+    // Legacy field kept for back-compat with existing callers. Section-scope
+    // edit restrictions were removed when the specialist role was collapsed
+    // into a plain inspector (2026-06-13) — this is no longer consulted.
     assignedSectionIds: string;   // JSON-encoded string array
 }
 
@@ -46,13 +43,14 @@ function safeJsonArray(raw: string): string[] {
 export function canEdit(
     user: CanEditUser,
     inspection: CanEditInspection,
-    sectionId?: string,
+    // Section-scope edit restrictions were removed with the specialist role
+    // (2026-06-13). The param is retained for call-site stability but unused.
+    _sectionId?: string,
 ): boolean {
-    const role = normaliseRole(user.role);
+    const role = user.role;
 
-    if (role === 'owner' || role === 'admin') return true;
-    if (role === 'office') return false;
-    if (role === 'agent')  return false;
+    if (role === ROLE.OWNER || role === ROLE.MANAGER) return true;
+    if (role === ROLE.AGENT)  return false;
 
     const helpers = safeJsonArray(inspection.helperInspectorIds);
     const onInspection =
@@ -61,13 +59,7 @@ export function canEdit(
         helpers.includes(user.id);
     if (!onInspection) return false;
 
-    if (role === 'lead' || role === 'apprentice') return true;
-
-    if (role === 'specialist') {
-        if (!sectionId) return false;
-        const sections = safeJsonArray(user.assignedSectionIds);
-        return sections.includes(sectionId);
-    }
+    if (role === ROLE.INSPECTOR) return true;
 
     // Unknown / new roles default to deny — safer than fail-open.
     return false;

@@ -134,6 +134,9 @@ export class AuthService {
             email: invite.email,
             passwordHash,
             role: invite.role,
+            // Carry the inviter's chosen permission-template overrides onto the
+            // new member row (null when the invite used the pure role template).
+            permissionOverrides: invite.permissionOverrides ?? null,
             ...(trimmedName ? { name: trimmedName } : {}),
             createdAt: new Date(),
         });

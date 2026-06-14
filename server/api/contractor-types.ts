@@ -24,7 +24,7 @@ const listContractorTypesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["contractor-types"],
     summary: 'List contractor types for current tenant',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {},
     responses: {
         200: { content: { 'application/json': { schema: ContractorTypeListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
@@ -37,7 +37,7 @@ const listContractorTypesRoute = createRoute(withMcpMetadata({
 const createContractorTypeRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["contractor-types"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: CreateContractorTypeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: { content: { 'application/json': { schema: ContractorTypeResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
@@ -51,7 +51,7 @@ const createContractorTypeRoute = createRoute(withMcpMetadata({
 const updateContractorTypeRoute = createRoute(withMcpMetadata({
     method: 'patch', path: '/{id}',
     tags: ["contractor-types"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: UpdateContractorTypeSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -68,7 +68,7 @@ const updateContractorTypeRoute = createRoute(withMcpMetadata({
 const deleteContractorTypeRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["contractor-types"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: z.object({ id: z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
@@ -83,7 +83,7 @@ const reorderContractorTypesRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/reorder',
     tags: ["contractor-types"],
     summary: 'Reorder contractor types (persist the supplied id order as sortOrder)',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: ReorderContractorTypesSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ reordered: z.literal(true).describe('TODO describe reordered field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Reordered' },

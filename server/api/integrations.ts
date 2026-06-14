@@ -38,7 +38,7 @@ const stripeTestRoute = createRoute(withMcpMetadata({
     path: '/stripe/test',
     tags: ['integrations'],
     summary: 'Verify the stored Stripe secret key against the live API',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: { content: { 'application/json': { schema: StripeTestResponseSchema } }, description: 'Key is valid; returns account name and mode' },
         502: { description: 'Stripe rejected the stored key' },
@@ -61,7 +61,7 @@ const stripeWebhookLogRoute = createRoute(withMcpMetadata({
     path: '/stripe/webhook-log',
     tags: ['integrations'],
     summary: 'Recent Stripe webhook deliveries (diagnostics)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(WebhookLogEntrySchema) }).openapi('StripeWebhookLogResponse') } }, description: 'Up to 20 recent deliveries, newest first' },
     },
@@ -76,7 +76,7 @@ const resendTestRoute = createRoute(withMcpMetadata({
     path: '/resend/test',
     tags: ['integrations'],
     summary: 'Verify the stored Resend API key against the live API',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ domains: z.number().describe('Verified sending domains on the account.') }) }).openapi('ResendTestResponse') } }, description: 'Key is valid' },
         502: { description: 'Resend rejected the stored key' },
@@ -91,7 +91,7 @@ const geminiTestRoute = createRoute(withMcpMetadata({
     path: '/gemini/test',
     tags: ['integrations'],
     summary: 'Verify the stored Gemini API key against the live API',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ ok: z.literal(true) }) }).openapi('GeminiTestResponse') } }, description: 'Key is valid' },
         502: { description: 'Google rejected the stored key' },

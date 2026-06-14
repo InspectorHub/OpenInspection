@@ -94,7 +94,7 @@ const downloadAgreementRoute = createRoute(withMcpMetadata({
     path: '/agreement-requests/{id}/pdf',
     tags: ['admin'],
     summary: 'Download signed agreement PDF (Worker-proxied from R2)',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
         200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes' },
@@ -109,7 +109,7 @@ const downloadCertRoute = createRoute(withMcpMetadata({
     path: '/agreement-requests/{id}/certificate.pdf',
     tags: ['admin'],
     summary: 'Download Certificate of Completion PDF',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
         200: { content: { 'application/pdf': { schema: z.any() } }, description: 'PDF bytes' },
@@ -124,7 +124,7 @@ const downloadEvidenceRoute = createRoute(withMcpMetadata({
     path: '/agreement-requests/{id}/evidence.zip',
     tags: ['admin'],
     summary: 'Download evidence pack zip',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }) },
     responses: {
         200: { content: { 'application/zip': { schema: z.any() } }, description: 'evidence zip' },

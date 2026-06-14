@@ -62,19 +62,6 @@ export const joinSchema = z.object({
 export type JoinInput = z.infer<typeof joinSchema>;
 
 /**
- * Guest-collaborator accept (`/guest-join`). Token comes from the URL. The
- * guest creates a real (role-scoped, time-limited) account, so the form
- * collects name + email + password — matching the API's POST /api/guest/claim.
- */
-export const guestJoinSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100, "Name is too long"),
-  email: z.string().email("Enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long"),
-});
-
-export type GuestJoinInput = z.infer<typeof guestJoinSchema>;
-
-/**
  * Partner-agent invite accept (`/agent-invite/accept`). Token + email come from
  * the invite (email is read-only), so only name + password are validated.
  * Mirrors the API's agent accept schema: name min 2, password min 12.

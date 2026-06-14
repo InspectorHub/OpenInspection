@@ -18,7 +18,7 @@ async function seedTenantAndUsers(testDb: BetterSQLite3Database<typeof schema>) 
         { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await testDb.insert(schema.users).values([
-        { id: USER_1, tenantId: TENANT_A, email: 'u1@a.com', name: 'U1', passwordHash: 'x', role: 'admin', createdAt: new Date() },
+        { id: USER_1, tenantId: TENANT_A, email: 'u1@a.com', name: 'U1', passwordHash: 'x', role: 'manager', createdAt: new Date() },
         { id: USER_2, tenantId: TENANT_A, email: 'u2@a.com', name: 'U2', passwordHash: 'x', role: 'owner', createdAt: new Date() },
     ]);
 }

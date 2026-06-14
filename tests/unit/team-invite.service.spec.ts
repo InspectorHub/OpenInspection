@@ -1,8 +1,8 @@
 /**
- * Design System 0520 subsystem C phase 5 task 5.1 — TeamService.createInvite
- * carries the new role-extension fields (assigned sections for
- * specialists, mentor id for apprentices) through onto the tenant_invites
- * row so they can be replayed onto the users row at accept time.
+ * TeamService.createInvite — roles collapsed to owner/admin/inspector/agent
+ * (2026-06-13). The apprentice mentor-id and specialist assigned-section
+ * extension fields were removed; createInvite now only carries the canonical
+ * role onto the tenant_invites row.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -15,7 +15,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
-const MENTOR = '11111111-1111-1111-1111-1111111111c1';
+const ADMIN = '11111111-1111-1111-1111-1111111111c1';
 
 async function seedTenant(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.tenants).values({
@@ -23,12 +23,12 @@ async function seedTenant(testDb: BetterSQLite3Database<typeof schema>) {
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
     await testDb.insert(schema.users).values({
-        id: MENTOR, tenantId: TENANT, email: 'lead@acme.test',
-        passwordHash: 'x', role: 'lead', createdAt: new Date(),
+        id: ADMIN, tenantId: TENANT, email: 'admin@acme.test',
+        passwordHash: 'x', role: 'admin', createdAt: new Date(),
     });
 }
 
-describe('TeamService.createInvite — 4-role extensions (subsystem C P5.1)', () => {
+describe('TeamService.createInvite — canonical roles', () => {
     let svc: TeamService;
     let testDb: BetterSQLite3Database<typeof schema>;
 
@@ -42,63 +42,69 @@ describe('TeamService.createInvite — 4-role extensions (subsystem C P5.1)', ()
         svc = new TeamService({} as D1Database);
     });
 
-    it('creates an invite for a specialist with assigned section ids', async () => {
+    it('creates an inspector invite', async () => {
         const out = await svc.createInvite({
             tenantId: TENANT,
-            email:    'spec@acme.test',
-            role:     'specialist',
-            assignedSectionIds: ['s-roof', 's-elec'],
+            email:    'insp@acme.test',
+            role:     'inspector',
         });
 
         const row = await testDb.select().from(schema.tenantInvites)
             .where(eq(schema.tenantInvites.id, out.token)).get();
-        expect(row?.role).toBe('specialist');
-        expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual(['s-roof', 's-elec']);
+        expect(row?.role).toBe('inspector');
+        // Extension columns default to empty/null — no longer written.
         expect(row?.mentorId).toBeNull();
-    });
-
-    it('creates an apprentice invite with mentor_id', async () => {
-        const out = await svc.createInvite({
-            tenantId: TENANT,
-            email:    'app@acme.test',
-            role:     'apprentice',
-            mentorId: MENTOR,
-        });
-
-        const row = await testDb.select().from(schema.tenantInvites)
-            .where(eq(schema.tenantInvites.id, out.token)).get();
-        expect(row?.role).toBe('apprentice');
-        expect(row?.mentorId).toBe(MENTOR);
         expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
     });
 
-    it('rejects an apprentice invite without a mentor', async () => {
-        await expect(svc.createInvite({
-            tenantId: TENANT,
-            email:    'app@acme.test',
-            role:     'apprentice',
-        })).rejects.toThrow(/mentor.*required/i);
-    });
-
-    it('rejects when the named mentor does not exist in the tenant', async () => {
-        await expect(svc.createInvite({
-            tenantId: TENANT,
-            email:    'app@acme.test',
-            role:     'apprentice',
-            mentorId: 'no-such-user',
-        })).rejects.toThrow(/mentor/i);
-    });
-
-    it('legacy lead/office invites still work with no extra fields', async () => {
+    it('creates an admin invite', async () => {
         const out = await svc.createInvite({
             tenantId: TENANT,
             email:    'office@acme.test',
-            role:     'office',
+            role:     'admin',
         });
         const row = await testDb.select().from(schema.tenantInvites)
             .where(eq(schema.tenantInvites.id, out.token)).get();
-        expect(row?.role).toBe('office');
+        expect(row?.role).toBe('admin');
         expect(row?.mentorId).toBeNull();
         expect(JSON.parse(row?.assignedSectionIds ?? '[]')).toEqual([]);
+    });
+
+    it('stores only the overrides that differ from the role template', async () => {
+        // Inspector template = publish:true, scheduleOthers:false, financial:false,
+        // manageContacts:false. publish:true matches the template (dropped);
+        // scheduleOthers:true differs (kept).
+        const out = await svc.createInvite({
+            tenantId: TENANT,
+            email:    'diff@acme.test',
+            role:     'inspector',
+            permissionOverrides: { publish: true, scheduleOthers: true },
+        });
+        const row = await testDb.select().from(schema.tenantInvites)
+            .where(eq(schema.tenantInvites.id, out.token)).get();
+        expect(row?.permissionOverrides).toEqual({ scheduleOthers: true });
+    });
+
+    it('stores null when every requested override equals the role template', async () => {
+        const out = await svc.createInvite({
+            tenantId: TENANT,
+            email:    'samedefault@acme.test',
+            role:     'inspector',
+            permissionOverrides: { publish: true, financial: false },
+        });
+        const row = await testDb.select().from(schema.tenantInvites)
+            .where(eq(schema.tenantInvites.id, out.token)).get();
+        expect(row?.permissionOverrides ?? null).toBeNull();
+    });
+
+    it('stores null when no overrides are supplied', async () => {
+        const out = await svc.createInvite({
+            tenantId: TENANT,
+            email:    'none@acme.test',
+            role:     'manager',
+        });
+        const row = await testDb.select().from(schema.tenantInvites)
+            .where(eq(schema.tenantInvites.id, out.token)).get();
+        expect(row?.permissionOverrides ?? null).toBeNull();
     });
 });

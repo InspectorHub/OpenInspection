@@ -15,7 +15,6 @@ interface BillingSummary {
   seatsUsed?: number;
   maxUsers?: number | null;
   permanent?: number;
-  guests?: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,7 +55,6 @@ export default function SettingsBillingPage() {
     seatsUsed = 0,
     maxUsers,
     permanent = 0,
-    guests = 0,
   } = billing;
 
   return (
@@ -87,7 +85,7 @@ export default function SettingsBillingPage() {
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-ih-fg-1">Self-hosted &middot; no subscription</h3>
                   <p className="text-[13px] text-ih-fg-2 mt-1.5 leading-relaxed">
-                    This deployment runs in standalone mode. No per-seat charge, no Stripe. Add as many inspectors, apprentices, and guests as you need.
+                    This deployment runs in standalone mode. No per-seat charge, no Stripe. Add as many inspectors as you need.
                   </p>
                   <a href="https://github.com/InspectorHub/OpenInspection" target="_blank" rel="noopener"
                     className="mt-3 inline-flex items-center gap-1 text-[13px] font-bold text-ih-ok-fg hover:underline">
@@ -117,7 +115,7 @@ export default function SettingsBillingPage() {
               </div>
 
               {/* Seat breakdown */}
-              <div className="grid grid-cols-3 gap-4 pt-5 border-t border-ih-border">
+              <div className="grid grid-cols-2 gap-4 pt-5 border-t border-ih-border">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">
                     {hasSeatQuota ? "Seats used" : "Active members"}
@@ -132,10 +130,6 @@ export default function SettingsBillingPage() {
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Permanent</div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{permanent}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Active guests</div>
-                  <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{guests}</div>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-ih-border">
@@ -153,7 +147,7 @@ export default function SettingsBillingPage() {
                 <h3 className="text-lg font-bold text-ih-fg-1">Workspace capacity</h3>
                 <p className="text-[11px] text-ih-fg-3 mt-0.5">No quotas in standalone mode — these are informational.</p>
               </header>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Active members</div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{seatsUsed}</div>
@@ -161,10 +155,6 @@ export default function SettingsBillingPage() {
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Permanent</div>
                   <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{permanent}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Active guests</div>
-                  <div className="text-2xl font-bold text-ih-fg-1 mt-1 tabular-nums">{guests}</div>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-ih-border">
@@ -189,12 +179,7 @@ export default function SettingsBillingPage() {
                   <dt className="text-ih-fg-3">{permanent} permanent inspector seat{permanent !== 1 ? "s" : ""} &middot; $29.99 each</dt>
                   <dd className="font-mono font-semibold text-ih-fg-1">{fmtMoney(permanent * 29.99)}</dd>
                 </div>
-                {guests > 0 && (
-                  <div className="py-2 flex items-center justify-between text-[13px]">
-                    <dt className="text-ih-fg-3">{guests} active guest{guests !== 1 ? "s" : ""} &middot; $1.49 / day each</dt>
-                    <dd className="font-mono font-semibold text-ih-fg-1">billed on use</dd>
-                  </div>
-                )}
+
                 <div className="py-3 flex items-center justify-between">
                   <dt className="text-[13px] font-bold text-ih-fg-1">Approximate seat charges this month</dt>
                   <dd className="font-mono font-bold text-lg text-ih-fg-1">{fmtMoney(permanent * 29.99)}</dd>
@@ -255,7 +240,7 @@ export default function SettingsBillingPage() {
           )}
           <section className="bg-ih-bg-card border border-ih-border rounded-md p-5 text-[12px] text-ih-fg-3 leading-relaxed">
             <div className="font-bold text-ih-fg-1 mb-1.5 text-[13px]">Add a seat</div>
-            Add a permanent inspector or generate a guest invite link in{" "}
+            Add an inspector in{" "}
             <Link to="/settings/team" className="font-semibold text-ih-primary hover:underline">Team settings</Link>.
           </section>
         </aside>

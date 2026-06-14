@@ -58,7 +58,7 @@ const exportDataRoute = createRoute(withMcpMetadata({
     path: '/export',
     tags: ["admin"],
     summary: "Export tenant for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: {
@@ -82,7 +82,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
     path: '/invite',
     tags: ["admin"],
     summary: "Invite tenant for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: {
             content: {
@@ -115,7 +115,7 @@ const importDataRoute = createRoute(withMcpMetadata({
     path: '/import',
     tags: ["admin"],
     summary: "Import tenant for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: {
             content: {
@@ -153,7 +153,7 @@ const listMembersRoute = createRoute(withMcpMetadata({
     path: '/members',
     tags: ["admin"],
     summary: "List tenant members for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: {
@@ -177,7 +177,7 @@ const listAgreementsRoute = createRoute(withMcpMetadata({
     path: '/agreements',
     tags: ["admin"],
     summary: "List tenant agreements for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: {
@@ -198,7 +198,7 @@ const createAgreementRoute = createRoute(withMcpMetadata({
     path: '/agreements',
     tags: ["admin"],
     summary: "Create tenant agreements for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: {
             content: {
@@ -228,7 +228,7 @@ const updateAgreementRoute = createRoute(withMcpMetadata({
     path: '/agreements/{id}',
     tags: ["admin"],
     summary: "Update tenant agreement for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
@@ -259,7 +259,7 @@ const deleteAgreementRoute = createRoute(withMcpMetadata({
     path: '/agreements/{id}',
     tags: ["admin"],
     summary: "Delete tenant agreement for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
@@ -286,7 +286,7 @@ const getAuditLogsRoute = createRoute(withMcpMetadata({
     path: '/audit-logs',
     tags: ["admin"],
     summary: "List tenant audit logs",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         query: z.object({
             limit: z.string().optional().describe('TODO describe limit field for the OpenInspection MCP integration'),
@@ -325,7 +325,7 @@ const postAuditLogRoute = createRoute(withMcpMetadata({
     path: '/audit-logs',
     tags: ["admin"],
     summary: 'Record an inspector-driven audit event',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
         body: {
             content: {
@@ -359,7 +359,7 @@ const eraseDataRoute = createRoute(withMcpMetadata({
     path: '/data',
     tags: ["admin"],
     summary: "Delete tenant data for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: {
             content: {
@@ -401,7 +401,7 @@ const getConfigRoute = createRoute(withMcpMetadata({
     path: '/config',
     tags: ["admin"],
     summary: 'Get integration config and masked secrets',
-    middleware: [requireRole(['owner'])],
+    middleware: [requireRole('owner')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ integrationConfig: IntegrationConfigSchema.describe('TODO describe integrationConfig field for the OpenInspection MCP integration'), secrets: z.record(z.string(), z.string()).describe('TODO describe secrets field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }).openapi('ConfigResponse') } },
@@ -418,7 +418,7 @@ const updateIntegrationConfigRoute = createRoute(withMcpMetadata({
     path: '/config',
     tags: ["admin"],
     summary: 'Save non-sensitive integration config (plaintext)',
-    middleware: [requireRole(['owner'])],
+    middleware: [requireRole('owner')],
     request: { body: { content: { 'application/json': { schema: IntegrationConfigSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Saved' },
@@ -435,7 +435,7 @@ const sendAgreementRoute = createRoute(withMcpMetadata({
     path: '/agreements/send',
     tags: ["admin", "agreements"],
     summary: 'Send an agreement signing request to a client',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { body: { content: { 'application/json': { schema: SendAgreementSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
@@ -467,7 +467,7 @@ const listSigningRequestsRoute = createRoute(withMcpMetadata({
     path: '/agreements/requests',
     tags: ["admin"],
     summary: 'List signing requests for tenant',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.array(z.unknown()).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'OK' },
     },
@@ -480,7 +480,7 @@ const getSigningRequestDetailRoute = createRoute(withMcpMetadata({
     path: '/agreements/requests/{id}',
     tags: ["admin"],
     summary: 'Get a signing request with full audit trail',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.unknown().describe('TODO describe data field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'OK' },
@@ -495,7 +495,7 @@ const downloadAuditTrailRoute = createRoute(withMcpMetadata({
     path: '/agreements/requests/{id}/audit-trail',
     tags: ["admin"],
     summary: 'Download audit trail JSON for legal evidence',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.unknown().describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Audit JSON download' },
@@ -527,7 +527,7 @@ const listSignersRoute = createRoute(withMcpMetadata({
     path: '/agreements/requests/{requestId}/signers',
     tags: ["admin", "agreements"],
     summary: 'List signers of an agreement envelope (no token material)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ requestId: z.string().describe('The agreement envelope (agreement_requests) id whose signers to list') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(SignerRowSchema) }) } }, description: 'OK' },
@@ -542,7 +542,7 @@ const remindSignerRoute = createRoute(withMcpMetadata({
     path: '/agreements/requests/{requestId}/signers/{signerId}/remind',
     tags: ["admin", "agreements"],
     summary: 'Re-send the agreement request to a single signer',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ requestId: z.string().describe('The agreement envelope id that owns the signer being reminded'), signerId: z.string().describe('The agreement_signers id to re-send the request to') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ remindedAt: z.number() }) }) } }, description: 'Reminder sent' },
@@ -559,7 +559,7 @@ const getSignerLinkRoute = createRoute(withMcpMetadata({
     path: '/agreements/requests/{requestId}/signers/{signerId}/link',
     tags: ["admin", "agreements"],
     summary: 'Get a single signer\'s persistent public link (copy-link)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ requestId: z.string().describe('The agreement envelope id that owns the signer whose link is requested'), signerId: z.string().describe('The agreement_signers id whose persistent public link to return') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ url: z.string() }) }) } }, description: 'OK' },
@@ -591,7 +591,7 @@ const listCommentsRoute = createRoute(withMcpMetadata({
     summary: 'List comment library entries',
     // Inspectors need read access so the inspection-edit picker (T7+1) can
     // populate. Create/delete remain admin-only further below.
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { query: ListCommentsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -610,7 +610,7 @@ const createCommentRoute = createRoute(withMcpMetadata({
     path: '/comments',
     tags: ["admin"],
     summary: 'Create a comment library entry',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { body: { content: { 'application/json': { schema: CommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         201: {
@@ -629,7 +629,7 @@ const deleteCommentRoute = createRoute(withMcpMetadata({
     path: '/comments/{id}',
     tags: ["admin"],
     summary: 'Delete a comment library entry',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -649,7 +649,7 @@ const updateCommentRoute = createRoute(withMcpMetadata({
     path: '/comments/{id}',
     tags: ["admin"],
     summary: 'Update a comment library entry',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: UpdateCommentSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -675,7 +675,7 @@ const touchCommentRoute = createRoute(withMcpMetadata({
     path:   '/comments/{id}/touch',
     tags:   ['admin'],
     summary: "Record an inspector's use of a snippet (per-user counter)",
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ id: z.string().min(1).describe('Comment library entry identifier') }) },
     responses: {
         200: {
@@ -696,7 +696,7 @@ const getWidgetOriginsRoute = createRoute(withMcpMetadata({
     path: '/widget/origins',
     tags: ["admin"],
     summary: 'Get current widget allowed-origin list',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ origins: z.array(z.string()).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -713,7 +713,7 @@ const setWidgetOriginsRoute = createRoute(withMcpMetadata({
     path: '/widget/origins',
     tags: ["admin"],
     summary: 'Replace widget allowed-origin list',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { body: { content: { 'application/json': { schema: z.object({ origins: z.array(z.string().min(1)).max(50).describe('TODO describe origins field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
@@ -733,7 +733,7 @@ const getStripeConnectRoute = createRoute(withMcpMetadata({
     path: '/stripe-connect',
     tags: ["admin"],
     summary: 'Get the tenant Stripe Connect account ID',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.string().nullable().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -750,7 +750,7 @@ const setStripeConnectRoute = createRoute(withMcpMetadata({
     path: '/stripe-connect',
     tags: ["admin"],
     summary: 'Set the tenant Stripe Connect account ID',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { body: { content: { 'application/json': { schema: StripeConnectAccountSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
@@ -768,7 +768,7 @@ const deleteStripeConnectRoute = createRoute(withMcpMetadata({
     path: '/stripe-connect',
     tags: ["admin"],
     summary: 'Disconnect the tenant Stripe Connect account',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ accountId: z.null().describe('TODO describe accountId field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
@@ -787,7 +787,7 @@ const getEarningsSummaryRoute = createRoute(withMcpMetadata({
     path: '/earnings-summary',
     tags: ["admin"],
     summary: 'Get aggregated invoice earnings (paid/pending/count)',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: {
@@ -817,7 +817,7 @@ const icsTokenRoute = createRoute(withMcpMetadata({
     path: '/ics-token',
     tags: ["admin", "calendar"],
     summary: "List tenant ics token",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: {
@@ -847,7 +847,7 @@ const getAttentionThresholdsRoute = createRoute(withMcpMetadata({
     path: '/attention-thresholds',
     tags: ["admin"],
     summary: "List tenant attention thresholds",
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     responses: {
         200: {
             content: { 'application/json': { schema: AttentionThresholdsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
@@ -864,7 +864,7 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
     path: '/attention-thresholds',
     tags: ["admin"],
     summary: "Patch tenant attention threshold",
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: AttentionThresholdsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
@@ -891,7 +891,7 @@ const getDashboardColumnsRoute = createRoute(withMcpMetadata({
     path: '/dashboard-columns',
     tags: ["admin"],
     summary: 'Get tenant default dashboard column prefs',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: {
             content: { 'application/json': { schema: DashboardColumnPrefsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
@@ -908,7 +908,7 @@ const updateDashboardColumnsRoute = createRoute(withMcpMetadata({
     path: '/dashboard-columns',
     tags: ["admin"],
     summary: 'Update tenant default dashboard column prefs',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: DashboardColumnPrefsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
@@ -942,7 +942,7 @@ const tenantConfigGetRoute = createRoute(withMcpMetadata({
     path: '/tenant-config',
     tags: ["admin"],
     summary: 'Get tenant configuration flags',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: {
             content: { 'application/json': { schema: TenantConfigGetResponseSchema.describe('Tenant configuration flags') } },
@@ -980,7 +980,7 @@ const tenantConfigPatchRoute = createRoute(withMcpMetadata({
     path: '/tenant-config',
     tags: ["admin"],
     summary: 'Patch a small allowlist of tenant_configs columns',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: TenantConfigPatchSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: {
@@ -1004,7 +1004,7 @@ const migrateFindingKeysRoute = createRoute(withMcpMetadata({
     path: '/migrate-finding-keys',
     tags: ['admin'],
     summary: 'One-time migration: rewrite legacy finding keys to composite format',
-    middleware: [requireRole(['owner'])] as const,
+    middleware: [requireRole('owner')] as const,
     responses: {
         200: {
             content: {
@@ -1063,7 +1063,7 @@ const brSmokeRoute = createRoute(withMcpMetadata({
     path: '/system/br-smoke',
     tags: ['admin'],
     summary: 'Probe Cloudflare Browser Run binding (env.BROWSER) liveness',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: { query: BrSmokeQuerySchema },
     responses: {
         200: {
@@ -1108,7 +1108,7 @@ const erasureLogRoute = createRoute(withMcpMetadata({
     path: '/compliance/erasure-log',
     tags: ['admin'],
     summary: 'Recent GDPR erasure (DSAR) decision records for the tenant',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     responses: {
         200: {
             content: { 'application/json': { schema: ErasureLogResponseSchema } },
@@ -1147,7 +1147,7 @@ const togglePdfPipelineRoute = createRoute(withMcpMetadata({
     path: '/pdf-pipeline',
     tags: ['admin'],
     summary: 'Toggle the per-tenant Browser-Run PDF rendering pipeline',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: { content: { 'application/json': { schema: PdfPipelineToggleSchema } } },
     },
@@ -1166,7 +1166,7 @@ const inspectorSignRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/agreement-requests/{id}/inspector-sign',
     tags: ['admin'],
     summary: 'Inspector pre-signs an agreement before sending to client',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
         params: z.object({ id: z.string().describe('Agreement request (envelope) identifier') }),
         body: { content: { 'application/json': { schema: InspectorSignSchema } } },
@@ -1206,7 +1206,7 @@ const listEventTypesRoute = createRoute(withMcpMetadata({
     path: '/event-types',
     tags: ['admin'],
     summary: 'List scheduling event types',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(z.array(EventTypeRowSchema)) } }, description: 'Event types' },
         401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
@@ -1221,7 +1221,7 @@ const createEventTypeRoute = createRoute(withMcpMetadata({
     path: '/event-types',
     tags: ['admin'],
     summary: 'Create a scheduling event type',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: EventTypeCreateSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(EventTypeRowSchema) } }, description: 'Created event type' },
@@ -1237,7 +1237,7 @@ const updateEventTypeRoute = createRoute(withMcpMetadata({
     path: '/event-types/{id}',
     tags: ['admin'],
     summary: 'Update a scheduling event type',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: EventTypeIdParam, body: { content: { 'application/json': { schema: EventTypeUpdateSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(EventTypeRowSchema) } }, description: 'Updated event type' },
@@ -1253,7 +1253,7 @@ const deleteEventTypeRoute = createRoute(withMcpMetadata({
     path: '/event-types/{id}',
     tags: ['admin'],
     summary: 'Delete or deactivate a scheduling event type',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: EventTypeIdParam },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ ok: z.literal(true) })) } }, description: 'Deleted/deactivated' },
@@ -1294,7 +1294,7 @@ const getCommunicationRoute = createRoute(withMcpMetadata({
     path: '/communication',
     tags: ['admin'],
     summary: 'Get tenant communication settings',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(CommunicationResponseSchema) } }, description: 'Communication config' },
         401: { description: 'Unauthorized' }, 403: { description: 'Forbidden' },
@@ -1309,7 +1309,7 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
     path: '/communication',
     tags: ['admin'],
     summary: 'Update tenant communication settings',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: CommunicationPatchSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({ ok: z.literal(true) })) } }, description: 'Saved' },

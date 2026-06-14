@@ -23,7 +23,7 @@ export const syncRoutes = createApiRouter()
     path: '/{id}/results/merge',
     tags: ["inspections"],
     summary: 'Three-way merge sync of offline results',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: ResultsMergeRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -151,7 +151,7 @@ export const syncRoutes = createApiRouter()
     path: '/{id}/items/{itemId}/photos/{photoIndex}',
     tags: ["inspections"],
     summary: 'Authoritative delete of a photo from a result item',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
             id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
@@ -210,7 +210,7 @@ export const syncRoutes = createApiRouter()
     path: '/{id}/inspector-signature',
     tags: ["inspections"],
     summary: 'Record inspector signature on an inspection (authenticated)',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: InspectorSignatureSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -267,7 +267,7 @@ export const syncRoutes = createApiRouter()
     path: '/{id}/template/upgrade',
     tags: ["inspections"],
     summary: 'Upgrade inspection template snapshot to current master version',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ from: z.number().describe('TODO describe from field for the OpenInspection MCP integration'), to: z.number().describe('TODO describe to field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Upgraded' } },
     operationId: "upgradeInspection",

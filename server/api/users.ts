@@ -51,7 +51,7 @@ const saveSignatureRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/me/signature',
     tags: ['profile'],
     summary: 'Save the authenticated user\'s default signature image',
-    middleware: [requireRole(['owner', 'admin', 'inspector', 'lead'])],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
         body: { content: { 'application/json': { schema: UserDefaultSignatureSchema } } },
     },

@@ -35,7 +35,7 @@ interface Member {
 }
 
 // Scheduling roles that may be restricted per-service.
-const SCHEDULING_ROLES = new Set(["owner", "admin", "inspector", "lead"]);
+const SCHEDULING_ROLES = new Set(["owner", "manager", "inspector"]);
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);

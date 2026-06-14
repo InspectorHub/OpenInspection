@@ -16,7 +16,7 @@ const getBrandingRoute = createRoute(withMcpMetadata({
     path: '/branding',
     tags: ["admin"],
     summary: "List tenant branding for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     responses: {
         200: {
             content: {
@@ -40,7 +40,7 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
     path: '/branding',
     tags: ["admin"],
     summary: "Create tenant branding for current tenant",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: {
             content: {
@@ -73,7 +73,7 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
     path: '/branding/logo',
     tags: ["admin"],
     summary: "Create tenant branding logo",
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: {
             content: {

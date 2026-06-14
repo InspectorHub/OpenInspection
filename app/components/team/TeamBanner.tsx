@@ -18,7 +18,7 @@ export function TeamBanner({ show, members, onManage }: TeamBannerProps) {
       <span className="ih-eyebrow text-ih-primary">Team mode</span>
       <div className="flex -space-x-1.5">
         {members.map((m) => (
-          <div key={m.id} className="w-7 h-7 rounded-full ring-2 ring-ih-bg-card bg-ih-bg-muted flex items-center justify-center text-xs font-bold text-ih-fg-2" title={`${m.name || m.id}${m.role === "lead" ? " (lead)" : ""}`}>
+          <div key={m.id} className="w-7 h-7 rounded-full ring-2 ring-ih-bg-card bg-ih-bg-muted flex items-center justify-center text-xs font-bold text-ih-fg-2" title={m.name || m.id}>
             {(m.name || m.id || "?").slice(0, 2).toUpperCase()}
           </div>
         ))}

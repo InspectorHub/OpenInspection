@@ -90,7 +90,7 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
     });
 
     it('assigns the template — a templateId-only payload returns 200 and persists', async () => {
-        expect(await patch('admin', { templateId: TPL_ID })).toBe(200);
+        expect(await patch('manager', { templateId: TPL_ID })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { templateId?: string | null }).templateId).toBe(TPL_ID);
     });
@@ -98,11 +98,11 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
     it('a payload that reduces to no recognised fields is a 200 no-op (not a 500)', async () => {
         // Mirrors the sanitizer dropping every empty-string "unchanged" field:
         // the validated body is `{}`, which must not crash `.set({})`.
-        expect(await patch('admin', { unknownField: 'x' })).toBe(200);
+        expect(await patch('manager', { unknownField: 'x' })).toBe(200);
     });
 
     it('still updates a normal scalar field', async () => {
-        expect(await patch('admin', { clientName: 'Updated Name' })).toBe(200);
+        expect(await patch('manager', { clientName: 'Updated Name' })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { clientName?: string }).clientName).toBe('Updated Name');
     });
@@ -137,30 +137,30 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
 
     it('DB-16: sets coverPhotoId to a pool photo key of this inspection (200)', async () => {
         await seedPoolRow();
-        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(200);
+        expect(await patch('manager', { coverPhotoId: POOL_KEY })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBe(POOL_KEY);
     });
 
     it('DB-16: sets coverPhotoId to an attached item photo key (200)', async () => {
         await seedAttachedPhoto();
-        expect(await patch('admin', { coverPhotoId: ATTACHED_KEY })).toBe(200);
+        expect(await patch('manager', { coverPhotoId: ATTACHED_KEY })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBe(ATTACHED_KEY);
     });
 
     it('DB-16: rejects a photo key belonging to a DIFFERENT inspection (400)', async () => {
         await seedPoolRow({ inspectionId: '550e8400-e29b-41d4-a716-446655449999' });
-        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(400);
+        expect(await patch('manager', { coverPhotoId: POOL_KEY })).toBe(400);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBeNull();
     });
 
     it('DB-16: rejects a dangling key (400) and accepts null to clear', async () => {
-        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(400); // no such photo at all
+        expect(await patch('manager', { coverPhotoId: POOL_KEY })).toBe(400); // no such photo at all
         await seedPoolRow();
-        expect(await patch('admin', { coverPhotoId: POOL_KEY })).toBe(200);
-        expect(await patch('admin', { coverPhotoId: null })).toBe(200);
+        expect(await patch('manager', { coverPhotoId: POOL_KEY })).toBe(200);
+        expect(await patch('manager', { coverPhotoId: null })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
         expect((row as { coverPhotoId?: string | null }).coverPhotoId).toBeNull();
     });

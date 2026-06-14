@@ -50,7 +50,7 @@ export class DashboardPrefsService {
 
     /**
      * Writes the tenant default. The caller (an OpenAPI route guarded by
-     * `requireRole(['owner','admin'])`) is responsible for permission checks.
+     * `requireRole('owner','manager')`) is responsible for permission checks.
      * Performs an upsert against `tenant_configs`.
      */
     async setColumnPrefs(tenantId: string, columns: string[]): Promise<string[]> {

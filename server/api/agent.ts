@@ -7,6 +7,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { inspections } from '../lib/db/schema/inspection';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
+import { ROLE } from '../lib/auth/roles';
 import {
     AgentReportsQuerySchema,
     AgentReportsResponseSchema,
@@ -235,7 +236,7 @@ const inspectorsRoute = createRoute(withMcpMetadata({
 export const agentRoutes = createApiRouter()
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
-        await requireRole(['office_staff', 'admin'])(c, async () => {});
+        await requireRole('manager')(c, async () => {});
 
         const tenantId = c.get('tenantId');
         const user = c.get('user');
@@ -245,7 +246,7 @@ export const agentRoutes = createApiRouter()
 
         // Admins/owners can pass ?agentId= to view any agent's reports
         const agentId =
-            userRole === 'admin'
+            userRole === ROLE.MANAGER
                 ? (queryAgentId ?? user.sub)
                 : user.sub;
 
@@ -263,13 +264,13 @@ export const agentRoutes = createApiRouter()
         }, 200);
     })
     .openapi(myRecommendationsRoute, async (c) => {
-        await requireRole(['agent'])(c, async () => {});
+        await requireRole('agent')(c, async () => {});
         const user = c.get('user');
         const groups = await c.var.services.agent.listRecommendationsForAgent(user.sub);
         return c.json({ success: true, data: groups }, 200);
     })
     .openapi(getLeaderboardRoute, async (c) => {
-        await requireRole(['owner', 'admin', 'inspector', 'agent'])(c, async () => {});
+        await requireRole('owner', 'manager', 'inspector', 'agent')(c, async () => {});
 
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
@@ -299,7 +300,7 @@ export const agentRoutes = createApiRouter()
         }, 200);
     })
     .openapi(updateProfileRoute, async (c) => {
-        await requireRole(['agent'])(c, async () => {});
+        await requireRole('agent')(c, async () => {});
         const user = c.get('user');
         if (!user?.sub) throw Errors.Unauthorized();
 
@@ -315,7 +316,7 @@ export const agentRoutes = createApiRouter()
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     })
     .openapi(conciergeBookRoute, async (c) => {
-        await requireRole(['agent'])(c, async () => {});
+        await requireRole('agent')(c, async () => {});
         const agentUserId = c.get('agentUserId');
         if (!agentUserId) throw Errors.Unauthorized('Agent identity missing from token');
 
@@ -336,13 +337,13 @@ export const agentRoutes = createApiRouter()
         return c.json({ success: true as const, data: result }, 200);
     })
     .openapi(referralsRoute, async (c) => {
-        await requireRole(['agent'])(c, async () => {});
+        await requireRole('agent')(c, async () => {});
         const user = c.get('user');
         const data = await c.var.services.agent.listReferrals(user.sub, { limit: 100 });
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(inspectorsRoute, async (c) => {
-        await requireRole(['agent'])(c, async () => {});
+        await requireRole('agent')(c, async () => {});
         const user = c.get('user');
         const data = await c.var.services.agent.listInspectors(user.sub);
         return c.json({ success: true as const, data }, 200);

@@ -13,7 +13,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 const importPreviewRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/import/preview',
     tags: ['contacts'], summary: 'Preview parsed CSV rows for the contact-import mapping UI',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: { content: { 'application/json': { schema: ContactImportPreviewSchema } } },
     },
@@ -31,7 +31,7 @@ const importPreviewRoute = createRoute(withMcpMetadata({
 const importRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/import',
     tags: ['contacts'], summary: 'Bulk-insert contacts from a CSV blob + mapping',
-    middleware: [requireRole(['owner', 'admin'])],
+    middleware: [requireRole('owner', 'manager')],
     request: {
         body: { content: { 'application/json': { schema: ContactImportSchema } } },
     },

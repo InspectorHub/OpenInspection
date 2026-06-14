@@ -213,7 +213,7 @@ export const agentsRoutes = createApiRouter()
     .openapi(inviteRoute, async (c) => {
         // RBAC moved inside to keep OpenAPIHono context typing happy. Owners, admins,
         // and rank-and-file inspectors can all invite agents.
-        await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
+        await requireRole('owner', 'manager', 'inspector')(c, async () => {});
 
         const tenantId = c.get('tenantId');
         const user = c.get('user');
@@ -272,7 +272,7 @@ export const agentsRoutes = createApiRouter()
         }, 200);
     })
     .openapi(listLinksRoute, async (c) => {
-        await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
+        await requireRole('owner', 'manager', 'inspector')(c, async () => {});
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();
         const db = drizzle(c.env.DB);
@@ -307,7 +307,7 @@ export const agentsRoutes = createApiRouter()
         return c.json({ success: true as const, data: { links } }, 200);
     })
     .openapi(revokeRoute, async (c) => {
-        await requireRole(['owner', 'admin', 'inspector'])(c, async () => {});
+        await requireRole('owner', 'manager', 'inspector')(c, async () => {});
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();
         const { linkId } = c.req.valid('param');

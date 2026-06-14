@@ -38,11 +38,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {
   owner: "primary",
-  admin: "info",
+  manager: "info",
   inspector: "neutral",
   lead: "info",
   specialist: "sat",
-  apprentice: "monitor",
   agent: "warning",
   office: "gen",
 };
@@ -50,8 +49,6 @@ const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "m
 const TABS = [
   { id: "active", label: "Active" },
   { id: "pending", label: "Pending Invites" },
-  { id: "apprentices", label: "Apprentices" },
-  { id: "guests", label: "Guests" },
 ];
 
 export default function TeamPage() {
@@ -60,13 +57,9 @@ export default function TeamPage() {
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  const leads = members.filter((m) => m.role === "lead").map((m) => ({ id: m.id, email: m.email }));
-
   const filtered = members.filter((m) => {
-    if (activeTab === "active") return m.status !== "pending" && m.role !== "apprentice";
+    if (activeTab === "active") return m.status !== "pending";
     if (activeTab === "pending") return m.status === "pending";
-    if (activeTab === "apprentices") return m.role === "apprentice";
-    if (activeTab === "guests") return m.role === "guest";
     return true;
   });
 
@@ -89,7 +82,7 @@ export default function TeamPage() {
         }
       />
 
-      <InviteSeatModal open={inviteOpen} onClose={() => setInviteOpen(false)} leads={leads} />
+      <InviteSeatModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
 
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
 
@@ -150,10 +143,10 @@ export default function TeamPage() {
         <h2 className="text-sm font-bold text-ih-fg-1 mb-3">Roles</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { role: "Lead inspector", desc: "Full edit, can publish, approves apprentice ratings." },
-            { role: "Specialist", desc: "Full edit within their assigned sections." },
-            { role: "Apprentice", desc: "Edits route through the lead's review queue before publish." },
-            { role: "Office staff", desc: "Read-only access to inspections and scheduling." },
+            { role: "Owner", desc: "Account holder. Full access, including billing." },
+            { role: "Manager", desc: "Back office: team, settings, scheduling, and all inspections." },
+            { role: "Inspector", desc: "Conducts inspections; edits and publishes reports." },
+            { role: "Agent", desc: "External agent. Read-only access to their own orders." },
           ].map((r) => (
             <div key={r.role} className="p-3 border border-ih-border rounded-md">
               <p className="text-[13px] font-bold text-ih-fg-1">{r.role}</p>

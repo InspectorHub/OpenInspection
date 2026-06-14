@@ -108,7 +108,7 @@ describe('GET /availability — on-behalf-of read role guard (IA-26)', () => {
     });
 
     it('admin querying a different inspectorId gets 200', async () => {
-        const app = buildApp(db, { sub: CALLER_ID, role: 'admin' });
+        const app = buildApp(db, { sub: CALLER_ID, role: 'manager' });
         const res = await app.request(`/?inspectorId=${OTHER_ID}`, {}, FAKE_ENV);
         expect(res.status).toBe(200);
     });
@@ -161,7 +161,7 @@ describe('GET /overrides — on-behalf-of read role guard (IA-26)', () => {
     });
 
     it('admin querying a different inspectorId gets 200', async () => {
-        const app = buildApp(db, { sub: CALLER_ID, role: 'admin' });
+        const app = buildApp(db, { sub: CALLER_ID, role: 'manager' });
         const res = await app.request(`/overrides?inspectorId=${OTHER_ID}`, {}, FAKE_ENV);
         expect(res.status).toBe(200);
     });

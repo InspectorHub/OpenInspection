@@ -26,7 +26,6 @@ export type { CoreAuthApi }           from '../../server/api/auth';
 export type { DataApi }               from '../../server/api/data';
 export type { EventsApi }             from '../../server/api/events';
 export type { EvidenceApi }           from '../../server/api/evidence';
-export type { GuestApi }              from '../../server/api/guest';
 export type { IdentityApi }           from '../../server/api/identity';
 export type { InspectionPrefsApi }    from '../../server/api/inspection-prefs';
 export type { InspectionRequestsApi } from '../../server/api/inspection-requests';

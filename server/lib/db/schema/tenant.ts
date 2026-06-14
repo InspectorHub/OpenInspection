@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+import { ROLES } from '../../auth/roles';
 
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
@@ -65,10 +66,10 @@ export const users = sqliteTable('users', {
     // check those before any reuse. Global AGENT slugs (tenant_id IS NULL,
     // role='agent') still use this column actively — do not repurpose.
     slug: text('slug'),
-    // DDL default 'admin' is FROZEN (D1 cannot alter column defaults without a
+    // DDL default is FROZEN (D1 cannot alter column defaults without a
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
     // explicit role — audited 2026-06-05; enforced by review, not DDL.
-    role: text('role').notNull().default('admin'),
+    role: text('role', { enum: ROLES }).notNull().default('manager'),
     googleRefreshToken: text('google_refresh_token'),
     googleCalendarId: text('google_calendar_id'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
@@ -91,30 +92,37 @@ export const users = sqliteTable('users', {
     // per worker isolate). Powers TeamStrip "last active Nm ago" pill and the
     // soft-presence fallback when WebSocket cannot connect.
     lastActiveAt:     integer('last_active_at'),
-    // Design System 0520 subsystem C phase 1 — apprentice + specialist roles.
-    //   mentorId            = nullable FK → users.id; required for apprentices
-    //                          (apprentice writes route to mentor's review queue)
-    //   assignedSectionIds  = JSON array of section ids; non-empty restricts
-    //                          a specialist's edit scope. Empty = full access
-    //                          (lead / office) per canEdit() matrix.
-    //   expiresAt           = guest-invite expiry; non-null means the user
-    //                          was created via a guest token + auto-revokes
-    //                          past this epoch.
+    // Design System 0520 subsystem C phase 1 — role-extension columns.
+    //   mentorId            = DEAD (2026-06-13, apprentice subsystem removed).
+    //                          Formerly the apprentice's mentor FK → users.id —
+    //                          no reads/writes.
+    //   assignedSectionIds  = DEAD (2026-06-13). Formerly: JSON array of
+    //                          section ids restricting a specialist's edit
+    //                          scope. Specialist scoping deferred — no reads/writes.
+    //   expiresAt           = DEAD (2026-06-13, guest removal). Formerly the
+    //                          guest-invite expiry epoch — no reads/writes.
+    // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
     mentorId:             text('mentor_id'),
+    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
     assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
+    // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
     expiresAt:            integer('expires_at'),
     // Account soft-delete marker — set by POST /api/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
     deletedAt:            integer('deleted_at', { mode: 'timestamp' }),
     // Legal-links feature — set when the account was created through a public
-    // form (agent signup / agent invite / guest join) while the operator had
+    // form (agent signup / agent invite) while the operator had
     // TERMS_URL/PRIVACY_URL configured. JSON: {at, ip, country, termsUrl, privacyUrl}.
     // Nullable: absent for accounts created before the feature or when the
     // operator runs without configured legal docs.
     termsAccepted: text('terms_accepted', { mode: 'json' }).$type<{
         at: string; ip?: string; country?: string; termsUrl?: string; privacyUrl?: string;
     } | null>(),
+    // Role permission-template overrides (2026-06-13). Nullable JSON map of the
+    // four toggleable capabilities; absent/null = pure role template.
+    permissionOverrides: text('permission_overrides', { mode: 'json' })
+      .$type<import('../../auth/capabilities').PermissionOverrides | null>(),
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
     // DB-2: soft-deleted rows must not block re-inviting the same email.
@@ -188,15 +196,21 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     email: text('email').notNull(),
-    role: text('role').notNull().default('inspector'),
+    role: text('role', { enum: ROLES }).notNull().default('inspector'),
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-    // Design System 0520 subsystem C P5 — carry apprentice mentor +
-    // specialist section assignment from the InviteSeatModal into the
-    // eventual users row at accept time. NULL/empty for lead/office.
+    // Design System 0520 subsystem C P5 — carry role-extension fields from the
+    // InviteSeatModal into the eventual users row at accept time.
+    // DEAD (2026-06-13, apprentice subsystem removed) — written on invite but
+    // never replayed onto the users row; no behavior depends on it.
     mentorId:           text('mentor_id'),
     assignedSectionIds: text('assigned_section_ids').notNull().default('[]'),
+    // Role permission-template overrides (2026-06-13). Mirrors
+    // users.permission_overrides — carries the inviter's chosen toggle diffs
+    // through accept onto the new users row. Null = pure role template.
+    permissionOverrides: text('permission_overrides', { mode: 'json' })
+      .$type<import('../../auth/capabilities').PermissionOverrides | null>(),
 }, (t) => [
     index('idx_invites_tenant').on(t.tenantId),
     // DB-9 — at most one OUTSTANDING invite per (tenant, email). Partial so an
@@ -305,7 +319,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     enablePdfPipeline: integer('enable_pdf_pipeline', { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
     teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
+    // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
     apprenticeReviewRequired: integer('apprentice_review_required', { mode: 'boolean' }).notNull().default(false),
+    // DEAD (2026-06-13, guest removal) — no reads/writes
     guestInvitesEnabled:      integer('guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),
     // Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
     // Tenant default; per-inspection override on inspections.require_defect_

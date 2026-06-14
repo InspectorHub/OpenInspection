@@ -46,7 +46,7 @@ const listTagsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["tags"],
     summary: 'List tags for the current tenant (seed + custom)',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: { content: { 'application/json': { schema: TagListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
     },
@@ -59,7 +59,7 @@ const createTagRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["tags"],
     summary: 'Create a custom tag',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { body: { content: { 'application/json': { schema: CreateTagSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: { content: { 'application/json': { schema: TagSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
@@ -72,7 +72,7 @@ const createTagRoute = createRoute(withMcpMetadata({
 const replaceTagRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
     tags: ["tags"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: UpdateTagSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -94,7 +94,7 @@ const listTagInspectionsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/inspections',
     tags: ["tags"],
     summary: 'List inspections that have any item tagged with this tag',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {
@@ -117,7 +117,7 @@ const listTagInspectionsRoute = createRoute(withMcpMetadata({
 const deleteTagRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["tags"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: TagDeleteResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' },
@@ -180,7 +180,7 @@ const listInspectionItemTagsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/items/{itemId}/tags',
     tags: ["tags"],
     summary: 'List tags linked to an inspection item',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: InspectionItemTagParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: TagListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Item tags' },
@@ -194,7 +194,7 @@ const linkInspectionItemTagRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/items/{itemId}/tags',
     tags: ["tags"],
     summary: 'Link a tag to an inspection item',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: InspectionItemTagParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: LinkBodySchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -211,7 +211,7 @@ const unlinkInspectionItemTagRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}/items/{itemId}/tags/{tagId}',
     tags: ["tags"],
     summary: 'Unlink a tag from an inspection item',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: InspectionItemTagWithTagParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: TagUnlinkResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Unlinked' },
@@ -228,7 +228,7 @@ const listInspectionTagMapRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/tags',
     tags: ["tags"],
     summary: 'Map of itemId → tags for an inspection',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: InspectionIdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {

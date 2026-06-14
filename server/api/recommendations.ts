@@ -18,7 +18,7 @@ const listRecommendationsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["recommendations"],
     summary: 'List recommendations (filter: category, severity)',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { query: ListRecommendationsQuerySchema.describe('TODO describe query field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: RecommendationListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
@@ -31,7 +31,7 @@ const listRecommendationsRoute = createRoute(withMcpMetadata({
 const getRecommendationRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["recommendations"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Single recommendation' },
@@ -45,7 +45,7 @@ const getRecommendationRoute = createRoute(withMcpMetadata({
 const createRecommendationRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["recommendations"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: { content: { 'application/json': { schema: RecommendationResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
@@ -59,7 +59,7 @@ const createRecommendationRoute = createRoute(withMcpMetadata({
 const replaceRecommendationRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
     tags: ["recommendations"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: UpdateRecommendationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -76,7 +76,7 @@ const replaceRecommendationRoute = createRoute(withMcpMetadata({
 const deleteRecommendationRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["recommendations"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Deleted' },
@@ -91,7 +91,7 @@ const seedDefaultsRecommendationRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/seed-defaults',
     tags: ["recommendations"],
     summary: 'Bulk-insert the default 80 recommendations (idempotent — skips entries with matching name+category)',
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {},
     responses: {
         200: { content: { 'application/json': { schema: z.object({

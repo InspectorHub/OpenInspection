@@ -24,7 +24,7 @@ const migrateRoute = createRoute(withMcpMetadata({
     tags: ["templates"],
     summary: 'Migrate inspections from old template to new template',
     description: "Auto-generated placeholder for createTemplateMigrationMigrateTo (POST /{oldId}/migrate-to/{newId}, templates domain). TODO: replace with a real description sourced from the handler.",
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: MigrationParamsSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {

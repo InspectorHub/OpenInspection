@@ -28,7 +28,7 @@ const listRatingSystemsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["ratings"],
     summary: 'List rating systems for the current tenant (seed + custom)',
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     responses: {
         200: { content: { 'application/json': { schema: RatingSystemListResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'List' },
     },
@@ -40,7 +40,7 @@ const listRatingSystemsRoute = createRoute(withMcpMetadata({
 const getRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["ratings"],
-    middleware: [requireRole(['owner', 'admin', 'inspector'])] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'One system' },
@@ -54,7 +54,7 @@ const getRatingSystemRoute = createRoute(withMcpMetadata({
 const createRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["ratings"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { body: { content: { 'application/json': { schema: CreateRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: { content: { 'application/json': { schema: RatingSystemSingleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Created' },
@@ -68,7 +68,7 @@ const createRatingSystemRoute = createRoute(withMcpMetadata({
 const cloneRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/clone',
     tags: ["ratings"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: CloneRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -85,7 +85,7 @@ const cloneRatingSystemRoute = createRoute(withMcpMetadata({
 const replaceRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
     tags: ["ratings"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: {
         params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: UpdateRatingSystemSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
@@ -102,7 +102,7 @@ const replaceRatingSystemRoute = createRoute(withMcpMetadata({
 const deleteRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["ratings"],
-    middleware: [requireRole(['owner', 'admin'])] as const,
+    middleware: [requireRole('owner', 'manager')] as const,
     request: { params: IdParamSchema.describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: {

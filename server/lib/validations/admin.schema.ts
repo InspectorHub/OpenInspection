@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
+import { ROLES } from '../auth/roles';
 
 /**
  * Validation schema for the branding configuration update.
@@ -46,14 +47,18 @@ export const UpdateBrandingSchema = z.object({
  */
 export const InviteMemberSchema = z.object({
     email: z.string().email('Invalid email address').openapi({ example: 'new-user@example.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
-    role: z.enum(['admin', 'inspector', 'agent', 'owner', 'lead', 'specialist', 'apprentice', 'office'])
-        .default('inspector').openapi({ example: 'lead' }).describe('TODO describe role field for the OpenInspection MCP integration'),
-    /** Required when role === 'apprentice'. Must be a user id from the
-     *  inviting tenant. Carried through to users.mentor_id at accept. */
-    mentorId: z.string().uuid().optional().openapi({ example: '6e9b6b1c-4a3f-4ae3-9c10-1f1c3f4d5e6a' }).describe('TODO describe mentorId field for the OpenInspection MCP integration'),
-    /** Used when role === 'specialist'. Section ids from the active
-     *  template. Carried through to users.assigned_section_ids JSON. */
-    assignedSectionIds: z.array(z.string().min(1)).optional().openapi({ example: ['s-roof', 's-elec'] }).describe('TODO describe assignedSectionIds field for the OpenInspection MCP integration'),
+    role: z.enum(ROLES)
+        .default('inspector').openapi({ example: 'inspector' }).describe('TODO describe role field for the OpenInspection MCP integration'),
+    // Role permission-template overrides (2026-06-13). Optional sparse map of the
+    // four toggleable capabilities. Only differing-from-template keys are sent;
+    // TeamService stores the diff (or null when nothing differs) and it is
+    // replayed onto the new users row at accept time.
+    permissionOverrides: z.object({
+        publish: z.boolean().optional(),
+        scheduleOthers: z.boolean().optional(),
+        financial: z.boolean().optional(),
+        manageContacts: z.boolean().optional(),
+    }).partial().optional().openapi({ example: { publish: false } }).describe('Sparse capability override map for the invited member'),
 }).openapi('InviteMember');
 
 /**
