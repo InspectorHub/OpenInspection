@@ -39,7 +39,7 @@ import { FooterBar } from "~/components/editor/FooterBar";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
-import { PhotoStudio } from "~/components/editor/PhotoStudio";
+import { PhotoAnnotator } from "~/components/image-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper } from "~/components/image-studio/CoverCropper";
@@ -327,6 +327,20 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  });
  const body = (await res.json().catch(() => null)) as { data?: { coverImageKey?: string } } | null;
  return { ok: res.ok, intent: "crop-cover", coverKey: body?.data?.coverImageKey ?? null };
+ }
+
+ if (intent === "annotate") {
+ const image = formData.get("image");
+ const itemId = String(formData.get("itemId") ?? "");
+ const photoIndex = Number(formData.get("photoIndex") ?? "-1");
+ const nodes = String(formData.get("nodes") ?? "[]");
+ const sectionId = String(formData.get("sectionId") ?? "");
+ if (!(image instanceof File) || !itemId || photoIndex < 0) return { ok: false as const, intent: "annotate" };
+ const res = await api.inspections[":id"].items[":itemId"].photos[":photoIndex"].annotation.$post({
+ param: { id: params.id, itemId, photoIndex: String(photoIndex) },
+ form: sectionId ? { image, nodes, sectionId } : { image, nodes },
+ });
+ return { ok: res.ok, intent: "annotate" };
  }
 
  if (intent === "toggle-auto-sign") {
@@ -1793,12 +1807,13 @@ export default function InspectionEditPage() {
  />
 
  {/* Photo studio overlay */}
- <PhotoStudio
+ <PhotoAnnotator
  open={photoStudioOpen}
  photoUrl={photoStudioUrl}
  photoIndex={photoStudioIndex}
  totalPhotos={photoStudioTotal}
  sectionName={state.currentSection?.title || state.currentSection?.name || ""}
+ initialAnnotationsJson={null}
  isCover={!!photoStudioKey && (state.inspection.coverPhotoId as string | null) === photoStudioKey}
  onSetCover={photoStudioKey ? () => {
   const isCover = (state.inspection.coverPhotoId as string | null) === photoStudioKey;
@@ -1807,7 +1822,18 @@ export default function InspectionEditPage() {
    { method: "post" },
   );
  } : undefined}
- onSave={() => {
+ onSave={({ blob, nodesJson }) => {
+  const itemId = state.activeItemId;
+  if (itemId && photoStudioIndex != null) {
+   const fd = new FormData();
+   fd.append("intent", "annotate");
+   fd.append("itemId", itemId);
+   fd.append("photoIndex", String(photoStudioIndex));
+   fd.append("nodes", nodesJson);
+   if (state.currentSection?.id) fd.append("sectionId", state.currentSection.id);
+   fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
+   coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+  }
   setPhotoStudioOpen(false);
  }}
  onClose={() => setPhotoStudioOpen(false)}
