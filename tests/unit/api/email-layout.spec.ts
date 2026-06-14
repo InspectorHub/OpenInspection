@@ -46,3 +46,28 @@ describe('EmailLayout', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 });
+
+const sigBrand = { name: 'Acme', logoUrl: null, primaryColor: '#000' };
+const SIG = '<div id="sig">signature</div>';
+
+describe('EmailLayout — signature placement', () => {
+  it('auto-appends at the bottom when no token present', () => {
+    const html = EmailLayout({ brand: sigBrand, heading: 'Hi', paragraphs: ['Body text'], signatureHtml: SIG });
+    expect(html).toContain(SIG);
+    expect(html.indexOf(SIG)).toBeGreaterThan(html.indexOf('Body text'));
+  });
+  it('injects at the token position (own paragraph) and does NOT also bottom-append', () => {
+    const html = EmailLayout({ brand: sigBrand, heading: 'Hi', paragraphs: ['Intro', '{{signature}}', 'Outro'], signatureHtml: SIG });
+    expect(html.split(SIG).length - 1).toBe(1);
+    expect(html.indexOf(SIG)).toBeLessThan(html.indexOf('Outro'));
+    expect(html).not.toContain('{{signature}}');
+  });
+  it('renders the token paragraph raw (no <p> wrapper around the signature div)', () => {
+    const html = EmailLayout({ brand: sigBrand, heading: 'Hi', paragraphs: ['{{signature}}'], signatureHtml: SIG });
+    expect(html).not.toMatch(/<p[^>]*>\s*<div id="sig"/);
+  });
+  it('leaves the literal token when no signatureHtml is provided', () => {
+    const html = EmailLayout({ brand: sigBrand, heading: 'Hi', paragraphs: ['{{signature}}'] });
+    expect(html).toContain('{{signature}}');
+  });
+});

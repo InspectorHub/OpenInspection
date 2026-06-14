@@ -22,8 +22,20 @@ export function EmailLayout(input: LayoutInput): string {
     ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="32" style="height:32px;display:block;" />`
     : `<span style="font-size:18px;font-weight:700;color:${accent};">${escapeHtml(brand.name)}</span>`;
 
+  const SIG_TOKEN = /\{\{\s*signature\s*\}\}/;
+  let signaturePlaced = false;
   const paras = paragraphs
-    .map(p => `<p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#334155;">${p}</p>`)
+    .map(p => {
+      if (signatureHtml && SIG_TOKEN.test(p)) {
+        signaturePlaced = true;
+        if (p.replace(SIG_TOKEN, '').trim() === '') {
+          return signatureHtml; // token on its own line → raw, no <p> wrapper
+        }
+        const stripped = p.replace(SIG_TOKEN, '').trim();
+        return `<p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#334155;">${stripped}</p>\n${signatureHtml}`;
+      }
+      return `<p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#334155;">${p}</p>`;
+    })
     .join('\n');
 
   const ctaHtml = cta
@@ -45,7 +57,7 @@ export function EmailLayout(input: LayoutInput): string {
           ${ctaHtml}
           ${systemHtml ?? ''}
         </td></tr>
-        ${signatureHtml ? `<tr><td style="padding:0 32px 16px 32px;">${signatureHtml}</td></tr>` : ''}
+        ${(signatureHtml && !signaturePlaced) ? `<tr><td style="padding:0 32px 16px 32px;">${signatureHtml}</td></tr>` : ''}
       </table>
       <p style="margin:16px 0 0 0;font-size:11px;color:#94a3b8;">Sent by ${escapeHtml(brand.name)}</p>
     </td></tr>
