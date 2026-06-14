@@ -20,7 +20,7 @@ interface CommConfig {
   resendConfigured: boolean;
   emailMode: "platform" | "own";
   senderDisplayName: string | null;
-  useInspectorFromName: boolean;
+  pointOfContact: "inspector" | "company";
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -61,7 +61,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       resendConfigured: Boolean(d?.resendConfigured),
       emailMode: (d?.emailMode as "platform" | "own") || "platform",
       senderDisplayName: (d?.senderDisplayName as string) || null,
-      useInspectorFromName: Boolean(d?.useInspectorFromName),
+      pointOfContact: ((d?.pointOfContact as string) === "inspector" ? "inspector" : "company") as "inspector" | "company",
     } as CommConfig,
     emailTemplates,
     icsUrl: (d?.icsUrl as string) || null,
@@ -90,14 +90,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (submission.status !== "success") {
       return submission.reply();
     }
-    const { senderEmail, replyTo, emailMode, senderDisplayName, useInspectorFromName } = submission.value;
+    const { senderEmail, replyTo, emailMode, senderDisplayName, pointOfContact } = submission.value;
     const res = await api.admin.communication.$patch({
       json: {
         senderEmail: senderEmail || null,
         replyTo: replyTo || null,
         emailMode,
         senderDisplayName: senderDisplayName || null,
-        useInspectorFromName,
+        pointOfContact,
       },
     });
     if (!res.ok) {
@@ -411,14 +411,19 @@ export default function SettingsCommunication() {
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-[13px] text-ih-fg-2">
-            <input
-              type="checkbox" name={emailFields.useInspectorFromName.name}
-              defaultChecked={config.useInspectorFromName}
-              className="h-4 w-4 rounded border-ih-border"
-            />
-            Use the sending inspector&rsquo;s name as the display name (replies go to that inspector)
-          </label>
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Point of contact</p>
+            {(["company", "inspector"] as const).map((poc) => (
+              <label key={poc} className="flex items-center gap-2 text-[13px] text-ih-fg-2 cursor-pointer">
+                <input
+                  type="radio" name={emailFields.pointOfContact.name} value={poc}
+                  defaultChecked={config.pointOfContact === poc}
+                  className="h-4 w-4 border-ih-border"
+                />
+                {poc === "company" ? "Company (reply-to address required)" : "Sending inspector (replies go to that inspector)"}
+              </label>
+            ))}
+          </div>
 
           {emailForm.errors && (
             <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">

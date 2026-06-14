@@ -1270,7 +1270,7 @@ const CommunicationResponseSchema = z.object({
     replyTo:                 z.string().nullable().describe('Reply-To: header for tenant transactional email.'),
     emailMode:               z.enum(['platform', 'own']).describe('platform = shared Resend; own = tenant Resend.'),
     senderDisplayName:       z.string().nullable().describe('From: display name.'),
-    useInspectorFromName:    z.boolean().describe("Use the sending inspector's name as the From display name."),
+    pointOfContact:          z.enum(['inspector', 'company']).describe('Who client-facing emails come from.'),
     resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
     templates:               z.array(z.object({
         id:      z.string().describe('Template id.'),
@@ -1286,8 +1286,19 @@ const CommunicationPatchSchema = z.object({
     replyTo:              z.string().nullable().describe('Reply-To: address, or null to clear.'),
     emailMode:            z.enum(['platform', 'own']),
     senderDisplayName:    z.string().nullable(),
-    useInspectorFromName: z.boolean(),
+    pointOfContact:       z.enum(['inspector', 'company']),
 }).openapi('CommunicationPatch');
+
+/** Shared (testable) rule: reply-to is mandatory when emails come from the company,
+ *  otherwise replies would fall back to a possibly-unmonitored From address. */
+export function validateCommunicationPatch(
+  body: { pointOfContact: 'inspector' | 'company'; replyTo: string | null },
+): { ok: true } | { ok: false; error: string } {
+  if (body.pointOfContact === 'company' && !(body.replyTo ?? '').trim()) {
+    return { ok: false, error: 'Reply-to is required when the Point of Contact is your company.' };
+  }
+  return { ok: true };
+}
 
 const getCommunicationRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -2698,7 +2709,7 @@ export const adminRoutes = createApiRouter()
                 replyTo: (cfg.replyTo as string | null) ?? null,
                 emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
                 senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
-                useInspectorFromName: Boolean(cfg.useInspectorFromName),
+                pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
                 resendConfigured,
                 templates: [],
                 icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
@@ -2709,12 +2720,14 @@ export const adminRoutes = createApiRouter()
     .openapi(patchCommunicationRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
+        const check = validateCommunicationPatch({ pointOfContact: body.pointOfContact, replyTo: body.replyTo });
+        if (!check.ok) throw Errors.BadRequest(check.error);
         await c.var.services.branding.updateBranding(tenantId, {
             senderEmail: body.senderEmail,
             replyTo: body.replyTo,
             emailMode: body.emailMode,
             senderDisplayName: body.senderDisplayName,
-            useInspectorFromName: body.useInspectorFromName,
+            pointOfContact: body.pointOfContact,
         });
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });

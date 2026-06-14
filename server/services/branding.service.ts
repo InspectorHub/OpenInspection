@@ -54,7 +54,7 @@ export class BrandingService {
                 senderEmail: tenantConfigs.senderEmail,
                 replyTo: tenantConfigs.replyTo,
                 senderDisplayName: tenantConfigs.senderDisplayName,
-                useInspectorFromName: tenantConfigs.useInspectorFromName,
+                pointOfContact: tenantConfigs.pointOfContact,
                 siteName: tenantConfigs.siteName,
             })
             .from(tenantConfigs)
@@ -65,7 +65,7 @@ export class BrandingService {
             senderEmail: row?.senderEmail ?? null,
             replyTo: row?.replyTo ?? null,
             senderDisplayName: row?.senderDisplayName ?? null,
-            useInspectorFromName: row?.useInspectorFromName ?? false,
+            pointOfContact: row?.pointOfContact ?? 'company',
             siteName: row?.siteName ?? null,
         };
     }

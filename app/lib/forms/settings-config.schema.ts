@@ -52,7 +52,7 @@ export const communicationEmailSchema = z.object({
     .optional(),
   emailMode: z.enum(["platform", "own"]).default("platform"),
   senderDisplayName: z.string().trim().max(120).optional(),
-  useInspectorFromName: z.preprocess((v) => v === "on" || v === true, z.boolean()).default(false),
+  pointOfContact: z.enum(["inspector", "company"]).default("company"),
 });
 
 export type CommunicationEmailInput = z.infer<typeof communicationEmailSchema>;
