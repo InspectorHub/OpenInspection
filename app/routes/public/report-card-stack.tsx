@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useParams } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
@@ -193,10 +193,42 @@ function isDefect(bucket: string): boolean {
 
 export default function ReportCardStackPage() {
  const data = useLoaderData<typeof loader>() as LoaderResult;
+ const params = useParams();
  const [filter, setFilter] = useState<FilterKey>(data.initialFilter ?? "all");
  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
  const [repairPanel, setRepairPanel] = useState(false);
  const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
+ const [generating, setGenerating] = useState(false);
+
+ const tenant = params.tenant ?? "";
+ const id = params.id ?? data.inspectionId;
+
+ const downloadPdf = async () => {
+   if (generating) return;
+   setGenerating(true);
+   try {
+     const searchParams = new URLSearchParams(window.location.search);
+     const token = searchParams.get("token");
+     const url = token
+       ? `/api/public/report/${tenant}/${id}/pdf?type=full&token=${encodeURIComponent(token)}`
+       : `/api/inspections/${id}/pdf?type=full`;
+     const res = await fetch(url, { credentials: "same-origin" });
+     if (!res.ok) throw new Error(`Download failed (${res.status})`);
+     const blob = await res.blob();
+     const objUrl = URL.createObjectURL(blob);
+     const a = document.createElement("a");
+     a.href = objUrl;
+     a.download = `report-${id}.pdf`;
+     document.body.appendChild(a);
+     a.click();
+     a.remove();
+     URL.revokeObjectURL(objUrl);
+   } catch (err) {
+     console.error(err);
+   } finally {
+     setGenerating(false);
+   }
+ };
 
  if (data.error) {
  const notFound = data.error === "Report not found";
@@ -235,13 +267,14 @@ export default function ReportCardStackPage() {
  {/* Download PDF FAB */}
  <button
  type="button"
- onClick={() => window.print()}
- className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2"
+ onClick={downloadPdf}
+ disabled={generating}
+ className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
  >
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
  </svg>
- Download PDF
+ {generating ? "Generating…" : "Download PDF"}
  </button>
 
  {/* Header */}
@@ -291,7 +324,7 @@ export default function ReportCardStackPage() {
  onClick={() => window.print()}
  className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
  >
- PDF
+ Print
  </button>
  <button
  type="button"
