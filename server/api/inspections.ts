@@ -92,7 +92,9 @@ async function resolveSignatureInspector(
             signatureEnabled: users.signatureEnabled,
         }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
         if (!row) return undefined;
-        const tenantSlug = c.get('requestedTenantSlug') ?? null;
+        // saas-aware: requestedTenantSlug is empty in saas, so the "Book again"
+        // link would otherwise drop. Resolve via the shared helper (DB fallback).
+        const tenantSlug = (await resolveTenantSlug(c, tenantId)) || null;
         return { ...row, tenantSlug };
     } catch (err) {
         logger.error('[email-signature] inspector lookup failed', { inspectorId }, err instanceof Error ? err : undefined);
@@ -2784,7 +2786,8 @@ export const inspectionsRoutes = createApiRouter()
         });
 
         // Build the public sign URL exactly like the admin send path.
-        const slug = c.get('requestedTenantSlug') ?? '';
+        // Use the saas-aware resolver (requestedTenantSlug is empty in saas → DB fallback).
+        const slug = await resolveTenantSlug(c, tenantId);
         const signUrl = agreementSignUrl(getBookingHost(c), slug, request.token);
 
         // Sign the email with the assigned inspector's rebooking footer (B-4a).
