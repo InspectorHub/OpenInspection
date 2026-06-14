@@ -360,7 +360,7 @@ export default function ReportCardStackPage() {
  {data.coverPhotoUrl && (
  <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
  <img
- src={data.coverPhotoUrl}
+ src={`${data.coverPhotoUrl}&w=1600`}
  alt={`Cover photo — ${data.address}`}
  className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
  loading={data.printMode ? "eager" : "lazy"}
@@ -534,7 +534,7 @@ export default function ReportCardStackPage() {
  return (
  <img
  key={photo.key}
- src={photo.url}
+ src={`${photo.url}&w=1000`}
  alt={name}
  title={name}
  className="w-full h-20 object-cover rounded cursor-pointer"
@@ -591,7 +591,7 @@ export default function ReportCardStackPage() {
  return (
  <div key={photo.key} className="group relative">
  <img
- src={photo.url}
+ src={`${photo.url}&w=1000`}
  alt={name}
  title={name}
  className="w-full h-32 object-cover rounded cursor-pointer"

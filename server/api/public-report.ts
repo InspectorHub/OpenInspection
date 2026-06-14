@@ -147,6 +147,7 @@ const reportPhotoRoute = createRoute(withMcpMetadata({
             token: z.string().optional().describe('Persistent portal access token.'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
             render: z.string().optional().describe('Server-minted render token (headless PDF only).'),
+            w: z.string().optional().describe('Optional max width in px for an on-the-fly WebP thumbnail; omitted serves the original.'),
         }),
     },
     responses: {
@@ -546,7 +547,7 @@ export const publicReportRoutes = createApiRouter()
     })
     .openapi(reportPhotoRoute, async (c) => {
         const { id } = c.req.valid('param');
-        const { key, token, download, render } = c.req.valid('query');
+        const { key, token, download, render, w } = c.req.valid('query');
         let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
         if (!tenantId && token) {
             const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
@@ -572,6 +573,29 @@ export const publicReportRoutes = createApiRouter()
         if (!key.startsWith(`${tenantId}/${id}/`)) return c.notFound();
         const obj = await c.env.PHOTOS.get(key);
         if (!obj) return c.notFound();
+        const width = w ? Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000) : 0;
+        const images = (c.env as unknown as { IMAGES?: {
+            input(s: ReadableStream): { transform(o: { width: number }): { output(o: { format: string }): Promise<{ response(): Response }> } };
+        } }).IMAGES;
+        if (width > 0 && images && obj.body) {
+            try {
+                const out = await images.input(obj.body).transform({ width }).output({ format: 'image/webp' });
+                const r = out.response();
+                const h = new Headers(r.headers);
+                h.set('Cache-Control', 'private, max-age=300');
+                return new Response(r.body, { status: 200, headers: h });
+            } catch (err) {
+                logger.warn('[photo] thumbnail transform failed — serving original', { key, width, error: String(err) });
+                const orig = await c.env.PHOTOS.get(key);
+                if (orig) {
+                    const hh = new Headers();
+                    hh.set('Content-Type', orig.httpMetadata?.contentType || 'application/octet-stream');
+                    hh.set('Cache-Control', 'private, max-age=300');
+                    return new Response(orig.body, { status: 200, headers: hh });
+                }
+                return c.notFound();
+            }
+        }
         const headers = new Headers();
         headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
         headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download === '1'));
