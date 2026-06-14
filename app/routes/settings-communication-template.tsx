@@ -160,7 +160,13 @@ function TemplateEditor({ detail }: { detail: Detail }) {
 
           <div className="pt-3 border-t border-ih-border space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Variables — click to insert</p>
-            <VariableChips variables={detail.variables} onInsert={insert} />
+            <VariableChips
+                variables={[
+                  ...detail.variables,
+                  { name: "signature", desc: "Your email signature — set it in Settings → Profile" },
+                ]}
+                onInsert={insert}
+              />
           </div>
 
           <div className="flex justify-end pt-2">

@@ -7,7 +7,7 @@ import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { safeISODate } from '../lib/date';
-import { getBaseUrl, getBookingHost } from '../lib/url';
+import { getBaseUrl, getBookingHost, resolveTenantSlug } from '../lib/url';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { agreementSignUrl, checkoutUrl } from '../lib/public-urls';
 import { shouldUseCheckoutLink } from '../lib/agreement-link';
@@ -1269,8 +1269,9 @@ const CommunicationResponseSchema = z.object({
     senderEmail:             z.string().nullable().describe('From: address for tenant transactional email.'),
     replyTo:                 z.string().nullable().describe('Reply-To: header for tenant transactional email.'),
     emailMode:               z.enum(['platform', 'own']).describe('platform = shared Resend; own = tenant Resend.'),
-    senderDisplayName:       z.string().nullable().describe('From: display name.'),
-    useInspectorFromName:    z.boolean().describe("Use the sending inspector's name as the From display name."),
+    senderDisplayName:       z.string().nullable().describe('From: display name (override; falls back to siteName).'),
+    siteName:                z.string().nullable().describe('Canonical company name (from workspace branding).'),
+    pointOfContact:          z.enum(['inspector', 'company']).describe('Who client-facing emails come from.'),
     resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
     templates:               z.array(z.object({
         id:      z.string().describe('Template id.'),
@@ -1286,8 +1287,19 @@ const CommunicationPatchSchema = z.object({
     replyTo:              z.string().nullable().describe('Reply-To: address, or null to clear.'),
     emailMode:            z.enum(['platform', 'own']),
     senderDisplayName:    z.string().nullable(),
-    useInspectorFromName: z.boolean(),
+    pointOfContact:       z.enum(['inspector', 'company']),
 }).openapi('CommunicationPatch');
+
+/** Shared (testable) rule: reply-to is mandatory when emails come from the company,
+ *  otherwise replies would fall back to a possibly-unmonitored From address. */
+export function validateCommunicationPatch(
+  body: { pointOfContact: 'inspector' | 'company'; replyTo: string | null },
+): { ok: true } | { ok: false; error: string } {
+  if (body.pointOfContact === 'company' && !(body.replyTo ?? '').trim()) {
+    return { ok: false, error: 'Reply-to is required when the Point of Contact is your company.' };
+  }
+  return { ok: true };
+}
 
 const getCommunicationRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -1322,7 +1334,7 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
 
 // --- Track I-a Task 9 — agreement send helpers (module scope) -------------
 
-type SenderSignature = { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null };
+type SenderSignature = { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; signatureEnabled: boolean | null };
 
 /**
  * Look up the current admin/inspector's signature block so the recipient can
@@ -1334,10 +1346,11 @@ async function lookupSenderSignature(c: Context<HonoConfig>, tenantId: string): 
     if (!senderId) return undefined;
     try {
         const row = await drizzle(c.env.DB).select({
-            name:          schema.users.name,
-            email:         schema.users.email,
-            phone:         schema.users.phone,
-            licenseNumber: schema.users.licenseNumber,
+            name:             schema.users.name,
+            email:            schema.users.email,
+            phone:            schema.users.phone,
+            licenseNumber:    schema.users.licenseNumber,
+            signatureEnabled: schema.users.signatureEnabled,
         }).from(schema.users)
             .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
             .get();
@@ -1592,7 +1605,7 @@ export const adminRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
         const svc = c.var.services.agreement;
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
 
         // Track I-a Task 9 — multi-signer envelope path. When `signers` is
         // provided AND the request is bound to an inspection, route through
@@ -1732,14 +1745,15 @@ export const adminRoutes = createApiRouter()
         // Sprint B-4a — append the sender (current admin/inspector) signature so
         // the client can rebook with this user via the embedded booking link.
         const senderId = c.get('user')?.sub;
-        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
+        let sigInspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; signatureEnabled: boolean | null } | undefined;
         if (senderId) {
             try {
                 const row = await drizzle(c.env.DB).select({
-                    name:          schema.users.name,
-                    email:         schema.users.email,
-                    phone:         schema.users.phone,
-                    licenseNumber: schema.users.licenseNumber,
+                    name:             schema.users.name,
+                    email:            schema.users.email,
+                    phone:            schema.users.phone,
+                    licenseNumber:    schema.users.licenseNumber,
+                    signatureEnabled: schema.users.signatureEnabled,
                 }).from(schema.users)
                     .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
                     .get();
@@ -1948,7 +1962,7 @@ export const adminRoutes = createApiRouter()
             ))
             .get();
         if (!signer) throw Errors.NotFound('Signer not found');
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const token = await svc.getSignerLink(requestId, signerId);
         const url = await buildSignUrl(c, tenantId, signer.inspectionId, tenantSlug, token);
         return c.json({ success: true as const, data: { url } }, 200);
@@ -1986,7 +2000,7 @@ export const adminRoutes = createApiRouter()
             throw Errors.RateLimited('This signer was reminded within the last hour.');
         }
 
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const token = await svc.getSignerLink(requestId, signerId);
         const signUrl = await buildSignUrl(c, tenantId, row.inspectionId, tenantSlug, token);
         const sigInspector = await lookupSenderSignature(c, tenantId);
@@ -2698,7 +2712,8 @@ export const adminRoutes = createApiRouter()
                 replyTo: (cfg.replyTo as string | null) ?? null,
                 emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
                 senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
-                useInspectorFromName: Boolean(cfg.useInspectorFromName),
+                siteName: (cfg.siteName as string | null) ?? null,
+                pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
                 resendConfigured,
                 templates: [],
                 icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
@@ -2709,12 +2724,14 @@ export const adminRoutes = createApiRouter()
     .openapi(patchCommunicationRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
+        const check = validateCommunicationPatch({ pointOfContact: body.pointOfContact, replyTo: body.replyTo });
+        if (!check.ok) throw Errors.BadRequest(check.error);
         await c.var.services.branding.updateBranding(tenantId, {
             senderEmail: body.senderEmail,
             replyTo: body.replyTo,
             emailMode: body.emailMode,
             senderDisplayName: body.senderDisplayName,
-            useInspectorFromName: body.useInspectorFromName,
+            pointOfContact: body.pointOfContact,
         });
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });

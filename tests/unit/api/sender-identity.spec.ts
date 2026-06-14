@@ -1,57 +1,43 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSenderIdentity } from '../../../server/lib/email/sender-identity';
+import { resolveSenderIdentity, type EmailIdentityConfig } from '../../../server/lib/email/sender-identity';
 
-const base = {
-  mode: 'platform' as const,
+const base: EmailIdentityConfig = {
+  mode: 'platform',
   senderEmail: null,
   replyTo: null,
   senderDisplayName: 'Acme Inspections',
-  useInspectorFromName: false,
-  siteName: 'Acme',
+  pointOfContact: 'company',
+  siteName: 'Acme Site',
 };
 
-describe('resolveSenderIdentity', () => {
-  it('uses the configured display name and reply-to when the toggle is off', () => {
-    const r = resolveSenderIdentity({ ...base, replyTo: 'hi@acme.com' });
+describe('resolveSenderIdentity — Point of Contact', () => {
+  it('company: uses display name, never the inspector name', () => {
+    const r = resolveSenderIdentity({ ...base, pointOfContact: 'company' }, { name: 'John Doe', email: 'john@gmail.com' });
     expect(r.fromName).toBe('Acme Inspections');
-    expect(r.replyTo).toBe('hi@acme.com');
   });
-
-  it('falls back to siteName when no display name is set', () => {
-    const r = resolveSenderIdentity({ ...base, senderDisplayName: null });
-    expect(r.fromName).toBe('Acme');
+  it('company: falls back to siteName when display name blank', () => {
+    const r = resolveSenderIdentity({ ...base, pointOfContact: 'company', senderDisplayName: null }, { name: 'John Doe' });
+    expect(r.fromName).toBe('Acme Site');
   });
-
-  it('uses the inspector name + email when the toggle is on and an inspector is present', () => {
-    const r = resolveSenderIdentity(
-      { ...base, useInspectorFromName: true },
-      { name: 'Jane Doe', email: 'jane@acme.com' },
-    );
-    expect(r.fromName).toBe('Jane Doe');
-    expect(r.replyTo).toBe('jane@acme.com');
+  it('company: reply-to is the configured reply-to, never the inspector email', () => {
+    const r = resolveSenderIdentity({ ...base, pointOfContact: 'company', replyTo: 'office@acme.com' }, { name: 'John', email: 'john@gmail.com' });
+    expect(r.replyTo).toBe('office@acme.com');
   });
-
-  it('explicit replyTo wins over the inspector email even with the toggle on', () => {
-    const r = resolveSenderIdentity(
-      { ...base, useInspectorFromName: true, replyTo: 'team@acme.com' },
-      { name: 'Jane Doe', email: 'jane@acme.com' },
-    );
-    expect(r.replyTo).toBe('team@acme.com');
-    expect(r.fromName).toBe('Jane Doe');
-  });
-
-  it('returns undefined fromName/replyTo when nothing is configured', () => {
-    const r = resolveSenderIdentity({ ...base, senderDisplayName: null, siteName: null });
-    expect(r.fromName).toBeUndefined();
+  it('company: no reply-to when none configured (omitted)', () => {
+    const r = resolveSenderIdentity({ ...base, pointOfContact: 'company', replyTo: null }, { name: 'John', email: 'john@gmail.com' });
     expect(r.replyTo).toBeUndefined();
   });
-
-  it('ignores a blank inspector name with the toggle on', () => {
-    const r = resolveSenderIdentity(
-      { ...base, useInspectorFromName: true },
-      { name: '  ', email: null },
-    );
+  it('inspector: uses inspector name and inspector email as reply-to', () => {
+    const r = resolveSenderIdentity({ ...base, pointOfContact: 'inspector' }, { name: 'John Doe', email: 'john@gmail.com' });
+    expect(r.fromName).toBe('John Doe');
+    expect(r.replyTo).toBe('john@gmail.com');
+  });
+  it('inspector: configured reply-to wins over inspector email', () => {
+    const r = resolveSenderIdentity({ ...base, pointOfContact: 'inspector', replyTo: 'office@acme.com' }, { name: 'John', email: 'john@gmail.com' });
+    expect(r.replyTo).toBe('office@acme.com');
+  });
+  it('inspector: falls back to display name when no sending inspector', () => {
+    const r = resolveSenderIdentity({ ...base, pointOfContact: 'inspector' }, undefined);
     expect(r.fromName).toBe('Acme Inspections');
-    expect(r.replyTo).toBeUndefined();
   });
 });

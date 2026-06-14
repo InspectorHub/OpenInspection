@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useParams } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
@@ -66,6 +66,8 @@ interface ReportSection {
  alwaysPageBreak?: boolean;
 }
 
+type FilterKey = "all" | "defects" | "summary";
+
 interface LoaderResult {
  inspectionId: string;
  address: string;
@@ -82,6 +84,8 @@ interface LoaderResult {
  brand: TenantBrand;
  error: string | null;
  reportTheme?: string;
+ initialFilter: FilterKey;
+ printMode: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +93,12 @@ interface LoaderResult {
 /* ------------------------------------------------------------------ */
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
+ const initialFilter: FilterKey =
+   new URL(request.url).searchParams.get("summary") === "1" ? "summary" : "all";
+ // Headless PDF renders carry ?print=1 (appended by generatePdfFromUrl). In that
+ // mode load images eagerly: Browser Rendering never scrolls, so loading={data.printMode ? "eager" : "lazy"}
+ // images below the fold would never load and the PDF would have blank photos.
+ const printMode = new URL(request.url).searchParams.get("print") === "1";
  try {
  // Relay the owner's session JWT when present so the inspector/admin can
  // preview their own report tokenlessly (resolveOwnerPreview server-side).
@@ -96,10 +106,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  const sessionToken = (await getToken(context, request)) ?? undefined;
  const api = createApi(context, { token: sessionToken });
  const token = new URL(request.url).searchParams.get("token") ?? undefined;
+ // Forward the server-minted render token (headless PDF generation). The
+ // Browser Rendering browser loads /report-view/:tenant/:id?render=<token>;
+ // the data route resolves the tenant from it (see public-report.ts). Without
+ // forwarding it here the headless render gets "Report not found".
+ const render = new URL(request.url).searchParams.get("render") ?? undefined;
  const [res, brand] = await Promise.all([
  api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
- query: { token },
+ query: { token, render },
  }),
  resolveTenantBrand(context, params.tenant),
  ]);
@@ -128,6 +143,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  brand,
  error: res.ok ? null : "Report not found",
  reportTheme: ((d as unknown as Record<string, unknown>)?.reportTheme as string | undefined) ?? meta?.theme,
+ initialFilter,
+ printMode,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -145,6 +162,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  brand: EMPTY_BRAND,
  coverPhotoUrl: null,
  error: "Service unavailable",
+ initialFilter,
+ printMode,
  } satisfies LoaderResult;
  }
 }
@@ -176,8 +195,6 @@ function getSectionIcon(title: string): string {
 /* Filter types */
 /* ------------------------------------------------------------------ */
 
-type FilterKey = "all" | "defects" | "summary";
-
 function isDefect(bucket: string): boolean {
  return /defect|safety|major/i.test(bucket);
 }
@@ -188,10 +205,62 @@ function isDefect(bucket: string): boolean {
 
 export default function ReportCardStackPage() {
  const data = useLoaderData<typeof loader>() as LoaderResult;
- const [filter, setFilter] = useState<FilterKey>("all");
+ const params = useParams();
+ const [filter, setFilter] = useState<FilterKey>(data.initialFilter ?? "all");
  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
  const [repairPanel, setRepairPanel] = useState(false);
  const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
+ const [generating, setGenerating] = useState(false);
+
+ const tenant = params.tenant ?? "";
+ const id = params.id ?? data.inspectionId;
+
+ // Dynamic rating summary — derived from THIS inspection's own rating system
+ // (Spectora-style) instead of fixed Satisfactory/Monitor/Defects buckets.
+ // Tally items by their rating level and render one card per level present,
+ // using the level's own label + color, ordered good→bad by severity bucket.
+ const BUCKET_RANK: Record<string, number> = { satisfactory: 0, monitor: 1, defect: 2, other: 3 };
+ const ratingTally = new Map<string, { label: string; color: string; bucket: string; count: number; seen: number }>();
+ let seenOrder = 0;
+ for (const it of data.sections.flatMap((s) => s.items)) {
+   if (!it.rating) continue;
+   const ex = ratingTally.get(it.rating);
+   if (ex) ex.count++;
+   else ratingTally.set(it.rating, { label: it.ratingLabel ?? it.rating, color: it.ratingColor, bucket: it.severityBucket, count: 1, seen: seenOrder++ });
+ }
+ const summaryCards: Array<{ label: string; value: number; color: string | null }> = [
+   { label: "Total", value: data.stats.total, color: null },
+   ...[...ratingTally.values()]
+     .sort((a, b) => (BUCKET_RANK[a.bucket] ?? 9) - (BUCKET_RANK[b.bucket] ?? 9) || a.seen - b.seen)
+     .map((l) => ({ label: l.label, value: l.count, color: l.color })),
+ ];
+
+ const downloadPdf = async () => {
+   if (generating) return;
+   setGenerating(true);
+   try {
+     const searchParams = new URLSearchParams(window.location.search);
+     const token = searchParams.get("token");
+     const url = token
+       ? `/api/public/report/${tenant}/${id}/pdf?type=full&token=${encodeURIComponent(token)}`
+       : `/api/inspections/${id}/pdf?type=full`;
+     const res = await fetch(url, { credentials: "same-origin" });
+     if (!res.ok) throw new Error(`Download failed (${res.status})`);
+     const blob = await res.blob();
+     const objUrl = URL.createObjectURL(blob);
+     const a = document.createElement("a");
+     a.href = objUrl;
+     a.download = `report-${id}.pdf`;
+     document.body.appendChild(a);
+     a.click();
+     a.remove();
+     URL.revokeObjectURL(objUrl);
+   } catch (err) {
+     console.error(err);
+   } finally {
+     setGenerating(false);
+   }
+ };
 
  if (data.error) {
  const notFound = data.error === "Report not found";
@@ -230,13 +299,14 @@ export default function ReportCardStackPage() {
  {/* Download PDF FAB */}
  <button
  type="button"
- onClick={() => window.print()}
- className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2"
+ onClick={downloadPdf}
+ disabled={generating}
+ className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
  >
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
  </svg>
- Download PDF
+ {generating ? "Generating…" : "Download PDF"}
  </button>
 
  {/* Header */}
@@ -286,7 +356,7 @@ export default function ReportCardStackPage() {
  onClick={() => window.print()}
  className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
  >
- PDF
+ Print
  </button>
  <button
  type="button"
@@ -310,10 +380,10 @@ export default function ReportCardStackPage() {
  {data.coverPhotoUrl && (
  <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
  <img
- src={data.coverPhotoUrl}
+ src={`${data.coverPhotoUrl}&w=1600`}
  alt={`Cover photo — ${data.address}`}
  className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
- loading="lazy"
+ loading={data.printMode ? "eager" : "lazy"}
  onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
  />
  </div>
@@ -322,14 +392,9 @@ export default function ReportCardStackPage() {
  {/* Stats */}
  <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
- {[
- { label: "Total", value: data.stats.total, color: "text-ih-fg-1" },
- { label: "Satisfactory", value: data.stats.satisfactory, color: "text-ih-ok-fg" },
- { label: "Monitor", value: data.stats.monitor, color: "text-ih-watch-fg" },
- { label: "Defects", value: data.stats.defect, color: "text-ih-bad-fg" },
- ].map((s) => (
+ {summaryCards.map((s) => (
  <div key={s.label} className="bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center">
- <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+ <div className={`text-2xl font-bold ${s.color ? "" : "text-ih-fg-1"}`} style={s.color ? { color: s.color } : undefined}>{s.value}</div>
  <div className="text-[11px] text-ih-fg-4 uppercase tracking-widest mt-1">
  {s.label}
  </div>
@@ -484,11 +549,11 @@ export default function ReportCardStackPage() {
  return (
  <img
  key={photo.key}
- src={photo.url}
+ src={`${photo.url}&w=1000`}
  alt={name}
  title={name}
  className="w-full h-20 object-cover rounded cursor-pointer"
- loading="lazy"
+ loading={data.printMode ? "eager" : "lazy"}
  onClick={() => setLightboxUrl(photo.url)}
  />
  );
@@ -541,11 +606,11 @@ export default function ReportCardStackPage() {
  return (
  <div key={photo.key} className="group relative">
  <img
- src={photo.url}
+ src={`${photo.url}&w=1000`}
  alt={name}
  title={name}
  className="w-full h-32 object-cover rounded cursor-pointer"
- loading="lazy"
+ loading={data.printMode ? "eager" : "lazy"}
  onClick={() => setLightboxUrl(photo.url)}
  />
  <a

@@ -12,6 +12,13 @@
  */
 import type { BrowserRun } from '../types/hono';
 
+/**
+ * Bump when the report render template/CSS changes so content-hashed PDFs
+ * re-render (e.g. eager images, photo resize, layout changes).
+ * Start at 'r2' since the template just changed — eager images + photo resize.
+ */
+export const RENDER_VERSION = 'r2';
+
 export async function generatePdfFromUrl(
     browser: BrowserRun | undefined,
     url: string,
@@ -24,7 +31,14 @@ export async function generatePdfFromUrl(
     // it wants to (currently the @media print stylesheet handles it).
     const renderUrl = url.includes('?') ? `${url}&print=1` : `${url}?print=1`;
 
-    const res = await browser.quickAction('pdf', { url: renderUrl });
+    // Wait for the network to go idle before capturing so full-resolution
+    // report photos finish downloading — otherwise large images race the
+    // capture and come out blank/broken in the PDF. gotoOptions is forwarded
+    // to the headless page.goto(); a generous timeout guards slow R2/IMAGES.
+    const res = await browser.quickAction('pdf', {
+        url: renderUrl,
+        gotoOptions: { waitUntil: 'networkidle0', timeout: 30000 },
+    });
     if (!res.ok) {
         const detail = await res.text().catch(() => '<no body>');
         throw new Error(`PDF rendering failed (${res.status}): ${detail.slice(0, 200)}`);

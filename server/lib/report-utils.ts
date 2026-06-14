@@ -1,7 +1,8 @@
 /**
  * Pure utility functions for inspection report statistics.
- * No external dependencies — supports both dynamic rating levels and legacy 3-level format.
+ * Supports both dynamic rating levels and legacy 3-level format.
  */
+import { findingKey, DEFAULT_UNIT } from './finding-key';
 
 export interface RatingLevel {
   id: string;
@@ -165,7 +166,11 @@ export function computeReportStats(
     let sectionDefects = 0;
     for (const item of section.items) {
       stats.total++;
-      const result = results[item.id];
+      // Ratings are stored under the composite findingKey (unit:section:item)
+      // by the editor; fall back to the bare item.id for legacy results. This
+      // MUST match getReportData's per-item resolution (inspection.service.ts)
+      // or the summary cards disagree with the rendered item buckets.
+      const result = results[findingKey(DEFAULT_UNIT, section.id, item.id)] ?? results[item.id];
       const ratingId = result?.rating ?? null;
       const bucket = getRatingBucket(ratingId, levels);
       stats[bucket]++;

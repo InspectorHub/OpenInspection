@@ -22,10 +22,15 @@ export const reportPdfs = sqliteTable('report_pdfs', {
     sizeBytes:     integer('size_bytes'),
     status:        text('status', { enum: ['queued', 'rendering', 'ready', 'failed'] }).notNull().default('ready'),
     error:         text('error'),
+    // Content-hash cache key (SHA-256 of render inputs + RENDER_VERSION salt).
+    // Null for rows rendered before this feature; populated for all new renders.
+    // Identical-content re-renders are skipped: same hash = same PDF.
+    contentHash:   text('content_hash'),
 }, (t) => ({
     uqInspectionType: uniqueIndex('uq_report_pdfs_inspection_type').on(t.inspectionId, t.type, t.versionNumber),
     idxTenant:        index('idx_report_pdfs_tenant').on(t.tenantId),
     idxStatus:        index('idx_report_pdfs_status').on(t.status),
+    idxContentHash:   index('idx_report_pdfs_content_hash').on(t.inspectionId, t.type, t.contentHash),
 }));
 
 export type ReportPdf = typeof reportPdfs.$inferSelect;

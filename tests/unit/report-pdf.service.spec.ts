@@ -129,4 +129,74 @@ describe('ReportPdfService', () => {
         const rec = await svc.getPdfRecord(INSP_1, TENANT_A, 'full');
         await expect(svc.streamPdf(rec!)).rejects.toThrow(/not ready/);
     });
+
+    describe('getOrRender (content-hash cache)', () => {
+        const REPORT_URL = 'https://example.com/report/insp-1';
+        const HASH_H1 = 'aabbcc1100000000000000000000000000000000000000000000000000000001';
+        const HASH_H2 = 'aabbcc2200000000000000000000000000000000000000000000000000000002';
+
+        it('(a) cache HIT — ready row with matching contentHash → returns it, no render', async () => {
+            // Seed a ready row with content_hash='H1'.
+            await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                sourceVersion: 100,
+                versionNumber: 1,
+                contentHash: HASH_H1,
+            });
+            vi.clearAllMocks();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+            (mockR2 as any).put = vi.fn(async () => undefined);
+
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                contentHash: HASH_H1,
+                versionNumber: 1,
+            });
+
+            expect(generatePdfFromUrl).toHaveBeenCalledTimes(0);
+            expect(rec.status).toBe('ready');
+            expect(rec.contentHash).toBe(HASH_H1);
+        });
+
+        it('(b) cache MISS — different hash → renders once, stores with new contentHash and content-addressed r2Key', async () => {
+            // Seed existing ready row with content_hash='H1'.
+            await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                sourceVersion: 100,
+                versionNumber: 1,
+                contentHash: HASH_H1,
+            });
+            vi.clearAllMocks();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+            (mockR2 as any).put = vi.fn(async () => undefined);
+
+            // Call with different hash H2 → must render.
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                contentHash: HASH_H2,
+                versionNumber: 2,
+            });
+
+            expect(generatePdfFromUrl).toHaveBeenCalledTimes(1);
+            expect(rec.status).toBe('ready');
+            expect(rec.contentHash).toBe(HASH_H2);
+            // Content-addressed R2 key must incorporate the hash.
+            expect(rec.r2Key).toContain(HASH_H2);
+            expect(rec.r2Key).toMatch(/full-.*\.pdf$/);
+        });
+
+        it('(c) cold miss — no row at all → renders once', async () => {
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL,
+                contentHash: HASH_H1,
+                versionNumber: null,
+            });
+
+            expect(generatePdfFromUrl).toHaveBeenCalledTimes(1);
+            expect(rec.status).toBe('ready');
+            expect(rec.contentHash).toBe(HASH_H1);
+        });
+    });
 });

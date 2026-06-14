@@ -4,13 +4,13 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
-import { getBookingHost } from '../lib/url';
-import { reportUrl as buildReportUrl, agreementSignUrl } from '../lib/public-urls';
+import { getBookingHost, resolveTenantSlug } from '../lib/url';
+import { reportUrl as buildReportUrl, buildRenderReportUrl, agreementSignUrl } from '../lib/public-urls';
+import { resolveArchiveVersion } from './inspections-pdf-helpers';
 import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { contentDisposition } from '../lib/content-disposition';
 import { logger } from '../lib/logger';
-import { generatePdfFromUrl } from '../lib/pdf';
 import { getCookie } from 'hono/cookie';
 import { verifyObserverCookie } from '../lib/observer-cookie';
 import { OBSERVER_COOKIE_NAME } from '../lib/middleware/observer-cookie';
@@ -84,14 +84,17 @@ async function resolveSignatureInspector(
     try {
         const db = drizzle(c.env.DB);
         const row = await db.select({
-            name:            users.name,
-            email:           users.email,
-            phone:           users.phone,
-            licenseNumber:   users.licenseNumber,
-            slug:            users.slug,
+            name:             users.name,
+            email:            users.email,
+            phone:            users.phone,
+            licenseNumber:    users.licenseNumber,
+            slug:             users.slug,
+            signatureEnabled: users.signatureEnabled,
         }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
         if (!row) return undefined;
-        const tenantSlug = c.get('requestedTenantSlug') ?? null;
+        // saas-aware: requestedTenantSlug is empty in saas, so the "Book again"
+        // link would otherwise drop. Resolve via the shared helper (DB fallback).
+        const tenantSlug = (await resolveTenantSlug(c, tenantId)) || null;
         return { ...row, tenantSlug };
     } catch (err) {
         logger.error('[email-signature] inspector lookup failed', { inspectorId }, err instanceof Error ? err : undefined);
@@ -2541,8 +2544,14 @@ export const inspectionsRoutes = createApiRouter()
         await db.update(inspectionTable).set({ status: 'completed' }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         if (inspection.clientEmail) {
-            const tenantSlug = c.get('requestedTenantSlug') ?? '';
-            const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
+            const tenantSlug = await resolveTenantSlug(c, tenantId);
+            // linkUrl: per-recipient TOKENIZED report link so the no-login client
+            // can open it (a plain URL 404s "Report not found"). Idempotent per
+            // (inspection, recipient) — re-sends keep the same stable link.
+            const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: inspection.clientEmail, role: 'client' });
+            const linkUrl = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?token=${encodeURIComponent(reportToken)}`;
+            // renderUrl: token-bearing URL for the headless browser PDF render.
+            const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
             const clientEmail = inspection.clientEmail;
             const address = inspection.propertyAddress as string;
 
@@ -2554,14 +2563,23 @@ export const inspectionsRoutes = createApiRouter()
             // Best-effort PDF: if BROWSER binding is missing or rendering fails,
             // fall back to the existing text-only "Report Ready" email so we
             // never block inspection completion on an optional dependency.
+            // Route through the PDF cache — if the publish flow already rendered
+            // this content, getOrRender returns the cached record at zero Browser
+            // Rendering cost.
             const deliver = async () => {
                 try {
-                    const pdf = await generatePdfFromUrl(c.env.BROWSER, reportUrl);
-                    await c.var.services.email.sendInspectionReportPdf(clientEmail, address, reportUrl, pdf, sigInspector, sigHost);
+                    const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+                    const versions = await c.var.services.reportVersion.list(tenantId, id);
+                    const versionNumber = resolveArchiveVersion(inspection.status, versions);
+                    const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
+                    const obj = await c.var.services.reportPdf.streamPdf(record);
+                    if (!obj) throw new Error('PDF unavailable');
+                    const pdf = await obj.arrayBuffer();
+                    await c.var.services.email.sendInspectionReportPdf(clientEmail, address, linkUrl, pdf, sigInspector, sigHost);
                 } catch (err) {
                     logger.error('[complete] PDF generation failed, falling back to text-only email',
                         { inspectionId: id }, err instanceof Error ? err : undefined);
-                    await c.var.services.email.sendReportReady(clientEmail, address, reportUrl, sigInspector, sigHost);
+                    await c.var.services.email.sendReportReady(clientEmail, address, linkUrl, sigInspector, sigHost);
                 }
             };
             c.executionCtx.waitUntil(deliver());
@@ -2596,8 +2614,15 @@ export const inspectionsRoutes = createApiRouter()
             throw Errors.BadRequest('No recipient email — set inspection.clientEmail or pass toEmail.');
         }
 
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
-        const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
+        // linkUrl: per-recipient TOKENIZED report link. The report viewer is
+        // gated (token / session / owner-preview); a plain URL 404s "Report not
+        // found" for a no-login recipient. issueToken is idempotent per
+        // (inspection, recipient), so re-sends reuse the same stable link.
+        const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: recipient, role: 'client' });
+        const linkUrl = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?token=${encodeURIComponent(reportToken)}`;
+        // renderUrl: token-bearing URL for the headless browser PDF render.
+        const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const address = inspection.propertyAddress as string;
 
         // Sprint B-4a — append rebooking signature for the assigned inspector.
@@ -2605,13 +2630,21 @@ export const inspectionsRoutes = createApiRouter()
         const sigHost = getBookingHost(c);
 
         try {
-            const pdf = await generatePdfFromUrl(c.env.BROWSER, reportUrl);
-            await c.var.services.email.sendInspectionReportPdf(recipient, address, reportUrl, pdf, sigInspector, sigHost);
+            // Route through the PDF cache — reuses an existing render when content
+            // is unchanged, avoiding a redundant Browser Rendering call.
+            const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+            const versions = await c.var.services.reportVersion.list(tenantId, id);
+            const versionNumber = resolveArchiveVersion(inspection.status, versions);
+            const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
+            const obj = await c.var.services.reportPdf.streamPdf(record);
+            if (!obj) throw new Error('PDF unavailable');
+            const pdf = await obj.arrayBuffer();
+            await c.var.services.email.sendInspectionReportPdf(recipient, address, linkUrl, pdf, sigInspector, sigHost);
             auditFromContext(c, 'inspection.send_pdf', 'inspection', { entityId: id, metadata: { recipient } });
             return c.json({ success: true as const, data: { sentTo: recipient } }, 200);
         } catch (err) {
             logger.error('[send-report-pdf] PDF failed, sending text-only', { inspectionId: id }, err instanceof Error ? err : undefined);
-            await c.var.services.email.sendReportReady(recipient, address, reportUrl, sigInspector, sigHost);
+            await c.var.services.email.sendReportReady(recipient, address, linkUrl, sigInspector, sigHost);
             auditFromContext(c, 'inspection.send_text_fallback', 'inspection', { entityId: id, metadata: { recipient } });
             // 200 because the user got AN email, just not a PDF — log + audit captures the degradation
             return c.json({ success: true as const, data: { sentTo: recipient } }, 200);
@@ -2753,7 +2786,8 @@ export const inspectionsRoutes = createApiRouter()
         });
 
         // Build the public sign URL exactly like the admin send path.
-        const slug = c.get('requestedTenantSlug') ?? '';
+        // Use the saas-aware resolver (requestedTenantSlug is empty in saas → DB fallback).
+        const slug = await resolveTenantSlug(c, tenantId);
         const signUrl = agreementSignUrl(getBookingHost(c), slug, request.token);
 
         // Sign the email with the assigned inspector's rebooking footer (B-4a).
@@ -2841,9 +2875,13 @@ export const inspectionsRoutes = createApiRouter()
         // remains the universal fallback.
         const reportPdf = c.var.services.reportPdf;
         if (await reportPdf.isPipelineEnabled(tenantId)) {
-            const tenantSlug = c.get('requestedTenantSlug') ?? '';
-            const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
+            const tenantSlug = await resolveTenantSlug(c, tenantId);
+            // renderUrl: token-bearing URL for the headless browser PDF render.
+            const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
             const sourceVersion = Date.now();
+            // Content hash enables post-publish owner/client downloads to reuse this
+            // render instead of triggering a second Browser Rendering call.
+            const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
             const renderBoth = async () => {
                 try {
                     await Promise.all([
@@ -2851,8 +2889,8 @@ export const inspectionsRoutes = createApiRouter()
                         reportPdf.markQueued(id, tenantId, 'full', publishedVersion),
                     ]);
                     await Promise.allSettled([
-                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion, versionNumber: publishedVersion }),
-                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion, versionNumber: publishedVersion }),
+                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash }),
+                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash }),
                     ]);
                 } catch (err) {
                     logger.error('[publish] PDF render enqueue failed', { inspectionId: id }, err instanceof Error ? err : undefined);
@@ -2908,8 +2946,9 @@ export const inspectionsRoutes = createApiRouter()
         if (!(await reportPdf.isPipelineEnabled(tenantId))) {
             throw Errors.Forbidden('PDF pipeline is disabled for this workspace. Enable it in Settings → Reports.');
         }
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
-        const reportUrl = buildReportUrl(getBookingHost(c), tenantSlug, id);
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
+        // renderUrl: token-bearing URL for the headless browser PDF render.
+        const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const sourceVersion = Date.now();
 
         // Refresh re-renders the CURRENT (highest) version in place rather than
@@ -2920,6 +2959,9 @@ export const inspectionsRoutes = createApiRouter()
         const currentFull    = await reportPdf.getPdfRecord(id, tenantId, 'full');
         const summaryVersion = currentSummary?.versionNumber ?? null;
         const fullVersion    = currentFull?.versionNumber ?? null;
+        // Store content_hash so post-refresh downloads reuse this render (force
+        // re-render is still guaranteed — renderAndStore always calls the browser).
+        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
 
         await Promise.all([
             reportPdf.markQueued(id, tenantId, 'summary', summaryVersion),
@@ -2928,8 +2970,8 @@ export const inspectionsRoutes = createApiRouter()
         c.executionCtx.waitUntil((async () => {
             try {
                 await Promise.allSettled([
-                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl, sourceVersion, versionNumber: summaryVersion }),
-                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl, sourceVersion, versionNumber: fullVersion }),
+                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: summaryVersion, contentHash }),
+                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: fullVersion,    contentHash }),
                 ]);
             } catch (err) {
                 logger.error('[pdf/refresh] background render failed', { inspectionId: id }, err instanceof Error ? err : undefined);
@@ -2942,6 +2984,7 @@ export const inspectionsRoutes = createApiRouter()
         method: 'get', path: '/{id}/pdf',
         tags: ["inspections"],
         summary: 'Download report PDF (Summary or Full)',
+        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
         request: {
             params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
             query: z.object({ type: z.enum(['summary', 'full']).default('full').describe('TODO describe type field for the OpenInspection MCP integration') }).describe('TODO describe query field for the OpenInspection MCP integration'),
@@ -2951,13 +2994,6 @@ export const inspectionsRoutes = createApiRouter()
                 content: { 'application/pdf': { schema: z.any().describe('TODO describe schema field for the OpenInspection MCP integration') } },
                 description: 'PDF bytes',
             },
-            202: {
-                content: { 'application/json': { schema: createApiResponseSchema(z.object({
-                    status: z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
-                    error: z.string().nullable().optional().describe('TODO describe error field for the OpenInspection MCP integration'),
-                })) } },
-                description: 'PDF still rendering',
-            },
         },
         operationId: "listInspectionPdf",
         description: "Auto-generated placeholder for listInspectionPdf (GET /{id}/pdf, inspections domain). TODO: replace with a real description sourced from the handler."
@@ -2966,25 +3002,33 @@ export const inspectionsRoutes = createApiRouter()
         if (!tenantId) return c.json({ success: false, error: { message: 'Tenant required' } }, 400);
         const { id } = c.req.valid('param');
         const { type } = c.req.valid('query');
-        const reportPdf = c.var.services.reportPdf;
-        if (!(await reportPdf.isPipelineEnabled(tenantId))) {
-            // Pipeline opt-in (migration 0059) — return 404 instead of leaking
-            // the existence of any pre-migration rendered PDFs. Clients fall
-            // back to window.print() in the report viewer.
-            return c.json({ success: false, error: { message: 'PDF not found' } }, 404);
+        // On-demand render — requires CF Browser Rendering + R2 bindings.
+        // The publish-time pre-render pipeline (POST /{id}/pdf/refresh) keeps its
+        // own isPipelineEnabled gate and is not affected here.
+        if (!c.env.BROWSER || !c.env.PHOTOS) {
+            return c.json({ success: false, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
         }
-        const record = await reportPdf.getPdfRecord(id, tenantId, type);
-        if (!record) return c.json({ success: false, error: { message: 'PDF not found' } }, 404);
-        if (record.status !== 'ready') {
-            return c.json({ success: true, data: { status: record.status, error: record.error ?? null } }, 202);
-        }
-        const obj = await reportPdf.streamPdf(record);
+        // Tenant isolation: getInspection throws NotFound if cross-tenant.
+        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        const versions = await c.var.services.reportVersion.list(tenantId, id);
+        // Published/delivered → immutable archive version (#120). Drafts → null → keyed on dataVersion.
+        const versionNumber = resolveArchiveVersion(inspection.status, versions);
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
+        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
+        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+        const record = await c.var.services.reportPdf.getOrRender(id, tenantId, type, {
+            reportUrl,
+            contentHash,
+            versionNumber,
+        });
+        const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.json({ success: false, error: { message: 'PDF object missing in storage' } }, 404);
+        const filename = `report-${id}${type === 'summary' ? '-summary' : ''}.pdf`;
         return new Response(obj.body, {
             status: 200,
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `inline; filename="report-${id}-${type}.pdf"`,
+                'Content-Disposition': `attachment; filename="${filename}"`,
                 'Cache-Control': 'private, max-age=300',
             },
         });
@@ -3007,7 +3051,7 @@ export const inspectionsRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
         const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const url = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?view=agent&token=${token}`;
         return c.json({ success: true, data: { token, url } });
     })
@@ -3052,7 +3096,7 @@ export const inspectionsRoutes = createApiRouter()
         }
 
         const token = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
         const url = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?view=agent&token=${token}`;
 
         // Sprint B-4c — append the inspector's signature so the receiving agent

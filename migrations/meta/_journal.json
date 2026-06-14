@@ -22,6 +22,20 @@
       "when": 1781395951852,
       "tag": "0002_classy_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1781414719428,
+      "tag": "0004_report_pdf_content_hash",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1781428433108,
+      "tag": "0005_email_identity_and_signature",
+      "breakpoints": true
     }
   ]
 }

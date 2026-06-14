@@ -7,7 +7,7 @@ const identity: EmailIdentityConfig = {
   senderEmail: null,
   replyTo: 'team@acme.com',
   senderDisplayName: 'Acme Inspections',
-  useInspectorFromName: true,
+  pointOfContact: 'inspector',
   siteName: 'Acme',
 };
 
@@ -37,7 +37,7 @@ describe('EmailService sender identity', () => {
   it('omits reply_to and uses a bare From when nothing resolves', async () => {
     const bare: EmailIdentityConfig = {
       mode: 'platform', senderEmail: null, replyTo: null,
-      senderDisplayName: null, useInspectorFromName: false, siteName: null,
+      senderDisplayName: null, pointOfContact: 'company', siteName: null,
     };
     const svc = new EmailService('re_test', 'reports@acme.com', 'Acme', bare);
     await svc.sendEmail(['c@x.com'], 'Hi', '<p>hi</p>');

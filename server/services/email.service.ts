@@ -43,6 +43,16 @@ export class EmailService {
         return { subject: fallback.subject, html: fallback.html, enabled: true };
     }
 
+    /** Single gate for the email footer signature: requires inspector + host,
+     *  honours the per-inspector toggle (default on), and suppresses a block
+     *  that would have no name (avoids a half-empty footer). */
+    private signatureFor(inspector?: SignatureUser, host?: string): string | undefined {
+        if (!inspector || !host) return undefined;
+        if (inspector.signatureEnabled === false) return undefined;
+        if (!(inspector.name ?? '').trim()) return undefined;
+        return inspectorSignature(inspector, host).html;
+    }
+
     /**
      * Sends a transactional email. Optionally includes binary attachments
      * (e.g. PDF reports) or text attachments (e.g. ICS calendar invites).
@@ -65,10 +75,15 @@ export class EmailService {
         const resolved = this.identity
             ? resolveSenderIdentity(this.identity, opts?.inspector)
             : {};
-        const baseFrom = this.senderEmail || `${this.appName} <noreply@example.com>`;
-        const from = resolved.fromName && this.senderEmail
+
+        if (!this.senderEmail) {
+            logger.error('[email] No sender (From) address configured — refusing to send', { to });
+            throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email is not configured (no sender address).');
+        }
+
+        const from = resolved.fromName
             ? `${resolved.fromName} <${this.senderEmail}>`
-            : baseFrom;
+            : this.senderEmail;
 
         const payload: Record<string, unknown> = {
             from,
@@ -209,7 +224,7 @@ export class EmailService {
                <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link: ${reportUrl}</p>
                <p style="font-size: 12px; color: #999;">This link expires in 30 days.</p>
              </div>`;
-        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const signatureHtml = this.signatureFor(inspector, host);
         const rendered = this.renderOr('agent-share-link', { address, reportUrl }, {
             subject: `Inspection report shared: ${address}`,
             html: appendSignature(fallbackBody, inspector, host),
@@ -239,7 +254,7 @@ export class EmailService {
                </div>
                <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link: ${reportUrl}</p>
              </div>`;
-        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const signatureHtml = this.signatureFor(inspector, host);
         const rendered = this.renderOr('report-ready', { address, reportUrl }, {
             subject: `Property Inspection Report: ${address}`,
             html: appendSignature(fallbackBody, inspector, host),
@@ -280,7 +295,7 @@ export class EmailService {
                 <p style="font-size: 14px; color: #666;">PDF attachment: <strong>${safeAddress}-report.pdf</strong></p>
                 <p style="font-size: 12px; color: #999;">Online link: ${reportUrl}</p>
             </div>`;
-        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const signatureHtml = this.signatureFor(inspector, host);
         const rendered = this.renderOr('report-ready-pdf', { address, reportUrl }, {
             subject: `Property Inspection Report: ${address}`,
             html: appendSignature(fallbackBody, inspector, host),
@@ -316,7 +331,7 @@ export class EmailService {
                     Thank you,<br>${this.appName} Team
                 </p>
             </div>`;
-        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const signatureHtml = this.signatureFor(inspector, host);
         const rendered = this.renderOr('agreement-request', { clientName: clientName ?? 'Client', agreementName, signUrl }, {
             subject: `Please sign: ${agreementName}`,
             html: appendSignature(fallbackBody, inspector, host),
@@ -352,7 +367,7 @@ export class EmailService {
                     Thank you,<br>${this.appName} Team
                 </p>
             </div>`;
-        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const signatureHtml = this.signatureFor(inspector, host);
         const rendered = this.renderOr('payment-request', { clientName: clientName ?? 'Client', amount: amountLabel, payUrl }, {
             subject: `Payment request: ${amountLabel}`,
             html: appendSignature(fallbackBody, inspector, host),
@@ -499,7 +514,7 @@ export class EmailService {
 </body>
 </html>`;
 
-        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const signatureHtml = this.signatureFor(inspector, host);
         const rendered = this.renderOr('agreement-signed', { clientName, propertyAddress, verifyUrl, confirmationId, signedAtUtc, ipAddress: ipAddress ?? 'recorded' }, {
             subject: `Agreement signed — ${propertyAddress}`,
             html: appendSignature(fallbackHtml, inspector, host),
@@ -566,7 +581,7 @@ export class EmailService {
                     Thank you,<br>${this.appName} Team
                 </p>
             </div>`;
-        const signatureHtml = inspector && host ? inspectorSignature(inspector, host).html : undefined;
+        const signatureHtml = this.signatureFor(inspector, host);
         const rendered = this.renderOr('booking-confirmation', { clientName, address, date, time, icsAttached: !!icsEvent }, {
             subject: `Inspection Scheduled: ${address}`,
             html: appendSignature(fallbackBody, inspector, host),

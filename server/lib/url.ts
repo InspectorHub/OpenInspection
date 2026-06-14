@@ -1,5 +1,23 @@
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
+import { drizzle } from 'drizzle-orm/d1';
+import { tenants } from './db/schema';
+import { eq } from 'drizzle-orm';
+
+/**
+ * Public tenant slug for building report links + headless render URLs. saas
+ * AUTHENTICATED routes resolve the tenant from the JWT and never set
+ * requestedTenantSlug, so fall back to a tenants.slug lookup by the verified
+ * tenantId (mirrors the hubRoute pattern). An empty slug yields /report-view//:id
+ * which 404s — fatal for the headless PDF render — so this fallback is mandatory.
+ */
+export async function resolveTenantSlug(c: Context<HonoConfig>, tenantId: string): Promise<string> {
+    const fromCtx = c.get('requestedTenantSlug');
+    if (fromCtx) return fromCtx;
+    const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+        .from(tenants).where(eq(tenants.id, tenantId)).get();
+    return row?.slug ?? '';
+}
 
 /**
  * Builds the base URL (protocol + host) from the current request context.

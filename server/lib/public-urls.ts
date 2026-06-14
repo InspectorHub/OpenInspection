@@ -6,6 +6,7 @@
  *   c.req.header('host') with deriveBaseUrl(c)
  * For canonical links (emails / PDFs) use env.APP_BASE_URL.
  */
+import { signRenderToken } from './render-token';
 
 function scheme(host: string): string {
     return host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
@@ -48,6 +49,20 @@ export function reportUrl(host: string, tenantSlug: string, inspectionId: string
     // getReportData shape. The legacy `/report/` route now 302-redirects here
     // (preserving ?token=/?view=), so older emails + the PDF pipeline still work.
     return joinUrl(host, `/report-view/${tenantSlug}/${inspectionId}`);
+}
+
+/**
+ * Report URL for HEADLESS rendering: carries a short-TTL render token so the
+ * cookieless browser can load real report data + photos. Use for the PDF
+ * pipeline + email attachment generation + on-demand download; never for links
+ * sent to humans (render tokens are server-internal and short-lived).
+ */
+export async function buildRenderReportUrl(
+    host: string, tenantSlug: string, inspectionId: string, secret: string,
+): Promise<string> {
+    const base = reportUrl(host, tenantSlug, inspectionId); // no query
+    const token = await signRenderToken(inspectionId, secret);
+    return `${base}?render=${encodeURIComponent(token)}`;
 }
 
 /**

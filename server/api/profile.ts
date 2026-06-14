@@ -7,6 +7,7 @@ import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { users } from '../lib/db/schema/tenant';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { inspectorSignature } from '../lib/inspector-signature';
 
 /**
  * Booking #7 Sprint A — authenticated profile endpoint mounted at
@@ -34,6 +35,8 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         bio: z.string().nullable(),
                         photoUrl: z.string().nullable(),
                         serviceAreas: z.any().nullable(),
+                        signatureEnabled: z.boolean(),
+                        signaturePreviewHtml: z.string(),
                     })),
                 },
             },
@@ -52,6 +55,7 @@ const PatchProfileSchema = z.object({
     phone: z.string().max(30).optional().describe('Contact phone number for the inspector profile'),
     licenseNumber: z.string().max(50).optional().describe('Professional inspector license or certification number'),
     bio: z.string().max(600).nullable().optional().describe('Short inspector biography shown on the public booking page'),
+    signatureEnabled: z.boolean().optional().describe('Whether the inspector business-card footer is added to outbound emails'),
 });
 
 const patchProfileRoute = createRoute(withMcpMetadata({
@@ -159,11 +163,21 @@ export const profileRoutes = createApiRouter()
             bio: users.bio,
             photoUrl: users.photoUrl,
             serviceAreas: users.serviceAreas,
+            signatureEnabled: users.signatureEnabled,
         }).from(users)
           .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
           .get();
 
         if (!row) throw Errors.NotFound('User not found');
+
+        const host = new URL(c.req.url).host;
+        const tenantSlug = c.get('requestedTenantSlug') ?? null;
+        const signaturePreviewHtml = (row.name ?? '').trim()
+          ? inspectorSignature({
+              name: row.name, email: row.email, phone: row.phone,
+              licenseNumber: row.licenseNumber, tenantSlug,
+            }, host).html
+          : '';
 
         let parsedAreas = null;
         if (row.serviceAreas) {
@@ -172,7 +186,7 @@ export const profileRoutes = createApiRouter()
 
         return c.json({
             success: true as const,
-            data: { ...row, serviceAreas: parsedAreas },
+            data: { ...row, serviceAreas: parsedAreas, signatureEnabled: row.signatureEnabled, signaturePreviewHtml },
         }, 200);
     })
     .openapi(patchProfileRoute, async (c) => {
@@ -187,6 +201,7 @@ export const profileRoutes = createApiRouter()
         if (body.phone !== undefined) updates.phone = body.phone;
         if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
         if (body.bio !== undefined) updates.bio = body.bio;
+        if (body.signatureEnabled !== undefined) updates.signatureEnabled = body.signatureEnabled;
         // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
         // Agent slug writes go through POST /api/agent/profile (separate endpoint).
 
