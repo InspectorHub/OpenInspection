@@ -8,6 +8,7 @@
 import type { Route } from "./+types/inspection-settings-sheet";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { flattenMedia } from "~/lib/inspection-media";
 
 interface Template {
     id: string;
@@ -71,30 +72,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
 
     // DB-16 — flatten attached + pool photos into one pickable cover list.
-    // Dedup by R2 key: results.data can store an item under BOTH a composite
-    // (unit::section::item) and a bare itemId key, which makes the media center
-    // surface the same photo twice; the cover grid must show each photo once.
-    const photos: CoverPhoto[] = [];
-    const seen = new Set<string>();
+    // Dedup by R2 key (shared flattenMedia helper): results.data can store an
+    // item under BOTH a composite (unit::section::item) and a bare itemId key,
+    // which makes the media center surface the same photo twice; the cover grid
+    // must show each photo once.
     // Request small thumbnails (?w=240) for the grid so the browser doesn't pull
     // full-resolution originals; the photo endpoint resizes when CF Images is
     // available and falls back to the original otherwise.
     const thumb = (url: string) => (url.includes("?") ? `${url}&w=240` : `${url}?w=240`);
-    const pushPhoto = (key?: string, url?: string, label = "") => {
-        if (!key || !url || seen.has(key)) return;
-        seen.add(key);
-        photos.push({ key, url: thumb(url), label });
-    };
-    if (mediaRes?.ok) {
-        const body = (await mediaRes.json()) as {
-            data?: {
-                attached?: Array<{ key: string; url: string; itemLabel?: string }>;
-                pool?: Array<{ key: string; url: string }>;
-            };
-        };
-        for (const a of body?.data?.attached ?? []) pushPhoto(a?.key, a?.url, a?.itemLabel ?? "");
-        for (const p of body?.data?.pool ?? []) pushPhoto(p?.key, p?.url, "Unattached");
-    }
+    const mediaBody = mediaRes?.ok ? ((await mediaRes.json()) as Parameters<typeof flattenMedia>[0]) : null;
+    const photos: CoverPhoto[] = flattenMedia(mediaBody).map((p) => ({ key: p.key, url: thumb(p.url), label: p.label }));
 
     return { inspection, templates, members, photos };
 }
