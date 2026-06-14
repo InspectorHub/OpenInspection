@@ -83,7 +83,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
  * tenantId (mirrors the hubRoute pattern). An empty slug yields /report-view//:id
  * which 404s — fatal for the headless PDF render — so this fallback is mandatory.
  */
-async function resolveTenantSlug(c: Context<HonoConfig>, tenantId: string): Promise<string> {
+export async function resolveTenantSlug(c: Context<HonoConfig>, tenantId: string): Promise<string> {
     const fromCtx = c.get('requestedTenantSlug');
     if (fromCtx) return fromCtx;
     const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
