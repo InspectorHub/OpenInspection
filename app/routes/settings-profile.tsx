@@ -6,6 +6,7 @@ import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SignaturePad } from "~/components/SignaturePad";
+import { AvatarCropper } from "~/components/image-studio/AvatarCropper";
 import { profileSchema } from "~/lib/forms/settings.schema";
 
 /* ------------------------------------------------------------------ */
@@ -112,6 +113,7 @@ export default function SettingsProfilePage() {
   const { profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [bioLen, setBioLen] = useState((profile.bio ?? "").length);
+  const [avatarSource, setAvatarSource] = useState<string | null>(null);
   // DB-12 / IA-26 — useSessionContext / tenantSlug removed; slug section gone.
 
   // Conform owns the main profile form (default intent). The save-signature
@@ -246,11 +248,8 @@ export default function SettingsProfilePage() {
                   className="block text-[11px] text-ih-fg-3"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (!file) return;
-                    const fd = new FormData();
-                    fd.append("intent", "photo-upload");
-                    fd.append("photo", file);
-                    photoFetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
+                    if (file) setAvatarSource(URL.createObjectURL(file));
+                    e.target.value = "";
                   }}
                 />
                 <p className="text-[11px] text-ih-fg-3">JPG, PNG, or WebP. Max 2 MB. Square crop renders best.</p>
@@ -360,6 +359,21 @@ export default function SettingsProfilePage() {
           </button>
         )}
       </section>
+
+      {avatarSource && (
+        <AvatarCropper
+          sourceUrl={avatarSource}
+          onCancel={() => { URL.revokeObjectURL(avatarSource); setAvatarSource(null); }}
+          onSave={(blob) => {
+            const fd = new FormData();
+            fd.append("intent", "photo-upload");
+            fd.append("photo", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
+            photoFetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
+            URL.revokeObjectURL(avatarSource);
+            setAvatarSource(null);
+          }}
+        />
+      )}
     </div>
   );
 }
