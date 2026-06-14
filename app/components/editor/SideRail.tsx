@@ -2,6 +2,7 @@ import { useState } from "react";
 import { renderTemplate } from "../../lib/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
 import { photoDisplayName, withDownload } from "../../lib/photo-name";
+import { PhotoGallery } from "~/components/image-studio/PhotoGallery";
 
 interface SideRailProps {
   activeItem?: { id: string; label: string; type?: string } | null;
@@ -10,16 +11,19 @@ interface SideRailProps {
   getRatingColor?: (id: string) => string;
   getRatingLabel?: (id: string) => string;
   inspectionId?: string;
+  onGallerySetCover?: (photo: { key: string; url: string }) => void;
+  onGalleryAnnotate?: (photo: { key: string; url: string }) => void;
 }
 
-type TabId = "preview" | "library";
+type TabId = "preview" | "library" | "photos";
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "preview", label: "Preview", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
   { id: "library", label: "Library", icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" },
+  { id: "photos", label: "Photos", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
 ];
 
-export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId }: SideRailProps) {
+export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, onGallerySetCover, onGalleryAnnotate }: SideRailProps) {
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(false);
 
@@ -144,6 +148,13 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
                 <input type="text" placeholder="Search comments..." className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2" />
                 <p className="text-[13px] text-ih-fg-3 text-center py-8">Type <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">/</kbd> in the note field to search.</p>
               </div>
+            )}
+            {activeTab === "photos" && (
+              inspectionId ? (
+                <PhotoGallery inspectionId={inspectionId} onSetCover={(p) => onGallerySetCover?.(p)} onAnnotate={(p) => onGalleryAnnotate?.(p)} />
+              ) : (
+                <p className="text-[13px] text-ih-fg-3 text-center py-8">Open an inspection to browse photos.</p>
+              )
             )}
           </div>
         </div>
