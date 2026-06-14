@@ -29,6 +29,19 @@ import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
 
+/**
+ * Image Studio (cover crop) — resolves the cover image URL, preferring the
+ * baked cropped derivative (`coverImageKey`) over the uncropped source
+ * (`coverPhotoId`). Returns null when neither is set.
+ */
+export function resolveCoverUrl(
+  ins: { coverImageKey?: string | null; coverPhotoId?: string | null },
+  makePhotoUrl: (key: string) => string,
+): string | null {
+  const key = ins.coverImageKey || ins.coverPhotoId;
+  return key ? makePhotoUrl(key) : null;
+}
+
 /** Slug → label map for resolving aggregated recommendation badges in
  *  getReportData. Built once at module load. */
 const RECOMMENDATION_CATEGORY_LABELS = new Map<string, string>(
@@ -2269,7 +2282,7 @@ export class InspectionService {
             // DB-16 — resolved report cover image URL (cover_photo_id holds the
             // R2 key of an attached/pool photo). null when the inspector has not
             // picked a cover. The renderer consumes this directly.
-            coverPhotoUrl: inspection.coverPhotoId ? makePhotoUrl(inspection.coverPhotoId) : null,
+            coverPhotoUrl: resolveCoverUrl(inspection as { coverImageKey?: string | null; coverPhotoId?: string | null }, makePhotoUrl),
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
             sections,
             ratingLevels: levels.length > 0 ? levels : [
