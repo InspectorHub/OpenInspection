@@ -2,7 +2,8 @@ import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { tenants } from '../lib/db/schema';
+import { tenants, inspections } from '../lib/db/schema';
+import { verifyRenderToken } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
@@ -77,6 +78,23 @@ async function resolveOwnerPreview(c: Context<HonoConfig>): Promise<string | nul
 }
 
 /**
+ * Render-token access path for headless PDF generation. The Cloudflare Browser
+ * Rendering headless browser cannot carry a session cookie or portal token, so
+ * trusted server flows mint a short-TTL render token (see lib/render-token.ts)
+ * and pass it as `?render=`. Returns the token's inspectionId only when it is
+ * valid AND matches the requested inspection; null otherwise (caller falls
+ * through to the other auth paths / 404).
+ */
+export async function resolveRenderAccess(
+    render: string | undefined, requestedId: string, secret: string,
+): Promise<{ inspectionId: string } | null> {
+    if (!render) return null;
+    const v = await verifyRenderToken(render, secret);
+    if (!v || v.inspectionId !== requestedId) return null;
+    return v;
+}
+
+/**
  * Public, no-login portal endpoints (`/api/public/*`). Access is gated by the
  * persistent per-(recipient, order) portal token (Spectora/ISN tokenized-link
  * model). The token is the credential; tenantId is resolved from it, NEVER from
@@ -93,7 +111,10 @@ const reportRoute = createRoute(withMcpMetadata({
             tenant: z.string().describe('Tenant slug (display only; tenant is resolved from the token).'),
             id: z.string().describe('Inspection id.'),
         }),
-        query: z.object({ token: z.string().optional().describe('Persistent portal access token.') }),
+        query: z.object({
+            token: z.string().optional().describe('Persistent portal access token.'),
+            render: z.string().optional().describe('Server-minted render token (headless PDF only).'),
+        }),
     },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(ReportDataResponseSchema) } }, description: 'Report data' },
@@ -446,7 +467,7 @@ export const publicReportRoutes = createApiRouter()
     })
     .openapi(reportRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');
-        const { token } = c.req.valid('query');
+        const { token, render } = c.req.valid('query');
         let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
         if (!tenantId && token) {
             // Bridge: existing customer share links carry the KV agent-view-token
@@ -456,6 +477,20 @@ export const publicReportRoutes = createApiRouter()
             const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
             if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
         }
+        // Render-token path: headless CF Browser Rendering cannot carry a session
+        // cookie or portal token; trusted server flows mint a short-TTL render token
+        // and pass it as `?render=`. Resolve tenantId from the inspection row so the
+        // headless browser can load the full report without any user credential.
+        let renderMode = false;
+        if (!tenantId && render) {
+            const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
+            if (r) {
+                const db = drizzle(c.env.DB);
+                const row = await db.select({ tenantId: inspections.tenantId })
+                    .from(inspections).where(eq(inspections.id, id)).get();
+                if (row) { tenantId = row.tenantId; renderMode = true; }
+            }
+        }
         // Owner-session preview: an authenticated tenant user (inspector/admin)
         // may preview their own report without a recipient token. Ownership of
         // THIS inspection is enforced by getReportData's tenant-scoped query.
@@ -464,15 +499,16 @@ export const publicReportRoutes = createApiRouter()
         if (!tenantId) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
-        // Photo URLs: a no-login client viewer fetches via the public token-scoped
-        // serve route. For an OWNER preview there is no recipient token — and a
-        // browser <img> request carries only the session cookie (no Bearer), which
-        // the public route's owner-preview cannot read — so point owner-preview
-        // images at the authed editor photo route, where the cookie authenticates.
+        // Photo URLs: render mode carries the render token so the headless browser
+        // can load photos without a session cookie. Owner-preview points at the
+        // authed editor photo route (cookie authenticates there). Public client
+        // viewers use the token-scoped public photo route.
         const tk = token ?? '';
-        const makePhotoUrl = ownerPreview
-            ? (key: string) => `/api/inspections/${id}/photo?key=${encodeURIComponent(key)}`
-            : (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
+        const makePhotoUrl = renderMode
+            ? (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&render=${encodeURIComponent(render!)}`
+            : ownerPreview
+                ? (key: string) => `/api/inspections/${id}/photo?key=${encodeURIComponent(key)}`
+                : (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
         const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl);
         return c.json({ success: true as const, data }, 200);
     })
