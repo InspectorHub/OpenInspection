@@ -42,6 +42,8 @@ import { BurstCamera } from "~/components/editor/BurstCamera";
 import { PhotoStudio } from "~/components/editor/PhotoStudio";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
+import { CoverCropper } from "~/components/image-studio/CoverCropper";
+import { fullResUrl } from "~/components/image-studio/cropImage";
 import { SignaturePad } from "~/components/SignaturePad";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
 import { ToastPortal } from "~/components/Toast";
@@ -900,6 +902,8 @@ export default function InspectionEditPage() {
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
+ // Image Studio — gallery "Set as cover" opens an editor-level CoverCropper.
+ const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
 
  /* Mobile shell state */
  const isMobile = useIsMobile();
@@ -1606,6 +1610,14 @@ export default function InspectionEditPage() {
  getRatingColor={state.getRatingColor}
  getRatingLabel={state.getRatingLabel}
  inspectionId={String(state.inspection.id)}
+ onGallerySetCover={(p) => setGalleryCropSource(p)}
+ onGalleryAnnotate={(p) => {
+  setPhotoStudioUrl(p.url);
+  setPhotoStudioKey(p.key);
+  setPhotoStudioIndex(0);
+  setPhotoStudioTotal(0);
+  setPhotoStudioOpen(true);
+ }}
  />
  );
 
@@ -1811,6 +1823,24 @@ export default function InspectionEditPage() {
  // staleness for mid-inspection template switches, not just the empty case.
  onTemplateApplied={() => window.location.reload()}
  />
+
+ {/* Image Studio — gallery "Set as cover" crop overlay */}
+ {galleryCropSource && (
+ <CoverCropper
+  sourceUrl={fullResUrl(galleryCropSource.url)}
+  sourceKey={galleryCropSource.key}
+  onCancel={() => setGalleryCropSource(null)}
+  onSave={(blob, c) => {
+   const fd = new FormData();
+   fd.append("intent", "crop-cover");
+   fd.append("sourceKey", galleryCropSource.key);
+   fd.append("crop", JSON.stringify({ aspect: c.aspect, orientation: c.orientation, ...c.pixels }));
+   fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
+   coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+   setGalleryCropSource(null);
+  }}
+ />
+ )}
 
  {/* Unsaved changes blocker dialog */}
  {blocker.state === "blocked" && (
