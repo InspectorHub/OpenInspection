@@ -6,6 +6,7 @@ import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
 import { getBookingHost } from '../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, agreementSignUrl } from '../lib/public-urls';
+import { resolveArchiveVersion } from './inspections-pdf-helpers';
 import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { contentDisposition } from '../lib/content-disposition';
@@ -2974,25 +2975,32 @@ export const inspectionsRoutes = createApiRouter()
         if (!tenantId) return c.json({ success: false, error: { message: 'Tenant required' } }, 400);
         const { id } = c.req.valid('param');
         const { type } = c.req.valid('query');
-        const reportPdf = c.var.services.reportPdf;
-        if (!(await reportPdf.isPipelineEnabled(tenantId))) {
-            // Pipeline opt-in (migration 0059) — return 404 instead of leaking
-            // the existence of any pre-migration rendered PDFs. Clients fall
-            // back to window.print() in the report viewer.
-            return c.json({ success: false, error: { message: 'PDF not found' } }, 404);
+        // On-demand render — requires CF Browser Rendering + R2 bindings.
+        // The publish-time pre-render pipeline (POST /{id}/pdf/refresh) keeps its
+        // own isPipelineEnabled gate and is not affected here.
+        if (!c.env.BROWSER || !c.env.PHOTOS) {
+            return c.json({ success: false, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
         }
-        const record = await reportPdf.getPdfRecord(id, tenantId, type);
-        if (!record) return c.json({ success: false, error: { message: 'PDF not found' } }, 404);
-        if (record.status !== 'ready') {
-            return c.json({ success: true, data: { status: record.status, error: record.error ?? null } }, 202);
-        }
-        const obj = await reportPdf.streamPdf(record);
+        // Tenant isolation: getInspection throws NotFound if cross-tenant.
+        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        const versions = await c.var.services.reportVersion.list(tenantId, id);
+        // Published/delivered → immutable archive version (#120). Drafts → null → keyed on dataVersion.
+        const versionNumber = resolveArchiveVersion(inspection.status, versions);
+        const tenantSlug = c.get('requestedTenantSlug') ?? '';
+        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
+        const record = await c.var.services.reportPdf.getOrRender(id, tenantId, type, {
+            reportUrl,
+            versionNumber,
+            currentVersion: inspection.dataVersion ?? 0,
+        });
+        const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.json({ success: false, error: { message: 'PDF object missing in storage' } }, 404);
+        const filename = `report-${id}${type === 'summary' ? '-summary' : ''}.pdf`;
         return new Response(obj.body, {
             status: 200,
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `inline; filename="report-${id}-${type}.pdf"`,
+                'Content-Disposition': `attachment; filename="${filename}"`,
                 'Cache-Control': 'private, max-age=300',
             },
         });
