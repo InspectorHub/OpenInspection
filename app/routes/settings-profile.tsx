@@ -20,6 +20,8 @@ interface Profile {
   // DB-12 / IA-26 — slug omitted; inspector booking slugs are frozen.
   bio?: string | null;
   photoUrl?: string | null;
+  signatureEnabled?: boolean;
+  signaturePreviewHtml?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +91,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   for (const key of ["name", "phone", "licenseNumber", "bio"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
+  // Email signature toggle: hidden "false" + optional checkbox "true" — last value wins.
+  const sigVals = fd.getAll("signatureEnabled");
+  body.signatureEnabled = sigVals[sigVals.length - 1] === "true";
   const res = await api.profile.index.$patch({ json: body });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -271,6 +276,31 @@ export default function SettingsProfilePage() {
             )}
           </div>
 
+        </section>
+
+        {/* Email signature (business-card footer) — independent of Point of Contact */}
+        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+          <header className="space-y-1">
+            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Email signature</h3>
+            <p className="text-[12px] text-ih-fg-3">
+              The business-card footer added to emails you send. Built from the fields above — save your profile to refresh the preview.
+            </p>
+          </header>
+
+          <input type="hidden" name="signatureEnabled" value="false" />
+          <label className="flex items-center gap-2 text-[13px] text-ih-fg-1">
+            <input type="checkbox" name="signatureEnabled" value="true" defaultChecked={profile.signatureEnabled ?? true} />
+            Add to my emails
+          </label>
+
+          {profile.signaturePreviewHtml ? (
+            <div className="rounded-md border border-ih-border bg-ih-bg-muted p-4">
+              <div className="text-[11px] text-ih-fg-3 mb-2 uppercase tracking-[0.2em]">Preview</div>
+              <div dangerouslySetInnerHTML={{ __html: profile.signaturePreviewHtml }} />
+            </div>
+          ) : (
+            <p className="text-[12px] text-ih-fg-3">Add your name (and phone/license) above to build a signature.</p>
+          )}
         </section>
 
         {form.errors && (

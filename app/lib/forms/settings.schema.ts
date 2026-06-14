@@ -94,6 +94,7 @@ export const profileSchema = z.object({
   phone: z.string().max(30, "Phone is too long").optional(),
   licenseNumber: z.string().max(50, "License number is too long").optional(),
   bio: z.string().max(600, "Bio must be at most 600 characters").optional(),
+  signatureEnabled: z.boolean().optional(),
 });
 
 export type ProfileInput = z.infer<typeof profileSchema>;
