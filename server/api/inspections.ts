@@ -2997,10 +2997,11 @@ export const inspectionsRoutes = createApiRouter()
         const versionNumber = resolveArchiveVersion(inspection.status, versions);
         const tenantSlug = await resolveTenantSlug(c, tenantId);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
+        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
         const record = await c.var.services.reportPdf.getOrRender(id, tenantId, type, {
             reportUrl,
+            contentHash,
             versionNumber,
-            currentVersion: inspection.dataVersion ?? 0,
         });
         const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.json({ success: false, error: { message: 'PDF object missing in storage' } }, 404);

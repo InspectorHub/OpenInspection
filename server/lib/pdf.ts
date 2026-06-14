@@ -12,6 +12,13 @@
  */
 import type { BrowserRun } from '../types/hono';
 
+/**
+ * Bump when the report render template/CSS changes so content-hashed PDFs
+ * re-render (e.g. eager images, photo resize, layout changes).
+ * Start at 'r2' since the template just changed — eager images + photo resize.
+ */
+export const RENDER_VERSION = 'r2';
+
 export async function generatePdfFromUrl(
     browser: BrowserRun | undefined,
     url: string,

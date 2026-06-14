@@ -633,8 +633,9 @@ export const publicReportRoutes = createApiRouter()
         const versions = await c.var.services.reportVersion.list(tenantId, id);
         const versionNumber = resolveArchiveVersion(insp.status, versions);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenant, id, c.env.JWT_SECRET);
+        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
         const record = await c.var.services.reportPdf.getOrRender(id, tenantId, reportType, {
-            reportUrl, versionNumber, currentVersion: insp.dataVersion ?? 0,
+            reportUrl, contentHash, versionNumber,
         });
         const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.notFound();

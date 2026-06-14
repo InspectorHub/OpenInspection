@@ -74,13 +74,18 @@ export class ReportPdfService {
      * Render a PDF + persist to R2 + write D1 row. Idempotent on (inspectionId, type)
      * via the unique index — re-rendering replaces the existing row.
      *
+     * When `contentHash` is provided the PDF is stored at a content-addressed R2
+     * key (`…/${type}-${contentHash}.pdf`) so different versions with identical
+     * rendered output share the same object in R2. The legacy versioned/draft keys
+     * are used when contentHash is absent, preserving backward compatibility.
+     *
      * Throws if BROWSER or R2 binding is absent (callers must check or accept failure).
      */
     async renderAndStore(
         inspectionId: string,
         tenantId: string,
         type: ReportPdfType,
-        opts: { reportUrl: string; sourceVersion: number; versionNumber?: number | null },
+        opts: { reportUrl: string; sourceVersion: number; versionNumber?: number | null; contentHash?: string },
     ): Promise<ReportPdf> {
         if (!this.browser) throw Errors.BadRequest('PDF rendering unavailable: BROWSER binding not configured');
         if (!this.r2) throw Errors.BadRequest('PDF storage unavailable: storage bucket binding not configured');
@@ -93,9 +98,13 @@ export class ReportPdfService {
             : opts.reportUrl;
 
         const pdfBuffer = await generatePdfFromUrl(this.browser, renderUrl);
-        const r2Key = opts.versionNumber != null
-            ? `${tenantId}/${inspectionId}/reports/v${opts.versionNumber}/${type}.pdf`
-            : `${tenantId}/${inspectionId}/reports/${type}.pdf`;
+
+        // Content-addressed key when a hash is available; legacy key for back-compat.
+        const r2Key = opts.contentHash != null
+            ? `${tenantId}/${inspectionId}/reports/${type}-${opts.contentHash}.pdf`
+            : opts.versionNumber != null
+                ? `${tenantId}/${inspectionId}/reports/v${opts.versionNumber}/${type}.pdf`
+                : `${tenantId}/${inspectionId}/reports/${type}.pdf`;
         await this.r2.put(r2Key, pdfBuffer);
 
         const now = Date.now();
@@ -112,10 +121,11 @@ export class ReportPdfService {
             status: 'ready' as ReportPdfStatus,
             error: null,
             versionNumber: opts.versionNumber ?? null,
+            contentHash: opts.contentHash ?? null,
         };
 
         // INSERT OR REPLACE via Drizzle: delete then insert (cheap; row count is small).
-        // The unique index on (inspection_id, type) makes this safe.
+        // The unique index on (inspection_id, type, version_number) makes this safe.
         const db = this.getDrizzle();
         await db.delete(reportPdfs).where(and(
             eq(reportPdfs.inspectionId, inspectionId),
@@ -179,24 +189,54 @@ export class ReportPdfService {
     }
 
     /**
-     * On-demand cache-or-render. Published reports pass an immutable versionNumber
-     * (render once → the #120 archive); drafts pass versionNumber=null + the live
-     * dataVersion as currentVersion (re-render when edits advance it).
+     * Look up a ready PDF row by content hash. Returns the first matching row
+     * or null. Used by getOrRender to short-circuit Browser Rendering when
+     * identical-content PDFs are already cached.
+     */
+    async getPdfRecordByContentHash(
+        inspectionId: string,
+        tenantId: string,
+        type: ReportPdfType,
+        contentHash: string,
+    ): Promise<ReportPdf | null> {
+        const db = this.getDrizzle();
+        const row = await db.select().from(reportPdfs).where(and(
+            eq(reportPdfs.inspectionId, inspectionId),
+            eq(reportPdfs.tenantId, tenantId),
+            eq(reportPdfs.type, type),
+            eq(reportPdfs.contentHash, contentHash),
+            eq(reportPdfs.status, 'ready'),
+        )).get();
+        return row ?? null;
+    }
+
+    /**
+     * On-demand content-hash cache-or-render.
+     *
+     * Cache decision is based on a SHA-256 hash of the render inputs
+     * (inspection data + RENDER_VERSION salt) rather than version/dataVersion,
+     * so a no-op edit that bumps dataVersion but leaves the visible report
+     * unchanged reuses the existing PDF without a Browser Rendering round-trip.
+     *
+     * Cache HIT  → return existing ready row immediately (no render).
+     * Cache MISS → renderAndStore with content-addressed R2 key, store hash.
+     *
+     * `versionNumber` is still forwarded to renderAndStore so the unique-index
+     * delete-then-insert keeps rows keyed by version (archive integrity).
      */
     async getOrRender(
         inspectionId: string,
         tenantId: string,
         type: ReportPdfType,
-        opts: { reportUrl: string; versionNumber: number | null; currentVersion: number },
+        opts: { reportUrl: string; contentHash: string; versionNumber: number | null },
     ): Promise<ReportPdf> {
-        const record = await this.getPdfRecordForVersion(inspectionId, tenantId, type, opts.versionNumber);
-        const fresh = record?.status === 'ready'
-            && (opts.versionNumber != null || !this.isStale(record, opts.currentVersion));
-        if (fresh && record) return record;
+        const cached = await this.getPdfRecordByContentHash(inspectionId, tenantId, type, opts.contentHash);
+        if (cached) return cached;   // identical content already rendered — reuse, no Browser Rendering
         return this.renderAndStore(inspectionId, tenantId, type, {
             reportUrl: opts.reportUrl,
-            sourceVersion: opts.currentVersion,
+            sourceVersion: Date.now(),
             versionNumber: opts.versionNumber,
+            contentHash: opts.contentHash,
         });
     }
 

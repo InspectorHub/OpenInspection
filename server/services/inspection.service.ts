@@ -26,6 +26,8 @@ import { renderTemplate, listUnresolved } from '../lib/mustache';
 import { InvoiceService } from './invoice.service';
 import type { DefectCommentState } from '../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
+import { sha256Hex } from './signing-key.service';
+import { RENDER_VERSION } from '../lib/pdf';
 
 /** Slug → label map for resolving aggregated recommendation badges in
  *  getReportData. Built once at module load. */
@@ -3591,6 +3593,25 @@ export class InspectionService {
         const requirement = resolveRequireDefectFields(override, cfgRow?.requireDefectFields);
 
         return computePublishReadinessFromState(schemaData, resultData, requirement);
+    }
+
+    /**
+     * Compute a stable content hash over the render inputs for an inspection
+     * report. Used to skip Browser Rendering when identical-content PDFs are
+     * already cached.
+     *
+     * Photo URLs use the raw R2 key (no volatile render/auth token) so the hash
+     * is stable across token refreshes. Template CSS / layout changes are
+     * covered by bumping RENDER_VERSION in server/lib/pdf.ts.
+     *
+     * Note: branding (logo image, primaryColor) is NOT included here because
+     * it is not returned by getReportData — branding changes are instead
+     * covered by bumping RENDER_VERSION.
+     */
+    async getReportContentHash(id: string, tenantId: string): Promise<string> {
+        const data = await this.getReportData(id, tenantId, (key: string) => key);
+        const payload = JSON.stringify({ v: RENDER_VERSION, data });
+        return sha256Hex(payload);
     }
 }
 
