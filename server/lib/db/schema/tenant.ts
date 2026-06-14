@@ -55,6 +55,9 @@ export const users = sqliteTable('users', {
     photoUrl: text('photo_url'),
     // Spec 5H D2 — saved signature used for auto-sign on publish + Settings prefill.
     defaultSignatureBase64: text('default_signature_base64'),
+    // 2026-06-14 — per-inspector opt-in for the business-card email footer
+    // (independent of Point of Contact). Default true preserves prior behaviour.
+    signatureEnabled: integer('signature_enabled', { mode: 'boolean' }).notNull().default(true),
     bio: text('bio'),
     serviceAreas: text('service_areas'),
     // FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector
@@ -244,6 +247,11 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     smsMode: text('sms_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
     senderDisplayName: text('sender_display_name'),
     useInspectorFromName: integer('use_inspector_from_name', { mode: 'boolean' }).notNull().default(false),
+    // 2026-06-14 — Point of Contact (Spectora parity). Single tenant-level
+    // switch for who client-facing emails come from. Drives From display name
+    // + reply-to (NOT the From address — that is emailMode). Replaces the
+    // useInspectorFromName boolean (kept as a dead column; no longer read).
+    pointOfContact: text('point_of_contact', { enum: ['inspector', 'company'] }).notNull().default('company'),
     billingUrl: text('billing_url'),
     // Track J (#122) — per-company Google/Yelp/Facebook review link. The
     // "Review request" automation stays inert until this is set (fail-closed).

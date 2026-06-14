@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e3c4729d-207d-4bdf-a259-6078a043fd93",
-  "prevId": "6eebc305-7df8-49c2-810b-9fc40fb64d0a",
+  "id": "b3d2164c-9f25-4eac-95b3-f1f6b6993e5e",
+  "prevId": "e3c4729d-207d-4bdf-a259-6078a043fd93",
   "tables": {
     "agreement_requests": {
       "name": "agreement_requests",
@@ -6947,6 +6947,14 @@
           "autoincrement": false,
           "default": false
         },
+        "point_of_contact": {
+          "name": "point_of_contact",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'company'"
+        },
         "billing_url": {
           "name": "billing_url",
           "type": "text",
@@ -7544,6 +7552,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "signature_enabled": {
+          "name": "signature_enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
         },
         "bio": {
           "name": "bio",
