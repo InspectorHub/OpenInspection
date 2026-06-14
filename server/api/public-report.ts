@@ -143,6 +143,7 @@ const reportPhotoRoute = createRoute(withMcpMetadata({
             key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
             token: z.string().optional().describe('Persistent portal access token.'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
+            render: z.string().optional().describe('Server-minted render token (headless PDF only).'),
         }),
     },
     responses: {
@@ -514,11 +515,20 @@ export const publicReportRoutes = createApiRouter()
     })
     .openapi(reportPhotoRoute, async (c) => {
         const { id } = c.req.valid('param');
-        const { key, token, download } = c.req.valid('query');
+        const { key, token, download, render } = c.req.valid('query');
         let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
         if (!tenantId && token) {
             const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
             if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
+        }
+        if (!tenantId && render) {
+            const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
+            if (r) {
+                const db = drizzle(c.env.DB);
+                const row = await db.select({ tenantId: inspections.tenantId })
+                    .from(inspections).where(eq(inspections.id, id)).get();
+                if (row) tenantId = row.tenantId;
+            }
         }
         // Owner-session preview — same fallback as the report data route so the
         // owner's tokenless preview can load its photos (the key is re-checked

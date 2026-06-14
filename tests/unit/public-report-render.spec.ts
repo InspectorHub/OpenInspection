@@ -17,3 +17,12 @@ describe('resolveRenderAccess', () => {
     expect(await resolveRenderAccess(tok, 'insp-1', SECRET)).toEqual({ inspectionId: 'insp-1' });
   });
 });
+
+describe('photo route reuses resolveRenderAccess', () => {
+  it('photo route reuses resolveRenderAccess: valid token resolves to its inspectionId', async () => {
+    const { signRenderToken } = await import('../../server/lib/render-token');
+    const { resolveRenderAccess } = await import('../../server/api/public-report');
+    const tok = await signRenderToken('insp-1', 's');
+    expect(await resolveRenderAccess(tok, 'insp-1', 's')).toEqual({ inspectionId: 'insp-1' });
+  });
+});
