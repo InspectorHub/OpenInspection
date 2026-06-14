@@ -16,6 +16,9 @@ import { verifyJwt, type JwtKeyring } from '../lib/jwt-keyring';
 import { classifyJwtPayload } from '../lib/auth/jwt-claims';
 import type { HonoConfig } from '../types/hono';
 import { logger } from '../lib/logger';
+import { resolveArchiveVersion } from './inspections-pdf-helpers';
+import { buildRenderReportUrl } from '../lib/public-urls';
+import { getBookingHost } from '../lib/url';
 
 /**
  * Testable core of the owner-session preview fallback. Given a raw session JWT
@@ -152,6 +155,34 @@ const reportPhotoRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getPublicReportPhoto',
     description: 'Public, no-login inspection photo gated by the same portal token as the report data. 404 when the token is invalid or the key is outside the token\'s tenant + inspection.',
+}, { scopes: [], tier: 'extended' }));
+
+// Public token-gated report PDF download. Mirrors the owner on-demand PDF
+// endpoint (Task 7) but authenticates via the persistent portal token only —
+// no owner-preview, no render-token acceptance (the handler mints its own
+// render token internally for the headless renderer).
+const reportPdfDownloadRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/report/{tenant}/{id}/pdf',
+    tags: ['public'],
+    summary: 'Public token-gated report PDF download',
+    request: {
+        params: z.object({
+            tenant: z.string().describe('Tenant slug (display only; tenant is resolved from the token).'),
+            id: z.string().describe('Inspection id.'),
+        }),
+        query: z.object({
+            token: z.string().optional().describe('Persistent portal access token.'),
+            type: z.enum(['summary', 'full']).optional().describe('Report variant. Defaults to full.'),
+        }),
+    },
+    responses: {
+        200: { content: { 'application/pdf': { schema: z.any().describe('Report PDF bytes') } }, description: 'Report PDF' },
+        404: { description: 'Not found or token invalid/expired' },
+        503: { description: 'PDF rendering is not configured on this deployment' },
+    },
+    operationId: 'getPublicReportPdf',
+    description: 'Public, no-login report PDF resolved via a persistent portal token. Renders on demand and caches by version (published reports = immutable archive). 404 when the token is missing/expired/revoked or does not match the inspection.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public inspector marketing profile (by slug). Tenant resolves from the
@@ -547,6 +578,43 @@ export const publicReportRoutes = createApiRouter()
         headers.set('Cache-Control', 'private, max-age=300');
         if (obj.httpEtag) headers.set('etag', obj.httpEtag);
         return new Response(obj.body, { status: 200, headers });
+    })
+    .openapi(reportPdfDownloadRoute, async (c) => {
+        const { tenant, id } = c.req.valid('param');
+        const { token, type } = c.req.valid('query');
+        const reportType = type ?? 'full';
+
+        // Auth: portal token + legacy agent-view-token bridge only.
+        // No owner-preview, no render-token acceptance — this is a public
+        // client-facing endpoint; the handler mints its own render token for
+        // the headless renderer below.
+        let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
+        if (!tenantId && token) {
+            const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
+            if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
+        }
+        if (!tenantId) return c.notFound();
+
+        if (!c.env.BROWSER || !c.env.PHOTOS) {
+            return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
+        }
+
+        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        const versions = await c.var.services.reportVersion.list(tenantId, id);
+        const versionNumber = resolveArchiveVersion(inspection.status, versions);
+        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenant, id, c.env.JWT_SECRET);
+        const record = await c.var.services.reportPdf.getOrRender(id, tenantId, reportType, {
+            reportUrl, versionNumber, currentVersion: inspection.dataVersion ?? 0,
+        });
+        const obj = await c.var.services.reportPdf.streamPdf(record);
+        if (!obj) return c.notFound();
+
+        const filename = `report-${id}${reportType === 'summary' ? '-summary' : ''}.pdf`;
+        return new Response(obj.body, { status: 200, headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${filename}"`,
+            'Cache-Control': 'private, max-age=300',
+        } });
     })
     .openapi(inspectorRoute, async (c) => {
         const { tenant, slug } = c.req.valid('param');
