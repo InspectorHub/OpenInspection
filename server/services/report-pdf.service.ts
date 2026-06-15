@@ -241,6 +241,29 @@ export class ReportPdfService {
     }
 
     /**
+     * Delete all transient (versionNumber=null) PDF rows for an inspection from
+     * both R2 and D1. Called after publish so stale on-demand renders are evicted
+     * and subsequent downloads render fresh current content.  Non-fatal: the
+     * caller wraps this in try/catch and logs warnings on failure.
+     */
+    async purgeTransientPdfs(inspectionId: string, tenantId: string): Promise<void> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(reportPdfs).where(and(
+            eq(reportPdfs.inspectionId, inspectionId),
+            eq(reportPdfs.tenantId, tenantId),
+            isNull(reportPdfs.versionNumber),
+        )).all();
+        for (const r of rows) {
+            try { if (this.r2) await this.r2.delete(r.r2Key); } catch { /* non-fatal */ }
+        }
+        await db.delete(reportPdfs).where(and(
+            eq(reportPdfs.inspectionId, inspectionId),
+            eq(reportPdfs.tenantId, tenantId),
+            isNull(reportPdfs.versionNumber),
+        ));
+    }
+
+    /**
      * Mark a record as queued for re-render. Used by POST /api/reports/:id/pdf/refresh
      * before kicking off the render workflow. Version-scoped (#120): operates only
      * on the row matching the given versionNumber (or the legacy NULL-version row
