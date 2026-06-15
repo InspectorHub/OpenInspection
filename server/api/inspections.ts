@@ -1470,6 +1470,83 @@ const sendAgreementRequestRoute = createRoute(withMcpMetadata({
 
 
 /**
+ * POST /api/inspections/:id/submit
+ * Submits a completed report for review (in_progress → submitted).
+ * Does NOT require the `publish` capability — any inspector/manager/owner can submit.
+ */
+const submitReportRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/submit',
+    tags: ['inspections'],
+    summary: 'Submit report for review',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Inspection id') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ reportStatus: z.string() })) } },
+            description: 'Report submitted for review',
+        },
+        400: { description: 'Invalid precondition (e.g. report already submitted, inspection not completed)' },
+    },
+    operationId: 'submitReport',
+    description: 'Transitions reportStatus from in_progress → submitted. Requires inspection.status === completed.',
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
+ * POST /api/inspections/:id/return
+ * Returns a submitted report to the inspector for revision (submitted → in_progress).
+ * Requires the `publish` capability (owner/manager by default; inspector only if not overridden).
+ */
+const returnReportRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/return',
+    tags: ['inspections'],
+    summary: 'Return submitted report to inspector for revision',
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Inspection id') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ reportStatus: z.string() })) } },
+            description: 'Report returned to inspector',
+        },
+        400: { description: 'Invalid precondition (report is not in submitted state)' },
+        403: { description: 'Missing publish capability' },
+    },
+    operationId: 'returnReport',
+    description: 'Transitions reportStatus from submitted → in_progress. Requires publish capability.',
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
+ * POST /api/inspections/:id/unpublish
+ * Unpublishes a published report, reverting it to in_progress (published → in_progress).
+ * Requires the `publish` capability.
+ */
+const unpublishReportRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/unpublish',
+    tags: ['inspections'],
+    summary: 'Unpublish a published report',
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Inspection id') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ reportStatus: z.string() })) } },
+            description: 'Report unpublished',
+        },
+        400: { description: 'Invalid precondition (report is not published)' },
+        403: { description: 'Missing publish capability' },
+    },
+    operationId: 'unpublishReport',
+    description: 'Transitions reportStatus from published → in_progress. Requires publish capability.',
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
  * POST /api/inspections/:id/publish
  */
 const publishRoute = createRoute(withMcpMetadata({
@@ -2956,6 +3033,36 @@ export const inspectionsRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const candidates = await c.var.services.inspection.getReinspectCandidates(tenantId, id);
         return c.json({ success: true, data: { candidates } }, 200);
+    })
+    .openapi(submitReportRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        try {
+            await c.var.services.inspection.submitReport(id, tenantId);
+            return c.json({ success: true as const, data: { reportStatus: 'submitted' } }, 200);
+        } catch (err) {
+            return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to submit report' } }, 400);
+        }
+    })
+    .openapi(returnReportRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        try {
+            await c.var.services.inspection.returnReport(id, tenantId);
+            return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
+        } catch (err) {
+            return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to return report' } }, 400);
+        }
+    })
+    .openapi(unpublishReportRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        try {
+            await c.var.services.inspection.unpublishReport(id, tenantId);
+            return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
+        } catch (err) {
+            return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to unpublish report' } }, 400);
+        }
     })
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/pdf/refresh',
