@@ -2523,6 +2523,7 @@ export class InspectionService {
             clientPhone: string | null;
             clientContactId: string | null;
             status: string;
+            reportStatus: string;
             date: string | null;
             inspectorId: string | null;
             templateId: string | null;
@@ -2614,6 +2615,7 @@ export class InspectionService {
                 clientPhone:       insp.clientPhone ?? null,
                 clientContactId:   insp.clientContactId ?? null,
                 status:            insp.status,
+                reportStatus:      insp.reportStatus as string,
                 date:              insp.date ?? null,
                 inspectorId:       insp.inspectorId ?? null,
                 templateId:        insp.templateId ?? null,
