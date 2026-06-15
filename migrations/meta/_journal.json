@@ -36,6 +36,13 @@
       "when": 1781428433108,
       "tag": "0005_email_identity_and_signature",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1781445762726,
+      "tag": "0006_bent_gamma_corps",
+      "breakpoints": true
     }
   ]
 }

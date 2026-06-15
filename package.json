@@ -80,8 +80,12 @@
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-easy-crop": "^6.0.2",
+    "react-konva": "^18.2.16",
+    "react-photo-album": "^3.6.0",
     "react-router": "^7.6.0",
     "stripe": "^22.2.0",
+    "yet-another-react-lightbox": "^3.32.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

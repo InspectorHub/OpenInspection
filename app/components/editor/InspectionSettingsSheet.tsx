@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
+import { CoverCropper } from "~/components/image-studio/CoverCropper";
+import { fullResUrl } from "~/components/image-studio/cropImage";
 
 interface SettingsForm {
   date: string;
@@ -80,8 +82,9 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   // `coverKey` is the chosen cover R2 key (optimistic; PATCHed via coverFetcher).
   const [photos, setPhotos] = useState<CoverPhoto[]>([]);
   const [coverKey, setCoverKey] = useState<string>("");
-  const coverFetcher = useFetcher<{ ok: boolean; intent?: string; coverKey?: string; coverUrl?: string | null }>();
+  const coverFetcher = useFetcher<{ ok: boolean; intent?: string; coverKey?: string | null; coverUrl?: string | null }>();
   const coverFileRef = useRef<HTMLInputElement>(null);
+  const [cropSource, setCropSource] = useState<{ key: string; url: string } | null>(null);
 
   // Trigger load when the sheet opens or inspectionId changes
   useEffect(() => {
@@ -121,9 +124,13 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   }, [loadFetcher.data]);
 
   function selectCover(key: string) {
-    const next = coverKey === key ? "" : key; // click current cover to clear
-    setCoverKey(next);
-    coverFetcher.submit({ intent: "set-cover", coverPhotoId: next }, { method: "post" });
+    if (coverKey === key) {
+      setCoverKey("");
+      coverFetcher.submit({ intent: "set-cover", coverPhotoId: "" }, { method: "post" });
+      return;
+    }
+    const photo = photos.find((p) => p.key === key);
+    if (photo) setCropSource({ key, url: photo.url });
   }
 
   // DB-16 — direct cover upload (Spectora parity). The file rides the BFF relay
@@ -143,10 +150,13 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     if (coverFetcher.state === "idle" && d?.intent === "upload-cover" && d.ok && d.coverKey) {
       const key = d.coverKey;
       const url = d.coverUrl ?? null;
-      setCoverKey(key);
       if (url) {
         setPhotos((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, url, label: "Uploaded" }, ...prev]));
+        setCropSource({ key, url });
       }
+    }
+    if (coverFetcher.state === "idle" && d?.intent === "crop-cover" && d.ok && d.coverKey) {
+      setCoverKey(d.coverKey);
     }
   }, [coverFetcher.state, coverFetcher.data]);
 
@@ -376,6 +386,22 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
           )}
         </div>
       </aside>
+      {cropSource && (
+        <CoverCropper
+          sourceUrl={fullResUrl(cropSource.url)}
+          sourceKey={cropSource.key}
+          onCancel={() => setCropSource(null)}
+          onSave={(blob, c) => {
+            const fd = new FormData();
+            fd.append("intent", "crop-cover");
+            fd.append("sourceKey", cropSource.key);
+            fd.append("crop", JSON.stringify({ aspect: c.aspect, orientation: c.orientation, ...c.pixels }));
+            fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
+            coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+            setCropSource(null);
+          }}
+        />
+      )}
     </>
   );
 }

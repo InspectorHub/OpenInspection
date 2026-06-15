@@ -47,6 +47,7 @@ import {
     ConflictListResponseSchema,
     ConflictResolveSchema,
     ConflictResolveResponseSchema,
+    CoverCropSchema,
 } from '../lib/validations/inspection.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema, TemplateSchemaV2Schema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -1611,6 +1612,41 @@ const saveAnnotationRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createInspectionItemsPhotosAnnotation (POST /{id}/items/{itemId}/photos/{photoIndex}/annotation, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
+// ── Image Studio (cover crop): POST /api/inspections/:id/cover ───────────────
+// Bakes a cropped JPEG derivative of the chosen cover source photo to R2 and
+// records the re-editable crop transform. Mirrors the annotation save shape.
+const setCoverCropRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/cover',
+    tags: ["inspections"],
+    summary: 'Set cropped report cover (baked JPEG derivative + crop transform)',
+    request: {
+        params: z.object({
+            id: z.string().describe('Inspection id'),
+        }).describe('Cover crop path params'),
+        body: {
+            content: {
+                'multipart/form-data': {
+                    schema: z.object({
+                        image: z.unknown().openapi({ type: 'string', format: 'binary' }).describe('Baked cropped JPEG (2048px long edge)'),
+                        sourceKey: z.string().describe('R2 key of the cover source photo this crop applies to'),
+                        crop: z.string().describe('JSON-encoded CoverCrop transform (source-pixel coords)'),
+                    }).describe('Cover crop multipart body'),
+                },
+            },
+        },
+    },
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ coverImageKey: z.string().describe('R2 key of the baked cropped cover derivative') })) } },
+            description: 'Cropped cover saved',
+        },
+    },
+    operationId: "setInspectionCover",
+    description: "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
+}, { scopes: ['write'], tier: 'extended' }));
+
 
 // -----------------------------------------------------------------------------
 // Agent Accounts A3 — POST /api/inspections/:id/concierge/approve
@@ -3131,6 +3167,22 @@ export const inspectionsRoutes = createApiRouter()
         const result = await c.var.services.inspection.saveAnnotation(
             id, tenantId, itemId, photoIndex, bytes, nodesJson, sectionId,
         );
+        return c.json({ success: true, data: result }, 200);
+    })
+    .openapi(setCoverCropRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        const formData = await c.req.parseBody();
+        const file = formData['image'] as File | undefined;
+        if (!file) throw Errors.BadRequest('image file required');
+        let rawCrop: unknown;
+        try { rawCrop = JSON.parse(String(formData['crop'] ?? '{}')); }
+        catch { throw Errors.BadRequest('invalid crop'); }
+        const parsed = CoverCropSchema.safeParse(rawCrop);
+        if (!parsed.success) throw Errors.BadRequest('invalid crop');
+        const sourceKey = String(formData['sourceKey'] ?? '');
+        const bytes = await file.arrayBuffer();
+        const result = await c.var.services.inspection.setCroppedCover(id, tenantId, sourceKey, bytes, parsed.data);
         return c.json({ success: true, data: result }, 200);
     })
     .openapi(approveConciergeRoute, async (c) => {

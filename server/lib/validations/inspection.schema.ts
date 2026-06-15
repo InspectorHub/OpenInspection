@@ -606,3 +606,17 @@ export const ConflictResolveResponseSchema = z.object({
         resolvedAt: z.string(),
     }),
 }).openapi('ConflictResolveResponse');
+
+/**
+ * Image Studio (cover crop) — re-editable crop transform applied to the
+ * source cover image, in source-pixel coordinates.
+ */
+export const CoverCropSchema = z.object({
+    aspect: z.enum(['3:2', '16:9', '1.91:1', '4:3']),
+    orientation: z.enum(['landscape', 'portrait']),
+    x: z.number().min(0),
+    y: z.number().min(0),
+    width: z.number().positive(),
+    height: z.number().positive(),
+});
+export type CoverCrop = z.infer<typeof CoverCropSchema>;

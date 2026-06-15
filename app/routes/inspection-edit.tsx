@@ -39,9 +39,11 @@ import { FooterBar } from "~/components/editor/FooterBar";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
-import { PhotoStudio } from "~/components/editor/PhotoStudio";
+import { PhotoAnnotator } from "~/components/image-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
+import { CoverCropper } from "~/components/image-studio/CoverCropper";
+import { fullResUrl } from "~/components/image-studio/cropImage";
 import { SignaturePad } from "~/components/SignaturePad";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
 import { ToastPortal } from "~/components/Toast";
@@ -312,6 +314,33 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // Return the uploaded photo's key + url so the sheet can append it to the
  // grid locally — avoids reloading (and visibly flickering) the whole sheet.
  return { ok: patch.ok, intent: "upload-cover", coverKey: key, coverUrl: body.data?.url ?? null };
+ }
+
+ if (intent === "crop-cover") {
+ const image = formData.get("image");
+ const sourceKey = String(formData.get("sourceKey") ?? "");
+ const crop = String(formData.get("crop") ?? "");
+ if (!(image instanceof File) || !sourceKey) return { ok: false as const, intent: "crop-cover" };
+ const res = await api.inspections[":id"].cover.$post({
+ param: { id: params.id },
+ form: { image, sourceKey, crop },
+ });
+ const body = (await res.json().catch(() => null)) as { data?: { coverImageKey?: string } } | null;
+ return { ok: res.ok, intent: "crop-cover", coverKey: body?.data?.coverImageKey ?? null };
+ }
+
+ if (intent === "annotate") {
+ const image = formData.get("image");
+ const itemId = String(formData.get("itemId") ?? "");
+ const photoIndex = Number(formData.get("photoIndex") ?? "-1");
+ const nodes = String(formData.get("nodes") ?? "[]");
+ const sectionId = String(formData.get("sectionId") ?? "");
+ if (!(image instanceof File) || !itemId || photoIndex < 0) return { ok: false as const, intent: "annotate" };
+ const res = await api.inspections[":id"].items[":itemId"].photos[":photoIndex"].annotation.$post({
+ param: { id: params.id, itemId, photoIndex: String(photoIndex) },
+ form: sectionId ? { image, nodes, sectionId } : { image, nodes },
+ });
+ return { ok: res.ok, intent: "annotate" };
  }
 
  if (intent === "toggle-auto-sign") {
@@ -887,6 +916,8 @@ export default function InspectionEditPage() {
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
+ // Image Studio — gallery "Set as cover" opens an editor-level CoverCropper.
+ const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
 
  /* Mobile shell state */
  const isMobile = useIsMobile();
@@ -1593,6 +1624,14 @@ export default function InspectionEditPage() {
  getRatingColor={state.getRatingColor}
  getRatingLabel={state.getRatingLabel}
  inspectionId={String(state.inspection.id)}
+ onGallerySetCover={(p) => setGalleryCropSource(p)}
+ onGalleryAnnotate={(p) => {
+  setPhotoStudioUrl(p.url);
+  setPhotoStudioKey(p.key);
+  setPhotoStudioIndex(0);
+  setPhotoStudioTotal(0);
+  setPhotoStudioOpen(true);
+ }}
  />
  );
 
@@ -1768,12 +1807,13 @@ export default function InspectionEditPage() {
  />
 
  {/* Photo studio overlay */}
- <PhotoStudio
+ <PhotoAnnotator
  open={photoStudioOpen}
  photoUrl={photoStudioUrl}
  photoIndex={photoStudioIndex}
  totalPhotos={photoStudioTotal}
  sectionName={state.currentSection?.title || state.currentSection?.name || ""}
+ initialAnnotationsJson={null}
  isCover={!!photoStudioKey && (state.inspection.coverPhotoId as string | null) === photoStudioKey}
  onSetCover={photoStudioKey ? () => {
   const isCover = (state.inspection.coverPhotoId as string | null) === photoStudioKey;
@@ -1782,7 +1822,18 @@ export default function InspectionEditPage() {
    { method: "post" },
   );
  } : undefined}
- onSave={() => {
+ onSave={({ blob, nodesJson }) => {
+  const itemId = state.activeItemId;
+  if (itemId && photoStudioIndex != null) {
+   const fd = new FormData();
+   fd.append("intent", "annotate");
+   fd.append("itemId", itemId);
+   fd.append("photoIndex", String(photoStudioIndex));
+   fd.append("nodes", nodesJson);
+   if (state.currentSection?.id) fd.append("sectionId", state.currentSection.id);
+   fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
+   coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+  }
   setPhotoStudioOpen(false);
  }}
  onClose={() => setPhotoStudioOpen(false)}
@@ -1798,6 +1849,24 @@ export default function InspectionEditPage() {
  // staleness for mid-inspection template switches, not just the empty case.
  onTemplateApplied={() => window.location.reload()}
  />
+
+ {/* Image Studio — gallery "Set as cover" crop overlay */}
+ {galleryCropSource && (
+ <CoverCropper
+  sourceUrl={fullResUrl(galleryCropSource.url)}
+  sourceKey={galleryCropSource.key}
+  onCancel={() => setGalleryCropSource(null)}
+  onSave={(blob, c) => {
+   const fd = new FormData();
+   fd.append("intent", "crop-cover");
+   fd.append("sourceKey", galleryCropSource.key);
+   fd.append("crop", JSON.stringify({ aspect: c.aspect, orientation: c.orientation, ...c.pixels }));
+   fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
+   coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+   setGalleryCropSource(null);
+  }}
+ />
+ )}
 
  {/* Unsaved changes blocker dialog */}
  {blocker.state === "blocked" && (
