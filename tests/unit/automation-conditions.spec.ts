@@ -59,8 +59,8 @@ async function seedInspection(over: Partial<typeof schema.inspections.$inferInse
     const id = over.id ?? crypto.randomUUID();
     await db.insert(schema.inspections).values({
         id, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
-        clientEmail: 'jane@example.com', date: '2026-06-01', status: 'published',
-        paymentStatus: 'unpaid', price: 50000, agreementRequired: false,
+        clientEmail: 'jane@example.com', date: '2026-06-01', status: 'completed',
+        reportStatus: 'published', paymentStatus: 'unpaid', price: 50000, agreementRequired: false,
         paymentRequired: false, createdAt: new Date(), ...over,
     } as never);
     return id;

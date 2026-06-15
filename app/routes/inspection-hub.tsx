@@ -4,7 +4,7 @@ import type { Route } from "./+types/inspection-hub";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { deriveBlockStates, formatCents, canPublish, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
+import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
 import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
@@ -463,7 +463,6 @@ export default function InspectionHubPage() {
 
   // Report card affordance: active publish CTA vs read-only-shipped.
   const reportPublished = isReportShipped(hub);
-  const publishReady = canPublish(hub);
 
   // Report action matrix — what buttons to show in the Report card.
   const reportActionList = reportActions(

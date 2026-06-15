@@ -144,7 +144,7 @@ async function seedPublishedBaseline(
     const itemIds = Object.keys(items);
     await db.insert(schema.inspections).values({
         id: inspectionId, tenantId, propertyAddress: '123 Birch Lane', date: '2026-06-01',
-        status: 'published', paymentStatus: 'unpaid', price: 0,
+        status: 'completed', reportStatus: 'published', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         templateSnapshot: templateSnapshot(itemIds) as never,
         templateSnapshotVersion: 1,
@@ -301,7 +301,7 @@ describe('#119 re-inspections — end-to-end (real workerd)', () => {
         // A DRAFT inspection with NO report_versions row.
         await db.insert(schema.inspections).values({
             id: DRAFT, tenantId: TENANT, propertyAddress: '9 Draft Way', date: '2026-06-01',
-            status: 'draft', paymentStatus: 'unpaid', price: 0,
+            status: 'requested', paymentStatus: 'unpaid', price: 0,
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             templateSnapshot: templateSnapshot(['x1']) as never, templateSnapshotVersion: 1,
         });

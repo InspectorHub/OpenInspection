@@ -212,7 +212,7 @@ describe('AdminService', () => {
             propertyAddress: '99 Actor Ave',
             clientName: 'Actor Client',
             clientEmail,
-            status: 'draft',
+            status: 'requested',
             paymentStatus: 'unpaid',
             price: 0,
             date: new Date().toISOString().split('T')[0],

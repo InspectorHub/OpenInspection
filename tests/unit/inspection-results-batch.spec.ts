@@ -33,7 +33,7 @@ describe('applyResultsBatch', () => {
             tenantId: 't-1',
             propertyAddress: '1 Test St',
             date: '2026-01-01',
-            status: 'draft',
+            status: 'requested',
             createdAt: new Date(),
         } as any);
     });

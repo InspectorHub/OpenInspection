@@ -47,7 +47,7 @@ describe('shouldUseCheckoutLink (Track I-a Task 8)', () => {
     async function seedInspection(over: Partial<typeof schema.inspections.$inferInsert> = {}) {
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', date: '2026-06-01',
-            status: 'draft', paymentStatus: 'unpaid', paymentRequired: true, createdAt: new Date(),
+            status: 'requested', paymentStatus: 'unpaid', paymentRequired: true, createdAt: new Date(),
             ...over,
         } as any);
     }

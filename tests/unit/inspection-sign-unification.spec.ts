@@ -106,7 +106,7 @@ async function seedBase(db: BetterSQLite3Database<typeof schema>, opts: { withTe
     } as any);
     await db.insert(schema.inspections).values({
         id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
-        clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid',
+        clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
         price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date(),
     } as any);
     if (opts.withTemplate ?? true) {
@@ -424,7 +424,7 @@ describe('signedByClient + dashboard truth read from the envelope (Track I-a Tas
         } as any);
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
-            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid',
+            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
             price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date(),
         } as any);
         await db.insert(schema.agreements).values({

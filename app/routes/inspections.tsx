@@ -1,7 +1,7 @@
 import { useLoaderData, Link } from 'react-router';
 import { requireToken } from '~/lib/session.server';
 import { createApi } from '~/lib/api-client.server';
-import { INSPECTION_STATUSES, INSPECTION_STATUS_LABELS, isReportPublished } from '~/lib/status';
+import { INSPECTION_STATUSES, INSPECTION_STATUS_LABELS } from '~/lib/status';
 import { deriveInspectionPill, deriveReportPill } from '~/lib/hub-blocks';
 import { PageHeader, Card, Pill, EmptyState } from '@core/shared-ui';
 import { formatInspectionDateTime } from '~/lib/format-date';
@@ -46,7 +46,7 @@ export async function loader({ request, context }: { request: Request; context: 
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
   const res = await api.inspections.dashboard.$get().catch(() => null);
-  let inspections: InspectionRow[] = [];
+  const inspections: InspectionRow[] = [];
   if (res && res.ok) {
     const body = (await res.json() as unknown) as { data?: Record<string, unknown[]> };
     const d = body.data ?? {};

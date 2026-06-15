@@ -65,13 +65,13 @@ describe('exportAccount', () => {
     it('returns inspections the user authored as inspector', async () => {
         await testDb.insert(schema.inspections).values({
             id: 'i-1', tenantId: TENANT, inspectorId: USER_ID, propertyAddress: '1 St',
-            date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 0,
+            date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         // unrelated inspection — different inspector
         await testDb.insert(schema.inspections).values({
             id: 'i-2', tenantId: TENANT, propertyAddress: '2 St',
-            date: '2026-06-02', status: 'draft', paymentStatus: 'unpaid', price: 0,
+            date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         const result = await exportAccount(testDb as any, USER_ID);

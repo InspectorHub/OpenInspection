@@ -43,7 +43,7 @@ let emailSend: ReturnType<typeof vi.fn>;
 
 async function seed() {
     await db.insert(schema.tenants).values({ id: TENANT, name: 'A', slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
-    await db.insert(schema.inspections).values({ id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date() });
+    await db.insert(schema.inspections).values({ id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date() });
     await db.insert(schema.agreements).values({ id: AGR_ID, tenantId: TENANT, name: 'Standard Agreement', content: 'Agreement text...', version: 1, createdAt: new Date() });
 }
 

@@ -32,7 +32,7 @@ async function seedInspection(over: Partial<typeof schema.inspections.$inferInse
     await db.insert(schema.inspections).values({
         id, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
         clientEmail: 'jane@example.com', clientPhone: '(555) 123-4567',
-        date: '2026-07-01', status: 'draft', paymentStatus: 'unpaid', price: 0,
+        date: '2026-07-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
         agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         ...over,
     } as never);

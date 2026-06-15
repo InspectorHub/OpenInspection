@@ -38,8 +38,8 @@ async function seedSmsLog(over: { contactId?: string | null } = {}) {
     await db.insert(schema.inspections).values({
         id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
         clientEmail: 'jane@example.com', clientPhone: '+15551234567',
-        clientContactId: over.contactId ?? null, date: '2026-07-01', status: 'published',
-        paymentStatus: 'paid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        clientContactId: over.contactId ?? null, date: '2026-07-01', status: 'completed',
+        reportStatus: 'published', paymentStatus: 'paid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
     } as never);
     const ruleId = crypto.randomUUID();
     await db.insert(schema.automations).values({

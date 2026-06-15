@@ -163,7 +163,7 @@ describe('runErasure', () => {
         const reqId = 'req-draft';
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT_A, propertyAddress: '2 Main', clientName: 'Drafty',
-            clientEmail: SUBJECT_EMAIL, date: '2026-06-02', status: 'draft', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+            clientEmail: SUBJECT_EMAIL, date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
         });
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
@@ -202,7 +202,7 @@ describe('runErasure', () => {
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT_A, propertyAddress: '4 Main',
             clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, clientPhone: '555-2222',
-            date: '2026-06-04', status: 'in_progress', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+            date: '2026-06-04', status: 'completed', reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
         });
         await db.insert(schema.agreementRequests).values({
             id: reqId, tenantId: TENANT_A, inspectionId: inspId, agreementId: 'agr-1',
@@ -281,7 +281,7 @@ describe('runErasure', () => {
         await db.insert(schema.inspections).values({
             id: 'insp-other-tenant', tenantId: TENANT_B, propertyAddress: '3 Main',
             clientName: 'Cross', clientEmail: SUBJECT_EMAIL, date: '2026-06-03',
-            status: 'draft', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+            status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
         });
 
         await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });

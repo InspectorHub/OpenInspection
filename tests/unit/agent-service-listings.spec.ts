@@ -54,10 +54,10 @@ describe('AgentService.listReferrals — A2', () => {
 
         await testDb.insert(schema.inspections).values([
             { id: 'i-1', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '1 Main', clientName: 'Sarah', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date() },
-            { id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak', clientName: 'Bob', date: '2026-06-02', status: 'delivered', paymentStatus: 'paid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date() },
-            { id: 'i-3', tenantId: T2, inspectorId: INSPECTOR_T2, propertyAddress: '3 Elm', clientName: 'Tim', date: '2026-06-03', status: 'draft', paymentStatus: 'unpaid', referredByAgentId: 'jane-c2', price: 0, createdAt: new Date() },
-            { id: 'other-agent-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '99 Pine', clientName: 'Dan', date: '2026-06-04', status: 'draft', paymentStatus: 'unpaid', referredByAgentId: 'other-c1', price: 0, createdAt: new Date() },
-            { id: 'no-referral-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '11 Pine', clientName: 'Eve', date: '2026-06-05', status: 'draft', paymentStatus: 'unpaid', referredByAgentId: null, price: 0, createdAt: new Date() },
+            { id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak', clientName: 'Bob', date: '2026-06-02', status: 'completed', reportStatus: 'published', paymentStatus: 'paid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date() },
+            { id: 'i-3', tenantId: T2, inspectorId: INSPECTOR_T2, propertyAddress: '3 Elm', clientName: 'Tim', date: '2026-06-03', status: 'requested', paymentStatus: 'unpaid', referredByAgentId: 'jane-c2', price: 0, createdAt: new Date() },
+            { id: 'other-agent-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '99 Pine', clientName: 'Dan', date: '2026-06-04', status: 'requested', paymentStatus: 'unpaid', referredByAgentId: 'other-c1', price: 0, createdAt: new Date() },
+            { id: 'no-referral-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '11 Pine', clientName: 'Eve', date: '2026-06-05', status: 'requested', paymentStatus: 'unpaid', referredByAgentId: null, price: 0, createdAt: new Date() },
         ]);
 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);

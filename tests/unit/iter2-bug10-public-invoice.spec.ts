@@ -18,8 +18,8 @@ async function seedBase(testDb: BetterSQLite3Database<typeof schema>) {
         { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await testDb.insert(schema.inspections).values([
-        { id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 50000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
-        { id: INSP_B, tenantId: TENANT_B, propertyAddress: '2 Other St', clientName: 'Bob', clientEmail: 'bob@test.com', date: '2026-06-02', status: 'draft', paymentStatus: 'unpaid', price: 30000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
+        { id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
+        { id: INSP_B, tenantId: TENANT_B, propertyAddress: '2 Other St', clientName: 'Bob', clientEmail: 'bob@test.com', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 30000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
     ]);
 }
 
@@ -147,7 +147,7 @@ describe('markPaid idempotency', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: INSP_C, tenantId: TENANT_A, propertyAddress: '3 Test St', clientName: 'Eve', clientEmail: 'eve@test.com',
-            date: '2026-06-07', status: 'draft', paymentStatus: 'unpaid', price: 10000,
+            date: '2026-06-07', status: 'requested', paymentStatus: 'unpaid', price: 10000,
             agreementRequired: false, paymentRequired: true, createdAt: new Date(),
         });
         await testDb.insert(schema.invoices).values({

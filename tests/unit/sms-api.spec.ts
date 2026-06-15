@@ -99,7 +99,7 @@ describe('SMS consent API (Track L Task 8)', () => {
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
             clientEmail: 'jane@x.com', clientContactId: contactId, date: '2026-07-01',
-            status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+            status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
 
         const app = buildApp(db);
@@ -117,7 +117,7 @@ describe('SMS consent API (Track L Task 8)', () => {
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT, propertyAddress: '2 Oak', clientName: 'Bob',
             clientEmail: 'bob@x.com', clientContactId: null, date: '2026-07-02',
-            status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+            status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
 
         const app = buildApp(db);
@@ -139,7 +139,7 @@ describe('SMS consent API (Track L Task 8)', () => {
         const inspId = crypto.randomUUID();
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
-            clientContactId: contactId, date: '2026-07-01', status: 'draft', paymentStatus: 'unpaid', price: 0,
+            clientContactId: contactId, date: '2026-07-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
         await new SmsConsentService({} as D1Database).record(TENANT, contactId, 'granted', 'booking_form', {});

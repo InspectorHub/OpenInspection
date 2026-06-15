@@ -16,7 +16,7 @@ function makeInspection(overrides: Partial<typeof schema.inspections.$inferInser
         clientName:      'Test Client',
         clientEmail:     'test@example.com',
         date:            '2026-06-01',
-        status:          'draft',
+        status:          'requested',
         paymentStatus:   'unpaid',
         price:           0,
         paymentRequired: false,
@@ -100,7 +100,7 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
         const insId = 'insp-stats-1';
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await testDb.insert(schema.inspections).values(makeInspection({
-            id: insId, date: todayStr(), status: 'in_progress',
+            id: insId, date: todayStr(), status: 'completed', reportStatus: 'in_progress',
             templateSnapshot: snap as any,
         }));
         // Per-inspection state: turn ON d_recommend, leave d_safety default-on,
@@ -165,7 +165,7 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             makeInspection({ id: ins1, date: todayStr(),    status: 'confirmed',   templateSnapshot: snap as any }),
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            makeInspection({ id: ins2, date: daysFromNow(-2), status: 'in_progress', templateSnapshot: snap as any, createdAt: new Date(Date.now() - 5 * 86400 * 1000) }),
+            makeInspection({ id: ins2, date: daysFromNow(-2), status: 'completed', reportStatus: 'in_progress', templateSnapshot: snap as any, createdAt: new Date(Date.now() - 5 * 86400 * 1000) }),
         ]);
 
         const buckets = await svc.getDashboardBuckets(TENANT);

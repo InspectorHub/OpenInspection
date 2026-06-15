@@ -62,7 +62,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
             clientEmail: 'jane@example.com', clientPhone: '(555) 123-4567', date: '2026-07-01',
-            status: 'published', paymentStatus: 'unpaid', price: 0,
+            status: 'completed', reportStatus: 'published', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
         const created = await svc.create(TENANT, {
@@ -86,7 +86,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT, propertyAddress: '2 Main', clientName: 'Joe',
             clientEmail: 'joe@example.com', date: '2026-07-02',
-            status: 'published', paymentStatus: 'unpaid', price: 0,
+            status: 'completed', reportStatus: 'published', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
         const created = await svc.create(TENANT, {
