@@ -822,7 +822,7 @@ export default function ReportCardStackPage() {
              <img
                src={sig.signatureBase64}
                alt="Inspector signature"
-               className="h-16 object-contain border border-ih-border rounded bg-white p-1"
+               className="h-16 object-contain border border-ih-border rounded bg-ih-bg-card p-1"
              />
            )}
            {sig.variant === "typed" && (
