@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
+import { INSPECTION_STATUSES } from '../status/inspection-status';
 
 /**
  * Core Inspection Schema (Output)
@@ -9,7 +10,7 @@ export const InspectionSchema = z.object({
     propertyAddress: z.string().openapi({ example: '123 Main St, Anytown' }).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     clientName: z.string().nullable().openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().email().nullable().openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
-    status: z.enum(['draft', 'completed', 'delivered']).openapi({ example: 'draft' }).describe('TODO describe status field for the OpenInspection MCP integration'),
+    status: z.enum(INSPECTION_STATUSES).openapi({ example: 'requested' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     date: z.string().openapi({ example: '2024-03-20' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     templateId: z.string().min(1).nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
@@ -22,7 +23,7 @@ export const InspectionSchema = z.object({
 export const InspectionListQuerySchema = z.object({
     limit: z.coerce.number().min(1).max(100).default(20).openapi({ example: 20 }).describe('TODO describe limit field for the OpenInspection MCP integration'),
     cursor: z.string().optional().openapi({ example: 'eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9' }).describe('TODO describe cursor field for the OpenInspection MCP integration'),
-    status: z.enum(['draft', 'completed', 'delivered']).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
+    status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     search: z.string().optional().openapi({ example: '123 Main' }).describe('TODO describe search field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-01-01' }).describe('TODO describe dateFrom field for the OpenInspection MCP integration'),
@@ -103,7 +104,7 @@ export const UpdateInspectionSchema = z.object({
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     price: z.number().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),
-    status: z.enum(['draft', 'completed', 'delivered']).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
+    status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
     agreementRequired: z.boolean().optional().openapi({ example: false }).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),
     yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),
@@ -233,7 +234,7 @@ export const BulkInspectionSchema = z.object({
     ids: z.array(z.string().uuid()).min(1).max(100).describe('TODO describe ids field for the OpenInspection MCP integration'),
     action: z.enum(['assignInspector', 'updateStatus']).describe('TODO describe action field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    status: z.enum(['draft', 'completed', 'delivered']).optional().describe('TODO describe status field for the OpenInspection MCP integration'),
+    status: z.enum(INSPECTION_STATUSES).optional().describe('TODO describe status field for the OpenInspection MCP integration'),
 }).openapi('BulkInspection');
 
 /**

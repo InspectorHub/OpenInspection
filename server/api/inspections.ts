@@ -1495,7 +1495,7 @@ const publishRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ reportUrl: z.string().describe('TODO describe reportUrl field for the OpenInspection MCP integration'), status: z.string().describe('TODO describe status field for the OpenInspection MCP integration') })),
+                    schema: createApiResponseSchema(z.object({ reportUrl: z.string().describe('TODO describe reportUrl field for the OpenInspection MCP integration'), reportStatus: z.string().describe('TODO describe reportStatus field for the OpenInspection MCP integration') })),
                 },
             },
             description: 'Published',

@@ -295,7 +295,7 @@ export class InspectionService {
         const db = this.getDrizzle();
         const conditions = [eq(inspections.tenantId, tenantId)];
 
-        if (params.status) conditions.push(eq(inspections.status, params.status as 'draft' | 'completed' | 'delivered'));
+        if (params.status) conditions.push(eq(inspections.status, params.status));
         if (params.inspectorId) conditions.push(eq(inspections.inspectorId, params.inspectorId));
         if (params.dateFrom) conditions.push(gte(inspections.date, params.dateFrom));
         if (params.dateTo) conditions.push(lte(inspections.date, params.dateTo));
@@ -331,7 +331,7 @@ export class InspectionService {
                     conditions.push(sql`${inspections.createdAt} < ${cutoff}`);
                     break;
                 case 'in_progress':
-                    conditions.push(eq(inspections.status, 'in_progress'));
+                    conditions.push(eq(inspections.reportStatus, REPORT_STATUS.IN_PROGRESS));
                     break;
             }
         }
@@ -366,7 +366,7 @@ export class InspectionService {
             propertyAddress: row.propertyAddress as string,
             clientName: row.clientName as string | null,
             clientEmail: row.clientEmail as string | null,
-            status: row.status as string,
+            status: row.status,
             date: row.date as string,
             inspectorId: row.inspectorId as string | null,
             templateId: row.templateId as string | null,
@@ -706,7 +706,7 @@ export class InspectionService {
             templateSnapshot:        baseline.templateSnapshot,
             templateSnapshotVersion: baseline.templateSnapshotVersion,
             date:                    createdAt.toISOString(),
-            status:                  'draft',
+            status:                  INSPECTION_STATUS.REQUESTED,
             paymentStatus:           'unpaid',
             price:                   0,
             paymentRequired:         false,

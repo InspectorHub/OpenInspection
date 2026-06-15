@@ -17,6 +17,7 @@ import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 
 export interface CreateRequestInput {
     clientName:      string;
@@ -237,7 +238,7 @@ export class InspectionRequestService {
                 templateSnapshot:         tpl ? tpl.schema : null,
                 templateSnapshotVersion:  tpl ? tpl.version : 1,
                 date:                     input.scheduledAt,
-                status:                   'draft' as const,
+                status:                   INSPECTION_STATUS.REQUESTED,
                 paymentStatus:            'unpaid' as const,
                 price:                    s.price ?? 0,
                 requestId,
@@ -287,7 +288,7 @@ export class InspectionRequestService {
             templateSnapshot:         tpl.schema,
             templateSnapshotVersion:  tpl.version,
             date:                     req.scheduledAt,
-            status:                   'draft' as const,
+            status:                   INSPECTION_STATUS.REQUESTED,
             paymentStatus:            'unpaid' as const,
             price:                    sub.price ?? 0,
             requestId,

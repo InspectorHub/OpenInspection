@@ -14,6 +14,8 @@
  * we render an inspection on a calendar surface.
  */
 
+import { INSPECTION_STATUS } from './status/inspection-status';
+
 export interface CalendarEventStyle {
     /** Hex fill color FullCalendar applies to the event chip. */
     color: string;
@@ -35,7 +37,7 @@ export interface CalendarEventStyle {
  */
 export function getCalendarEventStyle(status: string | null | undefined): CalendarEventStyle {
     const s = (status ?? '').toLowerCase();
-    if (s === 'draft') {
+    if (s === INSPECTION_STATUS.REQUESTED) {
         return {
             // Sprint 1 design tokens — slate-400 reads as "tentative" against
             // the indigo "confirmed" chips without introducing a new hue.

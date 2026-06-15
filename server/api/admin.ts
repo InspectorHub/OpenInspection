@@ -47,6 +47,7 @@ import { templates, agreements as agreementTable, agreements as agreementsTable,
 import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
+import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
 
@@ -1421,7 +1422,7 @@ export const adminRoutes = createApiRouter()
         interface InspectionImport {
             id: string; propertyAddress: string; inspectorId?: string; clientName?: string;
             clientEmail?: string; templateId?: string; date?: string;
-            status?: 'draft' | 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'delivered' | 'published' | 'cancelled';
+            status?: 'requested' | 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
             paymentStatus?: 'unpaid' | 'partial' | 'paid'; price?: number; createdAt?: string
         }
         interface ResultImport { id: string; inspectionId: string; data: unknown; lastSyncedAt?: string }
@@ -1452,7 +1453,7 @@ export const adminRoutes = createApiRouter()
                 id: ins.id, tenantId, propertyAddress: ins.propertyAddress,
                 inspectorId: ins.inspectorId || null, clientName: ins.clientName || null,
                 clientEmail: ins.clientEmail || null, templateId: ins.templateId || null,
-                date: ins.date || new Date().toISOString(), status: ins.status || 'draft',
+                date: ins.date || new Date().toISOString(), status: ins.status || INSPECTION_STATUS.REQUESTED,
                 paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
                 createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
             }).onConflictDoNothing().run();

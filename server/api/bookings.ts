@@ -18,6 +18,7 @@ import {
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { runEnvelopeCompletionPipeline } from '../lib/sign-effects';
+import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 
 /**
  * GET /api/public/inspectors
@@ -664,7 +665,7 @@ export const bookingsRoutes = createApiRouter()
                 // bare `body.date` never marked the slot busy, so even
                 // sequential double-booking succeeded.
                 date: startIso,
-                status: 'draft',
+                status: INSPECTION_STATUS.REQUESTED,
                 paymentStatus: 'unpaid',
                 price: 0,
                 requestId: createdRequestId,
