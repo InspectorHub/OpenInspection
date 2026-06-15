@@ -18,6 +18,7 @@ import type { HonoConfig } from '../types/hono';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../lib/url';
+import { publicReportAccessAllowed } from '../lib/report-access';
 
 /**
  * Testable core of the owner-session preview fallback. Given a raw session JWT
@@ -594,6 +595,16 @@ export const publicReportRoutes = createApiRouter()
         if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
         if (!tenantId) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
+        }
+        // Publish gate: client/token access is revoked while the report is not
+        // published (owner-preview + render-token bypass — they may view drafts).
+        const gateRow = await drizzle(c.env.DB)
+            .select({ reportStatus: inspections.reportStatus })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus })) {
+            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
         }
         // Photo URLs: render mode carries the render token so the headless browser
         // can load photos without a session cookie. Owner-preview points at the
