@@ -625,13 +625,13 @@ export const publicReportRoutes = createApiRouter()
 
         const db = drizzle(c.env.DB);
         const insp = await db
-            .select({ status: inspections.status, dataVersion: inspections.dataVersion })
+            .select({ status: inspections.status, reportStatus: inspections.reportStatus, dataVersion: inspections.dataVersion })
             .from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
         if (!insp) return c.notFound();
         const versions = await c.var.services.reportVersion.list(tenantId, id);
-        const versionNumber = resolveArchiveVersion(insp.status, versions);
+        const versionNumber = resolveArchiveVersion(insp.reportStatus, versions);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenant, id, c.env.JWT_SECRET);
         const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
         const record = await c.var.services.reportPdf.getOrRender(id, tenantId, reportType, {

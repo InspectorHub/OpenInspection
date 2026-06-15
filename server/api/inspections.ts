@@ -2606,7 +2606,7 @@ export const inspectionsRoutes = createApiRouter()
                 try {
                     const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
                     const versions = await c.var.services.reportVersion.list(tenantId, id);
-                    const versionNumber = resolveArchiveVersion(inspection.status, versions);
+                    const versionNumber = resolveArchiveVersion(inspection.reportStatus, versions);
                     const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
                     const obj = await c.var.services.reportPdf.streamPdf(record);
                     if (!obj) throw new Error('PDF unavailable');
@@ -2670,7 +2670,7 @@ export const inspectionsRoutes = createApiRouter()
             // is unchanged, avoiding a redundant Browser Rendering call.
             const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
             const versions = await c.var.services.reportVersion.list(tenantId, id);
-            const versionNumber = resolveArchiveVersion(inspection.status, versions);
+            const versionNumber = resolveArchiveVersion(inspection.reportStatus, versions);
             const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
             const obj = await c.var.services.reportPdf.streamPdf(record);
             if (!obj) throw new Error('PDF unavailable');
@@ -3047,8 +3047,8 @@ export const inspectionsRoutes = createApiRouter()
         // Tenant isolation: getInspection throws NotFound if cross-tenant.
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
         const versions = await c.var.services.reportVersion.list(tenantId, id);
-        // Published/delivered → immutable archive version (#120). Drafts → null → keyed on dataVersion.
-        const versionNumber = resolveArchiveVersion(inspection.status, versions);
+        // Published → immutable archive version (#120). Drafts → null → keyed on dataVersion.
+        const versionNumber = resolveArchiveVersion(inspection.reportStatus, versions);
         const tenantSlug = await resolveTenantSlug(c, tenantId);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);

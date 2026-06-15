@@ -11,6 +11,7 @@ import type { NotificationService } from './notification.service';
 import type { AgreementService } from './agreement.service';
 import { currentPeriodKey } from '../lib/usage/period';
 import type { EmailService } from './email.service';
+import { isReportPublished, REPORT_STATUS } from '../lib/status/report-status';
 
 // Track L (D7) — default TCPA SMS opt-in disclosure (version 1). Seeded once by
 // ensureSeeds (SaaS) and the standalone raw-SQL path; kept identical in both.
@@ -351,7 +352,8 @@ export class AutomationService {
         // check-then-insert dedup (safe because CF cron runs are effectively serial)
         // is the chosen guard rather than a DB unique constraint.
         if (automation.trigger === 'inspection.reminder' &&
-            ['cancelled', 'completed', 'delivered', 'published'].includes(inspection.status)) {
+            (inspection.status === 'cancelled' || inspection.status === 'completed' ||
+             isReportPublished(inspection.reportStatus))) {
             return { ok: false, reason: 'inspection no longer active' };
         }
         if (!automation.conditions) return { ok: true };
@@ -669,7 +671,8 @@ export class AutomationService {
                     gte(inspections.date, todayStr),
                     lte(inspections.date, upperStr),
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    notInArray(inspections.status, ['cancelled', 'completed', 'delivered', 'published'] as any),
+                    notInArray(inspections.status, ['cancelled', 'completed'] as any),
+                    ne(inspections.reportStatus, REPORT_STATUS.PUBLISHED),
                 ));
 
             for (const insp of upcoming) {

@@ -15,6 +15,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { isReportPublished } from '../lib/status/report-status';
 import { logger } from '../lib/logger';
 import { sendSuccess } from '../lib/response';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -49,11 +50,12 @@ export const publicShareRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
         const insp = await db.select({
             status: inspections.status,
+            reportStatus: inspections.reportStatus,
         }).from(inspections)
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
         if (!insp) throw Errors.NotFound('Inspection not found');
-        if (insp.status !== 'delivered') {
+        if (!isReportPublished(insp.reportStatus)) {
             throw Errors.Forbidden('Report has not been published yet');
         }
 
