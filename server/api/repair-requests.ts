@@ -26,6 +26,7 @@ import { checkRateLimit } from '../lib/rate-limit';
 import { logger } from '../lib/logger';
 import { writeAuditLog } from '../lib/audit';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { isReportPublished } from '../lib/status/report-status';
 
 const EmailRequestSchema = z.object({
     inspectionId:     z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
@@ -146,10 +147,14 @@ export const repairRequestRoutes = createApiRouter()
         paymentRequired:   inspections.paymentRequired,
         paymentStatus:     inspections.paymentStatus,
         agreementRequired: inspections.agreementRequired,
+        reportStatus:      inspections.reportStatus,
     }).from(inspections)
         .where(and(eq(inspections.id, body.inspectionId), eq(inspections.tenantId, tenantId as string)))
         .get();
     if (!insp) throw Errors.NotFound('Inspection');
+    if (!isReportPublished(insp.reportStatus)) {
+        throw Errors.Forbidden('This report is not published.');
+    }
 
     // Same gating as /report/:id and /r/:id/repair-request.
     if (insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
