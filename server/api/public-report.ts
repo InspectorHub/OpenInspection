@@ -704,6 +704,11 @@ export const publicReportRoutes = createApiRouter()
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
         if (!insp) return c.notFound();
+        // Publish gate: this is a pure client-facing endpoint (no owner-preview, no
+        // render token), so block whenever the report is not currently published.
+        if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus })) {
+            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        }
         // Everyday download always tracks current content (versionNumber: null →
         // content-hash cache, renders live data). Frozen per-version PDFs are only
         // served from the verify page via GET /api/public/verify/report/:token/pdf.

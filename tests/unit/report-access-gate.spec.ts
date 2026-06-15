@@ -149,3 +149,51 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
         expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function));
     });
 });
+
+describe('GET /api/public/report/:tenant/:id/pdf — publish gate', () => {
+    const T = '00000000-0000-0000-0000-0000000000a2';
+    const ID = '00000000-0000-0000-0000-0000000000b2';
+
+    let db: BetterSQLite3Database<typeof schema>;
+    let sqlite: any;
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db as BetterSQLite3Database<typeof schema>;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+
+        // Seed tenant + inspection with report_status='in_progress'
+        await db.insert(schema.tenants).values({
+            id: T, name: 'Demo', slug: 'demo', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        } as any);
+        await db.insert(schema.inspections).values({
+            id: ID, tenantId: T, propertyAddress: '2 Main St', clientName: 'Bob',
+            clientEmail: 'bob@test.com', date: '2026-06-01', status: 'completed',
+            reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 30000,
+            agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as any);
+    });
+
+    afterEach(() => sqlite.close());
+
+    it('403 NOT_PUBLISHED when report_status=in_progress (pure client endpoint)', async () => {
+        const app = new OpenAPIHono<HonoConfig>();
+        app.use('*', async (c, next) => {
+            c.env = { DB: {}, BROWSER: {}, PHOTOS: {} } as any; // BROWSER+PHOTOS must be truthy to pass the 503 guard
+            c.set('services', {
+                portalAccess: { resolveToken: vi.fn().mockResolvedValue({ inspectionId: ID, tenantId: T, role: 'client', recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null }) },
+                inspection: { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+            } as any);
+            await next();
+        });
+        app.route('/api/public', publicReportRoutes);
+
+        const res = await app.request(`/api/public/report/demo/${ID}/pdf?token=tok&type=full`);
+        expect(res.status).toBe(403);
+        const body = await res.json() as { error: { code: string } };
+        expect(body.error.code).toBe('NOT_PUBLISHED');
+    });
+});
