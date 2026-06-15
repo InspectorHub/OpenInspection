@@ -15,6 +15,7 @@ export interface VerifyInput {
   hashValid?: boolean;
   signatureValid?: boolean;
   chainValid?: boolean;
+  notPublished?: boolean;
   versionNumber?: number;
   publishedAt?: number;
   contentHash?: string;
@@ -22,7 +23,7 @@ export interface VerifyInput {
 }
 
 export interface VerifyModel {
-  state: "verified" | "legacy" | "failed";
+  state: "verified" | "legacy" | "failed" | "not_published";
   versionNumber?: number;
   publishedAt?: number;
   contentHash?: string;
@@ -36,6 +37,7 @@ export function verifyResultModel(v: VerifyInput): VerifyModel {
     contentHash: v.contentHash,
     address: v.propertyAddressMasked,
   };
+  if (v.notPublished) return { state: "not_published", ...base };
   if (v.legacy) return { state: "legacy", ...base };
   if (v.hashValid && v.signatureValid && v.chainValid)
     return { state: "verified", ...base };
@@ -77,6 +79,7 @@ export async function loader({
           hashValid: boolean;
           signatureValid: boolean;
           chainValid: boolean;
+          notPublished: boolean;
           versionNumber: number;
           publishedAt: number;
           contentHash: string | null;
@@ -90,6 +93,7 @@ export async function loader({
             hashValid: v.hashValid,
             signatureValid: v.signatureValid,
             chainValid: v.chainValid,
+            notPublished: v.notPublished,
             versionNumber: v.versionNumber,
             publishedAt: v.publishedAt,
             contentHash: v.contentHash ?? undefined,
@@ -215,6 +219,17 @@ export default function VerifyTokenPage() {
               : ""}
           </p>
         )}
+      </div>
+    );
+  }
+
+  if (model.state === "not_published") {
+    return (
+      <div className="max-w-xl mx-auto p-6">
+        <div className="rounded-lg bg-ih-bad-bg text-ih-bad-fg p-4 text-center mb-6">
+          <p className="text-lg font-bold">Not published</p>
+          <p className="text-[13px] mt-1">This report is not published.</p>
+        </div>
       </div>
     );
   }

@@ -98,6 +98,7 @@ interface LoaderResult {
  isDelivered: boolean;
  brand: TenantBrand;
  error: string | null;
+ notPublished: boolean;
  reportTheme?: string;
  initialFilter: FilterKey;
  printMode: boolean;
@@ -168,6 +169,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  isDelivered: d?.isDelivered ?? false,
  brand,
  error: res.ok ? null : "Report not found",
+ notPublished: (res.status as number) === 403,
  reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
  initialFilter,
  printMode,
@@ -193,6 +195,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  brand: EMPTY_BRAND,
  coverPhotoUrl: null,
  error: "Service unavailable",
+ notPublished: false,
  initialFilter,
  printMode,
  isPublished: false,
@@ -380,6 +383,14 @@ export default function ReportCardStackPage() {
  };
 
  if (data.error) {
+ if (data.notPublished) {
+ return (
+ <ErrorState
+ title="This report is not published"
+ message="This report is not published. Please contact your inspector if you believe this is a mistake."
+ />
+ );
+ }
  const notFound = data.error === "Report not found";
  return (
  <ErrorState

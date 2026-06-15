@@ -26,6 +26,7 @@ import { checkRateLimit } from '../lib/rate-limit';
 import { logger } from '../lib/logger';
 import { writeAuditLog } from '../lib/audit';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { isReportPublished } from '../lib/status/report-status';
 
 const EmailRequestSchema = z.object({
     inspectionId:     z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
@@ -146,10 +147,14 @@ export const repairRequestRoutes = createApiRouter()
         paymentRequired:   inspections.paymentRequired,
         paymentStatus:     inspections.paymentStatus,
         agreementRequired: inspections.agreementRequired,
+        reportStatus:      inspections.reportStatus,
     }).from(inspections)
         .where(and(eq(inspections.id, body.inspectionId), eq(inspections.tenantId, tenantId as string)))
         .get();
     if (!insp) throw Errors.NotFound('Inspection');
+    if (!isReportPublished(insp.reportStatus)) {
+        throw Errors.Forbidden('This report is not published.');
+    }
 
     // Same gating as /report/:id and /r/:id/repair-request.
     if (insp.paymentRequired === true && insp.paymentStatus !== 'paid') {
@@ -248,6 +253,17 @@ export const repairRequestRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const tenantId = (c.get('tenantId') || c.get('resolvedTenantId')) as string | null;
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+        // Publish gate: this public, no-login page feed exposes the defect list +
+        // estimates — pure client content. Block it whenever the report is not
+        // currently published (mirrors the email export; render/owner don't apply).
+        const insp = await drizzle(c.env.DB)
+            .select({ reportStatus: inspections.reportStatus })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!isReportPublished(insp?.reportStatus)) {
+            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        }
         const data = await c.var.services.inspection.getRepairRequestData(id, tenantId);
         return c.json({ success: true as const, data }, 200);
     });

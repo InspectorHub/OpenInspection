@@ -18,6 +18,8 @@ import type { HonoConfig } from '../types/hono';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../lib/url';
+import { publicReportAccessAllowed } from '../lib/report-access';
+import { isReportPublished } from '../lib/status/report-status';
 
 /**
  * Testable core of the owner-session preview fallback. Given a raw session JWT
@@ -442,6 +444,7 @@ const reportVerifyRoute = createRoute(withMcpMetadata({
             keyAlgorithm: z.string(), legacy: z.boolean(),
             hashValid: z.boolean(), signatureValid: z.boolean(), chainValid: z.boolean(),
             propertyAddressMasked: z.string(),
+            notPublished: z.boolean(),
         })) } }, description: 'Verification result' },
         404: { description: 'Token not found' },
     },
@@ -515,6 +518,7 @@ export const publicReportRoutes = createApiRouter()
             signatureValid: data.verify.signatureValid,
             chainValid:    data.verify.chainValid,
             propertyAddressMasked: data.propertyAddressMasked,
+            notPublished: data.notPublished,
         } }, 200);
     })
     .openapi(reportVerifyPdfRoute, async (c) => {
@@ -532,6 +536,16 @@ export const publicReportRoutes = createApiRouter()
         if (!versionRow) return c.notFound();
 
         const { tenantId, inspectionId, versionNumber, contentHash } = versionRow;
+
+        // Publish gate: the frozen archived PDF is a public client artifact — refuse
+        // while the report is not currently published (re-publishing restores it).
+        const inspRow = await db.select({ reportStatus: inspections.reportStatus })
+          .from(inspections)
+          .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+          .get();
+        if (!isReportPublished(inspRow?.reportStatus)) {
+          return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        }
 
         if (!c.env.BROWSER || !c.env.PHOTOS) {
             return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
@@ -595,6 +609,16 @@ export const publicReportRoutes = createApiRouter()
         if (!tenantId) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
+        // Publish gate: client/token access is revoked while the report is not
+        // published (owner-preview + render-token bypass — they may view drafts).
+        const gateRow = await drizzle(c.env.DB)
+            .select({ reportStatus: inspections.reportStatus })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus })) {
+            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        }
         // Photo URLs: render mode carries the render token so the headless browser
         // can load photos without a session cookie. Owner-preview points at the
         // authed editor photo route (cookie authenticates there). Public client
@@ -616,20 +640,30 @@ export const publicReportRoutes = createApiRouter()
             const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
             if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
         }
+        let renderMode = false;
+        let ownerPreview = false;
         if (!tenantId && render) {
             const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
             if (r) {
                 const db = drizzle(c.env.DB);
                 const row = await db.select({ tenantId: inspections.tenantId })
                     .from(inspections).where(eq(inspections.id, id)).get();
-                if (row) tenantId = row.tenantId;
+                if (row) { tenantId = row.tenantId; renderMode = true; }
             }
         }
         // Owner-session preview — same fallback as the report data route so the
         // owner's tokenless preview can load its photos (the key is re-checked
         // against this tenant + inspection below).
-        if (!tenantId) tenantId = await resolveOwnerPreview(c);
+        if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
         if (!tenantId) return c.notFound();
+        const photoGate = await drizzle(c.env.DB)
+            .select({ reportStatus: inspections.reportStatus })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus })) {
+            return c.notFound();
+        }
         if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/${inspectionId}/...` — reject anything
         // outside the token's tenant + the requested inspection.
@@ -693,6 +727,11 @@ export const publicReportRoutes = createApiRouter()
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
             .get();
         if (!insp) return c.notFound();
+        // Publish gate: this is a pure client-facing endpoint (no owner-preview, no
+        // render token), so block whenever the report is not currently published.
+        if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus })) {
+            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        }
         // Everyday download always tracks current content (versionNumber: null →
         // content-hash cache, renders live data). Frozen per-version PDFs are only
         // served from the verify page via GET /api/public/verify/report/:token/pdf.

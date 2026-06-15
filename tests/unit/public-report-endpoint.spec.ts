@@ -28,8 +28,15 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         getReportData = vi.fn().mockResolvedValue({ inspectionId: 'insp1' }),
         resolveAgentViewToken = vi.fn().mockResolvedValue(null),
     ) {
+        // The publish gate added to reportRoute runs drizzle(c.env.DB).select()...get()
+        // on the resolved (client/legacy) path. These cases all use published
+        // reports, so the chainable fake resolves to report_status='published' and
+        // the gate lets them through (the 404 cases bail before the gate).
+        const publishedDb = { select: () => ({ from: () => ({ where: () => ({ get: async () => ({ reportStatus: 'published' }) }) }) }) };
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(publishedDb as any);
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
             c.set('services', { portalAccess: { resolveToken }, inspection: { getReportData, resolveAgentViewToken } } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
