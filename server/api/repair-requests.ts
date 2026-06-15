@@ -253,6 +253,17 @@ export const repairRequestRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const tenantId = (c.get('tenantId') || c.get('resolvedTenantId')) as string | null;
         if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+        // Publish gate: this public, no-login page feed exposes the defect list +
+        // estimates — pure client content. Block it whenever the report is not
+        // currently published (mirrors the email export; render/owner don't apply).
+        const insp = await drizzle(c.env.DB)
+            .select({ reportStatus: inspections.reportStatus })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!isReportPublished(insp?.reportStatus)) {
+            return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        }
         const data = await c.var.services.inspection.getRepairRequestData(id, tenantId);
         return c.json({ success: true as const, data }, 200);
     });
