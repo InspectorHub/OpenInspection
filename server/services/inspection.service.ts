@@ -2206,10 +2206,12 @@ export class InspectionService {
         }));
 
         let inspectorName: string | null = null;
+        let inspectorLicense: string | null = null;
         if (inspection.inspectorId) {
-            const inspector = await db.select({ name: users.name, email: users.email })
+            const inspector = await db.select({ name: users.name, email: users.email, licenseNumber: users.licenseNumber })
                 .from(users).where(eq(users.id, inspection.inspectorId)).get();
             inspectorName = inspector?.name || (inspector?.email?.split('@')[0] ?? null);
+            inspectorLicense = inspector?.licenseNumber ?? null;
         }
 
         // Sprint 2 S2-4 — per-tenant flag controls whether the published
@@ -2301,6 +2303,47 @@ export class InspectionService {
             }
             : null;
 
+        // Layer-2 report signature + cryptographic verification metadata.
+        // Both fields are null for draft/submitted reports; once published the
+        // report page renders the inspector signature block and a verifiable QR.
+        const isPublished = isReportPublished(inspection.reportStatus);
+
+        // Extract _inspector_signature from the already-loaded results row.
+        type InspectorSig = { signatureBase64?: string | null; signedAt?: number | null; userId?: string | null; auto?: boolean };
+        const resultsData = resultsRow?.data as Record<string, unknown> | null | undefined;
+        const rawSig = resultsData?._inspector_signature as InspectorSig | undefined;
+
+        const signature = isPublished
+            ? {
+                signatureBase64: rawSig?.signatureBase64 ?? null,
+                signedAt:        rawSig?.signedAt ?? null,
+                inspectorName,
+                inspectorLicense,
+            }
+            : null;
+
+        let verification: { versionNumber: number; contentHash: string | null; verifyToken: string; publishedAt: number | null } | null = null;
+        if (isPublished) {
+            const vrow = await db.select({
+                versionNumber:     reportVersions.versionNumber,
+                contentHash:       reportVersions.contentHash,
+                verificationToken: reportVersions.verificationToken,
+                publishedAt:       reportVersions.publishedAt,
+            }).from(reportVersions)
+                .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
+                .orderBy(desc(reportVersions.versionNumber))
+                .limit(1)
+                .get();
+            if (vrow?.verificationToken) {
+                verification = {
+                    versionNumber: vrow.versionNumber,
+                    contentHash:   vrow.contentHash ?? null,
+                    verifyToken:   vrow.verificationToken,
+                    publishedAt:   vrow.publishedAt ?? null,
+                };
+            }
+        }
+
         return {
             inspection: { ...inspection, inspectorName },
             theme: reportTheme,
@@ -2320,6 +2363,10 @@ export class InspectionService {
             ],
             showEstimates,
             propertyFacts,
+            // Layer-2 report signature + verification (see docs/superpowers/specs/report-signature).
+            isPublished,
+            signature,
+            verification,
         };
     }
 
