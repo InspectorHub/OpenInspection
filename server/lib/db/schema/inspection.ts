@@ -2,6 +2,8 @@ import { sqliteTable, text, integer, real, uniqueIndex, index, primaryKey } from
 import { sql } from 'drizzle-orm';
 import { tenants, users } from './tenant';
 import { contacts } from './contact';
+import { INSPECTION_STATUSES } from '../../status/inspection-status';
+import { REPORT_STATUSES } from '../../status/report-status';
 
 // Sprint 2 S2-1 — tenant-scoped rating systems library. The level list
 // itself is stored as JSON because it is never queried independently and
@@ -66,7 +68,8 @@ export const inspections = sqliteTable('inspections', {
     clientPhone:         text('client_phone'),
     templateId:          text('template_id').references(() => templates.id),
     date:                text('date').notNull(),
-    status:              text('status', { enum: ['draft','scheduled','confirmed','in_progress','completed','delivered','published','cancelled'] }).notNull().default('draft'),
+    status:              text('status', { enum: [...INSPECTION_STATUSES] }).notNull().default('requested'),
+    reportStatus:        text('report_status', { enum: [...REPORT_STATUSES] }).notNull().default('in_progress'),
     paymentStatus:       text('payment_status', { enum: ['unpaid','partial','paid'] }).notNull().default('unpaid'),
     referredByAgentId:   text('referred_by_agent_id'),   // Buyer's Agent — unkeyed TEXT (backward compat)
     // P-4 authority chain: denormalized cache only — never reconcile back from invoice

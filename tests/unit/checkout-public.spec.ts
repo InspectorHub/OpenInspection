@@ -85,7 +85,7 @@ async function seedBase(
     } as any);
     await db.insert(schema.inspections).values({
         id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
-        clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid',
+        clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
         price: 50000, agreementRequired: true, paymentRequired: true, createdAt: new Date(),
         ...inspOver,
     } as any);

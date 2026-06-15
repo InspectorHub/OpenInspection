@@ -12,6 +12,7 @@ import { SeatBanner } from "~/components/SeatBanner";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
+import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished } from "~/lib/status";
 import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
 
 export function meta() {
@@ -30,6 +31,7 @@ interface Inspection {
   clientName: string | null;
   clientEmail?: string | null;
   status: string;
+  reportStatus?: string;
   confirmedAt?: string | null;
   price?: number | null;
   paymentStatus?: string | null;
@@ -138,8 +140,8 @@ function startOfWeek(d: Date) {
 function matchesFilter(insp: Inspection, filter: FilterId, now: Date): boolean {
   if (filter === "all") return true;
   const status = (insp.status || "").toLowerCase();
-  if (filter === "unconfirmed") return status === "scheduled" || status === "draft";
-  if (filter === "in_progress") return status === "in_progress";
+  if (filter === "unconfirmed") return status === INSPECTION_STATUS.SCHEDULED || status === INSPECTION_STATUS.REQUESTED;
+  if (filter === "in_progress") return status === INSPECTION_STATUS.COMPLETED && !isReportPublished(insp.reportStatus);
   if (!insp.date) return false;
   const date = new Date(insp.date);
   if (isNaN(date.getTime())) return false;
@@ -167,7 +169,8 @@ function matchesFilter(insp: Inspection, filter: FilterId, now: Date): boolean {
 const TABS = [
   { key: "all", label: "All" },
   { key: "active", label: "Active" },
-  { key: "drafts", label: "Drafts" },
+  { key: "requested", label: "Requested" },
+  { key: "to_review", label: "To Review" },
   { key: "awaiting_payment", label: "Awaiting payment" },
   { key: "published", label: "Published" },
   { key: "cancelled", label: "Cancelled" },
@@ -175,38 +178,51 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function matchesWorkflow(i: Inspection, tab: TabKey): boolean {
+/**
+ * Pure tab matching function for both inspection lifecycle and report axes.
+ * Exported for unit testing.
+ */
+export function tabMatches(
+  tab: string,
+  i: { status: string; reportStatus?: string; paymentStatus?: string | null },
+): boolean {
   if (tab === "all") return true;
   switch (tab) {
-    case "active": return ["scheduled", "in_progress", "draft", "confirmed"].includes(i.status);
-    case "drafts": return i.status === "draft";
-    case "awaiting_payment": return (i.status === "delivered" || i.status === "published") && i.paymentStatus !== "paid";
-    // #111: Published absorbs the retired /reports list — all report-ready statuses.
-    case "published": return ["completed", "delivered", "published", "signed"].includes(i.status);
-    case "cancelled": return i.status === "cancelled";
+    case "active": return (
+        i.status === INSPECTION_STATUS.REQUESTED ||
+        i.status === INSPECTION_STATUS.SCHEDULED ||
+        i.status === INSPECTION_STATUS.CONFIRMED
+      );
+    case "requested": return i.status === INSPECTION_STATUS.REQUESTED;
+    case "to_review": return i.reportStatus === REPORT_STATUS.SUBMITTED;
+    case "published": return isReportPublished(i.reportStatus);
+    case "awaiting_payment": return isReportPublished(i.reportStatus) && i.paymentStatus !== "paid";
+    case "cancelled": return i.status === INSPECTION_STATUS.CANCELLED;
     default: return true;
   }
+}
+
+/** @deprecated Use tabMatches instead. Kept for backward compat. */
+export function matchesWorkflow(i: Inspection, tab: TabKey): boolean {
+  return tabMatches(tab, i);
 }
 
 /* ------------------------------------------------------------------ */
 /*  Report-state badge (Published tab)                                 */
 /* ------------------------------------------------------------------ */
 
-// #111: the Published tab shows a report-state Pill. Mapping copied verbatim
-// from the now-retired reports.tsx (STATUS_TONE + statusLabel) so the
-// report-oriented list keeps its semantics after the page is deleted.
-const REPORT_STATE_TONE: Record<string, "monitor" | "sat" | "info"> = {
-  completed: "monitor",
-  delivered: "sat",
+// Report-state pill for the Published/to_review tabs (uses reportStatus axis).
+const REPORT_STATE_TONE: Record<string, "monitor" | "sat" | "warning"> = {
+  in_progress: "monitor",
+  submitted: "warning",
   published: "sat",
-  signed: "info",
 };
 
-function reportStateLabel(s: string): string {
-  if (s === "completed") return "Ready";
-  if (s === "delivered" || s === "published") return "Delivered";
-  if (s === "signed") return "Signed";
-  return s;
+function reportStateLabel(reportStatus: string): string {
+  if (reportStatus === "in_progress") return "In Progress";
+  if (reportStatus === "submitted") return "Submitted";
+  if (reportStatus === "published") return "Published";
+  return reportStatus;
 }
 
 /* ------------------------------------------------------------------ */
@@ -382,7 +398,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   if (intent === "status") {
     const id = formData.get("id") as string;
-    const status = formData.get("status") as "draft" | "completed" | "delivered";
+    const status = formData.get("status") as "requested" | "scheduled" | "confirmed" | "completed" | "cancelled";
     const res = await api.inspections[":id"].$patch({
       param: { id },
       json: { status },
@@ -621,7 +637,7 @@ export default function DashboardPage() {
   /* ---- Stats ---- */
   const counts = useMemo(() => ({
     upcoming: new Set([...buckets.today, ...buckets.thisWeek, ...buckets.later].map((i) => i.id)).size,
-    inProgress: allInspections.filter((i) => i.status === "in_progress").length,
+    inProgress: allInspections.filter((i) => i.status === INSPECTION_STATUS.COMPLETED && !isReportPublished(i.reportStatus)).length,
     needsAttention: buckets.needsAttention.length,
     recent: buckets.recentReports.length,
   }), [buckets, allInspections]);
@@ -723,14 +739,12 @@ export default function DashboardPage() {
     ? Object.values(filteredBuckets).flat().length
     : filteredInspections.length;
 
-  /* ---- Status → Pill tone mapping ---- */
+  /* ---- Status → Pill tone mapping (inspection lifecycle axis) ---- */
   const statusTone: Record<string, "ni" | "info" | "monitor" | "sat" | "gen"> = {
-    draft: "ni",
+    requested: "ni",
     scheduled: "info",
     confirmed: "info",
-    in_progress: "monitor",
-    delivered: "sat",
-    published: "sat",
+    completed: "sat",
     cancelled: "gen",
   };
 
@@ -744,7 +758,7 @@ export default function DashboardPage() {
   function InspectionRow({ insp, reportView = false }: { insp: Inspection; reportView?: boolean }) {
     const isSelected = selectedIds.has(insp.id);
     const showReportLink =
-      reportView && tenantSlug && (insp.status === "delivered" || insp.status === "published");
+      reportView && tenantSlug && isReportPublished(insp.reportStatus);
     return (
       <div className="flex items-center gap-2 px-4 py-3 hover:bg-ih-bg-muted transition-colors group">
         <input
@@ -787,10 +801,10 @@ export default function DashboardPage() {
                 {insp.status.replace(/_/g, " ")}
               </Pill>
             )}
-            {/* #111: report-state badge (Published tab only) */}
-            {reportView && REPORT_STATE_TONE[insp.status] && (
-              <Pill tone={REPORT_STATE_TONE[insp.status]}>
-                {reportStateLabel(insp.status)}
+            {/* report-state badge (Published/to_review tabs) */}
+            {reportView && insp.reportStatus && REPORT_STATE_TONE[insp.reportStatus] && (
+              <Pill tone={REPORT_STATE_TONE[insp.reportStatus]}>
+                {reportStateLabel(insp.reportStatus)}
               </Pill>
             )}
             {isColumnVisible("defectChips") && insp.defectStats && (
@@ -845,12 +859,10 @@ export default function DashboardPage() {
             onClick={(e) => e.stopPropagation()}
             className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none cursor-pointer"
           >
-            <option value="draft">Draft</option>
+            <option value="requested">Requested</option>
             <option value="scheduled">Scheduled</option>
             <option value="confirmed">Confirmed</option>
-            <option value="in_progress">In Progress</option>
-            <option value="delivered">Delivered</option>
-            <option value="published">Published</option>
+            <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
         </div>
@@ -1051,7 +1063,7 @@ export default function DashboardPage() {
                 {!collapsed && (
                   <div className="divide-y divide-ih-border">
                     {items.map((insp) => (
-                      <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published"} />
+                      <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published" || activeTab === "to_review"} />
                     ))}
                   </div>
                 )}
@@ -1075,7 +1087,7 @@ export default function DashboardPage() {
               </div>
               <div className="divide-y divide-ih-border">
                 {!isSearching && displayList.map((insp) => (
-                  <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published"} />
+                  <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published" || activeTab === "to_review"} />
                 ))}
               </div>
               {isSearching && (

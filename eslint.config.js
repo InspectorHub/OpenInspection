@@ -48,6 +48,28 @@ export default tseslint.config(
                     selector: "Literal[value=/^(owner|admin|manager|inspector|agent)$/]:not(CallExpression[callee.name='requireRole'] > Literal)",
                     message: 'Use ROLES / Role from server/lib/auth/roles.ts — no bare role string literals.',
                 },
+                // Status taxonomy guard — inspection status literals must derive from
+                // INSPECTION_STATUS / REPORT_STATUS in server/lib/status/*.ts.
+                // Narrowly targets only the values that are unambiguous in this codebase:
+                //   'requested'  — only an InspectionStatus value (lifecycle axis)
+                //   'submitted'  — only a ReportStatus value (report deliverable axis)
+                // Values NOT banned because they collide with other enums:
+                //   'draft'      — invoice status ('draft'|'sent'|'paid'|'partial')
+                //   'published'  — sync outbox status + automation trigger names
+                //   'completed'  — could be used in other enums
+                //   'cancelled'  — broad usage
+                //   'scheduled'  — booking/concierge status
+                //   'confirmed'  — booking/concierge status
+                //   'in_progress' — collision: inspection_requests table status +
+                //                   dashboard filter tab IDs + report-status
+                // All legit uses of 'requested' and 'submitted' live in files already
+                // covered by the override block below (server/lib/**, server/api/**,
+                // server/services/**, app/**), so this guard only fires on NEW code
+                // outside those zones — keeping it forward-looking with zero current noise.
+                {
+                    selector: "Literal[value=/^(requested|submitted)$/]",
+                    message: 'Use INSPECTION_STATUS / REPORT_STATUS from server/lib/status/* — no bare status literals.',
+                },
             ],
         },
     },

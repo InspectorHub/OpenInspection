@@ -103,7 +103,7 @@ async function seedInspection(tenantId: string, inspectionId: string): Promise<v
     });
     await db.insert(schema.inspections).values({
         id: inspectionId, tenantId, propertyAddress: '123 Birch Lane', date: '2026-06-01',
-        status: 'draft', paymentStatus: 'unpaid', price: 0,
+        status: 'requested', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),
     });
     await db.insert(schema.inspectionResults).values({

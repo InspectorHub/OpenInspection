@@ -83,7 +83,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             clientEmail:       null,
             clientPhone:       null,
             date:              '2026-06-01',
-            status:            'draft',
+            status:            'requested',
             paymentStatus:     'unpaid',
             price:             0,
             paymentRequired:   false,
@@ -106,7 +106,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
         await testDb.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER,
             propertyAddress: 'X', clientName: null, clientEmail: null, clientPhone: null,
-            date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid',
+            date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
             price: 0, paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });
 
@@ -126,7 +126,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             clientPhone:       null,
             referredByAgentId: 'agent-buyer-1',
             date:              '2026-06-01',
-            status:            'draft',
+            status:            'requested',
             paymentStatus:     'unpaid',
             price:             0,
             paymentRequired:   false,

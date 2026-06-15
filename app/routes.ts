@@ -99,9 +99,8 @@ export default [
     // requireToken() can redirect to /login when unauthenticated.
     route("resources/schedule-conflicts", "routes/resources/schedule-conflicts.ts"),
     route("dashboard", "routes/dashboard.tsx"),
-    // Inspections nav points here; same component as the dashboard list view.
-    // Explicit id avoids a duplicate-route-id collision with the dashboard route.
-    route("inspections", "routes/dashboard.tsx", { id: "inspections-list" }),
+    // Inspections list — dedicated route using the new inspections.tsx component.
+    route("inspections", "routes/inspections.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),
     // IA-18 (#111) — contact detail (record + inspection history + stats).

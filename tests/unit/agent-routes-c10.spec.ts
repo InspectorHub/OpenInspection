@@ -33,7 +33,7 @@ describe('agent C-10 routes', () => {
 
     it('GET /api/agent/referrals returns listReferrals data, called with (userId, {limit})', async () => {
         const listReferrals = vi.fn().mockResolvedValue([
-            { id: 'i1', tenantName: 'Acme', propertyAddress: '1 Main', clientName: 'Bob', date: '2026-06-01', status: 'delivered', inspectorName: 'Pat' },
+            { id: 'i1', tenantName: 'Acme', propertyAddress: '1 Main', clientName: 'Bob', date: '2026-06-01', status: 'completed', inspectorName: 'Pat' },
         ]);
         const res = await agentApp({ agent: { listReferrals } }).request('/api/agent/referrals');
         expect(res.status).toBe(200);

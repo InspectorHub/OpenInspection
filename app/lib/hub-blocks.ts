@@ -11,6 +11,8 @@
  * Intl.NumberFormat usage in routes/invoices.tsx.)
  */
 
+import { INSPECTION_STATUS, INSPECTION_STATUS_LABELS, isReportPublished } from '~/lib/status';
+
 /** Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx. */
 export type PillTone =
     | 'sat'
@@ -46,6 +48,7 @@ export interface BlockStates {
 export interface HubPayload {
     inspection: {
         status: string;
+        reportStatus: string;
         paymentRequired: boolean;
         agreementRequired: boolean;
     };
@@ -130,33 +133,31 @@ function deriveInvoice(hub: HubPayload): BlockState {
     }
 }
 
-/**
- * Report pill. Pre-completion statuses are all "in progress"; once completed
- * the publish-readiness gate decides ready-vs-blocked; delivered/published is
- * the terminal "published" state.
- */
-function deriveReport(hub: HubPayload): BlockState {
-    const { status } = hub.inspection;
+/** Inspection lifecycle pill (appointment axis). */
+export function deriveInspectionPill(status: string): BlockState {
+    const label = INSPECTION_STATUS_LABELS[status as keyof typeof INSPECTION_STATUS_LABELS] ?? status;
     switch (status) {
-        case 'draft':
-        case 'scheduled':
-        case 'confirmed':
-        case 'in_progress':
-            return { tone: 'neutral', label: 'In progress' };
-        case 'completed':
-            return hub.publishReadiness.ready
-                ? { tone: 'monitor', label: 'Ready to publish' }
-                : { tone: 'warning', label: `${hub.publishReadiness.blockingCount} blocker(s)` };
-        case 'delivered':
-        case 'published':
-            return { tone: 'sat', label: 'Published' };
-        case 'signed':
-            return { tone: 'info', label: 'Signed' };
-        case 'cancelled':
-            return { tone: 'defect', label: 'Cancelled' };
-        default:
-            return { tone: 'neutral', label: 'In progress' };
+        case 'requested':  return { tone: 'ni',      label };
+        case 'scheduled':  return { tone: 'info',    label };
+        case 'confirmed':  return { tone: 'info',    label };
+        case 'completed':  return { tone: 'sat',     label };
+        case 'cancelled':  return { tone: 'gen',     label };
+        default:           return { tone: 'neutral', label };
     }
+}
+
+/** Report deliverable pill (report axis). */
+export function deriveReportPill(reportStatus: string): BlockState {
+    switch (reportStatus) {
+        case 'in_progress': return { tone: 'neutral', label: 'In Progress' };
+        case 'submitted':   return { tone: 'warning', label: 'Submitted' };
+        case 'published':   return { tone: 'sat',     label: 'Published' };
+        default:            return { tone: 'neutral', label: 'In Progress' };
+    }
+}
+
+function deriveReport(hub: HubPayload): BlockState {
+    return deriveReportPill(hub.inspection.reportStatus);
 }
 
 /** Collapse the hub payload into the three action-block status pills. */
@@ -173,34 +174,18 @@ export function deriveBlockStates(hub: HubPayload): BlockStates {
 /* ------------------------------------------------------------------ */
 
 /**
- * Statuses where the report is already shipped to the client — no publish CTA.
- * `delivered` is the only LIVE inspection status here (the lifecycle enum is
- * `draft | completed | delivered`; publishInspection transitions to
- * `delivered`). `published` / `signed` are retained DEFENSIVELY, mirroring the
- * dashboard's `matchesWorkflow` published-tab matching — they are not produced
- * as inspection.status today but cost nothing to tolerate if that changes.
- */
-const PUBLISHED_STATUSES = new Set(['delivered', 'published', 'signed']);
-
-/**
- * Task 9 (Issue #111) — whether the hub Report card should offer an ACTIVE
- * "Publish report" button. True only when the inspection is `completed` (the
- * only status from which publishing is legitimate) AND publish-ready AND not
- * already shipped. The `completed` gate excludes cancelled / draft / in_progress
- * regardless of readiness, so a stale `ready` flag can never offer a Publish CTA
- * for a cancelled inspection. A non-ready completed report shows the disabled
- * button + a blockers hint; an already-shipped report shows read-only state +
- * the header View link.
+ * Whether the hub Report card should offer an active "Publish report" button.
+ * True only when the inspection is `completed` AND the report is not already
+ * published. The `completed` gate excludes cancelled / requested / in-progress
+ * regardless of report status.
  */
 export function canPublish(hub: HubPayload): boolean {
-    if (PUBLISHED_STATUSES.has(hub.inspection.status)) return false;
-    if (hub.inspection.status !== 'completed') return false;
-    return hub.publishReadiness.ready;
+    return hub.inspection.status === INSPECTION_STATUS.COMPLETED && !isReportPublished(hub.inspection.reportStatus);
 }
 
 /** Whether the report has already been shipped to the client (read-only state). */
 export function isReportShipped(hub: HubPayload): boolean {
-    return PUBLISHED_STATUSES.has(hub.inspection.status);
+    return isReportPublished(hub.inspection.reportStatus);
 }
 
 /* ------------------------------------------------------------------ */

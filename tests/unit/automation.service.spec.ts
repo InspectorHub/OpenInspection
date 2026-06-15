@@ -17,7 +17,7 @@ async function seedFor(testDb: BetterSQLite3Database<typeof schema>, agreementRe
         { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await testDb.insert(schema.inspections).values([
-        { id: INSP, tenantId: TENANT, propertyAddress: '1 St', clientName: 'J', clientEmail: 'j@t.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired, paymentRequired: false, createdAt: new Date() },
+        { id: INSP, tenantId: TENANT, propertyAddress: '1 St', clientName: 'J', clientEmail: 'j@t.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired, paymentRequired: false, createdAt: new Date() },
     ]);
     await testDb.insert(schema.agreements).values([
         { id: AGR, tenantId: TENANT, name: 'Std', content: 'text', version: 1, createdAt: new Date() },

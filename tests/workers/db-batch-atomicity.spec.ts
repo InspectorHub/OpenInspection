@@ -25,7 +25,7 @@ async function seedSchema(): Promise<void> {
         'CREATE TABLE IF NOT EXISTS inspection_inspectors (inspection_id TEXT NOT NULL, user_id TEXT NOT NULL, tenant_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT \'lead\', created_at INTEGER NOT NULL, PRIMARY KEY (inspection_id, user_id));',
     );
     await b.DB.exec(
-        'CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspector_id TEXT, property_address TEXT, date TEXT, status TEXT, request_id TEXT, created_at INTEGER NOT NULL);',
+        'CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspector_id TEXT, property_address TEXT, date TEXT, status TEXT, report_status TEXT NOT NULL DEFAULT \'in_progress\', request_id TEXT, created_at INTEGER NOT NULL);',
     );
 }
 
@@ -125,7 +125,7 @@ describe('B-28 arbitrateSlotRace — real D1 semantics', () => {
     async function seedBooking(id: string, requestId: string | null, createdAtMs: number): Promise<void> {
         await b.DB.prepare(
             'INSERT INTO inspections (id, tenant_id, inspector_id, property_address, date, status, request_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        ).bind(id, TENANT, 'insp-1', '1 Main St', ISO, 'draft', requestId, createdAtMs).run();
+        ).bind(id, TENANT, 'insp-1', '1 Main St', ISO, 'requested', requestId, createdAtMs).run();
         await seedLink(id, 'insp-1');
     }
 

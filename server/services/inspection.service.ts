@@ -28,6 +28,8 @@ import type { DefectCommentState } from '../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
+import { INSPECTION_STATUS } from '../lib/status/inspection-status';
+import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
 
 /**
  * Image Studio (cover crop) — resolves the cover image URL, preferring the
@@ -293,7 +295,7 @@ export class InspectionService {
         const db = this.getDrizzle();
         const conditions = [eq(inspections.tenantId, tenantId)];
 
-        if (params.status) conditions.push(eq(inspections.status, params.status as 'draft' | 'completed' | 'delivered'));
+        if (params.status) conditions.push(eq(inspections.status, params.status));
         if (params.inspectorId) conditions.push(eq(inspections.inspectorId, params.inspectorId));
         if (params.dateFrom) conditions.push(gte(inspections.date, params.dateFrom));
         if (params.dateTo) conditions.push(lte(inspections.date, params.dateTo));
@@ -329,7 +331,7 @@ export class InspectionService {
                     conditions.push(sql`${inspections.createdAt} < ${cutoff}`);
                     break;
                 case 'in_progress':
-                    conditions.push(eq(inspections.status, 'in_progress'));
+                    conditions.push(eq(inspections.reportStatus, REPORT_STATUS.IN_PROGRESS));
                     break;
             }
         }
@@ -364,7 +366,7 @@ export class InspectionService {
             propertyAddress: row.propertyAddress as string,
             clientName: row.clientName as string | null,
             clientEmail: row.clientEmail as string | null,
-            status: row.status as 'draft' | 'completed' | 'delivered',
+            status: row.status,
             date: row.date as string,
             inspectorId: row.inspectorId as string | null,
             templateId: row.templateId as string | null,
@@ -384,13 +386,12 @@ export class InspectionService {
             .where(eq(inspections.tenantId, tenantId))
             .groupBy(inspections.status);
 
-        const stats = { total: 0, draft: 0, completed: 0, delivered: 0 };
+        const stats = { total: 0, requested: 0, completed: 0, published: 0 };
         for (const row of counts) {
             const n = Number(row.count);
             stats.total += n;
-            if (row.status === 'draft') stats.draft = n;
-            else if (row.status === 'completed') stats.completed = n;
-            else if (row.status === 'delivered') stats.delivered = n;
+            if (row.status === INSPECTION_STATUS.REQUESTED) stats.requested = n;
+            else if (row.status === INSPECTION_STATUS.COMPLETED) stats.completed = n;
         }
         return stats;
     }
@@ -476,7 +477,7 @@ export class InspectionService {
         if (!this.sdb) throw new Error('ScopedDB session missing');
         const id = crypto.randomUUID();
         const createdAt = new Date();
-        const status = 'draft' as const;
+        const status = INSPECTION_STATUS.REQUESTED;
         const date = data.date || createdAt.toISOString();
 
         let templateSnapshot: unknown = null;
@@ -705,7 +706,7 @@ export class InspectionService {
             templateSnapshot:        baseline.templateSnapshot,
             templateSnapshotVersion: baseline.templateSnapshotVersion,
             date:                    createdAt.toISOString(),
-            status:                  'draft',
+            status:                  INSPECTION_STATUS.REQUESTED,
             paymentStatus:           'unpaid',
             price:                   0,
             paymentRequired:         false,
@@ -2522,6 +2523,7 @@ export class InspectionService {
             clientPhone: string | null;
             clientContactId: string | null;
             status: string;
+            reportStatus: string;
             date: string | null;
             inspectorId: string | null;
             templateId: string | null;
@@ -2613,6 +2615,7 @@ export class InspectionService {
                 clientPhone:       insp.clientPhone ?? null,
                 clientContactId:   insp.clientContactId ?? null,
                 status:            insp.status,
+                reportStatus:      insp.reportStatus as string,
                 date:              insp.date ?? null,
                 inspectorId:       insp.inspectorId ?? null,
                 templateId:        insp.templateId ?? null,
@@ -2856,8 +2859,8 @@ export class InspectionService {
             today:       sql<number>`sum(case when date(${inspections.date}) = ${todayStr} then 1 else 0 end)`,
             upcoming:    sql<number>`sum(case when ${inspections.date} > ${todayStr} and ${inspections.status} not in ('completed','cancelled') then 1 else 0 end)`,
             past:        sql<number>`sum(case when ${inspections.date} < ${todayStr} or ${inspections.status} in ('completed','cancelled') then 1 else 0 end)`,
-            unconfirmed: sql<number>`sum(case when ${inspections.status} = 'scheduled' and ${inspections.createdAt} < ${cutoff} then 1 else 0 end)`,
-            inProgress:  sql<number>`sum(case when ${inspections.status} = 'in_progress' then 1 else 0 end)`,
+            unconfirmed: sql<number>`sum(case when ${inspections.status} = 'requested' and ${inspections.createdAt} < ${cutoff} then 1 else 0 end)`,
+            inProgress:  sql<number>`sum(case when ${inspections.status} = 'completed' and ${inspections.reportStatus} = 'in_progress' then 1 else 0 end)`,
         }).from(inspections).where(eq(inspections.tenantId, tenantId));
 
         const row = result[0] ?? {};
@@ -3063,10 +3066,10 @@ export class InspectionService {
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
-        if (inspection.status === 'delivered') throw Errors.BadRequest('Inspection is already published');
+        if (inspection.status !== INSPECTION_STATUS.COMPLETED) throw Errors.BadRequest('Inspection must be completed before publishing the report.');
 
         await db.update(inspections)
-            .set({ status: 'delivered' })
+            .set({ reportStatus: REPORT_STATUS.PUBLISHED })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
         // Await so AutomationService.trigger actually inserts automation_logs
         // before the response goes out — the prior fire-and-forget pattern
@@ -3116,7 +3119,7 @@ export class InspectionService {
         const tenantSlug = tenantRow?.slug ?? '';
         return {
             reportUrl: `/report/${tenantSlug}/${inspectionId}`,
-            status: 'delivered',
+            reportStatus: REPORT_STATUS.PUBLISHED,
         };
     }
 
@@ -3133,9 +3136,9 @@ export class InspectionService {
 
     async confirmInspection(tenantId: string, id: string): Promise<void> {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
-        if (inspection.status === 'cancelled') throw Errors.BadRequest('Cannot confirm a cancelled inspection');
+        if (inspection.status === INSPECTION_STATUS.CANCELLED) throw Errors.BadRequest('Cannot confirm a cancelled inspection');
         await db.update(inspections).set({
-            status:      'confirmed',
+            status:      INSPECTION_STATUS.CONFIRMED,
             confirmedAt: new Date().toISOString(),
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         await fireAutomation(this.db, tenantId, id, 'inspection.confirmed');
@@ -3144,7 +3147,7 @@ export class InspectionService {
     async cancelInspection(tenantId: string, id: string, reason: string, notes?: string): Promise<void> {
         const { db } = await this.fetchForStatusChange(tenantId, id);
         await db.update(inspections).set({
-            status:       'cancelled',
+            status:       INSPECTION_STATUS.CANCELLED,
             cancelReason: reason,
             cancelNotes:  notes ?? null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
@@ -3153,12 +3156,60 @@ export class InspectionService {
 
     async uncancelInspection(tenantId: string, id: string): Promise<void> {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
-        if (inspection.status !== 'cancelled') throw Errors.BadRequest('Inspection is not cancelled');
+        if (inspection.status !== INSPECTION_STATUS.CANCELLED) throw Errors.BadRequest('Inspection is not cancelled');
         await db.update(inspections).set({
-            status:       'scheduled',
+            status:       INSPECTION_STATUS.SCHEDULED,
             cancelReason: null,
             cancelNotes:  null,
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
+     * Submits a completed inspection's report for manager review.
+     * Transitions: reportStatus in_progress → submitted.
+     */
+    async submitReport(inspectionId: string, tenantId: string): Promise<void> {
+        const { db, inspection } = await this.fetchForStatusChange(tenantId, inspectionId);
+        if (inspection.status !== INSPECTION_STATUS.COMPLETED) {
+            throw Errors.BadRequest('Inspection must be completed before submitting the report.');
+        }
+        const reportStatus = inspection.reportStatus as string;
+        if (reportStatus !== REPORT_STATUS.IN_PROGRESS) {
+            throw Errors.BadRequest(`Cannot submit a report in status ${reportStatus}.`);
+        }
+        await db.update(inspections)
+            .set({ reportStatus: REPORT_STATUS.SUBMITTED })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
+     * Returns a submitted report to the inspector for revision.
+     * Transitions: reportStatus submitted → in_progress.
+     */
+    async returnReport(inspectionId: string, tenantId: string): Promise<void> {
+        const { db, inspection } = await this.fetchForStatusChange(tenantId, inspectionId);
+        const reportStatus = inspection.reportStatus as string;
+        if (reportStatus !== REPORT_STATUS.SUBMITTED) {
+            throw Errors.BadRequest('Only submitted reports can be returned.');
+        }
+        await db.update(inspections)
+            .set({ reportStatus: REPORT_STATUS.IN_PROGRESS })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
+     * Unpublishes a published report, reverting it to in_progress for editing.
+     * Transitions: reportStatus published → in_progress.
+     */
+    async unpublishReport(inspectionId: string, tenantId: string): Promise<void> {
+        const { db, inspection } = await this.fetchForStatusChange(tenantId, inspectionId);
+        const reportStatus = inspection.reportStatus as string;
+        if (reportStatus !== REPORT_STATUS.PUBLISHED) {
+            throw Errors.BadRequest('Only published reports can be unpublished.');
+        }
+        await db.update(inspections)
+            .set({ reportStatus: REPORT_STATUS.IN_PROGRESS })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
     }
 
     /**
@@ -3366,32 +3417,37 @@ export class InspectionService {
         //  - active inspection with an overdue invoice past the invoice threshold.
         const needsAttention = all.filter(i => {
             const d = insDate(i);
-            if (i.status === 'scheduled' && d && d <= in48h) return true;
-            if (i.status === 'in_progress' && d && d <= reportStaleAt) return true;
-            if (i.status !== 'cancelled' && new Date(i.createdAt) <= agreementStaleAt && !signedSet.has(i.id as string)) return true;
-            if (i.status !== 'cancelled' && overdueSet.has(i.id as string)) return true;
+            if (i.status === INSPECTION_STATUS.SCHEDULED && d && d <= in48h) return true;
+            // Report not yet published past threshold (completed but reportStatus still in_progress/submitted)
+            if (i.status === INSPECTION_STATUS.COMPLETED && !isReportPublished(i.reportStatus) && new Date(i.createdAt) <= reportStaleAt) return true;
+            // Submitted reports awaiting manager review
+            if (i.reportStatus === REPORT_STATUS.SUBMITTED) return true;
+            if (i.status !== INSPECTION_STATUS.CANCELLED && new Date(i.createdAt) <= agreementStaleAt && !signedSet.has(i.id as string)) return true;
+            if (i.status !== INSPECTION_STATUS.CANCELLED && overdueSet.has(i.id as string)) return true;
             return false;
         });
 
-        const today = all.filter(i => isToday(i) && i.status !== 'cancelled');
+        const today = all.filter(i => isToday(i) && i.status !== INSPECTION_STATUS.CANCELLED);
 
         const thisWeek = all.filter(i => {
             const d = insDate(i);
-            return d !== null && d > endOfToday && d <= in7days && i.status !== 'cancelled';
+            return d !== null && d > endOfToday && d <= in7days && i.status !== INSPECTION_STATUS.CANCELLED;
         });
 
         const laterAll = all.filter(i => {
             const d = insDate(i);
-            return d !== null && d > in7days && i.status !== 'cancelled';
+            return d !== null && d > in7days && i.status !== INSPECTION_STATUS.CANCELLED;
         });
         const later      = laterAll.slice(0, 50);
         const laterTotal = laterAll.length;
 
-        const recentReports = all.filter(i => i.status === 'completed' || i.status === 'delivered');
+        const recentReports = all.filter(i =>
+            i.status === INSPECTION_STATUS.COMPLETED && isReportPublished(i.reportStatus)
+        );
 
         // Cancelled within last 30 days (no updatedAt on inspections — use createdAt as fallback proxy).
         const cancelled = all.filter(i =>
-            i.status === 'cancelled' && new Date(i.createdAt) >= minus30days
+            i.status === INSPECTION_STATUS.CANCELLED && new Date(i.createdAt) >= minus30days
         ).slice(0, 20);
 
         // Spec 5B P2B — annotate every surfaced inspection with defect counts
@@ -3478,11 +3534,10 @@ export class InspectionService {
                 const inspectorId = r.inspectorId as string | null;
                 const inspectorName = inspectorId ? inspectorNameMap.get(inspectorId) : undefined;
                 // Round-2 F2 — split "report ready" (built/completed) from "sent"
-                // (delivered = publish workflow completed). Older clients still
-                // see `reportPublished` (alias of reportReady) for backward-
-                // compat; new dashboard JSX reads `sent` for the ✈️ icon.
-                const reportReady = r.status === 'completed' || r.status === 'delivered';
-                const sent        = r.status === 'delivered';
+                // (published = publish workflow completed). reportPublished is the
+                // canonical flag; sent is an alias for the ✈️ icon on the dashboard.
+                const reportReady = r.status === INSPECTION_STATUS.COMPLETED;
+                const sent        = isReportPublished((r as { reportStatus?: unknown }).reportStatus);
                 return {
                     ...r,
                     defectStats: statsMap.get(id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
@@ -3495,7 +3550,7 @@ export class InspectionService {
                         paid:            paidIdSet.has(id),
                         sent,
                         flagged:         overdueSet.has(id),
-                        canceled:        r.status === 'cancelled',
+                        canceled:        r.status === INSPECTION_STATUS.CANCELLED,
                     },
                     ...(reqId ? { requestId: reqId, siblingCount } : {}),
                 };

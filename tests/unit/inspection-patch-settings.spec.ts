@@ -48,7 +48,7 @@ function buildApp(role: string) {
         c.set(
             'services',
             { inspection: {
-                getInspection: vi.fn().mockResolvedValue({ inspection: { status: 'draft' } }),
+                getInspection: vi.fn().mockResolvedValue({ inspection: { status: 'requested' } }),
                 isInspectionPhotoKey: (iid: string, tid: string, key: string) => realSvc.isInspectionPhotoKey(iid, tid, key),
             } } as never,
         );
@@ -83,7 +83,7 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT,
             propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@x',
-            date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 50000,
+            date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);

@@ -32,10 +32,10 @@ describe('ContactService.listContacts inspectionCount', () => {
             { id: AGENT_BOB, tenantId: TENANT_A, type: 'agent', name: 'Bob', email: 'bob@test.com', createdAt: new Date() },
         ]);
         await testDb.insert(schema.inspections).values([
-            { id: 'i-jane-1', tenantId: TENANT_A, propertyAddress: '1 St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
-            { id: 'i-jane-2', tenantId: TENANT_A, propertyAddress: '2 St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-02', status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
-            { id: 'i-bob-ref', tenantId: TENANT_A, propertyAddress: '3 St', clientName: 'X', clientEmail: 'x@test.com', referredByAgentId: AGENT_BOB, date: '2026-06-03', status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
-            { id: 'i-other-tenant', tenantId: TENANT_B, propertyAddress: '4 St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-04', status: 'draft', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
+            { id: 'i-jane-1', tenantId: TENANT_A, propertyAddress: '1 St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
+            { id: 'i-jane-2', tenantId: TENANT_A, propertyAddress: '2 St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
+            { id: 'i-bob-ref', tenantId: TENANT_A, propertyAddress: '3 St', clientName: 'X', clientEmail: 'x@test.com', referredByAgentId: AGENT_BOB, date: '2026-06-03', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
+            { id: 'i-other-tenant', tenantId: TENANT_B, propertyAddress: '4 St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-04', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date() },
         ]);
 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);

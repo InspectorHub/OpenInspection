@@ -43,7 +43,7 @@ describe('InspectionService.publishInspection auto-sign behavior', () => {
             id: INSP_ID, tenantId: TENANT,
             inspectorId: USER_ID,
             propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@x',
-            date: '2026-06-01', status: 'draft',
+            date: '2026-06-01', status: 'completed',
             paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false,
             autoSignOnPublish: true,

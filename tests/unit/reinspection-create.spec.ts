@@ -28,7 +28,7 @@ async function seed(testDb: BetterSQLite3Database<typeof schema>) {
         id: ORIGINAL, tenantId: TENANT,
         propertyAddress: '1 Main St', clientName: 'Jane Buyer',
         clientEmail: 'jane@example.com', date: '2026-06-01',
-        status: 'published', paymentStatus: 'unpaid', price: 0,
+        status: 'completed', reportStatus: 'published', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),
     });
     // Its r1 snapshot. snapshotOnPublish stores { inspection, data, units };
@@ -52,7 +52,7 @@ async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.inspections).values({
         id: DRAFT, tenantId: TENANT,
         propertyAddress: '2 Side St', date: '2026-06-02',
-        status: 'draft', paymentStatus: 'unpaid', price: 0,
+        status: 'requested', paymentStatus: 'unpaid', price: 0,
         paymentRequired: false, agreementRequired: false, createdAt: new Date(),
     });
 }

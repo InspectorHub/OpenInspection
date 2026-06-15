@@ -4,7 +4,8 @@ import type { Route } from "./+types/inspection-hub";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { deriveBlockStates, formatCents, canPublish, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
+import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
+import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
@@ -39,6 +40,7 @@ interface HubData extends HubPayload {
     referredByAgentId: string | null;
     sellingAgentId: string | null;
     createdAt: string | null;
+    // reportStatus is inherited from HubPayload["inspection"] but listed here for clarity
   };
   tenantSlug: string;
   people: {
@@ -92,11 +94,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const hub = ((body as Record<string, unknown>).data ?? {}) as unknown as HubData;
 
   // #119 Task 6 — re-inspection candidates for the "Create re-inspection" modal.
-  // Only meaningful off a PUBLISHED baseline, so we fetch them only then (the
-  // endpoint returns [] for unpublished anyway). Best-effort: a failure degrades
-  // to an empty list and the action gates publication server-side.
+  // Only meaningful off a PUBLISHED baseline (reportStatus=published), so we
+  // fetch them only then. Best-effort: a failure degrades to an empty list.
   let reinspectCandidates: ReinspectCandidate[] = [];
-  if (hub.inspection?.status === "published" || hub.inspection?.status === "delivered") {
+  if (isReportPublished(hub.inspection?.reportStatus)) {
     const candRes = await api.inspections[":id"]["reinspect-candidates"]
       .$get({ param: { id } })
       .catch(() => null);
@@ -114,7 +115,26 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       ? (((await consentRes.json()) as { data?: { consent?: "granted" | "revoked" | "none" } }).data?.consent ?? "none")
       : "none";
 
-  return { hub, smsConsent, reinspectCandidates };
+  // Capability: whether the current user can publish reports (owner/manager/inspector).
+  // Best-effort: falls back to false (inspector will see submit-only flow).
+  let canPublishCap = false;
+  try {
+    const meGet = (api as unknown as { auth?: { me?: { $get?: (args?: unknown) => Promise<Response> } } })
+      ?.auth?.me?.$get;
+    if (meGet) {
+      const meRes = await meGet().catch(() => null);
+      if (meRes && meRes.ok) {
+        const meBody = (await meRes.json().catch(() => ({}))) as { data?: { user?: { role?: string } } };
+        const role = meBody.data?.user?.role ?? 'inspector';
+        const publishRoles = new Set(['owner', 'manager', 'inspector']);
+        canPublishCap = publishRoles.has(role);
+      }
+    }
+  } catch {
+    // Best-effort: fail open on cap check (canPublishCap stays false)
+  }
+
+  return { hub, smsConsent, reinspectCandidates, canPublishCap };
 }
 
 /* ------------------------------------------------------------------ */
@@ -207,6 +227,54 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return { ok: true, intent: "publish" as const, error: undefined };
   }
 
+  if (intent === "submit") {
+    const submitApi = api.inspections[":id"] as unknown as {
+      submit: { $post: (args: { param: { id: string } }) => Promise<Response> };
+    };
+    const res = await submitApi.submit.$post({ param: { id } });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return {
+        ok: false,
+        intent: "submit" as const,
+        error: err?.error?.message ?? "Could not submit the report. Please try again.",
+      };
+    }
+    return { ok: true, intent: "submit" as const, error: undefined };
+  }
+
+  if (intent === "return") {
+    const returnApi = api.inspections[":id"] as unknown as {
+      return: { $post: (args: { param: { id: string } }) => Promise<Response> };
+    };
+    const res = await returnApi.return.$post({ param: { id } });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return {
+        ok: false,
+        intent: "return" as const,
+        error: err?.error?.message ?? "Could not return the report. Please try again.",
+      };
+    }
+    return { ok: true, intent: "return" as const, error: undefined };
+  }
+
+  if (intent === "unpublish") {
+    const unpublishApi = api.inspections[":id"] as unknown as {
+      unpublish: { $post: (args: { param: { id: string } }) => Promise<Response> };
+    };
+    const res = await unpublishApi.unpublish.$post({ param: { id } });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return {
+        ok: false,
+        intent: "unpublish" as const,
+        error: err?.error?.message ?? "Could not unpublish the report. Please try again.",
+      };
+    }
+    return { ok: true, intent: "unpublish" as const, error: undefined };
+  }
+
   if (intent === "create-reinspection") {
     // #119 Task 6 — carry the checked baseline items forward into a new
     // re-inspection. The form submits one `selectedItemIds` value per checked
@@ -261,11 +329,32 @@ function humanizeStatus(status: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Report action matrix (pure — testable)                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Derive which report action buttons to render given the current user's
+ * capabilities, the report status, and the inspection lifecycle status.
+ * Returns an ordered array of action identifiers for the Report card.
+ */
+export function reportActions(
+  caps: { publish: boolean },
+  reportStatus: string,
+  inspectionStatus: string,
+): Array<'submit' | 'publish' | 'return' | 'unpublish'> {
+  if (inspectionStatus !== INSPECTION_STATUS.COMPLETED) return [];
+  if (reportStatus === REPORT_STATUS.PUBLISHED) return caps.publish ? ['unpublish'] : [];
+  if (reportStatus === REPORT_STATUS.SUBMITTED) return caps.publish ? ['publish', 'return'] : [];
+  // in_progress (or unknown)
+  return caps.publish ? ['publish'] : ['submit'];
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
 export default function InspectionHubPage() {
-  const { hub, smsConsent, reinspectCandidates } = useLoaderData<typeof loader>();
+  const { hub, smsConsent, reinspectCandidates, canPublishCap } = useLoaderData<typeof loader>();
   const { inspection, people, services, tenantSlug } = hub;
   const blocks = deriveBlockStates(hub);
   const navigate = useNavigate();
@@ -336,6 +425,14 @@ export default function InspectionHubPage() {
     }
   }, [publishModalOpen, publish.state, publish.data]);
 
+  // Submit / return / unpublish — dedicated fetchers (B-17: never share).
+  const submitReport = useFetcher<typeof action>();
+  const returnReport = useFetcher<typeof action>();
+  const unpublishReport = useFetcher<typeof action>();
+  const submittingReport = submitReport.state !== "idle";
+  const returningReport = returnReport.state !== "idle";
+  const unpublishingReport = unpublishReport.state !== "idle";
+
   // Create-re-inspection modal — its own dedicated fetcher (B-17). On success
   // the action returns the new inspection id; navigate to its hub (mirrors the
   // app's create-then-navigate flow). Only published baselines can re-inspect.
@@ -362,13 +459,17 @@ export default function InspectionHubPage() {
   }, [createReinspection.state, createReinspection.data, navigate]);
 
   // "View report" only makes sense once the report is shipped to the client.
-  const reportShipped =
-    inspection.status === "delivered" || inspection.status === "published";
+  const reportShipped = isReportPublished(inspection.reportStatus);
 
-  // Report card affordance (Task 9): active publish CTA vs disabled-with-blockers
-  // vs read-only-shipped.
+  // Report card affordance: active publish CTA vs read-only-shipped.
   const reportPublished = isReportShipped(hub);
-  const publishReady = canPublish(hub);
+
+  // Report action matrix — what buttons to show in the Report card.
+  const reportActionList = reportActions(
+    { publish: canPublishCap },
+    inspection.reportStatus,
+    inspection.status,
+  );
 
   const servicesTotalCents = services.reduce((sum, s) => sum + s.priceCents, 0);
   const allAgents = [...people.buyerAgents, ...people.listingAgents];
@@ -631,7 +732,7 @@ export default function InspectionHubPage() {
               <p className="text-[12px] text-ih-fg-3 mb-3">
                 Report delivered to the client.
               </p>
-              {reportPublished && (
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -639,41 +740,79 @@ export default function InspectionHubPage() {
                 >
                   Create re-inspection
                 </Button>
+                {reportActionList.includes('unpublish') && (
+                  <unpublishReport.Form method="post">
+                    <input type="hidden" name="intent" value="unpublish" />
+                    <button
+                      type="submit"
+                      disabled={unpublishingReport}
+                      className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60"
+                    >
+                      {unpublishingReport ? "Unpublishing…" : "Unpublish"}
+                    </button>
+                  </unpublishReport.Form>
+                )}
+              </div>
+            </>
+          ) : reportActionList.length > 0 ? (
+            <>
+              {inspection.reportStatus === 'submitted' && (
+                <p className="text-[12px] text-ih-fg-3 mb-3">
+                  Report submitted for review.
+                </p>
               )}
-            </>
-          ) : publishReady ? (
-            <>
-              <p className="text-[12px] text-ih-fg-3 mb-3">
-                All required fields are complete.
-              </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPublishModalOpen(true)}
-              >
-                Publish report
-              </Button>
-            </>
-          ) : !hub.publishReadiness.ready ? (
-            <>
-              <p className="text-[12px] text-ih-fg-3 mb-3">
-                {hub.publishReadiness.blockingCount} blocker(s) to resolve before publishing
-              </p>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled
-                  title="Resolve blockers first"
-                >
-                  Publish report
-                </Button>
-                <Link
-                  to={`/inspections/${inspection.id}/edit`}
-                  className="text-[12px] font-bold text-ih-primary hover:underline"
-                >
-                  Resolve in editor
-                </Link>
+              {inspection.reportStatus === 'in_progress' && hub.publishReadiness.ready && (
+                <p className="text-[12px] text-ih-fg-3 mb-3">
+                  All required fields are complete.
+                </p>
+              )}
+              {inspection.reportStatus === 'in_progress' && !hub.publishReadiness.ready && hub.publishReadiness.blockingCount > 0 && (
+                <p className="text-[12px] text-ih-fg-3 mb-3">
+                  {hub.publishReadiness.blockingCount} blocker(s) to resolve before publishing.
+                </p>
+              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                {reportActionList.includes('publish') && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setPublishModalOpen(true)}
+                  >
+                    Publish report
+                  </Button>
+                )}
+                {reportActionList.includes('submit') && (
+                  <submitReport.Form method="post">
+                    <input type="hidden" name="intent" value="submit" />
+                    <button
+                      type="submit"
+                      disabled={submittingReport}
+                      className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+                    >
+                      {submittingReport ? "Submitting…" : "Submit for review"}
+                    </button>
+                  </submitReport.Form>
+                )}
+                {reportActionList.includes('return') && (
+                  <returnReport.Form method="post">
+                    <input type="hidden" name="intent" value="return" />
+                    <button
+                      type="submit"
+                      disabled={returningReport}
+                      className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60"
+                    >
+                      {returningReport ? "Returning…" : "Return to inspector"}
+                    </button>
+                  </returnReport.Form>
+                )}
+                {inspection.reportStatus === 'in_progress' && !hub.publishReadiness.ready && hub.publishReadiness.blockingCount > 0 && (
+                  <Link
+                    to={`/inspections/${inspection.id}/edit`}
+                    className="text-[12px] font-bold text-ih-primary hover:underline"
+                  >
+                    Resolve in editor
+                  </Link>
+                )}
               </div>
             </>
           ) : (

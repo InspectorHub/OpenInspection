@@ -19,8 +19,8 @@ async function seedBase(testDb: BetterSQLite3Database<typeof schema>) {
         { id: TENANT_B, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ]);
     await testDb.insert(schema.inspections).values([
-        { id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 50000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
-        { id: INSP_B, tenantId: TENANT_B, propertyAddress: '2 Other St', clientName: 'Bob', clientEmail: 'bob@test.com', date: '2026-06-02', status: 'draft', paymentStatus: 'unpaid', price: 30000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
+        { id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
+        { id: INSP_B, tenantId: TENANT_B, propertyAddress: '2 Other St', clientName: 'Bob', clientEmail: 'bob@test.com', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 30000, agreementRequired: true, paymentRequired: true, createdAt: new Date() },
     ]);
     await testDb.insert(schema.agreements).values([
         { id: AGR_ID, tenantId: TENANT_A, name: 'Standard', content: 'Agreement text...', version: 1, createdAt: new Date() },

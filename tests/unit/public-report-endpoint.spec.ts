@@ -79,7 +79,7 @@ describe('GET /api/public/observe/inspections/:id — ③-A.4', () => {
     function buildApp(
         claim: ReturnType<typeof vi.fn>,
         getObserveProgress = vi.fn().mockResolvedValue({
-            address: '1 Main St', date: '2026-06-01', inspectorName: 'Pat', status: 'in_progress', sections: [],
+            address: '1 Main St', date: '2026-06-01', inspectorName: 'Pat', status: 'completed', sections: [],
         }),
     ) {
         const app = new OpenAPIHono<HonoConfig>();
@@ -195,7 +195,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         } as any);
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
-            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid',
+            clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
             price: 50000, agreementRequired: true, paymentRequired: true, createdAt: new Date(),
             ...inspOver,
         } as any);

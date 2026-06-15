@@ -6,6 +6,7 @@ import { contacts } from '../lib/db/schema/contact';
 import { inspections, inspectionResults } from '../lib/db/schema/inspection';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
+import { REPORT_STATUS } from '../lib/status/report-status';
 import { hashPassword } from '../lib/password';
 import type { EmailService } from './email.service';
 import {
@@ -565,7 +566,7 @@ export class AgentService {
                     eq(inspectionResults.tenantId, inspections.tenantId),
                 ),
             )
-            .where(eq(inspections.status, 'delivered'))
+            .where(eq(inspections.reportStatus, REPORT_STATUS.PUBLISHED))
             .all();
 
         const agent = await db.select({ email: users.email })

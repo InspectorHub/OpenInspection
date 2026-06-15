@@ -91,7 +91,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT,
             propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@example.com',
-            date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 50000,
+            date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
     });
@@ -186,7 +186,7 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         });
         await db.insert(schema.inspections).values({
             id: 'insp-other', tenantId: OTHER, propertyAddress: 'X',
-            clientName: null, clientEmail: 'x@y.com', date: '2026-06-01', status: 'draft',
+            clientName: null, clientEmail: 'x@y.com', date: '2026-06-01', status: 'requested',
             paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
         const res = await send(`/api/inspections/insp-other/agreement-requests`, '{}');

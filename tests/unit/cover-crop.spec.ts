@@ -73,7 +73,7 @@ describe('InspectionService.setCroppedCover', () => {
     await testDb.insert(schema.inspections).values({
       id: INSPECTION_ID, tenantId: TENANT, templateId: null,
       propertyAddress: '1 Main St', clientName: 'C', clientEmail: 'c@example.com',
-      date: '2026-06-01', status: 'draft', paymentStatus: 'unpaid', price: 0,
+      date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
       paymentRequired: false, agreementRequired: false, createdAt: new Date(),
     });
     await testDb.insert(schema.inspectionMediaPool).values({

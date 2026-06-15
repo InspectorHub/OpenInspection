@@ -19,7 +19,8 @@ function hub(overrides: {
 } = {}): HubPayload {
     return {
         inspection: {
-            status: 'draft',
+            status: 'requested',
+            reportStatus: 'in_progress',
             paymentRequired: false,
             agreementRequired: false,
             ...overrides.inspection,
@@ -127,96 +128,77 @@ describe('deriveBlockStates — invoice block', () => {
     });
 });
 
-describe('deriveBlockStates — report block', () => {
-    it.each(['draft', 'scheduled', 'confirmed', 'in_progress'])(
-        '%s status → neutral / In progress',
-        (status) => {
-            const s = deriveBlockStates(hub({ inspection: { status } }));
-            expect(s.report).toEqual({ tone: 'neutral', label: 'In progress' });
-        },
-    );
-
-    it('completed & ready → monitor / Ready to publish', () => {
-        const s = deriveBlockStates(hub({
-            inspection: { status: 'completed' },
-            publishReadiness: { ready: true, blockingCount: 0 },
-        }));
-        expect(s.report).toEqual({ tone: 'monitor', label: 'Ready to publish' });
+describe('deriveBlockStates — report block (reportStatus axis)', () => {
+    it('in_progress reportStatus → neutral / In Progress', () => {
+        const s = deriveBlockStates(hub({ inspection: { reportStatus: 'in_progress' } }));
+        expect(s.report).toEqual({ tone: 'neutral', label: 'In Progress' });
     });
 
-    it('completed & not ready → warning / N blocker(s)', () => {
-        const s = deriveBlockStates(hub({
-            inspection: { status: 'completed' },
-            publishReadiness: { ready: false, blockingCount: 3 },
-        }));
-        expect(s.report).toEqual({ tone: 'warning', label: '3 blocker(s)' });
+    it('submitted reportStatus → warning / Submitted', () => {
+        const s = deriveBlockStates(hub({ inspection: { reportStatus: 'submitted' } }));
+        expect(s.report).toEqual({ tone: 'warning', label: 'Submitted' });
     });
 
-    it.each(['delivered', 'published'])('%s status → sat / Published', (status) => {
-        const s = deriveBlockStates(hub({ inspection: { status } }));
+    it('published reportStatus → sat / Published', () => {
+        const s = deriveBlockStates(hub({ inspection: { reportStatus: 'published' } }));
         expect(s.report).toEqual({ tone: 'sat', label: 'Published' });
     });
 
-    it('signed status → info / Signed', () => {
-        const s = deriveBlockStates(hub({ inspection: { status: 'signed' } }));
-        expect(s.report).toEqual({ tone: 'info', label: 'Signed' });
-    });
-
-    it('cancelled status → defect / Cancelled', () => {
-        const s = deriveBlockStates(hub({ inspection: { status: 'cancelled' } }));
-        expect(s.report).toEqual({ tone: 'defect', label: 'Cancelled' });
+    it('unknown reportStatus → neutral / In Progress (safe default)', () => {
+        const s = deriveBlockStates(hub({ inspection: { reportStatus: 'unknown_value' } }));
+        expect(s.report).toEqual({ tone: 'neutral', label: 'In Progress' });
     });
 });
 
-describe('canPublish — report publish affordance (Task 9)', () => {
-    it('completed & ready → true (active publish CTA)', () => {
+describe('canPublish — report publish affordance', () => {
+    it('completed + in_progress → true (active publish CTA)', () => {
         expect(canPublish(hub({
-            inspection: { status: 'completed' },
-            publishReadiness: { ready: true, blockingCount: 0 },
+            inspection: { status: 'completed', reportStatus: 'in_progress' },
         }))).toBe(true);
     });
 
-    it('completed & NOT ready → false (disabled, blockers shown)', () => {
+    it('completed + submitted → true (can still publish bypassing review)', () => {
         expect(canPublish(hub({
-            inspection: { status: 'completed' },
-            publishReadiness: { ready: false, blockingCount: 3 },
+            inspection: { status: 'completed', reportStatus: 'submitted' },
+        }))).toBe(true);
+    });
+
+    it('completed + published → false (already published)', () => {
+        expect(canPublish(hub({
+            inspection: { status: 'completed', reportStatus: 'published' },
         }))).toBe(false);
     });
 
-    it('in_progress & ready → false (status gate: nothing to publish yet)', () => {
-        // Even with a ready readiness flag, only `completed` may publish.
+    it('requested + in_progress → false (status gate: not completed yet)', () => {
         expect(canPublish(hub({
-            inspection: { status: 'in_progress' },
-            publishReadiness: { ready: true, blockingCount: 0 },
+            inspection: { status: 'requested', reportStatus: 'in_progress' },
         }))).toBe(false);
     });
 
-    it('cancelled & ready → false (status gate excludes cancelled)', () => {
-        // A stale ready flag on a cancelled inspection must NOT offer a CTA.
+    it('cancelled + in_progress → false (status gate excludes cancelled)', () => {
         expect(canPublish(hub({
-            inspection: { status: 'cancelled' },
-            publishReadiness: { ready: true, blockingCount: 0 },
+            inspection: { status: 'cancelled', reportStatus: 'in_progress' },
         }))).toBe(false);
     });
 
-    it.each(['delivered', 'published', 'signed'])(
-        'already-shipped status %s → false (read-only, no CTA) even if ready',
-        (status) => {
-            expect(canPublish(hub({
-                inspection: { status },
-                publishReadiness: { ready: true, blockingCount: 0 },
-            }))).toBe(false);
-        },
-    );
+    it('scheduled + in_progress → false (not completed)', () => {
+        expect(canPublish(hub({
+            inspection: { status: 'scheduled', reportStatus: 'in_progress' },
+        }))).toBe(false);
+    });
 });
 
 describe('isReportShipped', () => {
-    it.each(['delivered', 'published', 'signed'])('%s → true', (status) => {
-        expect(isReportShipped(hub({ inspection: { status } }))).toBe(true);
+    it('published reportStatus → true', () => {
+        expect(isReportShipped(hub({ inspection: { reportStatus: 'published' } }))).toBe(true);
     });
 
-    it.each(['draft', 'in_progress', 'completed', 'cancelled'])('%s → false', (status) => {
-        expect(isReportShipped(hub({ inspection: { status } }))).toBe(false);
+    it('in_progress reportStatus → false', () => {
+        expect(isReportShipped(hub({ inspection: { reportStatus: 'in_progress' } }))).toBe(false);
+    });
+
+    it('submitted reportStatus → false', () => {
+        expect(isReportShipped(hub({ inspection: { reportStatus: 'submitted' } }))).toBe(false);
     });
 });
 

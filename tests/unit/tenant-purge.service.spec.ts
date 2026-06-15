@@ -55,7 +55,7 @@ describe('TenantPurgeService.purge', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: 'i-1', tenantId: TENANT, propertyAddress: '1 St', date: '2026-06-01',
-            status: 'draft', paymentStatus: 'unpaid', price: 0,
+            status: 'requested', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
     });
