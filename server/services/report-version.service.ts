@@ -161,6 +161,37 @@ export class ReportVersionService {
         };
     }
 
+    /**
+     * Layer-2 report page — surface the latest published version's verification
+     * metadata without loading the full snapshot blob. Returns null when no
+     * version row exists yet (draft) or when the row somehow has no token.
+     */
+    async getLatestPublished(tenantId: string, inspectionId: string): Promise<{
+        versionNumber:     number;
+        contentHash:       string | null;
+        verificationToken: string | null;
+        publishedAt:       number | null;
+    } | null> {
+        const db = this.getDrizzle();
+        const row = await db.select({
+            versionNumber:     reportVersions.versionNumber,
+            contentHash:       reportVersions.contentHash,
+            verificationToken: reportVersions.verificationToken,
+            publishedAt:       reportVersions.publishedAt,
+        }).from(reportVersions)
+            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
+            .orderBy(desc(reportVersions.versionNumber))
+            .limit(1)
+            .get();
+        if (!row || !row.verificationToken) return null;
+        return {
+            versionNumber:     row.versionNumber,
+            contentHash:       row.contentHash ?? null,
+            verificationToken: row.verificationToken,
+            publishedAt:       row.publishedAt ?? null,
+        };
+    }
+
     async list(tenantId: string, inspectionId: string) {
         const db = this.getDrizzle();
         const rows = await db.select({

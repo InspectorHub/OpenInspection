@@ -6,7 +6,6 @@ import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, agreementSignUrl } from '../lib/public-urls';
-import { resolveArchiveVersion } from './inspections-pdf-helpers';
 import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { contentDisposition } from '../lib/content-disposition';
@@ -2682,9 +2681,9 @@ export const inspectionsRoutes = createApiRouter()
             const deliver = async () => {
                 try {
                     const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
-                    const versions = await c.var.services.reportVersion.list(tenantId, id);
-                    const versionNumber = resolveArchiveVersion(inspection.reportStatus, versions);
-                    const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
+                    // Everyday email attachment always renders current content.
+                    // Frozen per-version PDFs live only on the verify page.
+                    const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber: null });
                     const obj = await c.var.services.reportPdf.streamPdf(record);
                     if (!obj) throw new Error('PDF unavailable');
                     const pdf = await obj.arrayBuffer();
@@ -2745,10 +2744,10 @@ export const inspectionsRoutes = createApiRouter()
         try {
             // Route through the PDF cache — reuses an existing render when content
             // is unchanged, avoiding a redundant Browser Rendering call.
+            // Always tracks current content (versionNumber: null); frozen PDFs
+            // are only accessible from the verify page.
             const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
-            const versions = await c.var.services.reportVersion.list(tenantId, id);
-            const versionNumber = resolveArchiveVersion(inspection.reportStatus, versions);
-            const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber });
+            const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber: null });
             const obj = await c.var.services.reportPdf.streamPdf(record);
             if (!obj) throw new Error('PDF unavailable');
             const pdf = await obj.arrayBuffer();
@@ -2977,6 +2976,16 @@ export const inspectionsRoutes = createApiRouter()
             }
         }
 
+        // Purge transient (versionNumber=null) cached PDFs now that a frozen version
+        // exists. Subsequent everyday downloads will render fresh current content
+        // rather than serving a stale pre-publish snapshot. Best-effort: failures
+        // are logged but never block the publish response.
+        try {
+            await c.var.services.reportPdf.purgeTransientPdfs(id, tenantId);
+        } catch (e) {
+            logger.warn('purge transient pdfs failed', { inspectionId: id, error: String(e) });
+        }
+
         // Spec 5A.5 — enqueue + background-render Summary + Full PDFs after
         // publish. Best-effort: failures log but never block the publish
         // response. Persistent record in report_pdfs lets the client UI poll
@@ -3152,17 +3161,17 @@ export const inspectionsRoutes = createApiRouter()
             return c.json({ success: false, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
         }
         // Tenant isolation: getInspection throws NotFound if cross-tenant.
-        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
-        const versions = await c.var.services.reportVersion.list(tenantId, id);
-        // Published → immutable archive version (#120). Drafts → null → keyed on dataVersion.
-        const versionNumber = resolveArchiveVersion(inspection.reportStatus, versions);
+        const { inspection: _inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        // Everyday owner PDF always tracks current content (versionNumber: null →
+        // content-hash cache). Frozen per-version PDFs live only on the verify page.
+        void _inspection; // fetched for tenant isolation; version freeze dropped per spec.
         const tenantSlug = await resolveTenantSlug(c, tenantId);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
         const record = await c.var.services.reportPdf.getOrRender(id, tenantId, type, {
             reportUrl,
             contentHash,
-            versionNumber,
+            versionNumber: null,
         });
         const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.json({ success: false, error: { message: 'PDF object missing in storage' } }, 404);

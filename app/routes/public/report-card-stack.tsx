@@ -7,6 +7,7 @@ import { ErrorState } from "~/components/ErrorState";
 import { photoDisplayName, withDownload } from "~/lib/photo-name";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
+import { qrToSvg } from "../../../server/lib/qr";
 
 export function meta({ data }: Route.MetaArgs) {
  const d = data as LoaderResult | undefined;
@@ -68,6 +69,20 @@ interface ReportSection {
 
 type FilterKey = "all" | "defects" | "summary";
 
+interface ReportSignature {
+ signatureBase64: string | null;
+ signedAt: number | null; // epoch ms
+ inspectorName: string;
+ inspectorLicense: string | null;
+}
+
+interface ReportVerification {
+ versionNumber: number;
+ contentHash: string;
+ verifyToken: string;
+ publishedAt: number; // unix seconds
+}
+
 interface LoaderResult {
  inspectionId: string;
  address: string;
@@ -86,6 +101,11 @@ interface LoaderResult {
  reportTheme?: string;
  initialFilter: FilterKey;
  printMode: boolean;
+ isPublished: boolean;
+ signature: ReportSignature | null;
+ verification: ReportVerification | null;
+ ownerPreview: boolean;
+ baseUrl: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -99,18 +119,23 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  // mode load images eagerly: Browser Rendering never scrolls, so loading={data.printMode ? "eager" : "lazy"}
  // images below the fold would never load and the PDF would have blank photos.
  const printMode = new URL(request.url).searchParams.get("print") === "1";
+ const parsedUrl = new URL(request.url);
+ const baseUrl = parsedUrl.origin;
  try {
  // Relay the owner's session JWT when present so the inspector/admin can
  // preview their own report tokenlessly (resolveOwnerPreview server-side).
  // Public client viewers carry no session → getToken returns null → unchanged.
  const sessionToken = (await getToken(context, request)) ?? undefined;
+ // ownerPreview: the inspector/admin is viewing their own report via their
+ // session (no public ?token= needed). sessionToken present = owner session.
+ const ownerPreview = sessionToken != null;
  const api = createApi(context, { token: sessionToken });
- const token = new URL(request.url).searchParams.get("token") ?? undefined;
+ const token = parsedUrl.searchParams.get("token") ?? undefined;
  // Forward the server-minted render token (headless PDF generation). The
  // Browser Rendering browser loads /report-view/:tenant/:id?render=<token>;
  // the data route resolves the tenant from it (see public-report.ts). Without
  // forwarding it here the headless render gets "Report not found".
- const render = new URL(request.url).searchParams.get("render") ?? undefined;
+ const render = parsedUrl.searchParams.get("render") ?? undefined;
  const [res, brand] = await Promise.all([
  api.publicReport.report[":tenant"][":id"].$get({
  param: { tenant: params.tenant ?? "", id: params.id ?? "" },
@@ -127,6 +152,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
    inspection?: { propertyAddress?: string | null; date?: string | null; inspectorName?: string | null };
    theme?: string;
  } | undefined;
+ const raw = d as unknown as Record<string, unknown> | undefined;
  return {
  inspectionId: d?.inspectionId ?? params.id ?? "",
  address: d?.address ?? meta?.inspection?.propertyAddress ?? "",
@@ -142,9 +168,14 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  isDelivered: d?.isDelivered ?? false,
  brand,
  error: res.ok ? null : "Report not found",
- reportTheme: ((d as unknown as Record<string, unknown>)?.reportTheme as string | undefined) ?? meta?.theme,
+ reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
  initialFilter,
  printMode,
+ isPublished: (raw?.isPublished as boolean | undefined) ?? false,
+ signature: (raw?.signature as ReportSignature | null | undefined) ?? null,
+ verification: (raw?.verification as ReportVerification | null | undefined) ?? null,
+ ownerPreview,
+ baseUrl,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -164,6 +195,11 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  error: "Service unavailable",
  initialFilter,
  printMode,
+ isPublished: false,
+ signature: null,
+ verification: null,
+ ownerPreview: false,
+ baseUrl,
  } satisfies LoaderResult;
  }
 }
@@ -197,6 +233,87 @@ function getSectionIcon(title: string): string {
 
 function isDefect(bucket: string): boolean {
  return /defect|safety|major/i.test(bucket);
+}
+
+/* ------------------------------------------------------------------ */
+/* Signature + verification pure helpers (exported for tests) */
+/* ------------------------------------------------------------------ */
+
+export interface SignatureBlockResult {
+ variant: "image" | "typed" | "draft";
+ inspectorName?: string;
+ license?: string | null;
+ signedAt?: number | null;
+ signatureBase64?: string | null;
+ showNudge: boolean;
+}
+
+export function signatureBlockModel(d: {
+ isPublished: boolean;
+ signature: {
+   signatureBase64: string | null;
+   signedAt?: number | null;
+   inspectorName: string;
+   inspectorLicense?: string | null;
+ } | null;
+ ownerPreview: boolean;
+}): SignatureBlockResult {
+ if (!d.isPublished || !d.signature) return { variant: "draft", showNudge: false };
+ const base = {
+   inspectorName: d.signature.inspectorName,
+   license: d.signature.inspectorLicense ?? null,
+   signedAt: d.signature.signedAt ?? null,
+ };
+ if (d.signature.signatureBase64) {
+   return { variant: "image", signatureBase64: d.signature.signatureBase64, showNudge: false, ...base };
+ }
+ return { variant: "typed", showNudge: d.ownerPreview, ...base };
+}
+
+export interface VerificationBlockResult {
+ show: boolean;
+ verifyUrl: string;
+ shortHash: string;
+ versionNumber: number;
+ publishedAt: number;
+}
+
+export function verificationBlockModel(
+ d: {
+   verification: {
+     versionNumber: number;
+     contentHash: string;
+     verifyToken: string;
+     publishedAt: number;
+   } | null;
+ },
+ baseUrl: string,
+): VerificationBlockResult {
+ if (!d.verification) return { show: false, verifyUrl: "", shortHash: "", versionNumber: 0, publishedAt: 0 };
+ return {
+   show: true,
+   verifyUrl: `${baseUrl}/v/${d.verification.verifyToken}`,
+   shortHash: d.verification.contentHash.slice(0, 8),
+   versionNumber: d.verification.versionNumber,
+   publishedAt: d.verification.publishedAt,
+ };
+}
+
+/* ------------------------------------------------------------------ */
+/* Date formatting helpers for signature/verification blocks */
+/* ------------------------------------------------------------------ */
+
+function formatEpochMs(ms: number | null | undefined): string {
+ if (ms == null) return "";
+ const d = new Date(ms);
+ if (isNaN(d.getTime())) return "";
+ return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatUnixSeconds(sec: number): string {
+ const d = new Date(sec * 1000);
+ if (isNaN(d.getTime())) return "";
+ return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
 /* ------------------------------------------------------------------ */
@@ -680,6 +797,111 @@ export default function ReportCardStackPage() {
  );
  })}
  </div>
+
+ {/* ── Signature block ──────────────────────────────────────────── */}
+ {(() => {
+   const sig = signatureBlockModel({ isPublished: data.isPublished, signature: data.signature, ownerPreview: data.ownerPreview });
+   if (sig.variant === "draft") {
+     return (
+       <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">
+         <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-muted flex items-center gap-3">
+           <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md bg-ih-watch-bg text-ih-watch-fg">DRAFT</span>
+           <span className="text-sm text-ih-fg-3">This report is unsigned and has not been published.</span>
+         </div>
+       </div>
+     );
+   }
+   return (
+     <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">
+       <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
+         <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-4">
+           Inspected &amp; Signed By
+         </div>
+         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+           {sig.variant === "image" && sig.signatureBase64 && (
+             <img
+               src={sig.signatureBase64}
+               alt="Inspector signature"
+               className="h-16 object-contain border border-ih-border rounded bg-ih-bg-card p-1"
+             />
+           )}
+           {sig.variant === "typed" && (
+             <div className="font-serif italic text-2xl text-ih-fg-1 border-b border-ih-border pb-1 min-w-[160px]">
+               {sig.inspectorName}
+             </div>
+           )}
+           <div className="text-sm text-ih-fg-2 space-y-0.5">
+             <div className="font-semibold text-ih-fg-1">{sig.inspectorName}</div>
+             {sig.license && (
+               <div className="text-ih-fg-4 text-xs">License #{sig.license}</div>
+             )}
+             {sig.signedAt != null && (
+               <div className="text-ih-fg-4 text-xs">Signed {formatEpochMs(sig.signedAt)}</div>
+             )}
+             {sig.variant === "typed" && (
+               <div className="text-[10px] text-ih-fg-4">Electronically signed by {sig.inspectorName}</div>
+             )}
+           </div>
+         </div>
+         {sig.showNudge && (
+           <div className="print:hidden mt-4 text-xs text-ih-fg-4 border-t border-ih-border pt-3">
+             Upload your signature in <strong>Settings → Profile</strong> to show it on printed reports.
+           </div>
+         )}
+       </div>
+     </div>
+   );
+ })()}
+
+ {/* ── Verification block ───────────────────────────────────────── */}
+ {(() => {
+   const vb = verificationBlockModel({ verification: data.verification }, data.baseUrl);
+   if (!vb.show) return null;
+   let qrSvg: string | null = null;
+   try {
+     qrSvg = qrToSvg(vb.verifyUrl, { margin: 1, width: 120 });
+   } catch {
+     qrSvg = null;
+   }
+   return (
+     <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8">
+       <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
+         <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-4">
+           Verified Document
+         </div>
+         <div className="flex flex-col sm:flex-row items-start gap-6">
+           {qrSvg && (
+             <div
+               className="shrink-0 border border-ih-border rounded-lg overflow-hidden"
+               // biome-ignore lint/security/noDangerouslySetInnerHtml: server-generated SVG from qrToSvg — no user input
+               dangerouslySetInnerHTML={{ __html: qrSvg }}
+             />
+           )}
+           <div className="text-sm space-y-1.5">
+             <div className="font-semibold text-ih-fg-1">
+               Published &amp; signed — version v{vb.versionNumber}
+               <span className="text-ih-fg-4 font-normal"> · {formatUnixSeconds(vb.publishedAt)}</span>
+             </div>
+             <div>
+               <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mr-2">Verify at</span>
+               <a
+                 href={vb.verifyUrl}
+                 className="text-ih-primary underline text-xs break-all"
+                 target="_blank"
+                 rel="noreferrer"
+               >
+                 {vb.verifyUrl}
+               </a>
+             </div>
+             <div className="text-xs text-ih-fg-4 font-mono">
+               Integrity hash: {vb.shortHash}&hellip;
+             </div>
+           </div>
+         </div>
+       </div>
+     </div>
+   );
+ })()}
 
  {/* Repair Request Panel */}
  {repairPanel && (

@@ -29,7 +29,7 @@ export default [
     route("r/:id/invoice", "routes/public/invoice.tsx"),
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("verify", "routes/public/verify-offline.tsx"),
-    route("v/:token", "routes/public/verify-token.tsx"),
+    route("v/:token", "routes/public/v.$token.tsx"),
     route("observe/inspections/:id", "routes/public/observe.tsx"),
     route("concierge/expired", "routes/public/concierge-expired.tsx"),
     // Flow A — client redeems the agent-concierge magic link emailed as
