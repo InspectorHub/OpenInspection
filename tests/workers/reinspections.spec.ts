@@ -260,6 +260,14 @@ describe('#119 re-inspections — end-to-end (real workerd)', () => {
         expect(r2Data.d4!.original!.notes).toBe(originalNotes.d4);
         expect(r2Data.d5!.original!.notes).toBe(originalNotes.d5);
 
+        // r2 must be published for the client-token public view: the publish gate
+        // (publicReportAccessAllowed) revokes client/token access to a report whose
+        // report_status is not 'published'. snapshotOnPublish only writes the version
+        // snapshot; publishing flips report_status (mirrors InspectionService.publish).
+        await drizzle(env.DB).update(schema.inspections)
+            .set({ reportStatus: 'published' })
+            .where(eq(schema.inspections.id, r2.id));
+
         // 6) Drive the PUBLIC report for r2. Mint a persistent portal token so the
         //    route resolves the tenant from the token (production-shape).
         const token = await portalAccessService().issueToken({
