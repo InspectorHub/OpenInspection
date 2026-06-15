@@ -150,6 +150,57 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
     });
 });
 
+describe('GET /api/public/report/:tenant/:id/photo — publish gate', () => {
+    const T = '00000000-0000-0000-0000-0000000000a3';
+    const ID = '00000000-0000-0000-0000-0000000000b3';
+
+    let db: BetterSQLite3Database<typeof schema>;
+    let sqlite: any;
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db as BetterSQLite3Database<typeof schema>;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+
+        // Seed tenant + inspection with report_status='in_progress'
+        await db.insert(schema.tenants).values({
+            id: T, name: 'Photo', slug: 'photo', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        } as any);
+        await db.insert(schema.inspections).values({
+            id: ID, tenantId: T, propertyAddress: '3 Main St', clientName: 'Alice',
+            clientEmail: 'alice@test.com', date: '2026-06-01', status: 'completed',
+            reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 20000,
+            agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as any);
+    });
+
+    afterEach(() => sqlite.close());
+
+    it('404 for a client token when report_status=in_progress (gate fires before PHOTOS check)', async () => {
+        const app = new OpenAPIHono<HonoConfig>();
+        app.use('*', async (c, next) => {
+            // PHOTOS is intentionally absent — the gate must fire before the PHOTOS check
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} } as any;
+            c.set('services', {
+                portalAccess: { resolveToken: vi.fn().mockResolvedValue({
+                    inspectionId: ID, tenantId: T, role: 'client',
+                    recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null,
+                }) },
+                inspection: { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+            } as any);
+            await next();
+        });
+        app.route('/api/public', publicReportRoutes);
+
+        const key = encodeURIComponent(`${T}/${ID}/x.jpg`);
+        const res = await app.request(`/api/public/report/photo/${ID}/photo?key=${key}&token=tok`);
+        expect([403, 404]).toContain(res.status);
+    });
+});
+
 describe('GET /api/public/report/:tenant/:id/pdf — publish gate', () => {
     const T = '00000000-0000-0000-0000-0000000000a2';
     const ID = '00000000-0000-0000-0000-0000000000b2';

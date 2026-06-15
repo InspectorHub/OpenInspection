@@ -627,20 +627,30 @@ export const publicReportRoutes = createApiRouter()
             const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
             if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
         }
+        let renderMode = false;
+        let ownerPreview = false;
         if (!tenantId && render) {
             const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
             if (r) {
                 const db = drizzle(c.env.DB);
                 const row = await db.select({ tenantId: inspections.tenantId })
                     .from(inspections).where(eq(inspections.id, id)).get();
-                if (row) tenantId = row.tenantId;
+                if (row) { tenantId = row.tenantId; renderMode = true; }
             }
         }
         // Owner-session preview — same fallback as the report data route so the
         // owner's tokenless preview can load its photos (the key is re-checked
         // against this tenant + inspection below).
-        if (!tenantId) tenantId = await resolveOwnerPreview(c);
+        if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
         if (!tenantId) return c.notFound();
+        const photoGate = await drizzle(c.env.DB)
+            .select({ reportStatus: inspections.reportStatus })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus })) {
+            return c.notFound();
+        }
         if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/${inspectionId}/...` — reject anything
         // outside the token's tenant + the requested inspection.
