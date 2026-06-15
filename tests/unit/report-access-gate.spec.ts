@@ -248,3 +248,72 @@ describe('GET /api/public/report/:tenant/:id/pdf — publish gate', () => {
         expect(body.error.code).toBe('NOT_PUBLISHED');
     });
 });
+
+describe('GET /api/public/verify/report/:token — reflects current publish status', () => {
+    const T = '00000000-0000-0000-0000-0000000000a4';
+    const ID = '00000000-0000-0000-0000-0000000000b4';
+
+    let db: BetterSQLite3Database<typeof schema>;
+    let sqlite: any;
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db as BetterSQLite3Database<typeof schema>;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+
+        // Seed tenant + inspection with report_status='in_progress' (unpublished).
+        await db.insert(schema.tenants).values({
+            id: T, name: 'Verify', slug: 'verify', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        } as any);
+        await db.insert(schema.inspections).values({
+            id: ID, tenantId: T, propertyAddress: '4 Main St', clientName: 'Carol',
+            clientEmail: 'carol@test.com', date: '2026-06-01', status: 'completed',
+            reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 40000,
+            agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as any);
+    });
+
+    afterEach(() => sqlite.close());
+
+    function buildVerifyApp() {
+        const verifyByToken = vi.fn().mockResolvedValue({
+            inspectionId: ID, versionNumber: 1, isAmendment: false, publishedAt: 1000,
+            contentHash: 'h', keyFingerprint: 'f', legacy: false,
+            hashValid: true, signatureValid: true, chainValid: true,
+        });
+        const app = new OpenAPIHono<HonoConfig>();
+        app.use('*', async (c, next) => {
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            c.set('services', { reportVersion: { verifyByToken } } as any);
+            await next();
+        });
+        app.route('/api/public', publicReportRoutes);
+        return app;
+    }
+
+    it('Case A — verify returns notPublished:true when report_status=in_progress', async () => {
+        const app = buildVerifyApp();
+        const res = await app.request('/api/public/verify/report/sometoken');
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: { notPublished: boolean } };
+        expect(body.data.notPublished).toBe(true);
+    });
+
+    it('Case B — frozen PDF blocked (403) for an unpublished report', async () => {
+        // ALSO seed the report_versions row keyed by verificationToken so the
+        // raw versionRow lookup resolves; the publish gate then fires.
+        await db.insert(schema.reportVersions).values({
+            id: 'rv1', tenantId: T, inspectionId: ID, versionNumber: 1,
+            snapshotJson: '{}', contentHash: 'h', verificationToken: 'vtok',
+            publishedAt: 1000, publishedBy: 'u1', createdAt: new Date().toISOString(),
+        } as any);
+
+        const app = buildVerifyApp();
+        const res = await app.request('/api/public/verify/report/vtok/pdf');
+        expect([403, 404]).toContain(res.status);
+        expect(res.status).toBe(403);
+    });
+});

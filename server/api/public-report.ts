@@ -19,6 +19,7 @@ import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../lib/url';
 import { publicReportAccessAllowed } from '../lib/report-access';
+import { isReportPublished } from '../lib/status/report-status';
 
 /**
  * Testable core of the owner-session preview fallback. Given a raw session JWT
@@ -443,6 +444,7 @@ const reportVerifyRoute = createRoute(withMcpMetadata({
             keyAlgorithm: z.string(), legacy: z.boolean(),
             hashValid: z.boolean(), signatureValid: z.boolean(), chainValid: z.boolean(),
             propertyAddressMasked: z.string(),
+            notPublished: z.boolean(),
         })) } }, description: 'Verification result' },
         404: { description: 'Token not found' },
     },
@@ -516,6 +518,7 @@ export const publicReportRoutes = createApiRouter()
             signatureValid: data.verify.signatureValid,
             chainValid:    data.verify.chainValid,
             propertyAddressMasked: data.propertyAddressMasked,
+            notPublished: data.notPublished,
         } }, 200);
     })
     .openapi(reportVerifyPdfRoute, async (c) => {
@@ -533,6 +536,16 @@ export const publicReportRoutes = createApiRouter()
         if (!versionRow) return c.notFound();
 
         const { tenantId, inspectionId, versionNumber, contentHash } = versionRow;
+
+        // Publish gate: the frozen archived PDF is a public client artifact — refuse
+        // while the report is not currently published (re-publishing restores it).
+        const inspRow = await db.select({ reportStatus: inspections.reportStatus })
+          .from(inspections)
+          .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+          .get();
+        if (!isReportPublished(inspRow?.reportStatus)) {
+          return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+        }
 
         if (!c.env.BROWSER || !c.env.PHOTOS) {
             return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);

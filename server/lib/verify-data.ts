@@ -3,6 +3,7 @@ import { eq, and, asc } from 'drizzle-orm';
 import { Context } from 'hono';
 import * as schema from './db/schema';
 import { HonoConfig } from '../types/hono';
+import { isReportPublished } from './status/report-status';
 
 /**
  * Spec 5H P2 — Public verifier (no-auth, court-friendly) data loader.
@@ -51,11 +52,14 @@ export async function loadReportVerifyData(c: Context<HonoConfig>, token: string
     const verify = await c.var.services.reportVersion.verifyByToken(token);
     if (!verify) return null;
     const db = drizzle(c.env.DB, { schema });
-    const ins = await db.select({ propertyAddress: schema.inspections.propertyAddress })
+    const ins = await db.select({
+        propertyAddress: schema.inspections.propertyAddress,
+        reportStatus: schema.inspections.reportStatus,
+    })
         .from(schema.inspections)
         .where(eq(schema.inspections.id, verify.inspectionId))
         .get();
     // Mask the address to a coarse form (no unit/number) for a public endpoint.
     const masked = (ins?.propertyAddress ?? '').replace(/^\S+\s/, '••• ');
-    return { verify, propertyAddressMasked: masked };
+    return { verify, propertyAddressMasked: masked, notPublished: !isReportPublished(ins?.reportStatus) };
 }
