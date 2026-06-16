@@ -23,11 +23,12 @@ vi.mock('../../server/lib/public-access', async (importOriginal) => {
     return {
         ...actual,
         resolveOwnerPreviewFull: vi.fn().mockResolvedValue(null),
+        resolveAgentSession: vi.fn().mockResolvedValue(null),
     };
 });
 
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import { resolveOwnerPreviewFull } from '../../server/lib/public-access';
+import { resolveOwnerPreviewFull, resolveAgentSession } from '../../server/lib/public-access';
 
 // Import AFTER mock registration
 // eslint-disable-next-line import/order
@@ -101,6 +102,7 @@ function makeServices(overrides: {
     setIntro?: ReturnType<typeof vi.fn>;
     creditTotal?: ReturnType<typeof vi.fn>;
     assertCanEdit?: ReturnType<typeof vi.fn>;
+    accessToInspection?: ReturnType<typeof vi.fn>;
 } = {}) {
     const defaultPortalToken = vi.fn().mockResolvedValue(null);
     const defaultAgent = vi.fn().mockResolvedValue(null);
@@ -114,6 +116,9 @@ function makeServices(overrides: {
         inspection: {
             resolveAgentViewToken: overrides.resolveAgentViewToken ?? defaultAgent,
             getRepairList:         overrides.getRepairList ?? defaultRepairList,
+        },
+        agent: {
+            accessToInspection: overrides.accessToInspection ?? vi.fn().mockResolvedValue(null),
         },
         repairRequest: {
             listMine:      overrides.listMine ?? defaultListMine,
@@ -336,6 +341,54 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
         const body = await res.json() as { success: false; error: { code: string } };
         expect(body.success).toBe(false);
         expect(body.error.code).toBe('NOT_PUBLISHED');
+    });
+
+    it('200 via authenticated agent-portal session (tokenless dashboard link)', async () => {
+        // Portal + legacy tokens null; owner-preview null; agent session resolves a
+        // logged-in agent who IS associated with the inspection. The authoritative
+        // tenantId comes from accessToInspection (the inspection row), NOT the URL.
+        vi.mocked(resolveAgentSession).mockResolvedValueOnce({ userId: 'agent-user-1' });
+        const accessToInspection = vi.fn().mockResolvedValue({ tenantId: 't-real' });
+        const listMine = vi.fn().mockResolvedValue([]);
+
+        const { app } = buildApp({
+            services: makeServices({ accessToInspection, listMine }),
+            reportStatus: 'published',
+            enableCustomerRepairExport: true,
+        });
+
+        // URL tenant is 't-WRONG' on purpose — must be ignored.
+        const res = await app.request(
+            '/api/public/repair-builder/t-WRONG/insp1/source',
+            { headers: { Authorization: 'Bearer agent-jwt' } },
+        );
+        expect(res.status).toBe(200);
+        // Association check is keyed on the agent userId + inspection id (not URL tenant).
+        expect(accessToInspection).toHaveBeenCalledWith('agent-user-1', 'insp1');
+        // creator.ref is the stable agent userId; tenantId is the authoritative one.
+        expect(listMine).toHaveBeenCalledWith('t-real', 'insp1', { kind: 'agent', ref: 'agent-user-1' });
+    });
+
+    it('401 when agent session is valid but agent is NOT associated with the inspection', async () => {
+        vi.mocked(resolveAgentSession).mockResolvedValueOnce({ userId: 'agent-user-1' });
+        const accessToInspection = vi.fn().mockResolvedValue(null); // no claim
+        const listMine = vi.fn().mockResolvedValue([]);
+
+        const { app } = buildApp({
+            services: makeServices({ accessToInspection, listMine }),
+            reportStatus: 'published',
+            enableCustomerRepairExport: true,
+        });
+
+        const res = await app.request(
+            '/api/public/repair-builder/t1/insp1/source',
+            { headers: { Authorization: 'Bearer agent-jwt' } },
+        );
+        expect(res.status).toBe(401);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.error.code).toBe('UNAUTHORIZED');
+        expect(accessToInspection).toHaveBeenCalledWith('agent-user-1', 'insp1');
+        expect(listMine).not.toHaveBeenCalled();
     });
 });
 

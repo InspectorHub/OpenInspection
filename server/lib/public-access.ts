@@ -153,6 +153,59 @@ export async function resolveOwnerPreviewTokenFull(
 }
 
 /**
+ * Testable core of the agent-session fallback. Given a raw session JWT (Bearer
+ * value, already stripped of "Bearer "), the per-request keyring, and an
+ * optional KV getter for password-change invalidation, returns the agent's
+ * stable userId — or null on ANY failure (missing token, bad signature,
+ * expired, non-agent class, or KV-invalidated). Fail-closed.
+ *
+ * Agent JWTs classify as `{ kind: 'agent' }` (tenantId is NOT in the token —
+ * agents are global users). Tenant association for a specific inspection is
+ * asserted by the CALLER (AgentService.accessToInspection), never here.
+ */
+export async function resolveAgentSessionToken(
+    token: string | undefined,
+    keyring: JwtKeyring | undefined,
+    kvGet?: (key: string) => Promise<string | null>,
+): Promise<{ userId: string } | null> {
+    if (!token || !keyring) return null;
+    try {
+        const payload = await verifyJwt(token, keyring);
+        const classification = classifyJwtPayload(payload);
+        if (classification?.kind !== 'agent') return null;
+        const userId = classification.userId;
+        const tokenIat = payload.iat as number | undefined;
+        if (kvGet) {
+            const invalidatedAt = await kvGet(`pwchanged:${userId}`);
+            if (invalidatedAt) {
+                const invalidatedTs = parseInt(invalidatedAt, 10);
+                if (!tokenIat || tokenIat < invalidatedTs) return null;
+            }
+        }
+        return { userId };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Agent-session fallback for per-inspection agent capabilities (repair builder).
+ * Reads + verifies the relayed session Bearer JWT (the same token the agent
+ * portal dashboard holds) and returns the agent's userId, or null. The global
+ * JWT middleware skips `/api/public/*`, so we verify the token HERE.
+ */
+export async function resolveAgentSession(
+    c: Context<HonoConfig>,
+): Promise<{ userId: string } | null> {
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    if (!token) return null;
+    const keyring = await c.var.keyringPromise?.catch(() => undefined);
+    const kv = c.env?.TENANT_CACHE;
+    return resolveAgentSessionToken(token, keyring, kv ? (k) => kv.get(k) : undefined);
+}
+
+/**
  * Owner-session preview fallback for the public report endpoints.
  *
  * The owner's "View report" link (dashboard / inspection hub) deep-links into

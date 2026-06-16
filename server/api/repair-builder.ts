@@ -20,7 +20,7 @@ import { eq, and } from 'drizzle-orm';
 import { inspections, tenantConfigs } from '../lib/db/schema';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { resolvePortalAccess, resolveOwnerPreviewFull } from '../lib/public-access';
+import { resolvePortalAccess, resolveOwnerPreviewFull, resolveAgentSession } from '../lib/public-access';
 import { isReportPublished } from '../lib/status/report-status';
 import { flattenReportDefects } from '../lib/repair-defects';
 import { generatePdfFromUrl } from '../lib/pdf';
@@ -39,7 +39,8 @@ import type { HonoConfig } from '../types/hono';
  *
  * creator.ref semantics:
  *   client    → recipientEmail (stable per-recipient identifier from the token row)
- *   agent     → the raw token string (unique KV credential for this agent session)
+ *   agent     → the raw legacy KV token string, OR the agent's stable userId when
+ *               authenticated via a logged-in agent-portal session JWT
  *   inspector → userId from the verified owner-preview JWT
  */
 async function resolveBuilderAccess(
@@ -64,11 +65,25 @@ async function resolveBuilderAccess(
         }
     }
 
-    // Path 3: owner-preview via session Bearer JWT.
+    // Path 3: owner-preview via session Bearer JWT (tenant user / inspector).
     const ownerFull = await resolveOwnerPreviewFull(c);
     if (ownerFull) {
         const creator: Creator = { kind: 'inspector', ref: ownerFull.userId };
         return { tenantId: ownerFull.tenantId, creator, ownerPreview: true };
+    }
+
+    // Path 4: logged-in agent-portal session JWT (tokenless dashboard link).
+    // The agent JWT classifies as kind:'agent' and carries NO tenantId, so it is
+    // rejected by owner-preview above. Verify the session, then confirm the agent
+    // is actually associated with THIS inspection — deriving the tenantId from the
+    // inspection row, never from the URL `:tenant` segment.
+    const agentSession = await resolveAgentSession(c);
+    if (agentSession) {
+        const access = await c.var.services.agent.accessToInspection(agentSession.userId, id);
+        if (access) {
+            const creator: Creator = { kind: 'agent', ref: agentSession.userId };
+            return { tenantId: access.tenantId, creator, ownerPreview: false };
+        }
     }
 
     return null;

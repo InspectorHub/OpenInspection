@@ -389,32 +389,121 @@ function RepairBuilderUI({ defects, mine, token }: RepairBuilderUIProps) {
   const [sortKey, setSortKey] = useState<"section" | "severity">("section");
   const [selected, setSelected] = useState<Set<string>>(initialSelected);
   const [drafts, setDrafts] = useState<Record<string, ItemDraft>>(initialDrafts);
+  // findingKey → server item id. Kept in a ref (not state) because reads must see
+  // the freshest map synchronously inside queued ops, and updates from add-item
+  // responses must not depend on a stale render closure.
   const itemIdsRef = useRef<Record<string, string>>(initialItemIds);
-  const itemIds = itemIdsRef.current;
   const [customIntro, setCustomIntro] = useState<string>(existingList?.customIntro ?? "");
   const [copyLabel, setCopyLabel] = useState("Copy share link");
   const [emailTo, setEmailTo] = useState("");
   const [emailMsg, setEmailMsg] = useState("");
   const [emailSent, setEmailSent] = useState(false);
 
+  const createFetcher = useFetcher<{ ok?: boolean; error?: string; data?: unknown }>();
   const mutationFetcher = useFetcher<{ ok?: boolean; error?: string; data?: unknown }>();
   const introFetcher = useFetcher<{ ok?: boolean; error?: string }>();
   const emailFetcher = useFetcher<{ ok?: boolean; error?: string }>();
 
   const sorted = sortDefects(defects, sortKey);
 
-  // After create-list, capture the new rrId
+  // -----------------------------------------------------------------------
+  // Persistence queue
+  //
+  // Item operations (add / remove / update) are serialized through ONE
+  // mutationFetcher so concurrent rapid clicks don't clobber each other's
+  // in-flight submission (useFetcher is single-flight). Each queued op is a
+  // plain FormData; we drain the queue head whenever the fetcher is idle AND a
+  // list id exists. List creation is lazy but GUARDED so rapid toggles before
+  // the round-trip returns create exactly one list (no double-create race).
+  // -----------------------------------------------------------------------
+  const rrIdRef = useRef<string | null>(existingList?.id ?? null);
+  rrIdRef.current = rrId;
+  const opQueueRef = useRef<FormData[]>([]);
+  const creatingRef = useRef(false);
+  // Tracks the findingKey of an in-flight add-item so we can record its server
+  // id from the response (the response also echoes findingKey, used as backup).
+  const inFlightAddKeyRef = useRef<string | null>(null);
+
+  const drainQueue = useCallback(() => {
+    if (mutationFetcher.state !== "idle") return;
+    if (!rrIdRef.current) return;
+    let next = opQueueRef.current.shift();
+    while (next) {
+      const intent = next.get("_intent");
+      // For ops keyed by findingKey (remove / update), resolve the server item id
+      // at DRAIN time so an add that completed earlier in the queue is visible.
+      if (intent === "remove-item" || intent === "update-item") {
+        const fk = String(next.get("_findingKey") ?? "");
+        const itemId = fk ? itemIdsRef.current[fk] : (next.get("itemId") as string | null);
+        if (!itemId) {
+          // Item not on the server (e.g. added+removed before its add resolved,
+          // or never persisted) — nothing to do; skip and continue draining.
+          next = opQueueRef.current.shift();
+          continue;
+        }
+        next.set("itemId", itemId);
+      }
+      // Stamp the resolved rrId at submit time (it may not have existed when the
+      // op was enqueued).
+      next.set("rrId", rrIdRef.current);
+      inFlightAddKeyRef.current =
+        intent === "add-item" ? String(next.get("findingKey") ?? "") : null;
+      mutationFetcher.submit(next, { method: "post" });
+      return;
+    }
+  }, [mutationFetcher]);
+
+  const enqueueOp = useCallback(
+    (fd: FormData) => {
+      opQueueRef.current.push(fd);
+      // Lazily create the list once if it doesn't exist yet. Guarded so a burst
+      // of selections fires a single create-list, not one per click.
+      if (!rrIdRef.current && !creatingRef.current) {
+        creatingRef.current = true;
+        const createFd = new FormData();
+        createFd.append("_token", token ?? "");
+        createFd.append("_intent", "create-list");
+        createFetcher.submit(createFd, { method: "post" });
+      }
+      drainQueue();
+    },
+    [token, createFetcher, drainQueue],
+  );
+
+  // Capture the new rrId from create-list, then drain any queued ops.
   useEffect(() => {
     if (
-      mutationFetcher.state === "idle" &&
-      mutationFetcher.data?.ok &&
-      mutationFetcher.data?.data &&
-      !rrId
+      createFetcher.state === "idle" &&
+      createFetcher.data?.ok &&
+      createFetcher.data?.data
     ) {
-      const newRr = mutationFetcher.data.data as { id?: string };
-      if (newRr?.id) setRrId(newRr.id);
+      const newRr = createFetcher.data.data as { id?: string };
+      creatingRef.current = false;
+      if (newRr?.id && !rrIdRef.current) {
+        rrIdRef.current = newRr.id;
+        setRrId(newRr.id);
+      }
+      drainQueue();
+    } else if (createFetcher.state === "idle" && createFetcher.data && !createFetcher.data.ok) {
+      // Create failed — release the guard so a later toggle can retry.
+      creatingRef.current = false;
     }
-  }, [mutationFetcher.state, mutationFetcher.data, rrId]);
+  }, [createFetcher.state, createFetcher.data, drainQueue]);
+
+  // After each item op settles: record add-item ids, then drain the next op.
+  useEffect(() => {
+    if (mutationFetcher.state !== "idle") return;
+    const data = mutationFetcher.data;
+    if (data?.ok && inFlightAddKeyRef.current && data.data) {
+      const item = data.data as { id?: string; findingKey?: string };
+      const key = item.findingKey ?? inFlightAddKeyRef.current;
+      if (item.id && key) {
+        itemIdsRef.current = { ...itemIdsRef.current, [key]: item.id };
+      }
+    }
+    inFlightAddKeyRef.current = null;
+    drainQueue();
+  }, [mutationFetcher.state, mutationFetcher.data, drainQueue]);
 
   // Track email sent
   useEffect(() => {
@@ -431,41 +520,32 @@ function RepairBuilderUI({ defects, mine, token }: RepairBuilderUIProps) {
       setSelected((prev) => toggleSelected(prev, key));
 
       if (nowSelected) {
-        // Selecting: create list if needed, then add item
+        // Selecting: enqueue an add-item. rrId is stamped at drain time, so this
+        // works even before the list has been created.
         const fd = new FormData();
         fd.append("_token", token ?? "");
-        if (!rrId) {
-          // Must create the list first — after action response we'll catch rrId
-          fd.append("_intent", "create-list");
-          mutationFetcher.submit(fd, { method: "post" });
-        } else {
-          fd.append("_intent", "add-item");
-          fd.append("rrId", rrId);
-          fd.append("findingKey", key);
-          fd.append("sectionTitle", defect.sectionTitle);
-          fd.append("itemLabel", defect.itemLabel);
-          fd.append("commentSnapshot", defect.comment);
-          const draft = drafts[key];
-          if (draft?.requestedCreditCents != null) {
-            fd.append("requestedCreditCents", String(draft.requestedCreditCents));
-          }
-          if (draft?.note) fd.append("note", draft.note);
-          mutationFetcher.submit(fd, { method: "post" });
+        fd.append("_intent", "add-item");
+        fd.append("findingKey", key);
+        fd.append("sectionTitle", defect.sectionTitle);
+        fd.append("itemLabel", defect.itemLabel);
+        fd.append("commentSnapshot", defect.comment);
+        const draft = drafts[key];
+        if (draft?.requestedCreditCents != null) {
+          fd.append("requestedCreditCents", String(draft.requestedCreditCents));
         }
+        if (draft?.note) fd.append("note", draft.note);
+        enqueueOp(fd);
       } else {
-        // Deselecting: remove item
-        const existingItemId = itemIds[key];
-        if (existingItemId && rrId) {
-          const fd = new FormData();
-          fd.append("_token", token ?? "");
-          fd.append("_intent", "remove-item");
-          fd.append("rrId", rrId);
-          fd.append("itemId", existingItemId);
-          mutationFetcher.submit(fd, { method: "post" });
-        }
+        // Deselecting: enqueue a remove-item. The server item id is resolved at
+        // drain time via _findingKey so an add still in flight is handled.
+        const fd = new FormData();
+        fd.append("_token", token ?? "");
+        fd.append("_intent", "remove-item");
+        fd.append("_findingKey", key);
+        enqueueOp(fd);
       }
     },
-    [selected, rrId, token, drafts, itemIds, mutationFetcher],
+    [selected, token, drafts, enqueueOp],
   );
 
   const updateCredit = useCallback(
@@ -475,18 +555,16 @@ function RepairBuilderUI({ defects, mine, token }: RepairBuilderUIProps) {
         ...prev,
         [defect.findingKey]: { ...(prev[defect.findingKey] ?? { note: "" }), requestedCreditCents: cents },
       }));
-      const existingItemId = itemIds[defect.findingKey];
-      if (existingItemId && rrId && cents !== null) {
+      if (cents !== null) {
         const fd = new FormData();
         fd.append("_token", token ?? "");
         fd.append("_intent", "update-item");
-        fd.append("rrId", rrId);
-        fd.append("itemId", existingItemId);
+        fd.append("_findingKey", defect.findingKey);
         fd.append("requestedCreditCents", String(cents));
-        mutationFetcher.submit(fd, { method: "post" });
+        enqueueOp(fd);
       }
     },
-    [itemIds, rrId, token, mutationFetcher],
+    [token, enqueueOp],
   );
 
   const updateNote = useCallback(
@@ -495,18 +573,14 @@ function RepairBuilderUI({ defects, mine, token }: RepairBuilderUIProps) {
         ...prev,
         [defect.findingKey]: { ...(prev[defect.findingKey] ?? { requestedCreditCents: null }), note },
       }));
-      const existingItemId = itemIds[defect.findingKey];
-      if (existingItemId && rrId) {
-        const fd = new FormData();
-        fd.append("_token", token ?? "");
-        fd.append("_intent", "update-item");
-        fd.append("rrId", rrId);
-        fd.append("itemId", existingItemId);
-        fd.append("note", note);
-        mutationFetcher.submit(fd, { method: "post" });
-      }
+      const fd = new FormData();
+      fd.append("_token", token ?? "");
+      fd.append("_intent", "update-item");
+      fd.append("_findingKey", defect.findingKey);
+      fd.append("note", note);
+      enqueueOp(fd);
     },
-    [itemIds, rrId, token, mutationFetcher],
+    [token, enqueueOp],
   );
 
   const saveIntro = useCallback(() => {
